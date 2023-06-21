@@ -5,22 +5,22 @@
 > 我们都有看不开的时候，总有冷落自已的举动。但是我一定要提醒自己，如果还有明天。——薛岳
 《如果还有明天》
 
-* [在线阅读](https://csharp.apachecn.org)
+* [在线阅读](https://csharp.flygon.net)
 ## 下载
 
 ### Docker
 
 ```
-docker pull apachecn0/apachecn-csharp-zh
-docker run -tid -p <port>:80 apachecn0/apachecn-csharp-zh
+docker pull apachecn0/flygon-csharp-zh
+docker run -tid -p <port>:80 apachecn0/flygon-csharp-zh
 # 访问 http://localhost:{port} 查看文档
 ```
 
 ### NPM
 
 ```
-npm install -g apachecn-csharp-zh
-apachecn-csharp-zh <port>
+npm install -g flygon-csharp-zh
+flygon-csharp-zh <port>
 # 访问 http://localhost:{port} 查看文档
 ```
 

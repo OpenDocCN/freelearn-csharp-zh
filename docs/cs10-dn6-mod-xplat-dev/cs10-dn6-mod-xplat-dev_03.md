@@ -1158,7 +1158,7 @@ i）
 
 {
 
-WriteLine($"```
+WriteLine($"
 
 {i}
 
@@ -1690,7 +1690,7 @@ string
 
 {
 
-Write("输入您的密码： "```
+Write("输入您的密码： "
 
 );
 

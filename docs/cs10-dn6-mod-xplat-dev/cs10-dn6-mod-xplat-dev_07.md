@@ -962,7 +962,7 @@ win10-x64;osx-x64;osx.11.0
 
 ```cs
 
-dotnet publish -c Release -r win10-x64 /p:PublishSingleFile=true```
+dotnet publish -c Release -r win10-x64 /p:PublishSingleFile=true
 
 ```
 

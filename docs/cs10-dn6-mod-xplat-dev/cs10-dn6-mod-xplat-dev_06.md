@@ -2579,7 +2579,7 @@ thisCannotBeNull = null
 
 int
 
-? thisCouldBeNull = null```
+? thisCouldBeNull = null
 
 ;
 
@@ -4356,7 +4356,7 @@ arg1：email2.IsValidEmail());
 
 **</ItemGroup>**
 
-<ItemGroup>```
+<ItemGroup>
 
 <PackageReference Include="StyleCop.Analyzers"
 

@@ -1553,7 +1553,7 @@ WriteLine（$“
 
 数字）GetNamedFruit（）
 
-{```
+{
 
 返回
 
@@ -2589,7 +2589,7 @@ throw
 
 new
 
-System.ArgumentException(```
+System.ArgumentException(
 
 $"
 

@@ -1785,7 +1785,7 @@ GroupJoinCategoriesAndProducts
 
 var
 
-queryGroup = db.Categories.AsEnumerable().GroupJoin（```
+queryGroup = db.Categories.AsEnumerable().GroupJoin（
 
 内部：db.Products，
 

@@ -1,3 +1,4 @@
++   [C#8 和 .NET Core3 并行编程实用指南](README.md)
 +   [前言](hsn-prl-prog-cs8-dncore3_00.md)
 +   [第一部分：线程、多任务和异步性的基础](hsn-prl-prog-cs8-dncore3_01.md)
 +   [第一章：并行编程简介](hsn-prl-prog-cs8-dncore3_02.md)

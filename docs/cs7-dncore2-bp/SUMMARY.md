@@ -1,3 +1,4 @@
++   [C#7 和 .NET Core 2.0 蓝图](README.md)
 +   [前言](cs7-dncore2-bp_00.md)
 +   [第一章：电子书管理器和目录应用程序](cs7-dncore2-bp_01.md)
 +   [第二章：板球比分计算器和跟踪器](cs7-dncore2-bp_02.md)

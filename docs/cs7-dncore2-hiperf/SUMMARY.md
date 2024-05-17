@@ -1,3 +1,4 @@
++   [C#7 和 .NET Core 2.0 高性能](README.md)
 +   [前言](cs7-dncore2-hiperf_00.md)
 +   [第一章：.NET Core 2 和 C# 7 中的新功能是什么？](cs7-dncore2-hiperf_01.md)
 +   [第二章：理解.NET Core 内部和性能测量](cs7-dncore2-hiperf_02.md)

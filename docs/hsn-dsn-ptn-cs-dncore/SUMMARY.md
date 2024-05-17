@@ -1,3 +1,4 @@
++   [C# 和 .NETCore 设计模式实用指南](README.md)
 +   [前言](hsn-dsn-ptn-cs-dncore_00.md)
 +   [第一部分：C#和.NET Core 中设计模式的基本要点](hsn-dsn-ptn-cs-dncore_01.md)
 +   [第一章：.NET Core 和 C#中 OOP 的概述](hsn-dsn-ptn-cs-dncore_02.md)

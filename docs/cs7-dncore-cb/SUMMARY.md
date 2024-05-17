@@ -1,3 +1,4 @@
++   [C#7 和 .NET Core 秘籍](README.md)
 +   [前言](cs7-dncore-cb_00.md)
 +   [第一章：C# 7.0 中的新功能](cs7-dncore-cb_01.md)
 +   [第二章：类和泛型](cs7-dncore-cb_02.md)

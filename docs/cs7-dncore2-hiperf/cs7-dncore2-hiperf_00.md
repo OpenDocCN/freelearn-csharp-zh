@@ -94,21 +94,3 @@ Install-Pacakge App.Metrics.AspnetCore.Mvc
 警告或重要说明会以这种形式出现。
 
 提示和技巧会以这种形式出现。
-
-# 联系我们
-
-我们非常欢迎读者的反馈。
-
-**一般反馈**：发送电子邮件至`feedback@packtpub.com`，并在主题中提及书名。如果您对本书的任何方面有疑问，请发送电子邮件至`questions@packtpub.com`。
-
-**勘误**：尽管我们已经尽最大努力确保内容的准确性，但错误是难免的。如果您在本书中发现错误，我们将不胜感激地请您向我们报告。请访问[www.packtpub.com/submit-errata](http://www.packtpub.com/submit-errata)，选择您的书，点击勘误提交表格链接，然后输入详细信息。
-
-**盗版**：如果您在互联网上发现我们作品的任何形式的非法副本，我们将不胜感激，如果您能向我们提供位置地址或网站名称。请通过`copyright@packtpub.com`与我们联系，并附上材料链接。
-
-**如果您有兴趣成为作者**：如果您在某个专业领域有专长，并且有兴趣撰写或为一本书做出贡献，请访问[authors.packtpub.com](http://authors.packtpub.com/)。
-
-# 评论
-
-请留下评论。一旦您阅读并使用了这本书，为什么不在您购买它的网站上留下评论呢？潜在的读者可以看到并使用您的公正意见来做出购买决定，我们在 Packt 可以了解您对我们产品的看法，我们的作者可以看到您对他们的书的反馈。谢谢！
-
-有关 Packt 的更多信息，请访问[packtpub.com](https://www.packtpub.com/)。

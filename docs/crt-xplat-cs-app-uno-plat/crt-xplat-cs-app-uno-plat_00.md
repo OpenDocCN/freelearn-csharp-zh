@@ -85,21 +85,3 @@ dotnet new unoapp -o MyApp
 提示或重要说明
 
 以这种方式出现。
-
-# 联系我们
-
-我们始终欢迎读者的反馈。
-
-**一般反馈**：如果您对本书的任何方面有疑问，请发送电子邮件至[customercare@packtpub.com](https://customercare@packtpub.com)，并在邮件主题中提及书名。
-
-**勘误**：尽管我们已经非常注意确保内容的准确性，但错误是难免的。如果您在本书中发现错误，我们将不胜感激地接受您的报告。请访问[www.packtpub.com/support/errata](https://www.packtpub.com/support/errata)并填写表格。
-
-**盗版**：如果您在互联网上发现我们作品的任何非法副本，请提供给我们位置地址或网站名称，我们将不胜感激。请通过链接[ copyright@packt.com ](https://copyright@packt.com)与我们联系。
-
-**如果您有兴趣成为作者**：如果您在某个专题上有专业知识，并且有兴趣撰写或为一本书做出贡献，请访问[authors.packtpub.com](https://authors.packtpub.com)。
-
-# 分享您的想法
-
-阅读完《使用 Uno 平台创建跨平台 C#应用程序》后，我们很想听听您的想法！请[点击这里直接进入亚马逊评论页面](https://packt.link/r/1801078491)并分享您的反馈。
-
-您的评论对我们和技术社区至关重要，将帮助我们确保我们提供的内容质量卓越。

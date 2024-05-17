@@ -1,6 +1,4 @@
-# 第三章：3
-
-# 使用 Azure DevOps 记录需求
+# 第三章：使用 Azure DevOps 记录需求
 
 Azure DevOps 是 Visual Studio Team Services 的演进，它提供了各种新功能，可以帮助开发人员记录和组织他们的软件。本章的目的是介绍 Microsoft 提供的这个工具的概述。
 

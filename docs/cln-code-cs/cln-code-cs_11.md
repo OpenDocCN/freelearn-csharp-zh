@@ -1,4 +1,4 @@
-解决横切关注点
+# 第十一章：解决横切关注点
 
 在编写清晰代码时，您需要考虑两种类型的关注点-核心关注点和横切关注点。**核心关注点**是软件的原因以及为什么开发它。**横切关注点**是不属于业务需求的关注点，但必须在代码的所有区域中进行处理，如下图所示：
 
@@ -30,7 +30,7 @@
 
 +   构建您自己的可重用 AOP 库，以解决您的横切关注点。
 
-# 第十二章：技术要求
+# 技术要求
 
 要充分利用本章，您需要安装 Visual Studio 2019 和 PostSharp。有关本章的代码文件，请参阅[`github.com/PacktPublishing/Clean-Code-in-C-/tree/master/CH11`](https://github.com/PacktPublishing/Clean-Code-in-C-/tree/master/CH11)。让我们从装饰者模式开始。
 

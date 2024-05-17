@@ -1,6 +1,4 @@
-# 第十章：10
-
-# 使用 Entity Framework Core 处理数据
+# 第十章：使用 Entity Framework Core 处理数据
 
 本章介绍了如何使用名为**Entity Framework Core**（**EF Core**）的对象到数据存储映射技术，读取和写入数据存储，如 Microsoft SQL Server、SQLite 和 Azure Cosmos DB。
 

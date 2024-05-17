@@ -1,6 +1,4 @@
-# 第六章：6
-
-# Azure Service Fabric
+# 第六章：Azure Service Fabric
 
 本章专门描述了 Azure Service Fabric，它是微软的一种主观的微服务编排器。它在 Azure 上可用，但 Service Fabric 软件也可以下载，这意味着用户可以使用它来定义自己的本地微服务集群。
 

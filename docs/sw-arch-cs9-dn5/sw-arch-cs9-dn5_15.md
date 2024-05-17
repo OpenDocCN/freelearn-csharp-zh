@@ -1,6 +1,4 @@
-# 第十五章：15
-
-# 介绍 ASP.NET Core MVC
+# 第十五章：介绍 ASP.NET Core MVC
 
 在本章中，你将学习如何实现应用程序的表示层。具体来说，你将学习如何基于 ASP.NET Core MVC 实现 Web 应用程序。
 

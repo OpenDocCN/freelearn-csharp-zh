@@ -1,4 +1,4 @@
-单元测试
+# 第六章：单元测试
 
 之前，我们讨论了异常处理，如何正确实施以及在问题发生时对客户和程序员有何用处。在本章中，我们将看看程序员如何实施他们自己的质量保证（QA），以提供健壮的、不太可能在生产中产生异常的优质代码。
 
@@ -30,7 +30,7 @@
 
 +   能够编写失败的测试，然后使其通过，然后进行任何必要的重构
 
-# 第七章：技术要求
+# 技术要求
 
 要访问本章的代码文件，你可以访问以下链接：[`github.com/PacktPublishing/Clean-Code-in-C-/tree/master/CH06`](https://github.com/PacktPublishing/Clean-Code-in-C-/tree/master/CH06)。
 

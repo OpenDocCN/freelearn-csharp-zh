@@ -1,4 +1,4 @@
-使用工具来提高代码质量
+# 第十二章：使用工具来提高代码质量
 
 作为程序员，提高代码质量是您的主要关注点之一。提高代码质量需要利用各种工具。旨在改进代码并加快开发速度的工具包括代码度量衡、快速操作、JetBrains dotTrace 分析器、JetBrains ReSharper 和 Telerik JustDecompile。
 
@@ -30,7 +30,7 @@
 
 +   使用 Telerik JustDecompile 对代码进行反编译和生成解决方案
 
-# 第十三章：技术要求
+# 技术要求
 
 +   本书的源代码：[`github.com/PacktPublishing/Clean-Code-in-C-`](https://github.com/PacktPublishing/Clean-Code-in-C-)
 

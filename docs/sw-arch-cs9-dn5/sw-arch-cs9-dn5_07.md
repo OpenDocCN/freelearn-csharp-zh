@@ -1,6 +1,4 @@
-# 第七章：7
-
-# Azure Kubernetes Service
+# 第七章：Azure Kubernetes Service
 
 本章致力于描述 Kubernetes 微服务编排器，特别是在 Azure 中的实现，名为 Azure Kubernetes Service。该章节解释了基本的 Kubernetes 概念，然后重点介绍了如何与 Kubernetes 集群进行交互，以及如何部署 Azure Kubernetes 应用程序。所有概念都通过简单的示例进行了实践。我们建议在阅读本章之前先阅读*第五章*的*将微服务架构应用于企业应用程序*和*第六章*的*Azure Service Fabric*，因为它依赖于这些先前章节中解释的概念。
 

@@ -1,6 +1,4 @@
-# 第十四章：14
-
-# 使用 ASP.NET Core Razor Pages 构建网站
+# 第十四章：使用 ASP.NET Core Razor Pages 构建网站
 
 本章介绍了如何使用 Microsoft ASP.NET Core 在服务器端构建具有现代 HTTP 架构的网站。您将了解如何使用 ASP.NET Core 2.0 引入的 Razor Pages 功能和 ASP.NET Core 2.1 引入的 Razor 类库功能构建简单的网站。
 

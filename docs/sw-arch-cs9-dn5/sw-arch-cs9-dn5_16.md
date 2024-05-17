@@ -1,6 +1,4 @@
-# 第十六章：16
-
-# Blazor WebAssembly
+# 第十六章：Blazor WebAssembly
 
 在本章中，您将学习如何使用 Blazor WebAssembly 实现演示层。Blazor WebAssembly 应用程序是 C#应用程序，可以在支持 WebAssembly 技术的任何浏览器中运行。它们可以通过导航到特定的 URL 进行访问，并以标准静态内容的形式在浏览器中下载，由 HTML 页面和可下载文件组成。
 

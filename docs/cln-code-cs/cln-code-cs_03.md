@@ -1,4 +1,4 @@
-类、对象和数据结构
+# 第三章：类、对象和数据结构
 
 在本章中，我们将讨论组织、格式化和注释类。我们还将讨论编写符合迪米特法则的干净的 C#对象和数据结构。此外，我们还将讨论不可变对象和数据结构，以及在`System.Collections.Immutable`命名空间中定义不可变集合的接口和类。
 
@@ -28,7 +28,7 @@
 
 因此，让我们开始看看如何通过使用命名空间有效地组织我们的类。
 
-# 第四章：技术要求
+# 技术要求
 
 你可以在 GitHub 上访问本章的代码，网址为[`github.com/PacktPublishing/Clean-Code-in-C-/tree/master/CH03`](https://github.com/PacktPublishing/Clean-Code-in-C-/tree/master/CH03)。
 

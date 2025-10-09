@@ -1,6 +1,6 @@
-# Python 机器学习算法交易实用指南
+# C#12 和 .NET8 软件架构
 
-> 原文：[`zh.annas-archive.org/md5/fcb09c483bdb21866eb6782158d1f8d5`](https://zh.annas-archive.org/md5/fcb09c483bdb21866eb6782158d1f8d5)
+> 原文：[`zh.annas-archive.org/md5/2f40284e13cd7ef3a43a49539fd67e9f`](https://zh.annas-archive.org/md5/2f40284e13cd7ef3a43a49539fd67e9f)
 > 
 > 译者：[飞龙](https://github.com/wizardforcel)
 > 

@@ -1,6 +1,6 @@
-# Python 机器学习算法交易实用指南
+# Blazor Web 开发第三版
 
-> 原文：[`zh.annas-archive.org/md5/fcb09c483bdb21866eb6782158d1f8d5`](https://zh.annas-archive.org/md5/fcb09c483bdb21866eb6782158d1f8d5)
+> 原文：[`zh.annas-archive.org/md5/ce3dcde358e5ad6aa0a4c17a1e10f0f7`](https://zh.annas-archive.org/md5/ce3dcde358e5ad6aa0a4c17a1e10f0f7)
 > 
 > 译者：[飞龙](https://github.com/wizardforcel)
 > 

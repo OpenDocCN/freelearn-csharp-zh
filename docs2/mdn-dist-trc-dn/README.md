@@ -1,6 +1,6 @@
-# Python 机器学习算法交易实用指南
+# .NET 现代分布式跟踪指南
 
-> 原文：[`zh.annas-archive.org/md5/fcb09c483bdb21866eb6782158d1f8d5`](https://zh.annas-archive.org/md5/fcb09c483bdb21866eb6782158d1f8d5)
+> 原文：[`zh.annas-archive.org/md5/1f9298b049d28b75ab8a4ac0f34f1921`](https://zh.annas-archive.org/md5/1f9298b049d28b75ab8a4ac0f34f1921)
 > 
 > 译者：[飞龙](https://github.com/wizardforcel)
 > 

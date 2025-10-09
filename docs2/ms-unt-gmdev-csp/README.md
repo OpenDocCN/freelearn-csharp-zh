@@ -1,6 +1,6 @@
-# Python 机器学习算法交易实用指南
+# 精通 C# Unity 游戏开发
 
-> 原文：[`zh.annas-archive.org/md5/fcb09c483bdb21866eb6782158d1f8d5`](https://zh.annas-archive.org/md5/fcb09c483bdb21866eb6782158d1f8d5)
+> 原文：[`zh.annas-archive.org/md5/b2c7a89bf8aeb3beabb76e233c985411`](https://zh.annas-archive.org/md5/b2c7a89bf8aeb3beabb76e233c985411)
 > 
 > 译者：[飞龙](https://github.com/wizardforcel)
 > 

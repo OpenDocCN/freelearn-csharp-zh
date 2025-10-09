@@ -1,874 +1,1290 @@
 - en: '14'
+  id: totrans-0
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: '14'
 - en: Refactoring Code with Roslyn Analyzers
+  id: totrans-1
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 使用Roslyn分析器重构代码
 - en: In the last chapter, we saw how you can build Roslyn analyzers to flag issues
     in your code. In this chapter, we’ll improve our analyzers by giving them the
     ability to fix code issues by providing **Quick Actions** the user can invoke
     to modify their source code. We’ll also discuss some additional ways of deploying
     Roslyn analyzers that improve your ability to provide a consistent experience
     to your team members.
+  id: totrans-2
   prefs: []
   type: TYPE_NORMAL
+  zh: 在上一章中，我们看到了如何构建Roslyn分析器来标记代码中的问题。在本章中，我们将通过提供用户可以调用的**快速操作**来修复代码问题，从而改进我们的分析器，让它们能够修复代码问题。我们还将讨论一些额外的部署Roslyn分析器的方法，这些方法可以提高您为团队成员提供一致体验的能力。
 - en: 'This chapter covers the following:'
+  id: totrans-3
   prefs: []
   type: TYPE_NORMAL
+  zh: 本章涵盖了以下内容：
 - en: Building a Roslyn Analyzer code fix
+  id: totrans-4
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 构建Roslyn分析器代码修复
 - en: Testing code fixes with RoslynTestKit
+  id: totrans-5
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 使用RoslynTestKit测试代码修复
 - en: Publishing Roslyn analyzers as NuGet packages
+  id: totrans-6
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 将Roslyn分析器作为NuGet包发布
 - en: Technical requirements
+  id: totrans-7
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 技术要求
 - en: In this chapter, we’re starting right where we left off in [*Chapter 13*](B21324_13.xhtml#_idTextAnchor275).
+  id: totrans-8
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本章中，我们将从[*第13章*](B21324_13.xhtml#_idTextAnchor275)结束的地方开始。
 - en: The starting code for this chapter is available from GitHub at [https://github.com/PacktPublishing/Refactoring-with-CSharp](https://github.com/PacktPublishing/Refactoring-with-CSharp)
     in the `Chapter14/Ch14BeginningCode` folder.
+  id: totrans-9
   prefs: []
   type: TYPE_NORMAL
+  zh: 本章的起始代码可以从GitHub的[https://github.com/PacktPublishing/Refactoring-with-CSharp](https://github.com/PacktPublishing/Refactoring-with-CSharp)中的`Chapter14/Ch14BeginningCode`文件夹获取。
 - en: Case study – Cloudy Skies Airlines
+  id: totrans-10
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 案例研究 – Cloudy Skies Airlines
 - en: In [*Chapter 13*](B21324_13.xhtml#_idTextAnchor275), we built a `ToStringAnalyzer`
     that detects classes that do not override the `ToString` method. This results
     in suggestions in the Visual Studio editor and a message in the error list.
+  id: totrans-11
   prefs: []
   type: TYPE_NORMAL
+  zh: 在[*第13章*](B21324_13.xhtml#_idTextAnchor275)中，我们构建了一个`ToStringAnalyzer`，它可以检测没有重写`ToString`方法的类。这导致Visual
+    Studio编辑器中的建议和在错误列表中的消息。
 - en: 'Cloudy Skies Airlines has deployed this internally and found it to be generally
     helpful, but there are a few things that need improvement:'
+  id: totrans-12
   prefs: []
   type: TYPE_NORMAL
+  zh: Cloudy Skies Airlines已内部部署此工具并发现它通常很有帮助，但还有一些需要改进的地方：
 - en: Although violations of the `ToString` override rule are flagged by the analyzer,
     not every developer is addressing this issue. When discussed internally, some
     developers stated they didn’t want to take the time to address it. Additionally,
     some of the newer developers didn’t fully understand the rule or what fixing it
     would look like.
+  id: totrans-13
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 尽管分析器标记了`ToString`重写规则的违规行为，但并非每个开发者都在解决这个问题。在内部讨论时，一些开发者表示他们不想花时间解决这个问题。此外，一些新开发者没有完全理解这个规则或修复它的样子会是什么样子。
 - en: Whenever a new analyzer is created or a bug in an existing analyzer is addressed,
     a new VSIX file must be created. Developers then need to download and install
     it to get the updated version. Because of this, it’s hard for the team to know
     which developers have the analyzer installed or which version each developer is
     using.
+  id: totrans-14
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 每当创建一个新的分析器或解决现有分析器中的错误时，必须创建一个新的VSIX文件。然后开发者需要下载并安装它以获取更新版本。正因为如此，团队很难知道哪些开发者安装了分析器，或者每个开发者使用的是哪个版本。
 - en: In this chapter, we’ll address these concerns. We’ll look at creating and testing
     a code fix provider that can automatically resolve detected issues. After that,
     we’ll explore publishing analyzers via **NuGet packages** and show how they can
     help your team have a consistent analyzer experience.
+  id: totrans-15
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本章中，我们将解决这些问题。我们将探讨创建和测试一个能够自动解决检测到的问题的代码修复提供者。之后，我们将探索通过**NuGet包**发布分析器，并展示它们如何帮助您的团队能够获得一致的分析器体验。
 - en: Building a Roslyn Analyzer code fix
+  id: totrans-16
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 构建Roslyn分析器代码修复
 - en: Roslyn Analyzers allow you to provide options for users to automatically fix
     issues your analyzers detect in your code. They do this through something called
     a **code fix provider**, which can modify your document in an automated manner
     to resolve the diagnostic warning.
+  id: totrans-17
   prefs: []
   type: TYPE_NORMAL
+  zh: Roslyn分析器允许你为用户提供选项，自动修复分析器在代码中检测到的问题。他们通过称为**代码修复提供者**的东西来完成这项工作，它可以以自动化的方式修改你的文档，以解决诊断警告。
 - en: 'Think of it this way: diagnostic analyzers, like our `OverrideToStringAnalyzer`,
     help *detect* issues in your team’s code. On the other hand, code fix providers
     give you a way of *fixing* these issues.'
+  id: totrans-18
   prefs: []
   type: TYPE_NORMAL
+  zh: 想象一下：诊断分析器，就像我们的`OverrideToStringAnalyzer`，帮助*检测*团队代码中的问题。另一方面，代码修复提供者为你提供了一种*修复*这些问题的方法。
 - en: Not all diagnostic analyzers will have code-fix providers, but in my experience,
     those that also provide code-fix providers tend to get addressed earlier and more
     consistently.
+  id: totrans-19
   prefs: []
   type: TYPE_NORMAL
+  zh: 并非所有诊断分析器都会有代码修复提供者，但根据我的经验，那些也提供代码修复提供者的分析器往往会被更早和更一致地解决。
 - en: Let’s see how one works.
+  id: totrans-20
   prefs: []
   type: TYPE_NORMAL
+  zh: 让我们看看它是如何工作的。
 - en: Creating a CodeFixProvider
+  id: totrans-21
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 创建一个 CodeFixProvider
 - en: 'First, we’ll add a new class to the `Packt.Analyzers` class library. We’ll
     call this class `ToStringCodeFix`. Replace its contents with the following code
     for a basic code fix:'
+  id: totrans-22
   prefs: []
   type: TYPE_NORMAL
+  zh: 首先，我们将在 `Packt.Analyzers` 类库中添加一个新的类。我们将把这个类命名为 `ToStringCodeFix`。用以下代码替换其内容以实现基本的代码修复：
 - en: '[PRE0]'
+  id: totrans-23
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE0]'
 - en: This is the minimum amount of code we need in order to have a compiling code
     fix provider. Before we build out the rest of this class, let’s examine what’s
     here already.
+  id: totrans-24
   prefs: []
   type: TYPE_NORMAL
+  zh: 这是我们需要的最小代码量，以便有一个可编译的代码修复提供者。在我们构建这个类的其余部分之前，让我们看看这里已经有什么了。
 - en: First, we’re declaring a `ToStringCodeFix` class that inherits from `CodeFixProvider`.
     `CodeFixProvider` is the abstract class used for providing a fix for one or more
     diagnostics.
+  id: totrans-25
   prefs: []
   type: TYPE_NORMAL
+  zh: 首先，我们声明一个继承自 `CodeFixProvider` 的 `ToStringCodeFix` 类。`CodeFixProvider` 是用于为一个或多个诊断提供修复的抽象类。
 - en: Note that we named our code fix `ToStringCodeFix` to pair with the `ToStringAnalyzer`
     class it provides a code fix for. This is a convention I like to follow to help
     clearly associate analyzers and their code fixes.
+  id: totrans-26
   prefs: []
   type: TYPE_NORMAL
+  zh: 注意，我们给代码修复命名为 `ToStringCodeFix`，以与它提供的代码修复的 `ToStringAnalyzer` 类相匹配。这是一个我喜欢遵循的约定，以帮助清楚地关联分析器和它们的代码修复。
 - en: 'The class has two attributes assigned to it:'
+  id: totrans-27
   prefs: []
   type: TYPE_NORMAL
+  zh: 该类有两个属性被分配给它：
 - en: The `ExportCodeFixProviderAttribute` tells Roslyn that the class represents
     a code fix, what the name of the code fix is, and the languages the code fix applies
     to
+  id: totrans-28
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`ExportCodeFixProviderAttribute` 告诉 Roslyn，该类代表一个代码修复，代码修复的名称以及代码修复应用到的语言。'
 - en: The `SharedAttribute` doesn’t do anything on its own, but it is needed for Roslyn
     to be comfortable registering your code fix in Visual Studio
+  id: totrans-29
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`SharedAttribute` 本身不做任何事情，但它是为了让 Roslyn 在 Visual Studio 中舒适地注册你的代码修复所必需的。'
 - en: These two attributes should be on every code fix you create. Failing to use
     them will result in your code fix provider not appearing for some users (don’t
     ask me how I know).
+  id: totrans-30
   prefs: []
   type: TYPE_NORMAL
+  zh: 这两个属性应该出现在你创建的每一个代码修复中。未能使用它们将导致你的代码修复提供者对某些用户不可见（别问我怎么知道的）。
 - en: 'The `ToStringCodeFix` class has three members at the moment:'
+  id: totrans-31
   prefs: []
   type: TYPE_NORMAL
+  zh: '`ToStringCodeFix` 类目前有三个成员：'
 - en: '`ToStringAnalyzer` rule, meaning it says it can fix that issue.'
+  id: totrans-32
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`ToStringAnalyzer` 规则，这意味着它表示它可以修复该问题。'
 - en: '`WellKnownFixAllProviders.BatchFixer`, we tell Visual Studio to allow the user
     to try to fix all issues of that type in the file, project, or even solution.'
+  id: totrans-33
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`WellKnownFixAllProviders.BatchFixer`，我们告诉 Visual Studio 允许用户尝试修复文件、项目或甚至解决方案中该类型的所有问题。'
 - en: '**RegisterCodeFixesAsync**: This is where we can register our code fix and
     tell Visual Studio what to do if the user chooses to apply it.'
+  id: totrans-34
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**RegisterCodeFixesAsync**：这是我们注册代码修复并告诉 Visual Studio 如果用户选择应用它应该做什么的地方。'
 - en: The bulk of our logic will be in `RegisterCodeFixesAsync`, so let’s implement
     that method now.
+  id: totrans-35
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们的大部分逻辑将在 `RegisterCodeFixesAsync` 中，所以现在让我们实现这个方法。
 - en: Registering a code fix
+  id: totrans-36
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 注册代码修复
 - en: The job of `RegisterCodeFixesAsync` is to interpret code that violates the diagnostic
     rule we’ve set up and register an action that will let the user fix it.
+  id: totrans-37
   prefs: []
   type: TYPE_NORMAL
+  zh: '`RegisterCodeFixesAsync` 的任务是解释违反我们设置的诊断规则的代码，并注册一个让用户可以修复它的操作。'
 - en: 'The code to do this is fairly involved, so let’s look at parts of it at a time.
     The first part has to do with interpreting where in the document the diagnostic
     violation occurred:'
+  id: totrans-38
   prefs: []
   type: TYPE_NORMAL
+  zh: 实现这一点的代码相当复杂，所以让我们分部分来看。第一部分与解释诊断违规发生在文档中的哪个位置有关：
 - en: '[PRE1]'
+  id: totrans-39
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE1]'
 - en: Here, we get a `CodeFixContext` object that contains information about the code
     analysis diagnostic violations.
+  id: totrans-40
   prefs: []
   type: TYPE_NORMAL
+  zh: 这里，我们得到一个包含有关代码分析诊断违规信息的 `CodeFixContext` 对象。
 - en: These `Diagnostic` objects contain information about the exact span of text
     within the document that triggered the rule. In our case, this should be the text
     for the name of the class that doesn’t override `ToString`.
+  id: totrans-41
   prefs: []
   type: TYPE_NORMAL
+  zh: 这些 `Diagnostic` 对象包含有关触发规则的文档中确切文本范围的信息。在我们的情况下，这应该是没有重写 `ToString` 的类的名称文本。
 - en: Next, we get a reference to the `Document` containing the violation. Think of
     a `Document` as a file of source code somewhere in your solution. It’s possible
     to have analyzers and code fixes that look over your entire solution, so this
     `Document` helps narrow down the scope to the file containing the offending code.
+  id: totrans-42
   prefs: []
   type: TYPE_NORMAL
+  zh: 接下来，我们获取包含违规的`Document`的引用。将`Document`想象成你解决方案中某个地方的源代码文件。分析器和代码修复可以查看整个解决方案，所以这个`Document`有助于缩小范围到包含违规代码的文件。
 - en: 'With this `Document`, we can gain access to the syntax tree and its `type`
     declarations:'
+  id: totrans-43
   prefs: []
   type: TYPE_NORMAL
+  zh: 使用这个`Document`，我们可以访问语法树及其`type`声明：
 - en: '[PRE2]'
+  id: totrans-44
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE2]'
 - en: Here, we’re getting the `SyntaxRoot` element representing the base of our document
     and then finding the declaration of the class by the location of that span of
     text within the document.
+  id: totrans-45
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这里，我们正在获取表示我们文档基础的`SyntaxRoot`元素，然后根据文档中该文本span的位置找到类的声明。
 - en: This lets us jump from the raw text we had in the span to an object representing
     the `Type` declaration. Having this object allows us to make changes and provide
     a fix.
+  id: totrans-46
   prefs: []
   type: TYPE_NORMAL
+  zh: 这使我们能够从我们在span中拥有的原始文本跳转到表示`Type`声明的对象。拥有这个对象允许我们进行更改并提供修复。
 - en: 'The final portion of the method registers the code action to fix the issue:'
+  id: totrans-47
   prefs: []
   type: TYPE_NORMAL
+  zh: 方法末尾部分注册了修复问题的代码操作：
 - en: '[PRE3]'
+  id: totrans-48
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE3]'
 - en: This code creates a `CodeAction` and registers it as a fix for the diagnostic
     rule. This fix has a title representing the text the user will see in the `FixAsync`
     method we’ve yet to see.
+  id: totrans-49
   prefs: []
   type: TYPE_NORMAL
+  zh: 此代码创建一个`CodeAction`并将其注册为对诊断规则的修复。此修复有一个标题，表示用户将在我们尚未看到的`FixAsync`方法中看到的文本。
 - en: Additional options
+  id: totrans-50
   prefs: []
   type: TYPE_NORMAL
+  zh: 其他选项
 - en: There are several overloads and optional parameters to `CodeAction.Create` that
     let you change the entire solution instead of a single document or resolve conflicts
     when multiple code fixes have the same title.
+  id: totrans-51
   prefs: []
   type: TYPE_NORMAL
+  zh: '`CodeAction.Create`有几个重载和可选参数，允许您更改整个解决方案而不是单个文档，或者在多个代码修复具有相同标题时解决冲突。'
 - en: Now that we’ve registered our code fix, let’s see how the fix action works.
+  id: totrans-52
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在我们已经注册了我们的代码修复，让我们看看修复操作是如何工作的。
 - en: Modifying the document with a code fix
+  id: totrans-53
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 使用代码修复修改文档
 - en: The final step in implementing our code fix is the `FixAsync` method. This method’s
     job is to modify the `Document` so that it no longer violates the diagnostic rule.
+  id: totrans-54
   prefs: []
   type: TYPE_NORMAL
+  zh: 实现我们的代码修复的最终步骤是`FixAsync`方法。此方法的工作是修改`Document`，使其不再违反诊断规则。
 - en: 'In our case, the fix will be to generate code such as this:'
+  id: totrans-55
   prefs: []
   type: TYPE_NORMAL
+  zh: 在我们的情况下，修复将生成如下代码：
 - en: '[PRE4]'
+  id: totrans-56
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE4]'
 - en: Sadly, it’s a lot easier to write the raw C# here than it is to build it with
     the Roslyn API.
+  id: totrans-57
   prefs: []
   type: TYPE_NORMAL
+  zh: 很遗憾，在这里直接编写原始C#代码比使用Roslyn API构建它要容易得多。
 - en: 'To add this with Roslyn, we’ll follow these steps:'
+  id: totrans-58
   prefs: []
   type: TYPE_NORMAL
+  zh: 要使用Roslyn添加此功能，我们将遵循以下步骤：
 - en: Create a method body that throws a `NotImplementedException`.
+  id: totrans-59
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 创建一个抛出`NotImplementedException`的方法体。
 - en: Create a list of modifiers that go with the method (`public` and `override`).
+  id: totrans-60
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 创建与方法（`public`和`override`）一起使用的修饰符列表。
 - en: Create a method declaration with the appropriate name and return type and make
     sure this method has the list of modifiers and the method body.
+  id: totrans-61
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 使用适当的名称和返回类型创建一个方法声明，并确保这个方法有修饰符列表和方法体。
 - en: Create a version of the `Type` declaration that has the new method.
+  id: totrans-62
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 创建一个具有新方法的`Type`声明版本。
 - en: Find the `Type` declaration in the `Document` and replace it with our new one.
+  id: totrans-63
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 在`Document`中找到`Type`声明并将其替换为我们新的声明。
 - en: 'Let’s see how this works, starting with the code that declares the new method
     body:'
+  id: totrans-64
   prefs: []
   type: TYPE_NORMAL
+  zh: 让我们看看这是如何工作的，从声明新方法体的代码开始：
 - en: '[PRE5]'
+  id: totrans-65
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE5]'
 - en: As you can see, the code to declare anything in Roslyn can get a bit dense.
     When you take a step back, though, this code is just declaring a method block
     that instantiates and throws a `NotImplementedException`.
+  id: totrans-66
   prefs: []
   type: TYPE_NORMAL
+  zh: 如您所见，在Roslyn中声明任何内容的代码可能会变得有点密集。然而，当你退一步看时，这段代码只是在声明一个方法块，该块实例化并抛出`NotImplementedException`。
 - en: 'Next, we’ll define the method definition that uses this method body:'
+  id: totrans-67
   prefs: []
   type: TYPE_NORMAL
+  zh: 接下来，我们将定义使用此方法体的方法定义：
 - en: '[PRE6]'
+  id: totrans-68
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE6]'
 - en: This code is almost as dense as the last block, but all it really does is declare
     the method. This method brings together a return type of `string`, a name of `ToString`,
     the `public` and `override` modifiers, and the body we declared in the previous
     block.
+  id: totrans-69
   prefs: []
   type: TYPE_NORMAL
+  zh: 这段代码与上一个块几乎一样密集，但它实际上只是声明了方法。此方法结合了`string`返回类型、名为`ToString`的名称、`public`和`override`修饰符以及我们在上一个块中声明的主体。
 - en: 'The final step in the fix is to modify the editor’s code with our code fix.
     We do this with the following code:'
+  id: totrans-70
   prefs: []
   type: TYPE_NORMAL
+  zh: 修复的最终步骤是修改编辑器的代码以使用我们的代码修复。我们使用以下代码来完成此操作：
 - en: '[PRE7]'
+  id: totrans-71
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE7]'
 - en: This code creates a new version of the `Type` declaration that has our new method.
     We then find the old `Type` declaration in the `Document` and replace it with
     the new one. This creates a new `Document` that we then return from our code fix,
     and Visual Studio updates our code accordingly.
+  id: totrans-72
   prefs: []
   type: TYPE_NORMAL
+  zh: 这段代码创建了一个新的`Type`声明版本，其中包含我们的新方法。然后我们在`Document`中找到旧的`Type`声明，并用新的一个替换它。这创建了一个新的`Document`，然后我们从我们的代码修复中返回它，Visual
+    Studio相应地更新我们的代码。
 - en: With that, we now have a working code fix. How do we know it’s working? We test
     it!
+  id: totrans-73
   prefs: []
   type: TYPE_NORMAL
+  zh: 这样，我们现在有一个工作的代码修复。我们如何知道它正在工作？我们测试它！
 - en: Testing Code Fixes with RoslynTestKit
+  id: totrans-74
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 使用RoslynTestKit测试代码修复
 - en: In [*Chapter 13*](B21324_13.xhtml#_idTextAnchor275), we saw how the `RoslynTestKit`
     library helps your diagnostic analyzers flag code issues appropriately. In this
     chapter, we’ll revisit the library to verify our new code fix.
+  id: totrans-75
   prefs: []
   type: TYPE_NORMAL
+  zh: 在[*第13章*](B21324_13.xhtml#_idTextAnchor275)中，我们看到了`RoslynTestKit`库如何帮助您的诊断分析器适当地标记代码问题。在本章中，我们将重新访问该库以验证我们新的代码修复。
 - en: We will start by creating a new class in our test project named `ToStringCodeFixTests`
     due to our common naming conventions.
+  id: totrans-76
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们将首先在我们的测试项目中创建一个名为`ToStringCodeFixTests`的新类，这是由于我们的常见命名约定。
 - en: 'This class will start by declaring a test fixture like it did with the analyzer:'
+  id: totrans-77
   prefs: []
   type: TYPE_NORMAL
+  zh: 这个类将首先声明一个测试固定装置，就像它对分析器所做的那样：
 - en: '[PRE8]'
+  id: totrans-78
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE8]'
 - en: Like before, our test class inherits from a test fixture, but this time it’s
     a `CodeFixTestFixture` since we’re testing a code fix.
+  id: totrans-79
   prefs: []
   type: TYPE_NORMAL
+  zh: 与以前一样，我们的测试类继承自测试固定装置，但这次它是`CodeFixTestFixture`，因为我们正在测试一个代码修复。
 - en: Also like before, we need to specify that our code fix affects the C# programming
     language and provide a reference to our class through the `CreateProvider` method.
+  id: totrans-80
   prefs: []
   type: TYPE_NORMAL
+  zh: 同样，我们还需要指定我们的代码修复会影响C#编程语言，并通过`CreateProvider`方法提供对我们类的引用。
 - en: Unlike before, we also need to provide the code analyzer we’re testing through
     the `CreateAdditionalAnalyzers` method. The compiler will allow you to not override
     this method, but if you forget to do so, your analyzer will never trigger in the
     steps ahead, so be sure to include your analyzer here.
+  id: totrans-81
   prefs: []
   type: TYPE_NORMAL
+  zh: 与以前不同，我们还需要通过`CreateAdditionalAnalyzers`方法提供我们正在测试的代码分析器。编译器允许您不重写此方法，但如果您忘记这样做，您的分析器在接下来的步骤中永远不会触发，所以请确保在这里包含您的分析器。
 - en: 'Next, we test our code fix by providing a block of bad code and a block of
     good code and verifying that the code fix successfully moves from the bad code
     to the good code:'
+  id: totrans-82
   prefs: []
   type: TYPE_NORMAL
+  zh: 接下来，我们通过提供一个坏代码块和一个好代码块来测试我们的代码修复，并验证代码修复是否成功地将坏代码转换为好代码：
 - en: '[PRE9]'
+  id: totrans-83
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE9]'
 - en: This code should be somewhat familiar from the last chapter. Just like with
     analyzers, we need to denote the location the fix is triggered from using the
     `[|` and `|]` markers as we see on `[|Flight|]`.
+  id: totrans-84
   prefs: []
   type: TYPE_NORMAL
+  zh: 这段代码与上一章中的代码有些相似。就像分析器一样，我们需要使用`[|`和`|]`标记来表示触发修复的位置，就像我们在`[|Flight|]`中看到的那样。
 - en: The actual verification step occurs through the `TestCodeFix` method call. This
     method call will convert your bad code to a new form using the code fix and then
     compare that result to the expected good code.
+  id: totrans-85
   prefs: []
   type: TYPE_NORMAL
+  zh: 实际的验证步骤是通过`TestCodeFix`方法调用来进行的。此方法调用将使用代码修复将您的坏代码转换为新的形式，然后将其与预期的良好代码进行比较。
 - en: 'This comparison is very sensitive, and any extra space, line breaks, or differences
     at all will result in a failing test with the observed differences between the
     two strings highlighted, as shown in *Figure 14**.1*:'
+  id: totrans-86
   prefs: []
   type: TYPE_NORMAL
+  zh: 这个比较非常敏感，任何额外的空格、换行符或任何差异都将导致测试失败，并在两个字符串之间突出显示观察到的差异，如图*图14**.1*所示：
 - en: '![Figure 14.1 – A test failure showing a string difference due to styling choices](img/B21324_14_1.jpg)'
+  id: totrans-87
   prefs: []
   type: TYPE_IMG
+  zh: '![图14.1 – 由于样式选择导致的字符串差异的测试失败](img/B21324_14_1.jpg)'
 - en: Figure 14.1 – A test failure showing a string difference due to styling choices
+  id: totrans-88
   prefs: []
   type: TYPE_NORMAL
+  zh: 图14.1 – 由于样式选择导致的字符串差异的测试失败
 - en: Assuming your formatting is consistent, your test should now pass, proving you
     have a good code fix.
+  id: totrans-89
   prefs: []
   type: TYPE_NORMAL
+  zh: 假设您的格式是一致的，您的测试现在应该通过了，这证明了您有一个好的代码修复。
 - en: If you want, you can now launch your VSIX extension project and verify the code
     fix in Visual Studio. After that, you could share the VSIX file with colleagues
     or people in the .NET community and they’d have access to your analyzer and its
     fix.
+  id: totrans-90
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果您愿意，现在可以启动您的VSIX扩展项目，并在Visual Studio中验证代码修复。之后，您可以与同事或.NET社区的人分享VSIX文件，他们就可以访问您的分析器和其修复。
 - en: However, VSIX deployment has some downsides as we’ll soon see. Let’s close the
     chapter by looking at using NuGet packages to share your code fixes in a more
     controlled manner.
+  id: totrans-91
   prefs: []
   type: TYPE_NORMAL
+  zh: 然而，正如我们很快就会看到的，VSIX部署有一些缺点。让我们通过查看使用NuGet包以更受控的方式共享您的代码修复来结束这一章。
 - en: Publishing Roslyn Analyzers as NuGet packages
+  id: totrans-92
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 将Roslyn分析器作为NuGet包发布
 - en: Using VSIX files to share code analyzers works, but isn’t an ideal solution.
+  id: totrans-93
   prefs: []
   type: TYPE_NORMAL
+  zh: 使用VSIX文件共享代码分析器是可行的，但并不是一个理想的解决方案。
 - en: Since VSIX files must be manually installed and updated, this means that with
     a team of software engineers, you’re never sure who has the extension installed
     at all or who is on which version of the extension.
+  id: totrans-94
   prefs: []
   type: TYPE_NORMAL
+  zh: 由于VSIX文件必须手动安装和更新，这意味着在软件工程师团队中，您永远无法确定谁安装了扩展，或者谁使用的是哪个版本的扩展。
 - en: Because each developer must install the VSIX themselves and keep it updated,
     this makes it harder to onboard new team members, release new analyzers or code
     fixes, or issue patches for issues found in your existing analyzers.
+  id: totrans-95
   prefs: []
   type: TYPE_NORMAL
+  zh: 因为每个开发者都必须自己安装并保持VSIX更新，这使得吸纳新团队成员、发布新的分析器或代码修复，或为现有分析器中发现的问题发布补丁变得更加困难。
 - en: 'Thankfully, there’s a better option: *NuGet* *package deployment*.'
+  id: totrans-96
   prefs: []
   type: TYPE_NORMAL
+  zh: 幸运的是，有一个更好的选择：*NuGet* *包部署*。
 - en: Understanding NuGet package deployment
+  id: totrans-97
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 理解NuGet包部署
 - en: Analyzers and code fixes can be packed into NuGet packages and deployed to a
     NuGet feed so others can find them. Once in a NuGet feed, any developer on the
     team can install the package into one or more projects.
+  id: totrans-98
   prefs: []
   type: TYPE_NORMAL
+  zh: 分析器和代码修复可以被打包成NuGet包并部署到NuGet源，这样其他人就可以找到它们。一旦进入NuGet源，团队中的任何开发者都可以将包安装到一个或多个项目中。
 - en: Once a NuGet package is installed, any developer who opens the project will
     automatically have the package downloaded through the largely invisible NuGet
     package restore step. If you install a NuGet package and then add, commit, and
     push the change, other developers will see it automatically installed when they
     pull your changes and open the project in Visual Studio.
+  id: totrans-99
   prefs: []
   type: TYPE_NORMAL
+  zh: 一旦安装了NuGet包，任何打开项目的开发者都会自动通过几乎不可见的NuGet包还原步骤下载该包。如果您安装了一个NuGet包，然后添加、提交并推送更改，其他开发者会在他们拉取您的更改并在Visual
+    Studio中打开项目时自动看到已安装的包。
 - en: This means that only one developer on your team needs to install any NuGet package,
     including a package containing Roslyn Analyzers. Additionally, if you ever need
     to update the package to include new analyzers, any developer on the team can
     update the version of the package that is installed.
+  id: totrans-100
   prefs: []
   type: TYPE_NORMAL
+  zh: 这意味着您的团队中只需要一个开发者安装任何NuGet包，包括包含Roslyn分析器的包。此外，如果您需要更新包以包含新的分析器，团队中的任何开发者都可以更新已安装包的版本。
 - en: 'By using NuGet package deployment for Roslyn Analyzers, your analyzers become:'
+  id: totrans-101
   prefs: []
   type: TYPE_NORMAL
+  zh: 通过使用Roslyn分析器的NuGet包部署，您的分析器将变为：
 - en: Easy to install
+  id: totrans-102
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 容易安装
 - en: Easy to update
+  id: totrans-103
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 容易更新
 - en: Consistently available across all developers on the team
+  id: totrans-104
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 在团队所有开发者中一致可用
 - en: Intentionally associated with the project
+  id: totrans-105
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 故意与项目关联
 - en: That last point is an interesting one. With VSIX deployment, analyzers apply
     to any code that a developer opens on their machine. There is no formal link between
     the analyzer and your team’s source code, but if a developer has a VSIX analyzer
     installed, they’ll see its recommendations.
+  id: totrans-106
   prefs: []
   type: TYPE_NORMAL
+  zh: 最后一点很有趣。使用VSIX部署，分析器适用于开发者在他们的机器上打开的任何代码。分析器与您团队源代码之间没有正式的联系，但如果开发者安装了VSIX分析器，他们会看到其建议。
 - en: With NuGet packages, you’re explicit about which analyzers should analyze which
     projects because you explicitly associate them via the NuGet install process.
     This means that you can look at any project in your solution and get a sense of
     what analyzer rules should apply for all developers on your project, which is
     very hard to accomplish through VSIX deployment.
+  id: totrans-107
   prefs: []
   type: TYPE_NORMAL
+  zh: 使用NuGet包，您明确指定了哪些分析器应该分析哪些项目，因为您通过NuGet安装过程明确地将它们关联起来。这意味着您可以在解决方案中的任何项目中查看，并了解所有项目开发者应该应用哪些分析器规则，这是通过VSIX部署很难实现的。
 - en: Because of these things, I strongly recommend deploying your analyzers and code
     fixes as NuGet packages.
+  id: totrans-108
   prefs: []
   type: TYPE_NORMAL
+  zh: 由于这些原因，我强烈建议将您的分析器和代码修复作为NuGet包部署。
 - en: Let’s see how that’s done.
+  id: totrans-109
   prefs: []
   type: TYPE_NORMAL
+  zh: 让我们看看这是如何操作的。
 - en: Building a NuGet package
+  id: totrans-110
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 构建NuGet包
 - en: 'Visual Studio gives you an easy way of packaging most .NET projects: just right-click
     on a project in **Solution Explorer**, select **Properties**, and then find the
     **General** blade under **Package** in the navigator. From there, you can check
     the **Produce a package file during build operations** checkbox, as shown in *Figure
     14**.2*:'
+  id: totrans-111
   prefs: []
   type: TYPE_NORMAL
+  zh: Visual Studio为您提供了一种轻松打包大多数.NET项目的方法：只需在**解决方案资源管理器**中右键单击一个项目，选择**属性**，然后在导航器中的**包**下找到**常规**选项卡。从那里，您可以选择**在构建操作期间生成包文件**复选框，如图*图14.2*所示：
 - en: '![Figure 14.2 – Enabling NuGet package creation in Visual Studio](img/B21324_14_2.jpg)'
+  id: totrans-112
   prefs: []
   type: TYPE_IMG
+  zh: '![图14.2 – 在Visual Studio中启用NuGet包创建](img/B21324_14_2.jpg)'
 - en: Figure 14.2 – Enabling NuGet package creation in Visual Studio
+  id: totrans-113
   prefs: []
   type: TYPE_NORMAL
+  zh: 图14.2 – 在Visual Studio中启用NuGet包创建
 - en: 'When this box is checked, you should see something like the following in your
     build output after building:'
+  id: totrans-114
   prefs: []
   type: TYPE_NORMAL
+  zh: 当这个复选框被勾选时，构建后你应该能在你的构建输出中看到以下内容：
 - en: '[PRE10]'
+  id: totrans-115
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE10]'
 - en: The general blade also lets you configure many of the pieces of metadata associated
     with the package. This lets you specify a readme file or a logo, enter any legal
     information you need, and more. These pieces of information will later be visible
     to users considering installing your package.
+  id: totrans-116
   prefs: []
   type: TYPE_NORMAL
+  zh: 通用刀片还允许你配置与包关联的许多元数据部分。这让你可以指定一个自述文件或一个徽标，输入你需要任何法律信息，等等。这些信息将在用户考虑安装你的包时可见。
 - en: The many things to consider when configuring a NuGet package for publishing
     to the public are beyond the scope of this book, but additional resources are
     listed in the *Further reading* section at the end of this chapter.
+  id: totrans-117
   prefs: []
   type: TYPE_NORMAL
+  zh: 配置用于向公众发布NuGet包时需要考虑的许多事情超出了本书的范围，但额外的资源列在本章末尾的*进一步阅读*部分。
 - en: Unfortunately, when building packages for Roslyn Analyzers, you need to customize
     more than Visual Studio makes available in the properties user interface.
+  id: totrans-118
   prefs: []
   type: TYPE_NORMAL
+  zh: 不幸的是，当为Roslyn分析器构建包时，你需要自定义比Visual Studio在属性用户界面中提供的更多的内容。
 - en: 'Double-click on `Packt.Analyzers` in `.csproj` file and replace it with this:'
+  id: totrans-119
   prefs: []
   type: TYPE_NORMAL
+  zh: 双击`.csproj`文件中的`Packt.Analyzers`，并将其替换为以下内容：
 - en: '[PRE11]'
+  id: totrans-120
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE11]'
 - en: 'These additional pieces of metadata customize how your package will be installed.
     Let’s talk about each one of the relevant changes separately:'
+  id: totrans-121
   prefs: []
   type: TYPE_NORMAL
+  zh: 这些额外的元数据部分自定义了你的包将被如何安装。让我们分别讨论每个相关更改：
 - en: '**GeneratePackageOnBuild** is the same thing as checking the box on the properties
     page to build the package on build.'
+  id: totrans-122
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**GeneratePackageOnBuild**与在属性页上勾选复选框以在构建时构建包相同。'
 - en: '`ItemGroup` section.'
+  id: totrans-123
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`ItemGroup`部分。'
 - en: '`Packt.Analyzers`, I recommend using your name without spaces or punctuation
     in place of `Packt` to avoid conflicts publishing this.'
+  id: totrans-124
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`Packt.Analyzers`，我建议使用你的名字，而不是`Packt`，以避免在发布时发生冲突。'
 - en: '**PackageVersion** is the release version number of your package. The latest
     version of a package is typically what people install using NuGet.'
+  id: totrans-125
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**PackageVersion**是包的发布版本号。包的最新版本通常是人们使用NuGet安装的版本。'
 - en: '**PackageLicenseExpression** is optional, but it allows you to tell others
     what open-source license, if any, applies to the usage of your package. The various
     license types and their legal implications are beyond the scope of this book.'
+  id: totrans-126
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**PackageLicenseExpression**是可选的，但它允许你告诉其他人，如果你的包有任何开源许可，那么适用于包的使用。各种许可类型及其法律影响超出了本书的范围。'
 - en: '**Description** is a short user-friendly description of what the package does
     and why someone might want to install it.'
+  id: totrans-127
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**描述**是对包所做之事以及为什么有人可能想要安装它的简短、友好的描述。'
 - en: '**RepositoryUrl** is optional and tells others where the package code is available.'
+  id: totrans-128
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**RepositoryUrl**是可选的，它告诉其他人包代码在哪里可用。'
 - en: The really critical part of this file is the `None` element in the `ItemGroup`.
     This step tells the packaging process to take the compiled DLL of the analyzer
     project and put it in the `analyzers/dotnet/cs` directory of the NuGet package.
+  id: totrans-129
   prefs: []
   type: TYPE_NORMAL
+  zh: 这个文件真正关键的部分是`ItemGroup`中的`None`元素。这一步告诉打包过程将分析器项目的编译DLL放入NuGet包的`analyzers/dotnet/cs`目录中。
 - en: This directory is a special directory that .NET looks at when loading Roslyn
     Analyzers from various sources. If it doesn’t see your analyzers there, those
     analyzers will not be loaded.
+  id: totrans-130
   prefs: []
   type: TYPE_NORMAL
+  zh: 这个目录是一个特殊的目录，当.NET从各种来源加载Roslyn分析器时会查看它。如果它在那里看不到你的分析器，那么这些分析器将不会被加载。
 - en: With these steps configured and the file saved, rebuild the project and you
     should see your NuGet package created inside the `bin\Debug` or `bin\Release`
     directory of your `Packt.Analyzers` project.
+  id: totrans-131
   prefs: []
   type: TYPE_NORMAL
+  zh: 配置这些步骤并保存文件后，重新构建项目，你应该能在你的`Packt.Analyzers`项目的`bin\Debug`或`bin\Release`目录中看到创建的NuGet包。
 - en: Debug vs Release builds
+  id: totrans-132
   prefs: []
   type: TYPE_NORMAL
+  zh: 调试与发布构建
 - en: When publishing software, you’ll want to use the `Release` configuration instead
     of `Debug`. The `Debug` configuration suppresses certain compiler optimizations
     and adds extra build byproducts that help you debug your applications. `Release`
     builds tend to be smaller and faster and are generally recommended. You can change
     which configuration is active using the main toolbar in Visual Studio.
+  id: totrans-133
   prefs: []
   type: TYPE_NORMAL
+  zh: 当发布软件时，你将想要使用`Release`配置而不是`Debug`配置。`Debug`配置抑制了某些编译器优化，并添加了额外的构建副产品，这些副产品有助于你调试应用程序。`Release`构建通常更小、更快，并且通常推荐使用。你可以使用Visual
+    Studio的主工具栏更改哪个配置是活动的。
 - en: Once your `.nupkg` file is created, you’re ready to publish it for others to
     use.
+  id: totrans-134
   prefs: []
   type: TYPE_NORMAL
+  zh: 一旦创建了 `.nupkg` 文件，你就可以将其发布供他人使用。
 - en: Deploying the NuGet package
+  id: totrans-135
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 部署 NuGet 包
 - en: Now that we have a `.nupkg` file, we can deploy it to any NuGet feed. This can
     be a feed you set up yourself at your organization, a private NuGet registry on
     GitHub, or a public NuGet feed such as the one at `NuGet.org`.
+  id: totrans-136
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在我们有了 `.nupkg` 文件，我们可以将其部署到任何 NuGet 资源库。这可以是你自己在你组织内设置的资源库，GitHub 上的私有 NuGet
+    注册表，或者像 `NuGet.org` 上的公共 NuGet 资源库。
 - en: Because `NuGet.org` is the standard place for sharing open-source code packages,
     we’ll explore this path in this chapter. If your code is proprietary and you only
     want to share it within your organization, it should not go on `NuGet.org`.
+  id: totrans-137
   prefs: []
   type: TYPE_NORMAL
+  zh: 由于 `NuGet.org` 是共享开源代码包的标准场所，我们将在本章中探索此路径。如果你的代码是专有的，并且你只想在组织内部共享，它不应该上传到 `NuGet.org`。
 - en: NuGet hosting options
+  id: totrans-138
   prefs: []
   type: TYPE_NORMAL
+  zh: NuGet 托管选项
 - en: If you’d like to host your NuGet packages outside of `NuGet.org`, you have a
     few options including setting up a private NuGet server or using a team-shared
     NuGet repository service such as those offered on GitHub. See the *Further reading*
     section for more information.
+  id: totrans-139
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果你想在 `NuGet.org` 之外托管你的 NuGet 包，你有几种选择，包括设置私有 NuGet 服务器或使用 GitHub 提供的团队共享 NuGet
+    存储库服务。有关更多信息，请参阅 *进一步阅读* 部分。
 - en: To get started, navigate to [NuGet.org](http://NuGet.org), create a user, and
     then log in as that user.
+  id: totrans-140
   prefs: []
   type: TYPE_NORMAL
+  zh: 要开始，导航到 [NuGet.org](http://NuGet.org)，创建一个用户，然后以该用户身份登录。
 - en: 'Once you are authenticated, click on the **Upload** tab to begin the process
     of uploading a NuGet package. This will allow you to drag and drop or click **Browse…**
     to find your NuGet package, as shown in *Figure 14**.3*:'
+  id: totrans-141
   prefs: []
   type: TYPE_NORMAL
+  zh: 一旦你完成认证，点击 **上传** 选项卡开始上传 NuGet 包的过程。这将允许你拖放或点击 **浏览…** 来找到你的 NuGet 包，如图 *图
+    14**.3* 所示：
 - en: '![Figure 14.3 – Uploading a NuGet package](img/B21324_14_3.jpg)'
+  id: totrans-142
   prefs: []
   type: TYPE_IMG
+  zh: '![图 14.3 – 上传 NuGet 包](img/B21324_14_3.jpg)'
 - en: Figure 14.3 – Uploading a NuGet package
+  id: totrans-143
   prefs: []
   type: TYPE_NORMAL
+  zh: 图 14.3 – 上传 NuGet 包
 - en: If you need help finding your `.nupkg` file, it should be inside of the `Packt.Analyzers`
     project in the `\bin\Debug` folder or the `\bin\Release` folder depending on if
     you build your project in `Debug` or `Release` mode.
+  id: totrans-144
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果你需要帮助找到你的 `.nupkg` 文件，它应该位于 `\bin\Debug` 文件夹或 `\bin\Release` 文件夹中，具体取决于你是否以
+    `Debug` 或 `Release` 模式构建项目。
 - en: Tip
+  id: totrans-145
   prefs: []
   type: TYPE_NORMAL
+  zh: 小贴士
 - en: It’s always best to publish `Release` builds when sharing code with others.
+  id: totrans-146
   prefs: []
   type: TYPE_NORMAL
+  zh: 当与他人共享代码时，始终最好发布 `Release` 版本。
 - en: Once you’ve selected your NuGet package, the page will update with the information
     it detects about your package. This includes the version number, license file,
     readme file, and other information. While it’s best to configure these values
     in Visual Studio, some things, such as the readme file, can be customized here
     before publishing.
+  id: totrans-147
   prefs: []
   type: TYPE_NORMAL
+  zh: 一旦你选择了你的 NuGet 包，页面将更新为它检测到的关于你的包的信息。这包括版本号、许可文件、readme 文件和其他信息。虽然最好在 Visual
+    Studio 中配置这些值，但某些内容，如 readme 文件，可以在发布前在此处进行自定义。
 - en: If something doesn’t look right, you can create a new `.nupkg` file and upload
     that file.
+  id: totrans-148
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果某些内容看起来不正确，你可以创建一个新的 `.nupkg` 文件并上传该文件。
 - en: Once you’re satisfied with the information on the preview screen, click `NuGet.org`
     will begin checking your file for anything harmful and indexing the package so
     others can import it.
+  id: totrans-149
   prefs: []
   type: TYPE_NORMAL
+  zh: 一旦你对预览屏幕上的信息满意，点击 `NuGet.org` 将开始检查你的文件是否有任何有害内容，并对包进行索引以便他人可以导入。
 - en: This process typically takes 5 to 15 minutes but can vary. If you want to check
     on the status of your package, you can refresh the package details page found
     in *Figure 14**.4* to check on the status.
+  id: totrans-150
   prefs: []
   type: TYPE_NORMAL
+  zh: 此过程通常需要 5 到 15 分钟，但可能会有所不同。如果你想检查包的状态，可以刷新 *图 14**.4* 中找到的包详细信息页面来检查状态。
 - en: '![Figure 14.4 – NuGet.org checking and indexing a package](img/B21324_14_4.jpg)'
+  id: totrans-151
   prefs: []
   type: TYPE_IMG
+  zh: '![图 14.4 – NuGet.org 检查和索引包](img/B21324_14_4.jpg)'
 - en: Figure 14.4 – NuGet.org checking and indexing a package
+  id: totrans-152
   prefs: []
   type: TYPE_NORMAL
+  zh: 图 14.4 – NuGet.org 检查和索引包
 - en: Once this process finishes, you’re ready to reference the package in Visual
     Studio.
+  id: totrans-153
   prefs: []
   type: TYPE_NORMAL
+  zh: 一旦此过程完成，你就可以在 Visual Studio 中引用该包了。
 - en: Referencing the NuGet package
+  id: totrans-154
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 引用 NuGet 包
 - en: Once your package is published on `NuGet.org`, you can reference it in any compatible
     .NET project.
+  id: totrans-155
   prefs: []
   type: TYPE_NORMAL
+  zh: 一旦你的包在 `NuGet.org` 上发布，你就可以在任何兼容的 .NET 项目中引用它。
 - en: To prove this, open a solution from a previous chapter or create a new console
     application. Next, choose **Manage NuGet Packages…** for that project in **Solution
     Explorer**.
+  id: totrans-156
   prefs: []
   type: TYPE_NORMAL
+  zh: 为了证明这一点，打开前一章的解决方案或创建一个新的控制台应用程序。接下来，在 **解决方案资源管理器** 中选择该项目的 **管理 NuGet 包…**。
 - en: 'Once **NuGet Package Manager** comes up, go to the **Browse** tab and search
     for your package by its name. Assuming the name is correct and your package has
     finished indexing, you should see the package in *Figure 14**.5*:'
+  id: totrans-157
   prefs: []
   type: TYPE_NORMAL
+  zh: 一旦 **NuGet 包管理器** 出现，转到 **浏览** 选项卡，通过名称搜索你的包。假设名称正确且你的包已完成索引，你应该能在 *图 14*.5*
+    中看到该包：
 - en: '![Figure 14.5 – Referencing your package in NuGet Package Manager](img/B21324_14_5.jpg)'
+  id: totrans-158
   prefs: []
   type: TYPE_IMG
+  zh: '![图 14.5 – 在 NuGet 包管理器中引用你的包](img/B21324_14_5.jpg)'
 - en: Figure 14.5 – Referencing your package in NuGet Package Manager
+  id: totrans-159
   prefs: []
   type: TYPE_NORMAL
+  zh: 图 14.5 – 在 NuGet 包管理器中引用你的包
 - en: Click **Install** to install the latest published version of your package and
     notice the dependencies and license terms that appear based on your choices when
     creating the NuGet package.
+  id: totrans-160
   prefs: []
   type: TYPE_NORMAL
+  zh: 点击 **安装** 以安装你包的最新发布版本，并注意根据你创建 NuGet 包时的选择出现的依赖项和许可条款。
 - en: 'Once your package is installed, your analyzer will now be active and will appear
     inside of the **Analyzers** node nested inside of the project’s **Dependencies**
     node in **Solution Explorer**, as shown in *Figure 14**.6*:'
+  id: totrans-161
   prefs: []
   type: TYPE_NORMAL
+  zh: 一旦你的包安装完成，你的分析器现在将保持活跃状态，并将在 **解决方案资源管理器** 中项目 **依赖项** 节点的 **分析器** 节点内显示，如图
+    *图 14*.6* 所示：
 - en: '![Figure 14.6 – Our analyzers package installed and active in a project](img/B21324_14_6.jpg)'
+  id: totrans-162
   prefs: []
   type: TYPE_IMG
+  zh: '![图 14.6 – 我们的分析器包已安装并在项目中激活](img/B21324_14_6.jpg)'
 - en: Figure 14.6 – Our analyzers package installed and active in a project
+  id: totrans-163
   prefs: []
   type: TYPE_NORMAL
+  zh: 图 14.6 – 我们的分析器包已安装并在项目中激活
 - en: The analyzer will also be active for any class in your project and it will provide
     suggestions and code fixes.
+  id: totrans-164
   prefs: []
   type: TYPE_NORMAL
+  zh: 分析器也将对项目中的任何类都保持活跃状态，并提供建议和代码修复。
 - en: Once you commit and push your changes to the project, others on your team will
     pull down the reference to the new NuGet dependency. Visual Studio will then restore
     your NuGet packages and install the analyzer locally into that project for your
     coworkers.
+  id: totrans-165
   prefs: []
   type: TYPE_NORMAL
+  zh: 一旦你提交并推送你的更改到项目，团队中的其他人将拉取对新 NuGet 依赖项的引用。Visual Studio 然后将恢复你的 NuGet 包并在本地安装分析器供你的同事使用。
 - en: If you ever need to update your NuGet package, you can create a new version
     of the package and upload it to `NuGet.org`. Once the new version is indexed,
     you’ll be able to update the installed version of the package from NuGet Package
     Manager.
+  id: totrans-166
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果你需要更新你的 NuGet 包，你可以创建包的新版本并将其上传到 `NuGet.org`。一旦新版本被索引，你将能够通过 NuGet 包管理器更新已安装的包版本。
 - en: The NuGet deployment process makes it easy to install and update packages in
     your project that are then available to every developer on your team. This is
     why this process is my default recommendation for sharing your Roslyn Analyzers
     with your team.
+  id: totrans-167
   prefs: []
   type: TYPE_NORMAL
+  zh: NuGet 部署过程使得在你的项目中安装和更新包变得容易，这些包随后可供团队中的每个开发者使用。这就是为什么这个流程是我推荐与你的团队共享 Roslyn
+    分析器的默认方法。
 - en: Packaging a CodeFixProvider as an extension
+  id: totrans-168
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 将 CodeFixProvider 打包为扩展
 - en: If you want to package your code fix in a VSIX extension, you can do that in
     largely the same way as we did in [*Chapter 13*](B21324_13.xhtml#_idTextAnchor275)
     with one additional change.
+  id: totrans-169
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果你想要将你的代码修复打包为 VSIX 扩展，你可以像我们在 [*第 13 章*](B21324_13.xhtml#_idTextAnchor275)
+    中做的那样进行，只需进行一个额外的更改。
 - en: To get your `CodeFixProvider` to work in the extension, you’ll need to add a
     **Managed Extensibility Framework (MEF)** asset to your installer’s manifest.
+  id: totrans-170
   prefs: []
   type: TYPE_NORMAL
+  zh: 要使你的 `CodeFixProvider` 在扩展中工作，你需要在安装程序的清单中添加一个 **托管扩展性框架 (MEF)** 资产。
 - en: To do this, go to the **Assets** pane of your Installer project’s manifest and
     click **New**.
+  id: totrans-171
   prefs: []
   type: TYPE_NORMAL
+  zh: 要这样做，转到安装程序项目清单的 **资产** 面板并点击 **新建**。
 - en: Next, select **Microsoft.VisualStudio.MefComponent** as the type, specify the
     source as **A project in current solution**, and specify your analyzers project
     as the project (see *Figure 14**.7* for an example).
+  id: totrans-172
   prefs: []
   type: TYPE_NORMAL
+  zh: 接下来，选择 **Microsoft.VisualStudio.MefComponent** 作为类型，指定源为 **当前解决方案中的项目**，并指定你的分析器项目作为项目（见
+    *图 14*.7* 中的示例）。
 - en: '![Figure 14.7 – Adding an MEF component asset to the installer manifest](img/B21324_14_7.jpg)'
+  id: totrans-173
   prefs: []
   type: TYPE_IMG
+  zh: '![图 14.7 – 将 MEF 组件资产添加到安装程序清单中](img/B21324_14_7.jpg)'
 - en: Figure 14.7 – Adding an MEF component asset to the installer manifest
+  id: totrans-174
   prefs: []
   type: TYPE_NORMAL
+  zh: 图 14.7 – 将 MEF 组件资产添加到安装程序清单中
 - en: This change will ensure your code fix is properly registered by the installer.
+  id: totrans-175
   prefs: []
   type: TYPE_NORMAL
+  zh: 此更改将确保安装程序正确注册你的代码修复。
 - en: In my experience, it’s usually easier to maintain analyzers via a NuGet package
     than a VSIX installer, but both deployment models have their advantages. Pick
     the approach that makes the most sense for your installation, updating, and security
     needs.
+  id: totrans-176
   prefs: []
   type: TYPE_NORMAL
+  zh: 根据我的经验，通常通过 NuGet 包而不是 VSIX 安装程序来维护分析器更容易，但两种部署模型都有其优点。选择最适合你的安装、更新和安全需求的方法。
 - en: Summary
+  id: totrans-177
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 摘要
 - en: In this chapter, we saw how Roslyn Analyzers can be extended to provide code
     fixes along with the diagnostic information they already provided.
+  id: totrans-178
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本章中，我们看到了如何扩展 Roslyn Analyzers 以提供代码修复，以及它们已经提供的诊断信息。
 - en: Code fixes work by interpreting the tree structure of your code and making modifications
     to that structure, resulting in a new document or solution. Visual Studio then
     reacts to these changes by updating the source code.
+  id: totrans-179
   prefs: []
   type: TYPE_NORMAL
+  zh: 代码修复通过解释您的代码的树结构并对该结构进行修改来实现，从而生成新的文档或解决方案。Visual Studio 然后通过更新源代码对这些更改做出反应。
 - en: This means that code fixes can automatically make pre-configured modifications
     to your code to address known issues in a repeatable and safe manner.
+  id: totrans-180
   prefs: []
   type: TYPE_NORMAL
+  zh: 这意味着代码修复可以自动对您的代码进行预配置的修改，以可重复且安全的方式解决已知问题。
 - en: We also discussed how NuGet package deployment allows you to wrap up your Roslyn
     Analyzers into a package and share them with other developers – either other developers
     on your team or other developers worldwide.
+  id: totrans-181
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们还讨论了如何通过 NuGet 包部署将您的 Roslyn Analyzers 封装成包并与其他开发者共享——无论是您团队中的其他开发者还是全球的开发者。
 - en: This concludes *Part 3* of this book. In the final part of this book, we’ll
     explore some of the unique challenges and opportunities found in refactoring code
     in real-world organizations and teams.
+  id: totrans-182
   prefs: []
   type: TYPE_NORMAL
+  zh: 这本书的第三部分到此结束。在本书的最后一部分，我们将探讨在现实世界组织和团队中重构代码时遇到的独特挑战和机遇。
 - en: Questions
+  id: totrans-183
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 问题
 - en: What is the relationship between a `DiagnosticAnalyzer` and a `CodeFixProvider`?
+  id: totrans-184
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: '`DiagnosticAnalyzer` 和 `CodeFixProvider` 之间有什么关系？'
 - en: How can you test a code fix?
+  id: totrans-185
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 如何测试代码修复？
 - en: What are some of the advantages of NuGet deployment versus VSIX deployment?
+  id: totrans-186
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 与 VSIX 部署相比，NuGet 部署有哪些优势？
 - en: Further reading
+  id: totrans-187
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 进一步阅读
 - en: 'You can find more information about materials from this chapter at the following
     URLs:'
+  id: totrans-188
   prefs: []
   type: TYPE_NORMAL
+  zh: 您可以在以下网址找到有关本章材料的更多信息：
 - en: '*Get started with syntax* *transformation*: [https://learn.microsoft.com/en-us/dotnet/csharp/roslyn-sdk/get-started/syntax-transformation](https://learn.microsoft.com/en-us/dotnet/csharp/roslyn-sdk/get-started/syntax-transformation)'
+  id: totrans-189
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '*开始使用语法* *转换*：[https://learn.microsoft.com/en-us/dotnet/csharp/roslyn-sdk/get-started/syntax-transformation](https://learn.microsoft.com/en-us/dotnet/csharp/roslyn-sdk/get-started/syntax-transformation)'
 - en: '*Configuring and Publishing NuGet* *Packages*: [https://learn.microsoft.com/en-us/nuget/quickstart/create-and-publish-a-package-using-visual-studio?tabs=netcore-cli](https://learn.microsoft.com/en-us/nuget/quickstart/create-and-publish-a-package-using-visual-studio?tabs=netcore-cli)'
+  id: totrans-190
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '*配置和发布 NuGet* *包*：[https://learn.microsoft.com/en-us/nuget/quickstart/create-and-publish-a-package-using-visual-studio?tabs=netcore-cli](https://learn.microsoft.com/en-us/nuget/quickstart/create-and-publish-a-package-using-visual-studio?tabs=netcore-cli)'
 - en: '*Hosting your own NuGet* *feeds*: [https://learn.microsoft.com/en-us/nuget/hosting-packages/overview](https://learn.microsoft.com/en-us/nuget/hosting-packages/overview
     )'
+  id: totrans-191
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '*托管自己的 NuGet* *源*：[https://learn.microsoft.com/en-us/nuget/hosting-packages/overview](https://learn.microsoft.com/en-us/nuget/hosting-packages/overview)'
 - en: '*Working with NuGet on* *GitHub*: [https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-nuget-registry](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-nuget-registry)'
+  id: totrans-192
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '*在 GitHub 上使用 NuGet*：[https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-nuget-registry](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-nuget-registry)'
 - en: 'Part 4: Refactoring in the Enterprise'
+  id: totrans-193
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 第四部分：企业级重构
 - en: 'In the fourth and final part of the book, we focus on the social aspects of
     refactoring: communicating technical debt to others, adopting code standards as
     an engineering organization, and refactoring in agile environments.'
+  id: totrans-194
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本书的第四和最后一部分，我们关注重构的社会方面：向他人传达技术债务、作为工程组织采用代码标准，以及在敏捷环境中进行重构。
 - en: Convincing a large team or organization of the importance of refactoring can
     be a critical battle, and so this part looks at how software engineers can partner
     with business leaders. These chapters contain key tips and tricks to ensure that
     refactoring actually happens and that the right areas of technical debt get refactored
     first.
+  id: totrans-195
   prefs: []
   type: TYPE_NORMAL
+  zh: 说服一个大型团队或组织认识到重构的重要性可能是一场关键的战斗，因此本部分探讨了软件工程师如何与业务领导者合作。这些章节包含确保重构真正发生以及首先重构正确技术债务区域的关键技巧和窍门。
 - en: We specifically focus on refactoring in an agile environment and how to handle
     refactoring scenarios that are so large that it feels like a complete rewrite
     is necessary.
+  id: totrans-196
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们特别关注敏捷环境中的重构，以及如何处理那些感觉需要完全重写的大型重构场景。
 - en: 'This part contains the following chapters:'
+  id: totrans-197
   prefs: []
   type: TYPE_NORMAL
+  zh: 本部分包含以下章节：
 - en: '[*Chapter 15*](B21324_15.xhtml#_idTextAnchor316)*, Communicating Technical
     Debt*'
+  id: totrans-198
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '[*第15章*](B21324_15.xhtml#_idTextAnchor316)*，沟通技术债务*'
 - en: '[*Chapter 16*](B21324_16.xhtml#_idTextAnchor341)*, Adopting Code Standards*'
+  id: totrans-199
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '[*第16章*](B21324_16.xhtml#_idTextAnchor341)*，采纳代码标准*'
 - en: '[*Chapter 17*](B21324_17.xhtml#_idTextAnchor354)*, Agile Refactoring*'
+  id: totrans-200
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '[*第17章*](B21324_17.xhtml#_idTextAnchor354)*，敏捷重构*'

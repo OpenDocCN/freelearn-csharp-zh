@@ -1,6 +1,6 @@
-# Python 机器学习算法交易实用指南
+# ASP.NET8 最佳实践
 
-> 原文：[`zh.annas-archive.org/md5/fcb09c483bdb21866eb6782158d1f8d5`](https://zh.annas-archive.org/md5/fcb09c483bdb21866eb6782158d1f8d5)
+> 原文：[`zh.annas-archive.org/md5/9d6c90285a5660ecc8526cbe7d170150`](https://zh.annas-archive.org/md5/9d6c90285a5660ecc8526cbe7d170150)
 > 
 > 译者：[飞龙](https://github.com/wizardforcel)
 > 

@@ -1,6 +1,6 @@
-# Python 机器学习算法交易实用指南
+# .NET 企业级架构
 
-> 原文：[`zh.annas-archive.org/md5/fcb09c483bdb21866eb6782158d1f8d5`](https://zh.annas-archive.org/md5/fcb09c483bdb21866eb6782158d1f8d5)
+> 原文：[`zh.annas-archive.org/md5/e2f167345d4aed05295f494546f1d634`](https://zh.annas-archive.org/md5/e2f167345d4aed05295f494546f1d634)
 > 
 > 译者：[飞龙](https://github.com/wizardforcel)
 > 

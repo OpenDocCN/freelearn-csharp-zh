@@ -1,6 +1,6 @@
-# Python 机器学习算法交易实用指南
+# C#13 和 .NET9 现代跨平台开发基础知识
 
-> 原文：[`zh.annas-archive.org/md5/fcb09c483bdb21866eb6782158d1f8d5`](https://zh.annas-archive.org/md5/fcb09c483bdb21866eb6782158d1f8d5)
+> 原文：[`zh.annas-archive.org/md5/5f122bf1150958c3b3ee735b37781de3`](https://zh.annas-archive.org/md5/5f122bf1150958c3b3ee735b37781de3)
 > 
 > 译者：[飞龙](https://github.com/wizardforcel)
 > 

@@ -1,6 +1,6 @@
-# Python 机器学习算法交易实用指南
+# ASP.NET Core 应用架构
 
-> 原文：[`zh.annas-archive.org/md5/fcb09c483bdb21866eb6782158d1f8d5`](https://zh.annas-archive.org/md5/fcb09c483bdb21866eb6782158d1f8d5)
+> 原文：[`zh.annas-archive.org/md5/ab4d49f9725121832839b6070a1b3714`](https://zh.annas-archive.org/md5/ab4d49f9725121832839b6070a1b3714)
 > 
 > 译者：[飞龙](https://github.com/wizardforcel)
 > 

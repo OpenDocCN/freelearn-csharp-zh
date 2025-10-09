@@ -1,0 +1,1124 @@
+- en: '11'
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Instrumenting Messaging Scenarios
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Messaging and asynchronous processing improve distributed system scalability
+    and reliability by reducing coupling between services. However, they also increase
+    complexity and introduce a new failure mode, which makes observability even more
+    important.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In this chapter, we’ll work on instrumenting a messaging producer and consumer
+    with traces and metrics and cover individual and batch message processing.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In this chapter, you’ll learn how to do the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Trace individual messages as they are created and published
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Instrument receiving and processing operations
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Instrument batches
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Use instrumentation to diagnose common messaging problems
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: By the end of this chapter, you should be able to instrument your messaging
+    application from scratch or tune the existing messaging instrumentation to your
+    needs.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Technical requirements
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The code for this chapter is available in the book’s repository on GitHub at
+    [https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/tree/main/chapter11](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/tree/main/chapter11).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'To run the samples and perform analysis, we’ll need the following tools:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: .NET SDK 7.0 or later.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Docker and `docker-compose`.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Any HTTP benchmarking tool, for example, `bombardier`. You can install it with
+    `$ go get -u github.com/codesenberg/bombardier` if you have Go tools, or download
+    bits directly from its GitHub repository at [https://github.com/codesenberg/bombardier/releases](https://github.com/codesenberg/bombardier/releases).
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: We will also be using the Azure Storage emulator in Docker. No setup or Azure
+    subscription is necessary.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Observability in messaging scenarios
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In [*Chapter 10*](B19423_10.xhtml#_idTextAnchor161), *Tracing Network Calls*,
+    we just started scratching the surface of tracing support for asynchronous processing.
+    There, we saw how the client and server can send a stream of potentially independent
+    messages to each other.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In the case of messaging, things get even more complicated: in addition to
+    asynchronous communication, the producer and consumer interact through an intermediary
+    – a messaging **broker**.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Operation on the producer completes once the message is published to the broker
+    without waiting for the consumer to process this message. Depending on the scenario
+    and application health, the consumer may process it right away, in a few seconds,
+    or in several days.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In some cases, producers get a notification that the message was processed,
+    but this usually happens through another messaging queue or a different communication
+    channel.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Essentially, the producer does not know whether the consumer exists – failures
+    or delays in the processing pipeline are not visible on the producer side. This
+    changes how we should look at latency, throughput, or error rate from an observability
+    standpoint – now we need to think about end-to-end flows that consist of multiple
+    independent operations.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'For example, when using HTTP calls only, the latency of the original request
+    covers almost everything that happened with the request. Once we introduce messaging,
+    we need means to measure the end-to-end latency and identify failures between
+    different components. An example of an application that uses messaging is shown
+    in *Figure 11**.1*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 11.1 – Application using messaging to run tasks in the background
+    ](img/B19423_11_01.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 11.1 – Application using messaging to run tasks in the background
+  prefs: []
+  type: TYPE_NORMAL
+- en: In such an application, when the user sends a request to the frontend, they
+    receive a response once the backend finishes processing and publishes a message
+    to a topic. The indexer, replicator, archiver, and any other services that post-process
+    the data run at their own speed. The indexer usually processes the latest messages,
+    while the archiver would only look at the messages published days ago.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Some of these components can fail without affecting user scenarios directly,
+    while others impact how soon the data the user published shows up in other parts
+    of the system and therefore can be critical.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Let’s explore how we can instrument such applications.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Before writing our own instrumentation from scratch, we should always check
+    whether there are existing instrumentation libraries we can start with, and if
+    there are none available, we should consult with OpenTelemetry semantic conventions.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We’re going to instrument Azure Queue Storage as an example. The existing instrumentation
+    does not cover the messaging aspects of queues because of the reasons we’ll see
+    in the next couple of sections. So, we’ll have to write our own; we’ll do it according
+    to OpenTelemetry conventions.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Messaging semantic conventions
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: The messaging conventions for tracing are available at [https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/messaging.md](https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/messaging.md).
+  prefs: []
+  type: TYPE_NORMAL
+- en: They currently have experimental status and are very likely to change. There
+    are no general metrics conventions available yet, but you can find ones specific
+    to Kafka.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Conventions provide some considerations on context propagation (we’ll discuss
+    this in the *Trace context propagation* section) and define generic attributes
+    to describe messaging operations. Here are a few essential ones we’re going to
+    use:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`messaging.system`: Indicates that the span follows messaging semantics and
+    describes the specific messaging system used, such as `kafka` or `rabbitmq`. In
+    our sample, we’ll use `azqueues`.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`messaging.operation`: Identifies one of the standard operations: `publish`,
+    `receive`, or `process`.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`messaging.destination.name` and `messaging.source.name`: Describe a queue
+    or topic name within a broker. The term `destination` is used on the producer
+    and `source` is used on the consumer.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`net.peer.name`: Identifies the broker domain name.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Let’s see how we can use the conventions to add observability signals that can
+    help us document the application behavior or detect and resolve a new class of
+    issues happening in messaging scenarios.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Instrumenting the producer
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'The producer is the component responsible for publishing messages to a broker.
+    The publishing process itself is usually synchronous: we send a request to the
+    broker and get a response from it indicating whether the message was published
+    successfully.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Depending on the messaging system and producer needs, one publish request may
+    carry one or more messages. We’ll discuss batching in the *Instrumenting batching
+    scenarios* section. For now, let’s focus on a single message case.
+  prefs: []
+  type: TYPE_NORMAL
+- en: To trace it, we need to make sure we create an activity when we publish a message,
+    so we can track the call duration and status and debug individual requests. We’d
+    also be interested in metrics for duration, throughput, and failure rate – it’s
+    important to budget cloud messaging solutions or scale self-hosted brokers.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Another essential part of producer instrumentation is context propagation. Let’s
+    stop here for a second and discuss it.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Trace context propagation
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: When we instrument HTTP calls, context is propagated via HTTP request headers,
+    which are part of the request. In messaging, the context is carried via a transport
+    call to the broker and is not propagated to a consumer. Transport call trace context
+    identifies the request, but not the message(s) it carries.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'So, we need to propagate context inside the message to make sure it goes all
+    the way to the consumer. But which context should we inject? We have several options:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**Use context from the current activity**: For instance, when we publish messages
+    in the scope of an incoming HTTP request, we may use the context of the activity
+    representing this HTTP server call. This works only if we send one message per
+    incoming request. If we send more than one (each in an individual publish call),
+    we’d not be able to tell which message the consumer call processed or identify
+    whether we sent messages to the right queues.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Create an activity per message and inject its context**: Unique context allows
+    us to trace messages individually and works in batching scenarios as well where
+    we send multiple messages in one publish call. It also adds the overhead of creating
+    an additional activity per message.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Reuse the publish activity**: When we publish one message in one call to
+    the broker, we can uniquely identify a message and publish call with one activity.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The first option goes against OpenTelemetry messaging semantic conventions,
+    which allow us to pick a suitable option from the last two. In our example, we’re
+    using Azure Queue Storage, which does not support batching when publishing messages.
+    So, we’re going to use the last option and create one activity to trace a publish
+    call and inject its context into the message.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs: []
+  type: TYPE_NORMAL
+- en: When forking or routing messages from one queue to another, the message might
+    have pre-existing trace context injected in the upstream service. The default
+    behavior in such a case should be to keep the message context intact. To correlate
+    all operations that happen with the message, we can always add a link to an existing
+    trace context in the message when publishing or receiving it.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Another interesting aspect of Azure Queue Storage is that it doesn’t support
+    message metadata – the message is an opaque payload without any prescribed structure
+    or format that the service carries over. So, similarly to gRPC streaming, which
+    we covered in [*Chapter 10*](B19423_10.xhtml#_idTextAnchor161), *Tracing Network
+    Calls*, we’ll need to define our own message structure or use one of the well-known
+    event formats available out there, such as **CloudEvents**.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs: []
+  type: TYPE_NORMAL
+- en: CloudEvents ([https://cloudevents.io](https://cloudevents.io)) is an open standard
+    that defines event structure in a vendor- and technology-agnostic way. It’s commonly
+    used by cloud providers to notify applications about infrastructure changes or
+    when implementing data change feeds. CloudEvents have distributed tracing extensions
+    to carry W3C Trace Context as well as general-purpose metadata that can be used
+    for other formats. OpenTelemetry also provides semantic conventions for CloudEvents.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'For demo purposes, we’ll keep things simple and define our own tiny message
+    model in the following way:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: producer/Message.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE0]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter11/producer/Message.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter11/producer/Message.cs)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: We’ll use the `Headers` property to propagate the trace context and will keep
+    the payload in the `Text` property.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Similarly to the gRPC streaming examples we saw in [*Chapter 10*](B19423_10.xhtml#_idTextAnchor161),
+    *Tracing Network Calls*, we can inject context into this message using the OpenTelemetry
+    propagator with the following code snippet:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: producer/Controllers/SendController.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE1]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter11/producer/Controllers/SendController.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter11/producer/Controllers/SendController.cs)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Now we have all we need to instrument a publish call – let’s do it.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Tracing a publish call
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: We’ll need to create a new activity and put common messaging attributes on it
+    to identify the broker, queue operation, and add other information. In the case
+    of Azure Queue Storage, we can use the account name as the broker identifier (as
+    they are unique within a public cloud).
+  prefs: []
+  type: TYPE_NORMAL
+- en: Then, we’ll inject context into the message and proceed with publishing. After
+    the message is published successfully, we can also record the information returned
+    by the broker, such as the message ID and other details we might consider useful.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Here’s the corresponding code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: producer/Controllers/SendController.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE2]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter11/producer/Controllers/SendController.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter11/producer/Controllers/SendController.cs)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Here, we injected the context of `Activity.Current` with the `Inject` method
+    we implemented before. This may be useful if you want to turn off per-message
+    activities. In such a case, per-message tracing will be limited, but consumer
+    and producer calls will still be correlated. We also record metrics here – stay
+    tuned for the details; we’re going to cover them in the next section.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Here’s the `StartPublishActivity` method implementation:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: producer/Controllers/SendController.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE3]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter11/producer/Controllers/SendController.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter11/producer/Controllers/SendController.cs)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The activity here has a `producer` kind, which indicates the start of an async
+    flow. The name follows OpenTelemetry semantic conventions, which recommend using
+    the `{queue_name} {operation}` pattern. We can also cache it to avoid unnecessary
+    string formatting.
+  prefs: []
+  type: TYPE_NORMAL
+- en: This is it; we’ve covered producer tracing – let’s look at metrics now.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Producer metrics
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Messaging-specific metrics come as an addition to resource utilization, .NET
+    runtime, HTTP, and other metrics you might want to expose.
+  prefs: []
+  type: TYPE_NORMAL
+- en: To some extent, we can use HTTP metrics to monitor calls to Azure Queue Storage
+    since they work on top of HTTP. This would allow us to monitor duration, success
+    rate, and throughput for individual HTTP calls to storage, but won’t allow us
+    to distinguish queues within one storage account.
+  prefs: []
+  type: TYPE_NORMAL
+- en: So, if we rely on metrics, we should record some messaging-specific ones that
+    cover common indicators such as publish call duration, throughput, and latency
+    for each queue we use.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We can report all of them using a duration histogram, as we saw in [*Chapter
+    7*](B19423_07.xhtml#_idTextAnchor115), *Adding Custom Metrics*. First, let’s initialize
+    the duration histogram, as shown in the following code snippet:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: producer/Controllers/SendController.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE4]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter11/producer/Controllers/SendController.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter11/producer/Controllers/SendController.cs)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`Meter` and `Histogram` are static since we defined them in the controller.
+    The controller lifetime is scoped to a request, so we keep them static to stay
+    efficient.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'As we saw in the tracing example, every time we publish a message, we’re also
+    going to record a publish duration. Here’s how it’s implemented:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: producer/Controllers/SendController.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE5]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter11/producer/Controllers/SendController.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter11/producer/Controllers/SendController.cs)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Here, we used the same attributes to describe the queue and added a custom status
+    attribute. Keep in mind that we need it to have low cardinality, so we only use
+    `ok` and `fail` statuses when we call this method.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We’re done with the producer. Having basic tracing and metrics should give us
+    a good starting point to diagnose and debug most of the issues and monitor overall
+    producer health, as we’ll see in the *Performance analysis in messaging scenarios*
+    section later. Let’s now explore instrumentation on consumers.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Instrumenting the consumer
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: While you might be able to get away without custom instrumentation on the producer,
+    consumer instrumentation is unavoidable.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Some brokers push messages to consumers using synchronous HTTP or RPC calls,
+    and the existing framework instrumentation can provide the bare minimum of observability
+    data. In all other cases, messaging traces and metrics are all we have to detect
+    consumer health and debug issues.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Let’s start by tracing individual messages – recording when they arrive in the
+    consumer and how they are processed. This allows us to debug issues by answering
+    questions such as “Where is this message now?” or “Why did it take so long to
+    process the data?”
+  prefs: []
+  type: TYPE_NORMAL
+- en: Tracing consumer operations
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: When using Azure Queue Storage, applications request one or more messages from
+    the queue. Received messages stay in the queue but become invisible to other consumers
+    for configurable visibility timeout. The application processes messages and, when
+    done, deletes them from the queue. If processing fails with a transient issue,
+    applications don’t delete messages. The same flow is commonly used when working
+    with AWS SQS.
+  prefs: []
+  type: TYPE_NORMAL
+- en: RabbitMQ- and AMQP-based messaging flows look similar, except messages can be
+    pushed to the consumer so that the application reacts to the client library callback
+    instead of polling the queue.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Callback-based delivery allows us to implement instrumentation in client libraries
+    or provide a shared instrumentation library, and with a poll-based model, we essentially
+    are forced to write at least some custom instrumentation for processing. Let’s
+    do it.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'First, let’s instrument message processing in isolation from receiving. We’ll
+    need to create an activity to track processing that will capture everything that
+    happens there, including message deletion:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: consumer/SingleReceiver.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE6]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter11/consumer/SingleReceiver.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter11/consumer/SingleReceiver.cs)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Here, all the processing logic happens in the `ProcessMessage` method. When
+    it completes successfully, we delete the message from the queue. Otherwise, we
+    update its visibility to reappear in the queue after the backoff timeout.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Here’s the `StartProcessActivity` implementation:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: consumer/SingleReceiver.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE7]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter11/consumer/SingleReceiver.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter11/consumer/SingleReceiver.cs
+    )'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Here, we extracted the context from the message and used it as a parent of the
+    processing activity. It has the `consumer` kind, which indicates the continuation
+    of the asynchronous flow. We also kept `Activity.Current` as a link to preserve
+    correlation. We also added messaging attributes.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Message deletion and updates are traces by HTTP or Azure Queue SDK instrumentations.
+    They don’t have messaging semantics, but should give us reasonable observability.
+    Corresponding activities become children of the processing one, as shown in *Figure
+    11**.2*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 11.2 – Message trace from producer to consumer](img/B19423_11_02.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 11.2 – Message trace from producer to consumer
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The message was published and then we see two attempts to process it on the
+    consumer: the first attempt failed. The second try was successful, and the message
+    was deleted.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'What’s missing in the preceding screenshot? We don’t see how and when the message
+    was received. This might not be important on this trace, but look at another one
+    in *Figure 11**.3*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 11.3 – Message trace with a nine-minute gap between producer and consumer](img/B19423_11_03.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 11.3 – Message trace with a nine-minute gap between producer and consumer
+  prefs: []
+  type: TYPE_NORMAL
+- en: Here, nothing has happened for almost nine minutes. Was the message received
+    by a consumer during that time? Were the consumers alive? What were they doing?
+    Were there any problems in the Azure Queue service that prevented messages from
+    being received?
+  prefs: []
+  type: TYPE_NORMAL
+- en: We’ll see how to answer these questions later. Now, let’s focus on tracing the
+    receive operation.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The challenge with the receive operation is that the message trace context is
+    available after the message is received and the corresponding operation is about
+    to end. We could add links to message trace contexts then, but it’s currently
+    only possible to add them at activity start time.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'This is likely to change, but for now, we’ll work around it by tracing the
+    receive-and-process iteration and adding an attribute with the received message
+    ID so we can find all spans that touched this message:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: consumer/SingleReceiver.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE8]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter11/consumer/SingleReceiver.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter11/consumer/SingleReceiver.cs)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Here, we receive at most one message from the queue. If a message was received,
+    we process it.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'One iteration is tracked with the `ReceiveAndProcess` activity, which becomes
+    a parent to the receiving operation. The message processing activity is created
+    in the `ProcessAndSettle` method and links to the `ReceiveAndProcess` activity,
+    as shown in *Figure 11**.4*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 11.4 – Link from processing to outer loop activity](img/B19423_11_04.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 11.4 – Link from processing to outer loop activity
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'If we follow the link, we’ll see an outer loop trace like the one shown in
+    *Figure 11**.5*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 11.5 – Trace representing the receive and process iteration](img/B19423_11_05.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 11.5 – Trace representing the receive and process iteration
+  prefs: []
+  type: TYPE_NORMAL
+- en: Since more and more observability backends are providing better support for
+    links, it can be more convenient to use them in your backend.
+  prefs: []
+  type: TYPE_NORMAL
+- en: With iteration instrumented, we can now correlate receiving and processing or
+    see how long a full loop cycle takes. This can help us understand whether consumers
+    are alive and trying to receive and process something.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We’re stamping the `messaging.message.id` attribute on all spans to simplify
+    finding all operations related to any given message.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Now, back to the nine-minute gap we saw in *Figure 11**.3*. What happened there
+    is that we got too many messages in the queue – they were produced faster than
+    we consumed them. By looking at gaps in individual traces, we can suspect that
+    message spent time in the queue, but can’t tell for sure. What we need is to see
+    the rate at which messages are published, processed, and deleted. We should also
+    understand how long messages spend in the queue and how big the queue is. Let’s
+    see how we can record and use such metrics.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Consumer metrics
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Similar to producers, we should enable common runtime and process metrics so
+    we know the resource utilization for consumer processes. We should also record
+    the processing loop duration, which will give us the error rate and throughput.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'From a messaging perspective, we’d also want to cover the following things:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The amount of time messages spend in the queue is a great indicator of consumer
+    health and scale. When there are not enough consumers, the amount of time spent
+    in the queue will grow and can be used to scale consumers up. When it decreases
+    consistently, it could serve as a signal to scale consumers down.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The number of messages in the queue provides similar data, but in real time.
+    It includes messages that have not yet been processed. Queue size metric can also
+    be recorded on the producer side without ever depending on the consumer.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: These metrics, or similar ones you can come up with, and their trends over time
+    provide a great indication of consumer health.
+  prefs: []
+  type: TYPE_NORMAL
+- en: These metrics increase if consumer performance degrades or the error rate increases.
+    They won’t be helpful if consumers fail to process messages but immediately delete
+    them from the queue, but this will manifest in high error rate. So, let’s go ahead
+    and instrument our application with these metrics.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Duration, throughput, and failure rate
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: We’re going to measure the processing loop duration, which includes trying to
+    receive a message and its processing. Measuring the receiving and processing duration
+    independently would be even more precise and is something to consider in your
+    production applications.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'At the beginning of the loop, we’ll start a stopwatch to measure operation
+    duration, and once processing completes, we’ll report it as a histogram along
+    with queue information and the status. Let’s first create the histogram instrument:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: consumer/SingleReceiver.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE9]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter11/consumer/SingleReceiver.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter11/consumer/SingleReceiver.cs)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: We create meter and duration instruments here as instance variables, which we
+    dispose of along with the `SingleReceiver` instance. The receiver extends the
+    `BackgroundService` interface and is registered in the dependency injection container
+    as a singleton, so they are all disposed of once the application shuts down.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The processing loop instrumentation can be done in the following way:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: consumer/SingleReceiver.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE10]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter11/consumer/SingleReceiver.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter11/consumer/SingleReceiver.cs)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Here, we record the duration of each iteration along with the queue information
+    and status. The status can have the following values: `ok`, `fail`, or `empty`
+    (if no messages were received). In real applications, you probably want to be
+    more precise and add a few more statuses to indicate the failure reason. For example,
+    it would be important to record why the receive operation failed, whether there
+    was a serialization or validation error, processing timed out, or it failed with
+    a terminal or transient error.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The `RecordLoopDuration` method implementation is shown in this snippet:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: consumer/SingleReceiver.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE11]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter11/consumer/SingleReceiver.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter11/consumer/SingleReceiver.cs)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: We’ll see how we can use this metric later in this chapter. Let’s first implement
+    consumer lag and queue size.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Consumer lag
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: In the code sample showing metrics in the processing loop, we called into the
+    `RecordLag` method as soon as we received a message. Consumer lag records the
+    approximate time a message spent in the queue – the delta between the receive
+    and enqueue time.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The enqueue time is recorded by the Azure Queue service and is exposed as a
+    property on the `QueueMessage` instance. We can record the metric with the following
+    code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: consumer/SingleReceiver.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE12]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter11/consumer/SingleReceiver.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter11/consumer/SingleReceiver.cs)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Here, we create a histogram that represents the lag (in seconds) and record
+    it for every received message as the difference between the current time and the
+    time at which the message was received by the broker.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note that these timestamps usually come from two different computers – the difference
+    can be negative and is not precise due to clock skew. The margin of error can
+    reach seconds but may, to some extent, be corrected within your system.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Clock skew should be expected, but sometimes things can go really wrong. I once
+    was involved in investigating an incident that took our service down in one of
+    the data centers. It happened because of the wrong time server configuration,
+    which moved the clock on one of the services back a few hours. It broke authentication
+    – the authentication tokens had timestamps from hours ago and were considered
+    expired.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Despite being imprecise, consumer lag should give us an idea of how long messages
+    spend in a queue. We record it every time a message is received, so it also reflects
+    redeliveries. Also, we record it before we know whether processing was successful,
+    so it does not have any status.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Before we record lag on the consumer, we first need to receive a message. When
+    we see a huge lag, it’s a good signal that something is not right, but it does
+    not tell us how many messages have not yet been received.
+  prefs: []
+  type: TYPE_NORMAL
+- en: For example, when the load is low and the queue is empty, there might be a few
+    invalid messages that are stuck there. It’s a bug, but it can be fixed during
+    business hours. To detect how big the issue is, we also need to know how many
+    messages are in the queue. Let’s see how to implement it.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Queue size
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: Azure Queue Storage as well as Amazon SQS allow us to retrieve an approximate
+    count of messages. We can register another `BackgroundService` implementation
+    to retrieve the count periodically. This can be done on the consumer or producer.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We’ll use a gauge instrument to report it, as shown in this code snippet:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: consumer/QueueSizeReporter.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE13]'
+  prefs: []
+  type: TYPE_PRE
+- en: https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter11/consumer/QueueSizeReporter.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We passed a callback that returns a `_currentQueueSize` instance variable.
+    We’re going to update it every several seconds as we retrieve the size from the
+    queue:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: consumer/QueueSizeReporter.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE14]'
+  prefs: []
+  type: TYPE_PRE
+- en: https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter11/consumer/QueueSizeReporter.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: That’s it – now we measure the queue size. This number alone does not tell the
+    entire story, but if it’s significantly different from the baseline or grows fast,
+    this is a great indication of a problem.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Once the load grows, the queue size will also go up and we may try to add more
+    consumers or optimize them. One of the typical optimizations is batching – it
+    helps reduce the number of network calls and would utilize consumer instances
+    better. Let’s see how we can instrument it.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Instrumenting batching scenarios
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Instrumentation for batching scenarios can be different depending on the use
+    case – transport-level batching needs a slightly different approach compared to
+    batch processing.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Batching on a transport level
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Messages can be batched together to minimize the number of network calls. It
+    can be used by producers or consumers, and systems such as Kafka, Amazon SQS,
+    or Azure Service Bus support batching on both sides.
+  prefs: []
+  type: TYPE_NORMAL
+- en: On the consumer, when multiple messages are received together but processed
+    independently, everything we had for single message processing still applies.
+  prefs: []
+  type: TYPE_NORMAL
+- en: From a tracing perspective, the only thing we’d want to change is to add attributes
+    that record all received message identifiers and batch size on the outer iteration
+    activity.
+  prefs: []
+  type: TYPE_NORMAL
+- en: From the metrics side, we’d also want to measure individual message processing
+    duration, error rate, and throughput. We can track them all by adding a message
+    processing duration histogram.
+  prefs: []
+  type: TYPE_NORMAL
+- en: When we send multiple messages in a batch, we still need to trace these messages
+    independently . To do so, we’d have to create an activity per message and inject
+    unique trace context into each message. The publish activity then should be linked
+    to all the messages being published.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The main question here is when to create a per-message activity and inject context
+    into the message. Essentially, the message trace context should continue the operation
+    that created the message. So, if we buffer messages from different unrelated operations
+    and then send them in a background thread, we should create message activities
+    when the message is created. Then, a batch publish operation will link to independent,
+    unrelated trace contexts.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The duration metric for the publish operation remains the same as for the single-message
+    case we implemented before, but we should consider adding another metric to describe
+    the batch size and the exact number of sent messages – we won’t be able to figure
+    it out from the publish duration.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Processing batches
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: In some cases, we process messages in batches, for example, when aggregating
+    data for analytic purposes, replicating or archiving received data. In such cases,
+    it’s just not possible to separate individual messages. Things get even more complicated
+    in scenarios such as routing or sharding, when a received batch is split into
+    several new batches and sent to the next destination.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We can record relationships using links – this will allow us to tell whether
+    (when and how many times) a message was received, and which processing operation
+    it contributed to.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Essentially, we create a batch-processing activity with links to all messages
+    being processed. Links have attributes and there we can put important message
+    metadata, such as the delivery count, message ID, or insertion time.
+  prefs: []
+  type: TYPE_NORMAL
+- en: From a metrics perspective, consumer lag (measured per message), queue size,
+    and processing duration (throughput and failure rate) still apply. We might also
+    want to report the batch size as a histogram.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs: []
+  type: TYPE_NORMAL
+- en: Message and batch processing are frequently done outside of messaging client
+    library control, by application code or integration frameworks. It’s rarely possible
+    for auto-instrumentation to trace or measure processing calls. These scenarios
+    vary a lot from application to application, requiring custom instrumentations
+    tuned to specific use cases and messaging systems.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Now that we have an idea of how to instrument messaging scenarios, let’s see
+    how we can use it in practice.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Performance analysis in messaging scenarios
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'We’re going to use our demo application to simulate a few common problems and
+    use signals we have to detect and debug issues. Let’s start the application with
+    the following command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE15]'
+  prefs: []
+  type: TYPE_PRE
+- en: It will run one producer and three consumers along with the observability stack.
+  prefs: []
+  type: TYPE_NORMAL
+- en: You can now send a request to the producer at `http://localhost:5051/send`,
+    which sends one message to the queue and returns receipt information as a response.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Now you need to add some load with the tool of your choice. If you use `bombardier`,
+    you can do it with the following command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE16]'
+  prefs: []
+  type: TYPE_PRE
+- en: It sends requests to the producer in one connection. You can play with a different
+    number of connections and consumers in the `docker-compose` command to see how
+    the metrics change.
+  prefs: []
+  type: TYPE_NORMAL
+- en: You might also want to install Grafana and import the dashboard from the book’s
+    repository (https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter11/grafana-dashboard.json)
+    to look at all metrics at once.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'How do we check whether the consumers are working properly? We can start with
+    consumer lag and queue size metrics. *Figure 11**.6* shows the 95th percentile
+    for consumer lag obtained with the following query:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE17]'
+  prefs: []
+  type: TYPE_PRE
+- en: '![Figure 11.6 – Consumer lag grows over time](img/B19423_11_06.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 11.6 – Consumer lag grows over time
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Consumer lag grows almost to 600 seconds, and if we look at the queue size,
+    as shown in *Figure 11**.7*, we’ll see there were up to about 11,000 messages
+    in the queue:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 11.7 – Queue size grows and then slowly goes down](img/B19423_11_07.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 11.7 – Queue size grows and then slowly goes down
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Here’s the query for the queue size:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE18]'
+  prefs: []
+  type: TYPE_PRE
+- en: Consumer lag stays high for a long time until all messages are processed at
+    around 19:32, but we can judge by the queue size that things started to improve
+    at 19:27.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The trend changed and the queue quickly shrunk because I stopped the application
+    and restarted it with 15 consumers.
+  prefs: []
+  type: TYPE_NORMAL
+- en: But now we have too many consumers and are wasting resources. We can check the
+    average batch size we retrieve – if it’s consistently and noticeably lower than
+    the configured batch size, we may slowly start decreasing the number of consumers,
+    leaving some buffer for bursts of load.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Now, let’s stop the load and add some errors. Send a malformed message with
+    `http://localhost:5051/send?malformed=true`. We should see that queue size remains
+    small, but consumer lag grows over time.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We can also see that despite no messages being sent, we’re receiving messages,
+    processing them, and failing repeatedly.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'For example, we can visualize it with the following query:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE19]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'It shows the rate of process-and-receive iterations grouped by queue name and
+    status. This is shown in *Figure 11**.8*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 11.8 – Processing rate grouped by status](img/B19423_11_08.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 11.8 – Processing rate grouped by status
+  prefs: []
+  type: TYPE_NORMAL
+- en: We can see here that from around 20:57, we attempt to receive messages about
+    four times per second. Three of these calls don’t return any messages, and in
+    the other case, processing fails. There are no successful iterations.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We sent a few malformed messages, and it seems they are being processed forever
+    – this is a bug. If there were more than a few such messages, they would keep
+    consumers busy and not let them process any valid messages.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'To confirm this suggestion, let’s look at the traces. Let’s open Jaeger at
+    `http://localhost:16686` and filter traces with errors that come from consumers.
+    One such trace is shown in *Figure 11**.9*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 11.9 – Failed receive-and-process iteration](img/B19423_11_09.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 11.9 – Failed receive-and-process iteration
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Here, we see that four messages were received, and the iteration failed with
+    an error. If we could add links to this operation, we would be able to navigate
+    to traces for each individual message. Instead, we have message ID stamped. Let’s
+    find the trace for one of these messages using the corresponding attribute. The
+    result is shown in *Figure 11**.10*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 11.10 – Trace for one of the failed messages](img/B19423_11_10.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 11.10 – Trace for one of the failed messages
+  prefs: []
+  type: TYPE_NORMAL
+- en: This does not look great – we have 3,000 spans for just one message. If we open
+    the trace and check out the `messaging.azqueues.message.dequeue_count` attribute
+    for the latest processing spans, we’ll see the message was received more than
+    1,000 times.
+  prefs: []
+  type: TYPE_NORMAL
+- en: To fix the issue, we should delete messages that fail validation. We also make
+    sure we do so for any other terminal error and introduce a limit to the number
+    of times a message is dequeued, after which the message is deleted.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We just saw a couple of problems that frequently arise in messaging scenarios
+    (but usually in less obvious ways) and used instrumentation to detect and debug
+    them. As observability vendors improve user experience for links, it will become
+    even easier to do such investigations. But we already have all the means to record
+    telemetry and correlate it in messaging flows.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Summary
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In this chapter, we explored messaging instrumentation. We started with messaging
+    specifics and the new challenges they bring to observability. We briefly looked
+    into OpenTelemetry messaging semantic conventions and then dived into producer
+    instrumentation. The producer is responsible for injecting trace context into
+    messages and instrumenting publish operations so that it’s possible to trace each
+    independent flow on consumers.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Then, we instrumented the consumer with metrics and traces. We learned how to
+    measure consumer health using queue size and lag and explored the instrumentation
+    options for batching scenarios. Finally, we saw how we can use instrumentation
+    to detect and investigate common messaging issues.
+  prefs: []
+  type: TYPE_NORMAL
+- en: With this, you’re prepared to instrument common messaging patterns and can start
+    designing and tuning instrumentation for advanced streaming scenarios.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In the next chapter, we’re going to design a comprehensive observability store
+    for databases and caching.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Questions
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: How would you measure end-to-end latency for an asynchronous operation? For
+    example, in a scenario when a user uploads a meme and it takes some time to process
+    and index it before it appears in search results.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: How would you report batch size as a metric? How it can be used?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: How would you approach baggage propagation in messaging scenarios
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL

@@ -1,0 +1,843 @@
+- en: '12'
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Instrumenting Database Calls
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In this chapter, we’re going to continue exploring instrumentation approaches
+    for popular distributed patterns and will look into database instrumentation.
+    We’ll use MongoDB as an example and combine it with Redis cache. We’ll add tracing
+    and metrics instrumentation for database and cache calls and discuss how to add
+    application context and provide observability in these composite scenarios. In
+    addition to client-side instrumentation, we’ll see how to also scrape Redis server
+    metrics with the OpenTelemetry Collector Finally, we’ll explore the generated
+    telemetry and see how it helps with analyzing application performance.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Here’s what you’ll learn about:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Tracing MongoDB operations
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Tracing Redis cache and logical calls
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Adding client- and server-side metrics
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Using telemetry to analyze failures and performance
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: By the end of this chapter, you’ll be familiar with generic database instrumentations
+    and will be able to instrument your own applications using databases or caches
+    and analyze their performance.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Technical requirements
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The code for this chapter is available in the book’s repository on GitHub at
+    [https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/tree/main/chapter12](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/tree/main/chapter12).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'To run the samples and perform analysis, we’ll need the following tools:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: .NET SDK 7.0 or later
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Docker and `docker-compose`
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Instrumenting database calls
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Databases are used in almost every distributed application. Many databases provide
+    advanced monitoring capabilities on the server side, which include database-specific
+    metrics, logs, or expensive query detection and analysis tools. Client instrumentation
+    complements it by providing observability on the client side of this communication,
+    correlating database operations, and adding application-specific context.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Client instrumentation describes an application’s communication with a database
+    ORM system, driver, or client library, which can be quite complicated performing
+    load balancing or batching operations in the background.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In some cases, it could be possible to trace network-level communication between
+    the client library and the database cluster. For example, if a database uses gRPC
+    or HTTP protocols, the corresponding auto-instrumentation would capture transport-level
+    spans. In this case, we would see transport-level spans as children of a logical
+    database operation initiated by the application.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Here, we’re going to instrument the logical level of the MongoDB C# driver to
+    demonstrate the principles that apply to other database instrumentations.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs: []
+  type: TYPE_NORMAL
+- en: Generic instrumentation for `MongoDB.Driver` is available in the `MongoDB.Driver.Core.Extensions.OpenTelemetry`
+    NuGet package.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Before we start the instrumentation, let’s check out OpenTelemetry semantic
+    conventions for databases.
+  prefs: []
+  type: TYPE_NORMAL
+- en: OpenTelemetry semantic conventions for databases
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: The conventions are available at [https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/database.md](https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/database.md).
+    They have an experimental status and may have changed by the time you access the
+    link.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Conventions define attributes for both logical and physical calls. In our case,
+    we are not instrumenting transport-level communication, so we will only use the
+    ones applicable to logical operations:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`db.system`: This is a required attribute that tracing backends use to distinguish
+    database spans from all others. It should match the `mongodb` string, which observability
+    backends may use to provide database or even MongoDB-specific analysis and visualizations.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`db.connection_string`: This is a recommended attribute. It’s also recommended
+    to strip credentials before providing it. We’re not going to add it to our custom
+    instrumentation. There could be cases where it’s useful to capture the connection
+    string (without credentials) as it can help detect configuration issues or we
+    can also log it once at start time.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`db.user`: This is yet another recommended attribute that captures user information
+    and is useful to detect configuration and access issues. We’re not going to capture
+    it since we have just one user.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`db.name`: This is a required attribute defining the database name.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`db.operation`: This is a required attribute that captures the name of the
+    operation being executed, which should match the MongoDB command name.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`db.mongodb.collection`: This is a required attribute that represents the MongoDB
+    collection name.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: In addition to database-specific attributes, we’re going to populate MongoDB
+    host information with `net.peer.name` and `net.peer.port` – generic network attributes.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Populating network-level attributes on logical calls is not always possible
+    or useful. For example, when a MongoDB driver is configured with multiple hosts,
+    we don’t necessarily know which one is used for a particular command. In practice,
+    we should use auto-instrumentation that operates on the command level, subscribing
+    to command events with `IEventSubscriber` (as described in the MongoDB documentation
+    at [http://mongodb.github.io/mongo-csharp-driver/2.11/reference/driver_core/events](http://mongodb.github.io/mongo-csharp-driver/2.11/reference/driver_core/events)).
+  prefs: []
+  type: TYPE_NORMAL
+- en: In addition to attributes, semantic conventions require the use of the client
+    kind on spans and providing a low-cardinality span name that includes the operation
+    and database name. We’re going to use the `{db.operation} {``db.name}.{db.mongodb.collection}`
+    pattern.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Now that we know what information to include in spans, let’s go ahead and instrument
+    a MongoDB operation.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Tracing implementation
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: In our application, we store records in a MongoDB collection and handle all
+    communication with the collection in a custom `DatabaseService` class.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let’s start by instrumenting an operation that reads a single record from a
+    collection:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: DatabaseService.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE0]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter12/database/DatabaseService.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter12/database/DatabaseService.cs)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Here, we trace the `Find` method call. We use the `GetOperation` constant as
+    the operation name, which is set to `FindSingleOrDefault` – a synthetic name describing
+    what we do here. If the MongoDB command throws an exception, we set the activity
+    status to `error`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let’s look in the `StartMongoActivity` method implementation:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: DatabaseService.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE1]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter12/database/DatabaseService.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter12/database/DatabaseService.cs)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Here, we populate the activity name, kind, and attributes from the semantic
+    conventions mentioned previously. The host, port, database name, and collection
+    name are populated from the MongoDB settings provided via configuration and captured
+    at construction time.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'A similar approach could be used for any other operation. For bulk operations,
+    we may consider adding more context to describe individual requests in the array
+    attribute, as shown in this code snippet:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: DatabaseService.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE2]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter12/database/DatabaseService.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter12/database/DatabaseService.cs)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: This instrumentation is very generic – it does not record anything application-specific
+    even though it knows the type of the record. For example, we could add a record
+    identifier as an attribute or set the status to `error` if no records were found.
+    These are all valid things to do if you’re going to stick with specialized manual
+    instrumentation, but it’s more common to use a shared one when possible.
+  prefs: []
+  type: TYPE_NORMAL
+- en: So, how do we record application-specific context along with generic database
+    instrumentation? One solution would be to enrich auto-collected activities as
+    we did in [*Chapter 5*](B19423_05.xhtml#_idTextAnchor083), *Configuration and*
+    *Control Plane*.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Another solution is to add another layer of logical activities around database
+    and cache calls. Before we do this, let’s learn how to trace cache calls.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Tracing cache calls
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Caches such as Redis and Memcached are a special class of databases and are
+    covered by database semantic conventions too. Instrumenting cache calls according
+    to conventions is beneficial as it helps you to stay consistent across all services
+    and to get the most out of your tracing backends in terms of visualization and
+    analysis.
+  prefs: []
+  type: TYPE_NORMAL
+- en: So, let’s instrument Redis according to database conventions and add cache-specific
+    context. There is nothing specifically defined in OpenTelemetry for caches, so
+    let’s design something of our own.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs: []
+  type: TYPE_NORMAL
+- en: Auto-instrumentation for the `StackExchange.Redis` client is available in the
+    `OpenTelemetry.Instrumentation.StackExchangeRedis` NuGet package.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'When it comes to tracing, we want to know typical things: how long a call took,
+    whether there was an error, and what operation was attempted. Cache-specific things
+    include an indication whether an item was retrieved from the cache or the expiration
+    strategy (if it’s conditional) for set operations.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let’s go ahead and instrument a `Get` call – it looks pretty similar to the
+    database instrumentation we saw in the previous section:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: CacheService.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE3]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter12/database/CacheService.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter12/database/CacheService.cs)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Here, we created an activity to trace a `GetString` call to Redis. If a record
+    is found, we set the `cache.hit` attribute to `true`, and if an exception happens,
+    we set the activity status to `error` and include an exception message.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let’s take a look at the attributes that are set in the `StartCacheActivity`
+    method:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: CacheService.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE4]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter12/database/CacheService.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter12/database/CacheService.cs)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: In this snippet, we start a client activity with the name matching the operation
+    name. We also set all the applicable database and network attributes and add a
+    Redis-specific attribute defined by OpenTelemetry – `db.redis.database_index`.
+    Network attributes, which describe the host, port, IP address, and network family,
+    are populated from Redis configuration options. The `SetTagIfNotNull` method is
+    an extension method defined in our project.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Here, we have the same problem as with MongoDB – Redis configuration options
+    may include multiple servers and we don’t know which one is going to be used for
+    a specific call. The instrumentation in the `OpenTelemetry.Instrumentation.StackExchangeRedis`
+    package (we took a quick look at it in [*Chapter 3*](B19423_03.xhtml#_idTextAnchor052),
+    *The .NET Observability Ecosystem*) provides more precise information.
+  prefs: []
+  type: TYPE_NORMAL
+- en: This instrumentation is very generic for the same reasons as for MongoDB – in
+    most cases, we’d rather enrich auto-instrumentation or add another layer of application-specific
+    spans than write a custom instrumentation. So, let’s see how we can add the context
+    by adding another layer of instrumentation.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Instrumenting composite calls
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: With MongoDB and Redis calls instrumented independently and in a generic way,
+    it could be hard to answer questions such as “How long did it take to retrieve
+    a record with a specific ID?” or “How long did retrieval take?” given it involved
+    a call to the cache, a call to the database, and then another call to the cache.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We did not add a record identifier attribute to query on and we only know the
+    duration of individual calls that don’t really describe the overall operation.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In the following example, we’re adding an extra layer of instrumentation that
+    traces logical operations with a record identifier:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: RecordsController.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE5]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter12/database/Controllers/RecordsController.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter12/database/Controllers/RecordsController.cs)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Here, we wrap the sequence of calls in the `GetRecord` activity – it has an
+    `internal` kind and just two attributes: `app.record.id` (which captures the record
+    identifier) and `cache.hit` (describing whether the record was retrieved from
+    the database).'
+  prefs: []
+  type: TYPE_NORMAL
+- en: We also provide a `not found` status description when nothing is found and can
+    report other known issues in the same way.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In the case of our demo application, the encompassing database and cache spans
+    almost match the ASP.NET Core ones in terms of status and duration, but in practice,
+    controller methods do many other things. The encompassing operation helps us separate
+    all spans and logs related to record retrieval.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Now that we have an idea of how to approach tracing, let’s explore metrics.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Adding metrics
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: With databases, it’s common to monitor connections and query execution count
+    and duration, contention, and resource utilization in addition to technology-specific
+    things. The MongoDB cluster reports a set of such metrics that you can receive
+    with OpenTelemetry Collector (check it out at https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/mongodbreceiver).
+    These metrics provide the server side of the story. We should also add client-side
+    duration metrics. It’d help us account for connectivity issues and network latency.
+  prefs: []
+  type: TYPE_NORMAL
+- en: OpenTelemetry semantic conventions only document connection metrics for now.
+    We could record them by implementing an `IEventSubscriber` interface and listening
+    to connection events.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Instead, we’re going to record the basic operation duration, which also allows
+    us to derive the throughput and failure rate and slice and dice by operation,
+    database, or collection name.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let’s get back to the `Get` operation code and see how the metric can be added.
+    First, we’ll create a duration histogram:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: DatabaseService.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE6]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter12/database/DatabaseService.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter12/database/DatabaseService.cs)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Now that we have a histogram, we can record the duration for each operation:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: DatabaseService.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE7]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter12/database/DatabaseService.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter12/database/DatabaseService.cs)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Here, we call into the `TrackDuration` method and pass a stopwatch that tracks
+    the duration, the low-cardinality operation name, and an exception (if any). Here’s
+    the `TrackDuration` method:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: DatabaseStatus.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE8]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter12/database/DatabaseService.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter12/database/DatabaseService.cs)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Here, we add all the attributes we used for tracing and a new one – `db.mongodb.status`.
+    We use the exception type as a status to make sure that metric cardinality stays
+    low.
+  prefs: []
+  type: TYPE_NORMAL
+- en: While the idea of using the exception type looks compelling and easy, it only
+    works when we use the same MongoDB driver in the same language across the system.
+    Even then, statuses might change over time with driver updates. In a real production
+    scenario, I would recommend mapping known exceptions to language-agnostic status
+    codes. It also makes sense to test corresponding cases and check that proper error
+    codes are captured. It’s important if your alerts are based on specific codes.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The duration histogram and the metrics we can derive from it at query time cover
+    common monitoring needs (throughput, latency, and error rate). We could also use
+    it to do capacity analysis and make better design decisions. For example, before
+    adding a cache in front of the database, we could check the read-to-write ratio
+    to see whether caching would be helpful.
+  prefs: []
+  type: TYPE_NORMAL
+- en: With custom queries over traces, we could also estimate how frequently the same
+    records are accessed. This would help us pick a suitable expiration strategy.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Recording Redis metrics
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'In addition to common database concerns, we want to measure cache-specific
+    things: the hit-to-miss ratio, key expiration, and the eviction rate. This helps
+    optimize and scale the cache.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: These metrics are reported by Redis and can be captured with the Redis receiver
+    for OpenTelemetry Collector, available at https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/redisreceiver.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We can enable them with the following configuration:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: configs/otel-collector-config.yml
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE9]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter12/configs/otel-collector-config.yml](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter12/configs/otel-collector-config.yml)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: OpenTelemetry Collector connects to a Redis instance and scrapes available metrics
+    from it. Redis exposes multiple metrics, including uptime and resource utilization
+    metrics and, most importantly, counters measuring command rate, hits, misses,
+    expirations, evictions, and average time to live. With these, we can monitor Redis’
+    health and see whether it’s used efficiently and where the bottlenecks are.
+  prefs: []
+  type: TYPE_NORMAL
+- en: For example, a low hit-to-miss ratio could indicate that we’re not utilizing
+    the cache well and potentially could tune caching parameters to make it more efficient.
+    First, we should make sure caching makes sense – usually, it does when at least
+    some items are read more frequently than they are modified. We also need the interval
+    between reads to be relatively low.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'If, based on the collected data, we decided to add a cache, we can optimize
+    its configuration further by looking into other cache metrics:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: A high key eviction rate can tell us if we don’t have enough memory and keys
+    are evicted before items are read. We might want to scale Redis vertically or
+    horizontally or change the eviction policy to better match the usage pattern.
+    For example, if we have a relatively low number of periodically accessed items,
+    a **least frequently used** (**LFU**) policy could be more efficient than the
+    **least recently used** (**LRU**) one.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: If we see a low eviction but high expiration rate, it could mean that the expiration
+    time is too low – items are read less frequently than we expected. We can try
+    to gradually increase the expiration time or disable it and rely on eviction policy
+    instead.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: In addition to server-side metrics, we’ll also add a client-side duration histogram.
+    It allows us to record call duration distribution with command and other database-specific
+    dimensions. The implementation is almost identical to the MongoDB duration metric.
+    The only difference is that we’re going to add the `cache.hit` attribute to the
+    metrics for the `GetString` operation. This could be helpful when server-side
+    metrics are not available or there are multiple different operations we want to
+    measure a hit ratio for independently of each other.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Now that we have all the database traces and metrics in place, let’s bring all
+    the pieces together and see how we use this telemetry in practice.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Analyzing performance
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Let’s first run the demo application using the `$ docker-compose up --build`
+    command. It will start local MongoDB and Redis instances along the application
+    and observability stack.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'You can create some records with a tool such as `curl`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE10]'
+  prefs: []
+  type: TYPE_PRE
+- en: It should return a list of record identifiers the service created.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Now, let’s look at the Jaeger trace at `http://localhost:16686`, like the one
+    shown in *Figure 12**.1*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 12.1 – Trace showing bulk record creation](img/B19423_12_01.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 12.1 – Trace showing bulk record creation
+  prefs: []
+  type: TYPE_NORMAL
+- en: We see a controller span (`Records`) and then `CreateRecords`, which describes
+    a database-and-cache-encompassing operation. It’s a parent of the `BulkWrite`
+    span, which describes a MongoDB call and three individual Redis spans – one for
+    each record.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note that the controller and the `CreateRecords` spans end before caching is
+    complete, because we don’t wait for it. Anything that happens within the `SetString`
+    operation would still be properly correlated despite the parent request being
+    complete.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'If we were to wait about 10 seconds and try to get one of the records (by calling
+    `http://localhost:5051/records/{id}`), we’d see a trace like the one shown in
+    *Figure 12**.2*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 12.2 – Trace showing record retrieval from the database](img/B19423_12_02.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 12.2 – Trace showing record retrieval from the database
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'If we get the same record within 10 seconds, we’ll see it’s returned from the
+    cache, as shown in *Figure 12**.3*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: "![Figure 12.3 – Trace showing record retrieval from\uFEFF the cache](img/B19423_12_03.jpg)"
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 12.3 – Trace showing record retrieval from the cache
+  prefs: []
+  type: TYPE_NORMAL
+- en: By looking at individual traces, we can now quickly see whether records were
+    retrieved from the cache or the database. We can also find all operations that
+    happened across all traces for a specific record using the `app.record.id` attribute
+    or write ad hoc queries using the `cache.hit` flag.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Let’s now simulate a failure by stopping the Redis container with `$ docker`
+    `stop chapter12-redis-1`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: If we try to get one of the records again, the application will return the `500
+    – Internal Server Error` response. The trace predictably shows that the call to
+    Redis failed with `RedisConnectionException`. We might want to change this behavior,
+    and if the Redis call fails, retrieve the record from the database.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'If we did this, we’d see a trace similar to the one shown in *Figure 12**.4*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 12.4 – Trace showing Redis call failures with fallback to database](img/B19423_12_04.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 12.4 – Trace showing Redis call failures with fallback to database
+  prefs: []
+  type: TYPE_NORMAL
+- en: Here, calls to Redis failed, but the overall operation succeeded. You can reproduce
+    it if you comment out the `throw` statement on line 63 in `CacheService.cs` and
+    then rerun the application with `$ docker-compose` `up --build`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Let’s check what happens with metrics in this case. We can start by applying
+    some load with `loadgenerator$ dotnet run -c Release --rate 50`. Give it a few
+    minutes to stabilize and let’s check our application’s performance.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let’s first check out the service throughput with the following query in Prometheus
+    (at `http://localhost:9090`):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE11]'
+  prefs: []
+  type: TYPE_PRE
+- en: As we’ll see in *Figure 12**.6*, throughput stabilizes at around 40-50 requests
+    per second – that’s what we configured in the `rate` parameter.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Then, we can check the 50th percentile for latency with the following query:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE12]'
+  prefs: []
+  type: TYPE_PRE
+- en: Later, in *Figure 12**.7*, we’ll see that responses are blazing fast – the 50th
+    percentile for latency is just a few milliseconds.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Spoiler
+  prefs: []
+  type: TYPE_NORMAL
+- en: If we checked the 95th percentile for latency, we’d notice it is much bigger,
+    reaching 200-300 milliseconds. MongoDB shows these spikes in latency because container
+    resources are constrained for demo purposes.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let’s now check the cache hit rate. We can derive it from Redis server metrics
+    or a client operation duration histogram. The following query uses the latter
+    approach:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE13]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The query gets the rate of the `GetString` operation on Redis with the `cache.hit`
+    attribute set to `true` and divides it by the overall `GetString` operation success
+    rate. It also multiplies the ratio by 100 to calculate the hit percentage, which
+    is around 80%, as we can see in *Figure 12**.5*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 12.5 – Redis hit rate for the GetString method](img/B19423_12_05.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 12.5 – Redis hit rate for the GetString method
+  prefs: []
+  type: TYPE_NORMAL
+- en: So, the cache is used and it handles 80% of read requests. Let’s see what happens
+    if we stop it with the `$ docker stop` `chapter12-redis-1` command.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Tip
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'With this exercise, you may find it interesting to explore the effect of recording
+    exceptions from Redis. Once the Redis container is stopped, every call to Redis
+    will result in an exception being recorded. In the case of our tiny application,
+    it alone increases the telemetry volume tenfold. Check it out yourself with the
+    following Prometheus query:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE14]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Immediately after the Redis container is stopped (at around 14:48), the application
+    throughput starts to decrease to less than one record per second, as shown in
+    *Figure 12**.6*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 12.6 – Application throughput before and after the Redis container
+    is stopped](img/B19423_12_06.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 12.6 – Application throughput before and after the Redis container is
+    stopped
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'HTTP latency (the 50th percentile) increases from a few milliseconds to several
+    seconds, as you can see in *Figure 12**.7*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 12.7 – Application latency 50th percentile before and after Redis
+    container is stopped](img/B19423_12_07.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 12.7 – Application latency 50th percentile before and after Redis container
+    is stopped
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The spikes in HTTP latency are consistent with the MongoDB latency increase
+    shown in *Figure 12**.8*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 12.8 – MongoDB latency (p50) in milliseconds](img/B19423_12_08.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 12.8 – MongoDB latency (p50) in milliseconds
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Finally, we should check what happened with MongoDB throughput: since Redis
+    no longer handles 80% of read requests, the load on the database increases and,
+    initially, it tries to catch up, as you can see in *Figure 12**.9*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 12.9 – MongoDB throughput before and after the container is stopped](img/B19423_12_09.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 12.9 – MongoDB throughput before and after the container is stopped
+  prefs: []
+  type: TYPE_NORMAL
+- en: The resources on a MongoDB container are significantly constrained and it can’t
+    handle such a load.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'If we check the traces, we’ll see the MongoDB call takes significantly longer
+    and is the root cause of slow application responses and low throughput. An example
+    of such a trace is shown in *Figure 12**.10*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: "![Figure 12.10 – Trace showing \uFEFFa long MongoDB request when Redis is stopped](img/B19423_12_10.jpg)"
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 12.10 – Trace showing a long MongoDB request when Redis is stopped
+  prefs: []
+  type: TYPE_NORMAL
+- en: If you now start Redis with the `$ docker start chapter12-redis-1` command,
+    the throughput and latency will be restored to the original values within a few
+    minutes.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We did this analysis knowing the root cause, but it also works as a general
+    approach – when service-level indicators such as latency and throughput change
+    drastically, we should check the state and health of service dependencies. The
+    findings here are that we need to protect the database better, for example, by
+    adding a few more (potentially smaller) Redis instances that would handle the
+    load if one of them goes down. We may also consider rate-limiting calls to the
+    database on the service side, so it stays responsive, even with lower throughput.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Summary
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In this chapter, we explored database instrumentation. We started by looking
+    into OpenTelemetry semantic conventions for databases and implemented tracing
+    for MongoDB. Then, we added similar instrumentation for Redis and encompassing
+    calls. We saw how to provide application-specific context on encompassing spans
+    and record whether data was retrieved from the cache or database to improve performance
+    analysis across traces.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Then, we added metrics, including client duration histograms for MongoDB and
+    Redis along with server-side metrics for Redis that help analyze and optimize
+    cache usage, starting with the hit ratio, which we were able to measure.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Finally, we simulated a Redis outage and saw how collecting telemetry makes
+    it easy to detect and analyze what went wrong and how the outage progressed. We
+    also found several issues in our application that make it unreliable.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Now you’re ready to start instrumenting database calls in your application or
+    enrich auto-collected telemetry with additional traces and metrics.
+  prefs: []
+  type: TYPE_NORMAL
+- en: This concludes our journey through instrumentation recipes. In the next chapter,
+    we’ll talk about organizational aspects of adopting and evolving tracing and observability.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Questions
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: How would you approach instrumenting a database change feed (the event stream
+    exposed by the database that notifies about changes to database records)? For
+    example, an application can subscribe to a notification that the cloud provider
+    will send when a blob is created, updated, or removed from cloud storage (which
+    we can consider to be a database).
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Would it make sense to record calls to Redis as events/logs instead of spans?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Try removing resource limitations on the MongoDB container and check what happens
+    if we kill Redis now.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Part 4: Implementing Distributed Tracing in Your Organization'
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: This part walks through the sociotechnical aspects of observability adoption
+    – making an initial push and improving it further, developing telemetry standards
+    within your company, and instrumenting new parts of a system in the presence of
+    legacy services.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'This part has the following chapters:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[*Chapter 13*](B19423_13.xhtml#_idTextAnchor206), *Driving Change*'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[*Chapter 14*](B19423_14.xhtml#_idTextAnchor220), *Creating Your Own Conventions*'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[*Chapter 15*](B19423_15.xhtml#_idTextAnchor233), *Instrumenting Brownfield
+    Applications*'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL

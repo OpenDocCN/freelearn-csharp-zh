@@ -1,0 +1,1520 @@
+- en: '7'
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'Data Access in ASP.NET Core (Part 3: Tips)'
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'In [*Chapter 6*](B18971_06.xhtml#_idTextAnchor245), we learned how to manage
+    relationships between entities using the EF Core Fluent API. We introduced three
+    types of relationships: one-to-one, one-to-many, and many-to-many. We also learned
+    how to perform **CRUD** operations on related entities. With the knowledge we
+    gained from [*Chapter 6*](B18971_06.xhtml#_idTextAnchor245), we can now build
+    a simple data access layer for most web API applications. However, there are still
+    some scenarios that we need to handle properly. For example, how do we improve
+    the performance of data access? And what should we do if there are concurrency
+    conflicts?'
+  prefs: []
+  type: TYPE_NORMAL
+- en: In this chapter, we will cover some advanced topics related to data access in
+    ASP.NET Core, including `DbContext` pooling, performance optimization, raw SQL
+    queries, and concurrency conflicts. We will also discuss some tips and tricks
+    that can help you write better code.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We will cover the following topics:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`DbContext` pooling'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Tracking versus no-tracking queries
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: IQueryable versus IEnumerable
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Client versus server evaluation
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Raw SQL queries
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Bulk operations
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Concurrency conflicts
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Reverse engineering
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Other ORM frameworks
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: After reading this chapter, you will have gained a deeper understanding of EF
+    Core and be able to use it more effectively in your applications. You will have
+    learned how to use no-tracking queries to improve query performance, as well as
+    how to use raw SQL queries to execute complex queries. Additionally, you will
+    understand how to use bulk operations to improve the performance of bulk data
+    operations. Furthermore, you will be able to handle concurrency conflicts for
+    large-scale applications and use reverse engineering to generate the entity classes
+    and the `DbContext` class from an existing database.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Technical requirements
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The code examples in this chapter can be found at [https://github.com/PacktPublishing/Web-API-Development-with-ASP.NET-Core-8](https://github.com/PacktPublishing/Web-API-Development-with-ASP.NET-Core-8).
+    You can use VS 2022 or VS Code to open the solutions.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Understanding DbContext pooling
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In the previous chapter, we learned how to register the `DbContext` instance
+    as a scoped service in the DI container using the `AddDbContext()` extension method.
+    By default, a new `DbContext` instance is created for each request, which is generally
+    not a problem since it is a lightweight object that does not consume many resources.
+    However, in a high-throughput application, the cost of setting up various internal
+    services and objects for each `DbContext` instance can add up. To address this,
+    EF Core provides a feature called `DbContext` instance to be reused across multiple
+    requests.
+  prefs: []
+  type: TYPE_NORMAL
+- en: To enable `DbContext` pooling, you can replace the `AddDbContext()` method with
+    the `AddDbContextPool()` method. This resets the state of the `DbContext` instance
+    when it is disposed of, stores it in a pool, and reuses it when a new request
+    comes in. By reducing the cost of setting up the `DbContext` instance, `DbContext`
+    pooling can significantly improve the performance of your application for high-throughput
+    scenarios.
+  prefs: []
+  type: TYPE_NORMAL
+- en: You can find the sample code for this section from the `/samples/chapter7/EfCoreDemo`
+    folder in this chapter's GitHub repository.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Open the `Program.cs` file in the `EfCoreDemo` project. The following code
+    shows how to enable `DbContext` pooling:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE0]'
+  prefs: []
+  type: TYPE_PRE
+- en: The `AddDbContextPool()` method takes a `poolSize` parameter, which specifies
+    the maximum number of `DbContext` instances that can be stored in the pool. The
+    default value is `1024`, which is usually sufficient for most applications. If
+    the pool is full, EF Core will start creating new `DbContext` instances as needed.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'To validate whether `DbContext` pooling can improve the performance of the
+    application, we can run a performance test. **Grafana k6** is an open-source load-testing
+    tool that can be used to test the performance of web APIs. To use k6, you need
+    to install NodeJS here: [https://nodejs.org/](https://nodejs.org/). Then you can
+    download it from [https://k6.io/docs/get-started/installation/](https://k6.io/docs/get-started/installation/).
+    k6 has packages for various platforms, including Windows, Linux, and macOS. Install
+    k6 on your machine.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'You can find a `script.js` file in the `k6` folder in the project. The `script.js`
+    file is a k6 script that contains the test scenarios. The following code shows
+    the content of the `script.js` file:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE1]'
+  prefs: []
+  type: TYPE_PRE
+- en: This is a basic k6 test script that runs a 30-second, 500-VU load test. `GET`
+    requests to the `/api/Invoices?page=1&pageSize=10` endpoint for 30 seconds.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'First, use the `AddDbContext()` method to register the `DbContext`, and run
+    the application using the `dotnet run` command. Then, open a new terminal and
+    run the following command to start the k6 test:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE2]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Next, use the `AddDbContextPool()` method to register the `DbContext`, and
+    test the application again using the same k6 script. You can compare the results
+    of the two tests to see whether `DbContext` pooling improves the performance of
+    the application. For example, one test result of using the `AddDbContext()` method
+    is as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 7.1 – The test result of using the AddDbContext() method](img/B18971_07_1.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 7.1 – The test result of using the AddDbContext() method
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following is the result of using the `AddDbContextPool` method:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 7.2 – The test result of using the AddDbContextPool() method](img/B18971_07_2.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 7.2 – The test result of using the AddDbContextPool() method
+  prefs: []
+  type: TYPE_NORMAL
+- en: When using `AddDbContext()`, the average request duration is 1.07 s and 7,145
+    requests are completed, while when using `AddDbContextPool()`, the average request
+    duration is 782.36 ms and 8,530 requests are completed. The results show that
+    `DbContext` pooling can improve the performance of the application. Note that
+    your results may vary depending on your machine’s configuration. Also, the `dotnet
+    run` command is used to run the application in development mode, which is not
+    optimized for performance. So, this test is just for demonstration purposes and
+    cannot reflect the real performance of the application. However, it can give you
+    an idea of how `DbContext` pooling works.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Important note
+  prefs: []
+  type: TYPE_NORMAL
+- en: For most applications, `DbContext` pooling is not necessary. You should enable
+    `DbContext` pooling only if you have a high-throughput application. Therefore,
+    before enabling `DbContext` pooling, it is important to test your application’s
+    performance with and without it to see whether there’s any noticeable improvement.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In summary, while `DbContext` pooling can improve the performance of high-throughput
+    applications, it’s not a one-size-fits-all solution. Be sure to evaluate your
+    application’s specific needs before deciding whether to enable `DbContext` pooling
+    or not.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Understanding the difference between tracking versus no-tracking queries
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In this section, we will discuss the difference between tracking and no-tracking
+    queries. What are tracking queries and no-tracking queries? Let us start from
+    the beginning!
+  prefs: []
+  type: TYPE_NORMAL
+- en: In the early days of .NET, the term **SqlHelper** was popular to refer to a
+    static class that provided a set of methods to execute SQL queries. While SqlHelper
+    simplified the process of executing SQL queries, developers still had to manage
+    connection and transaction objects, write boilerplate code to map results to model
+    objects, and work directly with the database.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**ORM** frameworks such as EF Core were created to solve these problems. They
+    not only simplify the process of executing SQL queries and mapping the results
+    to model objects but also provide the ability to track changes made to the entities
+    returned by queries. When changes are saved, EF Core generates the appropriate
+    SQL queries to update the database. This is called tracking and is a significant
+    benefit of using an ORM framework such as EF Core.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: However, tracking comes at a cost. This can add overhead and memory usage, especially
+    when dealing with a large number of entities.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We introduced a little bit about tracking in [*Chapter 5*](B18971_05.xhtml#_idTextAnchor198).
+    Let's see an example of tracking. You can find the sample code for this section
+    from the `/samples/chapter7/EfCoreDemo` folder in this chapter's GitHub repository.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In the sample `EfCoreDemo` project, you can find the `GetInvoice` action in
+    the `InvoicesController` class. The following code shows how the tracking works:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE3]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'In the preceding code, we added some logging statements to see how EF Core
+    calls the database. Run the application and call the `GetInvoice` action. You
+    will see an output in the console like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE4]'
+  prefs: []
+  type: TYPE_PRE
+- en: When we call the `context.Invoices.FindAsync(id)` method for the first time,
+    EF Core will query the database and return the `Invoice` entity. The second time,
+    EF Core will return the `Invoice` entity from the context because the `Invoice`
+    entity is already in the context.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Find() versus Single()
+  prefs: []
+  type: TYPE_NORMAL
+- en: When we get an entity from the database by its primary key, we can use the `Find()`
+    or `FindAsync()` methods. Also, we can use the `Single()` or `SingleOrDefault()`
+    methods. They are similar, but they are not the same. The `Find()` and `FindAsync()`
+    methods are methods of the `DbSet` class. If an entity with the given primary
+    key values is being tracked by the context, the `Find()` or `FindAsync()` methods
+    will return the tracked entity without making a request to the database. Otherwise,
+    EF Core will make a query to the database to get the entity, attach it to the
+    context, and return it. But if you use the `Single()` or `SingleOrDefault()` methods,
+    EF Core will always make a query to the database to get the entity. The same is
+    true for the `First()` and `FirstOrDefault()` methods. So, the `Find()` and `FindAsync()`
+    methods are more efficient for getting an entity by its primary key. But in rare
+    cases, `Find()` and `FindAsync()` may return outdated data if the entity is updated
+    in the database after it is loaded into the context. For example, if you use the
+    bulk-update `ExecuteUpdateAsync()` method, the update will not be tracked by `DbContext`.
+    Then, if you use `Find()` or `FindAsync()` to get the entity from `DbContext`,
+    you will get the outdated data. In this case, you should use `Single()` or `SingleOrDefault()`
+    to get the entity from the database again. In most cases, you can use the `Find()`
+    or `FindAsync()` methods to get an entity by its primary key when you are sure
+    the entity is always tracked by the `DbContext`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'An entity has one of the following `EntityState` values: `Detached`, `Added`,
+    `Unchanged`, `Modified`, or `Deleted`. We introduced the `EntityState` enum in
+    [*Chapter 5*](B18971_05.xhtml#_idTextAnchor198). The following is how the states
+    change:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: All the entities that are returned by the query (such as `Find()`, `Single()`,
+    `First()`, `ToList()`, and their `async` overloads) are in the `Unchanged` state
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: If you update the properties of the entity, EF Core will change the state to
+    `Modified`
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: If you call the `Remove()` method on the entity, EF Core will change the state
+    to `Deleted`
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: If you call the `Add()` method on the entity, EF Core will change the state
+    to `Added`
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: If you call the `Attach()` method on the untracked entity, EF Core will track
+    the entity and set the state to `Unchanged`
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: If you call the `Detach()` method on the tracked entity, EF Core will not track
+    the entity and will change the state to `Detached`
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Note that EF Core can track the changes at the property level, meaning that
+    if you update a property of an entity, EF Core will only update the property when
+    you call the `SaveChanges` method.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'To retrieve the `EntityEntry` object for an entity, we can use the `Entry()`
+    method, which contains the state of the entity and the changed properties. Use
+    the sample `EfCoreDemo` project in the `/samples/chapter7/EfCoreDemo` folder.
+    You can find the `PutInvoice` action within the `InvoicesController` class:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE5]'
+  prefs: []
+  type: TYPE_PRE
+- en: In the preceding code snippet, we obtained the `EntityEntry` object for the
+    `Invoice` entity using the `Entry()` method and set its state to `Modified`. When
+    `SaveChanges()` is called, EF Core persists the changes to the database.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'By default, tracking is enabled in EF Core. However, there may be scenarios
+    where you do not want EF Core to track changes to entities. For instance, in read-only
+    queries within `Get` actions, where the `DbContext` only exists for the duration
+    of the request, tracking is not necessary. Disabling tracking can enhance performance
+    and save memory. If you don’t intend to modify entities, you should disable tracking
+    by calling the `AsNoTracking()` method on the query. Here’s an example:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE6]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'If you have lots of read-only queries and you feel it is tedious to call the
+    `AsNoTracking()` method every time, you can disable tracking globally when you
+    configure the `DbContext`. The following code shows how to do this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE7]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'For any other queries that you want to track, you can call the `AsTracking()`
+    method on the query, as shown in the following code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE8]'
+  prefs: []
+  type: TYPE_PRE
+- en: In the preceding code, we explicitly call the `AsTracking()` method to enable
+    tracking for the query, so that we can update the entity and save the changes
+    to the database.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Important note
+  prefs: []
+  type: TYPE_NORMAL
+- en: If an entity is a keyless entity, EF Core will never track it. Keyless entity
+    types do not have keys defined on them. They are configured by a `[Keyless]` data
+    annotation or a Fluent API `HasNoKey()` method. The keyless entity is often used
+    for read-only queries or views. We will not discuss keyless entities in detail
+    in this book. You can refer to the official documentation at [https://learn.microsoft.com/en-us/ef/core/modeling/keyless-entity-types](https://learn.microsoft.com/en-us/ef/core/modeling/keyless-entity-types)
+    for more information.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Using no-tracking queries is a good way to improve performance for read-only
+    scenarios. However, keep in mind that if you disable tracking, you will not be
+    able to update the entities when you call the `SaveChanges()` method because EF
+    Core cannot detect changes to untracked entities. So, it is important to consider
+    the implications of using no-tracking queries before implementing them.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In addition to non-tracking queries, there are other factors that can affect
+    the performance of data queries in EF Core. We will explore the differences between
+    `IQueryable` and `IEnumerable` and how they impact query performance in the next
+    section.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Understanding the difference between IQueryable and IEnumerable
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'When working with EF Core, you have two interfaces available to query the database:
+    `IQueryable` and `IEnumerable`. Although these interfaces may seem similar at
+    first glance, they have important differences that can affect your application’s
+    performance. In this section, we will discuss the differences between `IQueryable`
+    and `IEnumerable`, how they work, and when to use each of them.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: You might be familiar with the `IEnumerable` interface. The `IEnumerable` interface
+    is a standard .NET interface that is used to represent a collection of objects.
+    It is used to iterate through the collection. Many .NET collections implement
+    the `IEnumerable` interface, such as `List`, `Array`, `Dictionary`, and so on.
+    The `IEnumerable` interface has a single method called `GetEnumerator`, which
+    returns an `IEnumerator` object. The `IEnumerator` object is used to iterate through
+    the collection.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The first difference between `IQueryable` and `IEnumerable` is that `IQueryable`
+    is in the `System.Linq` namespace, while `IEnumerable` is in the `System.Collections`
+    namespace. The `IQueryable` interface inherits from the `IEnumerable` interface,
+    so `IQueryable` can do everything that `IEnumerable` does. But why do we need
+    the `IQueryable` interface?
+  prefs: []
+  type: TYPE_NORMAL
+- en: One of the key differences between `IQueryable` and `IEnumerable` is that `IQueryable`
+    is used to query data from a specific data source, such as a database. `IEnumerable`
+    is used to iterate through a collection in memory. When we use `IQueryable`, the
+    query will be translated into a specific query language, such as SQL, and executed
+    against the data source to get the results when we call the `ToList()` (or `ToAway()`)
+    method or iterate the items in the collection.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Download the sample code from the `/samples/chapter7/EfCoreDemo` folder in the
+    chapter's GitHub repository. You can find a `GetInvoices` action in the `InvoicesController`
+    class.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'First, let''s use the `IQueryable` interface to query the database:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE9]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'In the preceding code, `context.Invoices` is a `DbSet<TEntity>` object, which
+    implements the `IQueryable` interface. The `Where()` method is used to filter
+    the invoices by status, and returns an `IQueryable` object. Then, we use some
+    other methods to sort and paginate the invoices. When we call the `ToListAsync()`
+    method, the query will be translated into a SQL query and executed against the
+    database to get the results. The logs show the execution order of the code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE10]'
+  prefs: []
+  type: TYPE_PRE
+- en: From the logs, we can see that the query is executed against the database when
+    we call the `ToListAsync()` method. The query contains the `ORDER BY`, `OFFSET`,
+    and `FETCH NEXT` clauses, which means the query is executed on the database server.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Next, let us use the `IEnumerable` interface to query the database:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE11]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'In the preceding code, we use the `AsEnumerable()` method to convert the `IQueryable`
+    object to an `IEnumerable` object. Then, we sort and paginate the invoices and
+    call the `ToList()` method to get the results. The logs show the execution order
+    of the code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE12]'
+  prefs: []
+  type: TYPE_PRE
+- en: Look at the logs. The generated SQL query does not contain the `ORDER BY`, `OFFSET`,
+    and `FETCH NEXT` clauses, which means the query fetched all the invoices from
+    the database and then filtered, sorted, and paged the invoices in memory. If we
+    have a large number of entities in the database, the second query will be very
+    slow and inefficient.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Now, we can see the difference between the two interfaces. The `IQueryable`
+    interface is a deferred execution query, which means the query is not executed
+    when we add more conditions to the query. The query will be executed against the
+    database when we call the `ToList()` or `ToArray()` methods or iterate the items
+    in the collection. So, in complex and heavy queries, we should always use the
+    `IQueryable` interface to avoid fetching all the data from the database. Be careful
+    when you call the `ToList()` or `ToArray()` methods because `ToList()` or `ToArray()`
+    (and their `async` overloads) will execute the query immediately.
+  prefs: []
+  type: TYPE_NORMAL
+- en: What LINQ methods can cause the query to be executed immediately?
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'There are a couple of operations that result in the query being executed immediately:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Use the `for` or `foreach` loop to iterate the items in the collection
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Use the `ToList()`, `ToArray()`, `Single()`, `SingleOrDefault()`, `First()`,
+    `FirstOrDefault()`, or `Count()` methods, or the `async` overloads of these methods
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: In this section, we explored the differences between `IQueryable` and `IEnumerable`.
+    It is important to understand why we should use `IQueryable` instead of `IEnumerable`
+    when querying the database for complex and heavy queries. Loading all the data
+    from the database can cause performance issues if there are a large number of
+    entities in the database.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Moving on, we will discuss another factor that can affect performance: client
+    evaluation.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Client evaluation versus server evaluation
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In this section, we will discuss the difference between client evaluation and
+    server evaluation. In the old versions of EF Core (earlier than EF Core 3.0),
+    the wrong usage of LINQ queries that have client evaluation can cause significant
+    performance issues. Let's see what client evaluation and server evaluation are.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'When we use EF Core to query data from the database, we can just write LINQ
+    queries, and EF Core will translate the LINQ queries into SQL queries and execute
+    them against the database. However, sometimes, the LINQ operation must be executed
+    on the client side. Check the following code in the `SearchInvoices` action method
+    in the `InvoicesController` class:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE13]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'When we use the `Contains()` method, EF Core can translate the LINQ query into
+    the following SQL query:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE14]'
+  prefs: []
+  type: TYPE_PRE
+- en: You can see that the SQL query uses some native SQL functions to filter the
+    data, which means that the SQL query is executed on the database server. This
+    is called **server evaluation**. EF Core tries to run server evaluation as much
+    as possible.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Now, let's say we want to return the GST tax amount for each invoice. We can
+    transfer the entity to a new object with the GST tax amount. Of course, the better
+    way is to add a property for the tax in the `Invoice` entity. The following is
+    a demonstration of how to do this.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Add a `static` method to calculate the GST tax amount:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE15]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Update the code as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE16]'
+  prefs: []
+  type: TYPE_PRE
+- en: We updated the `Description` property by adding the GST tax calculation. When
+    we run the application and call the endpoint, we will see the generated SQL query
+    is the same as the previous query. But the `Description` property has been updated
+    in the result. This means the conversion is done on the client side. This is called
+    **client evaluation**.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'This kind of client evaluation is acceptable because the query does need to
+    fetch the data from the database. The cost is very low. However, it might cause
+    problems for some queries. For example, we want to query the invoices that have
+    a GST tax amount greater than $10\. Update the code as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE17]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'When we call the endpoint, we will see the following error:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE18]'
+  prefs: []
+  type: TYPE_PRE
+- en: The error message is very clear. This is because the `CalculateTax()` method
+    is not supported by EF Core. In old versions of EF Core (earlier than EF Core
+    3.0), EF Core will fetch all the data from the database and then filter the data
+    in memory. It could cause performance issues. After EF Core 3.0, EF Core will
+    throw an exception if the query cannot be translated correctly, to avoid potential
+    performance issues.
+  prefs: []
+  type: TYPE_NORMAL
+- en: But if you are sure the client evaluation is safe, such as when dealing with
+    a small data size, you can explicitly use the `AsEnumerable()` method (or `AsAsyncEnumerable()`,
+    `ToList()`, or `ToListAsync()`) to force EF Core to fetch all the data and then
+    execute the query on the client side. Make sure you know what you are doing.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Why must the CalculateTax() method be static?
+  prefs: []
+  type: TYPE_NORMAL
+- en: EF Core caches the compiled query due to the expensive nature of compiling the
+    query. If the `CalculateTax()` method is not static, EF Core will need to maintain
+    a reference to a constant expression of the `InvoicesController` through the `CalculateTax()`
+    instance method, which could potentially lead to memory leaks. To prevent this,
+    EF Core throws an exception if the `CalculateTax()` method is not static. Making
+    the method static will ensure that EF Core does not capture constant in the instance.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The latest version of EF Core offers the benefit of preventing potential performance
+    issues caused by client evaluation. If you encounter an exception similar to a
+    previous one, you can review the query to ensure it is being translated correctly.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Next, we will discuss how to use raw SQL queries in EF Core. For some scenarios,
+    we need to write raw SQL queries to execute complex queries.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Using raw SQL queries
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Although EF Core can translate most LINQ queries into SQL queries, which is
+    very convenient, sometimes we need to write raw SQL queries if the required query
+    cannot be written in LINQ, or the generated SQL query is not efficient. In this
+    section, we will explore how to use raw SQL queries in EF Core.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'EF Core provides several methods to execute raw SQL queries:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`FromSql()`'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`FromSqlRaw()`'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`SqlQuery()`'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`SqlQueryRaw()`'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`ExecuteSql()`'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`ExecuteSqlRaw()`'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: When we execute raw SQL queries, we must be careful to avoid SQL injection attacks.
+    Let's see when we should use raw SQL queries and how to use them properly. You
+    can download the sample code from the `/samples/chapter7/EfCoreDemo` folder in
+    the chapter's GitHub repository.
+  prefs: []
+  type: TYPE_NORMAL
+- en: FromSql() and FromSqlRaw()
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: We can use the `FromSql()` method to create a LINQ query based on an interpolated
+    string. The `FromSql()` method is available in EF Core 7.0 and later versions.
+    There is a similar method called `FromSqlInterpolated()` in older versions.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'To execute the raw SQL query, we just need to pass the interpolated string
+    to the `FromSql()` method, as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE19]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'We can also pass parameters to the raw SQL query. For example, we want to query
+    the invoices that have a specific status:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE20]'
+  prefs: []
+  type: TYPE_PRE
+- en: Wait, is it safe to insert a string into the SQL query directly? What if the
+    `status` parameter is `'; DROP TABLE Invoices; --`? Will it cause a SQL injection
+    attack?
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'That is a good question. Let us see how EF Core handles the parameters. Run
+    the application and call the `/api/invoices/status?status=AwaitPayment` endpoint.
+    We will see the generated SQL query is as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE21]'
+  prefs: []
+  type: TYPE_PRE
+- en: The parameter is not inserted into the SQL query directly. Instead, EF Core
+    uses the `@p0` parameter placeholder and passes the parameter value to the SQL
+    query. This is called a parameterized query. It is safe to use the parameterized
+    query to avoid SQL injection attacks. So, we do not need to worry about the safety
+    of the `FromSql` method.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Why FromSql() is safe to use
+  prefs: []
+  type: TYPE_NORMAL
+- en: The `FromSql()` method expects a parameter as the `FormattableString` type.
+    So, it is required to use the interpolated string syntax by using the `$` prefix.
+    The syntax looks like regular C# string interpolation, but it is not the same
+    thing. A `FormattableString` type can include interpolated parameter placeholders.
+    The interpolated parameter values will be automatically converted to the `DbParameter`
+    type. So, it is safe to use the `FromSql()` method to avoid SQL injection attacks.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'For some scenarios, we might need to build dynamic SQL queries. For example,
+    we want to query the invoices according to user input, which specifies the property
+    name and property value. For this case, we cannot use `FromSql` because it is
+    not allowed to parameterize the column names. We need to use `FromSqlRaw` instead.
+    However, we must be careful to avoid SQL injection attacks. It is the developer’s
+    responsibility to make sure the SQL query is safe. Here is an example:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE22]'
+  prefs: []
+  type: TYPE_PRE
+- en: In the preceding example, the column name is not parameterized. Therefore, we
+    must be careful to avoid SQL injection attacks. It is required to sanitize the
+    `propertyName` value to make sure it is safe. Maybe you can check whether the
+    value contains any special characters, such as `;`, `--`, and so on. If the value
+    contains any special characters, you can throw an exception or remove the special
+    characters before executing the SQL query. Also, if you allow the user to specify
+    the column name, it will increase the effort to validate the column name because
+    you need to check whether the column name exists in the database or whether the
+    column has the correct index. Make sure you know what you are doing.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The `propertyValue` is parameterized, so it is safe to use.
+  prefs: []
+  type: TYPE_NORMAL
+- en: After you build the SQL query using `FromSql()`, you can then apply the LINQ
+    query operators to filter the data as you want. Remember that it is better to
+    use `FromSql()` than `FromSqlRaw()`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'When we use the `FromSql()` or `FromSqlRaw()` methods, keep in mind that there
+    are some limitations:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The data returned from the SQL query must contain all the properties of the
+    entity, otherwise, EF Core cannot map the data to the entity.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The column names returned from the SQL query must match the column names that
+    the entity properties are mapped to.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The SQL query can only query one table. If you need to query multiple tables,
+    you can build the raw query first and then use the `Include()` method to include
+    the related entities.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: SqlQuery() and SqlQueryRaw()
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'The `FromSql()` method is useful when we want to query entities from the database
+    using a raw SQL query. For some cases, we want to execute the raw SQL query and
+    return a scalar value or non-entity type. For example, we want to query the IDs
+    of invoices that have a specific status. We can use the `SqlQuery()` method to
+    execute the raw SQL query and return a list of IDs. Here is an example:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE23]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The translated SQL query is as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE24]'
+  prefs: []
+  type: TYPE_PRE
+- en: Note that the `SqlQuery()` method is used on the `Database` property of the
+    `DbContext` object. It is not available on the `DbSet` object.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The `SqlQueryRaw()` method is similar to the `SqlQuery()` method, but it allows
+    us to build dynamic SQL queries like the `FromSqlRaw()` method. Similarly, you
+    must take responsibility to avoid SQL injection attacks.
+  prefs: []
+  type: TYPE_NORMAL
+- en: ExecuteSql() and ExecuteSqlRaw()
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'For some scenarios, where we do not need return values, we can use the `ExecuteSql`
+    method to execute a raw SQL query. Normally, it is used to update or delete data
+    or call a `ExecuteSql()` method to execute the raw SQL query. Here is an example:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE25]'
+  prefs: []
+  type: TYPE_PRE
+- en: In this way, we do not need to load the entities from the database and then
+    delete them one by one. It is much more efficient to use the `ExecuteSql()` method
+    to execute the raw SQL query.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The `ExecuteSqlRaw()` method is similar to the `ExecuteSql()` method, but it
+    allows us to build dynamic SQL queries like the `FromSqlRaw()` method. Similarly,
+    you must be very careful to sanitize the SQL query to avoid SQL injection attacks.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In this section, we introduced how to use raw SQL queries in EF Core. We discussed
+    the differences between `FromSql()` and `FromSqlRaw()`, `SqlQuery()` and `SqlQueryRaw()`,
+    and `ExecuteSql()` and `ExecuteSqlRaw()`. We also discussed the limitations of
+    these methods. Again, we must be very careful to avoid SQL injection attacks when
+    we use raw SQL queries.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In one of the examples in this section, we showed you how to run a raw SQL query
+    to delete a set of entities. EF Core 7.0 introduces a bulk operations feature
+    that can make this easier. There are two new methods available for bulk operations,
+    `ExecuteUpdate()` and `ExecuteDelete()`, which provide a more efficient way to
+    update or delete data. In the following section, we will discuss this feature
+    in more detail.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Using bulk operations
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In this section, we will explore how to effectively update/delete data using
+    EF Core. EF Core 7.0 or later offers the ability of bulk operations, which are
+    easy to use and can improve the performance of update/delete operations. To take
+    advantage of this feature, ensure you are using the most recent version of EF
+    Core.
+  prefs: []
+  type: TYPE_NORMAL
+- en: As we mentioned in the previous section, EF Core tracks the changes in entities.
+    To update an entity, normally, we need to load the entity from the database, update
+    the entity properties, and then call the `SaveChanges()` method to save the changes
+    to the database. This is a very common scenario. Deleting an entity is similar.
+    However, if we want to update or delete a large number of entities, it is not
+    efficient to load the entities one by one and then update or delete them. For
+    these scenarios, it is not required to track the changes in the entities. So,
+    it would be better to use the bulk operations feature to update or delete data.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We can use a raw SQL query to update or delete data using the `ExecuteSql()`
+    method. However, it lacks strong type support. Hardcoding the column names in
+    the SQL query is not a good practice. From EF Core 7.0, we can use the `ExecuteUpdate()`
+    and `ExecuteDelete()` methods to update or delete data. Note that these two methods
+    do not involve the entity tracking feature. So, once you call these two methods,
+    the changes will be executed immediately. There is no need to call the `SaveChanges()`
+    method.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Next, let us see how to use these two methods. We will show you how to use the
+    `ExecuteUpdate()` method and what SQL query is generated. The `ExecuteDelete()`
+    method is similar. The sample code is located at the `/samples/chapter7/EfCoreDemo`
+    folder in the chapter's GitHub repository.
+  prefs: []
+  type: TYPE_NORMAL
+- en: ExecuteUpdate()
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: The `ExecuteUpdate()` method is used to update data without loading the entities
+    from the database. You can use it to update one or more entities by adding the
+    `Where()` clause.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'For example, we want to update the status of the invoices that were created
+    before a specific date. The code is as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE26]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The generated SQL query is as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE27]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'This query can update multiple invoices at the same time. It does benefit from
+    the strong type support but has the same efficiency as the raw SQL query. If you
+    need to update more than one property, you can use the `SetProperty()` method
+    multiple times, as seen in the following code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE28]'
+  prefs: []
+  type: TYPE_PRE
+- en: In addition, the `Where()` clause can reference the other entities. So, the
+    `ExecuteUpdate()` method is always recommended to update multiple entities, instead
+    of using the raw SQL query.
+  prefs: []
+  type: TYPE_NORMAL
+- en: ExecuteDelete()
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Similarly, we can use the `ExecuteDelete()` method to delete data without loading
+    the entities from the database. This method can be used to delete one or more
+    entities by adding the `Where` clause. For example, we want to delete the invoices
+    that were created before a specific date. The code is as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE29]'
+  prefs: []
+  type: TYPE_PRE
+- en: Again, these bulk operations do not track the changes in the entities. If a
+    `DbContext` instance already loaded the entities, after the bulk update or delete,
+    the entities in the context will still keep the old values. So, be careful when
+    using these bulk operations.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In this section, we discussed how to use the bulk operations feature in EF Core.
+    We introduced the `ExecuteUpdate()` and `ExecuteDelete()` methods, which can be
+    used to update or delete data without loading the entities from the database.
+    Compared to a raw SQL query, these two methods have strong type support. It is
+    recommended to use these two methods to update or delete multiple entities.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Next, we will learn how to manage concurrency conflicts when updating data.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Understanding concurrency conflicts
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: An API endpoint can be called by multiple clients at the same time. If the endpoint
+    updates data, the data may be updated by another client before the current client
+    completes the update. When the same entity is updated by multiple clients, it
+    can cause a concurrency conflict, which may result in data loss or inconsistency,
+    or even cause data corruption. In this section, we will discuss how to handle
+    concurrency conflicts in EF Core. You can download the sample project `ConcurrencyConflictDemo`
+    from the `/samples/chapter7/ConcurrencyConflictDemo` folder in the chapter's GitHub
+    repository.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'There are two ways to handle concurrency conflicts:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**Pessimistic concurrency control**: This uses database locks to prevent multiple
+    clients from updating the same entity at the same time. When a client tries to
+    update an entity, it will first acquire a lock on the entity. If the lock is acquired
+    successfully, only this client can update the entity, and all other clients will
+    be blocked from updating the entity until the lock is released. However, this
+    approach may result in performance issues when the number of concurrent clients
+    is large because managing locks is expensive. EF Core does not have built-in support
+    for pessimistic concurrency control.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Optimistic concurrency control**: This way does not involve locks; instead,
+    a version column is used to detect concurrency conflicts. When a client tries
+    to update an entity, it will first get the value of the version column, and then
+    compare this value with the old value when updating the entity. If the value of
+    the version column is the same, it means that no other client has updated the
+    entity. In this case, the client can update the entity. But if the value of the
+    version column is different from the old value, it means that another client has
+    updated the entity. In this case, EF Core will throw an exception to indicate
+    the concurrency conflict. The client can then handle the exception and retry the
+    update operation.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Let''s see an example of concurrency conflicts. In the `ConcurrencyConflictDemo`
+    project, we have a `Product` entity with an `Inventory` property, which is used
+    to store the number of products in stock. We want to create an API endpoint to
+    sell a product. When a client calls this endpoint, it will pass the product ID
+    and the number of products to sell. The endpoint will then update the `Inventory`
+    property by subtracting the number of products to sell. The logic is as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The client calls the API endpoint to sell a product.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The application gets the product from the database.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'The application checks the `Inventory` property to make sure that the number
+    of products in stock is enough for the sale:'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: If the number of products in stock is enough, the application subtracts the
+    number of products being sold from the `Inventory` property and then calls the
+    `SaveChanges()` method to save the changes to the database
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: If the number of products in stock is not enough, the application returns an
+    error message to the client
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Important note
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The example project uses the following code to reset the database in the `Program.cs`
+    file when the application starts:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`dbContext.Database.EnsureDeleted();`'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`dbContext.Database.EnsureCreated();`'
+  prefs: []
+  type: TYPE_NORMAL
+- en: So, when you run the application, the database will be reset, and the `Inventory`
+    property of product 1 will be set to `15`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following code shows the first version of the implementation of the API
+    endpoint:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE30]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'There should be some other logic that handles the order creation and payment,
+    and so on. We will not discuss that here; instead, we will focus on the concurrency
+    conflicts caused by the product inventory update:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'To simulate this concurrent scenario, we can pass a `delay` parameter to add
+    a delay before saving the changes to the database. The following code shows how
+    to add a delay:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE31]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Now, let us try to call the API endpoint twice in a short time. The first `POST`
+    request will pass a `delay` parameter with a value of `2` seconds:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE32]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'The second `POST` request will pass the `delay` parameter with a value of `3`
+    seconds:'
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: '[PRE33]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: Send the first request and then send the second request in `2` seconds. The
+    expected result should be that the first request will succeed and the second request
+    will fail. But actually, both requests will succeed. The responses show that the
+    `Inventory` property of the product is updated to `5`, which is incorrect. The
+    initial value of the `Inventory` property is `15`, and we sold 20 products, so
+    how can the `Inventory` property be updated to `5`?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Let us see what happens in the application:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Client A calls the API endpoint to sell a product and wants to sell 10 products.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Client A checks the `Inventory` property and finds that the number of products
+    in stock is 15, which is enough to sell.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Almost at the same time, client B calls the API endpoint to sell a product and
+    wants to sell 10 products.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Client B checks the `Inventory` property and finds that the number of products
+    in stock is 15 because client A has not updated the `Inventory` property yet.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Client A subtracts 10 from the `Inventory` property, which results in a value
+    of `5`, and saves the changes to the database. Now, the number of products in
+    stock is `5`.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Client B also subtracts 10 from the `Inventory` property and saves the changes
+    to the database. The problem is that the number of products in stock has been
+    updated to `5` by client A, but client B does not know this. So, client B also
+    updates the `Inventory` property to `5`, which is incorrect.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: This is an example of concurrency conflict. Multiple clients try to update the
+    same entity at the same time, and the result is not what we expected. In this
+    case, client B should not be able to update the `Inventory` property because the
+    number of products in stock is not enough. However, if the application does not
+    handle concurrency conflicts, we may end up with incorrect data in the database.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'To solve this problem, EF Core provides optimistic concurrency control. There
+    are two ways to use optimistic concurrency control:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Native database-generated concurrency token
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Application-managed concurrency token
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Let us see how to use these two ways to handle concurrency conflicts.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Native database-generated concurrency token
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Some databases, such as SQL Server, provide a native mechanism to handle concurrency
+    conflicts. To use the native database-generated concurrency token in SQL Server,
+    we need to create a new property for the `Product` class and add a `[Timestamp]`
+    attribute to it. The following code shows the updated `Product` class:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE34]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'In the Fluent API configuration, we need to add the following code to map the
+    `RowVersion` property to the `rowversion` column in the database:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE35]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'If you prefer to use the data annotation configuration, you can add the `[Timestamp]`
+    attribute to the `RowVersion` property, and EF Core will automatically map it
+    to the `rowversion` column in the database, as shown in the following code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE36]'
+  prefs: []
+  type: TYPE_PRE
+- en: Do not forget to run the `dotnet ef migrations add AddConcurrencyControl` command
+    to create a new migration. There is no need to run the `dotnet ef database update`
+    command this time because we have the code to reset the database when the application
+    starts.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Important note
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'If you want to configure the mapping in Fluent API, you can use the following
+    code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`modelBuilder.Entity<Product>()`'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`.Property(p =>` `p.RowVersion)`'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`.``IsRowVersion();`'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'This will generate the following migration:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`migrationBuilder.AddColumn<byte[]>(`'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`name: "RowVersion",`'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`table: "Products",`'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`type: "rowversion",`'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`rowVersion: true,`'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`nullable: false,`'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`defaultValue:` `new byte[0]);`'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Now, let''s try to call the API endpoint again. Use the same requests as before,
+    one with a `delay` parameter of `2` seconds, and the other with a `delay` parameter
+    of `3` seconds. This time, we should see that the first request will succeed,
+    but the second request will fail with a `DbUpdateConcurrencyException` exception:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE37]'
+  prefs: []
+  type: TYPE_PRE
+- en: Check the database. The `Inventory` column of product 1 has been updated to
+    `5`, which is correct.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'If you check the SQL statement generated by EF Core, you will find that the
+    `rowversion` column is included in the `WHERE` clause of the `UPDATE` statement:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE38]'
+  prefs: []
+  type: TYPE_PRE
+- en: By using concurrency control, EF Core not only checks the ID of the entity but
+    also checks the value of the `rowversion` column. If the value of the `rowversion`
+    column is not the same as the value in the database, it means that the entity
+    has been updated by another client, and the current update operation should be
+    aborted.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note that the `rowversion` column type is available for SQL Server, but not
+    for other databases, such as SQLite. Different databases may have different types
+    of concurrency tokens, or may not support the concurrency token at all. Please
+    check the documentation of the database you are using to see whether it supports
+    the built-in concurrency token. If not, you need to use the application-managed
+    concurrency token, as shown in the next section.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Application-managed concurrency token
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: If the database does not support the built-in concurrency token, we can manually
+    manage the concurrency token in the application. Instead of using the `rowversion`
+    column, which can be automatically updated by the database, we can use a property
+    in the entity class to manage the concurrency token and assign a new value to
+    it every time the entity is updated.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Here is an example of using the application-managed concurrency token:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'First, we need to add a new property to the `Product` class, as shown in the
+    following code:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE39]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Update the Fluent API configuration to specify the `Version` property as the
+    concurrency token:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE40]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'The corresponding data annotation configuration is as follows:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE41]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: Because this `Version` property is not managed by the database, we need to manually
+    assign a new value whenever the entity is updated.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'The following code shows how to update the `Version` property when the entity
+    is updated:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE42]'
+  prefs: []
+  type: TYPE_PRE
+- en: You can use the application-managed concurrency token in SQL Server as well.
+    The only difference is that you need to manually assign a new value to the concurrency
+    token property every time the entity is updated. But if you use the built-in concurrency
+    token in SQL Server, you do not need to do that.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In the event of a concurrency conflict, it is essential to take the necessary
+    steps to resolve the issue. This will be addressed in the following section.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Handling concurrency conflicts
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'When a concurrency conflict occurs, EF Core will throw a `DbUpdateConcurrencyException`
+    exception. We can catch this exception and handle it in the application. For example,
+    we can return a `409 Conflict` status code to the client, and let the client decide
+    what to do next:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE43]'
+  prefs: []
+  type: TYPE_PRE
+- en: The preceding code returns a `409 Conflict` status code to the client when a
+    concurrency conflict occurs. The client can then handle the exception and retry
+    the update operation.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Important note
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Some databases provide different isolation levels to handle concurrency conflicts.
+    For example, SQL Server provides four isolation levels: `ReadUncommitted`, `ReadCommitted`,
+    `RepeatableRead`, and `Serializable`. The default isolation level is `ReadCommitted`.
+    Each isolation level has different behaviors when a concurrency conflict occurs
+    and has its own pros and cons. Higher levels of isolation provide more consistency
+    but also reduce concurrency. For more information, see *Isolation Levels* at [https://learn.microsoft.com/en-gb/sql/t-sql/statements/set-transaction-isolation-level-transact-sql](https://learn.microsoft.com/en-gb/sql/t-sql/statements/set-transaction-isolation-level-transact-sql).'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In this section, we discussed how to handle concurrency conflicts in EF Core.
+    We introduced two ways to handle concurrency conflicts: native database-generated
+    concurrency tokens and application-managed concurrency tokens. We also discussed
+    how to handle exceptions when concurrency conflicts occur. Concurrency conflicts
+    are a common issue in a highly concurrent environment. It is important to handle
+    them properly to avoid data loss or inconsistency.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Reverse engineering
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: So far, we have learned how to use EF Core to create a database schema from
+    the entity classes. This is called *code-first*. However, sometimes we need to
+    work with an existing database. In this case, we need to create the entity classes
+    and `DbContext` from the existing database schema. This is called *database-first*
+    or *reverse engineering*. In this section, we will discuss how to use EF Core
+    to reverse engineer the entity classes and `DbContext` from an existing database
+    schema. This is useful when we want to migrate an existing application to EF Core.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Let's use the `EfCoreRelationshipsDemoDb` database as an example. If you have
+    not created this database, please follow the steps in [*Chapter 6*](B18971_06.xhtml#_idTextAnchor245)
+    to create it. The sample code is located at the `/samples/chapter7/EfCoreReverseEngineeringDemo`
+    folder in the chapter's GitHub repository.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'First, let us create a new web API project. Run the following command in the
+    terminal:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE44]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Microsoft.EntityFrameworkCore.SqlServer NuGet package to the project:'
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: '[PRE45]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: '[PRE46]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Next, we will use the `dbcontext scaffold` command to generate the entity classes
+    and `DbContext` from the database schema. This command needs the connection string
+    of the database and the name of the database provider. We can run the following
+    command in the terminal:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE47]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: '[PRE48]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Open the `AppDbContext.cs` file, and we will see a warning in the following
+    code:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE49]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: This warning tells us that we should not store the connection string in the
+    source code. Instead, we should store it in a configuration file, such as `appsettings.json`.
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: In the `OnModelCreating` method, we can see the entity classes and their relationships
+    have been configured in Fluent API style. If you prefer to use data annotations,
+    you can use the `--data-annotations` option when you run the `dbcontext scaffold`
+    command. But as we mentioned in [*Chapter 5*](B18971_05.xhtml#_idTextAnchor198),
+    Fluent API is more powerful than data annotations, and it is recommended to use
+    Fluent API.
+  prefs: []
+  type: TYPE_NORMAL
+- en: EF Core is smart enough to detect the relationships between the entity classes
+    if your database schema follows the conventions. However, if this is not the case,
+    you may get unexpected results. Please review the generated code carefully to
+    make sure the relationships are configured correctly.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Keep in mind that the generated code is just a starting point. Some models or
+    properties may not be represented correctly in the database. For example, if your
+    models have inheritance, the generated code will not include the base class because
+    the base class is not represented in the database. Also, some column types may
+    not be able to be mapped to the corresponding CLR types. For example, the `Status`
+    column in the `Invoice` table is of the `nvarchar(16)` type, which will be mapped
+    to the `string` type in the generated code, instead of the `Status` enum type.
+  prefs: []
+  type: TYPE_NORMAL
+- en: You can update the generated code to suit your needs, but be aware that the
+    next time you run the `dbcontext scaffold` command, the changes will be overwritten.
+    You can use partial classes to add your own code to the generated classes, as
+    the generated classes are declared as `partial`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In this section, we discussed how to use EF Core to reverse engineer the entity
+    classes and `DbContext` from an existing database schema. It should be noted that
+    EF Core strongly prefers the code-first approach. Unless you are working with
+    an existing database, it is recommended to use the code-first approach to take
+    advantage of the EF Core migrations feature.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Other ORM frameworks
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'In addition to EF Core, there are numerous other ORM frameworks available for
+    .NET. Some of the most popular include the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**Dapper** ([https://dapperlib.github.io/Dapper/](https://dapperlib.github.io/Dapper/)):
+    Dapper is a micro-ORM framework that is designed to be fast and lightweight. Dapper
+    does not support change tracking, but it is easy to use, and it is very fast.
+    As the official documentation says, “*Dapper’s simplicity means that many features
+    that ORMs ship with are stripped out. It worries about the 95% scenario and gives
+    you the tools you need most of the time. It doesn’t attempt to solve every problem.*”
+    The performance is one of the most important features of Dapper. Maybe it is not
+    fair to compare Dapper’s performance with EF Core, because EF Core provides many
+    more features than Dapper. If you are looking for a simple ORM framework that
+    is fast and easy to use, Dapper is a good choice. In some projects, Dapper is
+    used with EF Core to provide the best of both worlds. Dapper is open-source and
+    originally developed by Stack Overflow.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**NHibernate** ([https://nhibernate.info/](https://nhibernate.info/)): Like
+    NUnit, NHibernate is a .NET implementation of the Hibernate ORM framework in Java.
+    It is a mature, open-source ORM framework that has been around for a long time.
+    It is very powerful and flexible. NHibernate is maintained by a community of developers.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**PetaPoco** ([https://github.com/CollaboratingPlatypus/PetaPoco](https://github.com/CollaboratingPlatypus/PetaPoco)):
+    PetaPoco is a tiny, fast, easy-to-use micro-ORM framework, which only had 1,000+
+    lines of code in the original version. PetaPoco has a similar performance to Dapper
+    because it uses dynamic method generation (MSIL) to assign column values to properties.
+    PetaPoco now supports SQL Server, SQL Server CE, MS Access, SQLite, MySQL, MariaDB,
+    PostgreSQL, Firebird DB, and Oracle. It uses T4 templates to generate the code.
+    PetaPoco is open-source and currently maintained by a few core developers.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: It is hard to say which one is the best. It depends on your needs. Dapper is
+    known for its speed and performance, while EF Core is more feature-rich and provides
+    better support for complex queries and relationships. When deciding which framework
+    to use for a particular task, consider the performance implications of each approach,
+    and also the trade-offs between the features and flexibility of the framework.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Summary
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In this chapter, we delved into some advanced topics of Entity Framework. We
+    started by exploring how to improve the performance of our application by using
+    `DbContext` pooling and no-tracking queries. We then learned how to execute raw
+    SQL queries safely and efficiently using parameterized queries, and how to leverage
+    the new bulk operations feature in EF Core for faster data manipulation.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Next, we looked at how to handle concurrency scenarios using optimistic concurrency
+    control, which allows multiple users to access and modify the same data simultaneously
+    without conflicts. We also covered reverse engineering, a technique for generating
+    entity classes and `DbContext` classes from an existing database schema, which
+    can save time and effort in creating a data access layer.
+  prefs: []
+  type: TYPE_NORMAL
+- en: To broaden our horizons beyond EF Core, we briefly introduced some other popular
+    ORM frameworks, such as Dapper, NHibernate, and PetaPoco, and discussed their
+    strengths and weaknesses. By the end of this chapter, you should have a solid
+    understanding of how to leverage EF Core in a web API project to efficiently access
+    and manipulate data, as well as some insights into other ORM options available
+    to you.
+  prefs: []
+  type: TYPE_NORMAL
+- en: However, EF Core is a very large topic, and we cannot cover everything in this
+    book. For more information about EF Core, please refer to the official documentation
+    at [https://learn.microsoft.com/en-us/ef/](https://learn.microsoft.com/en-us/ef/).
+  prefs: []
+  type: TYPE_NORMAL
+- en: In the next chapter, we will learn how to secure our web API project using authentication
+    and authorization.
+  prefs: []
+  type: TYPE_NORMAL

@@ -1,0 +1,1598 @@
+- en: '13'
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Externalization of Authorization
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The previous chapter was about business rules management in general. In this
+    chapter, we will analyze a particular case of authorization management, since
+    the rights and privileges of users are one of the most common uses of business
+    rules that you can find in many applications. Since there exist two standards
+    for authorization management (as already explored in [*Chapter 8*](B21293_08.xhtml#_idTextAnchor271))
+    we will quickly explain the first and more complete standard, namely **XACML**
+    (short for, **eXtensible Access Control Markup Language**) because it helps understand
+    how it relates to the **Single Responsibility Principle** (**SRP**); then, we
+    will create a more complete example with the new, lighter, standard, which is
+    **OPA** (short for, **Open** **Policy Agent**).
+  prefs: []
+  type: TYPE_NORMAL
+- en: We will then end this chapter (and the series of four chapters on the different
+    parts of an ideal information system) by reflecting on how to implement this authorization
+    in practice, which will open the way to the analysis and the implementation of
+    the information system for `DemoEditor`, which has accompanied us so far, illustrating
+    with examples the concepts studied, and it will, of course, also serve as a practical
+    example of the implementations of what we learned in the previous chapter.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In this chapter, we’ll cover the following topics:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: A BRMS and authorization management
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Applying authorization to our same information system
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: A BRMS and authorization management
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: As I quickly mentioned in the previous chapter, there is a functional domain
+    in the `DemoEditor` sample information system where an externalized business rules
+    engine would be interesting, and this domain is one of authorization. Before explaining
+    the need to clarify the semantics of the “rights” business domain, examine the
+    main paradigms to implement authorization in software applications, and also explain
+    one of the standards associated with this function, which decomposes very well
+    the different responsibilities it entails.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The semantics of identity and authorization management
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'As explained in [*Chapter 9*](B21293_09.xhtml#_idTextAnchor318), semantics
+    is the foundation of all things in architecture, and we will clarify the terms
+    we use for certain concepts in order to not incorrectly define the business domain
+    model. Thus, it is important to clearly define the different subdomains of **Identity
+    and Authorization Management** (**IAM**) and how we name things inside of them.
+    Let’s start with the concept associated with **identification** (who you are)
+    and **authentication** (how you can prove your identity):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 13.1 – Identification and authentication semantics](img/Figure_13.1_B21293.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 13.1 – Identification and authentication semantics
+  prefs: []
+  type: TYPE_NORMAL
+- en: A first – and very important – point is that authorization should depend only
+    on your identity (and, of course, some elements of context, but we will come to
+    that later) and never on how you prove your identity. At least, this is how we
+    are going to work on the information system for now. Of course, we may in the
+    future have to take into account that some authentication methods are safer than
+    others and that some applications may request a strong form of multi-factor authentication
+    to open certain features. But this use case will be handled with the addition
+    of attributes to identification to account for this. After all, even in this situation,
+    an application does not need to know exactly what you authenticated but, rather,
+    how strong a trust it can have in the identity that it is provided with.
+  prefs: []
+  type: TYPE_NORMAL
+- en: There are already some cases like this in the standard identity profiles associated
+    with OAuth; for example, in addition to the `email` attribute, the contact profile
+    can provide an `email_validated` attribute that specifies that the identity provider
+    has verified that the identified user indeed has control of a certain email address.
+    This is a way of augmenting trust in the identification without the identity consumer
+    knowing anything about *how* the email has been verified. We are not going to
+    dig deeper into authentication, as this is a hugely sophisticated domain, and
+    what we want to model precisely is the authorization domain. For now, let’s just
+    remember that a given user can be authenticated by different accounts/ways to
+    prove its identity.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The important aspect of what will follow is that users can belong to groups,
+    which ultimately will bring them some commonalities in rights management. These
+    groups can be formed in a hierarchical tree in order to ease complex management.
+    Bear in mind that we are still in the identification domain, so belonging to a
+    group does not directly give you certain rights. Groups are simply part of your
+    identity, as are any other attributes such as `lastname` or `firstname`, to give
+    examples from the OpenID Connect/JWT/OAuth standards.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let’s now discuss the other half of IAM, which is **authorization** management.
+    The main semantics are as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 13.2 – Authorization semantics](img/Figure_13.2_B21293.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 13.2 – Authorization semantics
+  prefs: []
+  type: TYPE_NORMAL
+- en: The preceding diagram is, of course, just an example, and you may have your
+    vocabulary for the terms used within it. But this is precisely the goal of such
+    a semantics analysis; I know that some people use the word “*profiles*” to describe
+    the groups of people from the identification domain, that some use the word “*group*”
+    to discuss authorization groups, and that some others replace “*role*” with “*profile*.”
+    But there are also people using other vocabulary, and the important thing is not
+    who is right; as long as there is no established standard, everyone is. The important
+    thing is to be able to understand univocally what we talk about. In this book,
+    a group will be an entity that organizes sets of users that are similar in their
+    identity, while a role will be a set of authorizations that are often used together.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Let’s explain in just a bit more detail the concept of permission, which is
+    defined by pointing to a resource and an operation (or several, if this is easier
+    in your model). For example, removing a book from the data referential service
+    may be something that only some editors have the right to do; we would then design
+    the corresponding permission by pointing to the `book` resource and the `DELETE`
+    verb. The use of the REST-based vocabulary is, of course, intentional – first,
+    it makes it more precise to explain what we mean; second, it allows for a precise
+    alignment of what will happen in the software. In this case, this permission will
+    be associated with the possibility of sending a `DELETE` verb to the `/api/books`
+    API, and it is thus implemented without any possible confusion in the books data
+    referential service.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Of course, some permissions are linked – a senior editor will not only be able
+    to delete books but also create, modify, and read them. This is where roles come
+    into play – grouping together many permissions that make sense together. This
+    is where semantics is also important. Naming the editor role is a difficult choice
+    because we will tend to use the word `editors` for two things that are fundamentally
+    different: the group to which all users belong when they `editors` for the identification
+    group and use a name such as `book-editor` for the role.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Semantics is important in another area – since there are several applications
+    in an information system and each of them (at least the data referential service)
+    deals with specific resources, it is important to specify the main resource in
+    the name of the role; otherwise, they would get confused with each other. By the
+    way, this is how we will group the two previous schemas, showing this multiplicity
+    of “rights management targets” against the unicity of identification concerns:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 13.3 – Each application takes care of its authorizations](img/Figure_13.3_B21293.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 13.3 – Each application takes care of its authorizations
+  prefs: []
+  type: TYPE_NORMAL
+- en: Before we go into more detail about what is in the **Authorization** boxes,
+    let’s make a useful digression on the way IAM is handled in many applications
+    and how it should be used to obtain a neat business/IT alignment.
+  prefs: []
+  type: TYPE_NORMAL
+- en: A digression on IAM implementation
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'In most existing information systems, identification is still handled directly
+    by many applications, leading to the well-known antipattern represented here:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 13.4 – An antipattern where IAM is in many applications](img/Figure_13.4_B21293.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 13.4 – An antipattern where IAM is in many applications
+  prefs: []
+  type: TYPE_NORMAL
+- en: These multiple implementations of a unique feature are one of the most observed
+    misalignment patterns in existing information systems. It leads not only to the
+    duplication of accounts, making it more difficult to manage access rights, but
+    also to the duplication of different passwords, which is a pain for users and
+    quickly causes security issues because lots of them will use similar passwords
+    across their line of business applications, making a password breach suddenly
+    more impactful because the attack surface is increased.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'One method that is often used by companies to compensate for this difficulty
+    is to automate the “newcomer” process and implement some kind of tool that will
+    automatically create accounts in every application of the information system.
+    Unless you only have a legacy application and no intention of modernizing your
+    system (for example, because the activity will be closed in a few years), this
+    is always the worst move that can be done, as it tends to crystallize the problem
+    – since you have added another (potentially costly) component to the system, you
+    will be even less keen on changing it again. The following diagram shows the second
+    antipattern in this approach:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 13.5 – The process for a newcomer in its coupled version](img/Figure_13.5_B21293.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 13.5 – The process for a newcomer in its coupled version
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'This diagram shows all the additional problems:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The process is designed in the upper functional layer, but it cannot be modified
+    by the business persons, since its execution is based on a job executed by an
+    **ETL** application and, thus, can only be modified by technicians, which creates
+    some time coupling (a change of regulation will be applied not when the business
+    needs it but when the IT department can get around to in its many projects).
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Talking about the many things the IT has to do, did you notice that the only
+    actor in the BPMN is **IT**? This is logical since all tasks have been designed
+    to be automated and IT is considered responsible for managing the users inside
+    the software, simply because they are the ones who have installed it or know how
+    to access the APIs. This is a very common problem; instead of having functional
+    administrators taking full responsibility for their applications, they rely entirely
+    on IT for this. Although this can be considered normal for technical tasks, this
+    is a problem in this case because trusting IT to add users and determining their
+    default permissions can be a recipe for regulatory disaster. After all, how could
+    you be mad at an intern who has dealt with an urgent ticket from accounting by
+    creating a user with a default password, not knowing that, in this legacy application,
+    users are created by default with full rights, which allows the newcomer user
+    to access the bank accounts of the company and empty them on their very first
+    day in the job?
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The process is directly implemented inside an ETL application, which is the
+    number one misalignment antipattern. If you continue in this direction, very soon,
+    all the business processes of the company will depend on one piece of software
+    that, in addition, is a single point of failure in your IT system. What if it
+    is discontinued? What if the editor suddenly raises prices? What if there is a
+    general failure?
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: In some cases, the person doing the implementation may be lucky enough to be
+    able to call a nice, backward compatible, and well-documented API such as on `Application
+    A`, allowing for some kind of decoupling, or even the possibility to expose this
+    API in the BCM. But in `Application B`, the API talks directly to a library of
+    the application, making this interoperation brittle to any change of version.
+    In `Application C`, it is even worse, since the only way found to automate the
+    creation of an account was to insert lines directly into the database. The behavior
+    might become completely erratic in the next version, or even as soon as you roll
+    out in production because you have forgotten an important part of the persistence
+    in your script, and so on.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'The preceding approach tends to embed in a system this antipattern, where each
+    application takes care of its own identification and even authentication, whereas
+    it should only handle authorization (this antipattern has to stay there, since
+    the application handles the resources, and the permissions apply to these). Instead
+    of this, the right move would be to progressively adopt the following correct
+    pattern:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 13.6 – A correct map of IAM responsibility](img/Figure_13.6_B21293.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 13.6 – A correct map of IAM responsibility
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In this case, the identification and authentication responsibilities are implemented
+    by a dedicated piece of software (in our example, an Apache Keycloak IAM server,
+    plugged into a Microsoft AD user directory) and all applications still take care
+    of authorization on the resource they respectively manage, but they point to this
+    unique identification feature that they need to apply the right permissions (again,
+    without knowing anything about the authentication process). Of course, this would
+    not be done in one day; you need to progressively equip your information system
+    with an application that supports externalized authentication/identification.
+    Nowadays, almost all modern enterprise-grade applications do so, and if they are
+    browser-based, it is even possible in some cases to handle these responsibilities
+    with a frontend protecting them if needed. And since you will likely always keep
+    some legacy applications, you will certainly end up with a “middle of the journey”
+    information system such as the following, which is already much better and easier
+    to handle:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 13.7 – The process for a newcomer in a perfectly aligned version](img/Figure_13.7_B21293.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 13.7 – The process for a newcomer in a perfectly aligned version
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Do not be put out by the added complexity to the diagram; it is simply more
+    complete because I have added more details – in particular, the hardware layer,
+    which had not been shown before. In this part of the information system, many
+    advantages can be seen on the right of the diagram, but we will discuss them now
+    in more detail:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The implementation of the process can now be dedicated to any tool, and it will
+    not have any coupling to the technical stack (except for the call to the Apache
+    Keycloak API to add a global user, but it is extremely rare, as this can be based
+    on the LDIF standard and a change of software would not be visible by the process
+    users).
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: If the process had to be modified – for example, by adding another step for
+    a legacy application that had been forgotten in the first version – it could be
+    done by decision-makers alone. In the new version, this additional task would
+    work like the existing one for the legacy accounting system – when a user-based
+    task is completed, an email would be sent to the functional administrator of the
+    application, together with a link to the procedure to add the requested user.
+    When done, this person would click on a link in the email received to signal that
+    the task is done, which would also close the process.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The first task dedicated to the IT department would still be manual, as there
+    would be a form to fill in (the one from Apache Keycloak or – as represented here
+    – a form provided by the BPMN engine that would call the API from Keycloak associated
+    with the `Create user` function of the BCM). If the API from Keycloak follows
+    the LDIF standard, it could be considered as the standardized unique point associated
+    with the function in the information system, making it easier to replace Keycloak
+    with another software if needed.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: In addition, Keycloak acts as an indirection layer to the actual user’s directory.
+    If this had to change to another directory, or even use identity federation and
+    several directories, this would be transparent for any user of the API associated
+    with the `Create` `user` function.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Of course, the problem of the legacy application would not completely disappear,
+    but at least, in this configuration, the legacy impact is progressively reduced
+    and the right functions are ready for the new and more modern applications to
+    work in the way they should. Also, the legacy application is isolated into a silo
+    and will be easier to discard in the future. In this example, we could start by
+    removing the task from the process, and then suppress the old application with
+    its locally coupled identification and authentication features. Finally, we have
+    to verify that the old server with an unsupported or exotic, hard-to-maintain
+    operating system does not serve any other software role in the system.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Role-based access control and attribute-based access control models
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: After that rather long – but hopefully useful – digression into IAM implementations,
+    we will return to where we were before, which is the fact that, in a good information
+    system, identification and authentication features are unique for all applications,
+    but the authorization feature is duplicated for each resource. Indeed, only the
+    application that handles the resources knows how to handle the permissions on
+    them. In our example with the book data referential service, we saw that a role
+    called `book-edition` would make sense. But what about in an archiving system?
+    Chances are we would find roles such as `archivist` or `readonly-verifier` in
+    there, but `book-edition` would make no sense.
+  prefs: []
+  type: TYPE_NORMAL
+- en: This is not to say that we could not find common role names between applications;
+    on the contrary – similar names should be considered carefully because they do
+    not mean the same thing. This is why it is so dangerous, even though it is frequently
+    done, to name roles `administrator`. Of course, everyone understands what this
+    means –users with this role can perform every operation in the software. But,
+    specifically, the definition of “everything” can differ from one software to another.
+    If you add to this situation a group called `administrators` inside your users’
+    directory, which is supposed to mean that the users in this group should have
+    full permissions in every application, the confusion is increased.
+  prefs: []
+  type: TYPE_NORMAL
+- en: I personally recommend restricting this situation to `domain-administrator`
+    and arranging for your IT department to never be a functional administrator of
+    an application, only of the machines they are installed on (which does not prevent
+    them from indirectly seeing or manipulating data, but this is another problem
+    that should be dealt with by contractual standards and full traceability of administrative
+    actions).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'To account for this, a better representation of the preceding diagram would
+    be the following one:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 13.8 – Affecting authorizations on permissions rather than resources](img/Figure_13.8_B21293.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 13.8 – Affecting authorizations on permissions rather than resources
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The left-hand side is not as detailed in the preceding diagram, but this is
+    what we wanted. Since we stated that authorizations should be based on identity,
+    how could we do this in practice? One of the easiest and most commonly used ways
+    is the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 13.9 – A pure role-based access control approach](img/Figure_13.9_B21293.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 13.9 – A pure role-based access control approach
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'When roles are associated (or “mapped”) to groups or directly to users, the
+    paradigm of rights management is called **Role-Based Access Control** (**RBAC**).
+    The main advantage of this approach is that it is very simple to implement. Since
+    the person who administrated rights only sees the role, the diagram could even
+    be represented like this from their point of view:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 13.10 – A documented RBAC approach](img/Figure_13.10_B21293.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 13.10 – A documented RBAC approach
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'This eases the work of developers as well because, as long as they respect
+    the contractual text-based definition of the rights associated with the role,
+    they can choose whatever implementation method for the role they prefer, or even
+    a mix of them:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 13.11 – Other possible role implementations in RBAC](img/Figure_13.11_B21293.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 13.11 – Other possible role implementations in RBAC
+  prefs: []
+  type: TYPE_NORMAL
+- en: The textual definition of the role may cause some trouble, due to the text’s
+    imprecise nature and the potential for knowledge to become outdated over time,
+    it is subject to approximation, particularly if the editor role has a high personnel
+    turnover and/or does not document clearly its software features.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Since pure RBAC is quite restrictive, applications often allow for the direct
+    mapping of granular permissions to users or groups, as schematized here:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 13.12 – Fine-grained permission as an improvement on RBAC](img/Figure_13.12_B21293.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 13.12 – Fine-grained permission as an improvement on RBAC
+  prefs: []
+  type: TYPE_NORMAL
+- en: This extends the possibilities, but it also makes it much more difficult for
+    functional administrators to keep track of the rights given to different users
+    if these cases become more than just exceptions. As the number of users increases,
+    the use of groups and roles becomes more and more important. The temptation to
+    delegate some rights administration responsibility increases as well, but it is
+    essential to implement this with rigid rules and train people carefully, as it
+    can quickly become a mess, where users with the same job title end up with different
+    rights, depending on who has given them these rights. Even worse, some users end
+    up with full permissions on the software because the new functional administrator
+    does not understand precisely how the rights management system works. This is
+    yet another reason to not give this responsibility to IT, however tempting this
+    may be, because they would have control of the technical part of the application.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Another, more sophisticated, way to extend the RBAC features is to shift to
+    what is called **Attribute-Based Access Control** (**ABAC**). In this rights management
+    paradigm, rules are set that link attributes from the identification to attributes
+    of the resources:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 13.13 – An ABAC approach](img/Figure_13.13_B21293.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 13.13 – An ABAC approach
+  prefs: []
+  type: TYPE_NORMAL
+- en: This allows us, for example, to overcome the limitations that would happen with
+    RBAC in our sample `DemoEditor` information system, if authors simply added a
+    `book-edition` role. Indeed, this role would either give them the right to read
+    and write books, `books` resource but not specific books.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'This is a job for ABAC, and the attributes it would use are the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 13.14 – An ABAC implementation with a BRMS](img/Figure_13.14_B21293.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 13.14 – An ABAC implementation with a BRMS
+  prefs: []
+  type: TYPE_NORMAL
+- en: You will notice that permissions are still represented – and we could include
+    roles as well – because ABAC is not exclusive of RBAC but, rather, complements
+    it in its forthcoming.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'What would happen technically in such a scenario is the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: An application would call the `GET` verb on `/api/books/978-2409002205`.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: This request would be accompanied by a bearer-based authentication header.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The JWT token would include the custom attribute providing the author internal
+    identifier (or another way to go would be to base the association to the author
+    on the email or another standard attribute).
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Upon reception of this request, the books referential service application would
+    call the authorization central API, providing it with everything it knows about
+    the request – the incoming JWT-born identity, the attributes of the book requested,
+    and so on.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The authorization app would find the rule that applies to the situation – in
+    this case, `GET` on a book.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: It would first check that the incoming user has `author_id` and that this is
+    the ID associated with one of the authors of the given book (looking at the `book_mainauthor_id`
+    attribute and – if necessary – the `book_secondaryauthors_ids` array of attributes).
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: It would then check that the initial request to the book referential service
+    does not contain something such as `$expand=release-information`, since this data
+    will not be seen by the author.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: It would realize it needs to check that the author has not been blocked and
+    would call a `GET` request to `/api/authors/x24b72`. This would be done with a
+    privileged account with full read rights, as we consider that the BRMS has a justified
+    “right to know” due to its function in the system.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: An alternative to this would be for the books referential service to provide
+    an extended view of the book, just as if there had been a call to `/api/books/978-2409002205?$expand=authors`.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: For most advanced authorization systems, these three checks would be done in
+    parallel to save time.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: If everything is correct, the BRMS will send a `200 OK` HTTP response to the
+    call from the books referential service.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The book referential service would then grant the requested access.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Of course, if anything goes wrong in these steps, the request will be refused
+    with a `403 Forbidden` status code. This could happen if the rules are not respected,
+    but also if the BRMS system does not respond in time. This behavior is expected,
+    as the so-called “graceful degradation” would imply, for security reasons, that
+    the system does not take any risk to disclose date data or allow any operation
+    if it is not sure it is allowed. This means that the authorization is another
+    SPOF in the system and should be operated corresponding to this requested level
+    of service.
+  prefs: []
+  type: TYPE_NORMAL
+- en: I hesitate to discuss **ReBAC** (**Relationship-Based Access Control**), which
+    looks like a nice complement to the RBAC and ABAC paradigms but, at the time of
+    writing, has not yet reached a mature enough state. In a nutshell, the principle
+    of ReBAC is to manage authorizations based on links between entities; hence, it
+    has a strong link to DDD. For example, this approach allows you to easily give
+    writing permission to an author on their books while keeping the books of other
+    authors with read-only permissions. This can, of course, also be done with ABAC,
+    but ReBAC makes it a little bit simpler, by basing its functioning on relationships
+    instead of simply attributes. To read a bit more about ReBAC, you can start at
+    [https://en.wikipedia.org/wiki/Relationship-based_access_control](https://en.wikipedia.org/wiki/Relationship-based_access_control)
+    and then check what OSO states about this mode at [https://www.osohq.com/academy/relationship-based-access-control-rebac](https://www.osohq.com/academy/relationship-based-access-control-rebac).
+  prefs: []
+  type: TYPE_NORMAL
+- en: OpenFGA ([https://openfga.dev/](https://openfga.dev/)) is also a project that
+    is worth looking at if you need a clean external authorization management system
+    that is ReBAC-capable. Although still nascent, the project has already been referenced
+    as a Cloud Native Computing Foundation project. If you want to check out what
+    it could do for your authorization needs, one of the best ways to start is to
+    tweak the samples provided in the sandbox ([https://play.fga.dev/sandbox](https://play.fga.dev/sandbox)).
+  prefs: []
+  type: TYPE_NORMAL
+- en: The XACML approach
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Now that the different organizations of rights management have been discussed,
+    we will start discussing a bit more about implementation and, by now, you will
+    certainly have started wondering what kind of norms and standards are available
+    to us. Since we have discussed the different steps to realize an ABAC implementation,
+    it would be interesting to study one of the most complete specifications and explain
+    how it would fit into these ABAC steps.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**XACML** (**eXtensible Access Control Markup Language**) specifies how access
+    control can be executed and administered. It is one of the most advanced ways
+    to handle authorization and establishes five different responsibilities to do
+    so:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The policy administration point is where rules are defined
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The policy retrieval point is where they are stored
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The policy decision point is the engine that decides which decision should be
+    taken
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The policy information point is where additional attributes that are necessary
+    for rule evaluation are gathered
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The policy enforcement point is the place where the result of the decision is
+    applied
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'How these five responsibilities are spread across one or many applications
+    defines how sophisticated a system will be. In the most simple approach, all five
+    responsibilities can be implemented inside the data referential service that ultimately
+    has to apply the enforcement point (since the data referential service is the
+    one who owns the data, this cannot be externalized). In this mode, the data referential
+    service not only stores the data but also stores the rules, executes them, and
+    decides what it should do depending on the outcome. The only instance in which
+    a responsibility could still be considered as external is if the referential service
+    needs some external data, but it could very well store that as well. In this case,
+    the responsibilities are affected like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 13.15 – All authorization responsibilities integrated into an application](img/Figure_13.15_B21293.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 13.15 – All authorization responsibilities integrated into an application
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'By contrast, this is how we could spread the responsibilities in the previous
+    organization of responsibilities we discussed previously:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 13.16 – Authorization responsibilities completely spread across dedicated
+    services](img/Figure_13.16_B21293.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 13.16 – Authorization responsibilities completely spread across dedicated
+    services
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In this very clean (but, of course, more expensive to set up) approach, each
+    responsibility is completely separated, and the BRMS and data referential service
+    work together in order to orchestrate them:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Before any first interaction, a functional user connects to the PAP and designs
+    the rules (just like what was done in the example previously with the DMN use).
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: These rules are stored in the associated database, which is the PRP.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: The books referential service receives the initial request. It cannot make decisions
+    on its own and delegates the PDP.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: It communicates to the deployed BRE the context of the call, in order to get
+    a decision from it.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: The PDP needs to retrieve the rules in order to process them. It could call
+    the PRP, but luckily, it has a local clone in our case, where we made the hypothesis
+    that the JBPM server has been used and the console deployed a standalone runtime
+    container for the rules execution.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: The PDP may also need some additional information that it could collect through
+    the PIP, which retrieves the `blocked` status for the author.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: The PDP sends the result of its rules decision engine back to the books referential
+    service.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: As with the PEP, the books referential service uses the decision sent by the
+    PDP to allow (or not) access to its data and possibly respond to the HTTP response
+    that was presented.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Before we show you a practical example of how to set this up, let me make another
+    digression, this time on how services should be separated.
+  prefs: []
+  type: TYPE_NORMAL
+- en: A digression on the granularity of microservices
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: First of all, let’s draw a diagram for a less sophisticated and more common
+    situation, where each data referential service contains its own PRP and PDP in
+    addition to the PEP. In this case, the PAP is generally minimal, as rules are
+    integrated into the code and do not allow for easy management, which means that
+    PRP is simply the code base itself.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 13.17 – The problem of authorization management when data is cloned](img/Figure_13.17_B21293.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 13.17 – The problem of authorization management when data is cloned
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Can you spot the potential problem? The books referential service does not
+    hold the author’s PDP/PRP, which is logical, since it is not responsible for it.
+    However, it still stores a clone of the author’s data in order to quickly respond
+    to API calls such as `/api/books/978-2409002205?$expand=authors`. This means that,
+    since it does not know how to filter this kind of data, it might create a breach
+    of confidential data if care is not taken. In a four-layer diagram, this problem
+    can be seen from a strange misalignment that appears this way:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 13.18 – A representation of the authorization antipattern in the four-layer
+    diagram](img/Figure_13.18_B21293.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 13.18 – A representation of the authorization antipattern in the four-layer
+    diagram
+  prefs: []
+  type: TYPE_NORMAL
+- en: This kind of misalignment arises from the fact that authorization has been trusted
+    by the application that stores the data. This way, since the data is duplicated,
+    there are in fact two potentially different ways to apply authorization to the
+    same data! This situation can also happen when we externalize data in a BRMS because
+    the runtime and the PAP may not be synchronized, but the advantages in this case
+    are much more important than the actual drawbacks. Indeed, the decoupling between
+    the JBPM console and the BRE runtime container bears lots of added value – the
+    console is a complex server whereas the runtime container is very light; it is
+    much better to separate them because errors are prone to happen in the first,
+    whereas the second one should have an excellent level of service. When the console
+    is used to deploy a standalone server, it can then crash without this being a
+    problem. The runtime, conversely, can be made extremely robust, since it is stripped
+    of almost every bit of code that is not immediately necessary to execute the functions.
+    The fact that the console deploys versions of the rulesets makes it possible to
+    create as many runtime servers as needed for performance reasons (thus, you also
+    avoid the SPOF problem, since this service is required by many others and should
+    be extremely stable) without any risk of a lack of consistency, which would be
+    a big problem (imagine explaining to your customers that their rights of access
+    to their tenant data vary on every new request).
+  prefs: []
+  type: TYPE_NORMAL
+- en: Still, this does not mean that all responsibilities should always be added to
+    as many services and different processes as possible. Of course, it may be useful,
+    but, as is often the case in information architecture, the most important thing
+    is to strike the right balance. There have been so many pointless discussions
+    on the internet over which is best between microservices and monolith applications
+    that you can almost surmise the quality of an article just by looking at its title.
+    Of course, the only correct response to what is best is, “*It depends,*” and any
+    competent software architect knows that this is not a “one-size-fits-all” situation.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 13.19 – Service granularity advantages and drawbacks](img/Figure_13.19_B21293.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 13.19 – Service granularity advantages and drawbacks
+  prefs: []
+  type: TYPE_NORMAL
+- en: I realize I have been saying this every chapter or so, but it’s worth repeating
+    – what should be a priority in the granularity of services for business functions?
+    If you know that the authorization rules change very rarely and having to wait
+    for a new release is not a problem, then implement what should be a priority in
+    the granularity of services for business functions directly in the code of the
+    associated referential service; you will get the best performance, and you only
+    will have to deal with the problem of securing cloned data if you have some. If
+    it is an issue, consider calling the other referential service if there is any
+    doubt; it will also be a way to refresh part of your cloned data. Conversely,
+    if you can foresee that authorization rules are going to change frequently or
+    there are external circumstances, such as regulation, then consider progressively
+    extracting responsibilities from your data referential service. Foreseeing this
+    kind of thing is admittedly a fine line between over-anticipating and adopting
+    too much of a DRY approach, but this is where judgment, long-time expertise, and
+    having suffered from many previous experiences come in handy.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Applying authorization to our sample information system
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: XACML was explained previously but is quite a complex mechanism to put in place.
+    Also, there is not a reference implementation of the protocol, although several
+    products exist such as WSO², Balana, Axiomatics, or products from AT&T. Although
+    these all have their place in big information systems such as banks or insurance,
+    they would be oversized for the small information system that we have decided
+    to simulate in our example, so we are going to use something lighter and closer
+    to the main internet protocols.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The Open Policy Agent alternative
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Open Policy Agent is a project that is supported by the Cloud Native Computing
+    Foundation and that proposes a nice decoupling between grammar to describe policies.
+    In short, OPA is to XACML what REST is to SOAP – a lightweight alternative that
+    takes on 80% of the job with 20% of the complexity. Instead of installing a full-blown
+    XACML server to show an example of externalizing the authorization responsibility,
+    we are going to use Docker to customize an authorization engine.
+  prefs: []
+  type: TYPE_NORMAL
+- en: OPA uses a declarative language named `Rego` to describe the policies that should
+    be applied to data to make decisions. It can then execute these policies to provide
+    JSON results that can be exploited in other services, or another part of the code
+    if you use the OPA implementation as a component.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Technically, what will happen is that a request like the following will be
+    sent to OPA, and it will respond with whether the requested access should be authorized
+    or not:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE0]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'In this example, the user `jpgou` requests full access to the `content` petal
+    of the book, identified under the ISBN number `978-2409002205` in the system.
+    If this is granted by the OPA server, it will respond with something like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE1]'
+  prefs: []
+  type: TYPE_PRE
+- en: Before diving into the technology again, we need to be precise about what we
+    want to achieve from a functional point of view.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The functional needs of DemoEditor
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Let’s return to our `DemoEditor` sample and describe what should be done from
+    the authorization’s point of view. Of course, in a publishing company, authors
+    have permission to provide the content of books and adjust it as they will, but
+    they should never be able to read the content of another author’s book, in order
+    to avoid plagiarism or even intellectual property theft. Since there are editors
+    who take care of authors, it is logical that they can at least read the content
+    of the books from the authors they manage. Salespersons, on the other hand, do
+    not have any editing responsibility, so they may know some information about the
+    book to prepare sales and orders but have no reason to know anything about the
+    editing process.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In this short description of the stakes at play in the rights management of
+    `DemoEditor`, it is quite clear that pure RBAC will not be enough, and we will
+    have to resort to ABAC to complete RBAC since there are rules based on the attributes
+    of the book, namely who is the author, and even other information such as the
+    link between authors and their editors. RBAC is simply not enough because an author
+    has more rights on their own books than on the ones from a different author, although
+    they both will benefit from the `author` authorization profile.
+  prefs: []
+  type: TYPE_NORMAL
+- en: As will be explained in more detail in the following section, we will also add
+    a few rules, such as the fact that salespersons can only see the book once it
+    has reached a certain status, or another one allowing us to block the rights for
+    an author that does not respect the editing contract and should be denied permissions.
+    To do so, we will use the same metaphor that we used in [*Chapter 9*](B21293_09.xhtml#_idTextAnchor318),
+    where designating the different categories of data for books is like placing them
+    in the petals of a flower, the core of which contains the most important, entity-defining
+    data, such as the ISBN number and the title of the book. Although it may be tempting
+    to define these petals based on the authorization rules, it is important to keep
+    in mind they have to be drawn from functional constraints, and authorization management
+    is one of them, but still only one of them.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Creating the authorization policies
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Starting with the definition of the authorization policies will allow us to
+    do two things simultaneously:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Explain what kind of authorization behavior we intend to put in place and how
+    the data referential service for the books should work
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Explore some of the `Rego` syntax and what is at play when externalizing authorizations
+    with such a mechanism
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'When writing the `policy.rego` file (just an arbitrary name) for the authorization
+    management of the books data referential service, we need to start with a package
+    name, which allows us to separate rules from different groups when they are executed
+    in the same engine. The beginning of the file also contains some instructions
+    to import specific keywords and functions (OPA supports plugins and extensions
+    of the grammar to ease its use) or prepare data (which we will come back to further
+    on in the chapter):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE2]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The body of the file then generally starts with a pattern where a main authorization
+    attribute, which we will call `allow`, is broken down into several finer-grained
+    decision policies. What we want to achieve is an authorization engine that, when
+    exposed to a type of access, will send as a result whether this access should
+    be granted or not. We will come back to this part later when demonstrating how
+    to apply the rules engine, but for now, let’s continue with the policy-defining
+    file and show how the behavior we discussed will be implemented:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE3]'
+  prefs: []
+  type: TYPE_PRE
+- en: In order to implement security best practices, access is forbidden by default.
+    This allows for what is called “graceful degradation” – if there is a problem
+    in the authorization subsystem, it will default to the safest situation. In our
+    case, the safest approach is to not allow access, since a lack of availability
+    is, of course, less of a problem than disclosing data to a person who should not
+    have been able to see it, with all the business consequences such an event could
+    have. This is what the first line in the preceding code is about – setting to
+    `false` the default value of the `allow` attribute.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The second operation states that, in order to make `allow` become `true`, we
+    need to pass five different decisions, each of them needing to be evaluated to
+    `true`. These decisions are, of course, named in such a way they will be easy
+    to understand and debug (setting authorizations correctly is somewhat of a challenge,
+    but this will almost never be 100% correct at the first attempt). The rest of
+    the file will basically be about detailing these five main decisions, but before
+    we declare how they work, we need to prepare some data. Indeed, as we will explain
+    in the next section, we need some referential service data in order for the engine
+    to make decisions. For example, since we stated that editors should have access
+    to books from the authors they coach, there will be an obvious need for the engine
+    to know about the links between authors and editors. Some other information, such
+    as the status attribute of the book, will also be useful. All this data will mostly
+    come from the data referential service to the engine, but it will be basic data,
+    and we may glean some information from it before actually using the whole set
+    of data to infer decisions.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'One such piece of information is the roles the current user owns. As stated
+    previously, we will need some bits of RBAC, even if it is not enough. That means
+    the user will be linked to some roles, some of them directly and some of them
+    through the user belonging to identification groups. The following grammar expresses
+    precisely this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE4]'
+  prefs: []
+  type: TYPE_PRE
+- en: Groups can be found in a piece of data called `directory`, by looking at the
+    entry in the list designated by the value of the input variable called `user`.
+    Once this user is found in the list, the `groups` attribute will provide the list
+    of identification groups. These will then be used to retrieve the roles associated
+    with the groups, leveraging a collection called `group_mappings`. The same logic
+    will be applied to a collection that sends the roles directly applied to a user,
+    and the two role lists will simply be merged by the last operation shown in the
+    preceding code.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We will also need information about the author potentially associated with
+    the user. This is something I have not explained fully yet, briefly mentioning
+    the fact that an author uses a user to access the information system from `DemoEditor`
+    even if they are not really part of an organization, or at least not employees
+    of it. This means that, first, access will have to be provided to them (we will
+    come back to how to do this when implementing the associated function). This also
+    means that there should be a way somehow to associate these two entities in the
+    information system. A method that happens quite often is to use a verified `email`
+    attribute to link them together. For the moment, we will just consider that the
+    user’s information is contained in the `author` entity. The rule to retrieve the
+    association is quite easy to write – it simply loops over the list of authors,
+    and if the `user` associated with an author is the one the request for access
+    relates to, then the author is the one we are looking for:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE5]'
+  prefs: []
+  type: TYPE_PRE
+- en: In fact, we should refer to authors rather than just an author because we know
+    there will functionally be only one, but technically, we will use a list even
+    if the name of the variable remains in the singular form, `user_author`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The same applies to the book that the request talks about, as we need to retrieve
+    its ID from the list of data to be able to make some decisions from rules on book
+    attributes:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE6]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'In the case of an author, we also have to retrieve the list of books they are
+    the writer of because some rules apply to this as well:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE7]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Now that all the necessary data is collected, we can start discussing the rules
+    themselves, taking the five units of rules separately and breaking them down even
+    more. The first rule that applies is that permissions should be owned by the user
+    associated with the request. It will not be enough to grant access, but this is
+    nonetheless a necessary constraint. In order to know whether the user should be
+    allowed access to the resource they requested, all accesses provided by roles
+    should be studied. If one corresponds to the type of resource and the operation
+    requested, then it is a match, and the permission is applied:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE8]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The following rule makes it happen that if someone gets a right to `books.content`,
+    `books.sales`, or `books.editing` (one of the petals of the flower corresponding
+    to the data referential service), then they automatically obtain a right to the
+    core of the flower, which is logical, since having access to some data without
+    being able to link it to a given entity would not prove to be very useful:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE9]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Since we have two rules with the same name (`permission_associated_to_role`)
+    instead of two rules with different names inside the same group, there is a big
+    difference in processing, as it means that rules are considered to be separate
+    by an “or” operator (and not all needs to be true for the result to be true, such
+    as what was set up previously for `allow`). Also, we are even going to add a third
+    case where this part of the policy should be granted, namely when the access provided
+    contains `all` as an operation. In this case, whether the requested operation
+    is `read`, `write`, or any other value, it will be granted (at least based on
+    this criteria):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE10]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Now, the question should be, how is `user_accesses_by_roles` calculated? Well,
+    this time, it is a bit more complicated, with a sub-decision that walks through
+    some tree-like hierarchy of profiles and their associated accesses, contained
+    in the `roles` entity of the data provided. We will return to the definition in
+    the next section, but for now, it is important to know that we will use a hierarchy
+    to set managers on top, and then salespersons and editors below, and authors under
+    their editors. The interesting bit in this approach will be how easy it is to
+    make it so that the role above receives all the permissions of the one below in
+    the tree. After all, if a salesperson has the right to write the sales values,
+    it is logical that their manager has at least the same rights. The syntax is harder
+    to read, but do not worry about this, as the OPA documentation is well-written,
+    and there are many examples available for even the most convoluted rules:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE11]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'When dealing with the rule stating that an author can only have rights on books
+    they are authors of, we need to apply a little trick. As usual, we start by setting
+    access to false, in order to respect security best practices. And we will set
+    it to `true` if we can follow the link of authoring when in the case of a book
+    writer, and also simply in the case where the user is not a book writer. That
+    may sound too relaxed a constraint, but remember that this is not the complete
+    result. In this case, this is just the piece of decision that is about the link
+    between an author and their books; if we are dealing with an editor, this rule
+    simply does not apply, but some others will, and all of them need to align in
+    order for the final, summarizing decision to be positive. The result is the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE12]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'By now, you should start to be better accustomed to the `Rego` syntax, but
+    the third part of the global authorization scheme still requires some thinking,
+    as it needs you to traverse the whole organizational chart in order to retrieve
+    the link between editors and “their” authors, since we need to apply the rule
+    that an editor only has rights on books from the authors they manage:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE13]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The fourth part of the global decision is simpler – it considers that salespersons
+    cannot see a book if it is not in a published or archived status. Again, in order
+    to account for the “or” approach, we need to calculate twice the `readable_for_sales`
+    attribute, initially set to `false` for security reasons, respectively for the
+    two values of the status allowing access to the salespersons:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE14]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The fifth and final part of the decision is even simpler, and we will not explain
+    the code, simply the rule – if an author has been blocked, they cannot have any
+    access to any book:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE15]'
+  prefs: []
+  type: TYPE_PRE
+- en: Once syntax is complete, we need a second type of information to make a decision.
+    This is what decision data is about.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Adding some data in order to make decisions
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'We had hinted in the previous section about the fact that data should be provided
+    (and even inferred from other data) in order for the rules engine to be able to
+    make a decision. Next, we will show what kinds of information we should put in
+    place for our example to work. First, we need the definition of roles (remember
+    that a role is a set of rights, each composed of a resource type and an operation
+    type):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE16]'
+  prefs: []
+  type: TYPE_PRE
+- en: The preceding JSON content also defines the notion of `parent`, which creates
+    a tree of roles, with, for example, `book-sales` and `book-edition` placed under
+    `book-direction`, which means that a director will automatically receive all the
+    permissions granted by default to a salesperson *and* the ones granted to editors,
+    in addition of course to the ones described directly on the role itself.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Some data about books will be sent in order to apply some specific rules that
+    need this. In the following example, I have shown a list because I tested different
+    combinations. In actual use, we could simply send the data associated with the
+    only book we request OPA for to decide on its access, and nothing more, in order
+    to preserve performance. Here is the associated data:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE17]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Note that the preceding code is not expressed in a JSON array but as a structure.
+    The same is true for data about authors:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE18]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The organizational chart allows us to define who is the big boss (`frfra`),
+    define which salespersons and editors are below him (three persons in my example),
+    and finally, to place two authors below the editor, codenamed `mnfra`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE19]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'We then simulate what would be sent by a user directory – for example, the
+    groups that each user belongs to. This is somewhat artificial, as we would normally
+    extract this for the JWT token that has been passed through identification, but
+    this is what we will do when hitting the difficulty in code. For now, we will
+    stay quite symbolic with the following tree:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE20]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Of course, now we have the groups, we need the mappings to link them to roles
+    in a true RBAC approach:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE21]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'And since we have decided to be as complete as possible, we will allow – beyond
+    pure RBAC – the possibility to also state some direct association between a user
+    and a role, without the group intermediary:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE22]'
+  prefs: []
+  type: TYPE_PRE
+- en: Now that everything is set for the server to output some results (rules and
+    data), we can go to the next step, which is setting up a real OPA server, feeding
+    it with these two files, and trying out some decisions.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Deploying a Docker-based OPA server
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'It is so easy to deploy with Docker that we would be asking for trouble not
+    using it to test OPA. The command line to run the server is extremely simple:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE23]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Once the server is up, we will start with a call to push policy definitions
+    in it:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE24]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Another call is used to send the data:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE25]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Finally, we are able to test the OPA server with a simple request that is shown
+    in the following code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE26]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'When called with the following command to send this text content to a `POST`-using
+    API, the OPA server will send a result in JSON, the rest of the command taking
+    care of retrieving only the part of the result we are interested in:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE27]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'If executed as is, this normally sends `true`, meaning that this context of
+    the request is granted by the OPA server. If you get rid of the last part of the
+    command and display the whole response, you will get something like the following,
+    which is really useful for debugging, since it shows the values for all intermediate
+    decisions:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE28]'
+  prefs: []
+  type: TYPE_PRE
+- en: Testing the authorizations
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: These sample authorizations are not very complicated, but the level of complexity
+    is enough to be hard to handle manually. There are many specific cases that pose
+    questions. For example, if I told you that a manager requests access to the sales
+    data of a book that has not been published yet, what do you think would happen?
+    And, more importantly, what do you think should happen?
+  prefs: []
+  type: TYPE_NORMAL
+- en: Also, the `Rego` syntax has a steep learning curve. Writing the rules presented
+    previously took me a few hours, if not a day since I am not a specialist, and
+    I am not sure they work exactly the way I think they do.
+  prefs: []
+  type: TYPE_NORMAL
+- en: This is where having good testers is of utmost importance, and their ability
+    to define a testing campaign, find all the corner cases, discuss them with the
+    product owners/customers, and so on will be a great help. Such a test campaign
+    will be created using a Gherkin syntax (see the following sample scenarios). If
+    you use a tool such as SpecFlow, you can create many of these scenarios and test
+    them automatically so that every modification to the rules grammar does not break
+    anything. Once your complete set of tests is ready, you will obtain a report on
+    whether all the series of tests have passed, ultimately reassuring you that all
+    modes you have thought of are correct.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In order to install SpecFlow in Visual Studio, follow the instructions at [https://docs.specflow.org/projects/getting-started/en/latest/index.html](https://docs.specflow.org/projects/getting-started/en/latest/index.html).
+    Then, you will need to create a project of type `SpecFlow Project`. The result
+    will be some classes with examples of how to use SpecFlow, and we are going to
+    adapt them to our specific needs, which is to test the authorization rules we
+    have set up in OPA. We will use xUnit as the underlying test framework here, but
+    you can, of course, modify this to your preferences:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 13.20 – Creating a SpecFlow project](img/Figure_13.20_B21293.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 13.20 – Creating a SpecFlow project
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The structure of the project created will be based on a sample called `Calculator`,
+    and the very first action is to change the names to fit our own purpose, which
+    is to test OPA:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 13.21 – The SpecFlow project structure](img/Figure_13.21_B21293.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 13.21 – The SpecFlow project structure
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The `OPA.feature` content is, in the first step, modified to the following
+    Gherkin content:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE29]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'This syntax should be easy to read, even for non-developers; the idea of behavior-driven
+    development is that functional people are able to express their requirements in
+    such a language, called Gherkin (which has many more sophisticated features than
+    we show here for simplicity reasons). In order for this Gherkin syntax to be transformed
+    into an automated xUnit test, we need to create a correspondence between the lines
+    in the scenario and the C# functions that implement this part of the test. This
+    is done in the `OPAStepDefinitions.cs` file. For example, for the `Given` and
+    `And` keywords (which are of the same notion), the corresponding functions will
+    be as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE30]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'In the initialization part of the class containing this function, we will,
+    of course, have a member to store the books (and other lists for other entities
+    needed for the test scenarios):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE31]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The corresponding classes contain all that is needed to vary the context of
+    the rules. As you can see, the first name and last name of the authors have not
+    been integrated into the model, since we have a strong assurance that they cannot
+    impact the output of the rules engine:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE32]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'This will allow us, upon calling on the function associated with the `When`
+    keyword, to realize the call to the so-called System Under Test (what we want
+    to validate is the OPA server, which should have been started and customized with
+    the `Rego` content and will listen on port `8181` in our setup):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE33]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The final part of the test execution is carried out by the method associated
+    with the `Then` keyword, which is the one running the asserts in order to simulate
+    an automated test:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE34]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'You now can display the Test Explorer by accessing it from the menu or using
+    the *Ctrl* + *E* + *T* shortcut. The tests might not display at first, and you
+    may have to run the solution generation for them to appear. Once they are displayed,
+    you can run the scenarios one by one or simultaneously, and if everything works
+    fine, they should confirm the rules work as intended and display everything with
+    ticks on circles:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 13.22 – The results of the SpecFlow tests](img/Figure_13.22_B21293.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 13.22 – The results of the SpecFlow tests
+  prefs: []
+  type: TYPE_NORMAL
+- en: Six scenarios are not a lot for such a complex set of policies, and in the real
+    world, a few dozen such scenarios would be welcome to form such a powerful harness
+    that everyone would be convinced the system works perfectly as expected. But again,
+    since this is not the main subject of the book, we will leave the automated tests
+    of authorization rules here. By the way, I showed automated BDD tests created
+    with SpecFlow because this is the framework I am used to, but there are alternatives
+    that may be more suitable, depending on your needs and context. The important
+    thing is not whether you use SpecFlow, Postman, or any other method but that such
+    important rules as authorizations should be verified carefully.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Challenges with OPA
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: OPA is a great approach to authorization rule implementation, but it still offers
+    some challenges.
+  prefs: []
+  type: TYPE_NORMAL
+- en: First of all, there is the complexity of writing rules, as previously discussed.
+    Although this is quite logical as we try to fit some complex functional algorithms
+    into just a few keywords, it can really be limiting for those trying to adopt
+    OPA and the `Rego` syntax, only to be held up by many incorrect attempts at writing
+    the right rule.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'I personally experienced this, and to be perfectly honest, I still do not really
+    understand how the following rule works:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE35]'
+  prefs: []
+  type: TYPE_PRE
+- en: I know that it does because I have tested it, and I can see the point about
+    walking through a tree and picking some data of the path, but the additional recurrent
+    valuation of `access` combined with the use of the `_` keyword and the `reachable`
+    function just make it too hard for me to write this on my own, without referring
+    to some examples that others have written. It may be a lack of practice, but I
+    have tried my fair share of exotic languages over almost four decades of programming,
+    and I still think `Rego` might be one of the most complicated logics I have encountered.
+    After a few attempts at using OpenFGA, it may be simpler to provide an equivalent
+    authorization rule, but I cannot make a commitment to this, since I have not yet
+    used this technology in a production-ready module.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Luckily, some documentation such as [https://www.openpolicyagent.org/docs/latest/policy-reference/](https://www.openpolicyagent.org/docs/latest/policy-reference/)
+    shows advanced examples, and I also found great advanced tips at [https://www.fugue.co/blog/5-tips-for-using-the-rego-language-for-open-policy-agent-opa](https://www.fugue.co/blog/5-tips-for-using-the-rego-language-for-open-policy-agent-opa),
+    while links such as [https://medium.com/@agarwalshubhi17/rego-cheat-sheet-5e25faa6eee8](mailto:https://medium.com/@agarwalshubhi17/rego-cheat-sheet-5e25faa6eee8)
+    provided some clear explanation on how these complex syntaxes work.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Another challenge with OPA might come from the fact that HTTP API calls can
+    cause performance problems if done in volume. And if your authorization rules
+    are complex, chances are that you will be obliged to apply them to business entities
+    one by one. So, how would you handle some calls requesting a list of entities?
+    Calling the API hundreds of times or more is not an option. And what is true for
+    a local Docker container is even more true for a service in the cloud such as
+    OSO ([https://www.osohq.com/](https://www.osohq.com/)) that proposes a SaaS solution
+    for authorization rules.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Of course, the best approach is still paginating results, which is also good
+    not only for ecological reasons, helping to reduce the strain on resources, but
+    also for ergonomic reasons, by providing users with screens that are less cluttered
+    with data and easier to read and comprehend. However, cases where you need volume
+    may remain, and calling an HTTP server many times is not an elegant option anyway.
+    Luckily, OPA can be accessed directly from your code if you use the Go language,
+    or even as a WebAssembly module, making it possible (although not currently easy)
+    to integrate it at the code level from many platforms.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Here’s a final thing to note on authorization management – in this chapter,
+    you have seen a simplified version of the grammar and data that will be applied
+    more realistically in the upcoming chapters. For example, I used simple identifiers
+    instead of URN, some attributes were repeated in order to ease rule execution,
+    and so on. I could have shown the policies in their final form but considered
+    it better to show the work in progress for two reasons:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Avoiding this additional complexity made it easier to concentrate on the subject
+    of authorization rules
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Showing these adjustments at the precise moment we need to make them will hopefully
+    also make them more understandable, as the situation will show how the simple
+    approach could cause an evolution problem and help explain the change
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Summary
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In this chapter, we showed what a Business Rules Management System does, how
+    useful it can be in an information system, and how we could implement one, starting
+    with a functional example and then demonstrating another example relating to authorizations,
+    which are one of the most used sets of business rules in software applications.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Just like for BPMN engines, BRMS engines are not used very often. In fact, business
+    rules are – in the great majority of cases – implemented in code expressions or
+    compiled into applications. This is absolutely normal because a BRMS represents
+    an important investment, and implementing such complex applications really needs
+    a strong business case, where business rules change very frequently or are associated
+    with strict regulatory or marketing constraints, such as the necessity to trace
+    all business rules and their changes, the capacity to simulate the effects of
+    new versions of sets of business rules, and so on. We can conclude, then, that
+    this approach is currently limited to very rare contexts. Things may, of course,
+    change in the future, with the industrialization of information system design
+    that we really long for, but at the present time, BPMNs and BRMSs are an effort
+    that is almost always overkill.
+  prefs: []
+  type: TYPE_NORMAL
+- en: And since two of the three parts of the ideal system are not worth using in
+    most of an organization, this means this ideal system is really utopic. Moreover,
+    even a centralized **Master Data Management** (**MDM**) approach is complicated.
+    The MDM practices per se are applicable to every business domain, so there is
+    no problem with a data referential service; they are not very complicated to set
+    up, as we will see in practice in [*Chapter 15*](B21293_15.xhtml#_idTextAnchor548),
+    and they bring lots of business value and advantages. However, the ideal system
+    aims for generic MDM, dynamically adjusting to every entity in the business context
+    of an application. This step further is also out of the scope of this book, though
+    static code generation for a data referential service is becoming a viable option,
+    as we will show at the end of [*Chapter 15*](B21293_15.xhtml#_idTextAnchor548).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In addition, we have shown that the three responsibilities of an ideal information
+    system are, ultimately, quite entangled with each other:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: MDM uses business rules in its validation of data
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: A BRMS needs data from MDM in order to apply the business rules and decide their
+    output value
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: A BPMN serves mainly as a collector of data to feed the MDM, while also consuming
+    data from the MDM
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: A BPMN also uses business rules in order to know where to go in the different
+    gateways (and, sometimes, to calculate some additional data during a given task)
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: All this proves that, technically, this assembly of three generic servers for
+    MDM, a BPMN, and a BRMS is not so feasible, and neither achieves a perfect decoupling.
+    So, why did we bother in [*Chapter 5*](B21293_05.xhtml#_idTextAnchor164) and the
+    last three chapters to talk about such an ideal system? Again, the answer lies
+    in the business/IT alignment. The ideal system is not something that can be realized
+    in practice in information systems today (and certainly not for at least a few
+    more decades), but it has the great advantage of forcing an architect to think
+    in terms of three generic, always applicable, functional responsibilities. Even
+    if you use a unique software application, knowing how to separate the data management,
+    business rules management, and business process execution provides a great step
+    toward decoupling your information system (which is not achieved at all with *n*-tier
+    architecture, for example). As you will see in the coming chapters, constructing
+    an information system with these principles in mind will help us achieve a very
+    complex goal, which is to be able to modify important functional rules and behaviors
+    very easily and, in most cases, without any significant impact on the implementation.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In the next chapter, we will use everything we have learned so far to design
+    the information system of `DemoEditor`. In the following chapters, we will finally
+    get hands-on and implement all the different parts of this information system,
+    using C# and .NET as a programming platform and Docker as deployment architecture.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Part 3: Building a Blueprint Application with .NET'
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: After a theoretical part and one on the architecture principles, we will now
+    dive deep into the technical aspects of the method by implementing some important
+    parts of the sample information system. We will create some ASP.NET services implementing
+    the API contracts and a graphical user interface that uses them and implements
+    some of the business processes. Since some features have been externalized to
+    bring more industrial-grade quality, we will also show how to interact with these
+    modules in a lowly coupled way. Plugging the services into the Apache Keycloak
+    IAM, using standards such as OAuth and JWT, will of course be an important step,
+    but we will also show electronic document management systems in a standard way
+    and talk about many other external services. Finally, the external execution of
+    business processes will be shown, with both orchestration and choreographic paradigms.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'This part has the following chapters:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[*Chapter 14*](B21293_14.xhtml#_idTextAnchor503), *Decomposing the Functional
+    Responsibilities*'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[*Chapter 15*](B21293_15.xhtml#_idTextAnchor548), *Plugging Standard External
+    Modules*'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[*Chapter 16*](B21293_16.xhtml#_idTextAnchor588), *Creating a Write-Only Data
+    Referential Service*'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[*Chapter 17*](B21293_17.xhtml#_idTextAnchor608), *Adding Query to the Data
+    Referential Service*'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[*Chapter 18*](B21293_18.xhtml#_idTextAnchor622), *Deploying Data Referential
+    Services*'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[*Chapter 19*](B21293_19.xhtml#_idTextAnchor634), *Designing a Second Data
+    Referential Service*'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[*Chapter 20*](B21293_20.xhtml#_idTextAnchor647), *Creating a Graphical User
+    Interface*'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[*Chapter 21*](B21293_21.xhtml#_idTextAnchor674), *Extending the Interfaces*'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[*Chapter 22*](B21293_22.xhtml#_idTextAnchor709), *Integrating Business Processes*'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL

@@ -1,0 +1,966 @@
+- en: '13'
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Creating a Roslyn Analyzer
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In the previous chapter, we covered the use of code analyzers to detect issues
+    in code. But what happens when your team has common issues that aren’t detected
+    by any existing analysis rules?
+  prefs: []
+  type: TYPE_NORMAL
+- en: It turns out that modern C# provides a means for building custom analyzers through
+    something called **Roslyn Analyzers**. In this chapter, we’ll see how Roslyn Analyzers
+    work in action by building an analyzer of our own.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'This chapter covers the following topics:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Understanding Roslyn Analyzers
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Creating a Roslyn Analyzer
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Testing Roslyn Analyzers with `RoslynTestKit`
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Sharing analyzers as Visual Studio extensions
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Technical requirements
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Unlike other chapters, we won’t be starting with sample code. Instead, we’ll
+    be starting with a blank solution and gradually adding new projects to that solution.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The starting empty solution and final code for this chapter are available from
+    GitHub at [https://github.com/PacktPublishing/Refactoring-with-CSharp](https://github.com/PacktPublishing/Refactoring-with-CSharp)
+    in the `Chapter13` folder.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Understanding Roslyn Analyzers
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Before we can go into what a Roslyn Analyzer is, let’s talk about Roslyn.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**Roslyn** is the codename for the reimagined **.NET Compiler Platform** that
+    was released alongside Visual Studio 2015\. Since “.NET Compiler Platform” is
+    a lot to say, most people refer to this as the Roslyn compiler or simply Roslyn
+    for short.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Before Roslyn, if a tool wanted to understand C#, VB, or F# source code, developers
+    needed to write their own language parser for these code files. This involved
+    a significant amount of time and complexity, and this effort needed to be repeated
+    every time these programming languages changed. This led to tools being slower
+    to support new language features, lost productivity, and bugs.
+  prefs: []
+  type: TYPE_NORMAL
+- en: One of the explicit goals of the Rosyln compiler was to provide visibility into
+    the structure of code in a standardized way. This way, plugins could work with
+    the Roslyn APIs to get live information about code without having to write their
+    own parser.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'To do this, projects can create **Roslyn Analyzers**, which integrate into
+    the code analysis and compilation process. This lets you do the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Provide warnings and errors when anti-patterns in code are present
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Integrate into the **Quick Actions** menu, allowing developers to automatically
+    fix known issues using established solutions
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Provide refactoring capabilities, thereby improving developer productivity
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: You’ve been working with Roslyn Analyzers this whole time with the various code
+    warnings, suggestions, and **Quick Action** refactorings you’ve seen in Visual
+    Studio.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'You can explore the built-in analyzers in your projects by going to **Solution
+    Explorer** and then expanding a project’s **Dependencies** node, followed by its
+    **Analyzers** node and specific analyzer assemblies, as shown in *Figure 13**.1*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 13.1 – Code analyzers in Solutions Explorer](img/B21324_13_1.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 13.1 – Code analyzers in Solutions Explorer
+  prefs: []
+  type: TYPE_NORMAL
+- en: Through the rest of this chapter, we’ll create a Roslyn Analyzer of our own,
+    but before we do, let’s talk about how Roslyn sees C# code.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Installing the extension development workload and DGML editor
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: When you’re developing with Roslyn Analyzers, two additions to Visual Studio
+    will help you create and debug your own analyzers. Let’s install these by launching
+    **Visual Studio Installer** from the Windows start menu. Next, select your installation
+    of Visual Studio and click **Modify**.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'This will bring up a list of workloads and features that are available. These
+    change over time, but you’ll want to make sure that the **Visual Studio extension
+    development** workload is checked in the **Workloads** tab, as shown in *Figure
+    13**.2*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 13.2 – Installing Visual Studio extension development and DGML editor](img/B21324_13_2.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 13.2 – Installing Visual Studio extension development and DGML editor
+  prefs: []
+  type: TYPE_NORMAL
+- en: Next, find **DGML editor** in the **Individual components** tab and check it
+    as well before clicking **Modify** to install the additional components.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The Visual Studio extension development workload is useful when you are trying
+    to create a VSIX extension project for Visual Studio. This type of project allows
+    you to add custom user interface elements, analyzers, and new features to Visual
+    Studio. We’ll talk more about VSIX extensions periodically throughout the rest
+    of this chapter and the next.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The DGML editor works with **Directed Graph Markup Language** (**DGML**) to
+    show interactive visualizations in Visual Studio. It also happens to install a
+    very useful view that will help us understand Rosyln more: **Syntax Visualizer**.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Introducing Syntax Visualizer
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: '**Syntax Visualizer** is a view in Visual Studio that allows you to see the
+    structure of source code from the Roslyn API’s point of view.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: To see this in action, open a C# file in your editor and then open **Syntax
+    Visualizer** by clicking the **View** menu, followed by **Other Windows** and
+    then **Syntax Visualizer**.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'This should show you a hierarchy of various nodes corresponding to the code
+    in your editor, as shown in *Figure 13**.3*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 13.3 – Syntax Visualizer synchronizing with the current code selection](img/B21324_13_3.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 13.3 – Syntax Visualizer synchronizing with the current code selection
+  prefs: []
+  type: TYPE_NORMAL
+- en: Click on various keywords, variables, methods, and values in your code and watch
+    **Syntax Visualizer** change to reflect what you’ve selected.
+  prefs: []
+  type: TYPE_NORMAL
+- en: This is a very good way of understanding how code is structured in Roslyn’s
+    APIs, but the tool can also be helpful when you’re not sure what class inside
+    of the Roslyn API refers to the type of code element you want to work with.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Now that we have a slightly greater understanding of what the Roslyn API is,
+    let’s create our first Roslyn Analyzer.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Creating a Roslyn Analyzer
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: People create custom Roslyn Analyzers when they experience common issues in
+    their code that no existing analyzer addresses. These custom analyzers help enforce
+    rules that specific organizations or teams find to be useful. However, these organization-specific
+    rules tend to be less relevant to the larger .NET community.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Here are a few examples of when you might want to build a custom analyzer:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Your team has been having issues with too many `FormatException` errors from
+    things such as `int.Parse` and wants to make `int.TryParse` their standard
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Due to large files and limited memory, your team wants to avoid the `File.ReadAllText`
+    method and use stream-based approaches instead
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Your team mandates that all classes must override the `ToString` method to improve
+    the debugging and logging experience
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Note that none of these approaches relate to styling or syntax. Instead, these
+    analyzers deal with team-specific decisions about how to best use .NET. We’ll
+    explore ways of enforcing styling and syntax choices in [*Chapter 16*](B21324_16.xhtml#_idTextAnchor341),
+    *Adopting* *Code Standards*.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Let’s say that Cloudy Skies Airlines is spending a lot of time debugging and
+    troubleshooting code and suspects that overriding `ToString` in more places would
+    lead to a better developer experience for their team.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs: []
+  type: TYPE_NORMAL
+- en: It’s not an established best practice to override `ToString` in all classes.
+    There are likely some performance drawbacks to doing so, but for this chapter,
+    we’ll assume this rule makes sense for the Cloudy Skies team.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Throughout the rest of this chapter, we’ll create this analyzer, starting from
+    a blank solution.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Adding the analyzer project to our solution
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: While there are templates for creating Roslyn Analyzers built into Visual Studio,
+    these are older templates and they hide some of the implementation details. Instead,
+    we’re going to walk through the steps of creating and deploying a Roslyn Analyzer
+    from an empty solution.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We’ll start by adding a class library that will contain our analyzer. Class
+    libraries are a special type of project that provides code to other projects but
+    cannot run on their own.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Starting with the `Chapter13BeginningCode` solution, we’ll right-click on the
+    solution in **Solution Explorer** and then choose **Add** and then **New Project…**.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'From there, we’ll select the type of project we want to create, select a **Class
+    Library** project using the C# language, as shown in *Figure 13**.4*, and click
+    **Next**:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 13.4 – Adding a C# Class Library project to our solution](img/B21324_13_4.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 13.4 – Adding a C# Class Library project to our solution
+  prefs: []
+  type: TYPE_NORMAL
+- en: Warning
+  prefs: []
+  type: TYPE_NORMAL
+- en: There are multiple projects with the name Class Library in different languages.
+    Look for the green C# icon and the C# label in the list.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Next, we’ll need to provide a name for our class library. This is the library
+    that will hold the code analyzer we’re creating this chapter, so let’s call it
+    `Packt.Analyzers` since the name of the project will become the default namespace
+    of the project.
+  prefs: []
+  type: TYPE_NORMAL
+- en: After this, you’ll be asked to select the framework the project should use.
+    Select **.NET Standard 2.0** and click **Create**. The new project will be added
+    to your solution.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Why .NET Standard?
+  prefs: []
+  type: TYPE_NORMAL
+- en: Unlike other projects in this book, we’re using .NET Standard here. This is
+    a special version of .NET that was designed to run on a variety of different .NET
+    runtimes. This makes .NET Standard a great choice for when you don’t know which
+    version of .NET your code will be running in. See the *Further reading* section
+    for more information.
+  prefs: []
+  type: TYPE_NORMAL
+- en: To create a Roslyn Analyzer, we’ll need to add a few NuGet packages to our class
+    library. To do this, right-click on the class library in **Solution Explorer**
+    and then choose **Manage** **NuGet Packages…**.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Once you’re in `Microsoft.CodeAnalysis` package, as shown in *Figure 13**.5*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 13.5 – Installing version 4.0.1 of Microsoft.CodeAnalysis](img/B21324_13_5.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 13.5 – Installing version 4.0.1 of Microsoft.CodeAnalysis
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note that version 4.0.1 is not the most recent version of this package. This
+    specific version was chosen to avoid a conflict with the testing library we’ll
+    use later.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Now that the package has been installed, we’re ready to start creating our Roslyn
+    Analyzer.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Defining a code analysis rule
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Let’s start by renaming the `Class1.cs` file to `ToStringAnalyzer.cs` and replacing
+    its contents with the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE0]'
+  prefs: []
+  type: TYPE_PRE
+- en: This is the minimum we need to have a compiling analyzer. Let’s explore what’s
+    here.
+  prefs: []
+  type: TYPE_NORMAL
+- en: First of all, the `ToStringAnalyzer` class inherits from `DiagnosticAnalyzer`,
+    which is a base class for all Roslyn Analyzers that provide warnings to the user.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The class has a `DiagnosticAnalyzer` attribute that says the analyzer applies
+    to code written in C#.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs: []
+  type: TYPE_NORMAL
+- en: It’s possible to write analyzers that apply to C#, F#, Visual Basic, or some
+    combination of these languages.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Inheriting from the abstract `DiagnosticAnalyzers` class forces us to override
+    the `SupportedDiagnostics` property and the `Initialize` method. Let’s do that
+    now in the simplest way possible:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE1]'
+  prefs: []
+  type: TYPE_PRE
+- en: The `SupportedDiagnostics` property returns `ImmutableArray`, which contains
+    all diagnostic rules the analyzer provides to the editor. In our case, we’ll want
+    it to return the warning the user might see if the rule is violated.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let’s add a new property and update our `SupportedDiagnostics` property, as
+    shown here:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE2]'
+  prefs: []
+  type: TYPE_PRE
+- en: Here, we’ve added a static `Rule` property that defines the `DiagnosticDescriptor`
+    object that’s defining our rule. This rule is then included in the `SupportedDiagnostics`
+    property.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Localization note
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`DiagnosticDescriptor` objects can be created with either raw strings, as we’re
+    using here, or by using `LocalizableString` parameters. `LocalizableString` works
+    better in different languages, so you’ll want to use it if you are trying to create
+    a Roslyn Analyzer intended to be used throughout the globe.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The `DiagnosticDescriptor` object that this code defines will show up in the
+    **Error List** pane and build output if the rule is ever violated. The rule needs
+    the following parts:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`CSA` for Cloudy Skies Airlines.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Title**: The short name of the code analysis warning. This is what will appear
+    in tooltips when the rule is violated.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Message format**: A formattable string that will appear in the Visual Studio
+    tooltip.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`Naming`, `Performance`, `Maintainability`, `Security`, `Reliability`, `Design`,
+    and `Usage`.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`Hidden`, `Info`, `Warning`, or `Error`.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Enabled by default**: Whether the rule starts as enabled.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Description**: A detailed description of the rule and why it’s important.
+    This shows up in the **Error List** pane when a rule violation is expanded.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Defining your rule as a separate property is helpful when other code needs to
+    refer to your exact rule definition.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Now that our rule has been defined, let’s write the code that detects when the
+    rule is violated.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Analyzing symbols with our Roslyn Analyzer
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Let’s start by building out our `Initialize` method:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE3]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'This method now does a few additional things:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: First, we configure the analyzer to ignore any auto-generated code for analysis
+    purposes. These are files that the user didn’t write but various tools generate
+    and so it doesn’t make sense to analyze them.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Secondly, we tell Roslyn that it’s fine to evaluate multiple pieces of code
+    with this rule at the same time. This is always the preferred option from a performance
+    standpoint.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Finally, we tell the analyzer that whenever it encounters a named `Type` during
+    code analysis, we want to know about it. Specifically, the code should call a
+    new `Analyze` method for each `Type` that is detected.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We haven’t written that `Analyze` method yet, so let’s do so now:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE4]'
+  prefs: []
+  type: TYPE_PRE
+- en: This code is not easy to write or read, so let’s go over it before discussing
+    *how* to write analyzer code.
+  prefs: []
+  type: TYPE_NORMAL
+- en: First, since we know this method is called on named types, we can cast the symbol
+    Roslyn gives us to `INamedTypeSymbol`, which lets us query further.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Using this symbol, we can ask for all members such as properties and methods
+    using `GetMembers`. Next, we can use LINQ to filter these down to just ones that
+    are methods. Once we have these, we can use `FirstOrDefault` to see if we have
+    a method named `ToString` that takes in zero parameters and is an override.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Why not check the return type?
+  prefs: []
+  type: TYPE_NORMAL
+- en: We could check if the return type was a string, but the C# compiler doesn’t
+    allow multiple methods with the same parameters and different return types. We
+    also know all objects have `string ToString()`, so the return type will be `string`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: If we didn’t find a `ToString` override, our analyzer should flag this as a
+    violation of the rule. It does so by creating a `Diagnostic` object referencing
+    the `Rule` property we defined earlier, as well as the name and location of the
+    symbol that violated the rule. Here, the symbol will be a `Type` definition that
+    does not override `ToString`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Before we go into verifying our analyzer works, let’s talk about writing analyzer
+    code.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Tips for writing Roslyn Analyzers
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: In my experience, Roslyn Analyzers are one of the tougher pieces of code to
+    write. With Roslyn, you’re looking at your C# code in a completely different light.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Each analyzer you write will likely be analyzing something completely different
+    than the last one, making discussing the breadth of options available in Roslyn
+    difficult.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'I’ve found two key things helpful for writing Roslyn Analyzers:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**Looking at other Roslyn Analyzers**: There are a lot of other Roslyn Analyzers
+    out there (including the ones built into .NET) and most are open source. This
+    means you can find an existing analyzer similar to what you’re interested in and
+    then look at its source code and do something similar.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: See the *Further reading* section of this chapter for a few popular collections
+    of Roslyn Analyzers.
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: '`Analyze` method, you can give Copilot a prompt such as “I want to find all
+    methods contained in this type” or “How would I check if this type is marked as
+    public?”'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: You still need to provide high-level guidance, but in my experience, Copilot
+    can be extremely effective at helping you write complex and unfamiliar analyzer
+    code.
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: Now that we’ve built our Roslyn Analyzer, let’s look at how we can make sure
+    it works.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Testing Roslyn Analyzers with RoslynTestKit
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: We’ll show how to use your Roslyn Analyzers in projects of your own at the end
+    of this chapter, but we’ll start by writing unit tests around our existing analyzer.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'At a high level, we want to test two things with our analyzer:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The analyzer doesn’t trigger for code that doesn’t violate its rule.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The analyzer correctly flags code that it should.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: We’ll do this with two unit tests in a new unit test project.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Adding a Roslyn Analyzer test project
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Our tests can be written in **MSTest**, **xUnit**, or **NUnit**. We’ll use xUnit
+    for consistency.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We’ll start by adding a new xUnit project to the solution by right-clicking
+    on the solution and then choosing **Add** and then **New Project…**, as we’ve
+    done before.
+  prefs: []
+  type: TYPE_NORMAL
+- en: After this, select the C# version of `Packt.Analyzers.Tests` and click **Next**.
+    When prompted with the framework, select **.NET 8.0** and click **Create**.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Once the project has been created, add a project reference to `Packt.Analyzers`
+    by right-clicking on the `Packt.Analyzers.Tests` project and then selecting **Add
+    Project Reference…**, as shown in *Figure 13**.6*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 13.6 – Add Project Reference…](img/B21324_13_6.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 13.6 – Add Project Reference…
+  prefs: []
+  type: TYPE_NORMAL
+- en: Check the box next to `Packt.Analyzers` and click **OK**. This will allow you
+    to reference your analyzers from the test project.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Next, we’ll need to add a reference to the **RoslynTestKit** NuGet package.
+    This is a testing framework-agnostic library that lets us unit-test Roslyn Analyzers
+    by extending from certain test fixture classes, as we’ll see in a moment.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Right-click `Packt.Analyzers.Tests` and click `SmartAnalyzers.RoslynTestKit`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Troubleshooting installation issues
+  prefs: []
+  type: TYPE_NORMAL
+- en: You may encounter a conflict between the latest versions of `Microsoft.CodeAnalysis`
+    and `SmartAnalyzers.RoslynTestKit`. See this chapter’s final code on GitHub for
+    recommended versions of NuGet packages to resolve this issue.
+  prefs: []
+  type: TYPE_NORMAL
+- en: With the project setup out of the way, let’s create our test fixture.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Creating AnalyzerTestFixture
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'We’ll start by renaming `UnitTest1.cs` to `ToStringAnalyzerTests.cs` and replacing
+    its contents with the following code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE5]'
+  prefs: []
+  type: TYPE_PRE
+- en: This class inherits from `AnalyzerTestFixture` in `RoslynTestKit`. This forces
+    the class to provide the language it works with and a method to create the analyzer
+    we want to test. Since we’re working with C#, we return `LanguageNames.CSharp`
+    for the language. In `CreateAnalyzer`, we instantiate and return an instance of
+    our `ToStringAnalyzer` from the `Packt.Analyzers` project.
+  prefs: []
+  type: TYPE_NORMAL
+- en: This lets `RoslynTestKit` know how to create our analyzer and what languages
+    we’re working with, but we haven’t defined a test yet. Let’s write our first test
+    now.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Verifying that our Roslyn Analyzer doesn’t flag good code
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Our first test will be to ensure that code that doesn’t violate our analyzer
+    won’t get flagged as a rule violation. We’ll test this by defining a string containing
+    valid code and then verifying that the analyzer didn’t find any issues with it.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We declare the “good” code as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE6]'
+  prefs: []
+  type: TYPE_PRE
+- en: This multi-line string defines C# for a simple class declaration of a `Flight`
+    class, which includes an override of the `ToString` method. Because `ToString`
+    is overridden, our rule should not find issues with this class definition.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We can verify this with the following code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE7]'
+  prefs: []
+  type: TYPE_PRE
+- en: Here, we use the `NoDiagnostic` method from the `RoslynTestKit's AnalyzerTestFixture`
+    class to check that the code doesn’t violate our rule.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`RoslynTestKit` needs to know the ID of the rule we’re checking for, so we
+    use the `Rule` property we defined on `ToStringAnalyzer` earlier to provide its
+    `id` value.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Now that our test passes without issues, let’s move on to the second test.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Verifying that our Roslyn Analyzer flags bad code
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'To verify that bad code triggers the analyzer rule, we’ll use a similar approach:
+    we’ll pass in known bad code and ensure that the rule is triggered.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'This is slightly more complicated because we want to make sure the rule is
+    triggered for the right symbol in the code. So, when we define our bad code, we
+    need to add `[|` and `|]` markers to denote which symbol should be flagged, as
+    shown here:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE8]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'This code doesn’t have a `ToString` override, so the `Flight` class should
+    be flagged as a rule violation. We can verify this with the `HasDiagnostic` method:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE9]'
+  prefs: []
+  type: TYPE_PRE
+- en: This code is very similar to our approach to validating good code and will fail
+    if the rule was not triggered or was not triggered explicitly for the `Flight`
+    symbol.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We could continue to expand our tests with additional examples and counter-examples,
+    but let’s move on to talking briefly about debugging our Roslyn Analyzers.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Debugging Roslyn Analyzers
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: When you write a Roslyn Analyzer, it’s unlikely that you’ll get it right the
+    first time.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Unit tests help detect failures in your analyzer, but let’s talk about how you
+    would debug a Roslyn Analyzer.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'My recommended approach with Roslyn Analyzers is to follow the approach of
+    this chapter: *create a class library containing your analyzer and a test project
+    that* *tests it*.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'If your analyzer isn’t properly triggering for certain code, you can put breakpoints
+    in your analyzer code and step through the code for a specific instance by right-clicking
+    on a specific test and selecting **Debug**, as shown in *Figure 13**.7*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 13.7 – Debugging a specific test case](img/B21324_13_7.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 13.7 – Debugging a specific test case
+  prefs: []
+  type: TYPE_NORMAL
+- en: I’ve found this approach to be generally very helpful when analyzing specific
+    test cases. In these scenarios, I can see the exact objects the analyzer encounters
+    from the test scenario. From there, I wrote enough code to get the analyzer to
+    handle that scenario. Once the analyzer has handled that test case, I’m usually
+    at a point where I’m ready to try the analyzer on a wider range of code, which
+    we’ll discuss next.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Sharing analyzers as Visual Studio extensions
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'Once you’re ready to try an analyzer on more code or share it with your peers,
+    there are a few options available:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Deploy the analyzer as a NuGet package, as we’ll discuss in the next chapter
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Create a **Visual Studio Installer** (**VSIX**) to install the analyzers locally
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Create a new project and add an explicit reference to the analyzers by editing
+    the `.csproj` file and adding an `Analyzer` node, as shown here:'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[PRE10]'
+  prefs: []
+  type: TYPE_PRE
+- en: This last approach is one you might consider if you had a large solution and
+    wanted your analyzer to only apply to other projects in that solution. However,
+    I’ve found this approach to be buggy and require frequent reloads of Visual Studio
+    for changes in the analyzers to take hold, so we’ll use the VSIX approach as we
+    close out this chapter.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Creating a Visual Studio extension (VSIX) for your Roslyn Analyzer
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Visual Studio extension projects (VSIX projects) allow you to bundle a diverse
+    set of capabilities into an extension that can then be installed into Visual Studio.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Let’s create a new VSIX project, add our analyzer to it, and then use it in
+    a new instance of Visual Studio.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We’ll start as we usually do: by right-clicking on the solution in **Solution
+    Explorer**, choosing **Add**, and then **New Project…**.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Next, select the `Packt.Analyzers.Installer` and click **Create**.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'This empty project consists of a single `source.extension.vsixmanifest` file,
+    which we’ll refer to as the manifest. This manifest is the only file we’ll need.
+    Double-click on it to open the designer, as shown in *Figure 13**.8*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 13.8 – The manifest in the design view](img/B21324_13_8.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 13.8 – The manifest in the design view
+  prefs: []
+  type: TYPE_NORMAL
+- en: This opens the metadata view, which contains different settings you can configure.
+    We’ll ignore those and click on the **Assets** blade on the left sidebar.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The **Assets** blade specifies the different components that are included in
+    the extension. We want to include our analyzer, so click **New** to open the **Add
+    New** **Asset** dialogue.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Next, specify the `Packt.Analyzers` project, as shown in *Figure 13**.9*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 13.9 – Adding the Roslyn Analyzer to your VSIX project as an asset](img/B21324_13_9.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 13.9 – Adding the Roslyn Analyzer to your VSIX project as an asset
+  prefs: []
+  type: TYPE_NORMAL
+- en: Click **OK**; your analyzer should now appear in the list of assets.
+  prefs: []
+  type: TYPE_NORMAL
+- en: With that change, our VSIX project is now ready for us to use. To test this
+    project, right-click on the `Packt.Analyzers.Installer` project and choose **Set
+    as Startup Project**. Next, run your project – a new experimental instance of
+    Visual Studio will open.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs: []
+  type: TYPE_NORMAL
+- en: It can take a few minutes for Visual Studio to open after you run the project.
+    The version of Visual Studio that opens is built specifically for developing extensions
+    and needs additional time to launch. It is not recommended to use this version
+    of Visual Studio for actual development. Instead, use it to test your extensions
+    and then close it.
+  prefs: []
+  type: TYPE_NORMAL
+- en: After a few minutes, a new instance of Visual Studio will open with your VSIX
+    project installed. Using this instance of Visual Studio, you can open any other
+    project and the Roslyn Analyzer you built in this chapter will be active.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Specifically, our analyzer will show up as a suggestion on classes that don’t
+    override `ToString`, such as the `SkillController` class in *Figure 13**.10*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 13.10 – Our Roslyn Analyzer suggests overriding ToString](img/B21324_13_10.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 13.10 – Our Roslyn Analyzer suggests overriding ToString
+  prefs: []
+  type: TYPE_NORMAL
+- en: Warnings for your analyzer will also show up in the error list, though if you
+    marked them as having a severity, as we did in the chapter, you’ll need to make
+    sure that messages are displayed in those results. See the highlighted button
+    in *Figure 13**.10* for the message filter.
+  prefs: []
+  type: TYPE_NORMAL
+- en: DebuggerDisplay attributes versus ToString overrides
+  prefs: []
+  type: TYPE_NORMAL
+- en: This chapter uses `ToString` as an example, and overriding `ToString` can help
+    with the debugger experience. An alternative to this would be to add a `[DebuggerDisplay]`
+    attribute above your class definition to describe how it appears in the debugger
+    without needing to override `ToString`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Once you are satisfied with your test, close the new instance of Visual Studio.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Building and testing your installer will have created a `Packt.Analyzers.Installer.vsix`
+    file in the `bin/Debug` folder within your extension project. This `.vsix` file
+    will let other people install your custom extension and use your analyzers in
+    their projects.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs: []
+  type: TYPE_NORMAL
+- en: You could also distribute your installer on the Visual Studio marketplace. This
+    would make the extension publicly available and easier for others to locate and
+    download.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Any time you update your analyzer, you’ll need to share a new version of the
+    extension and your team will need to upgrade. This makes managing Roslyn Analyzers
+    via `.vsix` files challenging.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Fortunately, NuGet packages offer a better way of sharing Roslyn Analyzers,
+    as we’ll see in the next chapter.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Summary
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In this chapter, we created our first Roslyn Analyzer, tested it with `RoslynTestKit`,
+    and built a VSIX extension to integrate it into Visual Studio.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We saw how Roslyn Analyzers power all the warnings we interact with in Visual
+    Studio and how you and your team can create new Roslyn Analyzers to detect and
+    flag issues that are unique to your team and its codebase.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In the next chapter, we’ll see how Roslyn Analyzers can be used to fix the issues
+    they find and help safely refactor your code.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Questions
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: How do Roslyn Analyzers work?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: When would you want to create your own Roslyn Analyzer?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: How can you verify that Roslyn Analyzers work correctly?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Further reading
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'You can find more information about the topics that were covered in this chapter
+    at these URLs:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '*Roslyn* *Analyzers*: [https://learn.microsoft.com/en-us/visualstudio/code-quality/roslyn-analyzers-overview](https://learn.microsoft.com/en-us/visualstudio/code-quality/roslyn-analyzers-overview)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '*Install third-party* *analyzers*: [https://learn.microsoft.com/en-us/visualstudio/code-quality/install-roslyn-analyzers](https://learn.microsoft.com/en-us/visualstudio/code-quality/install-roslyn-analyzers)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '*Awesome* *Roslyn*: [https://github.com/ironcev/awesome-roslyn](https://github.com/ironcev/awesome-roslyn)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '.*NET* *Standard*: [https://learn.microsoft.com/en-us/dotnet/standard/net-standard](https://learn.microsoft.com/en-us/dotnet/standard/net-standard)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Here are some popular open-source Roslyn Analyzers on GitHub:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '*Roslyn* *Analyzers*: *https://github.com/dotnet/roslyn-analyzers*'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '*StyleCop*: [https://github.com/DotNetAnalyzers/StyleCopAnalyzers](https://github.com/DotNetAnalyzers/StyleCopAnalyzers)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL

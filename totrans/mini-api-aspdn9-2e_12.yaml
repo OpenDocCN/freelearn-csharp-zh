@@ -1,0 +1,463 @@
+- en: '12'
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Caching Strategies for Enhanced Performance
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: It’s been frequently mentioned how minimal APIs should be just that, minimal.
+    For the most part, this minimalism has been based on minimizing real estate –
+    trying to keep the visible footprint of our code on the page as minimal as possible.
+    But minimalism in APIs also extends to the resource footprint, meaning that, where
+    possible, we should minimize the strain put on the system by overusing database/network
+    connections and CPU.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Enhancing the performance of APIs through minimalism is the goal, and this can
+    be achieved in part by caching.
+  prefs: []
+  type: TYPE_NORMAL
+- en: When data is cached, it is stored following its first use for reuse in future
+    operations. By doing this, we can reduce the latency or overhead incurred when
+    fetching that data.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In this chapter, we’re going to cover the following main topics:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Introduction to caching in minimal APIs
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: In-memory caching techniques
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Distributed caching strategies
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Response caching
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Technical requirements
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Visual Studio 2022 or Visual Studio Code will be required to run the code in
+    this chapter. You will also need SQL Server 2022 installed on your system, with
+    a working database you can query as an example. It is recommended that you complete
+    [*Chapter 9*](B20968_09.xhtml#_idTextAnchor143) before this chapter so that you
+    have the example employee database configured for use.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The code for this chapter is available in the GitHub repository at: [https://github.com/PacktPublishing/Minimal-APIs-in-ASP.NET-9](https://github.com/PacktPublishing/Minimal-APIs-in-ASP.NET-9)
+    .'
+  prefs: []
+  type: TYPE_NORMAL
+- en: This chapter demonstrates distributed caching strategies that require an in-memory
+    caching provider – in this example’s case, Redis. Installing Redis is not within
+    the scope of this book, but documentation on how to install Redis or host it in
+    Azure can be found at [https://learn.microsoft.com/en-us/azure/azure-cache-for-redis/quickstart-create-redis](https://learn.microsoft.com/en-us/azure/azure-cache-for-redis/quickstart-create-redis)
+    and [https://redis.io/docs/latest/operate/oss_and_stack/install/install-redis/](https://redis.io/docs/latest/operate/oss_and_stack/install/install-redis/)
+    .
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The way to use Redis on your local Windows machine would be to install it through
+    **Windows Subsystem for Linux** ( **WSL** ) and host it on your local WSL instance.
+    More information on installing WSL can be found here: [https://learn.microsoft.com/en-us/windows/wsl/install](https://learn.microsoft.com/en-us/windows/wsl/install)
+    .'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Introduction to caching in minimal APIs
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: APIs execute operations, and operations (usually) rely on data or state. Data
+    needs to be retrieved or calculated as it either exists *at rest* (i.e., in a
+    database or in a remote file location) or it exists as *data in use* (i.e., data
+    that is yet to be calculated to produce other data).
+  prefs: []
+  type: TYPE_NORMAL
+- en: Whichever way we look at it, there is overhead in retrieving data, whether it
+    is retrieved as-is or whether it is the result of a computation. Caching aims
+    to reduce that overhead by making use of data or state that has already been produced
+    from its original source.
+  prefs: []
+  type: TYPE_NORMAL
+- en: It could be argued that computing is so fast now that the overhead should be
+    minimal to the point that caching is no longer needed. This would, however, be
+    woefully inaccurate. Looking at a single operation in isolation, such as retrieving
+    a record from a SQL database, may seem extremely quick, but at scale, the benefits
+    of caching become more apparent.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Let’s take a working example of how caching can be beneficial. A start-up has
+    built a system that can be used to send alerts to mobile devices, accessible via
+    a minimal API. They must ensure that requests are allowed to be processed by calling
+    clients, so they require an API key to be sent in the request headers for validation
+    during each request.
+  prefs: []
+  type: TYPE_NORMAL
+- en: To validate the key, the start-up’s developers decided to outsource the key
+    validation to a cloud company that manages the key and the encryption algorithms
+    to be used – hosting an API itself for this purpose. The start-up is charged per
+    request for validating the key.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In the early days, the cost of validating keys went relatively unnoticed because
+    they had a low number of sporadic requests. However, as soon as their business
+    started to grow, so did the number of requests. Soon, they had a scary invoice
+    from their cloud partner for a huge amount of API validations, charged per request.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Caching could have been used to mitigate the cost of validating API keys. An
+    initial request could be made to validate the key, and then the result could be
+    cached. From then on, when requests using that key are received, there would be
+    an initial check against the cache first. If there is a record in the cache that
+    validates the key, there is no need to call the paid API to validate it. Each
+    cached record has an expiration date, meaning that it can be refreshed by calling
+    the paid API again. This dramatically reduces the financial effects of validating
+    API keys.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We’ve established that caching is good for performance, reducing latency, and
+    supporting overall application scalability, but what type of caching should we
+    use? To answer this, we will explore three key caching methods available in minimal
+    API development: in-memory caching, distributed caching, and response caching.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: In-memory caching techniques
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Out of the various caching techniques supported by ASP.NET Core, **in-memory
+    caching** is probably the simplest. This type of caching stores its contents in
+    the memory of the machine hosting the minimal API.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The implementation of the cache is based on **IMemoryCache** , included within
+    the **Microsoft.Extensions.Caching.Memory** package, which is usually included
+    by default in ASP.NET Core projects.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Like other core services, **IMemoryCache** is available using dependency injection,
+    so we can quite easily inject it as needed within various areas of a minimal API.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Using this cache type, we can store an object, which is our minimal requirement,
+    but we can also very easily specify an expiration time, which is a best practice
+    as periodically recycling the cache keeps it running smoothly.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Let’s explore a simple example within a minimal API. I’m going to use the API
+    project from [*Chapter 9*](B20968_09.xhtml#_idTextAnchor143) (which is available
+    on GitHub) as a foundation for this example project. Our aim is to mitigate the
+    latency and overhead incurred when communicating with a database.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In this API, we have an endpoint that allows clients to get an employee with
+    a specific ID. The API will use Entity Framework to run a SQL query against the
+    database, returning the result in the request response.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Using an in-memory cache, we can add some optimization logic to this operation.
+    Here are the steps we are going to work through:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Run the operation as requested, fetching the data from the database.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Check the in-memory cache to see whether the employee with this ID is currently
+    cached.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: If it isn’t, add the retrieved employee to the cache.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Return the employee in the request response.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Create a request for the same employee ( same ID).
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Get the employee from the cache instead of the database.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Return the cached employee to the client.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Before we can achieve this goal, we need to reference **IMemoryCache** in the
+    project.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'First, add **IMemoryCache** to the dependency injection container in **Program.cs**
+    :'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE0]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Then, you can create the **GET** endpoint, injecting this **IMemoryCache**
+    object along with **DapperService** :'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE1]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Now that you have a cache, you can add code for retrieving values from it:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE2]'
+  prefs: []
+  type: TYPE_PRE
+- en: By first running a check, we can avoid unnecessary execution of code and get
+    the required object to the client much quicker, also avoiding a call into the
+    database via Dapper.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Assuming that the item doesn’t exist, we will use our original logic of looking
+    up the **Employee** record from the database using **DapperService** . However,
+    instead of returning the item straight away, we will first add it to the cache:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE3]'
+  prefs: []
+  type: TYPE_PRE
+- en: This works well but, ideally, we don’t want this to stay in the cache forever.
+    It’s a good idea to refresh the cache periodically because data may change, and
+    we want to ensure we are getting the most up-to-date data where possible while
+    balancing this with reducing latency from database transactions.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We can strike this balance by imposing an expiration on cached objects. This
+    needs to be done after the retrieval of the **Employee** object but before it
+    is added to the cache. Let’s set an expiry of **30** seconds as an example:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE4]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'By creating an instance of **MemoryCacheEntryOptions** , we have defined some
+    cache configuration parameters that can be passed into the cache when we add a
+    new object to it. Update the **cache.Set()** method to include this parameter:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE5]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Your endpoint should now look like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE6]'
+  prefs: []
+  type: TYPE_PRE
+- en: There you go! You’ve successfully introduced caching to your minimal API endpoint
+    using **IMemoryCache** .
+  prefs: []
+  type: TYPE_NORMAL
+- en: In-memory caching is most likely the default caching strategy when starting
+    an API project, but if your system has growth in adoption, then scalability and
+    high availability will become increasingly important measurements of success.
+    When looking to scale, distributed caching strategies can be adopted with the
+    use of a reputable caching framework. Let’s look at one of the most famous caching
+    technologies, Redis.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Distributed caching strategies
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: A **distributed caching strategy** uses methods such as **IMemoryCache** within
+    an architecture that supports scalability. In contrast to **IMemoryCache** , distributed
+    caching involves a connection between the ASP.NET application hosting your minimal
+    API and the caching provider.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In this example, the caching provider I will be using is **Redis** .
+  prefs: []
+  type: TYPE_NORMAL
+- en: Redis is an in-memory caching provider that can also be used as an in-memory
+    database. It is available as an open source product for installation on-premises
+    or in the cloud.
+  prefs: []
+  type: TYPE_NORMAL
+- en: For the purposes of this demonstration, I installed Redis on an Ubuntu machine
+    as a basic service. I then updated the Redis configuration so that Redis binds
+    to **0.0.0.0** , listening on the default port of **6379** . This should only
+    be relevant to you if your Redis service is running on a separate machine like
+    mine is.
+  prefs: []
+  type: TYPE_NORMAL
+- en: With a Redis instance available, I can add the required NuGet packages to the
+    API project for interacting with Redis as a cache.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Add the **NRedisStack** package to the project:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE7]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'We will still be interacting with the cache in **Program.cs** , so we need
+    to reference namespaces from **NRedisStack** here:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE8]'
+  prefs: []
+  type: TYPE_PRE
+- en: Now, we can update the endpoint for retrieving employees by **Id** with a new
+    cache, replacing the **IMemoryCache** implementation with Redis.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We start by creating **ConfigurationOptions** , which can be passed as a parameter
+    when connecting to the Redis instance:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE9]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Following this, we should now have a Redis connection that can be referenced
+    in the **db** variable. Next, we will add the equivalent logic for caching from
+    the **IMemoryCache** example, where we first check for a cache entry with a key
+    (the **Employee** ID as a string, in this case) and return that if it exists,
+    returning the **Employee** instance from the cache if it does:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE10]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'When calling **StringGet()** to retrieve a relevant entry from Redis, if it
+    doesn’t exist already, an object will be returned with **HasValues** set to **false**
+    . Assuming that the Redis cache doesn’t contain the **Employee** record we’re
+    looking for, we fetch it from the database and cache it before returning it to
+    the client:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE11]'
+  prefs: []
+  type: TYPE_PRE
+- en: Please note that Redis doesn’t natively support the insertion of strongly typed
+    .NET objects, so we need to convert the **Employee** object to a JSON string through
+    serialization when saving it and deserialize it from a JSON string to an **Employee**
+    object when retrieving it.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Your updated Redis-connected endpoint should now look like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE12]'
+  prefs: []
+  type: TYPE_PRE
+- en: Implementing a cache in a separately hosted environment using something such
+    as Redis has introduced more flexibility to our minimal API. I encourage you to
+    take this simple example further by creating a generic service that can facilitate
+    the interactions between ASP.NET and the Redis cache so that you are ultimately
+    decoupling the API from its caching system. In the future, should you wish to
+    move away from Redis to a different caching technology, you need to be able to
+    do this without affecting the original API code.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We’ve covered two examples of caching strategies so far. Let’s wrap up with
+    a third technique, focusing on the caching of request responses.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Response caching
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: '**Response caching** works within the same logical principles as the previous
+    two caching strategies, but instead of caching database objects in memory, it
+    caches responses at the HTTP level.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Like **IMemoryCache** , minimal APIs can leverage ASP.NET’s native middleware
+    by enabling response caching as a feature in **Program.cs** :'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE13]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Once enabled, response caching is very simple to add to a **GET** endpoint.
+    We can add **HttpContext** to the parameters, and then, whenever we have the **Employee**
+    object and are ready to return it, we can set the response to be cached for a
+    certain amount of time, meaning that requesting the same data within that time
+    will simply return the cached HTTP response instead of touching the database:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE14]'
+  prefs: []
+  type: TYPE_PRE
+- en: As you can see, this is a remarkably straightforward way to cache frequent responses,
+    and the expiry time can, of course, be adjusted as needed. You could even combine
+    the caching approaches, having an in-memory cache that retrieves the data and
+    then caching the response.
+  prefs: []
+  type: TYPE_NORMAL
+- en: With three working examples of caching in a minimal API under our belt, let’s
+    review what we’ve learned in this chapter.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Summary
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'In this chapter, we have explored caching using three different strategies:
+    ASP.NET in-memory, distributed, and response caching.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: We started by defining caching as a concept, relating it to the context of minimal
+    APIs, before exploring a hypothetical scenario of a company looking to save on
+    the cost of retrieving data via APIs with a cache.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Following this, we explored the ASP.NET native method of caching in memory,
+    learning about **IMemoryCache** and how it can be implemented within an endpoint
+    to limit the overhead produced by database transactions. We also learned how to
+    make cached data expire.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Then, we took this knowledge and expanded on it, following similar caching principles
+    within a distributed cache in the form of Redis.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Finally, we reviewed an example of response caching, allowing us to take frequently
+    sent requests and bypass the database by resending a previously sent HTTP request.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In the next chapter, we will explore the best practices you can observe to increase
+    the readibility, scalibility and maintainability of your minimal APIs.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Part 4 - Best Practices, Design, and Deployment
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In the final part, we shift our focus to the principles of robust API design
+    and deployment. You’ll learn about best practices for shipping production-ready
+    minimal APIs, as well as strategies for testing and maintaining compatibility
+    across different environments.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'This part has the following chapters:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[*Chapter 13*](B20968_13.xhtml#_idTextAnchor183) , *Best Practices for Minimal
+    API Resiliency*'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[*Chapter 14*](B20968_14.xhtml#_idTextAnchor200) , *Unit Testing* *, Compatibility,
+    and Deployment of Minimal APIs*'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL

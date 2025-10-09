@@ -1,0 +1,918 @@
+- en: '2'
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Native Monitoring in .NET
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In this chapter, we’ll explore the out-of-the-box diagnostic capabilities of
+    modern .NET applications, starting with logs and ad hoc diagnostics, and then
+    move on to examine what OpenTelemetry provides on top of that. We’ll create a
+    sample application and instrument it, showcasing cross-process log correlation,
+    and learn how we can capture verbose logs with `dotnet-monitor`. Then, we’ll investigate
+    .NET runtime counters and export them to Prometheus. Finally, we’ll configure
+    OpenTelemetry to collect traces and metrics from .NET, ASP.NET Core, and Entity
+    Framework, and check out how basic auto-instrumentations address observability
+    needs.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following topics are what we’ll cover:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Native log correlation in ASP.NET Core applications
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Minimalistic monitoring with .NET runtime counters
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Install OpenTelemetry and enable common instrumentations
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Tracing and performance analysis with HTTP and database instrumentations
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: By the end of this chapter, you’ll be ready to use distributed tracing instrumentation
+    in .NET libraries and frameworks, enable log correlation and metrics, and leverage
+    multiple signals together to debug and monitor your applications.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Technical requirements
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'We’re going to start building a sample application and will use the following
+    tools for it:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: .NET SDK 7.0 or newer
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Visual Studio or Visual Studio Code with the C# development setup are recommended,
+    but any text editor would work
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Docker and `docker-compose`
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The application code can be found in the book’s repository on GitHub at [https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/tree/main/chapter2](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/tree/main/chapter2).
+  prefs: []
+  type: TYPE_NORMAL
+- en: Building a sample application
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'As shown in *Figure 2**.1*, our application consists of two REST services and
+    a MySQL database:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 2.1 – Meme service diagram](img/B19423_02_01.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 2.1 – Meme service diagram
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**Frontend**: ASP.NET Core Razor Pages application that serves user requests
+    to upload and download images'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Storage**: ASP.NET Core WebAPI application that uses Entity Framework Core
+    to store images in a MySQL database or in memory for local development'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: We’ll see how to run the full application using Docker later in this chapter.
+    For now, run it locally and explore the basic logging and monitoring features
+    that come with modern .NET.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We’re going to use the `Microsoft.Extensions.Logging.ILogger` API throughout
+    this book. `ILogger` provides convenient APIs to write structured logs, along
+    with verbosity control and the ability to send logs anywhere.
+  prefs: []
+  type: TYPE_NORMAL
+- en: ASP.NET Core and Entity Framework use `ILogger`; all we need to do is configure
+    the logging level for specific categories or events to log incoming requests or
+    database calls, and supply additional context with logging scopes. We’re going
+    to cover this in detail in [*Chapter 8*](B19423_08.xhtml#_idTextAnchor131), *Writing
+    Structured and Correlated Logs*. For now, let’s see log correlation in action.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Log correlation
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: ASP.NET Core enables log correlation across multiple services by default. It
+    creates an activity that loggers can access using `Activity.Current` and configures
+    `Microsoft.Extensions.Logging` to populate the trace context on logging scopes.
+    ASP.NET Core and `HttpClient` also support W3C Trace Context by default, so the
+    context is automatically propagated over HTTP.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Some logging providers, for example, OpenTelemetry, don’t need any configuration
+    to correlate logs, but our meme application uses a console provider, which does
+    not print any logging scopes by default.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'So let’s configure our console provider to print scopes and we’ll see the trace
+    context on every log record. Let’s also set the default level to `Information`
+    for all categories just so we can see the output:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: appsettings.json
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE0]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter2/storage/appsettings.json](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter2/storage/appsettings.json)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs: []
+  type: TYPE_NORMAL
+- en: Usually, you would use `Information` for application code only and set `Warning`
+    or `Error` for frameworks and third-party libraries.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let’s check it out – start the storage first, then, in a different terminal,
+    start the frontend:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE1]'
+  prefs: []
+  type: TYPE_PRE
+- en: Make sure to keep both terminals open so we can check logs later. Now, let’s
+    get the preloaded meme from the frontend in your browser – hit http://localhost:5051/Meme?name=dotnet
+    and then check the logs.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'On the frontend, you may see something like this (other logs and scopes are
+    omitted for brevity):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE2]'
+  prefs: []
+  type: TYPE_PRE
+- en: The first record describes the outgoing call to the storage service. You can
+    see the status, duration, HTTP method, and URL, as well as the trace context.
+    The second record describes an incoming HTTP call and has similar information.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs: []
+  type: TYPE_NORMAL
+- en: This trace context is the same on both log records and belongs to the incoming
+    HTTP request.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let’s see what happened on the storage:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE3]'
+  prefs: []
+  type: TYPE_PRE
+- en: Note
+  prefs: []
+  type: TYPE_NORMAL
+- en: The `TraceId` value is the same on the frontend and storage, so we have cross-process
+    log correlation out of the box.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'If we had OpenTelemetry configured, we’d see a trace similar to that shown
+    in *Figure 2**.2*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 2.2 – Communication between the frontend and storage](img/B19423_02_02.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 2.2 – Communication between the frontend and storage
+  prefs: []
+  type: TYPE_NORMAL
+- en: We already know that ASP.NET Core creates an activity for each request – it
+    reads trace context headers by default, but we can configure a different propagator.
+    So, when we make an outgoing request from the frontend to storage, `HttpClient`
+    creates another activity – a child of the ASP.NET Core one. `HttpClient` injects
+    the trace context from its activity to the outgoing request headers so that they
+    flow to the storage service, where ASP.NET Core parses them and creates a new
+    activity, which becomes a child of the outgoing request.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Even though we didn’t export activities, they are created and are used to enrich
+    the logs with trace context, enabling correlation across different services.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Without exporting activities, we achieve correlation but not causation. As you
+    can see in the logs, `ParentId` on storage is not the same as `SpanId` on the
+    outgoing HTTP request.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Hint on causation
+  prefs: []
+  type: TYPE_NORMAL
+- en: What happens here is that the outgoing request activity is created inside `HttpClient`,
+    which does not write logs with `ILogger`. The log record on the outgoing request
+    we just saw is written by the handler in the `Microsoft.Extensions.Http` package.
+    This handler is configured by ASP.NET Core. When the handler logs that the request
+    is starting, the `HttpClient` activity has not yet been created, and when the
+    handler logs that the request is ended, the `HttpClient` activity is already stopped.
+  prefs: []
+  type: TYPE_NORMAL
+- en: So, with ASP.NET Core and ILogger, we can easily enable log correlation. However,
+    logs don’t substitute distributed traces – they just provide additional details.
+    Logs also don’t need to duplicate traces.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '*Avoiding duplication is important: once, the author saved a company $80k a
+    month by dropping logs that were duplicated by* *rich events.*'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Going forward in this book, we’ll use logs for debugging and capturing additional
+    information that covers gaps in traces.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Using logs in production
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: To record logs in production, where we have multiple instances of services and
+    restricted access to them, we usually need a log management system – a set of
+    tools that collect and send logs to a central location, potentially enriching,
+    filtering, or parsing them along the way. OpenTelemetry can help us collect logs,
+    but we also need a backend to store, index, and query the logs using any context,
+    including `TraceId`. With this, we can easily navigate from traces to logs when
+    needed.
+  prefs: []
+  type: TYPE_NORMAL
+- en: On-demand logging with dotnet-monitor
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: It could be useful to dynamically increase log verbosity at runtime to get more
+    detailed information while reproducing the issue or, when the log exporting pipeline
+    is broken, get logs from the service directly.
+  prefs: []
+  type: TYPE_NORMAL
+- en: It’s possible with `dotnet-monitor` – a diagnostics tool that’s able to connect
+    to a specific .NET process and capture logs, counters, profiles, and core dumps.
+    We’ll talk about it in [*Chapter 3*](B19423_03.xhtml#_idTextAnchor052), The *.NET*
+    *Observability Ecosystem*.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let’s install and start `dotnet-monitor` to see what it can do:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE4]'
+  prefs: []
+  type: TYPE_PRE
+- en: Note
+  prefs: []
+  type: TYPE_NORMAL
+- en: If you’re on macOS or Linux, you need to authenticate requests to the `dotnet-monitor`
+    REST API. Please refer to the documentation at `https://github.com/dotnet/dotnet-monitor/blob/main/documentation/authentication.md`
+    or, for demo purposes only, disable authentication with the `dotnet monitor collect
+    –``no-auth` command.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'If you still have frontend and storage services running, you should see them
+    among the other .NET processes on your machine when you open `https://localhost:52323/processes`
+    in your browser:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE5]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Now let’s capture some debug logs from storage via `dotnet-monitor` by requesting
+    the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`https://localhost:52323/logs?pid=27020&level=debug&duration=60`'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'It connects to the process first, enables the requested log level, and then
+    starts streaming logs to the browser for 60 seconds. It doesn’t change the logging
+    level in the main logging pipeline, but will return the requested logs directly
+    to you, as shown in *Figure 2**.3*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: "![Figure 2.3 – A\uFEFFd hoc logging with dynamic level using dotnet-monitor](img/B19423_02_03.jpg)"
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 2.3 – Ad hoc logging with dynamic level using dotnet-monitor
+  prefs: []
+  type: TYPE_NORMAL
+- en: You can apply a more advanced configuration using the POST logs API – check
+    out https://github.com/dotnet/dotnet-monitor to learn more about it and other
+    `dotnet-monitor` features.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Using `dotnet-monitor` in production on a multi-instance service with restricted
+    SSH access can be challenging. Let’s see how we can do it by running `dotnet-monitor`
+    as a sidecar in Docker. It’s also possible to run it as a sidecar in Kubernetes.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Monitoring with runtime counters
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: So, we have correlated logs from the platform and services with which we can
+    debug issues. But what about system health and performance? .NET and ASP.NET Core
+    expose event counters that can give some insights into the overall system state.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We can collect counters with OpenTelemetry without running and managing `dotnet-monitor`.
+    But if your metrics pipeline is broken (or if you don’t have one yet), you can
+    attach `dotnet-monitor` to your process for ad hoc analysis.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`dotnet-monitor` listens to `EventCounters` reported by the .NET runtime and
+    returns them on an HTTP endpoint in **Prometheus** **exposition format**.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**Prometheus** is a metrics platform that scrapes and stores metrics. It supports
+    multidimensional data and allows us to slice, dice, filter, and calculate derived
+    metrics using **PromQL**.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We’re going to run our service as a set of Docker containers with `dotnet-monitor`
+    running as a sidecar for the frontend and storage, and configure Prometheus to
+    scrape metrics from `dotnet-monitor` sidecars, as shown in *Figure 2**.4*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 2.4 – Meme services with runtime counters in Prometheus](img/B19423_02_04.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 2.4 – Meme services with runtime counters in Prometheus
+  prefs: []
+  type: TYPE_NORMAL
+- en: This makes our setup closer to real life, where we don’t have the luxury of
+    running `dotnet-monitor` on the service instance.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'So, let’s go ahead and run our application. Open the terminal, navigate to
+    the `chapter2` folder, and run the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE6]'
+  prefs: []
+  type: TYPE_PRE
+- en: You might see some errors while MySQL is starting up. Let’s ignore them for
+    now. After a few seconds, you should be able to reach the frontend via the same
+    URL as before.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let’s explore the CPU and memory counters published by the .NET Runtime:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`cpu-usage` event counter (reported as `systemruntime_cpu_usage_ratio` metric
+    to Prometheus): Represents the CPU usage as a percentage.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`gc-heap-size` (or `systemruntime_gc_heap_size_bytes`): Represents the approximate
+    allocated managed memory size in megabytes.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`time-in-gc` (or `systemruntime_time_in_gc_ratio`): Represents time spent on
+    garbage collection since the last garbage collection.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`gen-0-gc-count`, `gen-1-gc-count`, and `gen-2-gc-count` (or `systemruntime_gen_<gen>_gc_count`):
+    Represents the count of garbage collections in the corresponding generation per
+    interval. The default update interval is 5 seconds, but you can adjust it. Generation
+    sizes are also exposed as counters.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`alloc-rate` (or `systemruntime_alloc_rate_bytes`): Represents the allocation
+    rate in bytes per interval.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: You can also find counters coming from Kestrel, Sockets, TLS, and DNS that can
+    be useful to investigate specific issues such as DNS outages, long request queues,
+    or socket exhaustion on HTTP servers. Check out the .NET documentation for the
+    full list (https://learn.microsoft.com/dotnet/core/diagnostics/available-counters).
+  prefs: []
+  type: TYPE_NORMAL
+- en: ASP.NET Core and `HttpClient` request counters don’t have dimensions, but would
+    be useful if you didn’t have OpenTelemetry tracing or metrics and wanted to get
+    a very rough idea about throughput and failure rate across all APIs.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Prometheus scrapes metrics from the `dotnet-monitor` metrics endpoint. We can
+    access it ourselves to see the raw data, as shown in *Figure 2**.5*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 2.5 – Frontend metrics in Prometheus exposure format](img/B19423_02_05.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 2.5 – Frontend metrics in Prometheus exposure format
+  prefs: []
+  type: TYPE_NORMAL
+- en: It’s also possible to query and plot basic visualizations with Prometheus, as
+    you can see in *Figure 2**.6*. Just hit `http://localhost:9090/graph`. For any
+    advanced visualizations or dashboards, we would need tooling that integrates with
+    Prometheus, such as **Grafana**.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 2.6 – GC memory heap size for frontend and storage services in Prometheus](img/B19423_02_06.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 2.6 – GC memory heap size for frontend and storage services in Prometheus
+  prefs: []
+  type: TYPE_NORMAL
+- en: As you can see, even basic ASP.NET Core applications come with minimal monitoring
+    capabilities – counters for overall system health and correlated logs for debugging.
+    With `dotnet-monitor` we can even retrieve telemetry at runtime without changing
+    the code or restarting the application (well, of course, only if we have access
+    to the application instance).
+  prefs: []
+  type: TYPE_NORMAL
+- en: With some additional infrastructure changes to run `dotnet-monitor` as a sidecar
+    and logging management solution, we would be able to build a very basic production
+    monitoring solution.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We still lack distributed tracing and metrics that have rich context. Let’s
+    now see how to enable them with OpenTelemetry instrumentation and improve this
+    experience further.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Enabling auto-collection with OpenTelemetry
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In this section, we’re going to add OpenTelemetry to our demo application and
+    enable auto-collection for ASP.NET Core, `HttpClient`, Entity Framework, and runtime
+    metrics. We’ll see what it adds to the bare-bones monitoring experience.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We’ll export traces to Jaeger and metrics to Prometheus, as shown in *Figure
+    2**.7*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 2.7 – Meme services sending telemetry to Jaeger and Prometheus](img/B19423_02_07.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 2.7 – Meme services sending telemetry to Jaeger and Prometheus
+  prefs: []
+  type: TYPE_NORMAL
+- en: You can also send data directly to your observability backend if it has an OTLP
+    endpoint, or you can configure a backend-specific exporter in the application.
+    So, let’s get started and instrument our application with OpenTelemetry.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Installing and configuring OpenTelemetry
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'OpenTelemetry comes as a set of NuGet packages. Here are a few that we’re using
+    in our demo app:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`OpenTelemetry`: The SDK that contains all that we need to produce traces and
+    metrics and configure a generic processing and export pipeline. It does not collect
+    any telemetry on its own.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`OpenTelemetry.Exporter.Jaeger`: This package contains a trace exporter that
+    publishes spans to Jaeger.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`OpenTelemetry.Exporter.Prometheus.AspNetCore`: This package contains the Prometheus
+    exporter. It creates a new `/metrics` endpoint for Prometheus to scrape metrics
+    from.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`OpenTelemetry.Extensions.Hosting`: This package simplifies OpenTelemetry configuration
+    in ASP.NET Core applications.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`OpenTelemetry.Instrumentation.AspNetCore`: This package enables ASP.NET Core
+    tracing and metrics auto-instrumentation.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`OpenTelemetry.Instrumentation.Http`: This package enables tracing and metrics
+    auto-instrumentation for `System.Net.HttpClient`.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`OpenTelemetry.Instrumentation.EntityFrameworkCore`: Tracing instrumentation
+    for Entity Framework Core. We only need it for the storage service.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`OpenTelemetry.Instrumentation.Process` and `OpenTelemetry.Instrumentation.Runtime`:
+    These two packages enable process-level metrics for CPU and memory utilization
+    and include the runtime counters we saw previously with `dotnet-monitor`.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: You can also enable other counter sources one by one with the `OpenTelemetry.Instrumentation.EventCounters`
+    package.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Distributed tracing
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'To configure tracing, first call `AddOpenTelemetry` extension method on `IServiceCollection`
+    and then call the W`ithTracing` method, as shown in the following example:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Program.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE7]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter2/storage/Program.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter2/storage/Program.cs)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Here, we’re adding the Jaeger exporter and enabling `HttpClient`, ASP.NET Core,
+    and Entity Framework instrumentations (on storage).
+  prefs: []
+  type: TYPE_NORMAL
+- en: We’re also configuring the service name via the `OTEL_SERVICE_NAME` environment
+    variable in `launchSetting.json` and in `docker-compose-otel.yml` for Docker runs.
+    The OpenTelemetry SDK reads it and sets the `service.name` resource attribute
+    accordingly.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The Jaeger host is configured with the `OTEL_EXPORTER_JAEGER_AGENT_HOST` environment
+    variable in `docker-compose-otel.yml`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We’ll talk more about configuration in [*Chapter 5*](B19423_05.xhtml#_idTextAnchor083),
+    *Configuration and Control Plane*, and learn how to configure sampling, enrich
+    telemetry, and add custom sources.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Metrics
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: Metrics configuration is similar – we first call the `AddOpenTelemetry` extension
+    method on `IServiceCollection` and then in the `WithMetrics` callback set up the
+    Prometheus exporter and auto-instrumentations for `HttpClient`, ASP.NET Core,
+    Process, and Runtime. Entity Framework’s instrumentation does not report metrics.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Program.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE8]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter2/storage/Program.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter2/storage/Program.cs)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We also need to expose the Prometheus endpoint after building the application
+    instance:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Program.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE9]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter2/storage/Program.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter2/storage/Program.cs)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: We’re ready to run the application!
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE10]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'You should see logs from all services including some errors while MySQL is
+    starting up. Check the frontend to make sure it works: `https://localhost:5051/Meme?name=dotnet`.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Exploring auto-generated telemetry
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The meme service is now up and running. Feel free to upload your favorite memes
+    and if you see any issues, use telemetry to debug them!
+  prefs: []
+  type: TYPE_NORMAL
+- en: Debugging
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: If you try to upload something right after the service starts, you might get
+    an error like the one shown in *Figure 2**.8*. Let’s figure out why!
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 2.8 – Error from application with traceparent](img/B19423_02_08.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 2.8 – Error from application with traceparent
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We can approach this investigation from two angles. The first is to use the
+    `traceparent` shown on the page; the second is to filter the traces from the frontend
+    based on the error status.     In any case, let’s go to Jaeger – our tracing backend running on `http://localhost:16686/`.
+    We can search by `Trace ID` or filter by service and error, as shown in *Figure
+    2**.9*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 2.9 – Find the trace in Jaeger by Trace ID (1) or with a combination
+    of the service (2) and error (3)](img/B19423_02_09.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 2.9 – Find the trace in Jaeger by Trace ID (1) or with a combination
+    of the service (2) and error (3)
+  prefs: []
+  type: TYPE_NORMAL
+- en: If we open the trace, we’ll see that the storage service refused the connection
+    – check out *Figure 2**.10*. What happened here?
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 2.10 – Drill down into the trace: the frontend service could not reach
+    the storage](img/B19423_02_10.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'Figure 2.10 – Drill down into the trace: the frontend service could not reach
+    the storage'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Since there are no traces from the storage, let’s check the storage logs with
+    `docker logs chapter2-storage-1`. We’ll query the logs in a more convenient way
+    in [*Chapter 8*](B19423_08.xhtml#_idTextAnchor131), *Writing Structured and Correlated
+    Logs*. For now, let’s just grep storage logs around the time the issue occurred
+    and find the relevant record, as shown in *Figure 2**.11*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 2.11 – Connection error in storage stdout](img/B19423_02_11.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 2.11 – Connection error in storage stdout
+  prefs: []
+  type: TYPE_NORMAL
+- en: Apparently, the storage was not able to connect to the MySQL server and it could
+    not start until the connection was established. If we dig further into the MySQL
+    logs, we’ll discover that it took a while for it to start, but then everything
+    worked just fine.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Some action items from this investigation are to enable retries on the frontend
+    and investigate the slow start for MySQL. If it happens in production where there
+    are multiple instances of storage, we should also dig into the load balancer and
+    service discovery behavior.
+  prefs: []
+  type: TYPE_NORMAL
+- en: What tracing brings here is *convenience* – we could have done the same investigation
+    with logs alone, but it would have taken longer and would be more difficult. Assuming
+    we dealt with a more complicated case with dozens of requests over multiple services,
+    parsing logs would simply not be a reasonable option.
+  prefs: []
+  type: TYPE_NORMAL
+- en: As we can see in this example, tracing can help us narrow the problem down,
+    but sometimes we still need logs to understand what’s going on, especially for
+    issues during startup.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Performance
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Let’s check out some metrics collected by the HTTP and runtime instrumentations.
+  prefs: []
+  type: TYPE_NORMAL
+- en: OpenTelemetry defines `http.server.duration` and `http.client.duration` **histogram**
+    metrics with low-cardinality attributes for method, API route (server only), and
+    status code. These metrics allow us to calculate latency percentiles, throughputs,
+    and error rates.
+  prefs: []
+  type: TYPE_NORMAL
+- en: With OpenTelemetry metrics, ASP.NET Core instrumentation can populate API routes
+    so we can finally analyze latency, throughput, and error rate per route. And histograms
+    give us even more flexibility – we can now check the distribution of latency rather
+    than the median, average, or a predefined set of percentiles.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Latency
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: HTTP client latency can be defined as the time between initiating a request
+    and the response being received. For servers, it’s the time between receiving
+    a request and the end of the server’s response.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Tip
+  prefs: []
+  type: TYPE_NORMAL
+- en: When analyzing latency, filter out errors and check the distribution of latency
+    rather than just averages or medians. It’s common to check the 95th percentile
+    (aka P95).
+  prefs: []
+  type: TYPE_NORMAL
+- en: '*Figure 2**.12* shows P95 latency for the `PUT /meme` API on the client and
+    server side:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 2.12 – Server versus client PUT /meme latency P95 in milliseconds](img/B19423_02_12.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 2.12 – Server versus client PUT /meme latency P95 in milliseconds
+  prefs: []
+  type: TYPE_NORMAL
+- en: Time to first byte versus time to last byte
+  prefs:
+  - PREF_H4
+  type: TYPE_NORMAL
+- en: In .NET, `HttpClient` buffers a response before returning it, but it can be
+    configured to return the response right after the headers are received with `HttpCompletionOptions`.
+    `HttpClient` instrumentation can’t measure time-to-last-byte in this case.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The distinction between *time to first body byte* versus *time to last byte*
+    can be important on frontends with clients using unreliable connections or when
+    transferring a lot of data. In such cases, it’s useful to instrument stream operations
+    and then measure the time to first byte *and* time to last byte. You can use the
+    difference between these metrics to get an idea about connection quality and optimize
+    the end user experience.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Error rate
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'Error rate is just a rate of unsuccessful requests per a given period of time.
+    The key question here is what constitutes an error:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`1xx`, `2xx`, and `3xx` status codes indicate success.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`5xx` codes cover errors such as the lack of a response, a disconnected client,
+    network, or DNS issues.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Status codes in the `4xx` range are hard to categorize. For example, `404` could
+    represent an issue – maybe the client expected to retrieve the data but it’s not
+    there – but could also be a positive scenario, where the client is checking whether
+    a resource exists before creating or updating it. There are similar concerns with
+    other statuses.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Note
+  prefs: []
+  type: TYPE_NORMAL
+- en: OpenTelemetry only marks client spans with `4xx` as errors. We’ll see in [*Chapter
+    5*](B19423_05.xhtml#_idTextAnchor083), *Configuration and Control Plane*, how
+    to tailor it to your needs.
+  prefs: []
+  type: TYPE_NORMAL
+- en: It’s also common to treat latency above a given threshold as an error to measure
+    availability, but we don’t strictly need it for observability purposes.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '*Figure 2**.13* shows an example of a server error rate chart for a single
+    API grouped by error code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: "![Figure 2.13 – Error rate per second for \uFEFFthe GET/meme API grouped by\
+    \ error code](img/B19423_02_13.jpg)"
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 2.13 – Error rate per second for the GET/meme API grouped by error code
+  prefs: []
+  type: TYPE_NORMAL
+- en: It is also important to calculate the error rate per API route and method on
+    servers. Because of different request rates, it’s easy to miss spikes or changes
+    in less frequently called APIs.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Tip
+  prefs: []
+  type: TYPE_NORMAL
+- en: Returning precise status codes for ‘‘known’’ errors and letting the service
+    return `500` only for unhandled exceptions makes it easier to use your service,
+    but also simplifies monitoring and alerting. By looking at the error code, we
+    can discern the possible reasons and not waste time on known cases. Any `500`
+    response becomes important to investigate and fix or handle properly.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'To check resource consumption, we can use runtime and process metrics. For
+    example, *Figure 2**.14* shows CPU usage:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 2.14 – CPU usage query](img/B19423_02_14.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 2.14 – CPU usage query
+  prefs: []
+  type: TYPE_NORMAL
+- en: The query returns the average CPU utilization percentage across all instances
+    for each service represented by job dimension – we configured jobs in `configs/prometheus-otel.yml`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The state dimension divides processor time into user and privileged (system)
+    time. To calculate the total average CPU usage per instance per service, we could
+    write another Prometheus query:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE11]'
+  prefs: []
+  type: TYPE_PRE
+- en: The query calculates the total CPU usage per instance and then calculates the
+    average value per service.
+  prefs: []
+  type: TYPE_NORMAL
+- en: As you can see, the Prometheus query language is a powerful tool allowing us
+    to calculate derived metrics and slice, dice, and filter them.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We’ll see more examples of runtime metrics and performance analysis in [*Chapter
+    4*](B19423_04.xhtml#_idTextAnchor068), *Low-Level Performance Analysis with* *Diagnostic
+    Tools*.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Summary
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In this chapter, we explored .NET diagnostics and monitoring capabilities supported
+    by the platform and frameworks. ASP.NET Core context propagation is enabled by
+    default and logging providers can use it to correlate logs. We need a log management
+    system to be able to store logs from multiple instances of a service and efficiently
+    query them.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`dotnet-monitor` allows the streaming of logs on demand from specific instances
+    of your service, and the scraping of event counters with Prometheus to get a basic
+    idea about service health. It can also be used for low-level performance analysis
+    and can be run in production.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Then, we enabled OpenTelemetry auto-instrumentation for the HTTP stack and Entity
+    Framework. HTTP and DB traces enable basic debugging capabilities, providing generic
+    information on what happened for each remote call. You can search for traces based
+    on attributes and query them using your tracing backend. With tracing, we can
+    easily find a problematic service or component, and when that’s not enough, we
+    can retrieve logs to get more details about the issue. With logs correlated to
+    traces, we can easily navigate between them.
+  prefs: []
+  type: TYPE_NORMAL
+- en: HTTP metrics enable common performance analysis. Depending on your backend,
+    you can query, filter, and derive metrics and build dashboards and alerts based
+    on them.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Now that we’ve got hands-on experience with basic distributed tracing and metrics,
+    let’s explore the .NET ecosystem more and see how you can leverage instrumentation
+    for common libraries and infrastructure.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Questions
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: How would you show trace context on a Razor page?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Imagine that the observability backend stopped receiving telemetry from some
+    instances of the service. What can we do to understand what’s going on with these
+    instances?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: With the help of the Prometheus documentation (https://prometheus.io/docs/prometheus/latest/querying/basics/),
+    write a query with PromQL to calculate the throughput (requests per second) per
+    service and API.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: With our meme service, how would you find out when a meme was uploaded and how
+    many times it had been downloaded if you know only the meme’s name?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL

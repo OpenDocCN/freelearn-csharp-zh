@@ -1,0 +1,794 @@
+- en: '8'
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Writing Structured and Correlated Logs
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Distributed tracing is a great tool to describe and correlate operations, but
+    sometimes, we need to record things such as callbacks and startup configurations,
+    or conditionally write debug information. In this chapter, we’re going to explore
+    logs – the oldest and most popular telemetry signal that can describe anything.
+  prefs: []
+  type: TYPE_NORMAL
+- en: First, we’ll talk about logging use cases and discover different APIs available
+    in .NET, and then we’ll focus on `ILogger` – a common logging façade. We’ll learn
+    how to use it efficiently to write structured events. We’ll see how to export
+    logs with OpenTelemetry and write rich queries over them. Finally, we’ll explore
+    log sampling and cost-saving strategies.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In this chapter, you’ll learn the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: When to write logs and which .NET API to use
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: How to write logs with the `Microsoft.Extentions.Logging.ILogger` class
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: How to capture and export logs with OpenTelemetry
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Cost-management strategies with the OpenTelemetry Collector
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: By the end of this chapter, you will be able to efficiently instrument your
+    application with logs and events to debug and analyze service behavior.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Technical requirements
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The code for this chapter is available in the book’s repository on GitHub at
+    [https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/tree/main/chapter8](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/tree/main/chapter8).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'To run samples and perform analysis, we’ll need the following tools:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: .NET SDK 7.0 or later
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Docker and `docker-compose`
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Logging evolution in .NET
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Logs are the most flexible telemetry signal and usually include a timestamp,
+    a level, a category, a message, and sometimes attributes.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Logs are frequently intended to be human-readable and don’t have a strict structure.
+    Here’s an example of a log record written to `stdout` by an ASP.NET Core application:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE0]'
+  prefs: []
+  type: TYPE_PRE
+- en: If we need to investigate something, we’d first look for logs describing interesting
+    operations and then read the filtered logs. Our ability to understand what happened
+    depends on how much context is logged and how searchable it is, with tools such
+    as `grep`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Structured logs are sometimes called **events**. Events are intended to be
+    queried, potentially across multiple requests and based on any property, and need
+    a strict and consistent structure. Here’s the previous log record in the OpenTelemetry
+    JSON format:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE1]'
+  prefs: []
+  type: TYPE_PRE
+- en: It’s not human-readable, but even when written to `stdout` or a file, it can
+    be easily parsed into structured records without any prior knowledge of the semantics
+    of the event.
+  prefs: []
+  type: TYPE_NORMAL
+- en: As we started exploring in [*Chapter 1*](B19423_01.xhtml#_idTextAnchor016),
+    *Observability Needs of Modern Applications*, the difference between logs and
+    events is semantical – the same information can be optimized and printed in human-readable
+    format or stored and indexed in a database in a structured format.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We’re going to learn how to write such structured logs with the `Microsoft.Extensions.Logging.ILogger`
+    class, but first, let’s take a quick look at other logging APIs in .NET.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Console
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: We can use the `System.Console` class as a logger and write everything to `stdout`.
+    We’d need to implement all logging primitives from scratch and forward `stdout`
+    to the log management system, parsing it along the way to bring the original log
+    structure back. Logging to `Console` is neither a convenient nor an efficient
+    solution.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Trace
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: The `System.Diagnostics.Trace` and `System.Diagnostics.TraceSource` classes
+    provide methods to write messages, along with some arguments, and support logging
+    levels. We can also listen to them with the `TraceListener` class to export them
+    to a log management system.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'It seems like a good start, but there are a couple of limitations:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The `TraceSource` API does not provide a standard way to write arguments. So,
+    it’s easy to format a message as a string, but we need to know specific event
+    semantics to know argument names.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: By default, `TraceSource` and `TraceListener` use a global lock on every operation.
+    It’s possible to use them in a lock-free way, but it might be easy to overlook
+    until the load becomes high enough.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: So, `Trace` APIs solve some logging problems but introduce new ones.
+  prefs: []
+  type: TYPE_NORMAL
+- en: EventSource
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: '`System.Diagnostics.Tracing.EventSource` is another logging API in .NET. It’s
+    designed for high-performance scenarios, supports logging levels, and rich payloads,
+    and captures the names and values of arguments. It’s possible to listen to it
+    by implementing the `EventListener` class or with .NET diagnostics tools running
+    as a side-car process.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`EventSource` is a part of the .NET platform and can be used directly without
+    any extra dependencies. `EventSource` is a perfect candidate to log in libraries
+    that don’t want to add any new dependencies.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: When it comes to consumption, many observability vendors provide custom packages
+    to listen to event sources, but there is no integration with OpenTelemetry yet,
+    which is likely to change by the time you read it.
+  prefs: []
+  type: TYPE_NORMAL
+- en: EventSource events can also be captured with `dotnet` diagnostics tools – `dotnet-trace`
+    and `dotnet-monitor` – as we saw in [*Chapter 4*](B19423_04.xhtml#_idTextAnchor068),
+    *Low-Level Performance Analysis with Diagnostic Tools*, and [*Chapter 2*](B19423_02.xhtml#_idTextAnchor038),
+    *Native Monitoring* *in .NET*.
+  prefs: []
+  type: TYPE_NORMAL
+- en: ILogger
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: '`Microsoft.Extensions.Logging.ILogger` is a common logging façade integrated
+    with ASP.NET Core. It supports structured logging and levels and has a rich ecosystem,
+    making it easy to configure and send data to any provider, local or remote.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Logs written with `ILogger` can be consumed from other logging libraries, such
+    as `Serilog` or `NLog`, and it’s also supported by OpenTelemetry. Many observability
+    backends support `ILogger`, making it a perfect tool to write application logs
+    with.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`ILogger` logs can be captured out of process with .NET diagnostics tools.
+    This is done by forwarding logs to `EventSource` first with the `Microsoft.Extensions.Logging.EventSource
+    .EventSourceLoggingProvider` class. This provider is enabled by default in ASP.NET
+    Core applications, and you can configure it manually with the `AddEventSourceLogger`
+    extension method for the `ILoggingBuilder` interface. We used this mechanism to
+    capture logs with `dotnet-monitor` and control log verbosity dynamically in [*Chapter
+    2*](B19423_02.xhtml#_idTextAnchor038), *Native Monitoring* *in .NET*.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Let’s go through the `ILogger` usage in more detail.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Logging with ILogger
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The `ILogger` class is part of the `Microsoft.Extensions.Logging.Abstractions`
+    NuGet package. If you work on an ASP.NET Core application, worker service, or
+    use other `Microsoft.Extensions` packages, you already depend on it transitively.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The `ILogger` interface exposes a few methods:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`Log` records a log message with a given level, ID, exception, state, and formatter.
+    The state type is generic but should contain a message, along with all the parameters
+    and their names.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`IsEnabled` checks whether logging at this level is enabled.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`BeginScope` adds an object to the logging scope, allowing you to enrich nested
+    log records with it. We saw scopes in action in [*Chapter 2*](B19423_02.xhtml#_idTextAnchor038),
+    *Native Monitoring in .NET*, where we annotated console logs with trace context
+    and ASP.NET Core request information.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: It’s common to use convenient extension methods defined in the `Microsoft.Extensions.Logging.LoggerExtensions`
+    class instead of the vanilla `ILogger.Log` method.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Before writing any logs, let’s first obtain an instance of `ILogger` – in ASP.NET
+    Core applications, we can do it with constructor parameter injection, as shown
+    in this example:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: frontend/RetryHandler.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE2]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter8/memes/frontend/RetryHandler.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter8/memes/frontend/RetryHandler.cs
+    )'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Here, we obtain an `ILogger` instance with the `RetryHandler` type parameter.
+    The full name of the type parameter translates into the logging **category**,
+    which is important to control verbosity and query logs, as we’ll see later in
+    the *Capturing logs with* *OpenTelemetry* section.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs: []
+  type: TYPE_NORMAL
+- en: Please refer to the .NET documentation at [https://learn.microsoft.com/aspnet/core/fundamentals/logging](https://learn.microsoft.com/aspnet/core/fundamentals/logging)
+    to learn how to create and configure loggers.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Now, we can finally log things. For example, we can write an information log
+    with `_logger.LogInformation("hello world")`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: If you use standard logging implementation, this call is broadcast to all registered
+    logging providers that have the `Information` level enabled for this logging category.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Filters are provided at configuration time and can be global or specific to
+    the logging provider. For example, here’s a global logging configuration in our
+    memes application:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: frontend/appsettings.json
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE3]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter8/memes/frontend/appsettings.json](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter8/memes/frontend/appsettings.json
+    )'
+  prefs: []
+  type: TYPE_NORMAL
+- en: This global configuration sets the `Information` level for the `frontend` and
+    `Microsoft.Hosting.Lifetime` categories and `Warning` for everything else.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Let’s get back to the `ILogger` API and see how we can write more useful logs.
+    For example, let’s log debug messages for error responses that include a response
+    body.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We should be cautious here – a body stream usually can only be read once and
+    can be very long, but in any case, we should be able to control any overhead that
+    is introduced:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: frontend/RetryHandler.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE4]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter8/memes/frontend/RetryHandler.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter8/memes/frontend/RetryHandler.cs)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Here, we write the log record at the `Debug` level and check whether the level
+    is enabled *before* reading the response stream. We also use **semantic** (aka
+    structured) logging, providing parameter names in curly brackets in the message
+    string and their values as arguments.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs: []
+  type: TYPE_NORMAL
+- en: Make sure to use semantic logging. String interpolation or explicit formatting
+    for `ILogger` messages removes the structure and makes performance optimization
+    based on logging level impossible.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Arguments are passed as objects. `ILogger` implementations, such as `OpenTelemetryLogger`,
+    support some types and usually call the `ToString` method on everything else.
+    If logging at this level is not enabled, `ToString` is never called, saving you
+    some CPU cycles and memory allocations.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Guarding logging calls, along with the retrieval or computation of arguments,
+    with an `IsEnabled` check, is a great way to keep the performance impact of disabled
+    categories very low.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Optimizing logging
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Logging-related code frequently becomes a source of performance degradation.
+    Avoiding memory allocations and the computation of arguments, especially when
+    logging at this level is disabled, is the first step, but we should also optimize
+    logging on the hot path when it’s enabled. Here’re a few tips for it:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**Avoid excessive logging**: You might need to write a log record when entering
+    an important code branch, a callback is called, or an exception is caught. Avoid
+    logging exceptions multiple times as they propagate, or logging the same callback
+    in nested methods.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Avoid duplication**: Unify multiple logs related to the same operation, and
+    use logs coming from ASP.NET Core and other libraries when they are available,
+    instead of adding your own.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Avoid calculating any values for logging purposes only**: It’s common to
+    serialize objects and parse or format strings, but this can usually be optimized
+    by reusing existing objects, caching values, or formatting text at query time.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Finally, when log volume and arguments are optimized, we can do some micro-optimizations.
+    One of them uses compile-time logging source generation and is demonstrated in
+    the following example:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: StorageService.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE5]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter8/memes/frontend/StorageService.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter8/memes/frontend/StorageService.cs)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Here, we defined a partial method and annotated it with the `LoggerMessage`
+    attribute, providing an event ID, level, and message. The implementation of this
+    method is generated at compile time (you can find more information on it in the
+    .NET documentation at [https://learn.microsoft.com/dotnet/core/extensions/logger-message-generator](https://learn.microsoft.com/dotnet/core/extensions/logger-message-generator)).
+  prefs: []
+  type: TYPE_NORMAL
+- en: If we check the generated code, we can see that it caches logger calls along
+    with their static arguments. Please refer to the .NET documentation available
+    at [https://learn.microsoft.com/dotnet/core/extensions/high-performance-logging](https://learn.microsoft.com/dotnet/core/extensions/high-performance-logging)
+    for more details on this approach.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We can compare the performance of different logging approaches by running `logging-benchmark$
+    dotnet run -c Release` and checking the results in the `BenchmarkDotNet.Artifacts`
+    folder. The benchmark uses a dummy logger and measures the instrumentation side
+    only. If we compare results for compile-time logging source generation and the
+    `LogInformation` (or similar) method, we’ll see the following results:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Compile-time logging source generation eliminates memory allocations on the
+    instrumentation side, even when logging is enabled. As a result, GC becomes less
+    frequent, leading to higher throughput and smaller P95 latency.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: With compile-time logging source generation, an `IsEnabled` check is not needed
+    if the argument values are readily available.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The duration of an individual log call, when logging is enabled, does not depend
+    much on the approach used.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: These results may vary, depending on the argument types and values. Make sure
+    to run performance, stress, and load tests, or profile your application with a
+    similar logging configuration as used in production.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Now, you’re fully equipped to write logs, so it’s time to explore the consumption
+    side.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Capturing logs with OpenTelemetry
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: By default, ASP.NET Core applications write logs to `stdout`, but since we want
+    to correlate them with traces and query them by any attribute, we should export
+    them to the observability backend or the log management tool that supports it.
+    If your vendor supports `ILogger`, you can send logs directly to your vendor by
+    configuring the corresponding logging provider. It will be up to this logging
+    provider to annotate logs with trace context or environment information. By collecting
+    logs with OpenTelemetry, we can annotate them consistently with other signals.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Let’s see how to collect logs from the meme application with OpenTelemetry.
+    To get the most out of the structure, we’ll export them to **ClickHouse** – an
+    open source database that supports SQL queries.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Here’s an example of a configuration that exports logs with the **OpenTelemetry
+    Protocol** (**OTLP**) exporter to the OpenTelemetry Collector first:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: frontend/Program.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE6]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter8/memes/frontend/Program.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter8/memes/frontend/Program.cs)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Here, we added an OpenTelemetry logging provider to the application’s `ILoggingBuilder`
+    instance and then configured the provider. We configured resource attributes,
+    enabled parsing state values to populate arguments, and added the OTLP exporter.
+    The exporter endpoint is configured with the `OTEL_EXPORTER_OTLP_ENDPOINT` environment
+    variable.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The OpenTelemetry Collector is configured to send all logs to a file and write
+    sampled logs to ClickHouse – we’ll look into its configuration in the next section.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Let’s go ahead and run the memes application with `memes$ docker-compose up
+    --build`. Then, we’ll hit the frontend at `http://localhost:5051/` to upload and
+    download some memes.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'To query logs in ClickHouse, run `$ docker exec -it memes-clickhouse-1 /usr/bin/clickhouse-client`
+    – this will start a client where we can write SQL queries, such as the following
+    one, that return all log records:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE7]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Here’s an example of the output – the download meme log we added earlier in
+    this chapter (if you don’t see it, keep in mind that logs are sampled and you
+    might need to download more memes):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE8]'
+  prefs: []
+  type: TYPE_PRE
+- en: It’s barely readable but easy to query, as it includes a timestamp, a trace
+    context, a log level, a body, resource information, and attributes – an event
+    name, an ID, a meme size, and a name.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs: []
+  type: TYPE_NORMAL
+- en: At the time of writing, OpenTelemetry log specification is still experimental,
+    so .NET implementation is minimal and details might change; the ClickHouse exporter
+    is in alpha status, and the table schema could change in later versions.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We didn’t enable capturing logging scopes; otherwise, we’d also see a few of
+    them as attributes. They’re populated by ASP.NET Core and describe incoming HTTP
+    request properties. As we saw in [*Chapter 2*](B19423_02.xhtml#_idTextAnchor038),
+    *Native Monitoring in .NET*, scopes include trace-context, which OpenTelemetry
+    captures for us anyway.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'With this, we can correlate logs using trace context or any attributes. For
+    example, we can find the most popular memes with a query such as this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE9]'
+  prefs: []
+  type: TYPE_PRE
+- en: This can be useful when making business or technical decisions. For example,
+    it helps to optimize caching or partitioning strategy, or plan capacity.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We can write queries such as these because we have enough structure in our logs,
+    including an optional event ID and name. If we didn’t have them, we’d have to
+    filter logs based on message text, which is neither efficient nor reliable. For
+    example, when someone changes the message when fixing a typo or adding new arguments,
+    all saved queries need to be changed to reflect this.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Tip
+  prefs: []
+  type: TYPE_NORMAL
+- en: To make logs queryable, make sure to use semantic logging. Provide a static
+    event ID and name. Use consistent (across the whole system) attribute names.
+  prefs: []
+  type: TYPE_NORMAL
+- en: By following this approach, we can change observability vendors, print logs
+    in human-readable format, and, at the same time, store them in a structured form,
+    post-process them, or aggregate them if needed.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Structured logs combined with traces allow us to report business telemetry and
+    run queries, but it brings new costs – let’s see how we can control them.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Managing logging costs
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Similarly to tracing and metrics, logging increases the compute resources needed
+    to run an application, the cost of running a logging pipeline (if any), and the
+    costs associated with using (or running) an observability backend. Vendor pricing
+    is frequently based on a combination of telemetry volume, retention time, and
+    API calls, including queries.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We already know how to write logs efficiently, so let’s talk about pipelines
+    and backends.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Pipelines
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: A logging pipeline consists of the infrastructure needed to send logs to the
+    backend of your choice. It’s typical to do some grokking, parsing, transformations,
+    buffering, throttling, and hardening on the way to the backend.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In a simple case, it’s all done by your vendor’s logging provider or the OpenTelemetry
+    processors and exporter inside the process.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In many cases, we need logging pipelines to capture logs and events coming from
+    outside – the OS, self-hosted third-party services, proxies, and other infrastructure
+    pieces. They could be structured such as Kubernetes events, have a well-known
+    configurable format such as HTTP server logs, or have no structure at all.
+  prefs: []
+  type: TYPE_NORMAL
+- en: A logging pipeline can help parse such logs and transform them into a common
+    format. In the OpenTelemetry world, this could be done on the Collector.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We would receive logs from `files`, `syslog`, `journald`, `fluentd`, other systems,
+    or collectors with a **receiver**, then massage, filter, and route them with a
+    **processor**, and finally, export them to the final destination.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Cost-saving strategies for pipelines start with a typical approach to minimize
+    log volume and avoid duplication and complex transformations, as we discussed
+    earlier in this chapter.
+  prefs: []
+  type: TYPE_NORMAL
+- en: For example, you might enable HTTP tracing, metrics, and logs from both a client
+    and server and logs from the HTTP proxy as well. Do you need logs from the proxy?
+    Do you use them?
+  prefs: []
+  type: TYPE_NORMAL
+- en: Eliminate duplicates by potentially substituting them with metrics, less verbose
+    events, or attributes on other signals. If some information is rarely needed,
+    process it lazily.
+  prefs: []
+  type: TYPE_NORMAL
+- en: It’s also important to monitor your logging pipeline – measure the error rate
+    and estimate the end-to-end latency and throughput. The OpenTelemetry Collector
+    helps by exposing its own metrics and logs.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Once, the team I worked on discovered that some logs had dropped at an ~80%
+    rate within the logging pipeline. We published them in a fire-and-forget manner
+    and didn’t even know they were dropped until we were not able to investigate incidents
+    in production.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Backends
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Backend cost optimization also starts by producing as few logs as possible.
+    Then, costs can be controlled in different ways, depending on your constraints
+    and observability backend pricing model:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The log volume can be reduced with sampling. Aggregations based on sampled events
+    would need to be scaled accordingly but would provide unskewed results when unbiased
+    sampling is used. Logs can be sampled consistently with traces at the same or
+    a higher rate.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Logs can stay in hot storage for a short period of time and then move to cold
+    storage. During the first few days, logs in hot storage can be used for urgent
+    ad hoc queries, but after that, query speed becomes less important.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: This strategy can be combined with sampling – logs could be sent to the cold
+    (and cheap) storage, while sampled in logs would go to hot storage.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Certain logs can be post-processed and aggregated into metrics or reports for
+    frequent queries.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'All these strategies and combinations of them can be implemented with the OpenTelemetry
+    Collector. For example, in our memes application, we use a combination of sampling
+    and hot/cold storage, as shown in *Figure 8**.1*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 8.1 – Logging pipelines with sampling and hot and cold storage](img/B19423_08_01.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 8.1 – Logging pipelines with sampling and hot and cold storage
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We have two different logging pipelines here. Both start with the OTLP receiver
+    and batch processor. Then, one pipeline writes all logs to a file, and another
+    one runs a filter based on log record properties. It checks `trace-flags` and
+    drops logs when the parent span is not recorded. Logs with a recorded parent (or
+    those that have no parent at all, such as startup logs) end up in ClickHouse.
+    Here’s the corresponding logging pipeline configuration:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: otel-collector-config.yml
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE10]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter8/memes/configs/otel-collector-config.yml](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter8/memes/configs/otel-collector-config.yml)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The filter processor, and many other processors, leverage a rich transformation
+    language – **OTTL**. OTTL can be used to rename attributes, change their values,
+    drop metrics and spans, create derived metrics, or add and drop attributes. Here’s
+    the filter processor configuration:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE11]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter8/memes/configs/otel-collector-config.yml](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter8/memes/configs/otel-collector-config.yml)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The collector can solve many common post-processing needs and take this burden
+    away from your service.
+  prefs: []
+  type: TYPE_NORMAL
+- en: That brings us to the end of this chapter. Let’s recollect what we’ve learned
+    so far.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Summary
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Logs are the most flexible telemetry signal – they can be used to write information
+    in human-readable format, complement traces with more information, or record structured
+    events to analyze usage or performance.
+  prefs: []
+  type: TYPE_NORMAL
+- en: To write logs, we can use different logging APIs – `ILogger` works best for
+    application code, while `EventSource` is usually the best choice for libraries.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`ILogger` makes it easy to write structured logs efficiently, but it depends
+    on application authors to do so by minimizing log volume and the operations needed
+    to calculate logging arguments.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`ILogger` has a rich ecosystem of integrations with .NET frameworks, libraries,
+    and providers that can send logs almost anywhere in a flat or structured format.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Collecting and exporting `ILogger` logs with OpenTelemetry produces logs that
+    are consistent and correlated with other telemetry signals.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In addition to application logs, we usually also need to collect logs from infrastructure
+    or legacy systems. We can do it with the OpenTelemetry Collector, which allows
+    us to collect and unify logs from multiple destinations. The Collector’s logging
+    pipelines can throttle, aggregate, or route logs to help you manage your logging
+    costs.
+  prefs: []
+  type: TYPE_NORMAL
+- en: You should now be ready to efficiently instrument your application with structured
+    logs and export them with OpenTelemetry. You’re also prepared to build logging
+    pipelines with OpenTelemetry to add observability to your infrastructure and control
+    logging costs.
+  prefs: []
+  type: TYPE_NORMAL
+- en: This concludes our deep dive into individual telemetry signals. In the next
+    chapter, we’ll talk about choosing a good set of telemetry signals, depending
+    on a scenario, and adding the right level of information, based on OpenTelemetry
+    semantic conventions.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Questions
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Is the following code snippet correct? How would you improve it?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE12]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: '[PRE13]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: '[PRE14]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: Let’s say your application writes usage events using the `ILogger` APIs. Events
+    are exported somewhere and then used to build business-critical reports. As your
+    application evolves, you will probably refactor code, rename namespaces and classes,
+    improve log messages, and add more arguments. How can you write logs to keep the
+    usage report resilient to logging changes?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Assuming that traces for HTTP requests are collected, do you also need to write
+    logs for the same HTTP calls?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Part 3: Observability for Common Cloud Scenarios'
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: This part provides instrumentation recipes for common scenarios such as network
+    calls, async messaging, databases, and web clients. It demonstrates how to write
+    your own instrumentation or cover a gap in an automatic one, and, most importantly,
+    how to investigate performance issues using a combination of distributed tracing,
+    metrics, and logs.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'This part has the following chapters:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[*Chapter 9*](B19423_09.xhtml#_idTextAnchor148), *Best Practices*'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[*Chapter 10*](B19423_10.xhtml#_idTextAnchor161), *Tracing Network Calls*'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[*Chapter 11*](B19423_11.xhtml#_idTextAnchor174), *Instrumenting Messaging
+    Scenarios*'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[*Chapter 12*](B19423_12.xhtml#_idTextAnchor192), *Instrumenting Database Calls*'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL

@@ -1,0 +1,488 @@
+- en: '7'
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Azure Durable Functions
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In the previous chapter, we discussed how HTTP APIs in Azure Functions provide
+    an alternative hosting model, as well as solve many traditional problems associated
+    with manual hosting.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Do you need to massively parallelize hundreds of millions of tasks on an arbitrary
+    number of physical processes or nodes (fan-out) and then wait for them all to
+    complete (fan-in)? Do you then need the app to wait for a human or other process
+    to review and take action to continue the next step? What if that human is unavailable
+    and you need to *timeout* the review process instead? This situation of events
+    is easily expressible in code, and we’ll be tackling a subset of this scenario
+    in this chapter.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In this chapter, we will look at the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Expanding on standard APIs to create resilient, stateful workflows
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Differences in debugging these workflows compared to previous chapters
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Interacting and injecting data into live systems using standard HTTP APIs
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Briefly discussing how to set up other common usage patterns
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Technical requirements
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Building Azure Durable Functions in Visual Studio has the same requirements
+    as for [*Chapter 6*](B21998_06.xhtml#_idTextAnchor077) . The source code for this
+    chapter is available at [https://github.com/PacktPublishing/Programming-APIs-with-C-Sharp-and-.NET/tree/main/Chapter07](https://github.com/PacktPublishing/Programming-APIs-with-C-Sharp-and-.NET/tree/main/Chapter07)
+    .
+  prefs: []
+  type: TYPE_NORMAL
+- en: Overview of Durable Functions
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'Durable Functions gets its very descriptive name from what it does under the
+    hood: save its state to persistent storage in case of crashes, outages, dependency
+    problems, and so on. Not only does this allow for problems to be recovered from
+    easily but it also allows scalability and coordination among tasks. Durability
+    in an Azure function is provided using a standard storage account by default.
+    Tables, blobs, and queues are all used under the hood:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Tables are used for managing function execution history, including parameters
+    and return values
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Blob storage is used for the automatic storage of large parameters passed to
+    activities
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Queues are used for triggering activities and orchestration instances
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: SQL Server and Netherite are the other two supported durable store options that
+    are not covered in this book but can be used in advanced scenarios.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'While there is never an “easy button” for scaling in a distributed system,
+    the following two specific rules simplify an enormous amount of platform- and
+    dependency-related overhead, allowing you to focus on the logic of the code itself:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Orchestrator functions must be deterministic
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Activity functions must be idempotent
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Orchestrator functions are exactly what they sound like: they orchestrate,
+    or control the execution order of, activities, which usually contain the bulk
+    of the work or logic of the application. A major restriction that must be followed
+    with orchestrators is that they must be deterministic, which also means that they
+    cannot do any form of I/O directly. All activity, sub-orchestrator, or other awaited
+    calls must be in the same order to return the executing code to its exact state
+    just prior to the next **await** call. Other nondeterministic APIs that you must
+    be aware of fall into categories such as DateTimes, GUIDs, I/O, and other async
+    APIs. In general, if you need data from outside the durable context, use activities
+    to retrieve it.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Activity functions are always called by orchestrators, and cannot be called
+    directly from anything else. These are where the bulk of the application logic
+    usually happens, and compared to orchestrators, activity functions have one restriction:
+    they must be idempotent. There is no guarantee that an activity instance will
+    run exactly once, so be sure that multiple runs in succession have the same result.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Adding durable support to your existing function is as easy as adding a NuGet
+    package. All the functions, triggers, and so on can interoperate and coexist in
+    a single project, depending on your application requirements.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Before Durable Functions, in a manually written situation with only basic OS
+    platform support, you had to manage the state yourself. This included handling
+    crashes, and marking tasks as done, errored, in progress, and so on. Restarts
+    also had to be managed, as did advanced processing such as a parallel fan-out
+    situation. Using Durable Functions simplifies all these requirements.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Now, let’s look at starting up a durable instance, and how these objects coordinate
+    tasks in a stateful system.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Orchestrators
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: The main “entry point” into the Durable system is through an orchestrator. These
+    are started up inside the running function using **DurableTaskClient** , or outside
+    of a function process by using the HTTP management APIs discussed later in the
+    *Programming and debugging walk-through* section. I say *entry point* because
+    I find it conceptually easier to think about it in this way. While the OS process
+    itself still uses the classic **Task** or void **Main(...)** , data or message
+    processing in a Durable system usually begins with a method marked with a **Function**
+    attribute, and **DurableTaskClient** marked with an **OrchestrationTrigger** attribute.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Serializable data objects, usually in JSON form, can be passed into the orchestrator
+    when an instance is created. These can be things such as larger descriptive objects,
+    SAS tokens to blob storage, binary data that must be deserialized, or all of them
+    combined. While you can work with standard strings or **JsonNodes** (sometimes
+    you must), my preferred way is to use the generic method overloads and create
+    serialization classes to mirror the structure of the data being passed around
+    in the system. This ensures that it is easy to modify the objects over time, delegating
+    the type-checking to the compiler. This also sidesteps a runtime issue that sometimes
+    occurs during development: missing or mismatched serialization classes, which
+    are not immediately apparent as there would be no standard compilation errors
+    or runtime exceptions. The same will apply to activities.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Since orchestration instances are durable and their state is written to persistent
+    storage, this means that a running orchestration instance does not need to stay
+    loaded into RAM while it waits for an activity to finish. Taking this a step further,
+    it need not resume running on the same OS process, virtual machine, or physical
+    machine. This can lead to highly performant and efficient allocation of compute
+    and memory resources. In the extreme case, you could have hundreds or thousands
+    of orchestration instances awaiting future completion of tasks, all without using
+    compute or memory, only minimal storage.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Continuing to take this further, you could have an infinite loop that also
+    does not use any compute or memory while awaiting a task. This concept, called
+    an eternal orchestrator, could respond to outside events, act, and durably wait
+    until the next event. A small caveat though: since orchestration instances save
+    their history to rebuild their state in the future, an eternal orchestrator could
+    have an ever-growing history, which would eventually cause performance problems.
+    A method called **ContinueAsNew** truncates that history, which prevents it from
+    growing.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: With any API or stateful workflow, you’ll almost certainly need to process something,
+    make network calls, and so on. Since we are unable to do so in orchestrators,
+    this is where activities come in.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Activities
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'The pieces of code that actually contain most of your logic are activities.
+    They have one very specific requirement: they must be idempotent. This means your
+    code must have no side effects if it happens to execute more than once, as there
+    is no guarantee that a specific instance will execute exactly once. Due to various
+    reasons, some out of your control, activities may be terminated in the middle
+    of execution. This must be handled in your activity code so that when the Durable
+    system detects an incomplete instance, starting from the beginning is not a problem.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Various built-in programming constructs that you would normally not think about,
+    now have a profound potential impact on the rest of the system. For example, **Guid.NewGuid()**
+    should likely not be used in an activity. Creating files, saving database records,
+    or calling other APIs with this random GUID could now result in an orphaned record
+    if the activity needed to be restarted from the beginning. Instead, you could
+    create the new GUID inside the orchestrator, and pass that into the activity with
+    its object parameter. The **TaskOrchestrationContext** instance passed into the
+    orchestrator has a specific method called **NewGuid** to facilitate this exact
+    need.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Programming and debugging walk-through
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Using the existing [*Chapter 6*](B21998_06.xhtml#_idTextAnchor077) function
+    code, let’s add support for Durable to it. Right-click on the project and select
+    **Add** | **New Azure Function** just as you did with the first HTTP endpoint.
+    Give it a name, and then select **Durable** **Functions Orchestration** .
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 7.1 – Adding a new Durable Functions orchestration](img/B21998_07_1.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 7.1 – Adding a new Durable Functions orchestration
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'You can see from the provided template that three static methods were created
+    corresponding to each of the concepts we discussed earlier: a regular function
+    with **HttpTrigger** , which schedules a new orchestration instance to run, which
+    then calls one or more activities. Visual Studio should have added a reference
+    to **Microsoft.Azure.Functions.Worker.Extensions.DurableTask** automatically,
+    but add it via NuGet if it did not.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs: []
+  type: TYPE_NORMAL
+- en: Notice that these methods are all static. Though this does work, it leaves a
+    lot to be desired as it prevents impactful concepts discussed in the last chapter
+    such as options, dependency injection, and easier testing. Durable Functions also
+    supports migrating the code to the non-static style in the previous chapter. This
+    exercise is left up to you. We are using the word “the” when referring to the
+    orchestrator and activity we are working on. This may seem out of place since
+    we are referring to single static methods and not necessarily an object or thing
+    you can see visually. The same static method may also be executing in different
+    threads, processes, and virtual machines concurrently with different data. If
+    you do decide to undertake the code migration, the individual files with regular
+    constructors and non-static methods may help you conceptually visualize them.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We’ll focus on saving some data to a file and waiting for an event that will
+    then update the file again. Let’s begin by deleting the contents of the **SayHello**
+    method, which contains a string parameter, **name** , with **ActivityTrigger**
+    on it. This is your one and only parameter that can be passed to your activity
+    from your orchestrator. Though this can be a string, generally, it is some kind
+    of data transfer or **Plain Old C# Class** ( **POCO** ) object that must be JSON
+    serializable. The **FunctionContext executionContext** parameter can be used to
+    discover information about the running activity, among other things. Change the
+    return type to **Task<string>** , and add a line that awaits a call to **File.WriteAllTextAsync**
+    , giving it a filename of your choosing, and then the contents will be the **name**
+    string parameter marked with **ActivityTrigger** . Rename this parameter and its
+    references to **contents** by pressing *F2* . This activity is simple and straightforward,
+    which will add extra value to the orchestrator when we use it more than once.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The **SayHello** method should resemble this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE0]'
+  prefs: []
+  type: TYPE_PRE
+- en: In the **RunOrchestrator** method, delete the contents and add an awaited call
+    to **context.CallActivityAsync** , passing it the name of the activity, which,
+    in our case, is **SayHello** . Change the return to **Task<object>** and then
+    **return default** to make the compiler happy. Add an awaited call to **context.WaitForExternalEvent<ExpandoObject>(“MyEvent”)**
+    after that, and save that into a **dynamic** variable. Finally, let’s add another
+    call to our first activity, but this time, pass it the dynamic awaited event’s
+    **value** property that we received from the external event call.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Tip
+  prefs: []
+  type: TYPE_NORMAL
+- en: Though you can use a normal double-quoted string when calling an activity via
+    **CallActivityAsync** , using the **nameof** expression is particularly powerful
+    here as it not only evaluates to a string during compile time but also responds
+    to symbol renaming. We’ll use this in the sample. The same idea can be used for
+    **WaitForExternalEvent** by using the POCO class name, for example.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The **RunOrchestrator** method should resemble this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE1]'
+  prefs: []
+  type: TYPE_PRE
+- en: Tip
+  prefs: []
+  type: TYPE_NORMAL
+- en: The **Function** runtime mandates that we pass JSON data to this endpoint, which
+    would then be automatically deserialized and returned from our awaited **WaitForExternalEvent**
+    call. This ensures a baseline level of backward compatibility in case things need
+    to change in the future. For our testing purposes, we are using **dynamic** to
+    reduce the number of boilerplate files that would need to be created during this
+    chapter.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Let’s start debugging in Visual Studio, and *Ctrl* / *CMD* click on the **MyOrchestrator_HttpStart**
+    HTTP trigger to run our orchestrator entrypoint. Navigate to the output folder
+    on the function, likely in **bin/debug/net8.0** , and notice there’s an empty
+    file. This is the result of the first call to the **SayHello** activity. What
+    is the function doing now? It is currently awaiting the call to **WaitForExternalEvent**
+    . Copy or save the URI specified by the **sendEventPostUri** element, as we’ll
+    need that in a moment. Let’s stop debugging now so that the physical application
+    process terminates. Immediately start debugging again, but do not click on the
+    link again to start a new instance. Our previous instance is still “running” in
+    the Durable Functions sense, only it is not taking up memory, CPU, or any other
+    OS resource, except for storage space.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Open up your favorite REST client interface such as the new built-in one from
+    Visual Studio, Postman, and so on. You’ll need the URI you copied previously to
+    signal our running orchestration instance event. We’ll be using Visual Studio.
+    Create a new text file by right-clicking on the project, selecting **Add** | **New
+    Item...** , and then selecting **Text File** . The name of this file should end
+    with **.http** so that Visual Studio recognizes it. Type **POST** in all uppercase,
+    and then paste in the URI that you copied earlier. Replace **{eventName}** with
+    the name that you chose in the code; we used **MyEvent** . Add a header with the
+    **Content-Type: application/json** value so that the **Function** runtime accepts
+    it. Ensure that there is an empty line after the URI, then type some valid JSON
+    with a **value** property and value. To end the body of the request, make sure
+    that there is also an empty line afterward.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 7.2 – REST client setup in Visual Studio](img/B21998_07_2.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 7.2 – REST client setup in Visual Studio
+  prefs: []
+  type: TYPE_NORMAL
+- en: Switch to the orchestrator file and place a breakpoint on both calls to our
+    activity. Send the **POST** request using the **Send** request link in the **.http**
+    file. The first breakpoint should now hit. But wait, why was the first one hit
+    when we already ran this line and are waiting on the line after that? Hover over
+    the **context** variable and expand it to look at the read-only **IsReplaying**
+    property. Notice that it is **true** .
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 7.3 – IsReplaying is true](img/B21998_07_3.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 7.3 – IsReplaying is true
+  prefs: []
+  type: TYPE_NORMAL
+- en: This is exactly what the property’s name sounds like; it is quite literally
+    rebuilding its internal state line by line. It will do this after every single
+    **await** . This is why orchestrators must be deterministic so that the internal
+    state is always exactly the same no matter how many times it must rerun the same
+    logic over and over. Every single call to these **await** methods is saved in
+    durable storage. At some point in the future, they are queried, deserialized,
+    and returned to the calling orchestrator. Press *F10* to step over the first activity
+    call, and check to see that the **IsReplaying** property is still **true** . Step
+    again over **WaitForExternalEvent** , which should return immediately. Now, look
+    at the **IsReplaying** property again; it should be **false** . This means it
+    is the very first time that this code has been run for this orchestration instance.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 7.4 – IsReplaying is false](img/B21998_07_4.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 7.4 – IsReplaying is false
+  prefs: []
+  type: TYPE_NORMAL
+- en: Press *F5* to continue; it should immediately call the activity. Navigate to
+    the output folder again and open the file. You should see the contents of the
+    value property that you set in the **.http** file’s **POST** request. The orchestration
+    instance is now completed. If you query durable storage, you’ll find the complete
+    history of this orchestration instance, including all input and output parameters,
+    errors if there are any, and timestamps. This will allow you to analyze the orchestration
+    instance later if needed or for tracking, logging, and so on. We’ll look at how
+    to view this in a moment.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Waiting on activities, external events, and sub-orchestrators is powerful all
+    on its own. However, we can take it one step further. Using the existing language
+    features such as **List<Task>** , **Task.WhenAny** , or **Task.WhenAll** , we
+    can have an arbitrarily long stateful execution system. This can scale, wait for
+    potentially hundreds or thousands of activity instances to run, and then move
+    on to the next code.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Tip
+  prefs: []
+  type: TYPE_NORMAL
+- en: Using **Task.WhenAny** , we can wait on an external human event or a timeout.
+    This allows us to default to an action if an external event is not received in
+    time.
+  prefs: []
+  type: TYPE_NORMAL
+- en: To have an easier time debugging, you’re likely to want to be familiar with
+    clearing the durable storage. This allows you to start from a clean state. If
+    you have many outstanding orchestration instances, timers, and so on, it can be
+    difficult when debugging anything in the same project. Using Azure Storage Explorer,
+    navigate to **Emulator & Attached** | **(Emulator – Default Ports) (Key)** | **Tables**
+    , and open two tables that end with **History** and **Instances** . Look around
+    for a bit to see how the data is physically stored if interested. When done, right-click
+    on the **History** table and select **Delete** . Do the same for **Instances**
+    .
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 7.5 – Clearing the local History table](img/B21998_07_5.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 7.5 – Clearing the local History table
+  prefs: []
+  type: TYPE_NORMAL
+- en: There are additional advanced topics not covered here. Some of them are durable
+    entities, and a counterpart, critical sections (.NET only). These together let
+    you coordinate distributed locks inside an orchestrator.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Additional options
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Sometimes, you want an orchestrator to continuously wait for an external event
+    without ever exiting. Using a standard **for** or **while** loop around the call
+    to **WaitForExternalEvent** is reasonable for a low number of events. But recall
+    how previously I mentioned that every single **await** is some type of network
+    call to the durable storage. Having **await** inside of a loop has the potential
+    to drastically increase the latency for building up the internal state. An alternative
+    way to support this exact scenario is to use eternal orchestrations with a call
+    to **ContinueAsNew** . Though these are especially suited for the situation described,
+    it’s worth noting that they have some considerations you need to keep in mind.
+    While they do prevent the continuous growth of durable storage for that instance,
+    they do so by truncating the history. This may be acceptable in your situation,
+    but it could also not be. Note that while you have lost the underlying execution
+    history in the durable store, nothing is preventing you from manually logging
+    things that you need or want to keep. You could have a logging activity in place
+    throughout your code to log various important events to, for example, Table storage.
+    There’s also the option of logging to Application Insights. However, Insights
+    is not a permanent log storage solution.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Sometimes, you want a single instance of a global orchestrator throughout your
+    entire application. These can be useful in background tasks, for example. This
+    is accomplished with what is known as singleton orchestrators. It does not have
+    a specific method call per se, but to enable this functionality, all you need
+    to do is start an orchestration instance normally with a specified instance ID
+    that will not change.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Exceptions
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: While most programming constructs are available, a bit of special care must
+    be taken when working with exceptions. Using C#, we do have first-class handling
+    of them. However, since this is potentially across a process boundary, a notable
+    incompatibility is when catching derived exception types. You should, in general,
+    catch the normal base exception, and then handle it appropriately.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Summary
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In this chapter, we discussed how the durable orchestration system comprising
+    activities and orchestrators helps to solve a wide variety of use cases. We then
+    walked through adding Durable Functions to our existing Functions code from the
+    previous chapter. Via debugging, we demonstrated how the orchestrator rebuilds
+    its internal state, and how to get information into a running orchestration instance.
+    We then discussed some helpful tips to clear the local durable store during development
+    and touched on some additional features and pitfalls.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In the next chapter, we‘ll take a look at related concepts including Table storage,
+    Aspire, and some additional advanced API topics.
+  prefs: []
+  type: TYPE_NORMAL
+- en: You try it
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Create or modify an existing HTTP trigger to start a new Orchestration instance.
+    Have your new Orchestrator await at least two Activities (they can be the same
+    one) so you can debug and step through to watch it rebuild its internal state.
+    The Activity can be something minimal for this, a single API call to anywhere
+    or something else. After it completes, view the Table Storage durable logs in
+    Azure or Azure Storage Explorer. Examine how the logs in the history table line
+    up with your orchestrator.
+  prefs: []
+  type: TYPE_NORMAL

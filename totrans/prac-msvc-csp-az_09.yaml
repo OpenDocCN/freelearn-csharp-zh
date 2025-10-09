@@ -1,0 +1,1142 @@
+- en: '9'
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Authentication and Authorization with Services and Clients
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Not every user and application should be allowed to access all API services.
+    Some APIs should only be accessible from specific applications, and others should
+    be restricted to a group of users.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In this chapter, you’ll learn how to use **business-to-consumer** (**B2C**)
+    to allow users to register with our application and protect APIs. We’ll use Azure
+    **Active Directory** (**AD**) B2C for this. For an on-premises solution (which
+    can also be used in the cloud), we’ll be using ASP.NET Core Identity.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Instead of securing every API project, you’ll learn about Microsoft **Yet Another
+    Reverse Proxy** (**YARP**), a proxy that is put in front of the APIs that are
+    available to restrict access to the services in the backend.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In this chapter, you’ll learn how to do the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Create an Azure AD B2C tenant
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Secure REST APIs
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Use Microsoft YARP
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Use ASP.NET Core Identity
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Technical requirements
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In this chapter, like the previous chapters, you’ll need an Azure subscription,
+    Docker Desktop, and .NET Aspire.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The code for this chapter can be found in this book’s GitHub repository: [https://github.com/PacktPublishing/Pragmatic-Microservices-with-CSharp-and-Azure](https://github.com/PacktPublishing/Pragmatic-Microservices-with-CSharp-and-Azure).'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The `ch09` folder contains the following projects, along with their outputs:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`Codebreaker.ApiGateway`: This is a new project that will act as an application
+    gateway in front of the `game-apis` service and `bot-service` and secure the APIs
+    with the help of YARP'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`WebAppAuth`: This is a new project for the client part that focuses on creating
+    new users with Azure AD B2C, providing authentication from the client side, and
+    invoking `bot-service` via the gateway'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`Codebreaker.ApiGateway.Identities`: This is a new project that can be used
+    instead of `Codebreaker.ApiGateway` where instead of using Azure AD B2C, local
+    users are created and managed'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: To help you go through the code with this chapter, start by using the code from
+    the previous chapter.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Choosing an identity solution
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Different options are available to authenticate users with .NET solutions. If
+    you require a local database that can manage users, you can use **ASP.NET Core
+    Identity**, which makes use of EF Core (see [*Chapter 5*](B21217_05.xhtml#_idTextAnchor110)).
+    It allows you to store local users and integrate user accounts, such as those
+    from Microsoft, Facebook, and Google, with **OpenID Connect** (**OIDC**). For
+    the database, SQL Server and MySQL can be used, while the data schema is completely
+    customizable.
+  prefs: []
+  type: TYPE_NORMAL
+- en: To reduce the work required, and to enhance security, it’s not necessary to
+    implement this functionality with every service – here, Microsoft YARP can be
+    used to forward the requests and send the required claims.
+  prefs: []
+  type: TYPE_NORMAL
+- en: If external applications are accessing the identity management solution, an
+    **OIDC** server should be used to manage identities. If storing user data in a
+    cloud service is not an option, a third-party service such as Identity Server
+    from Duende ([https://duendesoftware.com/products/communityedition](https://duendesoftware.com/products/communityedition))
+    can be used. This is free for small companies.
+  prefs: []
+  type: TYPE_NORMAL
+- en: To store user data in a cloud service, many companies use **Microsoft Entra**.
+    This can easily be integrated with .NET applications. This service offers **business-to-business**
+    (**B2B**) functionality that allows you to add external users (**Entra External
+    Identities**). Microsoft, Facebook, and Google accounts are on the list of supported
+    external users. However, at the time of writing, **Microsoft Entra** does not
+    allow users to register themselves. For this, **Azure AD B2C** is a great option.
+    This service can also be used with services running on-premises and accessing
+    authentication from the cloud.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs: []
+  type: TYPE_NORMAL
+- en: With its user data residency requirement, Azure AD B2C allows you to select
+    a country when you’re creating a directory and shows the location for the data.
+    However, if, for example, the requirement is to keep the user data in Switzerland,
+    it’s stored in Europe, which might not be enough for the legal requirements of
+    some businesses.
+  prefs: []
+  type: TYPE_NORMAL
+- en: For the Codebreaker solution, we’ll use Azure AD B2C and ASP.NET Core Identity.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Creating an Azure AD B2C tenant
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The Codebreaker solution should allow users to register with the application
+    and play different game types. Some limited game types are available to anonymous
+    users. All the game types and more functionalities are available to registered
+    users. Some parts of the solution should only be accessible to specific user groups
+    – for example, `bot-service` should not be accessible from normal registered playing
+    users. Specific user permissions (or claims) are required for differentiation.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'To create a new AAD B2C tenant, open the Azure portal and click **Create a
+    resource**. Select **Identity** from the left bar and choose **Azure Active Directory
+    B2C**. Then, select **Create a new Azure AD B2C Tenant**. This will open the screen
+    shown in *Figure 9**.1*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 9.1 – Creating an AAD B2C tenant](img/B21217_09_01.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 9.1 – Creating an AAD B2C tenant
+  prefs: []
+  type: TYPE_NORMAL
+- en: To create a new AAD B2C tenant, you need to enter the name of the organization,
+    the name of the domain name (a domain name that does not exist yet), the location
+    that will be used to define the region where the user data is stored, a subscription,
+    and a resource group. Once you’ve done this, click **Review + Create**, then **Create**.
+  prefs: []
+  type: TYPE_NORMAL
+- en: You’ll need to wait a short time for the directory to be created. To list the
+    directories available to you, and to switch directories, within the Azure portal,
+    click the **Settings** button. Select the new directory and click **Switch** to
+    change to it. Similarly, you can switch back to the directory where you run Azure
+    resources.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In the next few sections, we’ll do the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Specify identity providers so that the user doesn’t need to enter another password
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Configure user attributes to define what information the application needs from
+    the user
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Define user flows to specify how the user information flows
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Create app registrations to define service applications that offer APIs and
+    client applications for accessing APIs
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Specifying identity providers
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'When you are in an Azure AD B2C, you can open the Azure AD B2C configuration.
+    The B2C directory supports a large list of different identity providers. Users
+    don’t need to remember another password when they use identity providers. Within
+    the Azure AD B2C configuration, in the **Manage** category in the left pane, select
+    **Identity provider** (see *Figure 9**.2*):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 9.2 – Identity providers](img/B21217_09_02.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 9.2 – Identity providers
+  prefs: []
+  type: TYPE_NORMAL
+- en: By default, **Local account** is configured so that a password is stored locally
+    with AAD B2C. You can configure Microsoft, Google, Facebook, and other accounts
+    that support OIDC. The Codebreaker directory has GitHub configured as a provider
+    because most developers already have a GitHub account.
+  prefs: []
+  type: TYPE_NORMAL
+- en: For each provider, you’re what needs to be done to configure it. You just need
+    to click on the provider to get that information. With GitHub, for example, you
+    need to create a GitHub OAuth application to get all the values you need to configure
+    this provider. For authenticating services with AAD B2C, you can keep the default
+    settings.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Configuring user attributes
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'No matter which provider you choose, you must have a way to identify users.
+    To gather such information, you must ask your users for details. You can also
+    create custom attributes that should be stored in the directory. Within the **Manage**
+    category, select **User Attributes**, as shown in *Figure 9**.3*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 9.3 – User Attributes](img/B21217_09_03.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 9.3 – User Attributes
+  prefs: []
+  type: TYPE_NORMAL
+- en: Here, several built-in attributes, such as `Gamer Name` of the `String` type.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs: []
+  type: TYPE_NORMAL
+- en: Due to the **General Data Protection Regulation** (**GDPR**), you need to ensure
+    you only collect necessary data and keep it secured, allow the user to ask for
+    the data that you’ve stored, and allow the user to delete that data if it doesn’t
+    need to be stored for legal reasons.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Defining user flows
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: With user flows, you define what information should be collected from the user
+    when registering or editing the user profile, and what information should be sent
+    to the application within **claims**.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Within the AAD B2C configuration, from the left pane, within the `B2C_1_`.
+    Add a name (for example, `SUSI`) and select the **Email** signup identity provider.
+    You can also select social providers such as GitHub. Regarding the **User attributes
+    and token claims** category, select the user attributes the user should enter
+    when this dialogue is shown, as well as the claims that are passed to the application
+    within a token, as shown in *Figure 9**.4*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 9.4 – Creating a user flow](img/B21217_09_04.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 9.4 – Creating a user flow
+  prefs: []
+  type: TYPE_NORMAL
+- en: When defining what information to ask from the user, keep GDPR in mind.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Azure AD B2C allows you to customize user flow dialogues by specifying company
+    branding, changing the page layout, returning custom pages, and adding API connectors
+    for custom validators when a user registers.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs: []
+  type: TYPE_NORMAL
+- en: User attributes can be filled by creating user flows or **custom policies**.
+    See the links in the *Further reading* section for more information. Also, check
+    out the source code in the Codebreaker Backend repository ([https://github.com/codebreakerapp/Codebreaker.Backend](https://github.com/codebreakerapp/Codebreaker.Backend)),
+    which contains a custom policy for adding groups for privileged users.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'As soon as an application has been registered (the next step), you can test
+    the user flow, as shown in *Figure 9**.5*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 9.5 – Testing the user flow](img/B21217_09_05.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 9.5 – Testing the user flow
+  prefs: []
+  type: TYPE_NORMAL
+- en: Selecting the user attributes that should be collected defines the input elements
+    of the dialogue. The icon, colors, and layout can be customized. It’s even possible
+    to create complete custom dialogues.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Creating app registrations
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Next, we’ll learn how to register apps. Here, we will register the application
+    gateway that offers APIs and a client application. Other applications can be registered
+    similarly.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In the **Manage** category in the left pane, click **App registrations**. This
+    opens the **App registrations** page, as shown in *Figure 9**.6*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 9.6 – Registering an app](img/B21217_09_06.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 9.6 – Registering an app
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Add multiple app registrations: the `Codebreaker.GameAPIs` application offers
+    the game APIs, `Codebreaker.Bot` and `Codebreaker.Blazor` are web applications
+    that need API permissions, and `Codebreaker.Client` is a client application that
+    needs API permissions.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: When you configure the app registration process, you specify what accounts are
+    allowed to use this application. Here, we’ll allow all accounts, externally registered
+    users, and the redirect URI. To test the `game-apis` service from the local developer
+    system, specify the port number that’s used when running it locally, such as `http://localhost:5453`,
+    and click the **Register** button. The link to the Azure container app needs to
+    be added later.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Defining scopes
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'You can specify applications that offer APIs via the app registration process.
+    In the `games`. Within this scope, add the `Games.Play` and `Games.Query` scopes,
+    as shown in *Figure 9**.7*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 9.7 – Defining scopes](img/B21217_09_07.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 9.7 – Defining scopes
+  prefs: []
+  type: TYPE_NORMAL
+- en: Creating a secret
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: To only allow applications that have been identified applications, you can add
+    a certificate or a secret. Instead of using secrets, a better approach could be
+    to run the application with a user that is allowed to access the service. Here,
+    managed identities can be used. This is not possible in all scenarios.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Using the **Certificates and secrets** option from the left pane, create a client
+    secret. Secrets cannot be read from the portal again, only after creation. Copy
+    the secret before leaving the page.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Adding API permissions
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'For application registrations that invoke APIs, you need to configure **API
+    permissions**, as shown in *Figure 9**.8*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 9.8 – Adding API permissions](img/B21217_09_08.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 9.8 – Adding API permissions
+  prefs: []
+  type: TYPE_NORMAL
+- en: The `Codebreaker.Blazor` and `Codebreaker.Client` application registrations
+    need the `Games.Play` and `Games.Query` application permissions. After adding
+    these permissions, click **Grant** **admin consent**.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Evaluating the app registration process
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'With this configuration complete, open `bot-service` and the client applications).
+    Then, click **Evaluate my app registration**, as shown in *Figure 9**.9*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 9.9 – Integration assistant results](img/B21217_09_09.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 9.9 – Integration assistant results
+  prefs: []
+  type: TYPE_NORMAL
+- en: The integration assistant offers great information for development, testing,
+    releasing, and monitoring when you click the tabs above the recommended configurations.
+    If you see some warnings or errors, click the ellipsis (**…**). From here, you
+    can check the documentation and open a page where you can change your configuration.
+  prefs: []
+  type: TYPE_NORMAL
+- en: With Azure AD B2C configured, let’s implement some code so that we can make
+    use of AAD B2C.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Securing an API
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: We can now secure every API project. However, there are different ways we can
+    do this so that we can reduce the work we need to do. One option is to use Azure
+    Container Apps to configure authentication. Instead of configuring this for every
+    container app, let’s create a new project that will be secured and routed to multiple
+    services. For this, we’ll use **YARP**.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Creating a new project with authentication
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Create a new Web API project by using the .NET template with the `-au` authentication
+    option:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE0]'
+  prefs: []
+  type: TYPE_PRE
+- en: Using the .NET CLI, you can also pass all the values needed to configure the
+    B2C service, such as `--domain` for the domain, `--aad-b2c-instance` to pass the
+    domain link for logging in, `--client-id` for the application ID, `--susi-policy-id`
+    for the signup user flow (before it was called *user flow*, it was called *policy*),
+    and `--default-scope` to configure a scope. If you don’t assign parameter values
+    for these configurations, you just need to change them after they’ve been created
+    in the `appsettings.json` file.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The NuGet packages related to authentication and authorization that have been
+    added to this project are as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`Microsoft.AspNetCore.Authentication.JwtBearer`: This package supports authentication
+    using **JSON Web** **Tokens** (**JWT**)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`Microsoft.AspNetCore.Authentication.OpenIdConnect`: This package allows authentication
+    with an OIDC against identity providers, such as Azure AD B2C'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`Microsoft.Identity.Web`: This package provides utilities and middleware for
+    authentication flows and user authorization'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`Microsoft.Identity.Web.DownstreamApi`: This package helps call downstream
+    APIs using the same authentication context'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Next, we’ll add YARP to this project.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Creating an application gateway with YARP
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: When creating a microservices solution, it’s not necessary to implement authentication
+    with every service. Instead, you can create a service that acts as a reverse proxy.
+    Clients only call into the reverse proxy. This proxy forwards authenticated requests
+    to other services. Here, we’ll use Microsoft YARP. A reverse proxy sits in front
+    of backend services and intercepts invocations from a client before it is sent
+    to the service. The YARP proxy offers different features, such as load balancing,
+    rate limiting, switching of protocols, selecting services based on different versions,
+    and more. Based on Layer 7, the proxy can read HTTP requests to route based on
+    links and HTTP headers, as well as change the protocol that’s used. Here, we’ll
+    use a reverse proxy to deal with authentication and authorization before forwarding
+    the requests to the backend service.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '*Figure 9**.10* shows the new way to communicate with the services:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 9.10 – Communication via YARP](img/B21217_09_10.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 9.10 – Communication via YARP
+  prefs: []
+  type: TYPE_NORMAL
+- en: The reverse proxy routes incoming requests to backend services. The backend
+    services that have been routed are `game-apis` and `bot-service`. The client applications
+    don’t interact with these services; they just use the YARP gateway.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In addition to the NuGet packages we added earlier, we need to add the `Yarp.ReverseProxy`
+    and `Microsoft.Extensions.ServiceDiscovery.Yarp` NuGet packages. The first one
+    is the package for YARP, while the second one allows us to use.NET service discovery
+    with YARP.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Mapping routes with YARP
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'How the proxy service communicates with the backend APIs can be configured
+    both programmatically and using a configuration file. We’ll use the second option
+    with the `appsettings.json` file. First, let’s configure the addresses of the
+    `game-apis` service and `bot-service`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Codebreaker.ApiGatewayIntro/appsettings.json
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE1]'
+  prefs: []
+  type: TYPE_PRE
+- en: The complete reverse proxy configuration is added to the `ReverseProxy` section,
+    The configuration section, called `Clusters`, defines the list of systems that
+    are available for the `game-apis` service and `bot-service`. With every service,
+    multiple addresses can be added. Using the service discovery YARP package, we
+    can use the .NET Aspire named endpoints.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following code configures the routes that use the cluster configuration:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Codebreaker.ApiGatewayIntro/appsettings.json
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE2]'
+  prefs: []
+  type: TYPE_PRE
+- en: The `Routes` configuration contains a list of routes. `gamesRoute` references
+    the previously specified `gamesapicluster`, while `botRoute` references the hosts
+    defined by `botcluster`. The `Match` configuration specifies the `Path` that’s
+    used to map the request to the corresponding cluster.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We just need to make a small update to the startup code to activate this reverse
+    proxy library:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Codebreaker.ApiGateway/Program.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE3]'
+  prefs: []
+  type: TYPE_PRE
+- en: The `AddReverseProxy` method registers the services that are needed by the reverse
+    proxy to the DI container. The `LoadFromConfig` method retrieves the configuration
+    values from the previously specified configuration. The `MapReverseProxy` method
+    configures the middleware to forward the requests, as defined by the configuration.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'With the `AppHost` project, after adding a reference to the gateway project,
+    the gateway can be added to the app model:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Codebreaker.AppHost/Program.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE4]'
+  prefs: []
+  type: TYPE_PRE
+- en: The API gateway needs to reference the `game-apis` service and `bot-service`.
+    Here, external HTTP endpoints are no longer needed. Only the gateway needs references
+    from outside when it’s deployed to the Azure Container Apps environment, thus
+    only the gateway configuration uses the `WithExternalHttpEndpoints` method.
+  prefs: []
+  type: TYPE_NORMAL
+- en: With this in place, you can start the application and invoke the two services
+    via the gateway. The requests are forwarded to the specific service.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Next, we’ll add authentication to the gateway.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Adding authentication to the gateway
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Using the .NET template for the Web API with Identity already added some code
+    for authentication and authorization. We will enhance this code now.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We can configure the DI container to authenticate users by invoking the `AddAuthentication`
+    method:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Codebreaker.ApiGateway/Program.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE5]'
+  prefs: []
+  type: TYPE_PRE
+- en: The `AddAuthentication` method registers services that are needed for authentication.
+    The `JwtBearerDefaults.AuthenticationScheme` argument returns **Bearer** as the
+    authentication scheme. Bearer tokens are used with most REST APIs because they
+    can be used easily and don’t require encryption but need to perform HTTPS encryption
+    to secure it.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`AddMicrosoftIdentityWebApi` is an extension method that extends `AuthenticationBuilder`
+    and protects the API using the Microsoft Identity platform. `AzureAdB2C` is a
+    configuration section that specifies the values from AADB2C from `appsettings.json`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Codebreaker.ApiGateway/appsettings.json
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE6]'
+  prefs: []
+  type: TYPE_PRE
+- en: With the `appsettings.json` configuration file, you need to configure your Azure
+    AD B2C domain name, the application ID, and the previously configured user flow.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The `AddAuthentication` method specifies the authentication configuration:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Codebreaker.ApiGateway/Program.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE7]'
+  prefs: []
+  type: TYPE_PRE
+- en: The `AddAuthorization` method allows configuration with an `AuthorizationOptions`
+    delegate. The options allow you to specify a default policy and named policies.
+    The preceding code snippet defines the `playPolicy` and `queryPolicy` policies.
+    `playPolicy` requires the `Games.Play` scope to be set, whereas `queryPolicy`
+    requires the `Games.Query` scope to be set. `queryPolicy` also requires the user
+    to be authenticated. You can define a claim to be passed with the token by using
+    the `RequireClaim` method.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'With the policies in place, routes can be restricted to the required policies:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Codebreaker.ApiGateway/appsettings.json
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE8]'
+  prefs: []
+  type: TYPE_PRE
+- en: Using the `AuthorizationPolicy` configuration, alongside `botRoute`, `botPolicy`
+    is referenced to require authenticated users and the application to send the correct
+    scope.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Now that we’ve configured the DI container, the middleware needs to be configured:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Codebreaker.GameAPis/Program.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE9]'
+  prefs: []
+  type: TYPE_PRE
+- en: The `UseAuthentication` method adds authentication middleware, while the `UseAuthorization`
+    method adds authorization middleware.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs: []
+  type: TYPE_NORMAL
+- en: If the minimal API needs to be restricted directly, the `RequireAuthorization`
+    extension method can be used. A policy can be passed as an argument to check for
+    the policy’s requirements. Upon injecting `ClaimsPrincipal` as an argument to
+    a minimal API method, information about the user and claim information can be
+    retrieved programmatically. This allows us to check for restrictions based on
+    values that are retrieved with the API.
+  prefs: []
+  type: TYPE_NORMAL
+- en: To test this out, we’ll update our client application.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Authentication using Microsoft Identity with ASP.NET Core web applications
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: To authenticate using Azure AD B2C, we’ll use the Microsoft Identity platform.
+    In this section, we’ll focus on creating accounts with Azure AD B2C, logging in,
+    and invoking secured REST APIs with ASP.NET Core web applications.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Like with the minimal API we created earlier, a .NET template can be used.
+    Invoke this command to create a new project:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE10]'
+  prefs: []
+  type: TYPE_PRE
+- en: In creating this project, several NuGet packages are added for identities and
+    authentication. These were discussed when we secured the API. An additional package
+    that hasn’t been used before is `Microsoft.Identity.Web.UI`. This package integrates
+    with `Microsoft.Identity.Web` and offers pre-built UI elements for login, logout,
+    and profile management.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'With the DI container configuration, authentication is added. So, we need to
+    customize it for calling APIs:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: WebAppAuth/Program.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE11]'
+  prefs: []
+  type: TYPE_PRE
+- en: To use Azure AAD B2C, `AddAuthentication` is invoked using the configuration
+    from the `AzureAdB2C` section within `appsettings.json`. `AddMicrosoftIdentityWeb`
+    is an extension method from the `Microsoft.Identity.Web` NuGet package. This configures
+    supporting cookies and `OpenIdConnect`. The `EnableTokenAcquisitionToCallDownstreamApi`
+    method allows us to pass tokens that have been received from the application so
+    that we can forward them to the APIs that have been invoked by the application
+    via `HttpClient`. When using this method, the `ITokenAcquisition` interface is
+    registered in the DI container. This can be used to retrieve the tokens and pass
+    them to the HTTP headers of `HttpClient`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'For the Microsoft Identity user interface, the `AddMicrosoftIdentityUI` method
+    needs to be configured with the DI container:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: WebAppAuth/Program.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE12]'
+  prefs: []
+  type: TYPE_PRE
+- en: This method configures `AccountController` (based on ASP.NET Core MVC) with
+    `SignIn` and `SignOut` methods in the `MicrosoftIdentity` area.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs: []
+  type: TYPE_NORMAL
+- en: When creating Blazor client applications, AD B2C support is built-in with .NET
+    7 templates, but not with .NET 8\. Support has been planned for .NET 9\. You can
+    add AD B2C integration manually.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Some differences in authentication can be implemented with different client
+    technologies. Check out the links in the *Further reading* section for more information.
+    Also, check out the Codebreaker GitHub ([https://github.com/codebreakerapp](https://github.com/codebreakerapp))
+    for implementations for Blazor, WinUI, .NET MAUI, WPF, and Uno Platform.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Specifying authentication with Azure Container Apps
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Instead of needing to manage authentication with the service itself, we can
+    do this directly with Azure Container Apps. After selecting the deployed games
+    API, within the Azure portal, choose **Authentication** from the **Settings**
+    category in the left pane. Here, you can add an **identity provider**. By selecting
+    **Microsoft**, you can configure **Workforce** or **Customer** tenant types. **Workforce**
+    is for B2B scenarios. Here, you can directly create an app registration within
+    Microsoft Entra. For B2C, select **Customer**.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Using ASP.NET Core Identity to store user information in a local database
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: If Azure AD B2C is not an option for you, you can use **ASP.NET Core Identity**,
+    which .NET offers for storing users in a local database. We’ll use this as an
+    alternative way to run the solution without the need to configure Azure AD B2C.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'With `-au` `Individual` option:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE13]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'This creates two projects: `Codebreaker.ApiGateway.Identities` and `Codebreaker.ApiGateway.Identities.Client`.
+    The second project is a library that contains **Razor components** that can be
+    run on the client with **interactive WebAssembly rendering**, as well as **interactive
+    server rendering**. This library was referenced in the first project, which hosts
+    the Blazor application and contains Razor components that support interactive
+    server rendering. This project contains a huge list of Razor components for registering
+    users to help users with forgotten passwords, as well as components for managing
+    user information.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Let’s cover some important parts of this application, beginning with the database.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Customizing the EF Core configuration
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: With this project, user information is stored in a relational database via EF
+    Core. By default, MySQL is used. This can easily be changed to SQL Server, but
+    using MySQL for this scenario is great as well.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'What information about users is stored is defined with the `ApplicationDbContext`
+    class:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Codebreaker.ApiGateway.Identities/Data/ApplicationDbContext.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE14]'
+  prefs: []
+  type: TYPE_PRE
+- en: '`ApplicationDbContext` is an EF Core context with a hierarchy of base classes.
+    The body of this class is empty as it was created from the template. Adding custom
+    `DbSet` properties allows you to add additional tables to the database. The base
+    class, `IdentityDbContext`, uses the `ApplicationUser` class as a generic parameter
+    to define what information to store about the user:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Codebreaker.ApiGateway.Identities/Data/ApplicationUser.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE15]'
+  prefs: []
+  type: TYPE_PRE
+- en: Adding properties to this class allows you to customize the `users` table with
+    additional columns. To see the defined properties, you need to follow the base
+    classes, starting with `IdentityUser`. `IdentityUser` derives from `IdentityUser<string>`.
+    The generic string parameter specifies the use of GUID values for the key. The
+    generic `IdentiyUser` type defines the `UserName`, `Email`, `PasswordHash`, and
+    `PhoneNumber` properties, among others, to map to columns.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`IdentityDbContext<TUser>` has some more base classes, such as `IdentityUserContext<TUser`,
+    `TRole`, `TKey`, `TUserClaim`, `TuserLogin`, and `TUserToken>`, to define several
+    tables that are used.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The EF Core context needs to be configured with the DI container:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Codebreaker.ApiGateway.Identities/Program.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE16]'
+  prefs: []
+  type: TYPE_PRE
+- en: Here, the EF Core configuration has been changed to use the `Aspire.Pomelo.EntityFrameworkCore.MySql`
+    NuGet package with the MySQL Entity Framework .NET Aspire component.
+  prefs: []
+  type: TYPE_NORMAL
+- en: With that, the EF Core context has been configured with ASP.NET Core Identity.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Configuring ASP.NET Core Identity
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'When configuring ASP.NET Core Identity, EF Core must be mapped:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Codebreaker.ApiGateway.Identities/Program.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE17]'
+  prefs: []
+  type: TYPE_PRE
+- en: The `AddIdentityCore` method configures the `ApplicationUser` class (the same
+    class that was used with the EF Core model) for ASP.NET Core Identity. When the
+    user registers, before using the account, it needs to be confirmed by setting
+    the `RequireConfirmedAccount` property (discussed next). With the invocation of
+    `AddEntityFrameworkStores`, the EF Core context, `ApplicationDbContext`, is mapped
+    to ASP.NET Core Identity. The `AddSignInManager` method registers the `SignInManager`
+    class with the DI container. `SignInManager` can be used to log the user in and
+    out, retrieve claims, and work with two-factor authentication options. The `AddDefaultTokenProviders`
+    method registers token providers by implementing the `IUserTwoFactorTokenProvider`
+    interface to return and validate tokens for two-factor authentication, such as
+    email, phone, and so on.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'To confirm an account, the `IEmailSender` interface needs to be registered
+    with the DI container:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Codebreaker.ApiGateway.Identities/Data/ApplicationUser.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE18]'
+  prefs: []
+  type: TYPE_PRE
+- en: With the default configuration, a no-op `IdentityNoOpEmailSender` class is implemented.
+    This is practical for testing purposes but needs to be changed to verify a user’s
+    email address.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Now, let’s configure the project with the .NET Aspire AppHost project:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: CodebreakerAppHost/Program.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE19]'
+  prefs: []
+  type: TYPE_PRE
+- en: Here, the AppHost project uses multiple launch profiles to either start the
+    solution with Azure AD B2C (the `Azure` launch profile), or with the local database
+    (the `OnPremises` launch profile). When it comes to the different launch profile
+    settings, the `STARTUP_MODE` environment variable is configured, which is then
+    used to differentiate the projects to be started and how they are configured.
+    When launching `OnPremises` mode, the newly created project is configured to reference
+    the MySQL database running in a container via the `Aspire.Hosting.MySql` NuGet
+    package. The `WithDataVolume` method creates a named Docker volume (see [*Chapter
+    5*](B21217_05.xhtml#_idTextAnchor110)) to have persistence, while the `WithPhpMyAdmin`
+    method adds an admin UI.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'If we run the solution now, we can register a new user, as shown in *Figure
+    9**.11*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 9.11 – Registering a local user](img/B21217_09_11.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 9.11 – Registering a local user
+  prefs: []
+  type: TYPE_NORMAL
+- en: When registering the user, you might need to apply EF Core migrations to create
+    the database. On receiving the registration confirmation, choose **Click here
+    to confirm your account** to approve the email. Then, click the **Login** button
+    on the left pane. After logging in, the email will be shown on the **Auth** **Required**
+    page.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs: []
+  type: TYPE_NORMAL
+- en: Instead of having the user remember another password, with ASP.NET Core Identity,
+    it’s also possible to add external providers, such as Microsoft, Facebook, and
+    Google accounts, as shown at [https://learn.microsoft.com/en-us/aspnet/core/security/authentication/social](https://learn.microsoft.com/en-us/aspnet/core/security/authentication/social).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'With phpMyAdmin enabled, you can open the management UI and see the tables
+    that have been created, as shown in *Figure 9**.12*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 9.12 – MySQL admin UI](img/B21217_09_12.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 9.12 – MySQL admin UI
+  prefs: []
+  type: TYPE_NORMAL
+- en: Using this admin UI, you can perform SQL queries and easily change and delete
+    records.
+  prefs: []
+  type: TYPE_NORMAL
+- en: With ASP.NET Core Identity in place, users can now register with this application
+    and manage their accounts. This option is great if user data isn’t stored within
+    a managed cloud service and can be implemented easily. What about using desktop
+    client applications? They can use an API to access this data. We’ll learn how
+    to add this API in the next section.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Creating identity API endpoints
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: .NET 8 offers identity API endpoints that use the ASP.NET Core Identity infrastructure.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'With the EF Core configuration for ASP.NET Core Identity in place, all we need
+    to do is configure the identity endpoints with the DI container and the middleware.
+    The DI container must be configured first:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Codebreaker.Gateway.Identity/Program.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE20]'
+  prefs: []
+  type: TYPE_PRE
+- en: The `AddIdentityApiEndpoints` method adds authentication with a Bearer token
+    and identity cookies, as well as options and validators to validate allowed passwords
+    and usernames, register `UserManager`, and provide a factory for user claims.
+    `IEmailSender`, which is used to validate correct emails, is configured to use
+    `NoOpEmailSender`. When you have a real implementation of `IEmailSender` in place
+    (using your email provider), you need to make sure you register this class after
+    the invocation of `AddIdentityApiEndpoints` to overwrite `NoOpEmailSender` with
+    your configuration. The `AddEntityFrameworkStores` method is an extension method
+    for the returned `IdentityBuilder` object and adds the EF Core store for user
+    and role data.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The middleware can be configured using the `MapIdentityApi` method:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Codebreaker.Gateway.Identity/Program.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE21]'
+  prefs: []
+  type: TYPE_PRE
+- en: The `MapGroup` method is used to add a common prefix for the identity API. `MapIdentityApi`
+    itself defines several URIs, such as `/register` to register a new user by using
+    `RegisterRequest` with the body of a POST request, and `/login` to log a user
+    in while passing `LoginRequest`, which can include username, password, and two-factor
+    codes, links to reset a forgotten password, confirmation of the email, and more.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Some of these APIs allow anonymous access (for example, when registering or
+    logging in), while with others, authentication is required. The API group with
+    the `/manage` link is configured to require authentication.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'When Swagger is enabled, you’ll see all these APIs, as shown in *Figure 9**.13*.
+    This means you can test them before using them from a client application:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 9.13 – Identity API endpoints](img/B21217_09_13.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 9.13 – Identity API endpoints
+  prefs: []
+  type: TYPE_NORMAL
+- en: Try invoking the `/register` API and create a new user passing two values. With
+    a success, HTTP status code `200` is returned with an empty HTTP body if you didn’t
+    create a custom implementation of the `IEmailSender` interface. If this is the
+    case, you can use the MySQL admin UI to approve the user (or change the ASP.NET
+    Core Identity configuration so that it doesn’t require confirmed accounts) before
+    logging in; otherwise, login will be denied.
+  prefs: []
+  type: TYPE_NORMAL
+- en: With a successful login, Bearer tokens are returned. You receive access and
+    refresh tokens and expiration information that is set to 3,600 seconds by default.
+    The refresh token can be used with the `/refresh` API to get new access and refresh
+    tokens.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'To learn how to use SendGrid to implement `IemailSender`, take a look at the
+    following article: [https://learn.microsoft.com/en-us/aspnet/core/security/authentication/accconfirm](https://learn.microsoft.com/en-us/aspnet/core/security/authentication/accconfirm).'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Summary
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In this chapter, you learned how to authenticate users with Azure AD B2C using
+    Microsoft Identities and ASP.NET Core Identity. With Azure AD B2C, you added custom
+    user attributes, specified user flows, and registered applications.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Instead of implementing protection with every API, you created a reverse proxy
+    using Microsoft YARP and protected the APIs with a gateway service. Using YARP,
+    we defined routes to map different backend services and configured policies with
+    routes to require authenticated clients.
+  prefs: []
+  type: TYPE_NORMAL
+- en: You also learned to use ASP.NET Core Identity as an alternative option for authentication
+    and authorization with built-in ASP.NET Core functionality but a simpler feature
+    set.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The next chapter covers how to test microservices solutions, from unit tests
+    to integration tests, including testing services with Microsoft Playwright.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Further reading
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'To learn more about the topics that were discussed in this chapter, please
+    refer to the following links:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '*Azure AD B2C Claims* *Schema*: [https://learn.microsoft.com/en-us/azure/active-directory-b2c/claimsschema](https://learn.microsoft.com/en-us/azure/active-directory-b2c/claimsschema)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '*Enrich tokens with claims from external sources using API* *connectors*: [https://learn.microsoft.com/en-us/azure/active-directory-b2c/add-api-connector-token-enrichment](https://learn.microsoft.com/en-us/azure/active-directory-b2c/add-api-connector-token-enrichment)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '*ASP.NET Core* *Middleware*: [https://learn.microsoft.com/en-us/aspnet/core/fundamentals/middleware](https://learn.microsoft.com/en-us/aspnet/core/fundamentals/middleware)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '*How to use Identity to secure a Web API backend for* *SPAs*: [https://learn.microsoft.com/en-us/aspnet/core/security/authentication/identity-api-authorization](https://learn.microsoft.com/en-us/aspnet/core/security/authentication/identity-api-authorization)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '*GitHub repository for* *YARP*: [https://github.com/microsoft/reverse-proxy](https://github.com/microsoft/reverse-proxy)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '*Securing a Blazor WASM app with Azure AD* *B2C*: [https://learn.microsoft.com/en-us/aspnet/core/blazor/security/webassembly/hosted-with-azure-active-directory-b2c](https://learn.microsoft.com/en-us/aspnet/core/blazor/security/webassembly/hosted-with-azure-active-directory-b2c)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '*Securing a WPF desktop app with Aure AD* *B2C*: [https://learn.microsoft.com/en-us/azure/active-directory-b2c/configure-authentication-sample-wpf-desktop-app](https://learn.microsoft.com/en-us/azure/active-directory-b2c/configure-authentication-sample-wpf-desktop-app)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '*Choosing an identity management* *solution*: [https://learn.microsoft.com/en-us/aspnet/core/security/how-to-choose-identity-solution](https://learn.microsoft.com/en-us/aspnet/core/security/how-to-choose-identity-solution)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '*Azure API* *Management*: [https://learn.microsoft.com/en-us/azure/api-management/](https://learn.microsoft.com/en-us/azure/api-management/)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Part 3: Troubleshooting and Scaling'
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In this part, the focus shifts towards ensuring the smooth operation of the
+    application and promptly addressing any emerging issues. Emphasis is placed on
+    early issue detection through unit testing. You will delve into creating integration
+    tests using .NET Aspire libraries and implementing end-to-end testing with Microsoft
+    Playwright. The importance of logs, metrics, and distributed tracing, facilitated
+    by Open Telemetry and supported by .NET Aspire, will be explored. Monitoring service
+    interactions, performance metrics, memory consumption, and more during development
+    will be facilitated by the .NET Aspire dashboard. Within the Azure environment,
+    Azure Log Analytics and Application Insights will be utilized, alongside alternative
+    options like **Prometheus** and **Grafana** that can be deployed in both on-premises
+    and cloud environments. When scaling services, insights gained from previous chapters
+    will be leveraged, with caution advised when using Azure Load Testing to prevent
+    exceeding budget limits. Before scaling up and out, potential performance enhancements
+    will be identified and implemented.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'This part has the following chapters:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[*Chapter 10*](B21217_10.xhtml#_idTextAnchor239), *All about Testing the Solution*'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[*Chapter 11*](B21217_11.xhtml#_idTextAnchor263), *Logging and Monitoring*'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[*Chapter 12*](B21217_12.xhtml#_idTextAnchor294)*, Scaling Services*'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL

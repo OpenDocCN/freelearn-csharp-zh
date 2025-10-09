@@ -1,0 +1,1394 @@
+- en: '12'
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Scaling Services
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: How fast is the service responding? Is the service limited to CPU cores or memory?
+    Based on user load, when is it useful to start more server instances? If you run
+    too many compute resources, or if they’re too big, you pay more than is necessary.
+    If the resources you use are too small, the response time increases or the applications
+    might not be available at all. With this, you lose customers, and your income
+    is reduced. You should know how to find bottlenecks and know what good knobs to
+    turn to scale the resources as needed.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In [*Chapter 10*](B21217_10.xhtml#_idTextAnchor239), we created load tests to
+    see how the service behaves under load, while in [*Chapter 11*](B21217_11.xhtml#_idTextAnchor263),
+    we extended the service by adding telemetry data. Now, we’ll use both load tests
+    and telemetry data to find out what scaling option is best.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In this chapter, we’ll start reducing the response time with the help of telemetry
+    data before analyzing the load, which can be run with one instance. Finally, we’ll
+    define rules so that we can scale out to multiple instances. To automatically
+    restart instances when the service is not responding, we’ll add health checks.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In this chapter, you’ll learn how to do the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Increase performance using caching
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Simulate users with Azure Load Testing
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Scale up and scale out services
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Use scale rules
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Implement health checks
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Technical requirements
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In this chapter, like the previous chapters, you’ll need an Azure subscription,
+    the Azure Developer CLI (`winget install Microsoft.Azd`), and Docker Desktop.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The code for this chapter can be found in this book’s GitHub repository: [https://github.com/PacktPublishing/Pragmatic-Microservices-with-CSharp-and-Azure](https://github.com/PacktPublishing/Pragmatic-Microservices-With-CSharp-and-Azure).'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The `ch12` folder contains the projects we’ll need for this chapter, as well
+    as their output. To add the functionality from this chapter, you can start with
+    the source code from the previous chapter.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Here are the projects we’ll be implementing in this chapter:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`Codebreaker.AppHost`: The .NET Aspire host project. This project has been
+    enhanced by adding a Redis resource for caching.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`Codebreaker.ServiceDefaults`: Here, we use a common health check configuration
+    for all the services.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`Codebreaker.GameAPIs`: With this project, we implement caching games to reduce
+    database access and add a custom health check.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: To learn how to publish the resources to Microsoft Azure, check out the README
+    file for this chapter.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs: []
+  type: TYPE_NORMAL
+- en: While working on this chapter, we created load tests with many users and changed
+    the scale of the Azure Cosmos database. The duration of these tests and the number
+    of virtual users you can use with them depends on the amount of money you want
+    to spend. If you increase the RU/s with the database, make sure you delete the
+    resources after running the tests, or at least reduce the number of RU/s again
+    after running the tests. You might also skip running the tests with larger user
+    numbers and just read the results.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Increasing performance with caches
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'Before we analyze the application’s CPU and memory needs, let’s look at where
+    easy wins are possible to return faster responses to the client. By checking telemetry
+    information (as we did in the previous chapter), we can see that when using distributed
+    tracing to send a game move, several requests are made to the database. *Figure
+    12**.1* shows the bot sending the SetMoveAsync request:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 12.1 – Tracing a move set](img/B21217_12_01.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 12.1 – Tracing a move set
+  prefs: []
+  type: TYPE_NORMAL
+- en: As shown in the preceding figure, when receiving a PATCH request, the game ID
+    is used to retrieve the game from the database to verify the correctness of the
+    data that’s received. After the move is calculated, the resulting game is written
+    to the database. Trace information from EF Core is shown with the DATA keyword,
+    along with the time needed for access.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Performance might be good enough, but this also depends on the database load.
+    When using the SQL Server database, having many writes can reduce the read performance
+    because of locks with write operations. With higher database loads, increasing
+    the number of Request Units (RU) or using bigger machines (which increases the
+    price) can be a solution for higher loads. A better option is to cache data. Many
+    of the database reads can be replaced by reading objects from a memory cache.
+  prefs: []
+  type: TYPE_NORMAL
+- en: An initial idea might be to store the game in the memory of the process. If
+    it is not there, retrieve it from the database. However, if multiple instances
+    of the service are running, the client could invoke one move with server A and
+    another move with server B. Because the game contains the last move number, reading
+    it from the local cache could result in an older version of the game, and thus
+    the request fails. One option around this would be to use sticky sessions. With
+    this, one client always gets the same service instance to fulfill a request. This
+    requirement can easily be avoided by using a distributed memory cache.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs: []
+  type: TYPE_NORMAL
+- en: With a sticky session, a client always connects to the same service instance.
+    The biggest disadvantage of sticky sessions is when the service goes down. Without
+    sticky sessions, the client can immediately switch to another service instance,
+    and no downtime is detected. With sticky sessions, all the session data is lost
+    for the client. This is not the only disadvantage. What if another instance is
+    started because of low performance? The new service instance only receives the
+    traffic from new clients. Existing ones stick with the servers they already communicate
+    with. There’s a delayed server utilization (only from new clients). With sticky
+    sessions, the load can be unevenly distributed between service instances. The
+    best thing to do is try to avoid them.
+  prefs: []
+  type: TYPE_NORMAL
+- en: When using a distributed memory cache, multiple options are available. With
+    Microsoft Azure, Azure Cache for Redis can be used. This service offers Standard,
+    Premium, Enterprise, and Enterprise Flash offerings based on your availability
+    and memory size needs. Using Azure Cosmos DB, an integrated in-memory cache built
+    into the Azure Cosmos DB gateway, can be used. One feature of this service is
+    an item cache for point reads, which fulfills the purpose of reading the item
+    several times while the game is running. This reduces the cost with Azure Cosmos
+    DB because the RU/s needed to read from the cache are 0.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Here, we’ll use a Docker container for Redis that can be used in the local Docker
+    environment, as well as to run the solution with Azure Container Apps.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Reading and writing from the cache
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'The API of the IDistributedCache interface supports writing byte arrays and
+    strings – the data needs to be sent across the network to a Redis cluster. For
+    this, we’ll create methods to convert the Game class to and from bytes:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Codebreaker.GameAPIs/Models/GameExtensions.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE0]'
+  prefs: []
+  type: TYPE_PRE
+- en: The `System.Text.Json` serializer supports serializing the data not only to
+    JSON but also to a byte array. The `Game` class already supports serialization
+    with this serializer, so no other changes need to be made to the `Game` and `Move`
+    model types.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We can access the cache from the `GamesService` class:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Codebreaker.GameAPIs/Services/GamesService.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE1]'
+  prefs: []
+  type: TYPE_PRE
+- en: No matter what technology is used for the distributed memory cache, we can inject
+    the `IDistributedCache` interface.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'To update the `Game` class with the cache, we can implement the following method:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Codebreaker.GameAPIs/Services/GamesService.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE2]'
+  prefs: []
+  type: TYPE_PRE
+- en: The game ID is used as a key to retrieve the game object from the cache. Invoking
+    the `SetAsync` method adds the object to the cache. If the object has already
+    been cached, it is updated with the new value. With an additional parameter of
+    the `DistributedEntryCacheOptions` type, the object can be configured to specify
+    the time the object should stay in the cache. Here, we need to use a typical time
+    the user needs from one move to another. With every retrieval and update, the
+    **sliding expiration** starts anew. Instead of specifying this here, we can configure
+    default values.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The `UpdateGameInCacheAsync` method needs to be invoked from the `GamesService`
+    class when the game (`StartGameAsync`) is created, as well as after setting the
+    game move (`SetMoveAsync`).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The implementation within the `StartGameAsync` method is shown here:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Codebreaker.GameAPIs/Services/GamesService.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE3]'
+  prefs: []
+  type: TYPE_PRE
+- en: Writing to the database and the cache can be done in parallel. We don’t need
+    to wait until the database write is completed to add the game object to the cache
+    to return a faster answer. If the database fails, it doesn’t matter if the game
+    is cached or not.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'To read the data from the cache, we need to implement `GetGameFromCacheOrDataStoreAsync`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Codebreaker.GameAPIs/Services/GamesService.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE4]'
+  prefs: []
+  type: TYPE_PRE
+- en: The `GetAsync` method of the cache returns a byte array of the cached data,
+    which is then converted using the `ToGame` method. If the data is not available
+    within the cache (the item might have been removed from the cache because too
+    much memory was already allocated, or if the user was thinking about their next
+    move for too long), we get the game from the database. The code in the source
+    code repository includes a flag where you can switch off reading from the cache
+    to easily try out not using the cache with different loads that are used to check
+    the results.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`GetGameFromCacheOrDataStoreAsync` needs to be invoked from the `SetMoveAsync`
+    and `GetGameAsync` methods.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Configuring the Aspire Redis component
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Regarding the `game-apis` project, we need to add the **.NET Aspire StackExchange
+    Redis component** to configure the DI container:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Codebreaker.GameAPIs/ApplicationServices.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE5]'
+  prefs: []
+  type: TYPE_PRE
+- en: The `AddRedisDistributedCache` method uses the cache name that needs to be configured
+    with the Aspire App Host project to get the connection string and configuration
+    values. With this method, it’s also possible to specify the configuration values
+    programmatically.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Finally, a Docker container for the Redis resource is configured with `app-model`
+    in the AppHost project:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Codebreaker.AppHost/Program.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE6]'
+  prefs: []
+  type: TYPE_PRE
+- en: The `AddRedis` method configures using the `redis` Docker image for this service.
+    This needs to be configured both with `PublishAsAzureRedis` API instead of `PublishAsContainer`.
+    This method configures the PaaS offering for `WithRedisCommander` adds a management
+    UI for Redis to `app-model`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'With this configuration in place, running games via the bot provides the results
+    shown in *Figure 12**.2*. Even when using a low load on the local system, writing
+    to SQL Server took 5.96 ms, and writing to the cache took 1.83 ms. Both were running
+    in a Docker container:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 12.2 – Set move with a distributed cache](img/B21217_12_02.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 12.2 – Set move with a distributed cache
+  prefs: []
+  type: TYPE_NORMAL
+- en: Next, let’s add some load to the game-apis project to see the resource consumption.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Simulating users with Azure Load Testing
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'In [*Chapter 10*](B21217_10.xhtml#_idTextAnchor239), we created Playwright
+    tests that were used to create load tests. These Playwright tests allowed us to
+    use .NET code to easily create a complete flow so that we could play a game from
+    a test. Using Microsoft Azure, we can use another service to create tests and
+    get integrated analysis with Azure services: Azure Load Testing.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs: []
+  type: TYPE_NORMAL
+- en: At the time of writing, the **Microsoft Playwright Testing** cloud service is
+    great for testing the load of web applications. However, it doesn’t support load
+    testing APIs, so we’ll use Azure Load Testing here. You can still use Azure compute
+    (for example, Azure Container Instances) to run Playwright tests, but Azure Load
+    Testing has a better report configuration and report functionality.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Before creating the load test, make sure you deploy the solution to Microsoft
+    Azure using azd up. Check the README file for this chapter for more details about
+    the different azd versions.
+  prefs: []
+  type: TYPE_NORMAL
+- en: After creating the Azure resources, open the `game-apis` Azure Container App
+    in the Azure portal and select **Application** | **Containers** from the left
+    bar. The container’s resource allocation will be shown as *0.5 CPU cores* and
+    *1* *Gi memory*.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Now, let’s make sure the first tests use just one replica.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Scaling to one replica
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Scales and replicas can scale up to 300 instances. The default configuration
+    is to scale from 1 to 10\. Creating a load with many users would automatically
+    scale out and start multiple instances. To see what the limits of one instance
+    are, change the scale to just one instance for both Min replicas and Max replicas,
+    as shown in *Figure 12**.3*. Clicking Create creates a new revision of the app
+    and deprovisions the existing revision afterward:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 12.3 – Changing replicas with Azure Container Apps](img/B21217_12_03.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 12.3 – Changing replicas with Azure Container Apps
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'To specify scaling at deployment time, create YAML templates that specify the
+    configuration for Azure Container Apps. Start a terminal with the current directory
+    set to the solution and run the following command from the Azure Developer CLI
+    (after you’ve initialized the solution with azd init):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE7]'
+  prefs: []
+  type: TYPE_PRE
+- en: This tool uses the app-model manifest to create Bicep files to deploy the Azure
+    resources of app-model (in the root infra folder). The infra folder of the AppHost
+    project contains YAML templates that describe every Azure Container App that’s
+    been created (from projects and Docker images). See [*Chapter 6*](B21217_06.xhtml#_idTextAnchor137)
+    for more details on Bicep files.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In the AppHost project, you’ll see that a `<app>.tmpl.yaml` file has been generated
+    to specify the settings for Azure Container Apps.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'By default, the minimum number of replicas is set to `1`. With bot-service,
+    you can change the configuration:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE8]'
+  prefs: []
+  type: TYPE_PRE
+- en: With bot-service, to reduce cost, you can define the scale from `0` to `1`.
+    When the minimum instance count is set to `0`, there’s no cost for the service.
+    Just be aware that it takes a few seconds to start up the service, and the first
+    user accessing the service needs to wait. Because the bot is not invoked by game-playing
+    users, and this service is not always needed, it can be scaled down to `0`. The
+    game-apis service should always return answers fast; thus, the minimum scale should
+    be set to `1`. If there’s no load on the service, there’s an idle price. With
+    this, the cost of the CPU is reduced to about 10% of the normal cost, but the
+    memory (the application is still loaded in memory) has the normal price. To test
+    the load with exactly one replica, set the game-apis service’s minimum and maximum
+    values to `1`. Later, when scaling out, we’ll increase the value of Max replicas
+    again.
+  prefs: []
+  type: TYPE_NORMAL
+- en: After changing the number of replicas in the YAML file, you can re-deploy the
+    application using az up or just using az deploy.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We also need to make sure that the database allows the requests that are needed.
+    With a load test, we can expect that we’ll need more than the 400 RU/s. Before
+    the first test runs, change the Azure Cosmos DB throughput to Autoscale with a
+    maximum of 1,000 RU/s.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Now, we are ready to create a test.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Creating an Azure URL-based load test
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: To create a new load test, create the Azure Load Testing resource using the
+    Azure portal. Specify a resource group name and the name of the resource.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Once the resource is available, open it in the portal and select **Tests**
+    | **Tests** from the left bar. Then, click **Create** after choosing **Create
+    a URL-based test**. Under **Basics**, specify **Test name** and **Test description**
+    values and check the **Enable advanced settings** box, as shown in *Figure 12**.4*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 12.4 – Load testing – basic settings](img/B21217_12_04.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 12.4 – Load testing – basic settings
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'With Enable advanced settings selected, a test plan consisting of up to five
+    HTTP requests can be created. So, in the Test plan section, add five requests,
+    as shown in *Figure 12**.5*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 12.5 – Load testing – test plans](img/B21217_12_05.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 12.5 – Load testing – test plans
+  prefs: []
+  type: TYPE_NORMAL
+- en: The first request is a POST request to create the game. The second is a PATCH
+    request to update the game with a move. This is followed by a GET request to get
+    information about the game, a PATCH request to end the game, and a DELETE request
+    to delete the game.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'These requests can easily be configured with the UI, as shown in *Figure 12**.6*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 12.6 – Load testing – adding requests](img/B21217_12_06.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 12.6 – Load testing – adding requests
+  prefs: []
+  type: TYPE_NORMAL
+- en: Instead of getting the request information from the OpenAPI description or the
+    HTTP files, you can copy the requests from the README file of this chapter to
+    the Body area. The requests, including their HTTP headers, are listed. Make sure
+    you use the links to your Azure Container App when specifying the URL.
+  prefs: []
+  type: TYPE_NORMAL
+- en: With the POST request, don’t just specify the body – also define the use of
+    the response. With the JSON result, id is returned; this can be accessed with
+    the $.id expression. Set this to the gameId variable. Response variables can be
+    used with later requests – and the game ID is needed with all the following requests.
+    When setting the game move, use ${gameId} to pass the game ID to the URL string
+    and the HTTP body. You can check the README file for this chapter for more details
+    about the values you should specify with the different requests.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In the next dialogue, shown in *Figure 12**.7*, the load can be specified:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 12.7 – Load testing – specifying the load](img/B21217_12_07.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 12.7 – Load testing – specifying the load
+  prefs: []
+  type: TYPE_NORMAL
+- en: Here, we’ll start small with just 5 concurrent virtual users and do other tests
+    with more user loads and multiple engine instances, with a ramp-up time of 0.3
+    minutes. With one test engine instance, you can specify up to 250 virtual users
+    and go up to 2,500 virtual users with 10 instances. The configuration also allows
+    you to specify a Load pattern value, which increases the load over time. Having
+    multiple test runs with different user numbers can give a good indication of what
+    scaling rules should be used to increase the number of service instances.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Be aware of the cost you can incur when testing with 2,500 virtual users and
+    10 virtual machines behind the scenes. Contrary to the other resources we’ve used
+    so far, with this, you can easily go over the subscription limits with the Visual
+    Studio Enterprise Azure subscription or the free Azure subscription. Luckily,
+    we only pay for the time the test runs and don’t need to pay for physical machines
+    that are only needed for a short time.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs: []
+  type: TYPE_NORMAL
+- en: Don’t assume virtual users are the same as real users. Real users produce a
+    lot less load than virtual users with Azure Load Testing. A real user needs to
+    think between moves. Several seconds, if not minutes, are spent between each move.
+    Virtual users just continuously invoke the APIs. With the JMeter tests that are
+    used behind the scenes, the number of virtual users configures the number of threads
+    to be used. How many real users you can calculate compared to virtual users depends
+    on the type of application. You need to find out how long real users think on
+    average with Codebreaker when monitoring the application in production. In [*Chapter
+    10*](B21217_10.xhtml#_idTextAnchor239), we created custom metric data to monitor
+    the time spent between moves; this is a good value to use.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'With the test criteria configuration (see *Figure 12**.8*), you can specify
+    when the test should fail – for example, when the response time takes too long.
+    Before doing the first test run, you can leave the test criteria empty to see
+    values that are reached with low load:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 12.8 – Load testing – test criteria](img/B21217_12_08.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 12.8 – Load testing – test criteria
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'For the last configuration, open the Monitoring settings, as shown in *Figure
+    12**.9*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 12.9 – Specifying monitoring resources](img/B21217_12_09.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 12.9 – Specifying monitoring resources
+  prefs: []
+  type: TYPE_NORMAL
+- en: Select the resources that are taking part in the test, such as the gameapis
+    and redis Azure Container Apps, and the Azure Cosmos DB resource. You can easily
+    filter the resources based on the resource group.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Now, we are ready to run the test.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Running a load with virtual users
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: When creating and changing a test, after clicking Save, you need to wait until
+    the JMeter script is created; otherwise, the test will fail to start. To run the
+    test, click the Run button and enter a test description – for example, 5 users
+    0.5 core.
+  prefs: []
+  type: TYPE_NORMAL
+- en: After the test is completed, you will see client-side metrics from the test
+    engine and server-side metrics from the selected Azure Container Apps service.
+  prefs: []
+  type: TYPE_NORMAL
+- en: When I did my test run, 7,834 requests were sent (a lot more than five human
+    users would do for 2 minutes), and up to 0.49 CPU cores and 354 MB of memory were
+    used. The response time was below 116 milliseconds for 90% of the requests, and
+    the throughput was 67.53 requests per second.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs: []
+  type: TYPE_NORMAL
+- en: Don’t expect to get the same results with multiple runs. Many dependencies run
+    these tests. What’s the network performance and latency between the different
+    Azure services being used? For my tests, I created the Azure Load Testing service
+    in the same Azure region where the services are running. Even in the same Azure
+    region, different resources could be running in the same or different data centers.
+    These differences are not an issue. Users will be located outside an Azure data
+    center. What we need to know is how many users can be served from one instance
+    and what settings are best for the application, such as CPU and memory resources
+    (scale up) or running multiple replicas (scale out). We also need to see what
+    the real bottlenecks are, and what can be controlled.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '*Figure 12**.10* shows the response time results with every API invocation:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 12.10 – Response time for five virtual users](img/B21217_12_10.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 12.10 – Response time for five virtual users
+  prefs: []
+  type: TYPE_NORMAL
+- en: With five virtual users, the response time is OK when considering all the requests.
+    What might be interesting is that the delete request takes the most time to complete
+    with Azure Cosmos DB.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Five virtual users is a good start, but let’s add more load.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Reaching limits with a higher load
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: To change the load of a test, you can edit it. To do so, click `25`. Click **Apply**
+    and wait for the JMeter script to be created with **Notifications** in the Azure
+    portal. At this point, you can start the test again.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'With my test run, increasing the number of virtual users to 25 resulted in
+    just 11.701 total requests with 98.39 requests per second. The request to create
+    a game needed 289 ms with a 90% percentile. *Figure 12**.11* shows the number
+    of requests per second for this test:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 12.11 – Requests per second](img/B21217_12_11.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 12.11 – Requests per second
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Comparing the results to the five users’ test runs, using 25 users resulted
+    in just a small increase concerning the total requests and requests per second.
+    As a result, the time for creating a game increased from 96 ms to 498 ms. This
+    is not a good outcome. Why did this happen? The server-side metrics didn’t reach
+    Azure Container Apps limits with CPU cores and memory. The limit was not down
+    to Azure Container Apps but the Azure Cosmos database, as shown in *Figure 12**.12*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 12.12 – Azure Cosmos DB RU consumption](img/B21217_12_12.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 12.12 – Azure Cosmos DB RU consumption
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'When running this test with Azure Cosmos DB, the RU was configured with **autoscale**
+    throughput, and a maximum 1,000 RU/s limit was reached. This can be seen in the
+    preceding figure. You can also dig into **Application Map** on App Insights and
+    check the different Azure Cosmos DB metrics, as shown in *Figure 12**.13*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 12.13 – Requests throttled with Azure Cosmos DB](img/B21217_12_13.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 12.13 – Requests throttled with Azure Cosmos DB
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'As we can see, the requests have been throttled; an error code of 429 has been
+    returned to the `game-apis` service. You can use **Kusto Query Language** (**KQL**)
+    to query for these log messages (see [*Chapter 11*](B21217_11.xhtml#_idTextAnchor263)
+    for more information on KQL):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE9]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The complete log message that’s returned states “*Request rate is large. More
+    Request Units may be needed, so no changes were made. Plea*[*se retry this request
+    later. Lea*](http://aka.ms/cosmosdb-error-429)*rn* *more: http://aka.ms/cosmosdb-error-429.*”'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Earlier in this chapter, we reduced the load on Azure Cosmos DB by removing
+    requests from the database that were not needed by using a cache. Without this
+    change, the limit would have been hit earlier.
+  prefs: []
+  type: TYPE_NORMAL
+- en: While error code 429 has been returned to the `game-apis` service, the result
+    of the invocation was still successful because of the built-in retry configuration
+    with .NET Aspire. But of course, the time needed for the request increased.
+  prefs: []
+  type: TYPE_NORMAL
+- en: When creating the test, we ensured we could see the metrics data for all the
+    resources participating in the test. That’s why we can see the Cosmos metrics
+    with the test run and can easily fix it. Let’s use Cosmos DB to increase the RU/s.
+    With a maximum value of 1,000 RU/s, the minimum RU/s is 100\. Increasing the maximum
+    to 10,000 sets the minimum to 1,000\. Make sure you only change the maximum to
+    higher values for a short period while running the tests, and when needed. You
+    can view the expected cost in the dialogue where you scale the RU/s. Make sure
+    you reduce the scale limits as you don’t need them anymore. It is possible to
+    set the maximum to 1,000,000 RU/s, which sets the minimum to 100,000\. You can
+    view the price range when you change this throughput before clicking the **Save**
+    button. Be aware that when changing the maximum value above 10,000 RU/s, it can
+    take 4 to 6 hours for this compute power to become available.
+  prefs: []
+  type: TYPE_NORMAL
+- en: With 25 virtual users, we reached the 1,000 RU/s limit. So, let’s increase it
+    to 10,000 RU/s. If not that many RU/s are required with a specific number of users,
+    we’ll see this in the test results and adjust the setting according to our needs
+    after the test runs.
+  prefs: []
+  type: TYPE_NORMAL
+- en: After increasing the RU/s limit and running the test again with 25 virtual users,
+    Azure Cosmos DB is no longer the bottleneck. Just 12% of the RU/s are being used.
+    So, let’s increase the number of virtual users to 50.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Scaling up or scaling out services
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Let’s run the test with 50 virtual users and compare how the performance differs
+    when increasing CPU and memory, as well as increasing the number of replicas.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Configuring scaling up
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: To scale up, we must increase the CPU and memory values.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs: []
+  type: TYPE_NORMAL
+- en: When using `azd up` to create a Container App, a *consumption-based* environment
+    is created. There’s also the option to create a *workload profile* with *dedicated
+    hardware*. When using dedicated hardware, you can choose the type of virtual machine
+    that will be used. At the time of writing this book, the virtual machines were
+    in categories D (general purpose, 4 – 32 cores, 16 – 128 GiB memory) and E (memory
+    optimized 4 – 32 cores, 32 – 256 GiB memory, and GPU enabled with up to 4 GPUs).
+    The type of machine also defines the available network bandwidth. Depending on
+    the workload you have, there are great options available.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'To change CPU and memory in the Azure portal, within the Container App, select
+    **Containers** from the left bar, click the **Edit and deploy** button, select
+    the container image, and click **Edit**. This will open the container editor,
+    where you can select the CPU cores and memory, as shown in *Figure 12**.14*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 12.14 – Editing the container’s settings](img/B21217_12_14.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 12.14 – Editing the container’s settings
+  prefs: []
+  type: TYPE_NORMAL
+- en: Here, we’ll change the CPU and memory values. When using the consumption-based
+    environment, be aware that configurations need to map – for example, 0.5 cores
+    and 1.0 Gi memory, 1.0 cores and 2.0 Gi memory, up to 2.0 cores and 4.0 Gi memory.
+    In the consumption workload profile, you can have up to 4.0 cores and 8.0 Gi memory
+    with a container.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We can also configure this with the YAML template file:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE10]'
+  prefs: []
+  type: TYPE_PRE
+- en: CPU and memory resources are specified within the `resources` category. After
+    deciding on the best configuration, specifying this with the YAML file creates
+    the right size.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Running the load test for 50 users for 2 minutes shows the following results
+    based on the configuration:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '|  | **Total Requests** | **Throughput** | **Create** **Game Response** | **10,000
+    RU/s** |'
+  prefs: []
+  type: TYPE_TB
+- en: '| 0.5 Cores, 1 Gi | 12,015 | 100.13/s | 491 ms | 16% |'
+  prefs: []
+  type: TYPE_TB
+- en: '| 1 Cores, 2 Gi | 20,621 | 171.84/s | 383 ms | 24% |'
+  prefs: []
+  type: TYPE_TB
+- en: '| 2 Cores, 4 Gi | 22,444 | 187.03/s | 381 ms | 26% |'
+  prefs: []
+  type: TYPE_TB
+- en: Table 12.1 – Scaling up load test results
+  prefs: []
+  type: TYPE_NORMAL
+- en: With these configurations, we can see that increasing the compute resources
+    to 1 core and 2 Gi of memory makes an improvement, whereas duplicating the compute
+    resources again makes just a small improvement.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Now, let’s change the replicas.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Configuring scaling out
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: You learned how to change the number of replicas earlier in this chapter. In
+    this section, we’ll change both the minimum and maximum count to the same values
+    so that we can distribute the load across different instances.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We receive the following counts when the tests use 0.5 cores and 1 Gi of memory:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '|  | **Total Requests** | **Throughput** | **Create** **Game Response** | **10,000
+    RU/s** |'
+  prefs: []
+  type: TYPE_TB
+- en: '| 1 replica | 12,015 | 100.13/s | 491 ms | 16% |'
+  prefs: []
+  type: TYPE_TB
+- en: '| 2 replicas | 16,291 | 135.76/s | 490 ms | 20% |'
+  prefs: []
+  type: TYPE_TB
+- en: '| 4 replicas | 27,704 | 230.87/s | 299 ms | 34% |'
+  prefs: []
+  type: TYPE_TB
+- en: Table 12.2 – Scaling out the load test results
+  prefs: []
+  type: TYPE_NORMAL
+- en: Using two replicas with 0.5 cores and 1 Gi of memory uses the same CPU and memory
+    resources as one replica with 1 core and 2 Gi of memory does. One instance with
+    1 core was the better performing option, with 20,621 requests compared to 16,291
+    requests. By adding more replicas, we can scale higher than what’s possible by
+    just adding CPU resources.
+  prefs: []
+  type: TYPE_NORMAL
+- en: A big advantage of using multiple replicas is that we can dynamically scale
+    based on the load. We’ll create scale rules in the next section. Scale rules don’t
+    allow us to change CPU and memory resources.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'One issue you need to be aware of when scaling multiple instances is whether
+    the application is designed for this. When running the Codebreaker application
+    while using the in-memory games store, the implementation was built with multi-threading
+    in mind, but not with multiple machines. When one user starts a game and the next
+    user sets a move, the first request might access the first machine where the game
+    is stored in memory, and the second request might access the second machine where
+    the game to set the move is not available. The Redis cache, which offers distributed
+    memory, solves this issue. The sample application available in this chapter’s
+    GitHub repository includes the `DistributedMemoryGamesRepository` class, which
+    can be configured with the `DataStore` configuration set to `DistributedMemory`.
+    To test this on your local development environment, you can change the AppHost
+    project:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Codebreaker.AppHost/Program.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE11]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'When adding the `WithReplicas` method when configuring a project, the number
+    of replicas can be specified. With a value of `2`, when running the solution locally,
+    the .NET Aspire dashboard (*Figure 12**.15*) shows two instances of the `game-apis`
+    service running. Each service has a port number that allows the specific instance
+    to be accessed. The common port number, `9400`, is the port of the proxy client
+    that references both `game-apis` service instances running with port numbers `49379`
+    and `49376`. The port number that’s used by the proxy is defined with the `launchsettings.json`
+    file, while the port number for the instances randomly changes when a new application
+    starts:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 12.15 – Two replicas for game-apis](img/B21217_12_15.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 12.15 – Two replicas for game-apis
+  prefs: []
+  type: TYPE_NORMAL
+- en: Now that we know about the improvements that we can make when running multiple
+    replicas, let’s scale dynamically.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Scaling dynamically with scale rules
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: With Azure Container Apps, scale rules can be defined based on concurrent HTTP
+    requests, concurrent TCP requests, or custom rules. With custom rules, scaling
+    can be based on CPU, memory, or many events based on different data sources.
+  prefs: []
+  type: TYPE_NORMAL
+- en: A microservice isn’t necessarily triggered based on HTTP requests. The service
+    can also be triggered asynchronously, such as when a message arrives in a queue
+    (for example, using Azure Storage Queue or Azure Service Bus) or when events occur
+    (for example, using Azure Event Hub or Apache Kafka).
+  prefs: []
+  type: TYPE_NORMAL
+- en: Azure Container Apps scale rules are based on **Kubernetes Event-driven Autoscaling**
+    (**KEDA**), which offers a large list of scalers. You can find the full list at
+    [https://keda.sh](https://keda.sh).
+  prefs: []
+  type: TYPE_NORMAL
+- en: When using a KEDA scaler with the Azure Service Bus queue, you can specify how
+    many messages should be in the queue when another replica should be started. What’s
+    common with all the KEDA scalers is the configuration of the polling interval
+    – how often the values are checked (by default, this is 30 seconds), a scaling
+    algorithm to calculate the number of replicas, and a cooldown period (300 seconds)
+    – the time before replicas started can be stopped again.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In [*Chapter 15*](B21217_15.xhtml#_idTextAnchor349), we’ll use communication
+    with messages and events where autoscaling will be based on event-based KEDA scalers.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'As we saw when we tested the load with a fixed number of instances, the best
+    option to scale the services is using the number of HTTP requests. So, let’s configure
+    scaling with an HTTP rule. We can do this by using the Azure portal and the `azd
+    infra synth` generated template YAML file. This is the output from the JSON content
+    in the Azure portal:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE12]'
+  prefs: []
+  type: TYPE_PRE
+- en: The default HTTP rule scales with 10 concurrent requests. Based on the tests,
+    let’s set this value to `30`. The number of replicas is in the range of `1` to
+    `8`. What’s important to know regarding HTTP scaling is that the number of requests
+    is calculated every 15 seconds. The total requests from within the last 15 seconds
+    are divided by 15 so that they can be compared to the `concurrentRequests` value.
+    Based on this, the number of replicas is calculated. So, if there are 140 requests
+    per second, the instance count will be set to 5.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'When this scale rule is applied, and the instances are active, we can configure
+    a load test with a dynamic pattern configuration, as shown in *Figure 12**.16*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 12.16 – Step load pattern](img/B21217_12_16.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 12.16 – Step load pattern
+  prefs: []
+  type: TYPE_NORMAL
+- en: With this step load pattern, two engine instances are used to start 200 virtual
+    users. The complete test duration is 4 minutes. The ramp-up time defines how long
+    it takes until the 200 virtual users are reached – and 5 ramp-up steps are used
+    to increment the users with 40 increments.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'After the test runs are completed, you can see how the virtual users were added
+    over time, as shown in *Figure 12**.17*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 12.17 – 200 virtual users](img/B21217_12_17.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 12.17 – 200 virtual users
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The number of requests per second is shown in *Figure 12**.18*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 12.18 – Requests per second](img/B21217_12_18.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 12.18 – Requests per second
+  prefs: []
+  type: TYPE_NORMAL
+- en: '*Figure 12**.19* shows the response time with longer times starting after 2:17
+    P.M. Do you have any idea what could have happened here?'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 12.19 – Response time](img/B21217_12_19.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 12.19 – Response time
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The answer is that with this load, we reached the 10,000 RU/s limit using the
+    Azure Cosmos database. This is shown in *Figure 12**.20*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 12.20 – Reaching 10,000 RU/s](img/B21217_12_20.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 12.20 – Reaching 10,000 RU/s
+  prefs: []
+  type: TYPE_NORMAL
+- en: The max RU/s were reached after 2:16 P.M. Responses with “too many requests”
+    are not returned immediately when this limit is reached.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'It’s also interesting to see the replica count for the scale rule we’ve created.
+    This is shown in *Figure 12**.21*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 12.21 – Replica count](img/B21217_12_21.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 12.21 – Replica count
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The replica count started at 1 and increased up to 8 – the maximum configured
+    replica number. *Figure 12**.19* showed another issue than the RU/s limit. Directly
+    after the start, there are some peaks in the response time. This corresponds to
+    the reduction in requests per second in *Figure 12**.18*. I had to dig into this
+    issue after this test run. Metrics data didn’t reveal the reason, but checking
+    the logs in the `ContainerAppSystemLogs_CL` table provided information about what
+    the issue was. At that time, it was time to start a new replica. As indicated
+    by the logs, a new replica was assigned, the image was pulled, and a container
+    was created – but the *startup probe* failed, and the replica was unhealthy. Requests
+    are not sent to such replicas. So, for the load we generated, we still only had
+    one replica. Faulty replicas were started two times before the third one succeeded.
+    This is why increasing the replica count took longer than it should have been,
+    and that’s the reason for the peak in the beginning. After this, every new replica
+    that was created immediately succeeded. If you have some issues with a specific
+    replica, you can use the replica’s name to query the logs:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE13]'
+  prefs: []
+  type: TYPE_PRE
+- en: Next, we’ll dive into health checks. This will help you understand startup probes.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Implementing health checks
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The hosting platform needs to know if the service started successfully and is
+    available to serve requests. While the service is running, the hosting platform
+    continuously checks the service to see if it is running or broken and needs to
+    be restarted. This is what health checks are for.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'With Kubernetes, three probes can be configured:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`Startup`: Is the container ready and did it start? When this probe succeeds,
+    Kubernetes switches to the other probes.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`Liveness`: Did the application crash or deadlock? If this fails, the pod is
+    stopped, and a new container instance is created.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`Readiness`: Is the application ready to receive requests? If this fails, no
+    requests are sent to this service instance, but the pod keeps running.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Because Azure Container Apps is based on Kubernetes, these three probes can
+    be configured with this Azure service as well.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Adding health checks to the DI container
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Health checks can be configured with the DI container within the `AddDefaultHealthChecks`
+    extension method:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Codebreaker.ServiceDefaults/Extensions.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE14]'
+  prefs: []
+  type: TYPE_PRE
+- en: The `AddHealthChecks` method registers the `HealthCheckService` class with the
+    DI container that will be available for health checks. The `AddHealthChecks` method
+    can be invoked multiple times to access `IHealthChecksBuilder`, which is used
+    to register different implementations of checks. The fluently invoked `AddCheck`
+    method uses a delegate to return the `HealthCheckResult.Healthy` result on invocation.
+    The last parameter defines the `"live"` tag. Tags are used with middleware to
+    specify with which route this health check should be used. As the name suggests,
+    this tag is good for a `liveness` probe. When the service is accessible, a result
+    is returned. If the service is not available, nothing is returned, and thus it
+    will be restarted. The name `self` indicates that only the service itself is used
+    with this health check, and external resources are only consulted with readiness
+    health checks.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'On startup of the `game-apis` service, using Azure Cosmos DB, the container
+    is created, and with SQL Server, database migration can occur in case the database
+    schema is updated. The application is not ready to receive requests before this
+    is completed. With some applications, the cache needs to be filled with reference
+    data before requests are accepted. To do this, a Boolean flag must be defined
+    with the database update code that is set when the update is completed. Let’s
+    add a health check to the DI container configuration of `game-apis`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Codebreaker.GameAPIs/Program.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE15]'
+  prefs: []
+  type: TYPE_PRE
+- en: With this implementation, we return `Healthy` if the flag (the `IsDatabaseUpdateComplete`
+    property) is true and `Degraded` otherwise.
+  prefs: []
+  type: TYPE_NORMAL
+- en: When you try this out, the database migration might be too fast to see a degraded
+    result – especially if the database has already been created Adding a delay to
+    the migration of the database in the `Codebreaker.GameAPIs/ApplicationServices.cs`
+    file helps here as you can view different health results.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs: []
+  type: TYPE_NORMAL
+- en: Health checks should be implemented quickly. These checks are invoked quite
+    often and shouldn’t result in a big overhead. Often, these checks involve opening
+    a connection or checking a flag to be set.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Adding health checks with .NET Aspire components
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: All.NET Aspire components have health checks enabled – if the component supports
+    health checks. Check out the documentation regarding these components to learn
+    more.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Similar to metrics and telemetry configuration, health checks can be enabled
+    and disabled with the configuration settings of the component.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'This can be done programmatically:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Codebreaker.GameAPIs/ApplicationServices.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE16]'
+  prefs: []
+  type: TYPE_PRE
+- en: The parameter of the .NET Aspire SQL Server EF Core `EnrichSqlServerDbContext`
+    component method allows us to override the default for the component settings,
+    such as metrics, tracing, and health checks.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We can also specify this with the following .NET Aspire configuration:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE17]'
+  prefs: []
+  type: TYPE_PRE
+- en: This configuration shows the settings for the Redis and SQL Server EF Core components.
+    Both components integrate with the ready probe. What’s done with these health
+    checks? There’s no reading or writing to the database. Health checks should be
+    fast and not put a high load on the system. The Redis component tries to open
+    the connection. The SQL Server EF Core component invokes the EF Core `CanConnectAsync`
+    method. What you need to be aware of is that when the idle pricing of an Azure
+    Container App scales down to 1, with custom health checks, it might never be idle.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Using such a configuration ensures that this can be changed without the need
+    to recompile the project.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Now that we’ve implemented and configured health checks, let’s map these to
+    URL requests.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Mapping health checks
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Mapping health links to URLs allows us to access them. The shared `Codebreaker.ServiceDefaults`
+    file contains the health endpoints that have been configured with the `MapDefaultEndpoints`
+    method:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Codebreaker.ServiceDefaults/Extensions.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE18]'
+  prefs: []
+  type: TYPE_PRE
+- en: The `/alive` probe link has been configured to only use the health checks with
+    the `live` tag, so the health checks are used to check if the service is alive.
+    This link should be configured for live probing, and the service should be restarted
+    if it does not return `Healthy`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The `/health` probe link has been configured not to restrict the health checks
+    based on a tag. Here, all health checks are invoked and need to be successful.
+    This link should be used for a ready probe: is the service ready to receive requests?
+    If this returns `Unhealthy` or `Degraded`, the service isn’t stopped but doesn’t
+    receive requests.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs: []
+  type: TYPE_NORMAL
+- en: You might be wondering why .NET Aspire is not using the `/healthz` link for
+    the ready probes, as it is typically used with Kubernetes. `/healthz` historically
+    comes from Google’s internal practices, z-pages, so that it doesn’t get into conflicts.
+    The .NET Aspire team had several iterations on deciding on the different links
+    and included `/liveness` and `/readiness`, and finally ended up with `/alive`
+    and `/health`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Now that we’ve mapped the health checks to URIs, let’s use these links.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Using the health checks with Azure Container Apps
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: You can automatically integrate the health probes after generating probe configuration
+    with Azure Container Apps. You can also use these health probes with the Azure
+    dashboard. However, this is not available with the first release of .NET Aspire
+    and is planned for a later release. However, with a little customization, this
+    can easily be done.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'For this to work, you need to have initialized the solution with `azd init`,
+    which you did previously, before publishing the solution to Azure. Now, from the
+    folder that contains the solution, create the code that will publish these projects:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE19]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'With this, the AppHost project contains an `infra` folder with `<app>.tmpl.yaml`
+    files. Within the `gameapis.tmpl.yaml` file, specify the `probes` section:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE20]'
+  prefs: []
+  type: TYPE_PRE
+- en: The `probes` section allows `liveness`, `readiness`, and `startup` probe types
+    to be configured. The `liveness` probe is configured to invoke the `/alive` link
+    and the `readiness` probe is configured to invoke the `/health` link with the
+    port of the running Docker container. Azure Container Apps have default settings.
+    However, as soon as you specify probing, you need to configure all probe types;
+    otherwise, the probes that haven’t been configured will be disabled. Thus, when
+    specifying `liveness` and `readiness` probes, the `startup` probe should be configured
+    as well. This probe uses a TCP connection to connect to the service to verify
+    that the connection succeeds.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`initialDelaySeconds` specifies the seconds to wait until the first probe is
+    done. If this fails, additional checks are done after the number of seconds specified
+    by `periodSeconds`. A failure only counts until `failureTreshold` is reached.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The default startup probe uses a TCP probe to check the ingress target port
+    with an initial delay of 1 second, a timeout of 3 seconds, and a period of 1 second.
+    With the failure threshold, this multiplies, and the app can take some time until
+    it’s started successfully. When the `startup` probe has been successful once,
+    only the `liveness` and `readiness` probes are used afterward.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'After making this change, from the solution folder, run the following command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE21]'
+  prefs: []
+  type: TYPE_PRE
+- en: This will deploy the service to Azure and configure the health checks.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Open the Azure portal, navigate to Azure Container Apps, and select **Containers**
+    from the left pane. You’ll see a tab called **Health probes**, as shown in *Figure
+    12**.22*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 12.22 – Health probes within Azure Container Apps](img/B21217_12_22.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 12.22 – Health probes within Azure Container Apps
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Here, we can see the configured settings for the liveness probe in the portal.
+    You can also verify the readiness and startup probes. *Figure 12**.23* shows the
+    status of a container:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 12.23 – Container app running but not ready](img/B21217_12_23.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 12.23 – Container app running but not ready
+  prefs: []
+  type: TYPE_NORMAL
+- en: Here, one replica is running, but this replica isn’t ready. The `readiness`
+    probe didn’t return success at that time. If you configured the Redis component
+    to offer health checks with .NET Aspire, you can stop this container using the
+    Azure Container Apps environment. You’ll see that the `game-apis` service isn’t
+    ready. Because the `game-apis` service has the component health check activated,
+    an error is returned with the readiness check.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Summary
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In this chapter, you learned how to use telemetry data and implemented a cache
+    to reduce the number of database requests. You created health checks while differing
+    between startup, liveness, and readiness checks. Liveness checks are used to restart
+    services, while readiness checks are used to verify whether a service is ready
+    to receive requests. Regarding readiness checks, you learned how to integrate
+    .NET Aspire components. You also learned how to get information from load tests
+    to find bottlenecks in the deployed application and to decide on the infrastructure
+    you wish to use. By doing this, you learned how to configure the application so
+    that it scales up when changes are made to CPU and memory, as well as how to scale
+    out when running multiple replicas using scaling rules.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'This chapter has uncovered an important reason for using microservices: with
+    scaling, great flexibility can easily be achieved.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The next chapter will act as a starting point and implement different communication
+    techniques with microservices. When adding more functionality to your application,
+    you need to think about doing continuous load tests on the solution in a test
+    environment and monitoring the changes.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Further reading
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'To learn more about the topics that were discussed in this chapter, please
+    refer to the following links:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '*Distributed caching in ASP.NET* *Core*: [https://learn.microsoft.com/en-us/aspnet/core/performance/caching/distributed](https://learn.microsoft.com/en-us/aspnet/core/performance/caching/distributed)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '*Database scalability: scaling out vs scaling* *up*: [https://azure.microsoft.com/en-au/resources/cloud-computing-dictionary/scaling-out-vs-scaling-up/](https://azure.microsoft.com/en-au/resources/cloud-computing-dictionary/scaling-out-vs-scaling-up/)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '*Azure Virtual Machine* *Sizes*: [https://learn.microsoft.com/en-us/azure/virtual-machines/sizes](https://learn.microsoft.com/en-us/azure/virtual-machines/sizes)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '*Workload* *Profiles*: [https://learn.microsoft.com/en-us/azure/container-apps/workload-profiles-overview](https://learn.microsoft.com/en-us/azure/container-apps/workload-profiles-overview)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '*Container* *configuration*: [https://learn.microsoft.com/en-us/azure/container-apps/containers#configuration](https://learn.microsoft.com/en-us/azure/container-apps/containers#configuration)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '*Azure Container Apps YAML* *specification*: [https://learn.microsoft.com/en-us/azure/container-apps/azure-resource-manager-api-spec](https://learn.microsoft.com/en-us/azure/container-apps/azure-resource-manager-api-spec)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '*Health checks in ASP.NET* *Core*: [https://learn.microsoft.com/en-us/aspnet/core/host-and-deploy/health-checks/](https://learn.microsoft.com/en-us/aspnet/core/host-and-deploy/health-checks/)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '*Convention for /**healthz*: [https://stackoverflow.com/questions/43380939/where-does-the-convention-of-using-healthz-for-application-health-checks-come-f](https://stackoverflow.com/questions/43380939/where-does-the-convention-of-using-healthz-for-application-health-checks-come-f)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Part 4: More communication options'
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In this part, the focus shifts towards leveraging various communication technologies
+    and incorporating additional Azure services to enhance the application. Real-time
+    messaging capabilities are implemented using SignalR to deliver instantaneous
+    updates from the application to clients. gRPC is utilized for efficient binary
+    communication between services, enabling seamless message exchange through queues
+    and event publication. Azure services such as Azure SignalR Services, Event Hub,
+    Azure Queue Storage, and Apache Kafka are integrated into the application ecosystem.
+    Additionally, a detailed examination of considerations for production environments
+    is provided, culminating in the deployment of the application to a Kubernetes
+    cluster, specifically Azure Kubernetes Services, utilizing **Aspir8**.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'This part has the following chapters:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[*Chapter 13*](B21217_13.xhtml#_idTextAnchor317), *Real-time Messaging with
+    SignalR*'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[*Chapter 14*](B21217_14.xhtml#_idTextAnchor330), *gRPC for Binary Communication*'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[*Chapter 15*](B21217_15.xhtml#_idTextAnchor349)*, Asynchronous Communication
+    with Messages and Events*'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[*Chapter 16*](B21217_16.xhtml#_idTextAnchor373)*, Running Applications On-Premises
+    and in the Cloud*'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL

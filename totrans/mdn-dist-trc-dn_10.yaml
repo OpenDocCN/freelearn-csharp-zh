@@ -1,0 +1,812 @@
+- en: '10'
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Tracing Network Calls
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In this chapter, we’ll apply what we learned about tracing in [*Chapter 6*](B19423_06.xhtml#_idTextAnchor098),
+    *Tracing Your Code*, to instrument client and server communication via gRPC.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We’ll start by instrumenting unary gRPC calls on the client and server according
+    to OpenTelemetry semantic conventions. Then, we’ll switch to streaming and explore
+    different ways to get observability for individual messages. We’ll see how to
+    describe them with events or individual spans and learn how to propagate context
+    within individual messages. Finally, we’ll see how to use our instrumentation
+    to investigate issues.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In this chapter, you’ll learn how to do the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Instrument network calls on the client and server following OpenTelemetry semantic
+    conventions and propagate context over the wire
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Instrument gRPC streaming calls according to your application needs
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Apply telemetry to get insights into network call latency and failure rates
+    and investigate issues
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Using gRPC as an example, this chapter will show you how to trace network calls
+    and propagate context through them. With this chapter, you should also be able
+    to instrument advanced streaming scenarios and pick the appropriate observability
+    signals and granularity for your traces.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Technical requirements
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The code for this chapter is available in the book’s repository on GitHub at
+    [https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/tree/main/chapter10](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/tree/main/chapter10).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'To run the samples and perform analysis, we’ll need the following tools:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: .NET SDK 7.0 or later
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Docker and `docker-compose`
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Instrumenting client calls
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Network calls are probably the most important thing to instrument in any distributed
+    application since network and downstream services are unreliable and complex resources.
+    In order to understand how our application works and breaks, we need to know how
+    the services we depend on perform.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Network-level metrics can help us measure essential things such as latency,
+    error rate, throughput, and the number of active requests and connections. Tracing
+    enables context propagation and helps us see how requests flow through the system.
+    So, if you instrument your application at all, you should start with incoming
+    and outgoing requests.
+  prefs: []
+  type: TYPE_NORMAL
+- en: When instrumenting the client side of calls, we need to pick the right level
+    of the network stack. Do we want to trace TCP packets? Can we? The answer depends,
+    but distributed tracing is usually applied on the application layer of the network
+    stack where protocols such as HTTP or AMQP live.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In the case of HTTP on .NET, we apply instrumentation on the `HttpClient` level
+    – to be more precise, on the `HttpMessageHandler` level, which performs individual
+    HTTP requests, so we trace individual retries and redirects.
+  prefs: []
+  type: TYPE_NORMAL
+- en: If we instrument `HttpClient` methods, in many cases, we collect the duration
+    of the request, which includes all attempts to get a response with back-off intervals
+    between them. The error rate would show the rate without transient failures. This
+    information is very useful, but it describes network-level calls very indirectly
+    and heavily depends on the upstream service configuration and performance.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Usually, gRPC runs on top of HTTP/2 and to some extent can be covered by HTTP
+    instrumentation. This is the case for unary calls, when a client sends a request
+    and awaits a response. The key difference with HTTP instrumentation is that we’d
+    want to collect a gRPC-specific set of attributes, which includes the service
+    and method names as well as the gRPC status code.
+  prefs: []
+  type: TYPE_NORMAL
+- en: However, gRPC also supports streaming when the client establishes a connection
+    with the server, and then they can send each other multiple asynchronous messages
+    within the scope of one HTTP/2 call. We’ll talk about streaming calls later in
+    the *Instrumenting streaming calls* section of this chapter. For now, let’s focus
+    on unary calls.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Instrumenting unary calls
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: We’re going to use gRPC implementation in the `Grpc.Net.Client` NuGet package,
+    which has an OpenTelemetry instrumentation library available.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'OpenTelemetry provides two flavors of gRPC instrumentation: one for the `Grpc.Net.Client`
+    package called `OpenTelemetry.Instrumentation.GrpcNetClient` and another one for
+    the lower-level `Grpc.Core.Api` package called `OpenTelemetry.Instrumentation.GrpcCore`.
+    Depending on how you use gRPC, make sure to use one or another.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: These instrumentations should cover most gRPC tracing needs and you can customize
+    them further using the techniques described in [*Chapter 5*](B19423_05.xhtml#_idTextAnchor083),
+    *Configuration and Control Plane*. For example, the `OpenTelemetry.Instrumentation.GrpcNetClient`
+    instrumentation allows the suppression of the underlying HTTP instrumentation
+    or the enrichment of corresponding activities.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Here, we’re going to write our own instrumentation as a learning exercise, which
+    you can apply to other protocols or use to satisfy additional requirements that
+    you might have.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We can wrap every gRPC call with instrumentation code, but this would be hard
+    to maintain and would pollute the application code. A better approach would be
+    to implement instrumentation in a gRPC `Interceptor`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: So, we know where instrumentation should be done, but what should we instrument?
+    Let’s start with gRPC OpenTelemetry semantic conventions – the tracing conventions
+    are available at [https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/rpc.md](https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/rpc.md).
+  prefs: []
+  type: TYPE_NORMAL
+- en: The conventions are currently experimental and some changes (such as attribute
+    renames) should be expected.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'For unary client calls, the tracing specification recommends using the `{package.service}/{method}`
+    pattern for span names and the following set of essential attributes:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The `rpc.system` attribute has to match `grpc` – it helps backends understand
+    that it’s a gRPC call.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The `rpc.service` and `rpc.method` attributes should describe the gRPC service
+    and method. Even though this information is available in the span name, individual
+    service and method attributes help query and filter spans in a more reliable and
+    efficient way.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The `net.peer.name` and `net.peer.port` attributes describe remote endpoints.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`rpc.grpc.status_code` describes the numeric representation of the gRPC status
+    code.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'So, in the interceptor, we need to do a few things: start a new `Activity`
+    with the recommended name and a set of attributes, inject the context into the
+    outgoing request, await the response, set the status, and end the activity. This
+    is demonstrated in the following code snippet:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: client/GrpcTracingInterceptor.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE0]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/client/GrpcTracingInterceptor.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/client/GrpcTracingInterceptor.cs)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Here, we override the interceptor’s `AsyncUnaryCall` method: we start a new
+    `Activity` with the client kind and inject a trace context regardless of the sampling
+    decision. If the activity is sampled out, we just return a continuation call and
+    avoid any additional performance overhead.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'If the activity is sampled in, we set the gRPC attributes and return the continuation
+    call with the modified response task:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: client/GrpcTracingInterceptor.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE1]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/client/GrpcTracingInterceptor.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/client/GrpcTracingInterceptor.cs)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: We dispose of `Activity` explicitly here since the `AsyncUnaryCall` method is
+    synchronous and will end before the request is complete, but we need the activity
+    to last until we get the response from the server.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let’s take a closer look at each of the operations, starting with context injection:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: client/GrpcTracingInterceptor.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE2]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/client/GrpcTracingInterceptor.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/client/GrpcTracingInterceptor.cs)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Here, we inject the context using the `OpenTelemetry.Context.Propagation.TextMapPropagator`
+    class and the `Inject` method. We’ll see how the propagator is configured a bit
+    later.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We created an instance of the `PropagationContext` structure – it contains everything
+    that needs to be propagated, namely `ActivityContext` and the current `Baggage`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The context is injected into the `ctx.Options.Headers` property, which represents
+    gRPC metadata. The metadata is later on transformed into HTTP request headers
+    by `GrpcNetClient`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The last parameter of the `Inject` method is a function that tells the propagator
+    how to inject key-value pairs with trace context into the provided metadata. The
+    propagator, depending on its implementation, may follow different formats and
+    inject different headers. Here, we don’t need to worry about it.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Okay, we injected the context to enable correlation with the backend, and now
+    it’s time to populate the attributes:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: client/GrpcTracingInterceptor.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE3]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/client/GrpcTracingInterceptor.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/client/GrpcTracingInterceptor.cs)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Here, we populate the service and method names from the information provided
+    in the call context. But the host and port come from instance variables we passed
+    to the interceptor constructor – this information is not available in the client
+    interceptor.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Finally, we should populate the gRPC status code and `Activity` status once
+    the response is received:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: client/GrpcTracingInterceptor.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE4]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/client/GrpcTracingInterceptor.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/client/GrpcTracingInterceptor.cs)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: We left `Activity.Status` unset if the request was successful following the
+    gRPC semantic conventions. It makes sense for generic instrumentation libraries
+    since they don’t know what represents a success. In a custom instrumentation,
+    we may know better and can be more specific.
+  prefs: []
+  type: TYPE_NORMAL
+- en: This is it; we just finished unary call instrumentation on the client. Let’s
+    now configure a gRPC client to use.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Configuring instrumentation
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Let’s set up a tracing interceptor on `GrpcClient` instances. In the demo application,
+    we use `GrpcClient` integration with ASP.NET Core and set it up in the following
+    way:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: client/Program.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE5]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/client/Program.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/client/Program.cs)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Here, we added `GrpcClient`, configured the endpoint, and added a tracing interceptor.
+    We passed the options – the service endpoint and context propagator – explicitly.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The propagator is the implementation of the `TextMapPropagator` class – we
+    use a composite one that supports W3C Trace Context and Baggage formats:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: client/Program.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE6]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/client/Program.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/client/Program.cs)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The last step is to configure OpenTelemetry and enable `ActivitySource` we
+    use in the interceptor:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: client/Program.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE7]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/client/Program.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/client/Program.cs)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: That’s it for the unary client calls. Let’s now instrument the server.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Instrumenting server calls
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'Service-side instrumentation is similar. We can use the gRPC interceptor again
+    and this time override the `UnaryServerHandler` method. Once the request is received,
+    we should extract the context and start a new activity. It should have the `server`
+    kind, a name that follows the same pattern as for the client span – `{package.service}/{method}`
+    – and attributes very similar to those we saw on the client. Here’s the interceptor
+    code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: server/GrpcTracingInterceptor.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE8]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/server/GrpcTracingInterceptor.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/server/GrpcTracingInterceptor.cs)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: We extract the trace context and baggage using the propagator and then pass
+    the extracted parent trace context to the new activity and add the attributes.
+    The server interceptor callback is asynchronous, so we can await a response from
+    the server and populate the status.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'That’s it; now we just need to configure interceptors and enable `ActivitySource`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: server/Program.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE9]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/server/Program.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/server/Program.cs)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: We added gRPC services, configured the tracing interceptor, and enabled the
+    new activity source. It’s time to check out generated traces.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Run the application with `$docker-compose up --build` and then hit the frontend
+    at `http://localhost:5051/single/hello`. It will send a message to the server
+    and return a response or show a transient error. An example of a trace with an
+    error is shown in *Figure 10**.1*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 10.1 – gRPC trace showing error on server](img/B19423_10_01.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 10.1 – gRPC trace showing error on server
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Here, we see two spans from the client application and one from the server.
+    They describe an incoming request collected by the ASP.NET Core instrumentation
+    and client and server sides of the gRPC call. *Figure 10**.2* shows client span
+    attributes where we can see the destination and status:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 10.2 – gRPC client attributes](img/B19423_10_02.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 10.2 – gRPC client attributes
+  prefs: []
+  type: TYPE_NORMAL
+- en: This instrumentation allows us to trace unary calls for any gRPC service, which
+    is similar to the HTTP instrumentation we saw in [*Chapter 2*](B19423_02.xhtml#_idTextAnchor038),
+    *Native Monitoring in .NET*. Let’s now explore instrumentation for streaming calls.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Instrumenting streaming calls
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: So far in the book, we have covered the instrumentation of synchronous calls
+    where the application makes a request and awaits its completion. However, it’s
+    common to use gRPC or other protocols, such as SignalR or WebSocket, to communicate
+    in an asynchronous way when the client and server establish a connection and then
+    send each other messages.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Common use cases for this kind of communication include chat applications, collaboration
+    tools, and other cases when data should flow in real time and frequently in both
+    directions.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The call starts when the client initiates a connection and may last until the
+    client decides to disconnect, the connection becomes idle, or some network issue
+    happens. In practice, it means that such calls may last for days.
+  prefs: []
+  type: TYPE_NORMAL
+- en: While a connection is alive, the client and server can write each other messages
+    to corresponding network streams. It’s much faster and more efficient when the
+    client and server communicate frequently within a relatively short period of time.
+    This approach minimizes the overhead created by DNS lookup, protocol negotiation,
+    load balancing, authorization, and routing compared to request-response communication
+    when at least some of these operations would happen for each request.
+  prefs: []
+  type: TYPE_NORMAL
+- en: On the downside, the application could become more complex as in many cases,
+    we’d still need to correlate client messages with service replies to them and
+    come up with our own semantics for metadata and status codes.
+  prefs: []
+  type: TYPE_NORMAL
+- en: For observability, it means that out-of-the-box instrumentation is rarely enough
+    and at least some custom instrumentation is necessary. Let’s see why.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Basic instrumentation
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Some applications pass completely independent messages within one streaming
+    call and would want different traces to describe individual messages. Others use
+    streaming to send scoped batches of messages and would rather expect one trace
+    to describe everything that happens within one streaming call. When it comes to
+    streaming, there is no single solution.
+  prefs: []
+  type: TYPE_NORMAL
+- en: gRPC auto-instrumentations follow OpenTelemetry semantic conventions and provide
+    a default experience where a streaming call is represented with client and server
+    spans, even if the call lifetime is unbound. Individual messages are described
+    with span events with attributes covering the direction, message identifier, and
+    size.
+  prefs: []
+  type: TYPE_NORMAL
+- en: You can find a full instrumentation implementation that follows these conventions
+    in the `client/GrpcTracingInterceptor.cs` and `server/GrpcTracingInterceptor.cs`
+    files in the book’s repository. Let’s look at the traces it produces.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Go ahead and start the application with `$ docker-compose up --build` and then
+    hit the client application at `http://localhost:5051/streaming/hello?count=2`.
+    It will send two messages to the server and read all the responses.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Check out Jaeger at `http://localhost:16686/`. You should see a trace similar
+    to the one shown in *Figure 10**.3*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 10.3 – Streaming call with events](img/B19423_10_03.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 10.3 – Streaming call with events
+  prefs: []
+  type: TYPE_NORMAL
+- en: Similarly to a unary call, the trace consists of three spans. The only difference
+    is that client and server gRPC spans have events – two events per message, indicating
+    when the message was sent and received. The `message.id` attribute here represents
+    the sequence number of a message in a request or response stream and might be
+    used to correlate request and response messages.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The trace shown in *Figure 10**.3* represents the best we can achieve with auto-instrumentation
+    that is not aware of our specific streaming usage. Let’s see how we can improve
+    it.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Tracing individual messages
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Let’s pretend that the client initiates a very long stream – in this case, the
+    previous trace would not be very helpful. Assuming messages are not too frequent
+    and verbose, we might want to instrument each specific message and see how server
+    response messages correlate with client messages.
+  prefs: []
+  type: TYPE_NORMAL
+- en: To instrument individual messages, we’d have to propagate context inside the
+    message, which is not possible in an interceptor where we operate with generic
+    message types.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Our message protobuf definition contains text and an attribute map that we
+    can use to pass trace context:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: client\Protos\notifier.proto
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE10]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/client/notifier.proto](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/client/notifier.proto)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: We’re going to create one client span per message to describe and identify it,
+    and a server span that will represent processing the message.
+  prefs: []
+  type: TYPE_NORMAL
+- en: If we have hundreds of messages during one streaming call, having all of them
+    in one trace will be hard to read. Also, typical sampling techniques would not
+    apply – depending on the sampling decision made for the whole streaming call,
+    we’ll sample in or drop all per-message spans.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Ideally, we want to have a trace per message flow and have a link to the long-running
+    HTTP requests that carried the message over. This way, we still know what happened
+    with the transport and what else was sent over the same HTTP request, but we’ll
+    make independent sampling decisions and will have smaller and more readable traces.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs: []
+  type: TYPE_NORMAL
+- en: Tracing individual messages is reasonable when messages are relatively big and
+    processing them takes a reasonable amount of time. Alternative approaches may
+    include custom correlation or context propagation for sampled-in messages only.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let’s go ahead and instrument individual messages: we’ll need to start a new
+    activity per message with the `producer` kind indicating an async call. We need
+    to start a new trace and use `Activity.Current` as a link rather than a parent:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: client/controllers/StreamingController.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE11]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/client/Controllers/StreamingController.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/client/Controllers/StreamingController.cs)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: We created a link from the current activity and then set `Activity.Current`
+    to `null`, which forces the `StartActivity` method to create an orphaned activity.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs: []
+  type: TYPE_NORMAL
+- en: Setting `Activity.Current` should be done with caution. In this example, we’re
+    starting a new task specifically to ensure that it won’t change the `Activity.Current`
+    value beyond the scope of this task.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We have an activity; now it’s time to inject the context and send a message
+    to the server:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: client/controllers/StreamingController.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE12]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/client/Controllers/StreamingController.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/client/Controllers/StreamingController.cs)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Context injection looks similar to what we did in the client interceptor earlier
+    in this chapter, except here we inject it into message attributes rather than
+    gRPC call metadata.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'On the server side, we need to extract the context from the message, then use
+    it as a parent. We should also set `Activity.Current` as a link so we don’t lose
+    correlation between the message processing and streaming calls. The new activity
+    has a `consumer` kind, which indicates the processing side of the async call,
+    as shown in this code snippet:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: server/NotifierService.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE13]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/server/NotifierService.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/server/NotifierService.cs)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: We can now enable corresponding client and server activity sources – we used
+    different names for per-message tracing and interceptors, so we can now control
+    instrumentations individually. Go ahead and enable `Client.Grpc.Message` and `Server.Grpc.Message`
+    sources on the client and server correspondingly and then start an application.
+  prefs: []
+  type: TYPE_NORMAL
+- en: If we hit the streaming endpoint at `http://localhost:5051/streaming/hello?count=5`
+    and then went to Jaeger, we’d see six traces – one for each message sent and one
+    for the gRPC call.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Per-message traces consist of two spans, like the one shown in *Figure 10**.4*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 10.4 – Tracing messages in individual traces](img/B19423_10_04.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 10.4 – Tracing messages in individual traces
+  prefs: []
+  type: TYPE_NORMAL
+- en: Here, we see that sending this message took about 1 ms and processing it took
+    about 100 ms. Both spans have links (references in Jaeger terminology) to spans
+    describing the client and server sides of the underlying gRPC call.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'If we didn’t force new trace creation for individual messages, we’d see only
+    one trace containing all the spans, as shown in *Figure 10**.5*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: "![Figure 10.5 – Tracing \uFEFFa streaming call with all messages in one trace](img/B19423_10_05.jpg)"
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 10.5 – Tracing a streaming call with all messages in one trace
+  prefs: []
+  type: TYPE_NORMAL
+- en: Depending on your scenario, you might prefer to separate traces, have one big
+    trace, or come up with something else.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note that we can now remove our custom tracing interceptor and enable shared
+    gRPC and HTTP client instrumentation libraries. If you do this, the per-message
+    instrumentation will remain exactly the same and will keep working along with
+    auto-instrumentation.
+  prefs: []
+  type: TYPE_NORMAL
+- en: With this, you should be able to instrument unary or streaming gRPC calls and
+    have an idea of how to extend it to other cases, including SignalR or socket communication.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Let’s now see how to use gRPC instrumentation to investigate issues.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Observability in action
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'There are several issues in our server application. First issue reproduces
+    sporadically when you hit the frontend at `http://localhost:5051/single/hello`
+    several times. You might notice that some requests take longer than others. If
+    we look at the duration metrics or Jaeger’s duration view, we’ll see something
+    similar to *Figure 10**.6*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 10.6 – Duration view in Jaeger](img/B19423_10_06.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 10.6 – Duration view in Jaeger
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We see that most of the calls are fast (around 100 ms), but there is one that
+    takes longer than a second. If we click on it, Jaeger will open the corresponding
+    trace, like the one shown in *Figure 10**.7*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 10.7 – Long trace with errors](img/B19423_10_07.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 10.7 – Long trace with errors
+  prefs: []
+  type: TYPE_NORMAL
+- en: Apparently, there were three attempts to send the message – the first two were
+    not successful, but the third one succeeded. So retries are the source of long
+    latency. We can investigate the error by expanding the exception event – we’ll
+    see a full stack trace there.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Notably, we see retries only on the service side here. There is just one gRPC
+    span on the client side. What happens here is that we enable a retry policy on
+    the gRPC client channel, which internally adds a retry handler to the `HttpClient`
+    level. So, our tracing interceptor is not called on tries and traces the logical
+    part of the gRPC call.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The official `OpenTelemetry.Instrumentation.GrpcNetClient` instrumentation works
+    properly and traces individual tries on the client as well.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let’s look at another problem. Send the following request: `http://localhost:5051/streaming/hello?count=10`.
+    It will return a few messages and then stop. If we look into Jaeger traces, we’ll
+    see a lot of errors for individual messages. Some of them will have just a client
+    span, like the one shown in *Figure 10**.8*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 10.8 – Client error without server span](img/B19423_10_08.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 10.8 – Client error without server span
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'There is not much information in the span, but luckily, we have a link to the
+    gRPC call. Let’s follow it to see whether it explains something. The corresponding
+    trace is shown in *Figure 10**.9*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 10.9 – Error in the middle of the gRPC stream](img/B19423_10_09.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 10.9 – Error in the middle of the gRPC stream
+  prefs: []
+  type: TYPE_NORMAL
+- en: Here, we see a familiar trace, but the processing has failed while parsing the
+    message text. The server span has six events, indicating that two messages were
+    received and the response was successfully sent to the server. The third one was
+    received but then instead of the response, we see an exception with a stack trace
+    to help us investigate further.
+  prefs: []
+  type: TYPE_NORMAL
+- en: If we expand the client gRPC span, we’ll see more exceptions for each message
+    that was attempted to be sent after the server error has happened.
+  prefs: []
+  type: TYPE_NORMAL
+- en: But there were no retries – why? In our case, gRPC retries, as we’ve seen in
+    the previous example, are applied on the HTTP level. In the case of streaming,
+    it means that after the first response is received from the server, the HTTP response,
+    including status codes and headers, is received and the rest of the communication
+    happens within the request and response streams. You can read more about this
+    in the Microsoft gRPC documentation at [https://learn.microsoft.com/en-us/aspnet/core/grpc/retries](https://learn.microsoft.com/en-us/aspnet/core/grpc/retries).
+  prefs: []
+  type: TYPE_NORMAL
+- en: So, once an unhandled exception is thrown on the server for a particular message,
+    it ends the gRPC call and corresponding request and response streams on the client
+    and server. It affects all remaining messages on the client and explains the partial
+    response we noticed.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Distributed tracing helps us see what happens and learn more about the technologies
+    we use. In addition to tracing, OpenTelemetry defines a set of metrics to monitor
+    on the client and server sides, which includes the duration, the failure rate
+    that can be derived from it, the number of requests and responses, and the payload
+    sizes.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Summary
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In this chapter, we got hands-on experience in instrumenting network calls using
+    gRPC as an example. Before starting instrumentation, we learned about the available
+    instrumentation libraries and what OpenTelemetry semantic conventions recommend
+    recording for gRPC.
+  prefs: []
+  type: TYPE_NORMAL
+- en: First, we instrumented unary calls with client and server spans and propagated
+    context through gRPC metadata. Then, we experimented with gRPC streaming, which
+    needs a different approach to tracing. The generic instrumentation of streaming
+    calls suggests creating an event per individual request and response message in
+    the stream and provides a basic level of observability. Depending on our scenarios
+    and observability needs, we can add another layer of instrumentation to trace
+    individual messages. These custom spans work on top of the generic gRPC instrumentation.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Finally, we used tracing to get insights into high latency and transient error
+    scenarios, which also helped us understand gRPC internals.
+  prefs: []
+  type: TYPE_NORMAL
+- en: You’re now ready to instrument your network stack with tracing or enrich existing
+    instrumentation libraries by adding custom layers of instrumentation specific
+    to your application. In the next chapter, we’ll look into messaging scenarios
+    and dive even deeper into observability for asynchronous processing.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Questions
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: When using gRPC, would you write your own instrumentation or reuse an existing
+    one?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Let’s imagine we want to instrument gRPC communication between the client and
+    server when the client initiates a connection at startup time and keeps it open
+    forever (until the server or client stops) and then reuses this connection for
+    all the communication. Which tracing approach would you choose? Why?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL

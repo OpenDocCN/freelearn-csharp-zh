@@ -1,0 +1,2041 @@
+- en: 9 Options, Settings, and Configuration
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'Before you begin: Join our book community on Discord'
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Give your feedback straight to the author himself and chat to other early readers
+    on our Discord server (find the "architecting-aspnet-core-apps-3e" channel under
+    EARLY ACCESS SUBSCRIPTION).
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[https://packt.link/EarlyAccess](https://packt.link/EarlyAccess)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Qr code Description automatically generated](img/file44.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: This chapter covers the .NET Options pattern, a building block of any application.
+    .NET Core introduced new predefined mechanisms to enhance the usage of application
+    settings available to ASP.NET Core applications. These allow us to divide our
+    configuration into multiple smaller objects, configure them during various stages
+    of the startup flow, validate them, and even watch for runtime changes with minimal
+    effort.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The new options system repurposed the `ConfigurationManager` class as an internal
+    piece. We no longer can use it as the old .NET Framework-era static methods are
+    gone. The new patterns and mechanisms help avoid useless coupling, add flexibility
+    to our designs, and are DI-native. The system is also simpler to extend.
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: 'The Options pattern goal is to use settings at runtime, allowing changes to
+    the application to happen without changing the code. The settings could be as
+    simple as a `string`, a `bool`, a database connection string, or a complex object
+    that holds an entire subsystem’s configuration.This chapter delves into various
+    tools and methodologies we can use for managing, injecting, and loading configurations
+    and options into our ASP.NET Core applications. Our journey spans a broad spectrum
+    of scenarios, covering everything from commonly encountered to more complex use
+    cases.At the end of the chapter, you will know how to leverage the .NET options
+    and settings infrastructure.In this chapter, we cover the following topics:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Loading the configuration
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Learning the building blocks
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Exploring common usage scenarios
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Learning options configuration
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Validating our options objects
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Validating options using FluentValidation
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Injecting options objects directly—a workaround
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Centralizing the configuration for easier management
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Using the configuration-binding source generator
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Using the options validation source generator
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Using the options validation source generator
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Let’s get started!
+  prefs: []
+  type: TYPE_NORMAL
+- en: Loading the configuration
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'ASP.NET Core allows us to load settings from multiple sources seamlessly. We
+    can customize these sources from the `WebApplicationBuilder`, or use the defaults
+    set by calling the `WebApplication.CreateBuilder(args)` method.The default sources,
+    in order, are as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`appsettings.json`'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '`appsettings.{Environment}.json`'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: User secrets; these are only loaded when the environment is `Development`
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Environment variables
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Command-line arguments
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: The order is essential, as the last to be loaded overrides previous values.
+    For example, you can set a value in `appsettings.json` and override it in `appsettings.Staging.json`
+    by redefining the value in that file, user secrets, an environment variable or
+    by passing it as a command-line argument when you run your application.
+  prefs: []
+  type: TYPE_NORMAL
+- en: You can name your environments as you want, but by default, ASP.NET Core has
+    built-in helper methods for `Development`, `Staging`, and `Production`.
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: On top of the default providers, we can register other configuration sources
+    out of the box, like `AddIniFile`, `AddInMemoryCollection`, and `AddXmlFile`,
+    for example. We can also load NuGet packages to install custom providers, like
+    Azure KeyVault and Azure App Configuration, to centralize secrets and configuration
+    management into the Azure cloud. The most interesting part of those configuration
+    providers is that no matter the sources, it does not affect the consumption of
+    the settings, only the composition root. This means we can start loading settings
+    one way, then change our mind later or have different strategies for dev and prod,
+    and none of that affects the codebase but the composition root.We explore a few
+    building blocks next.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Learning the building blocks
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'There are four main interfaces to use settings: `IOptionsMonitor<TOptions>`,
+    `IOptionsFactory<TOptions>`, `IOptionsSnapshot<TOptions>`, and `IOptions<TOptions>`.
+    We must inject that dependency into a class to use the available settings. `TOptions`
+    is the type that represents the settings that we want to access.The framework
+    returns an empty instance of your options class if you don’t configure it. We
+    learn how to configure options properly in the next subsection; meanwhile, remember
+    that using property initializers inside your options class can also be a great
+    way to ensure certain defaults are used. You can also use constants to centralize
+    those defaults somewhere in your codebase (making them easier to maintain). Nevertheless,
+    proper configuration and validation are always preferred, but both combined can
+    add a safety net. Don’t use initializers or constants for default values that
+    change based on the environment (dev, staging, or production) or for secrets such
+    as connection strings and passwords.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: You should always keep secrets out of your Git history, whether it's out of
+    the C# code or out of setting files. Use ASP.NET Core secrets locally and a secret
+    store like Azure KeyVault for Staging and Production environments.
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: If we create the following class, since the default value of an `int` is `0`,
+    the default number of items to display per page would be 0, leading to an empty
+    list.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE0]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'However, we can configure this using a property initializer, as next:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE1]'
+  prefs: []
+  type: TYPE_PRE
+- en: The default number of items to display per page is now 20.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In the source code for this chapter, I’ve included a few tests in the `CommonScenarios.Tests`
+    project that assert the lifetime of the different options interfaces. I haven’t
+    included this code here for brevity, but it describes the behavior of the different
+    options via unit tests. See [https://adpg.link/AXa5](https://adpg.link/AXa5) for
+    more information.
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: 'The options served by each interface have different DI lifetimes and other
+    features. The following table exposes some of those features:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '| **Interface** | **Lifetime** | **Support named options** | **Support change
+    notification** |'
+  prefs: []
+  type: TYPE_TB
+- en: '| `IOptionsMonitor<TOptions>` | Singleton | Yes | Yes |'
+  prefs: []
+  type: TYPE_TB
+- en: '| `IOptionsFactory<TOptions>` | Transient | Yes | No |'
+  prefs: []
+  type: TYPE_TB
+- en: '| `IOptionsSnapshot<TOptions>` | Scoped | Yes | No |'
+  prefs: []
+  type: TYPE_TB
+- en: '| `IOptions<TOptions>` | Singleton | No | No |'
+  prefs: []
+  type: TYPE_TB
+- en: 'Table 9.1: The different options interfaces, their DI lifetime, and support
+    for other features.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Next, we explore those interfaces more in-depth.
+  prefs: []
+  type: TYPE_NORMAL
+- en: IOptionsMonitor<TOptions>
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'This interface is the most versatile of them all:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: It supports receiving notifications about reloading the configuration (like
+    when the setting file changed).
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: It supports caching.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: It supports named configuration (identifying multiple different `TOptions` with
+    a name).
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The injected `IOptionsMonitor<TOptions>` instance is always the same (**singleton
+    lifetime**).
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: It supports unnamed default settings through its `Value` property.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: If we only configure named options or no instance at all, the consumer will
+    receive an empty `TOptions` instance (`new TOptions()`).
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: IOptionsFactory<TOptions>
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: This interface is a factory, as we saw in *Chapter 7*, *Strategy, Abstract Factory,
+    and Singleton*, and in *Chapter 8*, *Dependency Injection*, we use factories to
+    create instances; this interface is no different.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Unless necessary, I suggest sticking with `IOptionsMonitor<TOptions>` or `IOptionsSnapshot<TOptions>`
+    instead.
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: 'How the factory works is simple: the container creates a new factory every
+    time you ask for one (transient lifetime), and the factory creates a new options
+    instance every time you call its `Create(name)` method (**transient lifetime**).To
+    get the default instance (non-named options), you can use the `Options.DefaultName`
+    field or pass an empty string; this is usually handled for you by the framework.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: If we only configure named options or no instance at all, the consumer will
+    receive an empty `TOptions` instance (`new TOptions()`) after calling `factory.Create(Options.DefaultName)`.
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: IOptionsSnapshot<TOptions>
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: This interface is useful when you need a snapshot of the settings for the duration
+    of an HTTP request.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The container creates only one instance per request (**scoped lifetime**).
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: It supports named configuration.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: It supports unnamed default settings through its `CurrentValue` property.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: If we only configure named options or no instance at all, the consumer will
+    receive an empty `TOptions` instance (`new TOptions()`).
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: IOptions<TOptions>
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: This interface is the first that was added to ASP.NET Core.
+  prefs: []
+  type: TYPE_NORMAL
+- en: It does not support advanced scenarios such as what snapshots and monitors do.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Whenever you request an `IOptions<TOptions>` instance, you get the same instance
+    (**singleton lifetime**).
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`IOptions<TOptions>` does not support named options, so you can only access
+    the default instance.'
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: Now that we looked at the building blocks, we dig into some code to explore
+    leveraging those interfaces.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Project – CommonScenarios
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: This first example covers multiple basic use cases, such as injecting options,
+    using named options, and storing options values in settings.Let’s start with the
+    shared building block.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Manual configuration
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'In the composition root, we can manually configure options, which is very useful
+    for configuring ASP.NET Core MVC, the JSON serializer, other pieces of the framework,
+    or our own handcrafted options.Here’s the first options class we use in the code,
+    which contains only a `Name` property:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE2]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'In the composition root, we can use the `Configure` extension method that extends
+    the `IServiceCollection` interface to achieve this. Here’s how we can set the
+    default options of the `MyOptions` class:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE3]'
+  prefs: []
+  type: TYPE_PRE
+- en: With that code, if we inject that options instance into a class, the value of
+    the `Name` property will be `Default Options`.We explore loading settings from
+    a non-hardcoded configuration source next.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Using the settings file
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'Loading configurations from a file is often more convenient than hardcoding
+    the values in C#. Moreover, the mechanism allows overriding the configurations
+    using different sources, bringing even more advantages.To load `MyOptions` from
+    the `appsettings.json` file, we must first get the configuration section, then
+    configure the options, like the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE4]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The preceding code loads the following data from the appsettings.json file:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE5]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The **defaultOptions** section maps to objects with the same key in the JSON
+    file (highlighted code). The `name` property of the `defaultOptions` section translates
+    to the `Name` property of the `MyOptions` class.That code does the same as the
+    preceding hardcoded version. However, manually loading the section this way allows
+    us to load a different section for different named options.Alternatively, we can
+    also “bind” a configuration section to an existing object using the `Bind` method
+    like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE6]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'That code loads the settings and assigns them to the object’s properties, matching
+    the settings key to the properties name. However, this does not add the object
+    to the IoC container.To overcome this, if we do not want to register the dependency
+    manually and don’t need the object, we can use the `Bind` or `BindConfiguration`
+    methods from the `OptionsBuilder<TOptions>`. We create that object with the `AddOptions`
+    method, like for `Bind`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE7]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The preceding code loads the `options3` configuration section using the `GetSection`
+    method (highlighted), then the `OptionsBuilder<TOptions>` binds that value to
+    the name `Options3` through the `Bind` method. This registers a named instance
+    of `MyOptions` with the container. We dig into named options later.Then again,
+    we can skip the use of the `GetSection` method by using the `BindConfiguration`
+    method instead, like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE8]'
+  prefs: []
+  type: TYPE_PRE
+- en: The preceding code loads the settings from the `options4` section, then registers
+    that new setting with the IoC container.These are just a subset of the different
+    ways we can leverage the ASP.NET Core Options pattern and configuration system.
+    Now that we know how to configure the options, it is time to use them.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Injecting options
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'Let’s start by learning how to leverage the `IOptions<TOptions>` interface,
+    the first and simplest interface that came out of .NET Core.To try this out, let’s
+    create an endpoint and inject the `IOptions<MyOptions>` interface as a parameter:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE9]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'In the preceding code, the `Value` property returns the configured value, which
+    is the following, serialized as JSON:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE10]'
+  prefs: []
+  type: TYPE_PRE
+- en: And voilà! We can also use constructor injection or any other method we know
+    to use the value of our options object.Next, we explore configuring multiple instances
+    of the same options class.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Named options
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: Now, let’s explore named options by configuring two more instances of the `MyOptions`
+    class. The concept is to associate a configuration of the options with a name.
+    Once that is done, we can request the configuration we need.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Unfortunately, the ways we explore named options and most online examples break
+    the Inversion of Control principle.
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: ''
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: Why? By injecting an interface that is directly tied to a lifetime, the consuming
+    class controls that part of the dependency.
+  prefs:
+  - PREF_BQ
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: ''
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: Rest assured, we are revisiting this at the end of the chapter.
+  prefs:
+  - PREF_BQ
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: 'First, in the `appsettings.json` file, let’s add the highlighted sections:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE11]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Now that we have those configs, let’s configure them in the `Program.cs` file
+    by adding the following lines:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE12]'
+  prefs: []
+  type: TYPE_PRE
+- en: In the preceding code, the highlighted strings represent the names of the options
+    we are configuring. We associate each configuration section with a named instance.Now
+    to consume those named options, we have multiple choices. We can inject an `IOptionsFactory<MyOptions>`,
+    `IOptionsMonitor<MyOptions>`, or an `IOptionsSnapshot<MyOptions>` interface. The
+    final choice depends on the lifetime the consumer of the options needs. However,
+    in our case, we use all of them to ensure we explore them all.
+  prefs: []
+  type: TYPE_NORMAL
+- en: IOptionsFactory<MyOptions>
+  prefs:
+  - PREF_H4
+  type: TYPE_NORMAL
+- en: 'Let’s start with creating an endpoint where we inject a factory:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE13]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The factory interface forces us to pass in a name that is convenient for us.
+    When we execute the program, the endpoint serves us the options based on the specified
+    name. For example, when we send the following request:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE14]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The endpoint returns the following JSON:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE15]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'If we pass Options2 instead, we get the following JSON:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE16]'
+  prefs: []
+  type: TYPE_PRE
+- en: As simple as that, we can now choose between three different options. Of course,
+    once again, we can leverage any other technique we know, like constructor injections.Let’s
+    explore the next interface.
+  prefs: []
+  type: TYPE_NORMAL
+- en: IOptionsMonitor<MyOptions>
+  prefs:
+  - PREF_H4
+  type: TYPE_NORMAL
+- en: 'We use the `IOptionsMonitor` interface similarly to the `IOptionsFactory` interface
+    when we need named options. So, let’s start by creating a similar endpoint:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE17]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The preceding code is almost the same as the factory one, but the `IOptionsMonitor`
+    interface exposes a `Get` method instead of a `Create` method. This semantically
+    expresses that the code is getting an options instance (singleton) instead of
+    creating a new one (transient).Again, similarly, if we send the following request:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE18]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The server returns the following JSON:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE19]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'One difference is that we can access the default options as well; here’s how:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE20]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'In the preceding code, the `CurrentValue` property returns the default options.
+    So, when calling this endpoint, we should receive the following JSON:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE21]'
+  prefs: []
+  type: TYPE_PRE
+- en: As simple as that, we can either access the default value or a named value.
+    We explore one other scenario that the `IOptionsMonitor` interface supports after
+    we cover the `IOptionsSnapshot` interface next.
+  prefs: []
+  type: TYPE_NORMAL
+- en: IOptionsSnapshot<MyOptions>
+  prefs:
+  - PREF_H4
+  type: TYPE_NORMAL
+- en: 'The `IOptionsSnapshot` interface inherits the `IOptions` interface, contributing
+    its `Value` property, and also offers a `Get` method (scoped lifetime) that works
+    like the `IOptionsMonitor` interface.Let’s start with the first endpoint:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE22]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'It should be no surprise that the preceding endpoint returns the following
+    default options:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE23]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Then the following parametrized endpoint returns the specified named options:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE24]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Say we are passing the name `Options1`, then the endpoint will return the following
+    options:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE25]'
+  prefs: []
+  type: TYPE_PRE
+- en: And we are done. It is quite simple to use the options as .NET does most of
+    the work for us. The same goes for configuring options classes.But wait, our exploration
+    isn't over yet! Up next, we delve into the process of reloading options at runtime.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Reloading options at runtime
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'A fascinating aspect of the ASP.NET Core options is that the system reloads
+    the value of the options when someone updates a configuration file like `appsettings.json`.
+    To try it out, you can:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Run the program.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Query an endpoint using the request available in the `CommonScenarios.http`
+    file.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Change the value of that option in the `appsettings.json` file and save the
+    file.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Query the same endpoint again, and you should see the updated value.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'This is an out-of-the-box feature. However, the system rebuilds the options
+    instance, which does not update the references on the previous instance. The good
+    news is that we can hook into the system and react to the changes.For most scenarios,
+    we don’t need to manually check for change since the value of the `CurrentValue`
+    property gets updated. However, if you directly reference that value, this mechanism
+    can be useful.In this scenario, we have a notification service that sends emails.
+    The SMTP client’s configurations are settings. In this case, we only have the
+    `SenderEmailAddress` since sending actual emails is unnecessary. We are logging
+    the notification in the console instead, allowing us to see the configuration
+    changes appear live.Let’s start with the `EmailOptions` class:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE26]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Next, we have the `NotificationService` class itself. Let’s start with its
+    first iteration:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE27]'
+  prefs: []
+  type: TYPE_PRE
+- en: In the preceding code, the class holds a reference on the `EmailOptions` class
+    upon creation (highlighted lines). The `NotifyAsync` method writes an information
+    message in the console and then returns.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We explore logging in the next chapter.
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: 'Because the `NotificationService` class has a singleton lifetime and references
+    the options class itself, if we change the configuration, the value will not update
+    since the system recreates a new instance with the updated configuration. Here’s
+    the service registration method:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE28]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'How to fix this? In this case, we could fix the issue by referencing the `IOptionsMonitor`
+    interface instead of its `CurrentValue` property. However, if you face a scenario
+    where it’s impossible, we can tap into the `OnChange` method of the `IOptionsMonitor`
+    interface. In the constructor, we could add the following code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE29]'
+  prefs: []
+  type: TYPE_PRE
+- en: With that code, when the `appsettings.json` file changes, the code updates the
+    `_emailOptions` field. As easy as this, we reactivated the reloading feature.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'One more thing, the `OnChange` method returns an `IDisposable` we can dispose
+    of to stop listening for changes. I implemented two additional methods in the
+    source code: `StartListeningForChanges` and `StopListeningForChanges`, and three
+    endpoints, one to send notifications, one to stop listening for changes, and one
+    to start listening for changes again.'
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: Now that we know how to use the options, let’s explore additional ways to configure
+    them.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Project – OptionsConfiguration
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Now that we have covered basic usage scenarios, let’s attack some more advanced
+    possibilities, such as creating types to configure, initialize, and validate our
+    options.We start by configuring options which happen in two phases:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The configuration phase.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: The post-configuration phase.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'In a nutshell, the post-configuration phase happens later in the process. This
+    is a good place to enforce that some values are configured a certain way or to
+    override configuration, for example, in integration tests.To configure an options
+    class, we have many options, starting with the following interfaces:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '| **Interface** | **Description** |'
+  prefs: []
+  type: TYPE_TB
+- en: '| `IConfigureOptions<TOptions>` | Configure the default `TOptions` type. |'
+  prefs: []
+  type: TYPE_TB
+- en: '| `IConfigureNamedOptions<TOptions>` | Configure the default and named `TOptions`
+    type. |'
+  prefs: []
+  type: TYPE_TB
+- en: '| `IPostConfigureOptions<TOptions>` | Configure the default and named `TOptions`
+    type during the post-configuration phase. |'
+  prefs: []
+  type: TYPE_TB
+- en: 'Table 9.2: interfaces to configure options classes.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: If a configuration class implements both `IConfigureOptions` and `IConfigureNamedOptions`
+    interfaces, the `IConfigureNamedOptions` interface will take precedence, and the
+    `Configure` method of the `IConfigureOptions` interface will not be executed.
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: ''
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: You can configure the default instance using the `Configure` method of the `IConfigureNamedOptions`
+    interface; the name of the options will be empty (equal to the member `Options.DefaultName`).
+  prefs:
+  - PREF_BQ
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: 'We can also leverage the following methods that extend the `IServiceCollection`
+    interface:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '| **Method** | **Description** |'
+  prefs: []
+  type: TYPE_TB
+- en: '| `Configure<TOptions>` | Configure the default and named `TOptions` type inline
+    or from a configuration section. |'
+  prefs: []
+  type: TYPE_TB
+- en: '| `ConfigureAll<TOptions>` | Configure all options of type `TOptions` inline.
+    |'
+  prefs: []
+  type: TYPE_TB
+- en: '| `PostConfigure<TOptions>` | Configure the default and named `TOptions` type
+    inline during the post-configuration phase. |'
+  prefs: []
+  type: TYPE_TB
+- en: '| `PostConfigureAll<TOptions>` | Configure all options of type `TOptions` inline
+    during the post-configuration phase. |'
+  prefs: []
+  type: TYPE_TB
+- en: 'Table 9.3: configuration methods.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: As we are about to see, the registration order is very important. The configurators
+    are executed in order of registration. Each phase is independent of the other;
+    thus, the sequence in which we arrange the configuration and post-configuration
+    phases doesn't influence one another.First, we must lay out the groundwork for
+    our little program.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Creating the program
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'After creating an empty web application, the first building block is to create
+    the options class that we want to configure:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE30]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'We use the `Lines` property as a trace bucket. We add lines to it to visually
+    confirm the order that the configurators are executed.Next, we define application
+    settings in the `appsettings.json` file:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE31]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'We use the configuration as a starting point. It defines the value of the `Title`
+    property and adds a first line to the `Lines` property, allowing us to trace the
+    order it is executed.Next, we need an endpoint to access the settings, serialize
+    the result to a JSON string, and then write it to the response stream:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE32]'
+  prefs: []
+  type: TYPE_PRE
+- en: By calling this endpoint, we can consult the values of the default and named
+    instances we are about to create.
+  prefs: []
+  type: TYPE_NORMAL
+- en: ASP.NET Core configures the options when they are requested for the first time.
+    In this case, both instances of the `ConfigureMeOptions` class are configured
+    when calling the `/configure-me` endpoint for the first time.
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: If we run the program now, we end up with two empty instances, so before doing
+    that, we need to tell ASP.NET about the `configureMe` configuration section we
+    added to the `appsettings.json` file.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Configuring the options
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'We want two different options to test out many possibilities:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: A default options (unnamed)
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: A named instance.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'To achieve this, we must add the following lines in the `Program.cs` file:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE33]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The preceding code registers a default instance (highlighted code) and a named
+    instance. Both use the `configureMe` configuration sections and so start with
+    the same initial values, as we can see when running the project:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE34]'
+  prefs: []
+  type: TYPE_PRE
+- en: The `defaultInstance` and `namedInstance` properties are self-explanatory and
+    relate to their respective options instance.Now that we completed our building
+    blocks, we are ready to explore the `IConfigureOptions<TOptions>` interface.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Implementing a configurator object
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'We can encapsulate the configuration logic into classes to apply the single
+    responsibility principle (SRP). To do so, we must implement an interface and create
+    the binding with the IoC container.First, we must create a class that we name
+    `ConfigureAllConfigureMeOptions`, which configures all `ConfigureMeOptions` instances;
+    default and named:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE35]'
+  prefs: []
+  type: TYPE_PRE
+- en: In the preceding code, we implement the interface (highlighted code), which
+    contains two methods. The second `Configure` method should never be called, but
+    just in case, we can simply redirect the call to the other method if it happens.
+    The body of the first `Configure` method (highlighted) adds a line to all options
+    and a second line when the options is not the default one.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Instead of testing if the options is not the default one (`name != Options.DefaultName`),
+    you can check for the options name or use a `switch` to configure specific options
+    by name.
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: 'We can tell the IoC container about this code, so ASP.NET Core executes it
+    like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE36]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Now with this binding in place, ASP.NET Core will run our code the first time
+    we request our endpoint. Here’s the result:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE37]'
+  prefs: []
+  type: TYPE_PRE
+- en: As we can see from that JSON output, the configurator ran and added the expected
+    lines to each instance.
+  prefs: []
+  type: TYPE_NORMAL
+- en: It is important to note that you must bind the `IConfigureOptions<TOptions>`
+    to your configuration class even if you implemented the `IConfigureNamedOptions<TOptions>`
+    interface.
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: And voilà—we have a neat result that took almost no effort. This can lead to
+    so many possibilities! Implementing `IConfigureOptions<TOptions>` is probably
+    the best way to configure the default values of an options class.Next, we add
+    post-configuration to the mix!
+  prefs: []
+  type: TYPE_NORMAL
+- en: Adding post-configuration
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'We must take a similar path to add post-configuration values but implement
+    the `IPostConfigureOptions<TOptions>` instead. To achieve this, we update the
+    `ConfigureAllConfigureMeOptions` class to implement that interface:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE38]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'In the preceding code, we implemented the interface (highlighted lines). The
+    `PostConfigure` method simply adds a line to the `Lines` property. To register
+    it with the IoC container, we must add the following line:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE39]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The big difference is that this runs during the post-configuration phase, independent
+    of the initial configuration phase. Executing the application now leads to the
+    following result:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE40]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'In the preceding JSON, the highlighted lines represent our post-configuration
+    code that was added at the end. You might tell yourself, of course, it’s the last
+    line; it’s the last code we registered, which is a legitimate assumption. However,
+    here’s the complete registration code, which clearly shows the `IPostConfigureOptions<TOptions>`
+    interface was registered first (highlighted), proving the post-configuration code
+    runs last:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE41]'
+  prefs: []
+  type: TYPE_PRE
+- en: Next, we create a second configuration class.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Using multiple configurator objects
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'A very interesting concept with the ASP.NET Core options pattern is that we
+    can register as many configuration classes as we want. This creates many possibilities,
+    including code from one or more assemblies configuring the same options class.Now
+    that we know how this works, let’s add the `ConfigureMoreConfigureMeOptions` class,
+    which also adds a line to the `Lines` property:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE42]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'This time, we want that class only to augment the default instance, so it implements
+    the **IConfigureOptions<TOptions>** interface (highlighted lines).Next, we must
+    register the binding:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE43]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'As we can see, it’s the same binding but pointing to the `ConfigureMoreConfigureMeOptions`
+    class instead of the `ConfigureAllConfigureMeOptions` class.Executing the application
+    and querying the endpoint outputs the following JSON:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE44]'
+  prefs: []
+  type: TYPE_PRE
+- en: The preceding JSON shows the line our new class added to only the default instance
+    (highlighted) before the post-configure option.The possibilities are great, right?
+    The code can contribute configuration objects and register them in one of the
+    two phases to configure options objects. Next, we explore a few more possibilities.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Exploring other configuration possibilities
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'We can mix those configuration classes with extension methods. For example:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: We can call the `Configure` and `PostConfigure` methods multiple times.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: We can call the `ConfigureAll` and `PostConfigureAll` methods to configure all
+    the options of a given `TOptions`.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Here, we use the `PostConfigure` method to demonstrate that. Let’s add the
+    following two lines of code (highlighted):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE45]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The preceding code registers two configuration delegates that target our named
+    instance. They both run in the post-configuration phase. So running the app and
+    accessing the endpoint shows the order in which all lines are added:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE46]'
+  prefs: []
+  type: TYPE_PRE
+- en: In the preceding JSON, we can see that the two highlighted lines are the ones
+    we just added, loaded in order, and not applied to the default options.
+  prefs: []
+  type: TYPE_NORMAL
+- en: There is one more possibility, which comes from the validation API. This is
+    most likely an unintended side effect, but it works nonetheless.
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: ''
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: 'The following code adds the `"Inline Validate"` line after the post-configuration
+    phase:'
+  prefs:
+  - PREF_BQ
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: '[PRE47]'
+  prefs: []
+  type: TYPE_PRE
+- en: On the separation of concerns aspect, we should stay away from this. However,
+    knowing this may help you work around a post-configuration order issue one day.
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: Now that we know the options interface types, their lifetimes, and many ways
+    to configure their values, it is time to validate them and enforce a certain level
+    of integrity in our programs.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Project – OptionsValidation
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Another feature that comes out of the box is options validation, which allows
+    us to run validation code when a `TOptions` object is created. The validation
+    code is guaranteed to run the first time an option is created and does not account
+    for subsequent options modifications. Depending on the lifetime of your options
+    object, the validation may or may not run. For example:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '| **Interface** | **Lifetime** | **Validation** |'
+  prefs: []
+  type: TYPE_TB
+- en: '| `IOptionsMonitor<TOptions>` | Singleton | Validate the options once. |'
+  prefs: []
+  type: TYPE_TB
+- en: '| `IOptionsFactory<TOptions>` | Transient | Validate the options every time
+    the code calls the `Create` method. |'
+  prefs: []
+  type: TYPE_TB
+- en: '| `IOptionsSnapshot<TOptions>` | Scoped | Validate the options once per HTTP
+    request (per scope). |'
+  prefs: []
+  type: TYPE_TB
+- en: '| `IOptions<TOptions>` | Singleton | Validate the options once. |'
+  prefs: []
+  type: TYPE_TB
+- en: 'Table 9.4: the effect of validation on options lifetime.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: I wrote three test cases in the `ValidateLifetime.cs` file if you are interested
+    to see this in action.
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: We can create validation types to validate options classes. They must implement
+    the `IValidateOptions<TOptions>` interface or use data annotations such as `[Required]`.
+    Implementing the interface works very similarly to the options configuration.First,
+    let’s see how to force the validation when the program starts.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Eager validation
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'Eager validation has been added to .NET 6 and allows catching incorrectly configured
+    options at startup time in a fail-fast mindset.The `Microsoft.Extensions.Hosting`
+    assembly adds the `ValidateOnStart` extension method to the `OptionsBuilder<TOptions>`
+    type.There are different ways of using this, including the following, which binds
+    a configuration section to an options class:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE48]'
+  prefs: []
+  type: TYPE_PRE
+- en: The highlighted line is all we need to apply our validation rules during startup.
+    I recommend using this as your new default so you know that options are misconfigured
+    at startup time instead of later at runtime, limiting unexpected issues.Now that
+    we know that, let’s look at how to configure options validation.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Data annotations
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: Let’s start by using `System.ComponentModel.DataAnnotations` types to decorate
+    our options with validation attributes. We activate this feature with the `ValidateDataAnnotations`
+    extension method. This also works with eager validation by chaining both methods.
+  prefs: []
+  type: TYPE_NORMAL
+- en: If you are unfamiliar with `DataAnnotations`, they are attributes used to validate
+    EF Core and MVC model classes. Don’t worry, they are very explicit, so you should
+    understand the code.
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: 'To demonstrate this, let’s look at the skeleton of two small tests:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE49]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The preceding code shows that the `MyImportantProperty` property of the `Options`
+    class is required and cannot be `null` (highlighted line). Next, we look at the
+    test cases.The first test is expecting the validation to pass:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE50]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The test simulates the execution of a program where the IoC container creates
+    the options class, and its consumer (the test) leverages it. The highlighted line
+    sets the property to `"A value"`, making the validation pass. The code also enables
+    eager validation (`ValidateOnStart`) on top of the validation of data annotations
+    (`ValidateDataAnnotations`).The second test is expecting the validation to fail:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE51]'
+  prefs: []
+  type: TYPE_PRE
+- en: In the preceding code, the `MyImportantProperty` is never set (highlighted code),
+    leading to the validation failing and throwing an `OptionsValidationException`.
+    The test simulates catching that exception.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The eager validation does not work in the tests because it is not an ASP.NET
+    Core program but xUnit test cases (Fascts).
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: That’s it—.NET does the job for us and validates our instance of the `Options`
+    class using the data annotation like you can do when using EF Core or MVC model.Next,
+    we explore how to create validation classes to validate our options objects manually.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Validation types
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: To implement options validation types or options validators, we can create a
+    class that implements one or more `IValidateOptions<TOptions>` interfaces. One
+    type can validate multiple options, and multiple types can validate the same options,
+    so the possible combinations should cover all use cases.Using a custom class is
+    no harder than using data annotations. However, it allows us to remove the validation
+    concerns from the options class and code more complex validation logic. You should
+    pick the way that makes the most sense for your project.
+  prefs: []
+  type: TYPE_NORMAL
+- en: On top of personal preferences, say you use a third-party library with options.
+    You load that library into your application and expect the configuration to be
+    a certain way. You could create a class to validate that the options class provided
+    by the library is configured appropriately for your application and even validate
+    this at startup time.
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: ''
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: You can’t use data annotations for that because you don’t control the code.
+    Moreover, it is not a general validation that should apply to all consumers but
+    specific validation for that one app.
+  prefs:
+  - PREF_BQ
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: 'Let’s start with the skeleton of the test class:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE52]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'In the preceding code, we have the `Options` class that is similar to the previous
+    example but without the data annotation. The difference is that instead of using
+    the `[Required]` attribute, we created the `OptionsValidator` class (highlighted)
+    containing the validation logic.`OptionsValidator` implements `IValidateOptions<Options>`,
+    which only contains a `Validate` method. This method allows named and default
+    options to be validated. The `name` argument represents the options’ names. In
+    our case, we implemented the required logic for all options. The `ValidateOptionsResult`
+    class exposes a few members to help us, such as the `Success` and `Skip` fields,
+    and two `Fail()` methods.`ValidateOptionsResult.Success` indicates success. `ValidateOptionsResult.Skip`
+    indicates that the validator did not validate the options, most likely because
+    it only validates certain named options but not the given one.The `ValidateOptionsResult.Fail(message)`
+    and `ValidateOptionsResult.Fail(messages)` methods take a single message or a
+    collection of messages as an argument.To make this work, we must make the validator
+    available to the IoC container, as we did with the options configuration. We explore
+    the two test cases next, which are very similar to the data annotation example.Here’s
+    the first test case that passes the validation:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE53]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The test case simulates an application that configures the `MyImportantProperty`
+    correctly, which passes validation. The highlighted line shows how to register
+    the validator class. The rest is done by the framework when using the options
+    class.Next, we explore a test that fails the validation:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE54]'
+  prefs: []
+  type: TYPE_PRE
+- en: The test simulates a program where the `Options` class is not configured appropriately.
+    When accessing the options object, the framework builds the class and validates
+    it, throwing an `OptionsValidationException` because of the validation rules (highlighted
+    lines).Using types to validate options is handy when you don’t want to use data
+    annotations, can’t use data annotations, or need to implement certain logic that
+    is easier within a method than with attributes.Next, we glance at how to leverage
+    options with FluentValidation.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Project – OptionsValidationFluentValidation
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'In this project, we validate options classes using FluentValidation. FluentValidation
+    is a popular open-source library that provides a validation framework different
+    from data annotations. We explore FluentValidation more in *Chapter 15*, *Getting
+    Started with Vertical Slice Architecture*, but that should not hinder you from
+    following this example.Here, I want to show you how to leverage a few patterns
+    we’ve learned so far to implement this ourselves with only a few lines of code.
+    In this micro-project, we leverage:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Dependency injection
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The Strategy design pattern
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The Options pattern
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Options validation: validation types'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Options validation: eager validation'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Let’s start with the options class itself:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE55]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The options class is very thin, containing only a nullable `Name` property.
+    Next, let’s look at the FluentValidation validator, which validates that the `Name`
+    property is not empty:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE56]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'If you have never used FluentValidation before, the `AbstractValidator<T>`
+    class implements the `IValidator<T>` interface and adds utility methods like `RuleFor`.
+    The `MyOptionsValidator` class contains the validation rules.To make ASP.NET Core
+    validate `MyOptions` instances using FluentValidation, we implement an `IValidateOptions<TOptions>`
+    interface as we did in the previous example, inject our validator in it, and then
+    leverage it to ensure the validity of `MyOptions` objects. This implementation
+    of the `IValidateOptions` interface creates a bridge between the FluentValidation
+    features and the ASP.NET Core options validation.Here is a generic implementation
+    of such a class that could be reused for any type of options:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE57]'
+  prefs: []
+  type: TYPE_PRE
+- en: In the preceding code, the `FluentValidateOptions<TOptions>` class adapts the
+    `IValidateOptions<TOptions>` interface to the `IValidator<TOptions>` interface
+    by leveraging FluentValidation in the `Validate` method. In a nutshell, we use
+    the output of one system and make it an input of another system.
+  prefs: []
+  type: TYPE_NORMAL
+- en: This type of adaptation is known as the Adapter design pattern. We explore the
+    Adapter pattern in the next chapter.
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: 'Now that we have all the building blocks, let’s have a look at the composition
+    root:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE58]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The highlighted code is the key to this system:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: It registers the FluentValidation `MyOptionsValidator` that contains the validation
+    rules.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: It registers the generic `FluentValidateOptions` instance, so .NET uses it to
+    validate `MyOptions` class.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Under the hood, The `FluentValidateOptions` class uses the `MyOptionsValidator`
+    to validate the options internally.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'When running the program, the console yields the following error, as expected:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE59]'
+  prefs: []
+  type: TYPE_PRE
+- en: This may look like a lot of trouble for a simple required field; however, the
+    `FluentValidateOptions<TOptions>` is reusable. We could also scan one or more
+    assemblies to register the validator with the IoC container automatically.Now
+    that we’ve explored many ways to configure and validate options objects, it is
+    time to look at a way to inject options classes directly, either by choice or
+    to work around a library capability issue.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Workaround – Injecting options directly
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: The only negative point about the .NET Options pattern is that we must tie our
+    code to the framework’s interfaces. We must inject an interface like `IOptionsMonitor<Options>`
+    instead of the `Options` class itself. By letting the consumers choose the interface,
+    we let them control the lifetime of the options, which breaks the inversion of
+    control, dependency inversion, and open/closed principles. We should move that
+    responsibility out of the consumer up to the composition root.
+  prefs: []
+  type: TYPE_NORMAL
+- en: As we explored at the beginning of this chapter, the `IOptions`, `IOptionsFactory`,
+    `IOptionsMonitor`, and `IOptionsSnapshot` interfaces define the options object’s
+    lifetime.
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: 'In most cases, I prefer to inject `Options` directly, controlling its lifetime
+    from the composition root, instead of letting the class itself control its dependencies.
+    I’m a little *anti-control-freak*, I know. Moreover, writing tests using the `Options`
+    class directly over mocking an interface like `IOptionsSnapshot` is easier.It
+    just so happens that we can circumvent this easily with the following two parts
+    trick:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Set up the options class normally, as explored in this chapter.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Create a dependency binding that instructs the container to inject the options
+    class directly using the Options pattern.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'The xUnit test of the `ByPassingInterfaces` class from the `OptionsValidation`
+    project demonstrates this. Here’s the skeleton of that test class:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE60]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The preceding `Options` class has only a `Name` property. We are using it next
+    to explore the workaround in the test case:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE61]'
+  prefs: []
+  type: TYPE_PRE
+- en: In the preceding code block, we registered the `Options` class using a factory
+    method. That way, we can inject the `Options` class directly (with a scoped lifetime).
+    Moreover, the delegate now controls the `Options` class's creation and lifetime
+    (highlighted code).And voilà, this workaround allows us to inject `Options` directly
+    into our system without tying our classes with any .NET-specific options interface.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Consuming options through the `IOptionsSnapshot<TOptions>` interface results
+    in a *scoped* lifetime.
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: The *Act & Assert* section of the test validates the correctness of the setup
+    by creating two scopes and ensuring that each scope returns a different instance
+    while returning the same instance within the scope. For example, both `options1`
+    and `options2` come from `scope1`, so they should be the same. On the other hand,
+    `options3` comes from `scope2`, so it should be different than `options1` and
+    `options2`.This workaround also applies to existing systems that could benefit
+    from the Options pattern without updating its code—assuming the system is dependency
+    injection-ready. We can also use this trick to compile an assembly that does not
+    depend on `Microsoft.Extensions.Options`. By using this trick, we can set the
+    lifetime of the options from the composition root, which is a more classic dependency
+    injection-enabled flow. To change the lifetime, use a different interface, like
+    `IOptionsMonitor` or `IOptionsFactory`.Next, we explore a way to organize all
+    this code.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Project – Centralizing the configuration
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Creating classes and classes is very object-oriented and follows the single-responsibility
+    principle, among others. However, dividing responsibilities into programming concerns
+    is not always what leads to the easiest code to understand because it creates
+    a lot of classes and files, often spread across multiple layers and more.An alternative
+    is to regroup the initialization and validation with the options class itself,
+    shifting the multiple responsibilities to a single one: an end-to-end options
+    class.In this example, we explore `ProxyOptions` class, which carries the name
+    of the service and the time the proxy service should cache items in seconds. We
+    want to set a default value for the `CacheTimeInSeconds` property and validate
+    that the `Name` property is not empty.On the other hand, we don’t want the consumer
+    of that class to have access to any other methods, like `Configure` or `Validate`.To
+    achieve this, we can implement the interfaces explicitly, hiding them from the
+    `ProxyOptions` but showing them to the consumers of the interfaces. For example,
+    binding the `ProxyOptions` class to the `IValidateOptions<ProxyOptions>` interface
+    gives the consumer access to the `Validate` method through the `IValidateOptions<ProxyOptions>`
+    interface. Explaining this should be simpler in code; here’s the class:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE62]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The preceding code implements both `IConfigureOptions<ProxyOptions>` and `IValidateOptions<ProxyOptions>`
+    interfaces explicitly (highlighted) by omitting the visibility modifier and prefixing
+    the name of the method with the name of the interface, like the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE63]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Now, to leverage it, we must register it with the IoC container like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE64]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'In the preceding code, we combined many notions we explored, like:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Registering the options class
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Using the workaround to access the `ProxyOptions` class directly
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Configuring the options inline and through a configurator class
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Leverage a validation class
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Enforcing the validation by eager loading our options during the startup.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: If you comment out the highlighted line, the application will throw an exception
+    on startup.
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: 'The only endpoint defined in the application is the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE65]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'When we run the application, we get the following output:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE66]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'As expected, the value of the `cacheTimeInSeconds` property equals the value
+    of the `DefaultCacheTimeInSeconds` field, and the value of the `name` property
+    to what we configured in the `Program.cs` file.When using the IntelliSense feature
+    inside your favorite IDE, I’m using Visual Studio 2022 here, we can see only the
+    properties, no method:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 9.1: VS IntelliSense not showing explicitly implemented interfaces
+    members.](img/file45.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'Figure 9.1: VS IntelliSense not showing explicitly implemented interfaces members.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: That’s it; we are done with this organizational technique.
+  prefs: []
+  type: TYPE_NORMAL
+- en: To keep the composition cleaner, we could encapsulate the bindings in an extension
+    method, and, even better, make that extension method register the whole proxy
+    feature. For example, `services.AddProxyService()`.
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: ''
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: I’ll let you practice this one on your own as we already explored this.
+  prefs:
+  - PREF_BQ
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: Next, we explore code generators!
+  prefs: []
+  type: TYPE_NORMAL
+- en: Using the configuration-binding source generator
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: .NET 8 introduces a **configuration-binding source generator** that provides
+    an alternative to the default reflection-based implementation. In simple terms,
+    the name of the options class properties and the settings keys are now hard-coded,
+    accelerating the configuration retrieval.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Beware, the settings keys are case-sensitive and map one-on-one with the C#
+    class property name, unlike the non-generated code.
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: Web applications using Native AOT deployment (ahead-of-time compilation to native
+    code) or trimming self-contained deployments to ship only the bits in use now
+    leverage this option by default.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The native AOT deployment model compiles the code to a single runtime environment
+    like Windows x64\. It does not need the just-in-time (JIT) compiler since the
+    code is already compiled to the native version of the targetted environment. AOT
+    deployments are self-contained and do not need the .NET runtime to work.
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: 'We can use the `EnableConfigurationBindingGenerator` property in your `csproj`
+    file to manually activate or deactivate the generator:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE67]'
+  prefs: []
+  type: TYPE_PRE
+- en: Now that the generator is enabled, let’ see how this works. The generator looks
+    for a few options, including the Configure and Bind methods. It then generates
+    the binding code.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Project – ConfigurationGenerators: Part 1'
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'In this first part of the project, we create an options class and register
+    it with the IoC container to consume it through an API endpoint.We use the following
+    options class:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE68]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'In the `Program.cs` file, we can use the source generator like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE69]'
+  prefs: []
+  type: TYPE_PRE
+- en: As you may have noticed, the preceding code is the same as we used before and
+    does what you expect it to do, but the new source generator generates the code
+    under the hood—no functional or usage changes.Let’s explore another source generator
+    next.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Using the options validation source generator
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: '.NET 8 introduces the **options validation source generator**, which generates
+    the validation code based on data annotations. The idea is similar to the configuration-binding
+    source generator but for the validation code.To leverage the validation generator,
+    we must add a reference on the `Microsoft.Extensions.Options.DataAnnotations`
+    package.Afterward, we must:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Create an empty validator class.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Ensure the class is `partial`.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Implement the `IValidateOptions<TOptions>` interface (but not the methods).
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Decorate the validator class with the `[OptionsValidator]` attribute.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Register the validator class with the container.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: This procedure sounds complicated but is way simpler in code; let's look at
+    that now.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Project – ConfigurationGenerators: Part 2'
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'In this second part of the project, we continue to build on the previous pieces
+    and add validation to our `MyOptions` class. Of course, we also want to test the
+    new source generator.Here''s the updated `MyOptions` class:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE70]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The highlighted line represents the changes. We want to ensure the `Name` property
+    is not empty.Now that we updated our options class, let''s create the following
+    validator class:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE71]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The preceding code is an empty shell that prepares the class for the code generator.
+    The `[OptionsValidator]` attribute represents the generator hook (a.k.a. that’s
+    the flag the generator is looking for). And with this code, we are done with steps
+    1 to 4; simpler than English, right?Now, for the last step, we register our validator
+    like normal:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE72]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'To test this out, let''s add a `valid` named options instance bound to the
+    following configuration section in the `appsettings.json` file:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE73]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Here''s how we bind it in the `Program.cs` file:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE74]'
+  prefs: []
+  type: TYPE_PRE
+- en: The preceding code registers the `valid` named options, binds it to the configuration
+    section `MyOptions`, and validates it when the application starts.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Other ways to register the named options also work. I used this one for convenience
+    purposes only.
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: 'If we were to inspect the content of the options at runtime, it would be what
+    we expect; nothing is different from what we explored throughout the chapter:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE75]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'At this point, the program should start.Next, to test this out, let''s add
+    another named options class, but an invalid one this time. We won''t change anything
+    in the `appsettings.json` file, and add the following registration code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE76]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The preceding code binds a missing section to the `invalid` named options,
+    making the `Name` property equal to `null`. That object will not pass our validation
+    because the `Name` property is required.If we run the application now, we get
+    the following message:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE77]'
+  prefs: []
+  type: TYPE_PRE
+- en: From that error, we know the validation works as expected. It is not every day
+    that we are happy when our application doesn’t start but this is one of those
+    time.That's it for the code generation, it behaves the same, but the code under
+    the hood is different, enabling technologies like AOT and trimming that do not
+    support reflection-based mechanisms well. Moreover, code generation should speed
+    up the program execution because the behaviors are hard-coded instead of relying
+    on a dynamic reflection-based approach.Next, let’s dig into another class introduced
+    in .NET 8.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Using the ValidateOptionsResultBuilder class
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: The `ValidateOptionsResultBuilder` is a new type in .NET 8\. It allows to dynamically
+    accumulate validation errors and create a `ValidateOptionsResult` object representing
+    its current state.Its basic usage is straightforward, as we are about to see.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Project - ValidateOptionsResultBuilder
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'In this project, we are validating the `MyOptions` object. The type has multiple
+    validation rules, and we want to ensure we are not stopping after the first rule
+    fails validation so a consumer would know all the errors in one go. To achieve
+    this, we decided to use the `ValidateOptionsResultBuilder` class.Let''s start
+    with the options class:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE78]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Next, let''s implement a validator class that enforces both properties are
+    not empty:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE79]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'In the preceding code, we create a `ValidateOptionsResultBuilder` object, add
+    errors to it, then returns an instance of the `SimpleMyOptionsValidator` class
+    by leveraging its `Build` method. The usage of the `ValidateOptionsResultBuilder`
+    class is highlighted.Next, to test this out, we must register the options. Let''s
+    also create an endpoint. Here''s the `Program.cs` file:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE80]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The preceding code is as normal as it can get after a whole chapter on the
+    Options pattern. We register our options class, the validator, and create an endpoint.When
+    we call the endpoint, we get the following result:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE81]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'As expected, the application failed to start because the validation of the
+    `MyOptions` class failed. One difference is that we have two combined error messages
+    instead of one.As a reference, a validator doing the same without using the `ValidateOptionsResultBuilder`
+    type would look like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE82]'
+  prefs: []
+  type: TYPE_PRE
+- en: The highlighted code represents the standard process which get replaced by the
+    use of the `ValidateOptionsResultBuilder` type in the `SimpleMyOptionsValidator`
+    class.This concludes our project. Nothing very complex, yet it is a nice addition
+    to help accumulate multiple error messages. On top of that, the `ValidateOptionsResultBuilder`
+    type can also accumulate `ValidationResult` and `ValidateOptionsResult` objects
+    which can lead to more complex systems like collecting results from multiple validators.
+    I’ll let you fiddle with this one.Let’s recap this chapter before jumping into
+    ASP.NET Core logging.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Summary
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'This chapter explored the Options pattern, a powerful tool allowing us to configure
+    our ASP.NET Core applications. It enables us to change the application without
+    altering the code. The capability even allows the application to reload the options
+    at runtime when a configuration file is updated without downtime. We learned to
+    load settings from multiple sources, with the last loaded source overriding previous
+    values. We discovered the following interfaces to access settings and learned
+    that the choice of interface influences the lifetime of the options object:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`IOptionsMonitor<TOptions>`'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`IOptionsFactory<TOptions>`'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`IOptionsSnapshot<TOptions>`'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`IOptions<TOptions>`'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'We delved into manually configuring options in the composition root and loading
+    them from a settings file. We also learned how to inject options into a class
+    and configure multiple instances of the same options type using named options.
+    We explored encapsulating the configuration logic into classes to apply the single
+    responsibility principle (SRP). We achieved this by implementing the following
+    interfaces:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`IConfigureOptions<TOptions>`'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`IConfigureNamedOptions<TOptions>`'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`IPostConfigureOptions<TOptions>`'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'We also learned that we could mix configuration classes with inline configurations
+    using the `Configure` and `PostConfigure` methods and that the registration order
+    of configurators is crucial as they are executed in order of registration.We also
+    delved into options validation. We learned that the frequency at which options
+    objects are validated depends on the lifetime of the options interface used. We
+    also discovered the concept of eager validation, which allows us to catch incorrectly
+    configured options classes at startup time. We learned to use data annotations
+    to decorate our options with validation attributes such as `[Required]`. We can
+    create validation classes to validate our options objects for more complex scenarios.
+    Those validation classes must implement the `IValidateOptions<TOptions>` interface.
+    We also learned how to bridge other validation frameworks like *FluentValidation*
+    to complement the out-of-the-box functionalities or accommodate your taste for
+    a different validation framework.We explored a workaround allowing us to inject
+    options classes directly into their consumers. Doing this allows us to control
+    their lifetime from the composition root instead of letting the types consuming
+    them control their lifetime. This approach aligns better with dependency injection
+    and Inversion of Control principles. That also makes testing the classes easier.Finally,
+    we looked at the .NET 8 code generators that change how the options are handled
+    but do not impact how we use the Options pattern. We also explored the `ValidateOptionsResultBuilder`
+    type, also introduced in .NET 8.The Options pattern helps us adhere to the SOLID
+    principles, as illustrated next:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**S**: The Options pattern divides managing settings into multiple pieces where
+    each has a single responsibility. Loading unmanaged settings into strongly typed
+    classes is one responsibility, validating options using classes is another, and
+    configuring options from multiple independent sources is one more.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: On the other hand, I find data annotations validation to mix two responsibilities
+    in the options class, bending this principle. If you like data annotations, I
+    don’t want to stop you from using them.
+  prefs:
+  - PREF_IND
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: ''
+  prefs:
+  - PREF_IND
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: Data annotations can seem to improve development speed but make testing validation
+    rules harder. For example, testing a `Validate` method that returns a `ValidateOptionsResult`
+    object is easier than attributes.
+  prefs:
+  - PREF_IND
+  - PREF_BQ
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: '**O**: The different `IOptions*<Toptions>` interfaces break this principle
+    by forcing the consumer to decide what lifetime and capabilities the options should
+    have. To change the lifetime of a dependency, we must update the consuming class
+    when using those interfaces. On the other hand, we explored an easy and flexible
+    workaround that allows us to bypass this issue for many scenarios and inject the
+    options directly, inverting the dependency flow again, leading to open/closed
+    consumers.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**L**: N/A'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**I**: The `IValidateOptions<TOptions>` and `IConfigureOptions<TOptions>` interfaces
+    are two good examples of segregating a system into smaller interfaces where each
+    has a single purpose.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**D**: The options framework is built around interfaces, allowing us to depend
+    on abstractions.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Again, the `IOptions*<Toptions>` interfaces are the exceptions to this. Even
+    if they are interfaces, they tie us to implementation details like the options
+    lifetime. In this case, I think it is more beneficial to inject the options object
+    directly (a data contract) instead of those interfaces.
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: Next, we explore .NET logging, which is another very important aspect of building
+    applications; good traceability can make all the difference when observing or
+    debugging applications.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Questions
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Let’s take a look at a few practice questions:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Name one interface we can use to inject a settings class.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Name the two phases the ASP.NET Core uses when configuring options.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: How significant is the order in which we register configuration objects and
+    inline delegates?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Can we register multiple configuration classes?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: What is eager validation, and why should you use it?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: What interface must we implement to create a validator class?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Further reading
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Here are some links to build upon what we learned in the chapter:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Options pattern in ASP.NET Core (official docs): [https://adpg.link/RTGc](https://adpg.link/RTGc)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Quickstart: Create an ASP.NET Core app with Azure App Configuration: [https://adpg.link/qhLV](https://adpg.link/qhLV)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Secret storage in the Production environment with Azure Key Vault: [https://adpg.link/Y5D7](https://adpg.link/Y5D7)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Answers
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'We can use one of the following interfaces: `IOptionsMonitor<TOptions>`, `IOptionsFactory<TOptions>`,
+    `IOptionsSnapshot<TOptions>`, or `IOptions<TOptions>`.'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: The configuration and the post-configuration phases.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Configurators are executed in the order of their registration, so their order
+    is crucial.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Yes, we can register as many configuration classes as we want.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Eager validation allows catching incorrectly configured options at startup time,
+    which can save you runtime issues.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: We must implement the `IValidateOptions<TOptions>` interface.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL

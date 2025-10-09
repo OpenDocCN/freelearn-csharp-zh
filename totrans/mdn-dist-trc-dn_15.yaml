@@ -1,0 +1,1624 @@
+- en: '15'
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Instrumenting Brownfield Applications
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: When building brand-new services and systems, it’s easy to achieve a basic level
+    of observability with distributed traces, metrics, and logs using OpenTelemetry
+    instrumentation libraries.
+  prefs: []
+  type: TYPE_NORMAL
+- en: However, we don’t usually create applications from scratch – instead, we evolve
+    existing systems that include services in different stages of their life, varying
+    from experimental to legacy ones that are too risky to change.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Such systems normally have some monitoring solutions in place, with custom correlation
+    formats, telemetry schemas, logs and metrics management systems, dashboards, alerts,
+    as well as documentation and processes around these tools.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In this chapter, we’ll explore instrumentation options for such heterogeneous
+    systems, which are frequently referred to as **brownfield**. First, we’ll discuss
+    instrumentation options for legacy parts of the system and then look deeper into
+    context propagation and interoperating with legacy correlation formats. Finally,
+    we’ll talk about existing monitoring solutions and investigate migration strategies.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'You’ll learn to do the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Pick a reasonable level of instrumentation for legacy services
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Leverage legacy correlation formats or propagate context transparently to enable
+    end-to-end tracing
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Forward telemetry from legacy services to new observability backends
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: By the end of this chapter, you will be able to implement distributed tracing
+    in your brownfield application, keeping changes to legacy parts of a system to
+    a minimum.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Technical requirements
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The code for this chapter is available in the book’s repository on GitHub at
+    [https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/tree/main/chapter15](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/tree/main/chapter15).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'To run samples for this chapter, we’ll need a Windows machine with the following
+    tools:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: .NET SDK 7.0 or later
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: .NET SDK 4.6.2
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Docker and `docker-compose`
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Instrumenting legacy services
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The word **legacy** has a negative connotation in software development, implying
+    something out of date and not exciting to work on. In this section, we will focus
+    on a different aspect and define a legacy service as something that mostly successfully
+    does its job but no longer evolves. Such services may still receive security updates
+    or fixes for critical issues, but they don’t get new features, refactoring, or
+    optimizations.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Maintaining such a service requires a different set of skills and fewer people
+    than the evolving one, so the context of a specific system can easily get lost,
+    especially after the team that was developing it moved on and now works on something
+    else.
+  prefs: []
+  type: TYPE_NORMAL
+- en: As a result, changing such components is very risky, even when it comes to updating
+    runtime or dependency versions. Any modification might wake up dormant issues,
+    slightly change performance, causing new race conditions or deadlocks. The main
+    problem here is that with limited resources and a lack of context, nobody might
+    know how a service works, or how to investigate and fix such issues. There also
+    may no longer be appropriate test infrastructure to validate changes.
+  prefs: []
+  type: TYPE_NORMAL
+- en: From an observability standpoint, such components usually have some level of
+    monitoring in place, which is likely to be sufficient for maintenance purposes.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Essentially, when working on the observability of a system, we would touch legacy
+    services only when it’s critical for newer parts of the system.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Let’s look at a couple of examples to better understand when changing legacy
+    service is important and how we can minimize the risks.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Legacy service as a leaf node
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Let’s assume we’re building new parts of the system using a few legacy services
+    as a dependency, as shown in *Figure 15**.1*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 15.1 – New services depend on legacy ones](img/B19423_15_01.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 15.1 – New services depend on legacy ones
+  prefs: []
+  type: TYPE_NORMAL
+- en: For the purposes of our new observability solution, we may be able to treat
+    a legacy system as a black box. We can trace client calls to the legacy components
+    and measure client-side latency and other stats. Sometimes, we’ll need to know
+    what happens inside the legacy component – for example, to understand client-side
+    issues or work around legacy system limitations. For this, we can leverage existing
+    logging and monitoring tools available in the legacy services. It could be inconvenient,
+    but if it is rare, it can be a reasonable option.
+  prefs: []
+  type: TYPE_NORMAL
+- en: If legacy components support any correlation headers for incoming requests,
+    we can populate them on the client side to correlate across different parts of
+    a system. We’ll look at this in the *Propagating context* section of this chapter.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Another thing we may be able to do without changing a legacy system is forking
+    and forwarding its telemetry to the same observability backend – we’ll take a
+    closer look at this in the *Consolidating telemetry from legacy-monitoring* *tools*
+    section.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Being able to correlate telemetry from new and legacy components and store it
+    in the same place could be enough to debug occasional integration issues.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Things get more interesting if a legacy system is in the middle of our application
+    – let’s see why.
+  prefs: []
+  type: TYPE_NORMAL
+- en: A legacy service in the middle
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'When we refactor a distributed system, we can update downstream and upstream
+    services around a legacy component, as shown in *Figure 15**.2*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 15.2 – Legacy service-b is in between the newer service-a and service-c](img/B19423_15_02.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 15.2 – Legacy service-b is in between the newer service-a and service-c
+  prefs: []
+  type: TYPE_NORMAL
+- en: From the tracing side, the challenge here is that the legacy component does
+    not propagate W3C Trace Context. Operations that go through **legacy-service-b**
+    are recorded as two traces – one started by **service-a** and another started
+    by **service-c**.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We need to either support legacy context propagation format in newer parts of
+    the system, or update the legacy component itself to enable context propagation.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Before we go into the context propagation details, let’s discuss the appropriate
+    level of changes we should consider applying to a service, depending on the level
+    of its maturity.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Choosing a reasonable level of instrumentation
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Finding the right level of instrumentation for mature parts of a system depends
+    on how big of a change is needed and how risky it is. Here are several things
+    to consider:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Where do legacy services send telemetry to? Is it the same observability backend
+    that we want to use for the newer parts?
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: How critical is it for the observability of the overall system to get telemetry
+    from legacy components?
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Do legacy services support some context propagation format? Can we interoperate
+    with it from newer services?
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Can we change some of our legacy services? How old is the .NET runtime? Do we
+    have an adequate testing infrastructure? How big is the load on this service?
+    How critical is the component?
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Let’s go through a few solutions that may apply, depending on your answers.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Not changing legacy services
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: When legacy parts of a system are instrumented with a vendor-specific SDK or
+    agent and send telemetry to the same observability backend as we want to use for
+    newer parts, we might not need to do anything – correlation might work out of
+    the box or with a little context propagation adapter in newer parts of the system.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Your vendor might have a migration plan and documentation explaining how to
+    make services, using their old SDK and OpenTelemetry-based solution, produce consistent
+    telemetry.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Another case when doing nothing is a good option is when our legacy components
+    are mostly isolated and either work side by side with newer parts or are leaf
+    nodes, as shown in *Figure 15**.1*. Then, we can usually develop and debug new
+    components without data from legacy services.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We could also be able to tolerate having broken traces, especially if they don’t
+    affect critical flows and we’re going to retire legacy services soon.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Doing nothing is the best, but if it’s problematic for overall observability,
+    the next discreet option is passing context though a legacy system.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Propagating context only
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: If newer parts communicate with legacy services back and forth and we can’t
+    make trace context propagation work, it can prevent us from tracing critical operations
+    through a system. The least invasive change we can do then is to transparently
+    propagate trace context through a legacy service.
+  prefs: []
+  type: TYPE_NORMAL
+- en: When such a service receives a request, we would read the trace context in W3C
+    (B3, or another format) and then pass it through, without any modification to
+    all downstream services.
+  prefs: []
+  type: TYPE_NORMAL
+- en: This way, legacy services will not appear on traces, but we will have consistent
+    end-to-end traces for the newer parts.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We can possibly go further and stamp trace context on the legacy telemetry to
+    simplify debugging.
+  prefs: []
+  type: TYPE_NORMAL
+- en: If transparent context propagation is still not enough and we need to have telemetry
+    from all services in one place, the next option to consider is forking legacy
+    telemetry and sending it to the new observability backend.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Forwarding legacy telemetry to the new observability backend
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: Debugging issues across different observability backends and log management
+    tools can be challenging, even when data is correlated.
+  prefs: []
+  type: TYPE_NORMAL
+- en: To improve it, we may be able to intercept telemetry from the legacy system
+    on the way to its backend or enable continuous export from that backend to the
+    new one used by the rest of the system.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Forwarding may require configuration changes on the legacy system, and even
+    if such changes are small, there is still a risk of slowing down the telemetry
+    pipeline and causing an incident for the legacy service.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The younger and the more flexible the system is, the more changes we can consider,
+    and the most invasive one is onboarding a legacy system onto OpenTelemetry and
+    enabling network instrumentations.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Adding network-level instrumentation
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: It’s likely that legacy telemetry is not consistent with distributed traces
+    coming from new services. We may be able to transform it, or can sometimes tolerate
+    the difference, but we may as well consider enabling minimalistic distributed
+    tracing in legacy services. This will take care of context propagation and produce
+    consistent telemetry with the rest of the system.
+  prefs: []
+  type: TYPE_NORMAL
+- en: With this approach, we’ll pump new telemetry from legacy services to the new
+    backend and keep all existing instrumentations and pipelines running to avoid
+    breaking existing reports, dashboards, and alerts.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Something to be aware of here is that OpenTelemetry works on .NET 4.6.2 or newer
+    versions of .NET. While instrumentations for IIS, classic ASP.NET, and OWIN are
+    available in the **contrib** repository (at [https://github.com/open-telemetry/opentelemetry-dotnet-contrib](https://github.com/open-telemetry/opentelemetry-dotnet-contrib)),
+    such instrumentations do not get as much love as newer ones.
+  prefs: []
+  type: TYPE_NORMAL
+- en: You might also hit some edge cases with `Activity.Current` when using IIS –
+    it can get lost during hopping between managed and native threads.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Onboarding existing services to OpenTelemetry while keeping old tools working
+    can be a first step in a migration project, which eventually sunsets legacy monitoring
+    solutions.
+  prefs: []
+  type: TYPE_NORMAL
+- en: This is a viable solution for any mature service and should be considered unless
+    the service is on a retirement path already. However, if it’s not an option, we
+    can still combine and evolve other approaches mentioned here. Let’s now look at
+    the practical side and see how we can do it.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Propagating context
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The first goal for context propagation is to enable end-to-end distributed tracing
+    for new services, even when they communicate through legacy ones, as shown in
+    *Figure 15**.2*. As a stretch goal, we can also try to correlate telemetry from
+    new and legacy parts.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The solution that would work in most cases involves enabling context propagation
+    in legacy services. Depending on how legacy services are implemented, this change
+    can be significant and risky. So, before we do it, let’s check whether we can
+    avoid it.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Leveraging existing correlation formats
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Our legacy services might already propagate context, just in a different format.
+    One popular approach is to pass a correlation ID that serves the same purpose
+    as a trace ID in the W3C Trace Context standard, identifying a logical end-to-end
+    operation.
+  prefs: []
+  type: TYPE_NORMAL
+- en: While correlation ID is not compatible with trace context out of the box, it
+    may be possible to translate one to another.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In a simple case, correlation ID is just a string, and then we just need to
+    pass it to the legacy service in a header. Then, we can expect it to propagate
+    it as is to downstream calls, as shown in *Figure 15**.3*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 15.3 – Passing the W3C Trace ID via a legacy correlation header](img/B19423_15_03.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 15.3 – Passing the W3C Trace ID via a legacy correlation header
+  prefs: []
+  type: TYPE_NORMAL
+- en: Here, `correlation-id` header along with `traceparent`, `correlation-id` up,
+    ignoring the unknown `traceparent`, and passes it over to `traceparent` and `correlation-id`
+    values. It only has `correlation-id`, so it uses it to continue the trace started
+    by **service-a**.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let’s implement it with a custom OpenTelemetry context propagator, starting
+    with the injection side, as shown in the following code snippet:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: CorrelationIdPropagator.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE0]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter15/Brownfield.OpenTelemetry.Common/CorrelationIdPropagator.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter15/Brownfield.OpenTelemetry.Common/CorrelationIdPropagator.cs)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Here, we check whether the activity context is valid and set `TraceId` as a
+    string on the `correlation-id` header. We’re setting this propagator up to run
+    after the `TraceContextPropagator` implementation available in OpenTelemetry,
+    so there is no need to take care of Trace Context headers here.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'And here’s the extraction code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: CorrelationIdPropagator.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE1]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter15/Brownfield.OpenTelemetry.Common/CorrelationIdPropagator.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter15/Brownfield.OpenTelemetry.Common/CorrelationIdPropagator.cs)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The custom extraction we implemented here runs after trace context extraction,
+    so if there was a valid `traceparent` header in the incoming request, then `context.ActivityContext`
+    is populated by the time the `Extract` method is called. Here, we give priority
+    to W3C Trace Context and ignore the `correlation-id` value.
+  prefs: []
+  type: TYPE_NORMAL
+- en: If `context.ActivityContext` is not populated, we retrieve the `correlation-id`
+    value and try to translate it to a trace ID. If we can do it, then we create a
+    new `ActivityContext` instance, using `correlation-id` as a trace ID and a fake
+    parent span ID.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Here’s the implementation of the `TryGetTraceId` method:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: CorrelationIdPropagator.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE2]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter15/Brownfield.OpenTelemetry.Common/CorrelationIdPropagator.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter15/Brownfield.OpenTelemetry.Common/CorrelationIdPropagator.cs)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: In this snippet, we support a variety of possible `correlation-id` formats –
+    we remove dashes if it’s a GUID, and pad or trim it if the length is not right.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs: []
+  type: TYPE_NORMAL
+- en: In a more complicated case, we may need to do other transformations during context
+    extraction and injection. For example, when a legacy system requires a GUID, we
+    can add dashes. Alternatively, if it wants a `base64`-encoded string, we can decode
+    and encode the trace ID.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Let’s now check out the traces we get with this approach.
+  prefs: []
+  type: TYPE_NORMAL
+- en: First, run new parts of the system with the `$ docker-compose up --build` command.
+    It starts with **service-a**, **service-c**, and the observability stack.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We also need to start **legacy-service-b**, which is the .NET Framework 4.6.2
+    application running on Windows. You can start it with your IDE or the following
+    command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE3]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Then, hit the following URL in your browser: http://localhost:5051/a?to=c.
+    This will send a request to **service-a**, which will call **service-c** through
+    **legacy-service-b**.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Now, let’s open Jaeger at http://localhost:16686 and find the trace from **service-a**,
+    which should look like the one shown in *Figure 15**.4*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 15.4 – An end-to-end trace covering service-a and service-c](img/B19423_15_04.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 15.4 – An end-to-end trace covering service-a and service-c
+  prefs: []
+  type: TYPE_NORMAL
+- en: As you can see, there is no `5050`) belongs to **legacy-service-b**.
+  prefs: []
+  type: TYPE_NORMAL
+- en: There is just one trace, but it still looks broken – spans are correlated, but
+    parent-child relationships between the client span on **service-a** and the server
+    span on **service-c** are lost.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Still, it’s an improvement. Let’s now disable the `correlation-id` support on
+    `Compatibility__SupportLegacyCorrelation` environment variable in `docker-compose.yml`
+    to `false` on both services and restarting the docker compose application. Then,
+    we’ll see two independent traces for **service-a** and **service-c**, so even
+    the correlation will be lost.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs: []
+  type: TYPE_NORMAL
+- en: By relying on the existing context propagation format and implementing a custom
+    propagation adapter, we can usually record end-to-end traces for new services
+    without any modification to the legacy ones.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Can we also correlate telemetry from the legacy and new services? Usually, legacy
+    services stamp their version of `correlation-id` on all logs. If that’s the case,
+    we can search using the trace ID across all telemetry but may need to map the
+    trace ID to the correlation ID and back, in the same way we did with the propagator.
+  prefs: []
+  type: TYPE_NORMAL
+- en: However, what if we didn’t have custom correlation implemented in a legacy service
+    or were not able to implement an adapter? We’d need to modify the legacy service
+    to enable context propagation – let’s see how it can be done.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Passing context through a legacy service
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Essentially, if there is no existing context propagation mechanism, we can implement
+    one. To minimize changes to legacy systems, we can propagate context transparently,
+    without modifying it.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We need to intercept incoming and outgoing requests to extract and inject trace
+    context, and we also need a way to pass the context inside the process.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The implementation of this approach, especially the interception, depends on
+    the technologies, libraries, and patterns used in a specific legacy service.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Incoming request interception can be achieved with some middleware or request
+    filter. If IIS is used, it can be also done in a custom HTTP telemetry module,
+    but then we cannot fully rely on ambient context propagation due to managed-to-native
+    thread hops.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Passing context within a process can be usually achieved with `AsyncLocal` on
+    .NET 4.6+ or `LogicalCallContext` on .NET 4.5 – this way, it will be contained
+    in the new code and won’t require plumbing context explicitly.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In our demo system, **legacy-service-b** is a self-hosted OWIN application,
+    and we can implement context extraction in the OWIN middleware:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: PassThroughMiddleware.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE4]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter15/legacy-service-b/PassThrough/PassThroughMiddleware.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter15/legacy-service-b/PassThrough/PassThroughMiddleware.cs)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: First, we declare a static `AsyncLocal` value that holds trace context, represented
+    with a simple dictionary.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In the middleware `Invoke` method, we read `traceparent` along with the `tracestate`
+    and `baggage` headers (which are omitted for brevity). We populate them in the
+    trace context dictionary. Depending on your needs, you can always limit supported
+    context fields to `traceparent` only and optimize the code further.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Then, we populate the context dictionary on the `_currentContext` field, which
+    we can then access through the public `CurrentContext` static property.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The last thing we do here is to invoke the next middleware, which we wrap with
+    a logger scope containing the context dictionary. This allows us to populate trace
+    context on all logs coming from **legacy-service-b**, thus correlating them with
+    telemetry coming from new services.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In practice, legacy applications rarely use `ILogger`, but logging libraries
+    usually have some other mechanism to populate ambient context on log records.
+    Depending on the library, you may be able to access and populate `CurrentContext`
+    with little change to the logging configuration code.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Getting back to context propagation, we now need to inject the `CurrentContext`
+    value into the outgoing requests.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In the case of HTTP and when .NET `HttpClient` is used, we can do it with custom
+    `DelegatingHandler` implementation. It will be more tedious with `WebRequest`
+    usage spread across the application code when there are no helper methods that
+    create them consistently.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The handler implementation is shown in the following code snippet:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: PassThroughHandler.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE5]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter15/legacy-service-b/PassThrough/PassThroughMiddleware.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter15/legacy-service-b/PassThrough/PassThroughMiddleware.cs)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Here, we just inject all fields from `CurrentContext` on outgoing request headers
+    and then invoke the next handler. That’s it.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs: []
+  type: TYPE_NORMAL
+- en: Starting with the `System.Diagnostics.DiagnosticSource` package version 6.0.0,
+    .NET provides a `DistributedContextPropagator` base class along with several implementations,
+    including W3C trace context and a pass-through propagator. It can be useful if
+    you can add a dependency on a newish `DiagnosticSource` package, or when configuring
+    propagation for native distributed tracing instrumentations in ASP.NET Core and
+    `HttpClient`. In the case of our legacy service, extraction and injection alone
+    are trivial, so adding a new dependency is not really justified.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Now, we can run the application again and check the traces:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Start new services with `$ docker-compose up --build` and then **legacy-service-b**
+    with the following command:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE6]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Then call **service-a** with http://localhost:5051/a?to=c again and open Jaeger.
+    We should see a trace like the one in *Figure 15**.5*:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '![Figure 15.5 – An end-to-end trace with transparent service-b](img/B19423_15_05.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 15.5 – An end-to-end trace with transparent service-b
+  prefs: []
+  type: TYPE_NORMAL
+- en: Here, we have correlation and causation – the client span on **service-a** is
+    a direct parent of the server span on **service-c**. However, **service-b** is
+    nowhere to be seen, as it does not actively participate in the tracing.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Now, we have a couple of options to pass context through the legacy system,
+    but we can be creative and come up with more options specific to our application
+    – for example, we can stamp legacy correlation or request IDs on the new telemetry,
+    or log them and then post-process telemetry to correlate broken traces.
+  prefs: []
+  type: TYPE_NORMAL
+- en: With these options, we should be able to achieve at least some level of correlation.
+    Let’s now check how we can forward telemetry from legacy services to the new observability
+    backends.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Consolidating telemetry from legacy monitoring tools
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: One of the biggest benefits a good observability solution can provide is low
+    cognitive load when debugging an application and reading through telemetry. Even
+    perfectly correlated and high-quality telemetry is very hard to use if it’s spread
+    across multiple tools and can’t be visualized and analyzed together.
+  prefs: []
+  type: TYPE_NORMAL
+- en: When re-instrumenting legacy services with OpenTelemetry is not an option, we
+    should check whether it’s possible to forward existing data from legacy services
+    to a new observability backend.
+  prefs: []
+  type: TYPE_NORMAL
+- en: As with context propagation, we can be creative and should start by leveraging
+    existing solutions. For example, old .NET systems usually report and consume Windows
+    performance counters and send logs to EventLog, or store them on the hard drive.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The OpenTelemetry Collector provides support for such cases via receivers, available
+    in the contrib repository (at https://github.com/open-telemetry/opentelemetry-collector-contrib).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'For example, we can configure a file receiver with the following snippet:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: otel-collector-config.yml
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE7]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter15/configs/otel-collector-config.yml](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter15/configs/otel-collector-config.yml)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Here, we configure the collector receiver and specify the log file location
+    and name pattern. We also configure mapping and transformation rules for individual
+    properties in log records. In this example, we only map timestamp and log level,
+    but if log records are structured, it’s possible to parse other properties using
+    similar operators.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We can also rely on our backend to grok unstructured log records or parse records
+    at a query time if we rarely need the data.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Here’s an example of collector output with a parsed log record, which, depending
+    on your collector configuration, can send logs to the new observability backend:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE8]'
+  prefs: []
+  type: TYPE_PRE
+- en: As you can see, we could also configure the receiver to parse the `traceparent`
+    value populated in the log scopes to record `Trace ID` and `Span ID` for the proper
+    correlation.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'You can reproduce it by running **legacy-service-b** with the following command
+    and sending some requests to it directly, or via **service-a**:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE9]'
+  prefs: []
+  type: TYPE_PRE
+- en: A collector can be helpful in sidecar mode, forwarding data available on the
+    machine where legacy service instances are running, and collecting performance
+    counters or logs. It can also pretend to be our old backend and receive Zipkin
+    or Jaeger spans, Prometheus metrics, and vendor-specific signals, such as Splunk
+    metrics and logs.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We can write custom receivers and leverage collector transformation processors
+    to produce consistent telemetry whenever possible.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In addition to the endless possibilities a OpenTelemetry Collector can provide,
+    we should check whether the observability vendor we use for legacy services allows
+    continuous export for collected telemetry, which would allow us to get the data
+    without changing anything on the legacy system.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Summary
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In this chapter, we explored tracing in brownfield applications, where some
+    of the services can be hard to change and onboard onto a full-fledged observability
+    solution with OpenTelemetry.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We discussed possible levels of instrumentation for such services and found
+    several cases when we can avoid changing old components altogether. Then, we went
+    through the changes we can apply, starting with minimalistic transparent context
+    propagation and going all the way to onboarding onto OpenTelemetry.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Finally, we applied some of these options in practice, enabling end-to-end correlation
+    through a legacy service and forwarding file logs to the OpenTelemetry Collector.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Now, you should be ready to come up with the strategy for your own legacy components
+    and have the building blocks to implement it.
+  prefs: []
+  type: TYPE_NORMAL
+- en: This chapter concludes our journey into distributed tracing and observability
+    on .NET – I hope you enjoyed it! The observability area is evolving fast, but
+    now you have a foundational knowledge to design and implement your systems with
+    observability in mind, evolve them by relying on relevant telemetry data, and
+    operate them with more confidence, knowing what telemetry represents and how it’s
+    collected. Now, it’s time to apply your knowledge or create something new based
+    on it.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Questions
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: How would you approach instrumenting an existing service that is a critical
+    part of most user scenarios in your system? This service is mature and is rarely
+    changed, but there are no plans to retire it any time soon.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: What can go wrong when we add OpenTelemetry to a legacy service?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: When implementing transparent context propagation, can we leverage the `Activity`
+    class instead of adding our own context primitive and the `AsyncLocal` field?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Assessments
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Chapter 1 – Observability Needs of Modern Applications
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: You can think about a span as a structured event with a strict but extensible
+    schema, allowing you to track any interesting operation. Spans have trace context
+    that describes the relationships between them. They also have a name, start time,
+    end time, status, and a property bag, with attributes to represent operation details.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Complex and distributed operations need multiple spans that describe at least
+    each incoming and outgoing request. A group of such correlated spans that share
+    the same `trace-id` is called a trace.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Spans (also known as Activities in .NET) are created by many libraries and applications.
+    To enable correlation, we need to propagate context within the process and between
+    processes.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: In .NET, we use `Activity.Current` to propagate context within the process.
+    This is a current span that flows with an execution context in synchronous or
+    asynchronous calls. Whenever a new activity is started, it uses `Activity.Current`
+    as its parent and then becomes current itself.
+  prefs: []
+  type: TYPE_NORMAL
+- en: To propagate the trace context between the processes, we pass it over the wire
+    to the next service. W3C Trace Context is a standard propagation format for the
+    HTTP protocol, but some services use the B3 format.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'There is no single answer to this question, but here’re some general considerations
+    on how you can leverage a combination of signals coming from your service:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Check whether the problem is widespread and affects more than this user and
+    request. Is your service healthy overall? Is it specific to the API path the user
+    hits, region, partition, feature flag, or new service version? Your observability
+    backend might be able to assist with it
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: If the problem is not widespread, find traces for problematic requests using
+    trace context if it is known, or filtering by known attributes. If you see gaps
+    in traces, retrieve logs for this operation. If that’s not enough, use profiling
+    to investigate further. Consider adding more telemetry.
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: For widespread issues, you might find the root cause of the problem by identifying
+    specific attributes correlated with the reported problem.
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Otherwise, narrow down the issue layer by layer. Are dependencies working fine?
+    Is there something new upstream? Any changes in the load?
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: If issues are not specific to any combination of attributes, check the dependency
+    health and resource utilization. Check the crash and restart count, CPU load,
+    memory utilization, extensive garbage collection, I/O, and network bottlenecks.
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Chapter 2 – Native Monitoring in .NET
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'Use `Activity.Current?.Id` on the page. For example, like this: `<``p>traceparent:
+    <code>@System.Diagnostics.Activity.Current?.Id</code></p>`.'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: If we have `dotnet-monitor` running as a sidecar, we can connect to its instance
+    corresponding to the problematic service instance, check the metrics and logs,
+    and create dumps. We could even configure `dotnet-monitor` to trigger a dump collection
+    based on certain events or resource consumption thresholds.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: If we don’t have `dotnet-monitor`, but can access service instances, we can
+    install `dotnet-monitor` there and get diagnostics information from the running
+    process.
+  prefs: []
+  type: TYPE_NORMAL
+- en: If instances are healthy, but the problem is somewhere inside the telemetry
+    pipeline, troubleshooting steps would depend on the tools we use. For example,
+    with Jaeger we can check logs; the Prometheus UI shows connectivity with targets;
+    the OpenTelemetry collector provides logs and metrics for self-diagnostics.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Query:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE10]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: '[PRE11]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: The query sums up the request rates across all running service instances, grouping
+    it by service name and `http_route` (which represents the API route).
+  prefs: []
+  type: TYPE_NORMAL
+- en: The rate function `(rate(http_server_duration_ms_count)` first calculates the
+    rate per second, then averages the rate over one minute.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Search the traces with the URL and method filter in Jaeger. For uploads, it
+    would be `http. url=http://storage:5050/memes/<name> http.method=PUT`. To find
+    downloads, we would use `http.url=http://storage:5050/memes/<name> http. method=GET`.
+    However, this isn’t convenient and we should consider adding the meme name as
+    an attribute on all spans.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Chapter 3 – The .NET Observability Ecosystem
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Check the registry ([https://opentelemetry.io/registry/](https://opentelemetry.io/registry/))
+    and OpenTelemetry .NET repo. If you don’t see your library in any of them, search
+    in issues and PRs. It’s also a good idea to search whether anything is available
+    in the library GitHub repo or documentation.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'When you find an instrumentation, there are several things to check for:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**Version and stability**: Beta instrumentations could still have a high quality
+    and be battle-tested but do not guarantee API or telemetry stability'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Performance and thread safety**: Understanding the mechanism behind instrumentation
+    is important to identify possible limitations and issues in advance'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The most common way to instrument libraries and frameworks is `ActivitySource`—
+    it’s the .NET analog of OpenTelemetry Tracer, which can start activities. You
+    can configure OpenTelemetry to listen to a source by its name. You might also
+    see instrumentations using `DiagnosticSource`—it’s an older and less structured
+    mechanism available in .NET.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: It’s also common to leverage hooks provided by libraries that can be global
+    or applied to specific instances of the client.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Service meshes can trace requests to and from service mesh sidecars and provide
+    insights into retries, service discovery, or load balancing. If they handle communication
+    with cloud service, remote database, or queue, they can instrument corresponding
+    communication. Service meshes can propagate the context from one application to
+    another but cannot propagate it within the service from incoming to outgoing calls.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Chapter 4 – Low-Level Performance Analysis with Diagnostic Tools
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: If your service defines SLIs, check them first and see whether they are within
+    the boundaries defined by your SLOs. In other words, check the key metrics that
+    measure your user experience and see whether they are within healthy limits. For
+    REST API-based services, it is usually the throughput of successful requests and
+    latency grouped by API and other things that are important in your application.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Resource consumption metrics could be correlated to user experience, but do
+    not determine it. They (and other metrics that describe the internals of your
+    service) can help you understand why the user experience has degraded and can
+    predict future issues with some level of confidence.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'First, we should try to find which service is responsible: check upstream and
+    downstream services for whether the load on your service is normal and properly
+    distributed across instances. Check whether dependencies are healthy using their
+    server-side metrics when possible.'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: If we can narrow down the issue to a specific service, we can check whether
+    the issue is specific to a certain instance or group of instances, or whether
+    instances are restarting a lot. For affected instances, we can check their resource
+    utilization patterns for memory, CPU, GC frequency, threads, contentions, or anything
+    that looks unusually high or low. Then, we can capture a dump from the problematic
+    instance(s) to analyze memory and thread stacks.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Performance tracing (also known as profiling or just tracing) is a technique
+    that allows us to capture detailed diagnostics about application behavior and
+    code – call stacks, GC, contention, network events, or anything else that .NET
+    or third-party libraries want to expose. Such events are off by default but can
+    be enabled and controlled inside the process and out-of-process. Tools such as
+    `dotnet-trace`, `dotnet-monitor`, PerfView, PerfCollect, JetBrains dotTrace, Visual
+    Studio, and continuous profilers can collect and visualize them. Performance tracing
+    can be used to investigate functional and performance issues or optimize your
+    code.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Chapter 5 – Configuration and Control Plane
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: We’d need tail-based sampling that’s applied after span or trace ends and we
+    know the duration or if there were any failures. Tail-based sampling can’t be
+    done inside the process since we have distributed multi-instance applications,
+    but we can use a tail-based sampling processor in the OpenTelemetry Collector
+    that buffers traces and then samples them based on latency, or status codes.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: If we only capture suspicious traces, we will not have a baseline anymore –
+    we won’t be able to use traces to observe normal system behavior, build analytics,
+    and so on. So, we should additionally capture a percentage or rate of random traces
+    – if we mark them somehow, we can analyze them separately from problematic traces
+    to create unbiased analytics.
+  prefs: []
+  type: TYPE_NORMAL
+- en: It’s always a good idea to rate-limit all traces, so we don’t overload the telemetry
+    pipeline with traffic bursts.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In addition to sampling configuration on the OpenTelemetry Collector, we should
+    consider configuring probability sampling on individual .NET services – depending
+    on this, we would allocate an appropriate number of resources for Collector and
+    also balance the performance impact of the instrumentation.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Let’s record a try number using the OpenTelemetry `http.resend_count` attribute
+    that should be set on each HTTP span that represents a retry or redirect. We can
+    use the `EnrichWithHttpRequestMessage` hook on the HTTP client instrumentation
+    to intercept the outgoing request and its activity, but where would we get the
+    retry number from?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Well, we can maintain it in our retry handler (if you use Polly, you could
+    use `Context` instead) and pass it to the hook via `HttpRequestMessage.Options`.
+    So, the final solution could look like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Program.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE12]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter5/memes/frontend/Program.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter5/memes/frontend/Program.cs)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: RetryHandler.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE13]'
+  prefs: []
+  type: TYPE_PRE
+- en: https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter5/memes/frontend/RetryHandler.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let’s check out the OpenTelemetry Collector documentation for tail-based sampling
+    at https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/processor/tailsamplingprocessor/README.md.
+    We need to declare and configure the `tail_sampling` processor and add it to the
+    pipeline. Here’s a sample configuration:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: otel-collector-config.yml
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE14]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter5/memes/configs/otel-collector-config.yml](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter5/memes/configs/otel-collector-config.yml)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: You can check your current rate of recorded spans using the `rate(otelcol_receiver_
+    accepted_spans[1m]`) query in Prometheus and monitor the exported rate with the
+    `rate(otelcol_exporter_sent_spans[1m])` query.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Chapter 6 – Tracing Your Code
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: When setting up OpenTelemetry, you can enable `ActivitySource` by calling into
+    the `TracerProviderBuilder.AddSource` method and passing the source name. OpenTelemetry
+    will then create an `ActivityListener` – a low-level .NET API that listens to
+    `ActivitySource` instances. The listener samples activities using the callback
+    provided by OpenTelemetry and notifies OpenTelemetry when activities start or
+    end.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Activity (or span) events can be used to represent something that happens at
+    a point in time or is too short to be a span and does not need individual context.
+    At the same time, events must happen in the scope of some activity and are recorded
+    along with it. Activity events stay in memory until the activity is garbage-collected
+    and their number is limited on the exporter side.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Logs are usually a better alternative to `Activity` events as they are not necessarily
+    tied to specific activity, sampling, or exporter limitations. OpenTelemetry treats
+    events and logs similarly. Events expressed as log records are structured and
+    can follow specific semantic conventions.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Links provide another way to correlate spans with cover scenarios when the span
+    has multiple parents or is related in some way to several other spans at once.
+    Without links, spans can only have one parent and multiple children and can’t
+    be related to spans in other traces.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Links are used in messaging scenarios to express receiving or processing multiple
+    independent messages at once. When we process multiple messages, we need to extract
+    the trace context and create an `ActivityLink` from each of them. Then, we can
+    pass a collection of these links to the `ActivitySource.StartActivity` method.
+    We can’t change these links after the corresponding `Activity` starts. Observability
+    backends support (or don’t support) links in different ways and we might need
+    to adjust the instrumentation based on the backend capabilities.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Chapter 7 – Adding Custom Metrics
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: We should first decide what we need the metric for. For example, if we need
+    it to rank memes in search results or to calculate ad hits, we should separate
+    it from telemetry. Assuming we store the meme download counter in a database for
+    business logic purposes, we could also stamp it on traces or events as an attribute
+    when the counter is updated.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: From a telemetry-only standpoint, metric per meme would have high cardinality
+    as we probably have millions of memes in the system and thousands active per minute.
+    With some additional logic (for example, if we can ignore rarely accessed memes),
+    we might even be able to introduce a metric with a meme name as an attribute.
+  prefs: []
+  type: TYPE_NORMAL
+- en: I would start with traces and aggregate spans by meme name in a rich query.
+    Even if traces are sampled, I can still calculate the estimated number of downloads,
+    compare it between memes, and see trends.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Usually, both, but it depends: we need incoming HTTP request traces to investigate
+    individual failures and delays and know what normal request flow looks like under
+    different conditions. Do we need metrics as well? Probably yes. At a high scale,
+    we sample traces aggressively but likely need more precise data than estimated
+    counts. Another problem is that even if we don’t sample or don’t mind rough estimates,
+    querying over all spans during the time window can be expensive and long – it
+    might need to process millions of records. If we build dashboards and alerts on
+    this data, we want queries to be fast and cheap. Even if they are used for ad
+    hoc analysis during incidents, we still want queries to be fast.'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: So, the answer depends on the observability backend, what it is optimized for,
+    and its pricing model, but collecting both gives us a good starting point.
+  prefs: []
+  type: TYPE_NORMAL
+- en: For the number of active instances, we can report `ObservableUpDownCounter`
+    with resource attributes that include instance information. The counter would
+    always report `1` so that the sum of values across all instances at any given
+    time will represent the number of active processes. This is how Kubernetes does
+    it with `kube_node_info` or `kube_pod_info` metrics (check out [https://github.com/kubernetes/kube-state-metrics](https://github.com/kubernetes/kube-state-metrics)
+    for more information).
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Uptime can be reported in multiple ways – for example, as a gauge containing
+    static start time (see `kube_node_created` or `kube_pod_start_time`) or as a resource
+    attribute.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Make sure to check whether your environment already emits anything similar or
+    whether OpenTelemetry semantic conventions define a common way to report the metric
+    you’re interested in.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Chapter 8 – Writing Structured and Correlated Logs
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'The code uses string interpolation instead of semantic logging. A log message
+    is formatted right away, so the `ILogger.Log` method is called underneath with
+    the `"hello world: 43, bar"` string, without any indication that there are two
+    arguments with specific names and values.'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: If the `Information` level is disabled, string interpolation happens anyway,
+    serializing all arguments and calculating just the message to be dropped.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'This code should be changed to `logger.LogInformation("hello world: {foo},
+    {bar}", 42, "bar")`.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We need to make sure that the usage report is built using log record properties
+    that don’t change:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: A log message would change a lot when new arguments are added or code is refactored.
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The logging category is usually based on a namespace, which might change during
+    refactoring. We can consider passing categories explicitly as strings instead
+    of a generic type parameter, but the better choice would be to make sure the report
+    does not rely on logging categories. We can use event names or IDs – they have
+    to be specified explicitly; we just need to make sure they are unique and don’t
+    change. One approach would be to declare them in a separate file and document
+    that the usage reports rely on them.
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Traces and logs describing HTTP requests contain similar information. Logs are
+    more verbose, since we’d usually have human-readable text and need two records
+    for one request (before and after it), with duplicated trace context and other
+    scopes.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: If your application records all HTTP traces, there is no need to enable HTTP
+    logging as well. If traces are sampled, there is a trade-off between the cost
+    of capturing all telemetry and your ability to investigate rare issues. Many applications
+    don’t really need to capture all telemetry to efficiently investigate problems.
+    For them, collecting sampled traces without HTTP logs would be the best option.
+    If you have to investigate rare issues, one option would be to increase the sampling
+    rate for traces. Recording HTTP logs instead is another option that comes with
+    an additional cost to collect, store, retrieve, and analyze logs.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Chapter 9 – Best Practices
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: HTTP traces, potentially combined with some application-specific attributes,
+    can help answer most questions about tiny RESTful service behavior. We can aggregate
+    metrics from traces using OpenTelemetry Collector or at query time on the backend.
+    We still need metrics for resource utilization though. The right questions to
+    ask here are how much this solution costs us and whether there is the potential
+    to reduce costs with sampling and how much we must spend to keep alerts running
+    based on queries over traces. If it’s a lot, then we should look into adding metrics.
+    So, the answer is – yes, but it can be more cost-efficient to add other signals.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: In an application under heavy load, every bug will happen again and again. No
+    matter how small of a sampling rate we choose, we’ll record at least some occurrences
+    of such an issue. A high sampling rate would likely have some performance impact,
+    but more importantly, it’ll be very expensive to store all these traces. So, a
+    small sampling rate should be the first choice.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Socket communication can be very frequent, so instrumenting every request with
+    a span can create a huge overhead. A good starting point would be to identify
+    how long a typical session lasts, and if it’s within seconds or minutes, instrument
+    a session with a span. Small requests can be recorded with metrics on a service
+    side, or sometimes with logs/events.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: OpenTelemetry general and RPC semantic conventions should cover the necessary
+    network attributes to represent the client and server and describe a request.
+    We can also apply suitable RPC metrics to track duration and throughput.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Chapter 10 – Tracing Network Calls
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Reusing existing instrumentation should be the first choice, especially if you
+    don’t have a lot of experience in both tracing and the gRPC stack. As you saw
+    throughout this chapter, there are multiple details related to retries, the order
+    of execution, and other tiny details that are hard to account for.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Custom gRPC instrumentation makes sense if existing instrumentation does not
+    satisfy your needs. For example, in our streaming experiments, we could optimize
+    two layers of instrumentation (individual messages and gRPC calls) by merging
+    them into one. We could also correlate requests, responses, and span events better
+    if we knew the message types in the interceptor.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note that even custom instrumentations benefit from following semantic conventions
+    and relying on common tooling and documentation.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In such an application, we should expect to see a very long span that describes
+    a connection between the client and server. If we sample spans, we should customize
+    the sampler to ensure we capture this span. Alternatively, we can just drop it
+    and instead capture events that describe anything important that happens with
+    the encompassing connection.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Then, we should think about how/whether to trace individual messages. If they
+    are very small and fast, tracing them individually could be too expensive because
+    of a couple of concerns:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The first concern is message size. Trace context can be propagated frugally
+    with the binary format, but still would require at least 26 bytes. You can be
+    creative and come up with even more frugal format, propagating the message index
+    instead of the span ID over the wire. The easiest solution would be to propagate
+    context only for sampled-in messages and rely on metrics and events to see the
+    overall picture.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The second concern is performance overhead. If your processing is very fast,
+    tracing it might be too expensive. Sampling can help offset some of these costs,
+    but you probably don’t need to trace individual messages. Logs and events might
+    give you the right level of observability, and you can correlate them with a message
+    identifier.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: If your message processing is complex and involves other network calls, you’d
+    benefit from mitigating these concerns and tracing individual messages.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Chapter 11 – Instrumenting Messaging Scenarios
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The most difficult part is finding operations that are important to measure.
+    In our example, it’s the time between when the meme is uploaded and when it became
+    available for other users.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: We can emit a couple of events to capture these two timestamps along with the
+    meme identifier and any other context. Then, we can find the delta by joining
+    events on the meme identifier.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Another option is to record the timestamp of when the meme was published along
+    with the meme metadata and pass it around our system. Then, we can report delta
+    as a metric or an event.
+  prefs: []
+  type: TYPE_NORMAL
+- en: When using batching, it’s usually interesting to know the number of messages
+    in a batch and the payload size. By tuning these numbers, we can reduce network
+    overhead, so having them readily available in the telemetry can be very useful.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'The key question is what instrument to use: a counter or histogram (a gauge
+    would not fit here).'
+  prefs: []
+  type: TYPE_NORMAL
+- en: We can count messages and batches with two metrics. The ratio between them would
+    give us the average batch size.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We can also record the number of messages in a batch and the payload size as
+    histograms. This would give us a distribution in addition to average numbers.
+  prefs: []
+  type: TYPE_NORMAL
+- en: I was tempted to record the batch size as an attribute on existing metrics but
+    decided against it. In a general case, it’s a high-cardinality attribute, which
+    is also hard to visualize in Prometheus; it would make more sense as a separate
+    metric.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Baggage represents application-specific context-propagated services. If you
+    have a need to propagate it across messaging systems, it can be injected into
+    each message with the OpenTelemetry propagator similar to trace context.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Baggage usually does not need to flow to the messaging system, but it may be
+    hard to prevent it. Attached to every message, it might create a significant overhead
+    in terms of the payload size, so make sure to account for it and be ready to make
+    trade-offs.
+  prefs: []
+  type: TYPE_NORMAL
+- en: On the consumption side, things get more interesting. If messages are processed
+    independently, make sure to restore baggage from the message when processing it.
+  prefs: []
+  type: TYPE_NORMAL
+- en: For batch processing, there is no single answer. Merging baggage from multiple
+    messages may or may not make sense in your application.
+  prefs: []
+  type: TYPE_NORMAL
+- en: If you want to stamp baggage information on your telemetry, one option could
+    be to record known baggage values on link attributes along with message-specific
+    information.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Chapter 12 – Instrumenting Database Calls
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The concept of a database change feed is similar to messaging, and we can apply
+    the same approach we used in the previous chapter for it. The key question is
+    how to propagate context and correlate operations that change the record and process
+    the notification.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: One solution would be to add a record identifier attribute and use it to find
+    all the operations related to a specific record. When multiple operations concurrently
+    modify the same record, it will generate multiple notifications and we won’t be
+    able to map producer operations to notification processing with the record ID.
+    There might be additional notification identifiers we can use, such as record
+    ETags. But in general cases, correlating operations that modify data and ones
+    that process corresponding notifications would mean we have to add a trace context
+    to the record and modify it on every operation.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The answer depends on how your tracing backend treats events and how mature,
+    robust, and reliable the cache configuration and infrastructure are.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Arguments for using events would be the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Spans/activities have a slightly bigger performance overhead than events. Events
+    also could be smaller in terms of telemetry volume.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: We don’t need the precise Redis duration for each operation since we have logical
+    layer activity tracing composite calls and Redis metrics.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'The status of individual Redis calls is not very important: a set operation
+    is even done in a fire-and-forget manner. It only matters when the failure rate
+    increases significantly, but we’d see it in the metrics.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The argument to use spans is that it’s more common and convenient because tracing
+    backends do a much better job at visualizing spans and performing any automated
+    analysis on them.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: To remove limits, remove the `deploy` section under the `mongo` container in
+    `docker-compose.yml`. If you run the application and kill Redis, you’ll see that
+    MongoDB can easily handle the load and throughput changes, which might mean that
+    Redis is not necessary in an application with such a small load.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Chapter 13 – Driving Change
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'Using a single backend for all signals has certain advantages. It should be
+    easier to navigate between signals: for example, get all logs correlated with
+    the trace, query events, and traces together with additional context, and jump
+    from metrics to trace with exemplars. So, using a single backend would reduce
+    cognitive load and minimize duplication in backend-related configuration and tooling.'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Using multiple backends can help reduce costs. For example, it’s usually possible
+    to store logs in a cheaper log management system, assuming you already have everything
+    up and running for logs and metrics. But these backends don’t always support traces
+    well. Adding a new backend for traces and events only would make total sense.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Tools such as Grafana may be able to provide a common UX on top of different
+    backends to mitigate some of the disadvantages.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'There are a few things that we need to do:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '**Lock down the context propagation format**: Using W3C Baggage spec is a good
+    default choice unless you already have something in place. It should be documented
+    and, ideally, implemented and configured in internal common libraries shared by
+    all services in your application.'
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Documenting key naming patterns**: Make sure to use namespaces and define
+    the root one for your system. It’ll help filter everything else out. Document
+    several common properties you want to put there – we want to make sure people
+    use them and don’t come up with something custom. Adding helper methods to populate
+    them would also be great.'
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Use common artifacts**: If you want to stamp baggage on telemetry, customize
+    propagation, or just unify baggage keys, make sure to ship common internal libraries
+    with these features.'
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: When adding a cache, we’re probably trying to reduce the load on a database
+    and optimize the service response time. We should already have observability of
+    service and database calls and can see whether the cache would help.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: If we roll this feature out gradually and conditionally, we need to be able
+    to filter and compare telemetry based on feature flags, so we need to make sure
+    they’re recorded.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Finally, we should make sure we have telemetry around the cache that will help
+    us understand how it works, and why it did not work if it fails. Adding this telemetry
+    along with feature code will have the biggest positive impact during development,
+    testing, and initial iterations.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Chapter 14 – Creating Your Own Conventions
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: A possible solution is to define and document the stability level for attributes.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: For example, new conventions are always added at the alpha stability level.
+    Once it’s fully implemented and deployed, and you’re mostly happy with the outcome,
+    the convention can be graduated to beta.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Conventions should stay in beta until someone tries to use them for alerts,
+    reports, or dashboards. If it works fine, or after feedback is addressed, the
+    convention becomes stable. After that, it cannot be changed in a breaking manner.
+  prefs: []
+  type: TYPE_NORMAL
+- en: It should be possible to validate actual telemetry to some extent.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: For example, it should be possible to write a test processor (an in-process
+    one or a custom collector component) that identifies specific spans, events, or
+    metrics that should follow the convention and checks whether the conventions are
+    applied consistently. This test processor could warn about issues found, flag
+    unknown attributes, notify when expected signals were not received, and so on.
+    It should be possible to run it as a part of integration testing in the CI pipeline.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Another approach is to just do a regular audit on a random subset of production
+    telemetry, which could also be automated.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Chapter 15 – Instrumenting Brownfield Applications
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Such a service is a good candidate for migration to OpenTelemetry – since we
+    still update it, there is probably a reasonable test infrastructure and the context
+    within the team to prevent and mitigate failures. As a first option, we should
+    consider adding OpenTelemetry with network instrumentation and then gradually
+    migrating existing tools and processes onto the new observability solution, while
+    evolving an OpenTelemetry-based approach.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: We can control the costs of this approach with sampling, enabling and moving
+    only essential pieces onto OpenTelemetry. At some point, when we can rely on the
+    new observability solution, we can remove corresponding legacy reporting.
+  prefs: []
+  type: TYPE_NORMAL
+- en: It’s likely that the .NET runtime version that the legacy service runs on is
+    older than .NET 4.6.2, and then it’s impossible to use OpenTelemetry. Even if
+    a newer version of .NET Framework is used, adding new dependencies, such as `System.Diagnostics.DiagnosticSource`
+    and the different `Microsoft.Extensions` packages that OpenTelemetry brings transitively,
+    can cause runtime problems due to version conflicts.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Other risks come from small changes and shifts in how an application works and
+    its performance, waking up or amplifying dormant issues such as race conditions,
+    deadlocks, or thread pool starvation.
+  prefs: []
+  type: TYPE_NORMAL
+- en: If you can add newer versions of `System.Diagnostics.DiagnosticSource` as a
+    dependency, then using `Activity` is an option.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Note that the `Activity` class is available in .NET, starting with the `DiagnosticSource`
+    package version 4.4.0 and .NET Core 3.0; however, it went through a lot of changes.
+    Most of the functionality we covered in this book, including W3C Trace Context,
+    was not available in the initial versions.
+  prefs: []
+  type: TYPE_NORMAL
+- en: With newer `DiagnosticSource` versions, by using `Activity`, we would modify
+    trace context – instead of passing `traceparent` as is, we would create server
+    and client spans and then pass an ancestor of the original `traceparent` to the
+    downstream service. If the legacy service does not report spans to the common
+    observability backend, we’ll see correlated traces, but with missing parent-child
+    relationships, as we saw in *Figure 15.4*.
+  prefs: []
+  type: TYPE_NORMAL
+- en: So, we need to have full-fledged distributed tracing implemented or, if no traces
+    are reported, pass context through as is, without using `Activity` for it.
+  prefs: []
+  type: TYPE_NORMAL

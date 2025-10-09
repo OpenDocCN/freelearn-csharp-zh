@@ -1,0 +1,941 @@
+- en: '4'
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Low-Level Performance Analysis with Diagnostic Tools
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: While distributed tracing works great for microservices, it’s less useful for
+    deep performance analysis within a process. In this chapter, we’ll explore .NET
+    diagnostics tools that allow us to detect and debug performance issues and profile
+    inefficient code. We’ll also learn how to perform ad hoc performance analysis
+    and capture necessary information automatically in production.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In this chapter, you will learn how to do the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Use .NET runtime counters to identify common performance problems
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Use performance tracing to optimize inefficient code
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Collect diagnostics in production
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: By the end of this chapter, you will be able to debug memory leaks, identify
+    thread pool starvation, and collect and analyze detailed performance traces with
+    .NET diagnostics tools.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Technical requirements
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'The code for this chapter is available in this book’s repository on GitHub
+    at [https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/tree/main/chapter4](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/tree/main/chapter4).
+    It consists of the following components:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The `issues` application, which contains examples of performance issues
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`loadgenerator`, which is a tool that generates load to reproduce problems'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'To run samples and perform analysis, we’ll need the following tools:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: .NET SDK 7.0 or later.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The .NET `dotnet-trace`, `dotnet-stack`, and `dotnet-dump` diagnostics tools.
+    Please install each of them with `dotnet tool install –``global dotnet-<tool>`.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Docker and `docker-compose`.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: To run the samples in this chapter, start the observability stack, which consists
+    of Jaeger, Prometheus, and the OpenTelemetry collector, with `docker-compose up`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Make sure that you start the `dotnet run -c Release` from the `issues` folder.
+    We don’t run it in Docker so that it’s easier to use diagnostics tools.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In the `OpenTelemetry.Instrumentation.Process` and `OpenTelemetry.Instrumentation.Runtime`
+    NuGet packages and configured metrics for the HTTP client and ASP.NET Core. Here’s
+    our metrics configuration:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Program.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE0]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/tree/main/chapter4/issues/Program.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/tree/main/chapter4/issues/Program.cs)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Investigating common performance problems
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Performance degradation is a symptom of some other issues such as race conditions,
+    dependency slow-down, high load, or any other problem that causes your **service-level
+    indicators** (**SLIs**) to go beyond healthy limits and miss **service-level objectives**
+    (**SLOs**). Such issues may affect multiple, if not all, code paths and APIs,
+    even if they’re initially limited to a specific scenario.
+  prefs: []
+  type: TYPE_NORMAL
+- en: For example, when a downstream service experiences issues, it can cause throughput
+    to drop significantly for all APIs, including those that don’t depend on that
+    downstream service. Retries, additional connections, or threads that handle downstream
+    calls consume more resources than usual and take them away from other requests.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs: []
+  type: TYPE_NORMAL
+- en: Resource consumption alone, be it high or low, does not indicate a performance
+    issue (or lack of it). High CPU or memory utilization can be valid if users are
+    not affected. It could still be important to investigate when they are unusually
+    high as it could be an early signal of a problem to come.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We can detect performance issues by monitoring SLIs and alerting them to violations.
+    If you see that issues are widespread and not specific to certain scenarios, it
+    makes sense to check the overall resource consumption for the process, such as
+    CPU usage, memory, and thread counts, to find the bottleneck. Then, depending
+    on the constrained resource, we may need to capture more information, such as
+    dumps, thread stacks, detailed runtime, or library events. Let’s go through several
+    examples of common issues and talk about their symptoms.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Memory leaks
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Memory leaks happen when an application consumes more and more memory over time.
+    For example, if we cache objects in-memory without proper expiration and overflow
+    logic, the application will consume more and more memory over time. Growing memory
+    consumption triggers garbage collection, but the cache keeps references to all
+    objects and GC cannot free them up.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let’s reproduce a memory leak and go through the signals that would help us
+    identify it and find the root cause. First, we need to run the `loadgenerator`
+    tool:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE1]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'It makes 20 million requests and then stops, but if we let it run for a long
+    time, we’ll see throughput dropping, as shown in *Figure 4**.1*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 4.1 – Service throughput (successful requests per second)](img/B19423_04_01.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 4.1 – Service throughput (successful requests per second)
+  prefs: []
+  type: TYPE_NORMAL
+- en: We can see periods when throughput drops and the service stops processing requests
+    – let’s investigate why.
+  prefs: []
+  type: TYPE_NORMAL
+- en: .NET reports event counters that help us monitor the size of each GC generation.
+    Newly allocated objects appear in **generation 0**; if they survive garbage collection,
+    they get promoted to **generation 1**, and then to **generation 2**, where they
+    stay until they’re collected or the process terminates. Large objects (that are
+    85 KB or bigger) appear on a **large object** **heap** (**LOH**).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'OpenTelemetry runtime instrumentations report generation sizes under the `process_runtime_dotnet_gc_heap_size_bytes`
+    metric. It’s also useful to monitor the `process_memory_usage_bytes`. We can see
+    generation 2 and physical memory consumption in *Figure 4**.2*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 4.2 – Memory consumption showing a memory leak in the application](img/B19423_04_02.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 4.2 – Memory consumption showing a memory leak in the application
+  prefs: []
+  type: TYPE_NORMAL
+- en: We can see that generation 2 grows over time, along with the virtual memory.
+    The physical memory used by the process goes up and down, which means that the
+    OS started using disk in addition to RAM. This process is called **paging** or
+    **swapping**, which is enabled (or disabled) at the OS level. When enabled, it
+    may significantly affect performance since RAM is usually much faster than disk.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Eventually, the system will run out of physical memory and the pagefile will
+    reach its size limit; then, the process will crash with an `OutOfMemoryException`
+    error. This may happen earlier, depending on the environment and heap size configuration.
+    For 32-bit processes, OOM happens when the virtual memory size reaches 4 GB as
+    it runs out of address space. Memory limits can be configured or imposed by the
+    application server (IIS), hosting providers, or container runtimes.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Kubernetes or Docker allows you to limit the virtual memory for a container.
+    The behavior of different environments varies, but in general, the application
+    is terminated with the `OutOfMemory` exit code after the limit is reached. It
+    might take days, weeks, or even months for a memory leak to crash the process
+    with `OutOfMemoryException`, so some memory leaks can stay dormant, potentially
+    causing rare restarts and affecting only a long tail of latency distribution.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Memory leaks on the hot path can take the whole service down fast. When memory
+    consumption grows quickly, garbage collection intensively tries to free up some
+    memory, which uses the CPU and can pause managed threads.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We can monitor garbage collection for individual generations using .NET event
+    counters and OpenTelemetry instrumentation, as shown in *Figure 4**.3*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 4.3 – Garbage collection rate per second for individual generations](img/B19423_04_03.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 4.3 – Garbage collection rate per second for individual generations
+  prefs: []
+  type: TYPE_NORMAL
+- en: As you can see, the generation 0 and generation 1 collections happened frequently.
+    Looking at the consistent memory growth and the frequency of garbage collection,
+    we can now be pretty sure we’re dealing with a memory leak. We could also collect
+    GC events from the `Microsoft-Windows-DotNETRuntime` event provider (we’ll learn
+    how to do this in the next section) to come to the same conclusion.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let’s also check the CPU utilization (shown in *Figure 4**.4*) reported by
+    the OpenTelemetry process instrumentation as the `process_cpu_time_seconds_total`
+    metric, from which we can derive the utilization:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 4.4 – CPU utilization during the memory leak](img/B19423_04_04.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 4.4 – CPU utilization during the memory leak
+  prefs: []
+  type: TYPE_NORMAL
+- en: We can see that there are periods when both user CPU utilization and privileged
+    (system) CPU utilization go up. These are the same periods when throughput dropped
+    in *Figure 4**.1*. User CPU utilization is derived from the `System.Diagnostics.Process.UserProcessorTime`
+    property, while system utilization (based on OpenTelemetry terminology) is derived
+    from the `System.Diagnostics.Process.PriviledgedProcessorTime` property. These
+    are the same periods when throughput dropped in *Figure 4**.1*.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Our investigation could have started with high latency, high error rate, a high
+    number of process restarts, high CPU, or high memory utilization, and all of those
+    are symptoms of the same problem – a memory leak. So, now, we need to investigate
+    it further – let’s collect a memory dump to see what’s in there. Assuming you
+    can reproduce the issue on a local machine, Visual Studio or JetBrains dotMemory
+    can capture and analyze a memory dump. We will use `dotnet-dump`, which we can
+    run on an instance experiencing problems. Check out the .NET documentation at
+    [https://learn.microsoft.com/dotnet/core/diagnostics/dotnet-dump](https://learn.microsoft.com/dotnet/core/diagnostics/dotnet-dump)
+    to learn more about the tool.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'So, let’s capture the dump using the following command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE2]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Once the dump has been collected, we can analyze it with Visual Studio, JetBrains
+    dotMemory, or other tools that automate and simplify it. We’re going to do this
+    the hard way with the `dotnet-dump` CLI tool:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE3]'
+  prefs: []
+  type: TYPE_PRE
+- en: This will open a prompt where we can run **SOS** commands. SOS is a debugger
+    extension that allows us to examine running processes and dumps. It can help us
+    find out what’s on the heap.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We can do this with the `dumpheap -stat` command, which prints the count and
+    total count and size of objects by their type, as shown in *Figure 4**.5*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 4.5 – Managed heap stats showing ~20 million MemoryLeakController
+    instances](img/B19423_04_05.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 4.5 – Managed heap stats showing ~20 million MemoryLeakController instances
+  prefs: []
+  type: TYPE_NORMAL
+- en: Stats are printed in ascending order, so the objects with the biggest total
+    size appear at the end. Here, we can see that we have almost 20 million `MemoryLeakController`
+    instances, which consume about 1.5 GB of memory. The controller instance is scoped
+    to the request, and it seems it is not collected after the request ends. Let’s
+    find **the GC roots** – objects that keep controller instances alive.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We need to find the address of any controller instance. We can do this using
+    its method table – the first hex number in each table row. The method table stores
+    type information for each object and is an internal CLR implementation detail.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We can find the object address for it using another SOS command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE4]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'This will print a table that contains the addresses of all `MemoryLeakController`
+    instances. Let’s copy one of them so that we can find the GC root with it:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE5]'
+  prefs: []
+  type: TYPE_PRE
+- en: '*Figure 4**.6* shows the path from the GC root to the controller instance printed
+    by the `gcroot` command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 4.6 – ProcessingQueue is keeping the controller instances alive](img/B19423_04_06.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 4.6 – ProcessingQueue is keeping the controller instances alive
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We can see that `issues.ProcessingQueue` is holding this and other controller
+    instances. It uses `ConcurrentQueue<Action>` inside. If we were to check the controller
+    code, we’d see that we added an action that uses `_logger` – a controller instance
+    variable that implicitly keeps controller instances alive:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: MemoryLeakController.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE6]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/tree/main/chapter4/issues/Controllers/MemoryLeakController.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/tree/main/chapter4/issues/Controllers/MemoryLeakController.cs)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: To fix this, we’d need to stop capturing the controller’s logger in action and
+    add size limits and backpressure to the queue.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Thread pool starvation
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Thread pool starvation happens when CLR does not have enough threads in the
+    pool to process work, which can happen at startup or when the load increases significantly.
+    Let’s reproduce it and see how it manifests.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'With the **issues** app running, add some load using the following commands
+    to send 300 concurrent requests to the app:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE7]'
+  prefs: []
+  type: TYPE_PRE
+- en: Now, let’s check what happens with the throughput and latency. You might not
+    see any metrics or traces coming from the application or see stale metrics that
+    were reported before the load started. If you try to hit any API on the issue
+    application, such as http://localhost:5051/ok, it will time out.
+  prefs: []
+  type: TYPE_NORMAL
+- en: If you check the CPU or memory for the **issues** process, you will see very
+    low utilization – the process got stuck doing nothing. It lasts for a few minutes
+    and then resolves – the service starts responding and reports metrics and traces
+    as usual.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'One way to understand what’s going on when a process does not report metrics
+    and traces is to use the `dotnet-counters` tool. Check out the .NET documentation
+    at [https://learn.microsoft.com/dotnet/core/diagnostics/dotnet-counters](https://learn.microsoft.com/dotnet/core/diagnostics/dotnet-counters)
+    to learn more about the tool. Now, let’s run it to see the runtime counters:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE8]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'It should print a table consisting of runtime counters that change over time,
+    as shown in *Figure 4**.7*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 4.7 – The dotnet-counters output dynamically showing runtime counters](img/B19423_04_07.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 4.7 – The dotnet-counters output dynamically showing runtime counters
+  prefs: []
+  type: TYPE_NORMAL
+- en: Here, we’re interested in thread pool counters. We can see 1,212 work items
+    waiting in the thread pool queue length and that it keeps growing along with the
+    thread count. Only a few (if any) work items are completed per second.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The root cause of this behavior is the following code in the controller, which
+    blocks the thread pool threads:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE9]'
+  prefs: []
+  type: TYPE_PRE
+- en: So, instead of switching to another work item, the threads sit and wait for
+    the dummy call to complete. It affects all tasks, including those that export
+    telemetry data to the collector – they are waiting in the same queue.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The runtime increases the thread pool size gradually and eventually, it becomes
+    high enough to clean up the work item queue. Check out *Figure 4**.8* to see thread
+    pool counter dynamics:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 4.8 – The thread pool threads count and queue changes before and after
+    starvation](img/B19423_04_08.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 4.8 – The thread pool threads count and queue changes before and after
+    starvation
+  prefs: []
+  type: TYPE_NORMAL
+- en: As you can see, we have no data for the time when starvation happened. But after
+    the thread pool queue is cleared, we start getting the data and see that the runtime
+    adjusts the number of threads to a lower value.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We just saw how problems on a certain code path can affect the performance of
+    the whole process and how we can use runtime metrics and diagnostics tools to
+    narrow them down. Now, let’s learn how to investigate performance issues specific
+    to certain APIs or individual requests.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Profiling
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: If we analyze individual traces corresponding to thread pool starvation or memory
+    leaks, we will not see anything special. They are fast under a small load and
+    get slower or fail when the load increases.
+  prefs: []
+  type: TYPE_NORMAL
+- en: However, some performance issues only affect certain scenarios, at least under
+    typical load. Locks and inefficient code are examples of such operations.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We rarely instrument local operations with distributed tracing under the assumption
+    that local calls are fast and exceptions have enough information for us to investigate
+    failures.
+  prefs: []
+  type: TYPE_NORMAL
+- en: But what happens when we have compute-heavy or just inefficient code in the
+    service? If we look at distributed traces, we’ll see high latency and gaps between
+    spans, but we wouldn’t know why it happens.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We know ahead of time that some operations, such as complex algorithms or I/O,
+    can take a long time to complete or fail, so we can deliberately instrument them
+    with tracing or just write a log record. But we rarely introduce inefficient code
+    to the hot path intentionally; due to this, our ability to debug it with distributed
+    tracing, metrics, or logs is limited.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In such cases, we need more precise signals, such as profiling. **Profiling**
+    involves collecting call stacks, memory allocations, timings, and the frequency
+    of calls. This can be done in-process using .NET profiling APIs that need the
+    application to be configured in a certain way. Low-level performance profiling
+    is usually done locally on a developer machine, but it used to be a popular mechanism
+    among **Application Performance Monitoring** (**APM**) tools to collect performance
+    data and traces.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In this chapter, we’re going to use a different kind of profiling, also called
+    performance tracing, which relies on `System.Diagnostics.Tracing.EventSource`,
+    and can be done ad hoc. `EventSource` is essentially a platform logger – CLR,
+    libraries, and frameworks write their diagnostics to event sources, which are
+    disabled by default, but it’s possible to enable and control them dynamically.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The .NET runtime and libraries events cover GC, tasks, the thread pool, the
+    DNS, sockets, and HTTP, among other things. ASP.NET Core, Kestrel, Dependency
+    Injection, Logging, and other libraries have their own event providers too.
+  prefs: []
+  type: TYPE_NORMAL
+- en: You can listen to any provider inside the process using `EventListener` and
+    access events and their payloads, but the true power of `EventSource` is that
+    you can control providers from out-of-process over `dotnet-monitor` tool in [*Chapter
+    2*](B19423_02.xhtml#_idTextAnchor038), *Native Monitoring* *in .NET*.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Let’s see how performance tracing and profiling with `EventSource` can help
+    us investigate specific issues.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Inefficient code
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Let’s run our demo application and see how inefficient code can manifest itself.
+    Make sure the observability stack is running, then start the **issues** application,
+    and then apply some load:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE10]'
+  prefs: []
+  type: TYPE_PRE
+- en: The load generator bombards the http://localhost:5051/spin?fib=<n> endpoint
+    with 100 concurrent requests. The spin endpoint calculates an *n*th Fibonacci
+    number; as you’ll see, our Fibonacci implementation is quite inefficient.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Assuming we don’t know how bad this Fibonacci implementation is, let’s try
+    to investigate why this request takes so long. Let’s open Jaeger by going to http://localhost:16686,
+    clicking on **Find traces**, and checking out the latency distribution, as shown
+    in *Figure 4**.9*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 4.9 – Latency distribution in Jaeger](img/B19423_04_09.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 4.9 – Latency distribution in Jaeger
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We can see that almost all requests take more than 2 seconds to complete. If
+    you click on any of the dots, Jaeger will show the corresponding trace. It should
+    look similar to the one shown in *Figure 4**.10*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 4.10 – Long trace in Jaeger](img/B19423_04_10.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 4.10 – Long trace in Jaeger
+  prefs: []
+  type: TYPE_NORMAL
+- en: The load application is instrumented so that we can measure client latency too.
+    We can see that the client request took 4.5 seconds, while the server-side request
+    took about 1.5 seconds. In a spin request, we call the dummy controller of the
+    same application and can see corresponding client and server spans. The only thing
+    that stands out here is that there are plenty of gaps and we don’t know what happened
+    there.
+  prefs: []
+  type: TYPE_NORMAL
+- en: If we check out the metrics, we will see high CPU and high server latency, but
+    nothing suspicious that can help us find the root cause. So, it’s time to capture
+    some performance traces.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Multiple tools can capture performance traces for the process that experiences
+    this issue, such as PerfView on Windows, or PerfCollect on Linux.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We’re going to use the cross-platform `dotnet-trace` CLI tool, which you can
+    install and use anywhere. Go ahead and run it using the following command for
+    10-20 seconds:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE11]'
+  prefs: []
+  type: TYPE_PRE
+- en: With this command, we’ve enabled the `Microsoft-DotNETCore-SampleProfiler` event
+    source (among other default providers) to capture managed thread call stacks for
+    the `dotnet-trace` tool by reading the .NET documentation at [https://learn.microsoft.com/dotnet/core/diagnostics/dotnet-trace](https://learn.microsoft.com/dotnet/core/diagnostics/dotnet-trace).
+    We could also configure it to collect events from any other event source.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The tool saves traces to the `issues.exe_*.nettrace` file, which we can analyze
+    with it as well:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE12]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'It outputs the top (5 by default) methods that have been on the stack most
+    of the time. *Figure 4**.11* shows some sample output:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 4.11 – Top five methods on the stack](img/B19423_04_11.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 4.11 – Top five methods on the stack
+  prefs: []
+  type: TYPE_NORMAL
+- en: There are no details about the top line – this is due to unmanaged or dynamically
+    generated code. But the second one is ours – the `MostInefficientFibonacci` method
+    looks suspicious and is worth checking. It was on the call stack 29.3% of the
+    time (exclusive percentage). Alongside nested calls, it was on the call stack
+    31.74% of the time (inclusive percentage). This was easy, but in more complex
+    cases, this analysis won’t be enough, and we might want to dig even further into
+    popular call stacks.
+  prefs: []
+  type: TYPE_NORMAL
+- en: You can open the trace file with any of the performance analysis tools I mentioned
+    previously. We’ll use SpeedScope ([https://www.speedscope.app/](https://www.speedscope.app/)),
+    a web-based tool.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'First, let’s convert the trace file into `speedscope` format:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE13]'
+  prefs: []
+  type: TYPE_PRE
+- en: Then, we must drop the generated JSON file into SpeedScope via the browser.
+    It will show the captured call stacks for each thread.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'You can click through different threads. You will see that many of them are
+    sitting and waiting for work, as shown in *Figure 4**.12*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 4.12 – The thread is waiting for work](img/B19423_04_12.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 4.12 – The thread is waiting for work
+  prefs: []
+  type: TYPE_NORMAL
+- en: This explains the top line in the report – most of the time, threads are waiting
+    in unmanaged code.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'There is another group of threads that is working hard to calculate Fibonacci
+    numbers, as you can see in *Figure 4**.13*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 4.13 – Call stack showing controller invocation with Fibonacci number
+    calculation](img/B19423_04_13.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 4.13 – Call stack showing controller invocation with Fibonacci number
+    calculation
+  prefs: []
+  type: TYPE_NORMAL
+- en: As you can see, we use a recursive Fibonacci algorithm without memorization,
+    which explains the terrible performance.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We could have also used the `dotnet-stack` tool, which prints managed thread
+    stack trace snapshots.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Debugging locks
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: With performance tracing, we can detect code that actively consumes CPU, but
+    what if nothing happens – for example, if we have a lock in our code? Let’s find
+    out.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let’s start the **issues** app and generate some load:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE14]'
+  prefs: []
+  type: TYPE_PRE
+- en: If we check the CPU and memory consumption, we can see that they are low and
+    don’t grow much, the thread count doesn’t change much, the thread queue is empty,
+    and the contention rate is low. At the same time, the throughput is low (around
+    60 requests per second) and the latency is big (P95 is around 3 seconds). So,
+    the application is doing nothing, but it can’t go faster. If we check the traces,
+    we will see a big gap with no further data.
+  prefs: []
+  type: TYPE_NORMAL
+- en: This issue is specific to the lock API; if we hit another API, such as `http://localhost:5051/ok`,
+    it responds immediately. This narrows down our search for the lock API.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Assuming we don’t know there is a lock there, let’s collect some performance
+    traces again with `$ dotnet-trace collect --name issues`. If we get the `topN`
+    stacks, as in the previous example, we won’t see anything interesting – just threads
+    waiting for work – locking is fast; waiting for the locked resource to become
+    available takes much longer.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We can dig deeper into the generated trace file to find actual stack traces
+    on what happens in the lock controller. We’re going to use PerfView on Windows,
+    but you can use PerfCollect on Linux, or other tools such as JetBrains dotTrace
+    to open trace files and find stack traces.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let’s open the trace file with PerfView and then click on the `LockController.Lock`,
+    as shown in *Figure 4**.14*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 4.14 – Finding LockController stacks across all threads](img/B19423_04_14.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 4.14 – Finding LockController stacks across all threads
+  prefs: []
+  type: TYPE_NORMAL
+- en: We can see that `LockController` rarely appears on the call stack, as well as
+    its nested calls – we can tell since both the inclusive and exclusive percentages
+    are close to 0\. From this, we can conclude that whatever we’re waiting for is
+    asynchronous; otherwise, we would see it on the call stack.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Now, let’s right-click on the `LockController` line and click on `LockController`
+    stacks. Switch to the **CallTree** tab, as shown in *Figure 4**.15*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 4.15 – Call stack with LockController.Lock](img/B19423_04_15.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 4.15 – Call stack with LockController.Lock
+  prefs: []
+  type: TYPE_NORMAL
+- en: We can see that the controller calls `SemaphoreSlim.WaitAsync` – this should
+    be our first suspect. It would explain the low CPU, low memory usage, and no anomalies
+    in the thread counts. It still makes clients wait and keeps client connections
+    open.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs: []
+  type: TYPE_NORMAL
+- en: We can only see the synchronous part of the call stack in *Figure 4**.15* –
+    it does not include `WaitAsync` or anything that happens after that.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The analysis we’ve done here relies on luck. In real-world scenarios, this issue
+    would be hidden among other calls. We would have multiple suspects and would need
+    to collect more data to investigate further. Since we’re looking for asynchronous
+    suspects, collecting task-related events with `dotnet-trace` from the `System.Threading.Tasks.TplEventSource`
+    provider would be useful.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The issue is obvious if we look into the code, but it can be hidden well in
+    real-world code, behind feature flags or third-party libraries:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: LockController.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE15]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/tree/main/chapter4/issues/Controllers/LockController.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/tree/main/chapter4/issues/Controllers/LockController.cs)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The problem here is that we put a lock around the HTTP call to the downstream
+    service. If we wrap only `ThreadUnsafeOperation` into a synchronous lock, we’ll
+    see a much higher throughput of around 20K requests per second and low latency
+    with P95 of around 20 milliseconds.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Performance tracing is a powerful tool that allows us to capture low-level data
+    reported by the .NET runtime, standard, and third-party libraries. In the examples
+    we have covered in this chapter, we run diagnostics tools ad hoc and on the same
+    host as the service. This is reasonable when you’re reproducing issues locally
+    or optimizing your service on the dev box. Let’s see what we can do in a more
+    realistic case with multiple instances of services running and restricted SSH
+    access.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Using diagnostics tools in production
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In production, we need to be able to collect some data proactively with reasonable
+    performance and a telemetry budget so that we can analyze data afterward.
+  prefs: []
+  type: TYPE_NORMAL
+- en: It’s difficult to reproduce an issue on a specific instance of a running process
+    and collect performance traces or dumps from it in a secure and distributed application.
+    If an issue such as a slow memory leak or a rare deadlock affects just a few instances,
+    it might be difficult to even detect it and, when detected, the instance has already
+    been recycled and the issue is no longer visible.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Continuous profiling
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: What we’re looking for is a continuous profiler – a tool that collects sampled
+    performance traces. It can run for short periods to minimize the performance impact
+    of collection on each instance and send profiles to central storage, where they
+    can be stored, correlated with distributed traces, queried, and viewed. Distributed
+    tracing supports sampling and a profiler can use it to capture traces and profiles
+    consistently.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Many observability vendors, such as Azure Monitor, New Relic, Dynatrace, and
+    others, provide continuous profilers for .NET. For example, Azure Monitor allows
+    us to navigate to profiles from traces, as you can see in *Figure 4**.16*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 4.16 – Navigating to a profile from a trace in Azure Monitor](img/B19423_04_16.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 4.16 – Navigating to a profile from a trace in Azure Monitor
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We will see a long trace for the inefficient code examples we went through
+    earlier in this chapter, but the continuous profiler was enabled and captured
+    some of these calls. If we click on the profiler icon, we will see the call stack,
+    similar to the one we captured with `dotnet-collect`, as shown in *Figure 4**.17*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 4.17 – Profile showing a recursive call stack with the MostInefficientFibonacci
+    method](img/B19423_04_17.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 4.17 – Profile showing a recursive call stack with the MostInefficientFibonacci
+    method
+  prefs: []
+  type: TYPE_NORMAL
+- en: With a continuous profiler, we can debug inefficient code in a matter of seconds,
+    assuming that the problem is reproduced frequently enough so that we can capture
+    both distributed trace and profile for it.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The dotnet-monitor tool
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Beyond profiling individual calls, we also need to be able to capture dumps
+    proactively and on demand. It’s possible to configure .NET to capture dumps when
+    a process crashes, but it doesn’t always work in containers and it’s not trivial
+    to access and transfer dumps.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'With `dotnet-monitor`, we can capture logs, memory, and GC dumps, and collect
+    performance traces in the same way we did with `dotnet` diagnostic tools:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Performance traces from event sources can be collected with the `dotnet-monitor`
+    `/trace` API or the `dotnet-trace` CLI tool
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Dumps can be collected with the `/dump` API or the `dotnet-dump` tool
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Event counters can be collected with the `/metrics` API or the `dotnet-counters`
+    tool
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Check out the `dotnet-monitor` documentation to learn more about these and
+    other HTTP APIs it provides: [https://github.com/dotnet/dotnet-monitor/tree/main/documentation](https://github.com/dotnet/dotnet-monitor/tree/main/documentation).'
+  prefs: []
+  type: TYPE_NORMAL
+- en: We can also configure triggers and rules that proactively collect traces or
+    dumps based on CPU or memory utilization, GC frequency, and other runtime counter
+    values. Results are uploaded to configurable external storage.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We looked at some features of `dotnet-monitor` in [*Chapter 2*](B19423_02.xhtml#_idTextAnchor038),
+    *Native Monitoring in .NET*, where we run it as a sidecar container in Docker.
+    Similarly, you can run it as a sidecar in Kubernetes.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Summary
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Performance issues affect the user experience by decreasing service availability.
+    Distributed tracing and common metrics allow you to narrow down the problem to
+    a specific service, instance, API, or another combination of factors. When it’s
+    not enough, you could increase resolution by adding more spans, but at some point,
+    the performance impact and cost of the solution would become unreasonable.
+  prefs: []
+  type: TYPE_NORMAL
+- en: .NET runtime metrics provide insights into CLR, ASP.NET Core, Kestrel, and other
+    components. Such metrics can be collected with OpenTelemetry, `dotnet-counters`,
+    or `dotnet-monitor`. It could be enough to root cause an issue, or just provide
+    input on how to continue the investigation. The next step could be capturing process
+    dumps and analyzing memory or threads’ call stacks, which can be achieved with
+    `dotnet-dump`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: For problems specific to certain scenarios, performance traces provide details
+    so that we can see what happens in the application or under the hood in third-party
+    library code. Performance traces are collected with `dotnet-trace` or `dotnet-monitor`.
+    By capturing performance traces, we can see detailed call stacks, get statistics
+    on what consumes CPU, and monitor contentions and garbage collection more precisely.
+    This is not only a great tool to investigate low-level issues but also to optimize
+    your code.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Collecting low-level data in a secure, multi-instance environment is challenging.
+    Continuous profilers can collect performance traces and other diagnostics on-demand,
+    on some schedule, or by reacting to certain triggers. They also can take care
+    of storing data in a central location and then visualizing and correlating it
+    with other telemetry signals.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The `dotnet-monitor` tool can run as a sidecar and then provide essential features
+    to diagnostics data proactively or on-demand and send it to external storage.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In this chapter, you learned how to collect diagnostics data using .NET diagnostics
+    tools and how to use it to solve several classes of common performance issues.
+    Applying this knowledge, along with what we learned about metrics, distributed
+    tracing, and logs previously, should allow you to debug most distributed and local
+    issues in your application.
+  prefs: []
+  type: TYPE_NORMAL
+- en: So, now, you know everything you need to leverage auto-instrumentation and make
+    use of telemetry created by someone else. In the next chapter, we’ll learn how
+    to enrich auto-generated telemetry and tailor it to our needs.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Questions
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: What would you check first to understand whether an application was healthy?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: If you were to see a major performance issue affecting multiple different scenarios,
+    how would you investigate it?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: What’s performance tracing and how can you leverage it?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Part 2: Instrumenting .NET Applications'
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: This part provides an in-depth overview and practical guide for .NET tracing,
+    metrics, logs, and beyond. We’ll start by learning about OpenTelemetry configuration
+    and then dive deep into manual instrumentation, using different signals.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'This part has the following chapters:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[*Chapter 5*](B19423_05.xhtml#_idTextAnchor083), *Configuration and Control
+    Plane*'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[*Chapter 6*](B19423_06.xhtml#_idTextAnchor098), *Tracing Your Code*'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[*Chapter 7*](B19423_07.xhtml#_idTextAnchor115), *Adding Custom Metrics*'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[*Chapter 8*](B19423_08.xhtml#_idTextAnchor131), *Writing Structured and Correlated
+    Logs*'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL

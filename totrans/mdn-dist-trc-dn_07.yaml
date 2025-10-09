@@ -1,0 +1,929 @@
+- en: '7'
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Adding Custom Metrics
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In the previous chapter, we looked into manual distributed tracing instrumentation,
+    which should help us debug individual operations or analyze service usage with
+    ad hoc queries. Here, we’ll talk about metrics. First, we’ll learn when to use
+    them, understand cardinality requirements, and then see how traces and metrics
+    complement each other. We’ll explore the metrics API’s evolution in .NET and then
+    spend most of this chapter talking about OpenTelemetry metrics. We’ll cover **instruments**
+    such as counters, gauges, and histograms, and learn about each of them in depth.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We will cover the following topics in the chapter:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The benefits, limitations, and evolution of metrics in .NET
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: How and when to use different counters
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: How to record and use gauges
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: How to record value distribution with histograms
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: By the end of this chapter, you should be able to pick the right instrument
+    for each scenario and implement and use it in your applications to analyze performance,
+    health, and usage.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Technical requirements
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The code for this chapter is available in this book’s repository on GitHub at
+    [https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/tree/main/chapter7](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/tree/main/chapter7).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'To run the samples and perform analysis, we’ll need the following tools:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: .NET SDK 7.0 or later
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Docker and `docker-compose`
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Metrics in .NET – past and present
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Even though we are focusing on distributed tracing in this book, learning about
+    metrics is important to understand when and how to use them to improve observability.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Metrics allow us to report data that’s been aggregated over a certain period
+    and set of attributes (that is, dimensions or tags). A metric can be represented
+    as a set of time series where each series measures the change of one indicator
+    with a unique combination of attribute values over time. Examples include CPU
+    utilization for a given service instance or HTTP request latency for a given route,
+    HTTP method, response code, and instance.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The key difference between traces and metrics is aggregation – traces capture
+    individual operations with detailed attributes. Traces answer questions such as
+    “*What happened with this specific request?*” and “*Why did it happen?*” Metrics,
+    on the other hand, tell us what happens in the system or specific parts of it,
+    how common a failure is, how widespread the performance issue is, and so on.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Before diving into the use cases, benefits, and APIs of metrics, we first need
+    to learn about the main limitation of metrics – low **cardinality**.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Cardinality
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Cardinality represents number of combinations of unique attributes or number
+    of time series. Adding a new attribute causes a combinatorial explosion of a time-series
+    number, which leads to the combinatorial growth of a metric’s volume.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs: []
+  type: TYPE_NORMAL
+- en: Metrics should have low cardinality, but “low” and “high” are relative – their
+    definition depends on the budget, backend limits, and local memory consumption.
+  prefs: []
+  type: TYPE_NORMAL
+- en: For example, a relatively big Prometheus instance can support millions of active
+    time series. If we have 1,000 instances of a service running, and the service
+    exposes four HTTP routes with three methods each and returns five different status
+    codes, we’re going to report 1,000 (instances) * 4 (routes) * 3 (methods) * 5
+    (status codes) = 60K time series of an HTTP server’s request duration metric (at
+    worst). If we try to include something such as the `customer_id` attribute and
+    have 1,000 active customers, we’ll start reporting 60M time series for the HTTP
+    server request duration metric only.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We can still do this by scaling Prometheus horizontally, so reporting a few
+    high-cardinality attributes is still feasible when justified.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs: []
+  type: TYPE_NORMAL
+- en: Metrics are aggregated in memory before they are exported, so metrics with high
+    cardinality may affect application performance.
+  prefs: []
+  type: TYPE_NORMAL
+- en: There are no limits in terms of attribute cardinality in .NET, but the OpenTelemetry
+    SDK has configurable limits on the maximum number of metrics and the number of
+    attribute combinations per metric.
+  prefs: []
+  type: TYPE_NORMAL
+- en: When to use metrics
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Resource consumption, low-level communication details, or the number of open
+    connections are best represented by metrics. In other cases, we have a choice
+    and can report telemetry as metrics, spans, or events. For example, if we want
+    to measure number of incoming HTTP requests by route, we can query spans that
+    are filtered by service, route, and timestamp. Should we also report metrics for
+    it? Let’s see.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Metrics are implemented and optimized under the assumption of low cardinality,
+    which enables several important benefits:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**Predictable costs and limited resource consumption**: The metrics’ volume
+    does not grow much as load increases – we only get a new set of time series when
+    the service scales up adding new instances.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Low performance impact**: Reporting a single measurement can be done without
+    allocating memory.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Unbiased usage and performance data**: Metrics are recorded regardless of
+    sampling decisions. Metrics don’t always report exact data, but we can control
+    their precision by configuring collection intervals and histogram boundaries.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Fast and cheap(er) queries**: While observability backends store metrics
+    in different ways and their pricing options vary, metrics are much more compact,
+    which usually leads to faster ingestion and cheaper queries.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Metrics work best when we use them to monitor service health and usage regularly.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'When you want to instrument some operation and are in doubt about which signal
+    to use, the following strategy can help: if you need unbiased data or want to
+    create an alert or a chart on a dashboard, use metrics. Otherwise, start with
+    tracing and ad hoc queries. If you find yourself running a lot of similar queries
+    over traces, then add a metric to optimize such queries.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Assuming your tracing backend does not support rich queries, you probably want
+    to be more proactive in adding metrics. And if your backend is optimized for high-cardinality
+    data and ad hoc analysis, you might not need metrics much.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Now that we have a rough idea of when we need metrics, let’s dive into instrumentation.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Reporting metrics
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: There are a few different metrics (and counters) APIs in .NET – let’s take a
+    look at them and learn when to use them.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Performance counters
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: The `System.Diagnostics.PerformanceCounter` class and its friends implement
+    Windows performance counters. They don’t support dimensions. These limitations
+    make performance counters an unlikely choice for a modern distributed system monitoring
+    story.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Event counters
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: '`System.Diagnostics.Tracing.EventCounter` is a cross-platform implementation
+    of a counter, which represents a single time series – we saw it in action in [*Chapter
+    2*](B19423_02.xhtml#_idTextAnchor038), *Native Monitoring in .NET*, and [*Chapter
+    4*](B19423_04.xhtml#_idTextAnchor068), *Low-Level Performance Analysis with Diagnostic
+    Tools*, where we collected counters coming from .NET with `dotnet-counters` and
+    `dotnet-monitor`. OpenTelemetry can listen to them too, converting them into OpenTelemetry
+    metrics and enriching them with resource attributes.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: If you want to report a metric that does not need any dimensions except static
+    context and want to be able to dynamically turn this metric on and off using diagnostics
+    tools, event counters would be a good choice.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We’re not going to dive into the `EventCounter` API, so please refer to the
+    .NET documentation ([https://learn.microsoft.com/dotnet/core/diagnostics/event-counters](https://learn.microsoft.com/dotnet/core/diagnostics/event-counters))
+    to find out more.
+  prefs: []
+  type: TYPE_NORMAL
+- en: OpenTelemetry metrics
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: The APIs we’re going to focus on are available in the `System.Diagnostics.Metrics`
+    namespace in the `System.Diagnostics.DiagnosticSource` NuGet package. These APIs
+    follow OpenTelemetry’s metrics specification and terminology, except the term
+    “tags” is used instead of “attributes.” There is no shim for metrics.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The metrics API supports recording multi-dimensional data using the following
+    instruments:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**Counter**: Represents a value that increments over time – for example, the
+    number of open connections'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**UpDownCounter**: Represents an additive value that increments or decrements
+    over time – for example, the number of active connections'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Gauge**: Represents a current value – for example, the sequence number of
+    the last message received from the messaging queue'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Histogram**: Represents a distribution of value – for example, HTTP request
+    latency'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Instruments can be created with the `Meter` class. So, first, we need an instance
+    of `Meter`, which we can create using a name and optional instrumentation version:
+    `Meter meter =` `new ("sample")`.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The name of `Meter` can match the application name, namespace, class, or anything
+    else that makes sense in your case. It’s used to enable metrics, as shown in the
+    following example:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Program.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE0]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter7/metrics/Program.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter7/metrics/Program.cs)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Here, we enabled all metrics coming from any `Meter` whose name starts with
+    `queue.` (we can use an exact match or wildcards).
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`Meter` is disposable. In some cases, when you use the same `Meter` instance
+    for the application’s lifetime, you can make `Meter` instances static; otherwise,
+    make sure to dispose of them to disable all nested instruments.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs: []
+  type: TYPE_NORMAL
+- en: We can listen to metrics directly, without OpenTelemetry, using the `System.Diagnostics.Metrics.MeterListener`
+    class. It can subscribe to specific instruments and record their measurements.
+    `MeterListener` is used by OpenTelemetry, so you might find it useful to debug
+    instrumentation.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Now that we have a `Meter` instance and configured OpenTelemetry to export metrics,
+    we can create instruments using factory methods on the `Meter` class; for example,
+    `meter.CreateCounter<long>("connections.open")`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We’ll see how to create instruments later in this chapter, but for now, here’s
+    a list of common instrument properties:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`byte`, `short`, `int`, `long`, `float`, `double`, or `decimal`).'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**The instrument name** represents a unique exported metric name; it’s a required
+    property. OpenTelemetry limits the instrument name to 63 characters and has other
+    limitations. We’ll talk about it more in [*Chapter 9*](B19423_09.xhtml#_idTextAnchor148),
+    *Best Practices*.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**A unit** represents an optional value unit following Unified Code for Units
+    and Measure ([https://unitsofmeasure.org/](https://unitsofmeasure.org/)).'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**The description** is an optional free-form piece of text that briefly describes
+    the instrument.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: We can create multiple instances of instruments with the same name in the process
+    – the OpenTelemetry SDK aggregates data coming from them into one value. Instruments
+    are de facto identified by their name, unit, and combination of resource attributes.
+    So, measurements from multiple instrument instances that share the same identity
+    are aggregated together. Let’s explore instruments one by one and learn how to
+    use them, starting with counters.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Using counters
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: '**Counter** and **UpDownCounter** represent additive values – values that it
+    makes sense to sum up. For example, the sum of incoming request counts with different
+    HTTP methods makes sense, but the sum of CPU utilization across different cores
+    does not.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: On the instrumentation side, the only difference between **Counter** and **UpDownCounter**
+    is that the former increases monotonically (or stays the same), while the latter
+    can decrease. For example, the number of open and closed connections should be
+    represented by **Counter**, while the number of active connections should be represented
+    by **UpDownCounter**.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Both kinds of counters can be synchronous and asynchronous:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**Synchronous** counters report a delta of value when change happens. For example,
+    once we successfully initiate a new connection, we can increment counters for
+    both open and active connections. Once we’ve finished terminating a connection,
+    we decrement the number of active connections only.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`UpDownCounter` instrument and increment it when the item is enqueued and decrement
+    when dequeued or create `ObservableUpDownCounter` and return the queue’s length
+    in a callback.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Let’s instrument in-memory queue processing and learn about each instrument
+    as we go.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The Counter class
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'A synchronous counter is implemented in the `System.Diagnostics.Metrics.Counter`
+    class. We’ll use it to keep track of the number of enqueued items:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Producer.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE1]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter7/metrics/Producer.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter7/metrics/Producer.cs)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Here, we created an instance of the `Meter` class called `queue.producer`. It’s
+    static here because we never need to disable corresponding instruments. Then,
+    we created a static counter called `queue.enqueue.count` with a `long` type parameter,
+    with the unit set to `{count}`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We also need to increment it every time an item is enqueued. `Counter` exposes
+    the `Add` method to record a positive delta; it has several overloads to pass
+    zero or more attributes. In our sample, we have multiple queues and pass queue
+    names:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Producer.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE2]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter7/metrics/Producer.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter7/metrics/Producer.cs)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let’s run the sample application with `metrics$ docker-compose up --build`
+    and open the metrics endpoint on OpenTelemetry Collector at `http://localhost:8889/metrics`.
+    We should see `queue_enqueued_count_total` among other metrics in the Prometheus
+    exposition format:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE3]'
+  prefs: []
+  type: TYPE_PRE
+- en: Here, we can see the description, along with the instrument’s type, followed
+    by a list of all attribute combinations and the latest reported counter values.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We can also visualize this counter in Prometheus (at `http://localhost:9090`).
+    Usually, we are interested in rates or trends, and not the absolute value of a
+    counter. For example, the rate at which items are enqueued would be a good indication
+    of producer load and performance.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We can get this by using the `sum by (queue) (rate(queue_enqueued_count_total[1m]))`
+    query – Prometheus calculates the rate per second (and averages it over 1 minute),
+    then sums up values by grouping them by queue name across application instances.
+    The corresponding chart is shown in *Figure 7**.1*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 7.1 – Enqueue rate per second grouped by queue name](img/Figure_7.01_B19423.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 7.1 – Enqueue rate per second grouped by queue name
+  prefs: []
+  type: TYPE_NORMAL
+- en: Here, we can see that we enqueue items at around 16 items per second to each
+    queue. Instead of `sum`, we could use the `min` or `max` operators to see whether
+    there are application instances that stand out.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Counters, along with other instruments, expose an `Enabled` flag, which indicates
+    whether there are any listeners for this instrument. Meters are not enabled by
+    default and the specific instrument could be disabled, so the `Enabled` flag should
+    be used to guard any additional work necessary for metric reporting. It’s really
+    important for native instrumentations, where end users of such libraries may or
+    may not have metrics enabled and the goal is to have zero performance impact when
+    metrics are disabled.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Other properties that are exposed on the instruments include `Name`, `Unit`,
+    `Description`, and `Meter`, which we used to create this instrument.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The UpDownCounter class
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: The `System.Diagnostics.Metrics.UpDownCounter` class is very similar to `Counter`
+    in terms of the API. You can create one with the `CreateUpDownCounter` method
+    on the `Meter` instance by providing an instrument name, along with an optional
+    unit and description. The `UpDownCounter` class exposes an `Add` method, which
+    takes a delta of the measured value and zero or more tags. It also exposes the
+    `Enabled` flag and the properties the instrument was created with, such as its
+    name, unit, and description.
+  prefs: []
+  type: TYPE_NORMAL
+- en: On the consumption side, however, `UpDownCounter` is different. It’s not monotonic
+    and maps to the `gauge` type in Prometheus. We’ll learn more about it in *The
+    ObservableUpDownCounter* *class* section.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The ObservableCounter class
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: '`System.Diagnostics.Metrics.ObservableCounter` implements an asynchronous version
+    of `Counter`. There is no difference between synchronous and asynchronous counters
+    on the consumption side. `ObservableCounter` just provides a more convenient way
+    to record counters in a callback executed periodically.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: For example, the number of completed (by the thread pool) tasks (`process.runtime.dotnet.thread_pool.completed_items.count`)
+    available in the `OpenTelemetryInstrumentation.Runtime` NuGet package is implemented
+    as `ObservableCounter`. On every call, it returns the `ThreadPool.CompletedWorkItems`
+    property.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We can create an observable counter with the `CreateObservableCounter` method:
+    `Meter.CreateObservableCounter<long>("my.counter", GetValue)`. Here, in addition
+    to the name, we pass a lambda function – `GetValue` – which returns the current
+    value of the counter.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'It’s executed when metrics are about to be exported. In our application, this
+    happens every 5 seconds, while the default period for the OTLP exporter is 60
+    seconds. We configured it with the `OTEL_METRIC_EXPORT_INTERVAL` environment variable,
+    but it’s also possible to set it explicitly with the `PeriodicExportingMetricReaderOptions.ExportIntervalMilliseconds`
+    property:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: ExplicitConfiguration.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE4]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter7/metrics/ExplicitConfiguration.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter7/metrics/ExplicitConfiguration.cs)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The `ExportIntervalMilliseconds` property controls how frequently counter values
+    are collected, so it controls the precision and volume of individual time series.
+  prefs: []
+  type: TYPE_NORMAL
+- en: This configuration does not affect pull-based exporters such as Prometheus,
+    where it’s controlled externally (for example, with the `scrape_interval` parameter
+    on the Prometheus instance). In our sample application, we have the OTLP exporter,
+    which is push-based and sends metrics to OpenTelemetry Collector. Collector then
+    exposes metrics on the `http://localhost:8889/metrics` endpoint, where Prometheus
+    scrapes them from.
+  prefs: []
+  type: TYPE_NORMAL
+- en: With `ObservableCounter`, we can only record data using the callback provided
+    at start time, and there are several overloads of the `CreateObservableCounter`
+    method that allow us to report the metric’s value, along with its attributes (via
+    the `Measurement` struct) or as a list of `Measurement` instances.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'There are several important things to know about the callback:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Unlike the `Counter.Add` method, it reports an absolute value of the counter.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: It should finish in a reasonable amount of time. We can configure the timeout
+    similarly to the export interval with the `OTEL_METRIC_EXPORT_TIMEOUT` environment
+    variable or the `PeriodicExportingMetricReaderOptions.ExportTimeoutMilliseconds`
+    property.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The callback should not return multiple measurements for the same set of attributes.
+    The OpenTelemetry SDK’s behavior is not defined for this case.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Note
+  prefs: []
+  type: TYPE_NORMAL
+- en: These requirements are from the OpenTelemetry specification. `MeterListener`
+    does not enforce any of them.
+  prefs: []
+  type: TYPE_NORMAL
+- en: To unsubscribe from observable counters, we must dispose of the corresponding
+    `Meter` instance. So, if the counter relies on any instance data and belongs to
+    an object with a limited lifetime, we must create `Meter` as an instance variable
+    and dispose of it, along with the object it belongs to. Let’s see an example of
+    this with `ObservableUpDownCounter`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The ObservableUpDownCounter class
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: '`System.Diagnostics.Metrics.ObservableUpDownCounter` represents an asynchronous
+    version of `UpDownCounter`. Its creation is similar to `ObservableCounter`, but
+    its consumption side matches `UpDownCounter`.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: We’ll use it to report queue length – it should give us a good indication of
+    processor throughput and whether it processes items fast enough.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The queue length is not monotonic – it can go up and down, so a regular counter
+    would not work. We could track it as `UpDownCounter`: we could increment it when
+    enqueueing an item and decrement when dequeuing. But if we use `ObservableUpDownCounter`,
+    we’ll achieve the same more frugally by only returning the queue length every
+    few seconds.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: In a more complicated case of a distributed queue, we might not be able to instrument
+    both the producer and consumer and would need to periodically get the current
+    distributed queue length with a network call to the broker (be careful if you
+    decide to do this in the counter callback).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let’s implement the queue length counter. First, the `Processor` class is disposable,
+    so we should assume it can die before the application ends. It’s important to
+    disable all the instruments when this happens – we need to create a `Meter` as
+    an instance variable and create the counter:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Processor.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE5]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter7/metrics/Processor.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter7/metrics/Processor.cs)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Here, we created an `ObservableUpDownCounter` instance with a `queue.length`
+    name and configured it to report the length in a callback, along with the queue
+    name attribute. The last thing we need to do is to dispose of the `Meter` instance,
+    along with the processor, using the `_meter.Dispose()` method. That’s it!
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Start the sample application (unless it’s still running) with `metrics$ docker-compose
+    up --build` and check out the `queue_length` metric (at `http://localhost:8889/metrics`).
+    You should see it, among other metrics:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE6]'
+  prefs: []
+  type: TYPE_PRE
+- en: As you can see, `UpDownCounter` and `ObservableUpDownCounter` are both mapped
+    to gauge Prometheus – we’ll learn more about gauges in the next section.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We can visualize this metric in the Prometheus UI (at `http://localhost:9090`)
+    with the `avg by (queue) (queue_length)` query, as shown in *Figure 7**.2*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 7.2 – Average queue length per queue](img/Figure_7.02_B19423.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 7.2 – Average queue length per queue
+  prefs: []
+  type: TYPE_NORMAL
+- en: By looking at this chart, we can say that the **update** queue grows linearly
+    while the other queues remain almost empty. We don’t need any complicated queries
+    here because we’re interested in absolute values as we expect the queue length
+    to always be small.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Let’s learn about other instruments – gauges and histograms – and investigate
+    what happens with the **update** queue.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Using an asynchronous gauge
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: '`System.Diagnostics.Metrics.ObservableGauge` represents the current value of
+    a non-additive metric. There is only an asynchronous version of it.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The key difference with `ObservableUpdownCounter` is that the counter is additive.
+    For example, with counters, if we have multiple metric points for the same counter
+    name, at the same timestamp, and with the same attributes, we can just add them
+    up. For gauge, aggregation makes no sense and OpenTelemetry uses the last reported
+    value.
+  prefs: []
+  type: TYPE_NORMAL
+- en: When exported to Prometheus, `ObservableGauge` and `ObservableUpdownCounter`
+    are the same, but their OTLP definitions (over-the-wire formats) are different.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Tip
+  prefs: []
+  type: TYPE_NORMAL
+- en: You can get an idea of the internal representation of metric points on the OpenTelemetry
+    side by enabling the `ConsoleExporter` output or looking into the OpenTelemetry
+    documentation at [https://opentelemetry.io/docs/reference/specification/overview/#metrics-data-model-and-sdk](https://opentelemetry.io/docs/reference/specification/overview/#metrics-data-model-and-sdk).
+  prefs: []
+  type: TYPE_NORMAL
+- en: We use `ObservableGauge` to report a sequence number for the last processed
+    item. It’s useful with distributed queues, where the sequence number (or offset)
+    represents the unique and ordered position of the item in the queue.
+  prefs: []
+  type: TYPE_NORMAL
+- en: By looking at sequence number trends, we can estimate how many items are processed
+    and how fast they are processed. For example, if the processor is stuck trying
+    to process an invalid work item, we’d see that the sequence number is not increasing.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Adding up sequence numbers from different queues make no sense, so it should
+    be an `ObservableGauge`, which we can create using a familiar API:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Processor.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE7]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter7/metrics/Processor.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter7/metrics/Processor.cs)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: In the callback, we return the `_seqNo` instance variable, which we update after
+    dequeuing the work item. The only thing we need here is thread safety; we don’t
+    need precision since data is collected periodically.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We can report values with zero or more attributes or multiple measurements at
+    once, so long as they have different attributes.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'If we run the sample application with `metrics$ docker-compose up --build`,
+    we can check the sequence number in Prometheus with a query such as `delta(processor_last_sequence_number[1m])`.
+    It returns the delta per minute and is shown in *Figure 7**.3*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 7.3 – Sequence number delta per minute](img/Figure_7.03_B19423.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 7.3 – Sequence number delta per minute
+  prefs: []
+  type: TYPE_NORMAL
+- en: As we can see, after the application starts, the delta stabilizes around 3,000
+    items per minute in the `queue_length` counter – the **update** queue is not processed
+    fast enough. By looking at metrics, we can’t say why, but there is one that can
+    cast some light on it – the processing duration. Let’s take a look at it.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Using histograms
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: '`System.Diagnostics.Metrics.Histogram` represents a distribution of values
+    – for example, the operation duration or payload size. Histograms can only be
+    reported synchronously as each measurement is important. As we saw in [*Chapter
+    2*](B19423_02.xhtml#_idTextAnchor038), *Native Monitoring in .NET*, they allow
+    us to calculate percentiles at query time.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We’ll use a histogram to record the processing duration in our example:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Processor.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE8]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter7/metrics/Processor.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter7/metrics/Processor.cs)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Every time we process an item from the queue, we should measure and record
+    the time it took:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Processor.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE9]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter7/metrics/Processor.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter7/metrics/Processor.cs)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Here, we are using the `Enabled` flag – when metrics are not enabled, it prevents
+    us from allocating a `Stopwatch` object on the heap.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The recording method has multiple overloads to report zero or more attributes
+    associated with this value. Here, we report the queue name and the processing
+    status. The status has low cardinality – it’s an `enum` with a few values.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We also want to stay as efficient as possible, so we implemented the optimal
+    and non-allocating `StatusToString` method.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Let’s run the application with `metrics$ docker-compose up --build` and check
+    out how the histogram looks in Prometheus exposition format (at `http://localhost:8889/metrics`).
+    You should see a set of `processor_processing_duration_milliseconds_bucket` points
+    for each queue, status, and bucket.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'For example, this is what I see for the `Ok` (attributes and some buckets have
+    been omitted for brevity):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE10]'
+  prefs: []
+  type: TYPE_PRE
+- en: Each bucket is identified by a `le` attribute – the inclusive upper boundary.
+    There were 27 measurements smaller than or equal to 50 milliseconds, 52 measurements
+    that were smaller than 75 milliseconds, and so on. Overall, there were 72 measurements,
+    and the sum of all durations was around 4,146 milliseconds.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'OTLP format defines a few more interesting properties that we can’t see here:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The `min` and `max` values for each bucket – they are not supported by Prometheus
+    but show up in OTLP data.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Exemplars**, which represent examples of traces in a bucket. We could use
+    them to easily navigate from metrics to traces and investigate long processing
+    operations in higher histogram buckets. They are not implemented in OpenTelemetry
+    for .NET yet.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The bucket boundaries we can see here are the default ones. They are static
+    and work best if the measured value is well within the [0, 10000] range. If we
+    start to measure values in the [10,000, 20,000] range, every measurement would
+    be in the last two buckets, making the percentile calculation invalid. In this
+    case, we should set explicit boundaries for corresponding histograms with the
+    `MeterProviderBuilder.AddView` method.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In the future, OpenTelemetry will allow us to use exponential histograms with
+    dynamic boundaries adjusted to data.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note that we also have the `processor_processing_duration_milliseconds_sum`
+    and `processor_processing_duration_milliseconds_count` metrics, so by reporting
+    only the histogram, we get percentiles, averages, and measurement counters.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We can get the median processing time with the following query:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE11]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'This should produce the chart shown in *Figure 7**.4*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 7.4 – Median processing time per queue](img/Figure_7.04_B19423.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 7.4 – Median processing time per queue
+  prefs: []
+  type: TYPE_NORMAL
+- en: Here, we can see that the median processing time for the **add** queue is around
+    61 milliseconds, 48 milliseconds for the **remove** queue, and 75 milliseconds
+    for the **update** queue.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let’s also check the processing rate using the `sum by (queue) (rate(processor_processing_duration_milliseconds_count[1m]))`
+    query, as shown in *Figure 7**.5*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 7.5 – Processing rate per queue](img/Figure_7.05_B19423.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 7.5 – Processing rate per queue
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Items from the **update** queue are processed at a rate of about 14 items per
+    second; the enqueue rate is ~16 items per second, as we saw in *Figure 7**.1*.
+    This should explain why the **update** queue is growing:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Processing takes too much time – we should try to optimize it so that it targets
+    at least 60 milliseconds to be able to process 16 items per second.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: If optimization is not possible (or is not enough), we know that we need to
+    process an extra 2-3 items per second, so we need ~20% more processor instances.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: We could also implement backpressure on the producer side and throttle **update**
+    requests to decrease the enqueue rate on the processor.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: With just a small set of metrics, we were able to narrow down the problem to
+    a specific area. If it was a production incident, we’d be able to quickly mitigate
+    it by scaling the number of processors up and then investigating other options.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Summary
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In this chapter, we explored metrics in .NET and OpenTelemetry.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Metrics allow us to collect aggregated multi-dimensional data. They produce
+    unbiased telemetry with a predictable volume at any scale and allow us to monitor
+    system health, performance, and usage.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Metrics can’t have high-cardinality attributes, so we can’t use them to detect
+    problems that happen in specific and narrow cases – for this, we need distributed
+    tracing or events. .NET provides an OpenTelemetry metrics implementation that
+    consists of the `Meter` class, which can create specific instruments: counters,
+    gauges, and histograms.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Counters are used to report additive values and can be synchronous or asynchronous.
+    Gauges report current, non-additive values asynchronously, while histograms report
+    value distribution.
+  prefs: []
+  type: TYPE_NORMAL
+- en: With this, you should be able to identify scenarios where metrics are beneficial,
+    choose appropriate instruments, and efficiently report metrics in your application.
+    You should also be able to configure OpenTelemetry, and, most importantly, start
+    detecting and monitoring performance issues.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In the next chapter, we’re going to look at structured logs and events and learn
+    how to write and consume them efficiently using .NET and OpenTelemetry.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Questions
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Let’s say you want to track the number of meme downloads (from our meme sample
+    applications). Which telemetry signals would you choose? Why?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: When reporting HTTP request duration, would you report it as a span, metric,
+    or both?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: How would you monitor the number of active application instances and the uptime?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL

@@ -1,0 +1,874 @@
+- en: '14'
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Refactoring Code with Roslyn Analyzers
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In the last chapter, we saw how you can build Roslyn analyzers to flag issues
+    in your code. In this chapter, we’ll improve our analyzers by giving them the
+    ability to fix code issues by providing **Quick Actions** the user can invoke
+    to modify their source code. We’ll also discuss some additional ways of deploying
+    Roslyn analyzers that improve your ability to provide a consistent experience
+    to your team members.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'This chapter covers the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Building a Roslyn Analyzer code fix
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Testing code fixes with RoslynTestKit
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Publishing Roslyn analyzers as NuGet packages
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Technical requirements
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In this chapter, we’re starting right where we left off in [*Chapter 13*](B21324_13.xhtml#_idTextAnchor275).
+  prefs: []
+  type: TYPE_NORMAL
+- en: The starting code for this chapter is available from GitHub at [https://github.com/PacktPublishing/Refactoring-with-CSharp](https://github.com/PacktPublishing/Refactoring-with-CSharp)
+    in the `Chapter14/Ch14BeginningCode` folder.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Case study – Cloudy Skies Airlines
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In [*Chapter 13*](B21324_13.xhtml#_idTextAnchor275), we built a `ToStringAnalyzer`
+    that detects classes that do not override the `ToString` method. This results
+    in suggestions in the Visual Studio editor and a message in the error list.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Cloudy Skies Airlines has deployed this internally and found it to be generally
+    helpful, but there are a few things that need improvement:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Although violations of the `ToString` override rule are flagged by the analyzer,
+    not every developer is addressing this issue. When discussed internally, some
+    developers stated they didn’t want to take the time to address it. Additionally,
+    some of the newer developers didn’t fully understand the rule or what fixing it
+    would look like.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Whenever a new analyzer is created or a bug in an existing analyzer is addressed,
+    a new VSIX file must be created. Developers then need to download and install
+    it to get the updated version. Because of this, it’s hard for the team to know
+    which developers have the analyzer installed or which version each developer is
+    using.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: In this chapter, we’ll address these concerns. We’ll look at creating and testing
+    a code fix provider that can automatically resolve detected issues. After that,
+    we’ll explore publishing analyzers via **NuGet packages** and show how they can
+    help your team have a consistent analyzer experience.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Building a Roslyn Analyzer code fix
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Roslyn Analyzers allow you to provide options for users to automatically fix
+    issues your analyzers detect in your code. They do this through something called
+    a **code fix provider**, which can modify your document in an automated manner
+    to resolve the diagnostic warning.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Think of it this way: diagnostic analyzers, like our `OverrideToStringAnalyzer`,
+    help *detect* issues in your team’s code. On the other hand, code fix providers
+    give you a way of *fixing* these issues.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Not all diagnostic analyzers will have code-fix providers, but in my experience,
+    those that also provide code-fix providers tend to get addressed earlier and more
+    consistently.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Let’s see how one works.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Creating a CodeFixProvider
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'First, we’ll add a new class to the `Packt.Analyzers` class library. We’ll
+    call this class `ToStringCodeFix`. Replace its contents with the following code
+    for a basic code fix:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE0]'
+  prefs: []
+  type: TYPE_PRE
+- en: This is the minimum amount of code we need in order to have a compiling code
+    fix provider. Before we build out the rest of this class, let’s examine what’s
+    here already.
+  prefs: []
+  type: TYPE_NORMAL
+- en: First, we’re declaring a `ToStringCodeFix` class that inherits from `CodeFixProvider`.
+    `CodeFixProvider` is the abstract class used for providing a fix for one or more
+    diagnostics.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note that we named our code fix `ToStringCodeFix` to pair with the `ToStringAnalyzer`
+    class it provides a code fix for. This is a convention I like to follow to help
+    clearly associate analyzers and their code fixes.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The class has two attributes assigned to it:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The `ExportCodeFixProviderAttribute` tells Roslyn that the class represents
+    a code fix, what the name of the code fix is, and the languages the code fix applies
+    to
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The `SharedAttribute` doesn’t do anything on its own, but it is needed for Roslyn
+    to be comfortable registering your code fix in Visual Studio
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: These two attributes should be on every code fix you create. Failing to use
+    them will result in your code fix provider not appearing for some users (don’t
+    ask me how I know).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The `ToStringCodeFix` class has three members at the moment:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`ToStringAnalyzer` rule, meaning it says it can fix that issue.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`WellKnownFixAllProviders.BatchFixer`, we tell Visual Studio to allow the user
+    to try to fix all issues of that type in the file, project, or even solution.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**RegisterCodeFixesAsync**: This is where we can register our code fix and
+    tell Visual Studio what to do if the user chooses to apply it.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The bulk of our logic will be in `RegisterCodeFixesAsync`, so let’s implement
+    that method now.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Registering a code fix
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: The job of `RegisterCodeFixesAsync` is to interpret code that violates the diagnostic
+    rule we’ve set up and register an action that will let the user fix it.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The code to do this is fairly involved, so let’s look at parts of it at a time.
+    The first part has to do with interpreting where in the document the diagnostic
+    violation occurred:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE1]'
+  prefs: []
+  type: TYPE_PRE
+- en: Here, we get a `CodeFixContext` object that contains information about the code
+    analysis diagnostic violations.
+  prefs: []
+  type: TYPE_NORMAL
+- en: These `Diagnostic` objects contain information about the exact span of text
+    within the document that triggered the rule. In our case, this should be the text
+    for the name of the class that doesn’t override `ToString`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Next, we get a reference to the `Document` containing the violation. Think of
+    a `Document` as a file of source code somewhere in your solution. It’s possible
+    to have analyzers and code fixes that look over your entire solution, so this
+    `Document` helps narrow down the scope to the file containing the offending code.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'With this `Document`, we can gain access to the syntax tree and its `type`
+    declarations:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE2]'
+  prefs: []
+  type: TYPE_PRE
+- en: Here, we’re getting the `SyntaxRoot` element representing the base of our document
+    and then finding the declaration of the class by the location of that span of
+    text within the document.
+  prefs: []
+  type: TYPE_NORMAL
+- en: This lets us jump from the raw text we had in the span to an object representing
+    the `Type` declaration. Having this object allows us to make changes and provide
+    a fix.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The final portion of the method registers the code action to fix the issue:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE3]'
+  prefs: []
+  type: TYPE_PRE
+- en: This code creates a `CodeAction` and registers it as a fix for the diagnostic
+    rule. This fix has a title representing the text the user will see in the `FixAsync`
+    method we’ve yet to see.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Additional options
+  prefs: []
+  type: TYPE_NORMAL
+- en: There are several overloads and optional parameters to `CodeAction.Create` that
+    let you change the entire solution instead of a single document or resolve conflicts
+    when multiple code fixes have the same title.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Now that we’ve registered our code fix, let’s see how the fix action works.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Modifying the document with a code fix
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: The final step in implementing our code fix is the `FixAsync` method. This method’s
+    job is to modify the `Document` so that it no longer violates the diagnostic rule.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In our case, the fix will be to generate code such as this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE4]'
+  prefs: []
+  type: TYPE_PRE
+- en: Sadly, it’s a lot easier to write the raw C# here than it is to build it with
+    the Roslyn API.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'To add this with Roslyn, we’ll follow these steps:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Create a method body that throws a `NotImplementedException`.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Create a list of modifiers that go with the method (`public` and `override`).
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Create a method declaration with the appropriate name and return type and make
+    sure this method has the list of modifiers and the method body.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Create a version of the `Type` declaration that has the new method.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Find the `Type` declaration in the `Document` and replace it with our new one.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Let’s see how this works, starting with the code that declares the new method
+    body:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE5]'
+  prefs: []
+  type: TYPE_PRE
+- en: As you can see, the code to declare anything in Roslyn can get a bit dense.
+    When you take a step back, though, this code is just declaring a method block
+    that instantiates and throws a `NotImplementedException`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Next, we’ll define the method definition that uses this method body:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE6]'
+  prefs: []
+  type: TYPE_PRE
+- en: This code is almost as dense as the last block, but all it really does is declare
+    the method. This method brings together a return type of `string`, a name of `ToString`,
+    the `public` and `override` modifiers, and the body we declared in the previous
+    block.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The final step in the fix is to modify the editor’s code with our code fix.
+    We do this with the following code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE7]'
+  prefs: []
+  type: TYPE_PRE
+- en: This code creates a new version of the `Type` declaration that has our new method.
+    We then find the old `Type` declaration in the `Document` and replace it with
+    the new one. This creates a new `Document` that we then return from our code fix,
+    and Visual Studio updates our code accordingly.
+  prefs: []
+  type: TYPE_NORMAL
+- en: With that, we now have a working code fix. How do we know it’s working? We test
+    it!
+  prefs: []
+  type: TYPE_NORMAL
+- en: Testing Code Fixes with RoslynTestKit
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In [*Chapter 13*](B21324_13.xhtml#_idTextAnchor275), we saw how the `RoslynTestKit`
+    library helps your diagnostic analyzers flag code issues appropriately. In this
+    chapter, we’ll revisit the library to verify our new code fix.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We will start by creating a new class in our test project named `ToStringCodeFixTests`
+    due to our common naming conventions.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'This class will start by declaring a test fixture like it did with the analyzer:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE8]'
+  prefs: []
+  type: TYPE_PRE
+- en: Like before, our test class inherits from a test fixture, but this time it’s
+    a `CodeFixTestFixture` since we’re testing a code fix.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Also like before, we need to specify that our code fix affects the C# programming
+    language and provide a reference to our class through the `CreateProvider` method.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Unlike before, we also need to provide the code analyzer we’re testing through
+    the `CreateAdditionalAnalyzers` method. The compiler will allow you to not override
+    this method, but if you forget to do so, your analyzer will never trigger in the
+    steps ahead, so be sure to include your analyzer here.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Next, we test our code fix by providing a block of bad code and a block of
+    good code and verifying that the code fix successfully moves from the bad code
+    to the good code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE9]'
+  prefs: []
+  type: TYPE_PRE
+- en: This code should be somewhat familiar from the last chapter. Just like with
+    analyzers, we need to denote the location the fix is triggered from using the
+    `[|` and `|]` markers as we see on `[|Flight|]`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The actual verification step occurs through the `TestCodeFix` method call. This
+    method call will convert your bad code to a new form using the code fix and then
+    compare that result to the expected good code.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'This comparison is very sensitive, and any extra space, line breaks, or differences
+    at all will result in a failing test with the observed differences between the
+    two strings highlighted, as shown in *Figure 14**.1*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 14.1 – A test failure showing a string difference due to styling choices](img/B21324_14_1.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 14.1 – A test failure showing a string difference due to styling choices
+  prefs: []
+  type: TYPE_NORMAL
+- en: Assuming your formatting is consistent, your test should now pass, proving you
+    have a good code fix.
+  prefs: []
+  type: TYPE_NORMAL
+- en: If you want, you can now launch your VSIX extension project and verify the code
+    fix in Visual Studio. After that, you could share the VSIX file with colleagues
+    or people in the .NET community and they’d have access to your analyzer and its
+    fix.
+  prefs: []
+  type: TYPE_NORMAL
+- en: However, VSIX deployment has some downsides as we’ll soon see. Let’s close the
+    chapter by looking at using NuGet packages to share your code fixes in a more
+    controlled manner.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Publishing Roslyn Analyzers as NuGet packages
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Using VSIX files to share code analyzers works, but isn’t an ideal solution.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Since VSIX files must be manually installed and updated, this means that with
+    a team of software engineers, you’re never sure who has the extension installed
+    at all or who is on which version of the extension.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Because each developer must install the VSIX themselves and keep it updated,
+    this makes it harder to onboard new team members, release new analyzers or code
+    fixes, or issue patches for issues found in your existing analyzers.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Thankfully, there’s a better option: *NuGet* *package deployment*.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Understanding NuGet package deployment
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Analyzers and code fixes can be packed into NuGet packages and deployed to a
+    NuGet feed so others can find them. Once in a NuGet feed, any developer on the
+    team can install the package into one or more projects.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Once a NuGet package is installed, any developer who opens the project will
+    automatically have the package downloaded through the largely invisible NuGet
+    package restore step. If you install a NuGet package and then add, commit, and
+    push the change, other developers will see it automatically installed when they
+    pull your changes and open the project in Visual Studio.
+  prefs: []
+  type: TYPE_NORMAL
+- en: This means that only one developer on your team needs to install any NuGet package,
+    including a package containing Roslyn Analyzers. Additionally, if you ever need
+    to update the package to include new analyzers, any developer on the team can
+    update the version of the package that is installed.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'By using NuGet package deployment for Roslyn Analyzers, your analyzers become:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Easy to install
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Easy to update
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Consistently available across all developers on the team
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Intentionally associated with the project
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: That last point is an interesting one. With VSIX deployment, analyzers apply
+    to any code that a developer opens on their machine. There is no formal link between
+    the analyzer and your team’s source code, but if a developer has a VSIX analyzer
+    installed, they’ll see its recommendations.
+  prefs: []
+  type: TYPE_NORMAL
+- en: With NuGet packages, you’re explicit about which analyzers should analyze which
+    projects because you explicitly associate them via the NuGet install process.
+    This means that you can look at any project in your solution and get a sense of
+    what analyzer rules should apply for all developers on your project, which is
+    very hard to accomplish through VSIX deployment.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Because of these things, I strongly recommend deploying your analyzers and code
+    fixes as NuGet packages.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Let’s see how that’s done.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Building a NuGet package
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Visual Studio gives you an easy way of packaging most .NET projects: just right-click
+    on a project in **Solution Explorer**, select **Properties**, and then find the
+    **General** blade under **Package** in the navigator. From there, you can check
+    the **Produce a package file during build operations** checkbox, as shown in *Figure
+    14**.2*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 14.2 – Enabling NuGet package creation in Visual Studio](img/B21324_14_2.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 14.2 – Enabling NuGet package creation in Visual Studio
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'When this box is checked, you should see something like the following in your
+    build output after building:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE10]'
+  prefs: []
+  type: TYPE_PRE
+- en: The general blade also lets you configure many of the pieces of metadata associated
+    with the package. This lets you specify a readme file or a logo, enter any legal
+    information you need, and more. These pieces of information will later be visible
+    to users considering installing your package.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The many things to consider when configuring a NuGet package for publishing
+    to the public are beyond the scope of this book, but additional resources are
+    listed in the *Further reading* section at the end of this chapter.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Unfortunately, when building packages for Roslyn Analyzers, you need to customize
+    more than Visual Studio makes available in the properties user interface.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Double-click on `Packt.Analyzers` in `.csproj` file and replace it with this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE11]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'These additional pieces of metadata customize how your package will be installed.
+    Let’s talk about each one of the relevant changes separately:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**GeneratePackageOnBuild** is the same thing as checking the box on the properties
+    page to build the package on build.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`ItemGroup` section.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`Packt.Analyzers`, I recommend using your name without spaces or punctuation
+    in place of `Packt` to avoid conflicts publishing this.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**PackageVersion** is the release version number of your package. The latest
+    version of a package is typically what people install using NuGet.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**PackageLicenseExpression** is optional, but it allows you to tell others
+    what open-source license, if any, applies to the usage of your package. The various
+    license types and their legal implications are beyond the scope of this book.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Description** is a short user-friendly description of what the package does
+    and why someone might want to install it.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**RepositoryUrl** is optional and tells others where the package code is available.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The really critical part of this file is the `None` element in the `ItemGroup`.
+    This step tells the packaging process to take the compiled DLL of the analyzer
+    project and put it in the `analyzers/dotnet/cs` directory of the NuGet package.
+  prefs: []
+  type: TYPE_NORMAL
+- en: This directory is a special directory that .NET looks at when loading Roslyn
+    Analyzers from various sources. If it doesn’t see your analyzers there, those
+    analyzers will not be loaded.
+  prefs: []
+  type: TYPE_NORMAL
+- en: With these steps configured and the file saved, rebuild the project and you
+    should see your NuGet package created inside the `bin\Debug` or `bin\Release`
+    directory of your `Packt.Analyzers` project.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Debug vs Release builds
+  prefs: []
+  type: TYPE_NORMAL
+- en: When publishing software, you’ll want to use the `Release` configuration instead
+    of `Debug`. The `Debug` configuration suppresses certain compiler optimizations
+    and adds extra build byproducts that help you debug your applications. `Release`
+    builds tend to be smaller and faster and are generally recommended. You can change
+    which configuration is active using the main toolbar in Visual Studio.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Once your `.nupkg` file is created, you’re ready to publish it for others to
+    use.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Deploying the NuGet package
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Now that we have a `.nupkg` file, we can deploy it to any NuGet feed. This can
+    be a feed you set up yourself at your organization, a private NuGet registry on
+    GitHub, or a public NuGet feed such as the one at `NuGet.org`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Because `NuGet.org` is the standard place for sharing open-source code packages,
+    we’ll explore this path in this chapter. If your code is proprietary and you only
+    want to share it within your organization, it should not go on `NuGet.org`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: NuGet hosting options
+  prefs: []
+  type: TYPE_NORMAL
+- en: If you’d like to host your NuGet packages outside of `NuGet.org`, you have a
+    few options including setting up a private NuGet server or using a team-shared
+    NuGet repository service such as those offered on GitHub. See the *Further reading*
+    section for more information.
+  prefs: []
+  type: TYPE_NORMAL
+- en: To get started, navigate to [NuGet.org](http://NuGet.org), create a user, and
+    then log in as that user.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Once you are authenticated, click on the **Upload** tab to begin the process
+    of uploading a NuGet package. This will allow you to drag and drop or click **Browse…**
+    to find your NuGet package, as shown in *Figure 14**.3*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 14.3 – Uploading a NuGet package](img/B21324_14_3.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 14.3 – Uploading a NuGet package
+  prefs: []
+  type: TYPE_NORMAL
+- en: If you need help finding your `.nupkg` file, it should be inside of the `Packt.Analyzers`
+    project in the `\bin\Debug` folder or the `\bin\Release` folder depending on if
+    you build your project in `Debug` or `Release` mode.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Tip
+  prefs: []
+  type: TYPE_NORMAL
+- en: It’s always best to publish `Release` builds when sharing code with others.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Once you’ve selected your NuGet package, the page will update with the information
+    it detects about your package. This includes the version number, license file,
+    readme file, and other information. While it’s best to configure these values
+    in Visual Studio, some things, such as the readme file, can be customized here
+    before publishing.
+  prefs: []
+  type: TYPE_NORMAL
+- en: If something doesn’t look right, you can create a new `.nupkg` file and upload
+    that file.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Once you’re satisfied with the information on the preview screen, click `NuGet.org`
+    will begin checking your file for anything harmful and indexing the package so
+    others can import it.
+  prefs: []
+  type: TYPE_NORMAL
+- en: This process typically takes 5 to 15 minutes but can vary. If you want to check
+    on the status of your package, you can refresh the package details page found
+    in *Figure 14**.4* to check on the status.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 14.4 – NuGet.org checking and indexing a package](img/B21324_14_4.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 14.4 – NuGet.org checking and indexing a package
+  prefs: []
+  type: TYPE_NORMAL
+- en: Once this process finishes, you’re ready to reference the package in Visual
+    Studio.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Referencing the NuGet package
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Once your package is published on `NuGet.org`, you can reference it in any compatible
+    .NET project.
+  prefs: []
+  type: TYPE_NORMAL
+- en: To prove this, open a solution from a previous chapter or create a new console
+    application. Next, choose **Manage NuGet Packages…** for that project in **Solution
+    Explorer**.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Once **NuGet Package Manager** comes up, go to the **Browse** tab and search
+    for your package by its name. Assuming the name is correct and your package has
+    finished indexing, you should see the package in *Figure 14**.5*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 14.5 – Referencing your package in NuGet Package Manager](img/B21324_14_5.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 14.5 – Referencing your package in NuGet Package Manager
+  prefs: []
+  type: TYPE_NORMAL
+- en: Click **Install** to install the latest published version of your package and
+    notice the dependencies and license terms that appear based on your choices when
+    creating the NuGet package.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Once your package is installed, your analyzer will now be active and will appear
+    inside of the **Analyzers** node nested inside of the project’s **Dependencies**
+    node in **Solution Explorer**, as shown in *Figure 14**.6*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 14.6 – Our analyzers package installed and active in a project](img/B21324_14_6.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 14.6 – Our analyzers package installed and active in a project
+  prefs: []
+  type: TYPE_NORMAL
+- en: The analyzer will also be active for any class in your project and it will provide
+    suggestions and code fixes.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Once you commit and push your changes to the project, others on your team will
+    pull down the reference to the new NuGet dependency. Visual Studio will then restore
+    your NuGet packages and install the analyzer locally into that project for your
+    coworkers.
+  prefs: []
+  type: TYPE_NORMAL
+- en: If you ever need to update your NuGet package, you can create a new version
+    of the package and upload it to `NuGet.org`. Once the new version is indexed,
+    you’ll be able to update the installed version of the package from NuGet Package
+    Manager.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The NuGet deployment process makes it easy to install and update packages in
+    your project that are then available to every developer on your team. This is
+    why this process is my default recommendation for sharing your Roslyn Analyzers
+    with your team.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Packaging a CodeFixProvider as an extension
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: If you want to package your code fix in a VSIX extension, you can do that in
+    largely the same way as we did in [*Chapter 13*](B21324_13.xhtml#_idTextAnchor275)
+    with one additional change.
+  prefs: []
+  type: TYPE_NORMAL
+- en: To get your `CodeFixProvider` to work in the extension, you’ll need to add a
+    **Managed Extensibility Framework (MEF)** asset to your installer’s manifest.
+  prefs: []
+  type: TYPE_NORMAL
+- en: To do this, go to the **Assets** pane of your Installer project’s manifest and
+    click **New**.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Next, select **Microsoft.VisualStudio.MefComponent** as the type, specify the
+    source as **A project in current solution**, and specify your analyzers project
+    as the project (see *Figure 14**.7* for an example).
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 14.7 – Adding an MEF component asset to the installer manifest](img/B21324_14_7.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 14.7 – Adding an MEF component asset to the installer manifest
+  prefs: []
+  type: TYPE_NORMAL
+- en: This change will ensure your code fix is properly registered by the installer.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In my experience, it’s usually easier to maintain analyzers via a NuGet package
+    than a VSIX installer, but both deployment models have their advantages. Pick
+    the approach that makes the most sense for your installation, updating, and security
+    needs.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Summary
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In this chapter, we saw how Roslyn Analyzers can be extended to provide code
+    fixes along with the diagnostic information they already provided.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Code fixes work by interpreting the tree structure of your code and making modifications
+    to that structure, resulting in a new document or solution. Visual Studio then
+    reacts to these changes by updating the source code.
+  prefs: []
+  type: TYPE_NORMAL
+- en: This means that code fixes can automatically make pre-configured modifications
+    to your code to address known issues in a repeatable and safe manner.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We also discussed how NuGet package deployment allows you to wrap up your Roslyn
+    Analyzers into a package and share them with other developers – either other developers
+    on your team or other developers worldwide.
+  prefs: []
+  type: TYPE_NORMAL
+- en: This concludes *Part 3* of this book. In the final part of this book, we’ll
+    explore some of the unique challenges and opportunities found in refactoring code
+    in real-world organizations and teams.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Questions
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: What is the relationship between a `DiagnosticAnalyzer` and a `CodeFixProvider`?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: How can you test a code fix?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: What are some of the advantages of NuGet deployment versus VSIX deployment?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Further reading
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'You can find more information about materials from this chapter at the following
+    URLs:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '*Get started with syntax* *transformation*: [https://learn.microsoft.com/en-us/dotnet/csharp/roslyn-sdk/get-started/syntax-transformation](https://learn.microsoft.com/en-us/dotnet/csharp/roslyn-sdk/get-started/syntax-transformation)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '*Configuring and Publishing NuGet* *Packages*: [https://learn.microsoft.com/en-us/nuget/quickstart/create-and-publish-a-package-using-visual-studio?tabs=netcore-cli](https://learn.microsoft.com/en-us/nuget/quickstart/create-and-publish-a-package-using-visual-studio?tabs=netcore-cli)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '*Hosting your own NuGet* *feeds*: [https://learn.microsoft.com/en-us/nuget/hosting-packages/overview](https://learn.microsoft.com/en-us/nuget/hosting-packages/overview
+    )'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '*Working with NuGet on* *GitHub*: [https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-nuget-registry](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-nuget-registry)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Part 4: Refactoring in the Enterprise'
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'In the fourth and final part of the book, we focus on the social aspects of
+    refactoring: communicating technical debt to others, adopting code standards as
+    an engineering organization, and refactoring in agile environments.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Convincing a large team or organization of the importance of refactoring can
+    be a critical battle, and so this part looks at how software engineers can partner
+    with business leaders. These chapters contain key tips and tricks to ensure that
+    refactoring actually happens and that the right areas of technical debt get refactored
+    first.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We specifically focus on refactoring in an agile environment and how to handle
+    refactoring scenarios that are so large that it feels like a complete rewrite
+    is necessary.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'This part contains the following chapters:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[*Chapter 15*](B21324_15.xhtml#_idTextAnchor316)*, Communicating Technical
+    Debt*'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[*Chapter 16*](B21324_16.xhtml#_idTextAnchor341)*, Adopting Code Standards*'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[*Chapter 17*](B21324_17.xhtml#_idTextAnchor354)*, Agile Refactoring*'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL

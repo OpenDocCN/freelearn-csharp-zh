@@ -1,0 +1,1052 @@
+- en: '6'
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Tracing Your Code
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In the previous chapters, we talked about instrumentation libraries and learned
+    how to use auto-collected telemetry to monitor and debug distributed systems.
+    Auto-instrumentations, when available, provide necessary and reasonable coverage
+    for network calls, but you may want to trace additional logical operations, I/Os,
+    sockets, or other calls that don’t have shared instrumentation available.
+  prefs: []
+  type: TYPE_NORMAL
+- en: This chapter provides an in-depth guide to manual tracing using the `System.Diagnostics`
+    primitives or the OpenTelemetry API and explains the mechanism behind auto-instrumentation.
+    We will cover the `Activity` properties and how to populate them and show you
+    how to record events. We’ll then learn how to use links to represent complex relationships
+    between spans. Finally, we’ll cover the testing aspects of instrumentation.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'You’ll learn how to do the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Create activities using the .NET API or with the OpenTelemetry API shim
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Use ambient context propagation with `Activity.Current` and understand its limitations
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Use `ActivityEvent` and understand when to use logs instead
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Represent complex relationships between traces with links
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Validate your instrumentations
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: By the end of this chapter, you should be able to cover your application needs
+    with manual tracing.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Technical requirements
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The code for this chapter can be found in this book’s GitHub repository at [https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/tree/main/chapter6](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/tree/main/chapter6).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We’ll need the following tools for it:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: NET SDK 7.0 or newer
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Visual Studio or Visual Studio Code with C# development setup is recommended,
+    but any text editor will work
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Docker
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'If you want to explore traces from sample applications in Jaeger, you can run
+    it with the following command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE0]'
+  prefs: []
+  type: TYPE_PRE
+- en: Tracing with System.Diagnostics or the OpenTelemetry API shim
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'As we saw in the previous chapters, distributed tracing in .NET relies on primitives
+    in the `System.Diagnostics` namespace: `Activity` and `ActivitySource`. They’re
+    used by HTTP Client and ASP.NET Core instrumentations.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The terminology used by .NET and OpenTelemetry is different: `Activity` represents
+    the OpenTelemetry span, `ActivitySource` maps to the tracer, and tags map to attributes.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The `OpenTelemetry.Api` NuGet package also provides `TelemetrySpan`, `Tracer`,
+    and several more auxiliary classes in the `OpenTelemetry.Trace` namespace. These
+    APIs are a **shim** over .NET tracing APIs – a thin wrapper that does not provide
+    any additional functionality on top of .NET tracing APIs.
+  prefs: []
+  type: TYPE_NORMAL
+- en: You are probably wondering which one you should use. The rule of thumb is to
+    use .NET APIs unless you want to stick to OpenTelemetry terminology. Shim is just
+    an additional layer, which brings a small performance overhead.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Tracing with System.Diagnostics
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Let’s say we want to instrument an operation – for example, a method that processes
+    a work item. It might break down into smaller, potentially auto-instrumented operations
+    such as HTTP requests. In this case, spans describing individual requests won’t
+    show us the overall duration and result of processing, so we need to create a
+    new logical `Activity` to describe it.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Activities should be created from `ActivitySource`, which notifies OpenTelemetry
+    and other potential listeners about them. Using this approach, we can instrument
+    our work processing operation with the following code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Worker.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE1]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/tracing-with-net/Worker.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/tracing-with-net/Worker.cs)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: In this example, the actual processing happens in the `DoWorkImpl` method. We
+    created a new activity before calling into this method and implicitly ended it.
+    If the method throws an exception, we set the status of the activity to `Error`
+    while providing an exception message in the description. The activity is disposed
+    of (and ended) when control leaves the scope, but we could also call the `Activity.Stop`
+    method to stop it explicitly.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We created `ActivitySource` as a static singleton here since we’re assuming
+    we need it for the application’s lifetime. If you decide to make it an instance
+    variable and tie its lifetime to some long-living client or service in your application,
+    make sure to dispose of it.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The only thing we configured in this example is the `Activity` name – we passed
+    `DoWork` to the `ActivitySource.StartActivity` method.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs: []
+  type: TYPE_NORMAL
+- en: The activity returned by `ActivitySource.StartActivity` is nullable. It can
+    be null if there are no listeners for this source, or if the listener sampled
+    out this activity in a specific way by returning `ActivitySamplingResult.None`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We’ll learn more about APIs in a moment, but first, let’s learn how to export
+    generated activities.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Exporting activities with OpenTelemetry
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'So far, we have used the `OpenTelemetry.Extensions.Hosting` NuGet package to
+    configure OpenTelemetry in ASP.NET Core applications. Here, we’re going to use
+    plain OpenTelemetry SDK configuration, which still looks quite similar to what
+    we saw in [*Chapter 5*](B19423_05.xhtml#_idTextAnchor083), *Configuration and*
+    *Control Plane*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Program.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE2]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/tracing-with-net/Program.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/tracing-with-net/Program.cs)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: In this example, we’re building the `TracerProvider` instance by setting the
+    service name to `activity-sample` and enabling `ActivitySource` with `Worker`
+    – the one we used to create the activity in the previous example. We are also
+    using the console exporter along with Jaeger – spans will be exported to both.
+  prefs: []
+  type: TYPE_NORMAL
+- en: OpenTelemetry needs explicit configuration to listen to `ActivitySource`, but
+    you can enable a group of them with wildcards, as we saw in [*Chapter 3*](B19423_03.xhtml#_idTextAnchor052),
+    *The .NET* *Observability Ecosystem*.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let’s run these examples using the following command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE3]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'We should see `Activity` exported to the console:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE4]'
+  prefs: []
+  type: TYPE_PRE
+- en: When we configure OpenTelemetry to listen to the `Worker` source, it leverages
+    the `System.Diagnostics.ActivityListener` primitive. If you use OpenTelemetry,
+    you probably won’t need to use the listener directly, but you may still find it
+    useful for testing purposes or when debugging instrumentation issues. Let’s see
+    how it works.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Listening to activities with ActivityListener
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: '`ActivityListener` allows us to subscribe to any `ActivitySource` instance
+    using its name and get notifications when activities created by one of the enabled
+    sources start or end. The following example shows how to write a listener:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Program.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE5]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/tracing-with-net/Program.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/tracing-with-net/Program.cs)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Here, we’re subscribing to `ActivitySource` with `Worker` and specifying that
+    we sample in all activities. When `Activity` ends, we call our `PrintActivity`
+    method. We could also provide the `ActivityStarted` callback when needed.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'So, let’s go ahead and run this sample with this command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE6]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'You should see something like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE7]'
+  prefs: []
+  type: TYPE_PRE
+- en: Now that you know how OpenTelemetry and `ActivitySource` work together, it’s
+    time to explore other tracing APIs.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Starting activities
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: The `ActivitySource` class defines several `CreateActivity` and `StartActivity`
+    method overloads.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Calling into `StartActivity` is equivalent to calling `CreateActivity` and
+    then starting it later with the `Activity.Start` method:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE8]'
+  prefs: []
+  type: TYPE_PRE
+- en: The `Start` methods generate a new span ID, capture the start time, and populate
+    the ambient context via the `Activity.Current` property. `Activity` can’t be used
+    until it’s started. So, in most cases, the `StartActivity` method is the easiest
+    choice and `CreateActivity` might only be useful if you want to construct an activity
+    instance but start it later.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs: []
+  type: TYPE_NORMAL
+- en: Sampling callback happens during activity creation, so you must pass all properties
+    that affect the sampling decision to the `StartActivity` or `CreateActivity` method.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Here are the start time properties:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`Internal`, indicating local or logical operation. `Client` and `Server` spans
+    describe the client and server side of synchronous remote calls such as HTTP requests.
+    Similarly, the `Producer` and `Consumer` spans describe corresponding sides of
+    asynchronous operations, such as asynchronous messaging.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Observability backends rely on span kinds for visualizations such as service
+    maps and semi-automated performance analysis.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`ActivityContext` struct. This is usually based on the W3C Trace Context standard
+    for HTTP and might be different for other protocols. `ActivityContext` contains
+    the trace ID, span ID, trace flags, and trace state.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Another option is to pass the `traceparent` value in W3C Trace Context format
+    to the `StartActivity` method as a string. You can set `tracestate` later after
+    the activity starts, but then, of course, you won’t be able to use it to make
+    sampling decisions.
+  prefs: []
+  type: TYPE_NORMAL
+- en: If the parent context is not provided, `Activity.Current` is used.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`Activity` starts and should affect sampling decisions. If you don’t use attributes
+    to make head-based sampling decisions, it’s best not to populate them and minimize
+    the performance overhead for sampled-out activities.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Links**: Links can correlate different traces and represent relationships
+    between spans other than parent-child ones. We’ll learn more about them later
+    in this chapter.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`Activity` starts.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`Activity` also supports custom trace context formats – for example, legacy
+    hierarchical ones.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: After `Activity` starts, we can always add more attributes, change the start
+    and end times, update the sampling decision, set `tracestate`, and record events.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Before adding new events or attribute, make sure to check the `IsAllDataRequested`
+    flag, which specifies whether the activity has been sampled. We can use it to
+    minimize the performance impact of the instrumentation by guarding any expensive
+    operations:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: StartSamples.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE9]'
+  prefs: []
+  type: TYPE_PRE
+- en: https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/tracing-with-net/StartSamples.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: The `Activity` and `ActivitySource` APIs are the foundation for any instrumentation.
+    We’ll cover additional APIs allowing to populate events and links later in this
+    chapter and see more examples throughout the rest of this book. For now, let’s
+    take a quick look at how we can use the OpenTelemetry API shim.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Tracing with the OpenTelemetry API shim
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: The OpenTelemetry API shim does not provide any additional features on top of
+    .NET APIs; it only aligns terminology with OpenTelemetry. If you use OpenTelemetry
+    in other languages, then it might be more appealing to you. If you decide to go
+    down this path, keep in mind that the behavior of `Tracer` and `Span` matches
+    `ActivitySource` and `Activity`. For example, this means that you still have to
+    enable each tracer when configuring OpenTelemetry.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let’s repeat our processing instrumentation using the `Tracer` and `TelemetrySpan`
+    classes:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Worker.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE10]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/tracing-with-shim/Worker.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/tracing-with-shim/Worker.cs)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The overall flow is the same: we create an instance of `Tracer` instead of
+    `ActivitySource`, then use it to create a span. Adding attributes and setting
+    the status is done similarly to the `ActivitySource` example.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: If we were to look under the hood of `Tracer` and `TelemetrySpan`, we’d see
+    that they fully rely on `ActivitySource` and `Activity`. As a result, enabling
+    this instrumentation and enriching and customizing it is the same as enabling
+    an `ActivitySource`-based one – it’s done by using the `AddSource` method on `TracerProviderBuilder`
+    (the source name matches the tracer name).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Even though the APIs look similar, there are a few important differences:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Spans are not nullable. You always get an instance of a span, even if there
+    is no listener to the underlying `ActivitySource` (but then it’s an optimized,
+    inoperative instance).
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: All operations on spans are internally guarded with the `TelemetrySpan.IsRecording`
+    flag, which is equivalent to the `activity?.IsAllDataRequested == true` check.
+    However, it could still be useful to guard expensive operations to calculate attribute
+    values and other span properties behind the `IsRecording` flag.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Spans are not active (that is, current) by default. While you can’t start an
+    activity without making it current, that’s not the case for `TelemetrySpan`. You
+    probably noticed that we used the `Tracer.StartActiveSpan` method for the `DoWork`
+    span, which populates `Activity.Current`.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: If we were to use the `Tracer.StartSpan` method, we’d get a started activity,
+    but `Activity.Current` would not point to it. To make it current, we could call
+    into the `Tracer.WithSpan` method.
+  prefs: []
+  type: TYPE_NORMAL
+- en: If we run the previous OpenTelemetry API example with the `tracing-with-otel-api$
+    dotnet run` command, we’ll see the same trace as before with plain .NET tracing
+    APIs.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Now, let’s see how we can create hierarchies of activities and enrich them using
+    ambient context.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Using ambient context
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In complex applications, we usually have multiple layers of spans in each trace.
+    These spans are emitted by different libraries that are not aware of each other.
+    Still, they are correlated because of the ambient context propagated in the `Activity.Current`
+    property.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let’s create two layers of activities – we’ll make processing more resilient
+    by retrying failed operations and instrumenting tries and the logical `DoWork`
+    operation:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Worker.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE11]'
+  prefs: []
+  type: TYPE_PRE
+- en: https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/tracing-with-net/Worker.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In this example, we have `workActivity`, which describes the logical operation,
+    and `tryActivity`, which describes a try. Let’s run it with the following command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE12]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Check out the trace in Jaeger at `http://localhost:16686`. You should see something
+    similar to the trace shown in *Figure 6**.1*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 6.1 – Work item processing](img/B19423_06_01.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 6.1 – Work item processing
+  prefs: []
+  type: TYPE_NORMAL
+- en: Here, we can see that there were two attempts to process a work item – the first
+    one failed with an exception and then the operation succeeded after the second
+    try. By looking at this trace, it’s clear why the `DoWork` operation took this
+    much time – it was spent between tries.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note that we didn’t do anything special to correlate `workActivity` and `tryActivity`.
+    This happened because `workActivity` was current when `tryActivity` started –
+    since we didn’t provide any parent, it defaulted to the `Activity.Current` instance.
+  prefs: []
+  type: TYPE_NORMAL
+- en: To troubleshoot instrumentation issues, we can always check the parent of `Activity`
+    on the started activity by looking at its properties. `Activity.Parent` represents
+    an implicit parent. When we start an activity, we can also provide `traceparent`
+    as a string or a parent `ActivityContext` explicitly – in these cases, the `Parent`
+    property will be null. You can find some examples of this at [https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/tracing-with-net/StartSamples.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/tracing-with-net/StartSamples.cs)
+    and we’ll see more examples of context propagation in [*Chapter 10*](B19423_10.xhtml#_idTextAnchor161),
+    Tracing *Network Calls*. `Activity.ParentId` is the equivalent of the `traceparent`
+    header and `Activity.ParentSpanId` represents the `span-id` portion of it. These
+    properties are populated if `Activity` has any parent at all.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Getting back to our example, what happens if all the tries fail? Should we set
+    an error on the `DoWork` activity? Well, we can do this inside the `DoWithRetry`
+    method with `Activity.Current?.SetStatus(ActivityStatusCode.Error)`. We can use
+    the current activity here because we control when and how the `DoWithRetry` method
+    is called.
+  prefs: []
+  type: TYPE_NORMAL
+- en: As a rule of thumb, avoid adding attributes, events, or setting a status on
+    `Activity.Current` unless you know for sure it’s the right one. With suppression,
+    filtering, or some new activities created in between, `Current` can point to some
+    other activity. So, make sure to pass instances of activities within your instrumentations
+    explicitly.
+  prefs: []
+  type: TYPE_NORMAL
+- en: If you want to enrich an auto-collected `Activity`, accessing the `Current`
+    property in one of the enrichment callbacks provided when enabling instrumentation
+    should be safe.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Some instrumentations may also provide access to the created `Activity`. For
+    example, ASP.NET Core does so with the `IHttpActivityFeature` interface. It’s
+    also possible to walk up the activity tree using the `Parent` property to find
+    the one you want to enrich.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`Activity.Current` works on top of `AsyncLocal`, so the .NET runtime propagates
+    it through asynchronous calls. This does not work with background processing or
+    manual manipulations with threads, but you can always pass activities explicitly
+    and set the `Activity.Current` value manually as needed.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Now, we know how to create hierarchies of activities and use attributes to describe
+    our scenarios. But sometimes, we need something more lightweight, such as events
+    – let’s take a closer look at them.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Recording events
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Spans describe operations that have a duration and a result, but sometimes,
+    creating a span could be too verbose and expensive – for example, for busy socket-level
+    communication. Common use cases for events include recording exceptions or individual
+    messages in gRPC streaming calls.
+  prefs: []
+  type: TYPE_NORMAL
+- en: To represent something that happened at a certain point in time, we should use
+    events or logs. In OpenTelemetry, the difference between logs and events is semantical
+    – it’s the same data structure with the same over-the-wire format but different
+    attributes. For example, logs have mandatory severity, which does not apply to
+    events. Events, on the other hand, have mandatory names.
+  prefs: []
+  type: TYPE_NORMAL
+- en: They are also different in terms of their API and implementation (at least with
+    .NET 7.0 and prior versions). In this section, we will explore Activity’s events
+    API; we will look at logs in [*Chapter 8*](B19423_08.xhtml#_idTextAnchor131),
+    *Writing Structured and* *Correlated Logs*.
+  prefs: []
+  type: TYPE_NORMAL
+- en: When to use events
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: To create an activity event, we need an instance of an activity, which is not
+    the case, for example, at startup time.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Activity events depend on sampling – we can add them to a sampled-out `Activity`,
+    but in general, they’ll be dropped along with it.
+  prefs: []
+  type: TYPE_NORMAL
+- en: An event’s lifetime is tightly coupled with the `Activity` instance, so it’ll
+    stay in memory until it’s garbage-collected. There is no limit regarding how many
+    events you can have on the .NET side, but OpenTelemetry exporters limit the number
+    of exported events. It is set to 128 by default and can be controlled with the
+    `OTEL_SPAN_ATTRIBUTE_COUNT_LIMIT` environment variable.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs: []
+  type: TYPE_NORMAL
+- en: Activity events should be used to express operations that don’t deserve a span,
+    don’t have a duration or are too short, and have a predictable outcome. Events
+    must happen in the scope of some `Activity` and should only be exported if `Activity`
+    is sampled in. There should also be a reasonable number of them under a single
+    `Activity` instance. Given these limitations, logs are usually a better choice,
+    as long as your observability backend supports them.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Now that we know these limitations, we’re finally ready to play with events.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The ActivityEvent API
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: An event is represented with the `ActivityEvent` class. To create one, we must
+    provide an event name, and can optionally specify a timestamp (that defaults to
+    the time the event was constructed), as well as a collection of attributes.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The event’s name is a low-cardinality string that implies the event’s structure:
+    events with the same name are expected to describe occurrences of the same thing
+    and should use the same set of attributes.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Let’s enrich HTTP client instrumentation with events. Imagine that we have read
+    a long stream over HTTP and want to control content buffering.
+  prefs: []
+  type: TYPE_NORMAL
+- en: To achieve this, we can pass the `HttpCompletionOption.ResponseHeadersRead`
+    flag to the `HttpClient.SendAsync` method. The HTTP client will then return a
+    response before reading the response body. It’s useful to know the point in time
+    when we got the response so that we know how long it took to read a response.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following example demonstrates this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Worker.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE13]'
+  prefs: []
+  type: TYPE_PRE
+- en: https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/events/Worker.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: In this example, we start `Activity` to track overall logical request processing
+    through the HTTP client pipeline and then record the `response_headers` event.
+    This event does not have any attributes – its sole purpose is to record the timestamp
+    when we got a response from the server.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Let’s add more events! Assuming we use throttling or circuit-breaking in our
+    HTTP pipeline, we won’t have any physical HTTP requests and no spans reported
+    by auto-instrumentation. Events can provide observability into it.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We’ll implement client-side throttling using the `RateLimiter` class, which
+    is available in .NET 7 and included in the `System.Threading.RateLimiting` NuGet
+    package. We’ll do so in the `DelegatingHandler` class, as shown in this example:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: RateLimitingHandler.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE14]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/events/RateLimitingHandler.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/events/RateLimitingHandler.cs)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Here, we are trying to acquire a lease from the rate limiter. If it’s successfully
+    acquired, we call into the `base.SendAsync` method, letting this request process
+    further. Otherwise, we must throttle the request, as demonstrated in the following
+    code snippet:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: RateLimitingHandler.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE15]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/events/RateLimitingHandler.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/events/RateLimitingHandler.cs)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: In the `Throttle` method, we emit the `exception` event and provide a message
+    alongside the `retry_after` attribute. We got a value of this attribute from the
+    rate limiter; it provides a hint regarding when it will make sense to retry this
+    request.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The example in the `events` folder demonstrates a full rate-limiting solution
+    – it configures the rate limiter to allow one request every 5 seconds but sends
+    two requests in parallel so that the first one comes through and the second one
+    is throttled.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Go ahead and run the sample with `events$ dotnet run` and then switch to Jaeger
+    to see two traces from the `events-sample` service.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'One trace has two spans and represents a successful operation, as shown in
+    *Figure 6**.2*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 6.2 – A trace with logical and physical HTTP spans and the response_headers
+    event](img/B19423_06_02.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 6.2 – A trace with logical and physical HTTP spans and the response_headers
+    event
+  prefs: []
+  type: TYPE_NORMAL
+- en: Here, we can see that the time to first byte was around 110 milliseconds. Then,
+    we got the `response_headers` event; the rest of the logical `DoWork` operation
+    was spent on reading stream contents.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The other trace has just one span and represents a failed operation; it’s shown
+    in *Figure 6**.3*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 6.3 – A trace with a logical call and the rate_is_limited exception
+    event](img/B19423_06_03.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 6.3 – A trace with a logical call and the rate_is_limited exception event
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Here, we can see a logical `DoWork` span, which ended with an error. If we
+    expand the attributes, we’ll see a status description stating `Response status
+    code does not indicate success: 429 (Too Many Requests)`. This could give us an
+    idea of what happened, even if we didn’t have an event. There is no physical HTTP
+    span here and it could be confusing and unclear where the response came from.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: With the `rate_is_limited` event, we can populate additional attributes such
+    as `retry_after_ms`, but most importantly, we can easily understand the root cause
+    of the problem and find the place in our code where the event is sent from.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Recording exceptions
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: In the previous example, we created an event that represents an error, which
+    is a special event defined in OpenTelemetry. It has `exception` as its name and
+    the `exception.type`, `exception.message`, and `exception.stacktrace` attributes.
+    Either `type` or `message` is required.
+  prefs: []
+  type: TYPE_NORMAL
+- en: If we had an exception object, we could have used a `RecordException` extension
+    method declared in the `OpenTelemetry.Trace.ActivityExtensions` class. We could
+    record exceptions using `activity?.RecordException(ex)` and then pass custom tag
+    collection to add to the event.
+  prefs: []
+  type: TYPE_NORMAL
+- en: This method calls into the `Activity.AddEvent` method under the hood, filling
+    in all the exception attributes, including the stack trace. Since stack traces
+    can be huge, it’s a good idea to record them for unhandled exceptions and only
+    once.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Correlating spans with links
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: So far, we have talked about parent-child relationships between spans. They
+    cover request-response scenarios well and allow us to describe distributed call
+    stacks as a tree, where each span has at most one parent and as many children
+    as needed.
+  prefs: []
+  type: TYPE_NORMAL
+- en: But what if our scenarios are more complicated? For example, how do we express
+    receiving temperature data from multiple sensors and aggregating it on the backend,
+    as shown in *Figure 6**.4*?
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 6.4 – Batch processing](img/B19423_06_04.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 6.4 – Batch processing
+  prefs: []
+  type: TYPE_NORMAL
+- en: In this example, sensors send data to the aggregator in the scope of different
+    traces. The aggregator must start a third one – it shouldn’t continue one of the
+    sensor’s traces.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We can use links to connect `trace3` to both `trace1` and `trace2`, allowing
+    us to correlate all of them. Links don’t specify exact relationships between spans,
+    but in the scope of this example, we can think about them as multiple parents
+    for a single span.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Links are mostly used in messaging scenarios where messages are sent and received
+    in batches to optimize network usage, or could be also processed together.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Links have two properties: a linked trace context and a collection of attributes.
+    Currently, they can only be provided to the `StartActivity` method and may be
+    used to make sampling decisions. This is an OpenTelemetry specification limitation
+    that might be removed in the future.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Using links
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Let’s see how we can use links to instrument batch processing scenarios with
+    an in-memory queue. With background processing, we can’t rely on `Activity.Current`
+    to flow from the enqueue operation to processing. So, we’ll pass `ActivityContext`
+    along with the work item through the queue.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'But first, we need to create an `Activity` for the enqueue operation so that
+    we have some context to capture and pass around:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Producer.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE16]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/links/Producer.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/links/Producer.cs)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: While it’s important to instrument publish calls for remote queues, it’s not
+    essential in this example. We only did it here to have some valid `ActivityContext`
+    captured. If we had any other activity, we could use its context instead.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Now, we’re ready to instrument the work item processor:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: BatchProcessor.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE17]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/links/BatchProcessor.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/links/BatchProcessor.cs)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Here, we iterated over work items and created an `ActivityLink` for each of
+    them by using the trace context passed alongside the `WorkItem` instance.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Then, we added the `work_item.id` attribute with an array containing all received
+    IDs to the `BatchProcessing` activity. Ideally, we’d put attributes on the links
+    themselves via the `ActivityLink` constructor, but I’m not aware of any observability
+    backend that supports it now. As an alternative, we can also create an event for
+    each work item and populate attributes on them.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let’s run the sample with `links$ dotnet run`. It will enqueue three work items
+    and then process them all in one batch. In Jaeger, we should see four independent
+    traces – one for each enqueue operation and one for batch processing. An example
+    of the latter is shown in *Figure 6**.5*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 6.5 – Processing span with links](img/B19423_06_05.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 6.5 – Processing span with links
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We can see that it has three references (links in Jaeger terminology), which
+    we can click on and land on the corresponding `Enqueue` operation, as shown in
+    *Figure 6**.6*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 6.6 – Enqueue span](img/B19423_06_06.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 6.6 – Enqueue span
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In Jaeger, it’s not possible to navigate from the `Enqueue` span to the `ProcessBatch`
+    span. But some of the observability backends support navigation in both directions.
+    For example, *Figure 6**.7* shows the `Enqueue` operation linked to processing
+    in Azure Monitor:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 6.7 – Two linked traces visualized in Azure Monitor ](img/B19423_06_07.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 6.7 – Two linked traces visualized in Azure Monitor
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note that there are two different operations IDs (trace IDs) that have been
+    correlated using a link. We’ll see more examples of links in messaging scenarios
+    in [*Chapter 11*](B19423_11.xhtml#_idTextAnchor174), *Instrumenting Messaging
+    Scenarios*. For now, let’s learn how to test our instrumentations.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Testing your instrumentation
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The idea of testing logs might look wild – logs are not intended to stay in
+    one place or retain a specific structure. It’s not the case for traces.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Instrumentation directly affects your ability to evaluate production health
+    and usage. Testing auto-instrumentation could be limited to basic happy case validation
+    – we only need to check that it’s enabled and emits some data in the right format.
+    This would help us detect potential problems with dependency updates. Manual instrumentation
+    needs more attention.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Let’s see how we can test any instrumentation in ASP.NET Core applications.
+    We’re going to rely on the integration testing capabilities provided by the `Microsoft.AspNetCore.Mvc.Testing`
+    NuGet package. You can find more details about it in the ASP.NET Core testing
+    documentation available at https://learn.microsoft.com/aspnet/core/test/integration-tests.
+    It allows us to modify the ASP.NET Core application’s configuration for test purposes.
+    In this section, we’ll use it to change the OpenTelemetry pipeline and intercept
+    activities.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Intercepting activities
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'There are a few different ways to intercept activities; let’s list them:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: We can add a span processor, similar to how we enriched activities in [*Chapter
+    5*](B19423_05.xhtml#_idTextAnchor083), *Configuration and Control Plane*. Since
+    processors run synchronously, we can validate the `Activity` attributes against
+    the ambient context – for example, `Baggage.Current`. We can also check (when
+    needed) that attributes are provided at start time in the `OnStart` callback.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: We can implement a test exporter. The downside of this approach is that we’ll
+    only see completed activities. Also, exporters run asynchronously and there will
+    be no ambient context to validate against.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: We can write a custom `ActivityListener` implementation. This approach would
+    not allow us to test the customization and configurations we’ve done with OpenTelemetry.
+    We won’t even be able to validate whether OpenTelemetry is configured to listen
+    to specific `ActivitySource` instances or check whether sampling works as expected.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: So, `ActivityListener` could be a great choice for unit testing, and the processor
+    gives the most flexibility in terms of integration testing, which we’re going
+    to focus on here. Let’s see how we can inject a processor into the OpenTelemetry
+    pipeline in tests.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The `OpenTelemetry.Extensions.Hosting` NuGet package allows us to customize
+    the pipeline with the `ConfigureOpenTelemetryTracerProvider` extension method.
+    It’s called after the OpenTelemetry pipeline is configured, right before the `TracerProvider`
+    instance is built. If you are using vanilla OpenTelemetry, you will have to implement
+    a callback for tests to alter the pipeline.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Here’s an example of adding a test processor:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: TestFactory.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE18]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/testing/app.tests/TestFactory.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/testing/app.tests/TestFactory.cs)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The `TestFactory` class allows us to set up an ASP.NET Core application for
+    testing, which we’re doing in the `ConfigureWebHost` method. There, we call into
+    the `ConfigureOpenTelemetryTracerProvider` method, where we change the OpenTelemetry
+    pipeline and inject our test processor. Here’s the minimalistic processor implementation:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: TestActivityProcessor.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE19]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/testing/app.tests/TestActivityProcessor.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/testing/app.tests/TestActivityProcessor.cs)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: We’re almost ready to write some tests, but there is another challenge – how
+    do we filter activities related to a specific test?
+  prefs: []
+  type: TYPE_NORMAL
+- en: Filtering relevant activities
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: When we run tests in parallel, we effectively register multiple OpenTelemetry
+    pipelines that listen to the same `ActivitySource` instances. With unit tests
+    covering our instrumentations, we can control this better, but in the case of
+    integration tests, `ActivitySource` and its listeners are de facto static and
+    global – if we run tests in parallel, we’ll see activities from all of them in
+    the processor. We need to filter relevant activities that belong to our test,
+    which we can do using distributed tracing.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We’ll start a new activity for each test and propagate the context to the service
+    under test. Then, we can filter processed activities based on their trace IDs.
+    This approach is implemented in `TracingTests` ([https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/testing/app.tests/TracingTests.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/testing/app.tests/TracingTests.cs)).
+  prefs: []
+  type: TYPE_NORMAL
+- en: Validation
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'Once we can filter all the activities related to this test execution, we’re
+    ready to do some checks on them. It’s useful to check all the properties you rely
+    upon in your monitoring and debugging tasks. For example, the following code validates
+    a few properties of ASP.NET Core’s `Activity`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: TracingTests.cs
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE20]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/testing/app.tests/TracingTests.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/testing/app.tests/TracingTests.cs)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Now, you’re ready to write and test your instrumentations! You may also find
+    it useful to use distributed tracing for your general integration testing needs
+    – relying on it to validate intended test behavior and investigate flaky tests
+    or unstable service behavior. You could also use traces as one of the inputs to
+    validate service behavior.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Summary
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In this chapter, we explored manual distributed tracing instrumentation using
+    .NET diagnostics primitives. `Activity` and `ActivitySource` are the default ways
+    to instrument your code – create, start, end, and enrich activities with attributes
+    and events. You can achieve the same functionality with `Tracer` and `TelemetrySpan`,
+    from the OpenTelemetry API package. They provide a thin wrapper over .NET diagnostics
+    APIs while using OpenTelemetry terminology.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We also looked into the ambient context propagation with `Activity.Current`
+    and how it makes multiple instrumentation layers work together. Then, we learned
+    about events and their limitations and used links to correlate different traces.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Finally, we covered testing – since instrumentation can be critical for monitoring,
+    we should validate it as any other feature. We learned how to reliably do this
+    in ASP.NET Core applications.
+  prefs: []
+  type: TYPE_NORMAL
+- en: With this, you should be able to write rich tracing instrumentations and troubleshoot
+    and validate custom tracing code. To achieve better observability, we can combine
+    multiple signals with minimal duplication, so in the next chapter, we’re going
+    to look at manual metrics instrumentation and see how it can work along with tracing.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Questions
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Let’s say you started `Activity` using `ActivitySource`. How do you configure
+    OpenTelemetry to listen to it? How does it work?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: When should you use `Activity` events? What are the alternatives?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: What do we need links for? How can we use them?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL

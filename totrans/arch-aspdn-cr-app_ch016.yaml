@@ -1,0 +1,1108 @@
+- en: 15 Object Mappers, Aggregate Services, and Façade
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'Before you begin: Join our book community on Discord'
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Give your feedback straight to the author himself and chat to other early readers
+    on our Discord server (find the "architecting-aspnet-core-apps-3e" channel under
+    EARLY ACCESS SUBSCRIPTION).
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[https://packt.link/EarlyAccess](https://packt.link/EarlyAccess)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Qr code Description automatically generated](img/file93.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'In this chapter, we explore object mapping. As we saw in the previous chapter,
+    working with layers often leads to copying models from one layer to another. Object
+    mappers solve that problem. We first look at manually implementing an object mapper.
+    Then, we improve our design by regrouping the mappers under a mapper service,
+    exploring the Aggregate Services, and Mapping façade patterns along the way. Finally,
+    we replace that manual work with two open-source tools that helps us generate
+    business value instead of writing mapping code.In this chapter, we cover the following
+    topics:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Overview of object mapping and object mappers
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Implementing a simple object mapper
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Exploring the too-many-dependencies code smell
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Exploring the Aggregate Services pattern
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Implementing a Mapping Façade by leveraging the Façade pattern
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Using the Service Locator pattern to create a flexible Mapping Service in front
+    of our mappers
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Using AutoMapper to map an object to another, replacing our homebrewed code
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Using Mapperly instead of AutoMapper
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Object mapper
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: What is object mapping? In a nutshell, it is the action of copying the value
+    of an object’s properties into the properties of another object. But sometimes,
+    properties’ names do not match; an object hierarchy may need to be flattened and
+    transformed. As we saw in the previous chapter, each layer can own its own model,
+    which can be a good thing, but that comes at the price of copying objects from
+    one layer to another. We can also share models between layers, but even then,
+    we usually need to map one object into another. Even if it’s just to map your
+    models to **Data Transfer Objects** (**DTOs**), it is almost inevitable.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Remember that DTOs define our API’s contract. Independent contract classes help
+    maintain the system, making us choose when to modify them. If you skip that part,
+    each time you change your model, it automatically updates your endpoint’s contract,
+    possibly breaking some clients. Moreover, if you input your model directly, a
+    malicious user could try to bind the values of properties that they should not,
+    leading to potential security issues (known as **over-posting** or **over-posting
+    attacks**). Having good data exchange contracts is one of the keys to designing
+    robust systems.
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: In the previous projects, the mapping logic was hardcoded, sometimes duplicated
+    and adding additional responsibilities to the class doing the mapping. In this
+    chapter, we extract the mapping logic into object mappers to fix that issue.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Goal
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: The object mapper’s goal is to copy the value of an object’s properties into
+    the properties of another object. It encapsulates the mapping logic away from
+    where the mapping takes place. The mapper is also responsible for transforming
+    the values from the original format to the destination format when both objects
+    do not follow the same structure.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Design
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'We can design object mappers in many ways. Here is the most basic object mapper
+    design:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 15.1: Basic design of the object mapper](img/file94.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'Figure 15.1: Basic design of the object mapper'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In the diagram, the **Consumer** uses the `IMapper` interface to map an object
+    of `Type1` to an object of `Type2`. That’s not very reusable, but it illustrates
+    the concept. By using the power of **generics**, we can upgrade that simple design
+    to this more reusable version:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 15.2: Generic object mapper design](img/file95.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'Figure 15.2: Generic object mapper design'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'This design lets us map any `TSource` to any `TDestination` by implementing
+    the `IMapper<TSource, TDestination>` interface once per mapping rule. One class
+    could also implement multiple mapping rules. For example, we could implement the
+    mapping of `Type1` to `Type2` and `Type2` to `Type1` in the same class (a bidirectional
+    mapper).Another way would be to use the following design and create an `IMapper`
+    interface with a single method that handles all of the application’s mapping:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 15.3: Object mapping using a single IMapper as the entry point](img/file96.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'Figure 15.3: Object mapping using a single IMapper as the entry point'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The biggest advantage of this last design is the ease of use. We always inject
+    a single `IMapper` instead of one `IMapper<TSource, TDestination>` per type of
+    mapping, which reduces the number of dependencies and the complexity of consuming
+    such a mapper.You can implement object mapping in any way your imagination allows,
+    but the critical part is that the mapper is responsible for mapping an object
+    to another. A mapper should avoid complex processes, such as loading data from
+    a database and whatnot. It should copy the values of one object into another:
+    that’s it. Think about the **Single Responsibility Principle** (**SRP**) here:
+    the class must have a single reason to change, and since it’s an object mapper,
+    that reason should be object mapping.Let’s jump into some code to explore the
+    designs in more depth with each project.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Project – Mapper
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'This project is an updated version of the Clean Architecture code from the
+    previous chapter. The project aims to demonstrate the design’s versatility of
+    encapsulating entity mapping logic into mapper classes, moving that logic away
+    from the consumers. Of course, the project is again focused on the use case at
+    hand, making learning the topics easier.First, we need an interface that resides
+    in the `Core` project so the other projects can implement the mapping they need.
+    Let’s adopt the second design that we saw:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE0]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'With this interface, we can start by creating the data mappers. But first,
+    let’s start by creating record classes instead of anonymous types to name the
+    DTOs returned by the endpoints. Here are all the DTOs (from the `Program.cs` file):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE1]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Three of the four output DTOs need mapping:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`Product` to `ProductDetails`'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`ProductNotFoundException` to `ProductNotFound`'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`NotEnoughStockException` to `NotEnoughStock`'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Why not map the `StockLevel` DTO? In our case, the `StockService` returns an
+    `int` when we add or remove stocks, so converting a primitive value like an `int`
+    into a `StockLevel` object does not require an object mapper. Moreover, creating
+    such an object mapper adds no value and makes the code more complex. If the service
+    had returned an object, creating a mapper that maps an object to `StockLevel`
+    would have made more sense.
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: 'Let’s start with the product mapper (from the `Program.cs` file):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE2]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The preceding code is straightforward; the `ProductMapper` class implements
+    the `IMapper<Product,` `ProductDetails>` interface. The `Map` method returns a
+    `ProductDetails` instance. The highlighted code ensures the `Id` property is not
+    `null`, which should not happen. We could also add a guard clause to ensure the
+    `Id` property is not `null`.All in all, the `Map` method takes a `Product` as
+    input and outputs a `ProductDetails` instance containing the same values.Then
+    let’s continue with the exception mappers (from the `Program.cs` file):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE3]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Compared to the `ProductMapper` class, the `ExceptionsMapper` class implements
+    the two remaining use cases by implementing the `IMapper` interface twice. The
+    two `Map` methods handle mapping an exception to its DTO, leading to one class
+    being responsible for mapping exceptions to DTOs.Let’s look at the `products`
+    endpoint (original value from the `clean-architecture` project of *Chapter 14*,
+    *Layering and Clean Architecture*):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE4]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Before analyzing the code, let’s look at the updated version (from the `Program.cs`
+    file):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE5]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'In the preceding code, the request delegate uses the mapper to replace the
+    copy logic (the highlighted lines of the original code). That simplifies the handler,
+    moving the mapping responsibility into mapper objects instead (highlighted in
+    the preceding code)—one more step toward the SRP.Let’s skip the add stocks endpoint
+    since it is very similar to the remove stocks endpoint but simpler, and let’s
+    focus on the later (original value from the `clean-architecture` project of *Chapter
+    14*, *Layering and Clean Architecture*):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE6]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Once again, before analyzing the code, let’s look at the updated version (from
+    the `Program.cs` file):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE7]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The same thing happened for this request delegate, but we injected two mappers
+    instead of just one. We moved the mapping logic from inline using an anonymous
+    type to the mapper objects. Nevertheless, a code smell is emerging here; can you
+    smell it? We will investigate this after we are done with this project; meanwhile,
+    keep thinking about the number of injected dependencies.Now that the delegates
+    depend on interfaces with object mappers encapsulating the mapping responsibility,
+    we must configure the composition root and bind the mapper implementations to
+    the `IMapper<TSource, TDestination>` interface. The service bindings look like
+    this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE8]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Since `ExceptionsMapper` implements two interfaces, we bind both to that class.
+    That is one of the beauties of abstractions; the remove stocks delegate asks for
+    two mappers but receives an instance of `ExceptionsMapper` twice without even
+    knowing it.We could also register the classes so the same instance is injected
+    twice, like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE9]'
+  prefs: []
+  type: TYPE_PRE
+- en: Yes, I did that double registration of the same class on purpose. That proves
+    we can compose an application as we want without impacting the **consumers**.
+    That is done by depending on abstractions instead of implementations, as per the
+    **Dependency Inversion Principle** (**DIP**—the “D” in SOLID). Moreover, the division
+    into small interfaces, as per the **Interface Segregation Principle** (**ISP**—the
+    “I” in SOLID), makes that kind of scenario possible. Finally, we can glue all
+    those pieces together using the power of **Dependency Injection** (**DI**).
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: Conclusion
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'Before exploring more alternatives, let’s see how object mapping can help us
+    follow the **SOLID** principles:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**S**: Using mapper objects helps to separate the responsibility of mapping
+    types from the consumers, making it easier to maintain and refactor the mapping
+    logic.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**O**: By injecting mappers, we can change the mapping logic without changing
+    the code of their consumers.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**L**: N/A'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**I**: We explored different designs that provide a small mapper interface
+    that reduces the dependencies between the components.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**D**: The consumers depend only on abstractions, moving the implementation’s
+    binding to the composition root and inverting the dependency flow.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Now that we’ve explored how to extract and use mappers, let’s look at the code
+    smell that emerged.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Code smell – Too many dependencies
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Using this kind of mapping could become tedious in the long run, and we would
+    rapidly see scenarios such as injecting three or more mappers into a single request
+    delegate or controller. The consumer would likely already have other dependencies,
+    leading to four or more.That should raise the following flag:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Does the class do too much and have too many responsibilities?
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: In this case, the fine-grained `IMapper` interface pollutes our request delegates
+    with tons of dependencies on mappers, which is not ideal and makes our code harder
+    to read.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The preferred solution would be to move the exception-handling responsibility
+    away from the delegates or controllers, leveraging a middleware or an exception
+    filter, for example. This tactic would move boilerplate code away from the endpoints.
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: ''
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: Since we are talking about mappers, we will explore more object mapping concepts
+    to help us with this problem instead, which applies to many use cases.
+  prefs:
+  - PREF_BQ
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: As a rule of thumb, you want to **limit the number of dependencies to three
+    or less**. Over that number, ask yourself if there is a problem with that class;
+    does it have too many responsibilities? Having more than three dependencies is
+    not inherently wrong; it just indicates that you should investigate the design.
+    If nothing is wrong, keep it at 4 or 5, or 10; it does not matter. If you find
+    a way to reduce the number of dependencies or that the class actually does too
+    many things refactor the code.If you don’t like having that many dependencies,
+    you could extract service aggregates that encapsulate two or more dependencies
+    and inject that aggregate instead. Beware that moving your dependencies around
+    does not fix anything; it just moves the problem elsewhere if there was a problem
+    in the first place. Using aggregates could increase the readability of the code,
+    though.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Instead of blindly moving dependencies around, analyze the problem to see if
+    you could create classes with actual logic that could do something useful to reduce
+    the number of dependencies.
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: Next, let’s have a quick look at aggregating services.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Pattern – Aggregate Services
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Even if the Aggregate Services pattern is not a magic problem-solving pattern,
+    it is a viable alternative to injecting too many dependencies into another class.
+    Its goal is to aggregate many dependencies in a class to reduce the number of
+    injected services in other classes, grouping dependencies together. The way to
+    manage aggregates would be to group them by concern or responsibility. Putting
+    a bunch of services in another service just for the sake of it is rarely the way
+    to go; aim for cohesion.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Creating one or more aggregation services that expose other services can be
+    a way to implement service discovery in a project. Like always, analyze if the
+    problem is not elsewhere first. Loading a service that exposes other services
+    can be handy. However, this may create issues, so don’t put everything into an
+    aggregate firsthand either.
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: 'Here is an example of a mapping aggregate to reduce the number of dependencies
+    of a **Create-Read-Update-Delete** (**CRUD**) controller that allows the creation,
+    updating, deletion, and reading of one, many, or all products. Here’s the aggregate
+    service code and a usage example:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE10]'
+  prefs: []
+  type: TYPE_PRE
+- en: The `IProductMappers` aggregate could be logical in this example as it groups
+    the mappers used by the `ProductsController` class under its umbrella. It is responsible
+    for mapping `ProductsController`-related domain objects to DTOs and vice versa
+    while the controller gives up this responsibility.You can create aggregate services
+    with anything, not just mappers. That’s a fairly common pattern in DI-heavy applications
+    (which can also point to some design flaws).Now that we’ve explored the Aggregate
+    Services pattern, let’s explore how to make a mapping façade instead.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Pattern – Mapping Façade
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'We studied façades already; here, we explore another way to organize our many
+    mappers by leveraging that design pattern.Instead of what we just did, we will
+    create a mapping façade to replace our aggregate services. The code consuming
+    the façade will be more elegant because it uses the `Map` methods directly instead
+    of the properties. The responsibility of the façade is the same as the aggregate,
+    but it implements the interfaces instead of exposing them as properties.Let’s
+    look at the code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE11]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'In the preceding code, the `ProductMapperService` class implements the `IMapper`
+    interfaces through the `IProductMapperService` interface and delegates the mapping
+    logic to each injected mapper: a façade wrapping multiple individual mappers.
+    Next, we look at the `ProductsController` that consumes the façade:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE12]'
+  prefs: []
+  type: TYPE_PRE
+- en: From the consumer standpoint (the `ProductsController` class), I find it cleaner
+    to write`_mapper.Map(...)` instead of `_mapper.SomeMapper.Map(...)`. The consumer
+    does not want to know what mapper is doing what mapping; it only wants to map
+    what needs mapping. If we compare the Mapping Façade with the Aggregate Services
+    of the previous example, the façade takes the responsibility of choosing the mapper
+    and moves it away from the consumer. This design distributes the responsibilities
+    between the classes better.This was an excellent opportunity to review the Façade
+    design pattern. Nonetheless, now that we've gone through multiple mapping options
+    and examined the issue of having too many dependencies, it's time to move forward
+    on our object mapping adventure with an enhanced version of our mapping façade.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Project – Mapping service
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'The goal is to simplify the implementation of the Mapper façade with a universal
+    interface. To achieve this, we are implementing the diagram shown in *Figure 13.3*.
+    Here’s a reminder:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 15.4: Object mapping using a single IMapper interface](img/file97.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'Figure 15.4: Object mapping using a single IMapper interface'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Instead of naming the interface `IMapper`, we will use the name `IMappingService`.
+    This name is more suitable because it is not mapping anything; it is a dispatcher
+    servicing the mapping request to the right mapper. Let’s take a look:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE13]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'That interface is self-explanatory; it maps any `TSource` to any `TDestination`.On
+    the implementation side, we are leveraging the **Service Locator** pattern, so
+    I called the class `ServiceLocatorMappingService`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE14]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The logic is simple:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Find the appropriate `IMapper<TSource, TDestination>` service, then map the
+    entity with it
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: If you don’t find any, throw a `MapperNotFoundException`
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The key to that design is to register the mappers with the IoC container instead
+    of the service itself. Then we use the mappers without knowing every single one
+    of them, like in the previous example. The `ServiceLocatorMappingService` class
+    doesn’t know any mappers; it just dynamically asks for one whenever needed.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The Service Locator pattern should not be part of the application’s code. However,
+    it can be helpful at times. For example, we are not trying to cheat DI in this
+    case. On the contrary, we are leveraging its power.
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: ''
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: Using a service locator is wrong when acquiring dependencies in a way that removes
+    the possibility of controlling the program’s composition from the composition
+    root, which breaks the IoC principle.
+  prefs:
+  - PREF_BQ
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: ''
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: In this case, we load mappers dynamically from the IoC container, limiting the
+    container’s ability to control what to inject which is acceptable since it has
+    little to no negative impact on the program’s maintainability, flexibility, and
+    reliability. For example, we can replace the `ServiceLocatorMappingService` implementation
+    with another class without affecting the `IMappingService` interface consumers.
+  prefs:
+  - PREF_BQ
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: 'Now, we can inject that service everywhere we need mapping and use it directly.
+    We already registered the mappers, so we only need to bind the `IMappingService`
+    to its `ServiceLocatorMappingService` implementation and update the consumers.
+    Here’s the DI binding:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE15]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'If we look at the new implementation of the remove stocks endpoint, we can
+    see we reduced the number of mapper dependencies to one:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE16]'
+  prefs: []
+  type: TYPE_PRE
+- en: The preceding code is similar to the previous sample, but we replaced the mappers
+    with the new service (the highlighted lines). And that’s it; we now have a universal
+    mapping service that delegates the mapping to any mapper we register with the
+    IoC container.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Even if you are not likely to implement object mappers manually often, exploring
+    and revisiting those patterns and a code smell is very good and will help you
+    craft better software.
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: This is not the end of our object mapping exploration. We have two tools to
+    explore, starting with AutoMapper, which does all the object mapping work for
+    us.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Project – AutoMapper
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'We just covered different ways to implement object mapping, but here we leverage
+    an open-source tool named AutoMapper that does it for us instead of implementing
+    our own.Why bother learning all of that if a tool already does it? There are a
+    few reasons to do so:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: It is important to understand the concepts; you don’t always need a full-fledged
+    tool like AutoMapper.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: It allowed us to cover multiple patterns we can use in other contexts and apply
+    them to components with different responsibilities. So, all in all, you should
+    have learned multiple new techniques during this object mapping progression.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Lastly, we dug deeper into applying the SOLID principles to write better programs.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The AutoMapper project is also a copy of the Clean Architecture sample. The
+    biggest difference between this project and the others is that we don’t need to
+    define any interface because AutoMapper exposes an `IMapper` interface with all
+    the methods we need and more.To install AutoMapper, you can install the `AutoMapper`
+    NuGet package using the CLI (`dotnet add package AutoMapper`), Visual Studio’s
+    NuGet package manager, or by updating your `.csproj` manually.The best way to
+    define our mappers is by using AutoMapper’s profile mechanism. A profile is a
+    simple class that inherits from `AutoMapper.Profile` and contains maps from one
+    object to another. We use profiles to group mappers together, but in our case,
+    with only three maps, I decided to create a single `WebProfile` class.Finally,
+    instead of manually registering our profiles, we can scan one or more assemblies
+    to load all of the profiles into AutoMapper by using the `AutoMapper.Extensions.Microsoft.DependencyInjection`
+    package.
+  prefs: []
+  type: TYPE_NORMAL
+- en: When installing the `AutoMapper.Extensions.Microsoft.DependencyInjection` package
+    you don’t have to load the `AutoMapper` package.
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: 'There is more to AutoMapper than what we cover here, but it has enough resources
+    online, including the official documentation, to help you dig deeper into the
+    tool. The goal of this project is to do basic object mapping.In the *Web* project,
+    we must create the following maps:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Map `Product` to `ProductDetails`
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Map `NotEnoughStockException` to `NotEnoughStock`
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Map `ProductNotFoundException` to `ProductNotFound`
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'To do that, we create the following `WebProfile` class (in the `Program.cs`
+    file, but could live anywhere):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE17]'
+  prefs: []
+  type: TYPE_PRE
+- en: A profile in AutoMapper is nothing more than a class where you create maps in
+    the constructor. The `Profile` class adds the required methods for you to do that,
+    such as the `CreateMap` method. What does that do?Invoking the method `CreateMap<Product,
+    ProductDetails>()` tells AutoMapper to register a mapper that maps `Product` to
+    `ProductDetails`. The other two `CreateMap` calls are doing the same for the other
+    two maps. That’s all we need for now because AutoMapper maps properties using
+    conventions, and both our model and DTO classes have the same sets of properties
+    with the same names.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In the preceding examples, we defined some mappers in the `Core` layer. In this
+    example, we rely on a library, so it is even more important to consider the dependency
+    flow. We are mapping objects only in the `Web` layer, so there is no need to put
+    the dependency on AutoMapper in the `Core` layer. Remember that all layers depend
+    directly or indirectly on `Core`, so having a dependency on AutoMapper in that
+    layer means all layers would also depend on it.
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: ''
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: Therefore, in this example, we created the `WebProfile` class in the `Web` layer
+    instead, limiting the dependency on AutoMapper to only that layer. Having only
+    the `Web` layer depend on AutoMapper allows all outer layers (if we were to add
+    more) to control how they do object mapping, giving more independence to each
+    layer. It is also a best practice to limit object mapping as much as possible.
+  prefs:
+  - PREF_BQ
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: ''
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: I’ve added a link to *AutoMapper Usage Guidelines* in the *Further reading*
+    section at the end of the chapter.
+  prefs:
+  - PREF_BQ
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: 'Now that we have one profile, we need to register it with the IoC container,
+    but we don’t have to do this by hand; we can scan for profiles from the composition
+    root by using one of the `AddAutoMapper` extension methods to scan one or more
+    assemblies:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE18]'
+  prefs: []
+  type: TYPE_PRE
+- en: The preceding method accepts a `params Assembly[] assemblies` argument, meaning
+    we can pass multiple `Assembly` instances to it.
+  prefs: []
+  type: TYPE_NORMAL
+- en: That `AddAutoMapper` extension method comes from the `AutoMapper.Extensions.Microsoft.DependencyInjection`
+    package.
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: 'Since we have only one profile in one assembly, we leverage that class to access
+    the assembly by passing the `typeof(WebProfile).Assembly` argument to the `AddAutoMapper`
+    method. From there, AutoMapper scans for profiles in that assembly and finds the
+    `WebProfile` class. If there were more than one, it would register all it finds.The
+    beauty of scanning for types like this is that once you register AutoMapper with
+    the IoC container, you can add profiles in any registered assemblies, and they
+    get loaded automatically; there’s no need to do anything else afterward but to
+    write useful code. Scanning assemblies also encourages composition by convention,
+    making it easier to maintain in the long run. The downside of assembly scanning
+    is that debugging can be hard when something is not registered because the registration
+    process is less explicit.Now that we’ve created and registered the profiles with
+    the IoC container, it is time to use AutoMapper. Let’s look at the three endpoints
+    we created initially:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE19]'
+  prefs: []
+  type: TYPE_PRE
+- en: The preceding code shows how similar it is to use AutoMapper to the other options.
+    We inject an `IMapper` interface, then use it to map the entities. Instead of
+    explicitly specifying both `TSource` and `TDestination` like in the previous example,
+    when using AutoMapper, we must specify only the `TDestination` generic parameter,
+    reducing the code's complexity.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Suppose you are using AutoMapper on an `IQueryable` collection returned by EF
+    Core. In that case, you should use the `ProjectTo` method, which limits the number
+    of fields that EF will query to those you need. In our case, that changes nothing
+    because we need the whole entity.
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: ''
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: 'Here is an example that fetches all products from EF Core and projects them
+    to `ProductDto` instances:'
+  prefs:
+  - PREF_BQ
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: '[PRE20]'
+  prefs: []
+  type: TYPE_PRE
+- en: Performance-wise, this is the recommended way to use AutoMapper with EF Core.
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: 'One last yet significant detail is that we can assert whether our mapper configurations
+    are valid when the application starts. This does not identify missing mappers
+    but validates that the registered ones are configured correctly. The recommended
+    way of doing this is in a unit test. To make this happen, I made the autogenerated
+    `Program` class public by adding the following line at the end:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE21]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Then I created a test project named `Web.Tests` that contain the following
+    code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE22]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'In the preceding code, we validate that all the AutoMapper maps are valid.
+    To make the test fail, you can uncomment the following line of the `WebProfile`
+    class:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE23]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The `AutoMapperAppWebApplication` class is there to centralize the initialization
+    of the test cases when there is more than one.In the test project, I created a
+    second test case ensuring the `products` endpoint is reachable. For both tests
+    to work together, we must change the database name to avoid seeding conflicts
+    so each test runs on its own database. This has to do with how we seed the database
+    in the `Program.cs` file, which is not something we usually do except for development
+    or proofs of concept. Nonetheless, testing against multiple databases can come
+    in handy to isolate tests.Here’s that second test case and updated `AutoMapperAppWebApplication`
+    class to give you an idea:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE24]'
+  prefs: []
+  type: TYPE_PRE
+- en: Running the tests ensures that the mapping in our application works and that
+    one of the endpoints is reachable. We could add more tests, but those two cover
+    about 50% of our code.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The `CallerMemberNameAttribute` used in the preceding code is part of the `System.Runtime.CompilerServices`
+    namespace and allows its decorated member to access the name of the method that
+    called it. In this case, the `databaseName` parameter receives the test method
+    name.
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: And this closes the AutoMapper project. At this point, you should begin to be
+    familiar with object mapping. I’d recommend you evaluate whether AutoMapper is
+    the right tool for the job whenever a project needs object mapping. You can always
+    load another tool or implement your own mapping logic if AutoMapper does not suit
+    your needs. If too much mapping is done at too many levels, maybe another application
+    architecture pattern would be better, or some rethinking is in order.AutoMapper
+    is convention-based and does a lot on its own without any configuration from us.
+    It is also configuration-based, caching the conversions to improve performance.
+    We can also create **type converters**, **value resolvers**, **value converters**,
+    and more. AutoMapper keeps us away from writing that boring mapping code.Yet,
+    AutoMapper is old, feature complete, and is almost unavoidable due to the number
+    of projects that uses it. However, it is not the fastest, which is why we are
+    exploring Mapperly next.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Project – Mapperly
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Mapperly is a newer object mapper library that leverages source generation to
+    make it lightning-fast. To get started, we must add a dependency on the `Riok.Mapperly`
+    NuGet package.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Source generators were introduced with .NET 5, allowing developers to generate
+    C# code during compilation.
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: 'There are many ways to create object mappers with Mapperly and many options
+    to adjust the mapping process. The following code sample is similar to the others
+    but using Mapperly. We cover the following ways to use Mapperly:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Injecting a mapper class.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Using a static method.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Using an extension method.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Let’s start with the injected mapper. First, the class must be `partial` for
+    the source generator to extend it (that is how source generators work). Decorate
+    the class with the `[Mapper]` attribute (highlighted). Then, in that partial class,
+    we must create one or more `partial` methods that have the signature of the mappers
+    we want to create (like the `MapToProductDetails` method), like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE25]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Upon compilation, the code generator creates the following class (I formatted
+    the code to make it easier to read):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE26]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Mapperly writes the boilerplate code for us in a generated `partial` class,
+    which is why it is so fast.To use the mapper, we must register it with the IoC
+    Container and inject it into our endpoint. Let’s make it a singleton once again:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE27]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Then, we can inject and use it like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE28]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The highlighted code in the preceding block shows we can use our mapper like
+    any other class. The biggest drawback is that we may end up injecting many mappers
+    into a single class or endpoint if we do not consider how we create them wisely.Moreover,
+    we must register all of our mappers with the IoC container, which creates a lot
+    of boilerplate code but makes the process explicit. On the other hand, we could
+    scan the assembly for all classes decorated with the `[Mapper]` attribute.If you
+    want an abstraction layer like an interface for your mapper, you must design that
+    yourself because Mapperly only generates the mappers. Here is an example:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE29]'
+  prefs: []
+  type: TYPE_PRE
+- en: The preceding code centralizes all the mapper methods under the same class and
+    interface, allowing you to inject an interface similar to AutoMapper. In subsequent
+    chapters, we explore ways to organize mappers and app code that does not involve
+    creating a central mapper class.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'To inspect the generated code, you can add the `EmitCompilerGeneratedFiles`
+    property in a `PropertyGroup` tag inside your project file and set its value to
+    `true` like this:'
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: '[PRE30]'
+  prefs: []
+  type: TYPE_PRE
+- en: Then the generated C# files will be available under the `obj\Debug\net8.0\generated`
+    directory. Change the `net8.0` subdirectory to the SDK version and `Debug` by
+    your configuration.
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: 'Next, we explore how to make a static mapper, which follows a very similar
+    process, but we must make both the class and the method `static` like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE31]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Mapperly takes the preceding code and generates the following (formatted for
+    improved readability):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE32]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Once again, the code generator writes the boilerplate code. The difference
+    is that we don’t have to inject any dependency since it is a static method. We
+    can use it this way (I only included the catch block, the rest of the code is
+    unchanged):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE33]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'It is pretty straightforward but creates a strong bond between the generated
+    class and its consumers. You can use those static methods if having a hard dependency
+    on a static class is acceptable for your project.The last way to map objects we
+    are exploring is very similar, but we create an extension method in the same class
+    instead of just a static method. Here’s the new method:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE34]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The generated code for that method looks like the following (formatted):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE35]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The only difference is the addition of the `this` keyword, making a regular
+    static method into an extension method that we can use like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE36]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'An extension method is more elegant than a static method, yet it creates a
+    bond similar to the static method. Once again, choosing how you want to proceed
+    with your mapping is up to you.One noteworthy thing about Mapperly is that its
+    analyzers yield information, warnings, or errors when the mapping code is incorrect
+    or potentially incorrect. The severity of the messages is configurable. For example,
+    if we add the following method in the `ExceptionMapper` class, Mapperly yields
+    the `RMG013` error:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE37]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Error message:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE38]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Moreover, the two exception mapper methods yield messages about properties
+    that do not exist on the target class as information. Here’s an example of such
+    a message:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE39]'
+  prefs: []
+  type: TYPE_PRE
+- en: With those in place, we know when something is or can be wrong, which safeguards
+    us from misconfigurations.Let’s wrap this chapter up.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Summary
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Object mapping is an unavoidable reality in many cases. However, as we saw in
+    this chapter, there are several ways of implementing object mapping, taking that
+    responsibility away from the other components of our applications or simply coding
+    it inline manually.At the same time, we took the opportunity to explore the Aggregate
+    Services pattern, which gives us a way to centralize multiple dependencies into
+    one, lowering the number of dependencies needed in other classes. That pattern
+    can help with the too-many-dependencies code smell, which, as a rule of thumb,
+    states that we should investigate objects with more than three dependencies for
+    design flaws. When moving dependencies into an aggregate, ensure there is cohesion
+    within the aggregate to avoid adding unnecessary complexity to your program and
+    just moving the dependencies around.We also explored leveraging the Façade pattern
+    to implement a mapping façade, which led to a more readable and elegant mapper.Afterward,
+    we implemented a mapper service that mimicked the façade. Despite being less elegant
+    in its usage, it was more flexible.We finally explored is AutoMapper and Mapperly,
+    two open-source tools that do object mapping for us, offering us many options
+    to configure the mapping of our objects. As we explored, just using the default
+    convention of AutoMapper allowed us to eliminate all of our mapping code. On Mapperly’s
+    side, we had to define the mapper contracts using partial classes and methods
+    to let its code generator implement the mapping code for us. You can choose from
+    many existing object mapper libraries, AutoMapper being one of the oldest, most
+    famous, and hated at the same time, while Mapperly is one of the newest and fastest
+    but yet in its infancy.Hopefully, as we are putting more and more pieces together,
+    you are starting to see what I had in mind at the beginning of this book when
+    stating this was an architectural journey.Now that we are done with object mapping,
+    we explore the Mediator and CQRS patterns in the next chapter.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Questions
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Let’s take a look at a few practice questions:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Is it true that injecting an Aggregate Service instead of multiple services
+    improves our system?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Is it true that using mappers helps us extract responsibilities from consumers
+    to mapper classes?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Is it true that you should always use AutoMapper?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: When using AutoMapper, should you encapsulate your mapping code into profiles?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: How many dependencies should start to raise a flag telling you that you are
+    injecting too many dependencies into a single class?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Further reading
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Here are some links to build upon what we learned in the chapter:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'If you want more information on object mapping, I wrote an article about that
+    in 2017, titled *Design Patterns: ASP.NET Core Web API, Services, and Repositories
+    | Part 9: the NinjaMappingService and the Façade Pattern*: [https://adpg.link/hxYf](https://adpg.link/hxYf)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'AutoMapper official website: [https://adpg.link/5AUZ](https://adpg.link/5AUZ)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '*AutoMapper Usage Guidelines* is an excellent do/don’t list to help you do
+    the right thing with AutoMapper, written by the library’s author: [https://adpg.link/tTKg](https://adpg.link/tTKg)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Mapperly (GitHub): [https://adpg.link/Dwcj](https://adpg.link/Dwcj)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Answers
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Yes, an Aggregate Service can improve a system, but not necessarily. Moving
+    dependencies around does not fix design flaws; it just moves those flaws elsewhere.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Yes, mappers help us follow the SRP. However, they are not always needed.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: No, it is not suitable for every scenario. For example, when the mapping logic
+    becomes complex, consider not using AutoMapper. Too many mappers may also mean
+    a flaw in the application design itself.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Yes, use profiles to organize your mapping rules cohesively.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Four or more dependencies should start to raise a flag. Once again, this is
+    just a guideline; injecting four or more services into a class can be acceptable.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL

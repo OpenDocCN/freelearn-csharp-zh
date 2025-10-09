@@ -1,4 +1,4 @@
-# 4
+
 
 # 可用的 Azure Functions 和触发器
 

@@ -1,4 +1,4 @@
-# 6
+
 
 # 使用 CollectionView 和 CarouselView 构建 Photo Gallery 应用程序
 

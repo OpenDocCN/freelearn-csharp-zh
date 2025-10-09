@@ -1,4 +1,4 @@
-# 3
+
 
 # C# Fundamentals in Unity – Variables, Loops, and Troubleshooting Techniques
 

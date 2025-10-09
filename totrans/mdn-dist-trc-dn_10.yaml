@@ -1,780 +1,1156 @@
 - en: '10'
+  id: totrans-0
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: '10'
 - en: Tracing Network Calls
+  id: totrans-1
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 跟踪网络调用
 - en: In this chapter, we’ll apply what we learned about tracing in [*Chapter 6*](B19423_06.xhtml#_idTextAnchor098),
     *Tracing Your Code*, to instrument client and server communication via gRPC.
+  id: totrans-2
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本章中，我们将应用我们在[*第6章*](B19423_06.xhtml#_idTextAnchor098)“跟踪您的代码”中学到的跟踪知识，通过gRPC对客户端和服务器通信进行仪表化。
 - en: We’ll start by instrumenting unary gRPC calls on the client and server according
     to OpenTelemetry semantic conventions. Then, we’ll switch to streaming and explore
     different ways to get observability for individual messages. We’ll see how to
     describe them with events or individual spans and learn how to propagate context
     within individual messages. Finally, we’ll see how to use our instrumentation
     to investigate issues.
+  id: totrans-3
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们将首先根据OpenTelemetry语义约定在客户端和服务器上仪表化单一gRPC调用。然后，我们将切换到流式调用，并探讨为单个消息获取可观察性的不同方法。我们将看到如何用事件或单个跨度来描述它们，并学习如何在单个消息内传播上下文。最后，我们将看到如何使用我们的仪表化来调查问题。
 - en: 'In this chapter, you’ll learn how to do the following:'
+  id: totrans-4
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本章中，您将学习以下内容：
 - en: Instrument network calls on the client and server following OpenTelemetry semantic
     conventions and propagate context over the wire
+  id: totrans-5
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 根据OpenTelemetry语义约定在客户端和服务器上仪表化网络调用，并通过网络传播上下文
 - en: Instrument gRPC streaming calls according to your application needs
+  id: totrans-6
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 根据您的应用需求对gRPC流式调用进行仪表化
 - en: Apply telemetry to get insights into network call latency and failure rates
     and investigate issues
+  id: totrans-7
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 应用遥测以深入了解网络调用延迟和失败率，并调查问题
 - en: Using gRPC as an example, this chapter will show you how to trace network calls
     and propagate context through them. With this chapter, you should also be able
     to instrument advanced streaming scenarios and pick the appropriate observability
     signals and granularity for your traces.
+  id: totrans-8
   prefs: []
   type: TYPE_NORMAL
+  zh: 以gRPC为例，本章将向您展示如何跟踪网络调用并通过它们传播上下文。通过本章，您还应该能够仪表化高级流式场景，并为您的跟踪选择适当的可观察性信号和粒度。
 - en: Technical requirements
+  id: totrans-9
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 技术要求
 - en: The code for this chapter is available in the book’s repository on GitHub at
     [https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/tree/main/chapter10](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/tree/main/chapter10).
+  id: totrans-10
   prefs: []
   type: TYPE_NORMAL
+  zh: 本章的代码可在GitHub上本书的仓库中找到：[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/tree/main/chapter10](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/tree/main/chapter10)。
 - en: 'To run the samples and perform analysis, we’ll need the following tools:'
+  id: totrans-11
   prefs: []
   type: TYPE_NORMAL
+  zh: 为了运行示例并执行分析，我们需要以下工具：
 - en: .NET SDK 7.0 or later
+  id: totrans-12
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: .NET SDK 7.0或更高版本
 - en: Docker and `docker-compose`
+  id: totrans-13
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: Docker和`docker-compose`
 - en: Instrumenting client calls
+  id: totrans-14
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 仪表化客户端调用
 - en: Network calls are probably the most important thing to instrument in any distributed
     application since network and downstream services are unreliable and complex resources.
     In order to understand how our application works and breaks, we need to know how
     the services we depend on perform.
+  id: totrans-15
   prefs: []
   type: TYPE_NORMAL
+  zh: 在任何分布式应用程序中，网络调用可能是最重要的仪表化对象，因为网络和下游服务是不可靠且复杂的资源。为了了解我们的应用程序是如何工作以及如何出错的，我们需要知道我们依赖的服务是如何表现的。
 - en: Network-level metrics can help us measure essential things such as latency,
     error rate, throughput, and the number of active requests and connections. Tracing
     enables context propagation and helps us see how requests flow through the system.
     So, if you instrument your application at all, you should start with incoming
     and outgoing requests.
+  id: totrans-16
   prefs: []
   type: TYPE_NORMAL
+  zh: 网络级指标可以帮助我们测量诸如延迟、错误率、吞吐量和活动请求数和连接数等基本指标。跟踪可以实现上下文传播，并帮助我们了解请求是如何通过系统的。因此，如果您要仪表化应用程序，您应该从入站和出站请求开始。
 - en: When instrumenting the client side of calls, we need to pick the right level
     of the network stack. Do we want to trace TCP packets? Can we? The answer depends,
     but distributed tracing is usually applied on the application layer of the network
     stack where protocols such as HTTP or AMQP live.
+  id: totrans-17
   prefs: []
   type: TYPE_NORMAL
+  zh: 在仪表化调用客户端时，我们需要选择网络堆栈的正确级别。我们想要跟踪TCP数据包吗？我们可以吗？答案取决于具体情况，但分布式跟踪通常应用于网络堆栈的应用层，其中存在HTTP或AMQP等协议。
 - en: In the case of HTTP on .NET, we apply instrumentation on the `HttpClient` level
     – to be more precise, on the `HttpMessageHandler` level, which performs individual
     HTTP requests, so we trace individual retries and redirects.
+  id: totrans-18
   prefs: []
   type: TYPE_NORMAL
+  zh: 在.NET的HTTP情况下，我们在`HttpClient`级别应用了仪表化——更准确地说，是在`HttpMessageHandler`级别，它执行单个HTTP请求，因此我们可以追踪单个重试和重定向。
 - en: If we instrument `HttpClient` methods, in many cases, we collect the duration
     of the request, which includes all attempts to get a response with back-off intervals
     between them. The error rate would show the rate without transient failures. This
     information is very useful, but it describes network-level calls very indirectly
     and heavily depends on the upstream service configuration and performance.
+  id: totrans-19
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果我们仪表化 `HttpClient` 方法，在许多情况下，我们会收集请求的持续时间，这包括所有尝试在它们之间使用退避间隔获取响应的尝试。错误率将显示没有瞬态故障的速率。这些信息非常有用，但它非常间接地描述了网络级别的调用，并且很大程度上依赖于上游服务的配置和性能。
 - en: Usually, gRPC runs on top of HTTP/2 and to some extent can be covered by HTTP
     instrumentation. This is the case for unary calls, when a client sends a request
     and awaits a response. The key difference with HTTP instrumentation is that we’d
     want to collect a gRPC-specific set of attributes, which includes the service
     and method names as well as the gRPC status code.
+  id: totrans-20
   prefs: []
   type: TYPE_NORMAL
+  zh: 通常，gRPC 在 HTTP/2 上运行，并在一定程度上可以被 HTTP 仪表库覆盖。对于单一调用来说，当客户端发送请求并等待响应时，情况就是这样。与
+    HTTP 仪表库的关键区别是我们希望收集一组特定的 gRPC 属性，包括服务和方法名称以及 gRPC 状态码。
 - en: However, gRPC also supports streaming when the client establishes a connection
     with the server, and then they can send each other multiple asynchronous messages
     within the scope of one HTTP/2 call. We’ll talk about streaming calls later in
     the *Instrumenting streaming calls* section of this chapter. For now, let’s focus
     on unary calls.
+  id: totrans-21
   prefs: []
   type: TYPE_NORMAL
+  zh: 然而，当客户端与服务器建立连接后，gRPC 也支持流式传输，它们可以在一个 HTTP/2 调用范围内互相发送多个异步消息。我们将在本章的 *流式调用的监控*
+    部分中稍后讨论流式调用。现在，让我们专注于单一调用。
 - en: Instrumenting unary calls
+  id: totrans-22
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 仪表化单一调用
 - en: We’re going to use gRPC implementation in the `Grpc.Net.Client` NuGet package,
     which has an OpenTelemetry instrumentation library available.
+  id: totrans-23
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们将使用 `Grpc.Net.Client` NuGet 包中的 gRPC 实现，该包提供了一个 OpenTelemetry 仪表库。
 - en: Note
+  id: totrans-24
   prefs: []
   type: TYPE_NORMAL
+  zh: 注意
 - en: 'OpenTelemetry provides two flavors of gRPC instrumentation: one for the `Grpc.Net.Client`
     package called `OpenTelemetry.Instrumentation.GrpcNetClient` and another one for
     the lower-level `Grpc.Core.Api` package called `OpenTelemetry.Instrumentation.GrpcCore`.
     Depending on how you use gRPC, make sure to use one or another.'
+  id: totrans-25
   prefs: []
   type: TYPE_NORMAL
+  zh: OpenTelemetry 提供了两种 gRPC 仪表化版本：一个是为 `Grpc.Net.Client` 包提供的 `OpenTelemetry.Instrumentation.GrpcNetClient`，另一个是为底层
+    `Grpc.Core.Api` 包提供的 `OpenTelemetry.Instrumentation.GrpcCore`。根据您如何使用 gRPC，确保使用其中一个。
 - en: These instrumentations should cover most gRPC tracing needs and you can customize
     them further using the techniques described in [*Chapter 5*](B19423_05.xhtml#_idTextAnchor083),
     *Configuration and Control Plane*. For example, the `OpenTelemetry.Instrumentation.GrpcNetClient`
     instrumentation allows the suppression of the underlying HTTP instrumentation
     or the enrichment of corresponding activities.
+  id: totrans-26
   prefs: []
   type: TYPE_NORMAL
+  zh: 这些仪表化应该覆盖大多数 gRPC 跟踪需求，并且您可以使用在第 [*第 5 章*](B19423_05.xhtml#_idTextAnchor083)
+    中描述的技术进一步自定义它们，*配置和控制平面*。例如，`OpenTelemetry.Instrumentation.GrpcNetClient` 仪表化允许抑制底层
+    HTTP 仪表化或丰富相应的活动。
 - en: Here, we’re going to write our own instrumentation as a learning exercise, which
     you can apply to other protocols or use to satisfy additional requirements that
     you might have.
+  id: totrans-27
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这里，我们将编写自己的仪表化代码作为一个学习练习，您可以将它应用到其他协议或用于满足您可能有的额外要求。
 - en: We can wrap every gRPC call with instrumentation code, but this would be hard
     to maintain and would pollute the application code. A better approach would be
     to implement instrumentation in a gRPC `Interceptor`.
+  id: totrans-28
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们可以将每个 gRPC 调用包裹在仪表化代码中，但这将很难维护，并且会污染应用程序代码。更好的方法是实现 gRPC `Interceptor` 中的仪表化。
 - en: So, we know where instrumentation should be done, but what should we instrument?
     Let’s start with gRPC OpenTelemetry semantic conventions – the tracing conventions
     are available at [https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/rpc.md](https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/rpc.md).
+  id: totrans-29
   prefs: []
   type: TYPE_NORMAL
+  zh: 因此，我们知道应该在何处进行仪表化，但我们应该仪表化什么？让我们从 gRPC OpenTelemetry 语义约定开始——跟踪约定可在 [https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/rpc.md](https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/rpc.md)
+    找到。
 - en: The conventions are currently experimental and some changes (such as attribute
     renames) should be expected.
+  id: totrans-30
   prefs: []
   type: TYPE_NORMAL
+  zh: 当前，这些约定是实验性的，并且应该预期会有一些变化（例如属性重命名）。
 - en: 'For unary client calls, the tracing specification recommends using the `{package.service}/{method}`
     pattern for span names and the following set of essential attributes:'
+  id: totrans-31
   prefs: []
   type: TYPE_NORMAL
+  zh: 对于单一客户端调用，跟踪规范建议使用`{package.service}/{method}`模式作为跨度名称，以及以下一组基本属性：
 - en: The `rpc.system` attribute has to match `grpc` – it helps backends understand
     that it’s a gRPC call.
+  id: totrans-32
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`rpc.system`属性必须匹配`grpc`——它帮助后端理解这是一个gRPC调用。'
 - en: The `rpc.service` and `rpc.method` attributes should describe the gRPC service
     and method. Even though this information is available in the span name, individual
     service and method attributes help query and filter spans in a more reliable and
     efficient way.
+  id: totrans-33
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`rpc.service`和`rpc.method`属性应该描述gRPC服务和方法的名称。尽管这些信息在跨度名称中可用，但单独的服务和方法属性有助于更可靠和高效地查询和过滤跨度。'
 - en: The `net.peer.name` and `net.peer.port` attributes describe remote endpoints.
+  id: totrans-34
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`net.peer.name`和`net.peer.port`属性描述远程端点。'
 - en: '`rpc.grpc.status_code` describes the numeric representation of the gRPC status
     code.'
+  id: totrans-35
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`rpc.grpc.status_code`描述了gRPC状态代码的数值表示。'
 - en: 'So, in the interceptor, we need to do a few things: start a new `Activity`
     with the recommended name and a set of attributes, inject the context into the
     outgoing request, await the response, set the status, and end the activity. This
     is demonstrated in the following code snippet:'
+  id: totrans-36
   prefs: []
   type: TYPE_NORMAL
+  zh: 因此，在拦截器中，我们需要做一些事情：使用推荐名称和一组属性启动一个新的`Activity`，将上下文注入到出站请求中，等待响应，设置状态，并结束活动。以下代码片段展示了这一过程：
 - en: client/GrpcTracingInterceptor.cs
+  id: totrans-37
   prefs: []
   type: TYPE_NORMAL
+  zh: client/GrpcTracingInterceptor.cs
 - en: '[PRE0]'
+  id: totrans-38
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE0]'
 - en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/client/GrpcTracingInterceptor.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/client/GrpcTracingInterceptor.cs)'
+  id: totrans-39
   prefs: []
   type: TYPE_NORMAL
+  zh: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/client/GrpcTracingInterceptor.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/client/GrpcTracingInterceptor.cs)'
 - en: 'Here, we override the interceptor’s `AsyncUnaryCall` method: we start a new
     `Activity` with the client kind and inject a trace context regardless of the sampling
     decision. If the activity is sampled out, we just return a continuation call and
     avoid any additional performance overhead.'
+  id: totrans-40
   prefs: []
   type: TYPE_NORMAL
+  zh: 这里，我们重写了拦截器的`AsyncUnaryCall`方法：我们使用客户端类型启动一个新的`Activity`，并注入一个跟踪上下文，无论采样决策如何。如果活动被采样排除，我们只返回一个延续调用，避免任何额外的性能开销。
 - en: 'If the activity is sampled in, we set the gRPC attributes and return the continuation
     call with the modified response task:'
+  id: totrans-41
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果活动被采样包含，我们设置gRPC属性，并返回带有修改后的响应任务的延续调用：
 - en: client/GrpcTracingInterceptor.cs
+  id: totrans-42
   prefs: []
   type: TYPE_NORMAL
+  zh: client/GrpcTracingInterceptor.cs
 - en: '[PRE1]'
+  id: totrans-43
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE1]'
 - en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/client/GrpcTracingInterceptor.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/client/GrpcTracingInterceptor.cs)'
+  id: totrans-44
   prefs: []
   type: TYPE_NORMAL
+  zh: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/client/GrpcTracingInterceptor.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/client/GrpcTracingInterceptor.cs)'
 - en: We dispose of `Activity` explicitly here since the `AsyncUnaryCall` method is
     synchronous and will end before the request is complete, but we need the activity
     to last until we get the response from the server.
+  id: totrans-45
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们在这里显式地释放`Activity`，因为`AsyncUnaryCall`方法是同步的，将在请求完成之前结束，但我们需要活动持续到我们从服务器获取响应。
 - en: 'Let’s take a closer look at each of the operations, starting with context injection:'
+  id: totrans-46
   prefs: []
   type: TYPE_NORMAL
+  zh: 让我们逐一仔细查看每个操作，从上下文注入开始：
 - en: client/GrpcTracingInterceptor.cs
+  id: totrans-47
   prefs: []
   type: TYPE_NORMAL
+  zh: client/GrpcTracingInterceptor.cs
 - en: '[PRE2]'
+  id: totrans-48
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE2]'
 - en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/client/GrpcTracingInterceptor.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/client/GrpcTracingInterceptor.cs)'
+  id: totrans-49
   prefs: []
   type: TYPE_NORMAL
+  zh: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/client/GrpcTracingInterceptor.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/client/GrpcTracingInterceptor.cs)'
 - en: Here, we inject the context using the `OpenTelemetry.Context.Propagation.TextMapPropagator`
     class and the `Inject` method. We’ll see how the propagator is configured a bit
     later.
+  id: totrans-50
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这里，我们使用`OpenTelemetry.Context.Propagation.TextMapPropagator`类和`Inject`方法注入上下文。我们稍后会看到传播器的配置方式。
 - en: We created an instance of the `PropagationContext` structure – it contains everything
     that needs to be propagated, namely `ActivityContext` and the current `Baggage`.
+  id: totrans-51
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们创建了一个`PropagationContext`结构的实例——它包含需要传播的一切，即`ActivityContext`和当前的`Baggage`。
 - en: The context is injected into the `ctx.Options.Headers` property, which represents
     gRPC metadata. The metadata is later on transformed into HTTP request headers
     by `GrpcNetClient`.
+  id: totrans-52
   prefs: []
   type: TYPE_NORMAL
+  zh: 上下文被注入到`ctx.Options.Headers`属性中，该属性代表gRPC元数据。稍后，`GrpcNetClient`将元数据转换成HTTP请求头。
 - en: The last parameter of the `Inject` method is a function that tells the propagator
     how to inject key-value pairs with trace context into the provided metadata. The
     propagator, depending on its implementation, may follow different formats and
     inject different headers. Here, we don’t need to worry about it.
+  id: totrans-53
   prefs: []
   type: TYPE_NORMAL
+  zh: '`Inject`方法的最后一个参数是一个函数，它告诉传播者如何将带有跟踪上下文的关键值对注入到提供的元数据中。传播者根据其实现可能遵循不同的格式并注入不同的头信息。在这里，我们不需要担心这个问题。'
 - en: 'Okay, we injected the context to enable correlation with the backend, and now
     it’s time to populate the attributes:'
+  id: totrans-54
   prefs: []
   type: TYPE_NORMAL
+  zh: 好的，我们已经注入了上下文以实现与后端的关联，现在我们需要填充属性：
 - en: client/GrpcTracingInterceptor.cs
+  id: totrans-55
   prefs: []
   type: TYPE_NORMAL
+  zh: client/GrpcTracingInterceptor.cs
 - en: '[PRE3]'
+  id: totrans-56
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE3]'
 - en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/client/GrpcTracingInterceptor.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/client/GrpcTracingInterceptor.cs)'
+  id: totrans-57
   prefs: []
   type: TYPE_NORMAL
+  zh: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/client/GrpcTracingInterceptor.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/client/GrpcTracingInterceptor.cs)'
 - en: Here, we populate the service and method names from the information provided
     in the call context. But the host and port come from instance variables we passed
     to the interceptor constructor – this information is not available in the client
     interceptor.
+  id: totrans-58
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这里，我们从调用上下文中提供的信息中填充服务和方法名称。但主机和端口来自我们传递给拦截器构造函数的实例变量——这些信息在客户端拦截器中不可用。
 - en: 'Finally, we should populate the gRPC status code and `Activity` status once
     the response is received:'
+  id: totrans-59
   prefs: []
   type: TYPE_NORMAL
+  zh: 最后，一旦收到响应，我们应该填充gRPC状态码和`Activity`状态：
 - en: client/GrpcTracingInterceptor.cs
+  id: totrans-60
   prefs: []
   type: TYPE_NORMAL
+  zh: client/GrpcTracingInterceptor.cs
 - en: '[PRE4]'
+  id: totrans-61
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE4]'
 - en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/client/GrpcTracingInterceptor.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/client/GrpcTracingInterceptor.cs)'
+  id: totrans-62
   prefs: []
   type: TYPE_NORMAL
+  zh: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/client/GrpcTracingInterceptor.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/client/GrpcTracingInterceptor.cs)'
 - en: We left `Activity.Status` unset if the request was successful following the
     gRPC semantic conventions. It makes sense for generic instrumentation libraries
     since they don’t know what represents a success. In a custom instrumentation,
     we may know better and can be more specific.
+  id: totrans-63
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果请求成功遵循gRPC语义约定，我们保留了`Activity.Status`未设置。对于通用仪表库来说是有意义的，因为它们不知道什么代表成功。在自定义仪表中，我们可能更了解情况，可以更加具体。
 - en: This is it; we just finished unary call instrumentation on the client. Let’s
     now configure a gRPC client to use.
+  id: totrans-64
   prefs: []
   type: TYPE_NORMAL
+  zh: 就这样；我们刚刚完成了客户端的单例调用仪表。现在，让我们配置一个gRPC客户端来使用。
 - en: Configuring instrumentation
+  id: totrans-65
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 配置仪表
 - en: 'Let’s set up a tracing interceptor on `GrpcClient` instances. In the demo application,
     we use `GrpcClient` integration with ASP.NET Core and set it up in the following
     way:'
+  id: totrans-66
   prefs: []
   type: TYPE_NORMAL
+  zh: 让我们在`GrpcClient`实例上设置一个跟踪拦截器。在演示应用程序中，我们使用与ASP.NET Core集成的`GrpcClient`，并按以下方式设置：
 - en: client/Program.cs
+  id: totrans-67
   prefs: []
   type: TYPE_NORMAL
+  zh: client/Program.cs
 - en: '[PRE5]'
+  id: totrans-68
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE5]'
 - en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/client/Program.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/client/Program.cs)'
+  id: totrans-69
   prefs: []
   type: TYPE_NORMAL
+  zh: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/client/Program.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/client/Program.cs)'
 - en: Here, we added `GrpcClient`, configured the endpoint, and added a tracing interceptor.
     We passed the options – the service endpoint and context propagator – explicitly.
+  id: totrans-70
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这里，我们添加了`GrpcClient`，配置了端点，并添加了跟踪拦截器。我们明确传递了选项——服务端点和上下文传播者。
 - en: 'The propagator is the implementation of the `TextMapPropagator` class – we
     use a composite one that supports W3C Trace Context and Baggage formats:'
+  id: totrans-71
   prefs: []
   type: TYPE_NORMAL
+  zh: 传播者是`TextMapPropagator`类的实现——我们使用一个支持W3C Trace Context和Baggage格式的复合传播者：
 - en: client/Program.cs
+  id: totrans-72
   prefs: []
   type: TYPE_NORMAL
+  zh: client/Program.cs
 - en: '[PRE6]'
+  id: totrans-73
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE6]'
 - en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/client/Program.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/client/Program.cs)'
+  id: totrans-74
   prefs: []
   type: TYPE_NORMAL
+  zh: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/client/Program.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/client/Program.cs)'
 - en: 'The last step is to configure OpenTelemetry and enable `ActivitySource` we
     use in the interceptor:'
+  id: totrans-75
   prefs: []
   type: TYPE_NORMAL
+  zh: 最后一步是配置 OpenTelemetry 并启用我们在拦截器中使用的 `ActivitySource`：
 - en: client/Program.cs
+  id: totrans-76
   prefs: []
   type: TYPE_NORMAL
+  zh: client/Program.cs
 - en: '[PRE7]'
+  id: totrans-77
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE7]'
 - en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/client/Program.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/client/Program.cs)'
+  id: totrans-78
   prefs: []
   type: TYPE_NORMAL
+  zh: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/client/Program.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/client/Program.cs)'
 - en: That’s it for the unary client calls. Let’s now instrument the server.
+  id: totrans-79
   prefs: []
   type: TYPE_NORMAL
+  zh: 单例客户端调用就此结束。现在让我们仪器化服务器。
 - en: Instrumenting server calls
+  id: totrans-80
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 仪器化服务器调用
 - en: 'Service-side instrumentation is similar. We can use the gRPC interceptor again
     and this time override the `UnaryServerHandler` method. Once the request is received,
     we should extract the context and start a new activity. It should have the `server`
     kind, a name that follows the same pattern as for the client span – `{package.service}/{method}`
     – and attributes very similar to those we saw on the client. Here’s the interceptor
     code:'
+  id: totrans-81
   prefs: []
   type: TYPE_NORMAL
+  zh: 服务端仪器化类似。我们可以再次使用 gRPC 拦截器，这次覆盖 `UnaryServerHandler` 方法。一旦收到请求，我们应该提取上下文并启动一个新的活动。它应该具有
+    `server` 类型，一个遵循与客户端跨度相同的模式的名字 – `{package.service}/{method}` – 以及与我们在客户端看到的非常相似的属性。以下是拦截器代码：
 - en: server/GrpcTracingInterceptor.cs
+  id: totrans-82
   prefs: []
   type: TYPE_NORMAL
+  zh: server/GrpcTracingInterceptor.cs
 - en: '[PRE8]'
+  id: totrans-83
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE8]'
 - en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/server/GrpcTracingInterceptor.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/server/GrpcTracingInterceptor.cs)'
+  id: totrans-84
   prefs: []
   type: TYPE_NORMAL
+  zh: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/server/GrpcTracingInterceptor.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/server/GrpcTracingInterceptor.cs)'
 - en: We extract the trace context and baggage using the propagator and then pass
     the extracted parent trace context to the new activity and add the attributes.
     The server interceptor callback is asynchronous, so we can await a response from
     the server and populate the status.
+  id: totrans-85
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们使用传播者提取跟踪上下文和行李，然后将提取的父跟踪上下文传递给新的活动并添加属性。服务器拦截器回调是异步的，因此我们可以等待来自服务器的响应并填充状态。
 - en: 'That’s it; now we just need to configure interceptors and enable `ActivitySource`:'
+  id: totrans-86
   prefs: []
   type: TYPE_NORMAL
+  zh: 就这样；现在我们只需要配置拦截器并启用 `ActivitySource`：
 - en: server/Program.cs
+  id: totrans-87
   prefs: []
   type: TYPE_NORMAL
+  zh: server/Program.cs
 - en: '[PRE9]'
+  id: totrans-88
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE9]'
 - en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/server/Program.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/server/Program.cs)'
+  id: totrans-89
   prefs: []
   type: TYPE_NORMAL
+  zh: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/server/Program.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/server/Program.cs)'
 - en: We added gRPC services, configured the tracing interceptor, and enabled the
     new activity source. It’s time to check out generated traces.
+  id: totrans-90
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们添加了 gRPC 服务，配置了跟踪拦截器，并启用了新的活动源。现在是检查生成的跟踪的时候了。
 - en: 'Run the application with `$docker-compose up --build` and then hit the frontend
     at `http://localhost:5051/single/hello`. It will send a message to the server
     and return a response or show a transient error. An example of a trace with an
     error is shown in *Figure 10**.1*:'
+  id: totrans-91
   prefs: []
   type: TYPE_NORMAL
+  zh: 使用 `$docker-compose up --build` 运行应用程序，然后访问前端 `http://localhost:5051/single/hello`。它将向服务器发送消息并返回响应或显示一个短暂错误。*图10.1*
+    展示了一个带有错误的跟踪示例：
 - en: '![Figure 10.1 – gRPC trace showing error on server](img/B19423_10_01.jpg)'
+  id: totrans-92
   prefs: []
   type: TYPE_IMG
+  zh: '![图10.1 – 服务器上显示错误的 gRPC 跟踪](img/B19423_10_01.jpg)'
 - en: Figure 10.1 – gRPC trace showing error on server
+  id: totrans-93
   prefs: []
   type: TYPE_NORMAL
+  zh: 图10.1 – 服务器上显示错误的 gRPC 跟踪
 - en: 'Here, we see two spans from the client application and one from the server.
     They describe an incoming request collected by the ASP.NET Core instrumentation
     and client and server sides of the gRPC call. *Figure 10**.2* shows client span
     attributes where we can see the destination and status:'
+  id: totrans-94
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这里，我们看到来自客户端应用程序的两个跨度和一个来自服务器。它们描述了由 ASP.NET Core 仪器化收集的传入请求以及 gRPC 调用的客户端和服务器端。*图10.2*
+    展示了客户端跨度属性，我们可以看到目的地和状态：
 - en: '![Figure 10.2 – gRPC client attributes](img/B19423_10_02.jpg)'
+  id: totrans-95
   prefs: []
   type: TYPE_IMG
+  zh: '![图10.2 – gRPC 客户端属性](img/B19423_10_02.jpg)'
 - en: Figure 10.2 – gRPC client attributes
+  id: totrans-96
   prefs: []
   type: TYPE_NORMAL
+  zh: 图10.2 – gRPC 客户端属性
 - en: This instrumentation allows us to trace unary calls for any gRPC service, which
     is similar to the HTTP instrumentation we saw in [*Chapter 2*](B19423_02.xhtml#_idTextAnchor038),
     *Native Monitoring in .NET*. Let’s now explore instrumentation for streaming calls.
+  id: totrans-97
   prefs: []
   type: TYPE_NORMAL
+  zh: 这种仪器化使我们能够跟踪任何 gRPC 服务的单例调用，这与我们在 [*第2章*](B19423_02.xhtml#_idTextAnchor038)
+    中看到的 HTTP 仪器化类似，即 .NET 的原生监控。现在让我们探索流调用的仪器化。
 - en: Instrumenting streaming calls
+  id: totrans-98
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 仪器化流调用
 - en: So far in the book, we have covered the instrumentation of synchronous calls
     where the application makes a request and awaits its completion. However, it’s
     common to use gRPC or other protocols, such as SignalR or WebSocket, to communicate
     in an asynchronous way when the client and server establish a connection and then
     send each other messages.
+  id: totrans-99
   prefs: []
   type: TYPE_NORMAL
+  zh: 到目前为止，本书已经涵盖了同步调用的工具配置，其中应用程序发起请求并等待其完成。然而，当客户端和服务器建立连接并发送消息时，通常使用 gRPC 或其他协议，如
+    SignalR 或 WebSocket，以异步方式进行通信。
 - en: Common use cases for this kind of communication include chat applications, collaboration
     tools, and other cases when data should flow in real time and frequently in both
     directions.
+  id: totrans-100
   prefs: []
   type: TYPE_NORMAL
+  zh: 这种通信的常见用例包括聊天应用程序、协作工具以及其他数据应实时且频繁双向流动的情况。
 - en: The call starts when the client initiates a connection and may last until the
     client decides to disconnect, the connection becomes idle, or some network issue
     happens. In practice, it means that such calls may last for days.
+  id: totrans-101
   prefs: []
   type: TYPE_NORMAL
+  zh: 调用开始于客户端发起连接，可能持续到客户端决定断开连接、连接变为空闲或发生某些网络问题。在实践中，这意味着此类调用可能持续数天。
 - en: While a connection is alive, the client and server can write each other messages
     to corresponding network streams. It’s much faster and more efficient when the
     client and server communicate frequently within a relatively short period of time.
     This approach minimizes the overhead created by DNS lookup, protocol negotiation,
     load balancing, authorization, and routing compared to request-response communication
     when at least some of these operations would happen for each request.
+  id: totrans-102
   prefs: []
   type: TYPE_NORMAL
+  zh: 在连接活跃期间，客户端和服务器可以向对方相应的网络流写入消息。当客户端和服务器在相对较短的时间内频繁通信时，这种方法要快得多，效率也更高。与请求-响应通信相比，这种方法可以最大限度地减少由DNS查找、协议协商、负载均衡、授权和路由等操作产生的开销，因为这些操作至少会在每个请求中发生一次。
 - en: On the downside, the application could become more complex as in many cases,
     we’d still need to correlate client messages with service replies to them and
     come up with our own semantics for metadata and status codes.
+  id: totrans-103
   prefs: []
   type: TYPE_NORMAL
+  zh: 从另一方面来看，应用程序可能会变得更加复杂，因为在许多情况下，我们仍然需要将客户端消息与相应的服务回复关联起来，并为元数据和状态代码制定我们自己的语义。
 - en: For observability, it means that out-of-the-box instrumentation is rarely enough
     and at least some custom instrumentation is necessary. Let’s see why.
+  id: totrans-104
   prefs: []
   type: TYPE_NORMAL
+  zh: 对于可观察性而言，这意味着现成的工具通常不足以满足需求，至少需要一些定制的工具。让我们看看原因是什么。
 - en: Basic instrumentation
+  id: totrans-105
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 基本工具配置
 - en: Some applications pass completely independent messages within one streaming
     call and would want different traces to describe individual messages. Others use
     streaming to send scoped batches of messages and would rather expect one trace
     to describe everything that happens within one streaming call. When it comes to
     streaming, there is no single solution.
+  id: totrans-106
   prefs: []
   type: TYPE_NORMAL
+  zh: 一些应用程序在一个流调用中传递完全独立的消息，并希望不同的跟踪描述单个消息。其他应用程序使用流来发送范围批次的消息，并希望有一个跟踪描述流调用中发生的所有事情。当涉及到流时，没有单一的解决方案。
 - en: gRPC auto-instrumentations follow OpenTelemetry semantic conventions and provide
     a default experience where a streaming call is represented with client and server
     spans, even if the call lifetime is unbound. Individual messages are described
     with span events with attributes covering the direction, message identifier, and
     size.
+  id: totrans-107
   prefs: []
   type: TYPE_NORMAL
+  zh: gRPC 自动工具配置遵循 OpenTelemetry 语义约定，并提供了默认体验，其中流调用用客户端和服务器跨度表示，即使调用生命周期是未定义的。单个消息用跨度事件描述，具有涵盖方向、消息标识符和大小的属性。
 - en: You can find a full instrumentation implementation that follows these conventions
     in the `client/GrpcTracingInterceptor.cs` and `server/GrpcTracingInterceptor.cs`
     files in the book’s repository. Let’s look at the traces it produces.
+  id: totrans-108
   prefs: []
   type: TYPE_NORMAL
+  zh: 你可以在本书的存储库中的 `client/GrpcTracingInterceptor.cs` 和 `server/GrpcTracingInterceptor.cs`
+    文件中找到一个遵循这些约定的完整工具配置实现。让我们看看它产生的跟踪。
 - en: Go ahead and start the application with `$ docker-compose up --build` and then
     hit the client application at `http://localhost:5051/streaming/hello?count=2`.
     It will send two messages to the server and read all the responses.
+  id: totrans-109
   prefs: []
   type: TYPE_NORMAL
+  zh: 使用 `$ docker-compose up --build` 启动应用程序，然后访问客户端应用程序 `http://localhost:5051/streaming/hello?count=2`。它将向服务器发送两条消息并读取所有响应。
 - en: 'Check out Jaeger at `http://localhost:16686/`. You should see a trace similar
     to the one shown in *Figure 10**.3*:'
+  id: totrans-110
   prefs: []
   type: TYPE_NORMAL
+  zh: 查看Jaeger，请访问 `http://localhost:16686/`。你应该会看到一个类似于 *图 10.3* 中所示的跟踪：
 - en: '![Figure 10.3 – Streaming call with events](img/B19423_10_03.jpg)'
+  id: totrans-111
   prefs: []
   type: TYPE_IMG
+  zh: '![图 10.3 – 带事件的流调用](img/B19423_10_03.jpg)'
 - en: Figure 10.3 – Streaming call with events
+  id: totrans-112
   prefs: []
   type: TYPE_NORMAL
+  zh: 图 10.3 – 带事件的流调用
 - en: Similarly to a unary call, the trace consists of three spans. The only difference
     is that client and server gRPC spans have events – two events per message, indicating
     when the message was sent and received. The `message.id` attribute here represents
     the sequence number of a message in a request or response stream and might be
     used to correlate request and response messages.
+  id: totrans-113
   prefs: []
   type: TYPE_NORMAL
+  zh: 与单一调用类似，跟踪由三个跨度组成。唯一的区别是客户端和服务器gRPC跨度有事件——每个消息两个事件，指示消息何时被发送和接收。这里的`message.id`属性代表请求或响应流中消息的序列号，可能用于关联请求和响应消息。
 - en: The trace shown in *Figure 10**.3* represents the best we can achieve with auto-instrumentation
     that is not aware of our specific streaming usage. Let’s see how we can improve
     it.
+  id: totrans-114
   prefs: []
   type: TYPE_NORMAL
+  zh: '*图10**.3* 中显示的跟踪是我们能够通过自动监控（不 aware of our specific streaming usage）实现的最好效果。让我们看看我们如何可以改进它。'
 - en: Tracing individual messages
+  id: totrans-115
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 跟踪单个消息
 - en: Let’s pretend that the client initiates a very long stream – in this case, the
     previous trace would not be very helpful. Assuming messages are not too frequent
     and verbose, we might want to instrument each specific message and see how server
     response messages correlate with client messages.
+  id: totrans-116
   prefs: []
   type: TYPE_NORMAL
+  zh: 让我们假设客户端启动了一个非常长的流——在这种情况下，之前的跟踪不会很有帮助。假设消息不是太频繁且冗长，我们可能想要监控每个特定的消息，并查看服务器响应消息如何与客户端消息相关联。
 - en: To instrument individual messages, we’d have to propagate context inside the
     message, which is not possible in an interceptor where we operate with generic
     message types.
+  id: totrans-117
   prefs: []
   type: TYPE_NORMAL
+  zh: 要监控单个消息，我们必须在消息内部传播上下文，但在我们使用通用消息类型操作的拦截器中这是不可能的。
 - en: 'Our message protobuf definition contains text and an attribute map that we
     can use to pass trace context:'
+  id: totrans-118
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们的消息protobuf定义包含文本和一个属性映射，我们可以使用它来传递跟踪上下文：
 - en: client\Protos\notifier.proto
+  id: totrans-119
   prefs: []
   type: TYPE_NORMAL
+  zh: client\Protos\notifier.proto
 - en: '[PRE10]'
+  id: totrans-120
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE10]'
 - en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/client/notifier.proto](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/client/notifier.proto)'
+  id: totrans-121
   prefs: []
   type: TYPE_NORMAL
+  zh: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/client/notifier.proto](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/client/notifier.proto)'
 - en: We’re going to create one client span per message to describe and identify it,
     and a server span that will represent processing the message.
+  id: totrans-122
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们将为每个消息创建一个客户端跨度来描述和识别它，以及一个表示处理消息的服务器跨度。
 - en: If we have hundreds of messages during one streaming call, having all of them
     in one trace will be hard to read. Also, typical sampling techniques would not
     apply – depending on the sampling decision made for the whole streaming call,
     we’ll sample in or drop all per-message spans.
+  id: totrans-123
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果在一次流式调用中我们有一百多条消息，将它们全部放在一个跟踪中会很难阅读。此外，典型的采样技术也不适用——根据整个流式调用中做出的采样决策，我们将对每个消息的跨度进行采样或丢弃。
 - en: Ideally, we want to have a trace per message flow and have a link to the long-running
     HTTP requests that carried the message over. This way, we still know what happened
     with the transport and what else was sent over the same HTTP request, but we’ll
     make independent sampling decisions and will have smaller and more readable traces.
+  id: totrans-124
   prefs: []
   type: TYPE_NORMAL
+  zh: 理想情况下，我们希望每个消息流都有一个跟踪，并且有一个链接到承载消息的长运行HTTP请求。这样，我们仍然知道传输中发生了什么，以及通过相同的HTTP请求发送了什么其他内容，但我们将做出独立的采样决策，并将拥有更小、更易读的跟踪。
 - en: Note
+  id: totrans-125
   prefs: []
   type: TYPE_NORMAL
+  zh: 注意
 - en: Tracing individual messages is reasonable when messages are relatively big and
     processing them takes a reasonable amount of time. Alternative approaches may
     include custom correlation or context propagation for sampled-in messages only.
+  id: totrans-126
   prefs: []
   type: TYPE_NORMAL
+  zh: 当消息相对较大且处理它们需要合理的时间时，跟踪单个消息是合理的。其他方法可能包括仅对采样消息进行自定义关联或上下文传播。
 - en: 'Let’s go ahead and instrument individual messages: we’ll need to start a new
     activity per message with the `producer` kind indicating an async call. We need
     to start a new trace and use `Activity.Current` as a link rather than a parent:'
+  id: totrans-127
   prefs: []
   type: TYPE_NORMAL
+  zh: 让我们继续对单个消息进行监控：我们需要为每个消息启动一个新的活动，使用`producer`类型表示异步调用。我们需要启动一个新的跟踪，并使用`Activity.Current`作为链接而不是父链接：
 - en: client/controllers/StreamingController.cs
+  id: totrans-128
   prefs: []
   type: TYPE_NORMAL
+  zh: client/controllers/StreamingController.cs
 - en: '[PRE11]'
+  id: totrans-129
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE11]'
 - en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/client/Controllers/StreamingController.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/client/Controllers/StreamingController.cs)'
+  id: totrans-130
   prefs: []
   type: TYPE_NORMAL
+  zh: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/client/Controllers/StreamingController.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/client/Controllers/StreamingController.cs)'
 - en: We created a link from the current activity and then set `Activity.Current`
     to `null`, which forces the `StartActivity` method to create an orphaned activity.
+  id: totrans-131
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们从当前活动创建了一个链接，然后将`Activity.Current`设置为`null`，这强制`StartActivity`方法创建一个孤儿活动。
 - en: Note
+  id: totrans-132
   prefs: []
   type: TYPE_NORMAL
+  zh: 注意
 - en: Setting `Activity.Current` should be done with caution. In this example, we’re
     starting a new task specifically to ensure that it won’t change the `Activity.Current`
     value beyond the scope of this task.
+  id: totrans-133
   prefs: []
   type: TYPE_NORMAL
+  zh: 设置`Activity.Current`应谨慎进行。在这个例子中，我们启动了一个新任务，专门确保它不会改变这个任务范围之外的`Activity.Current`值。
 - en: 'We have an activity; now it’s time to inject the context and send a message
     to the server:'
+  id: totrans-134
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们有一个活动；现在是我们注入上下文并发送消息到服务器的时候了：
 - en: client/controllers/StreamingController.cs
+  id: totrans-135
   prefs: []
   type: TYPE_NORMAL
+  zh: client/controllers/StreamingController.cs
 - en: '[PRE12]'
+  id: totrans-136
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE12]'
 - en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/client/Controllers/StreamingController.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/client/Controllers/StreamingController.cs)'
+  id: totrans-137
   prefs: []
   type: TYPE_NORMAL
+  zh: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/client/Controllers/StreamingController.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/client/Controllers/StreamingController.cs)'
 - en: Context injection looks similar to what we did in the client interceptor earlier
     in this chapter, except here we inject it into message attributes rather than
     gRPC call metadata.
+  id: totrans-138
   prefs: []
   type: TYPE_NORMAL
+  zh: 上下文注入看起来与本章前面在客户端拦截器中做的类似，但在这里我们将其注入到消息属性中，而不是gRPC调用元数据中。
 - en: 'On the server side, we need to extract the context from the message, then use
     it as a parent. We should also set `Activity.Current` as a link so we don’t lose
     correlation between the message processing and streaming calls. The new activity
     has a `consumer` kind, which indicates the processing side of the async call,
     as shown in this code snippet:'
+  id: totrans-139
   prefs: []
   type: TYPE_NORMAL
+  zh: 在服务器端，我们需要从消息中提取上下文，然后将其用作父级。我们还应该将`Activity.Current`设置为链接，这样我们就不丢失消息处理和流调用之间的相关性。新的活动有一个`consumer`类型，这表示异步调用的处理端，如这个代码片段所示：
 - en: server/NotifierService.cs
+  id: totrans-140
   prefs: []
   type: TYPE_NORMAL
+  zh: server/NotifierService.cs
 - en: '[PRE13]'
+  id: totrans-141
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE13]'
 - en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/server/NotifierService.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/server/NotifierService.cs)'
+  id: totrans-142
   prefs: []
   type: TYPE_NORMAL
+  zh: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/server/NotifierService.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter10/server/NotifierService.cs)'
 - en: We can now enable corresponding client and server activity sources – we used
     different names for per-message tracing and interceptors, so we can now control
     instrumentations individually. Go ahead and enable `Client.Grpc.Message` and `Server.Grpc.Message`
     sources on the client and server correspondingly and then start an application.
+  id: totrans-143
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们现在可以启用相应的客户端和服务器活动源 – 我们为每条消息跟踪和拦截器使用了不同的名称，因此我们现在可以单独控制仪器。相应地启用客户端的`Client.Grpc.Message`和服务器上的`Server.Grpc.Message`源，然后启动应用程序。
 - en: If we hit the streaming endpoint at `http://localhost:5051/streaming/hello?count=5`
     and then went to Jaeger, we’d see six traces – one for each message sent and one
     for the gRPC call.
+  id: totrans-144
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果我们在`http://localhost:5051/streaming/hello?count=5`上击中流端点，然后转到Jaeger，我们会看到六个跟踪
+    – 每个消息发送一个，以及一个gRPC调用。
 - en: 'Per-message traces consist of two spans, like the one shown in *Figure 10**.4*:'
+  id: totrans-145
   prefs: []
   type: TYPE_NORMAL
+  zh: 每条消息的跟踪由两个跨度组成，就像*图10.4*中显示的那样：
 - en: '![Figure 10.4 – Tracing messages in individual traces](img/B19423_10_04.jpg)'
+  id: totrans-146
   prefs: []
   type: TYPE_IMG
+  zh: '![图10.4 – 在单独的跟踪中跟踪消息](img/B19423_10_04.jpg)'
 - en: Figure 10.4 – Tracing messages in individual traces
+  id: totrans-147
   prefs: []
   type: TYPE_NORMAL
+  zh: 图10.4 – 在单独的跟踪中跟踪消息
 - en: Here, we see that sending this message took about 1 ms and processing it took
     about 100 ms. Both spans have links (references in Jaeger terminology) to spans
     describing the client and server sides of the underlying gRPC call.
+  id: totrans-148
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这里，我们看到发送这条消息大约花费了1毫秒，处理它大约花费了100毫秒。两个跨度都有链接（Jaeger术语中的引用）到描述底层gRPC调用客户端和服务器端的跨度。
 - en: 'If we didn’t force new trace creation for individual messages, we’d see only
     one trace containing all the spans, as shown in *Figure 10**.5*:'
+  id: totrans-149
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果我们没有强制为单个消息创建新的跟踪，我们会看到只有一个包含所有跨度的跟踪，如图*10.5*所示：
 - en: "![Figure 10.5 – Tracing \uFEFFa streaming call with all messages in one trace](img/B19423_10_05.jpg)"
+  id: totrans-150
   prefs: []
   type: TYPE_IMG
+  zh: '![图10.5 – 在一个跟踪中跟踪流调用中的所有消息](img/B19423_10_05.jpg)'
 - en: Figure 10.5 – Tracing a streaming call with all messages in one trace
+  id: totrans-151
   prefs: []
   type: TYPE_NORMAL
+  zh: 图10.5 – 在一个跟踪中跟踪流调用中的所有消息
 - en: Depending on your scenario, you might prefer to separate traces, have one big
     trace, or come up with something else.
+  id: totrans-152
   prefs: []
   type: TYPE_NORMAL
+  zh: 根据您的场景，您可能更喜欢分离跟踪，有一个大跟踪，或者想出其他方法。
 - en: Note that we can now remove our custom tracing interceptor and enable shared
     gRPC and HTTP client instrumentation libraries. If you do this, the per-message
     instrumentation will remain exactly the same and will keep working along with
     auto-instrumentation.
+  id: totrans-153
   prefs: []
   type: TYPE_NORMAL
+  zh: 注意，我们现在可以移除我们的自定义追踪拦截器并启用共享的 gRPC 和 HTTP 客户端仪表化库。如果你这样做，按消息的仪表化将保持完全相同，并且将与自动仪表化一起工作。
 - en: With this, you should be able to instrument unary or streaming gRPC calls and
     have an idea of how to extend it to other cases, including SignalR or socket communication.
+  id: totrans-154
   prefs: []
   type: TYPE_NORMAL
+  zh: 通过这种方式，你应该能够仪表化一元或流式 gRPC 调用，并了解如何将其扩展到其他情况，包括 SignalR 或套接字通信。
 - en: Let’s now see how to use gRPC instrumentation to investigate issues.
+  id: totrans-155
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在我们来看看如何使用 gRPC 仪表化来调查问题。
 - en: Observability in action
+  id: totrans-156
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 可观察性实践
 - en: 'There are several issues in our server application. First issue reproduces
     sporadically when you hit the frontend at `http://localhost:5051/single/hello`
     several times. You might notice that some requests take longer than others. If
     we look at the duration metrics or Jaeger’s duration view, we’ll see something
     similar to *Figure 10**.6*:'
+  id: totrans-157
   prefs: []
   type: TYPE_NORMAL
+  zh: 在我们的服务器应用程序中存在几个问题。第一个问题在你多次点击 `http://localhost:5051/single/hello` 前端时偶尔重现。你可能会注意到一些请求比其他请求耗时更长。如果我们查看持续时间指标或
+    Jaeger 的持续时间视图，我们会看到类似于 *图 10.6* 的内容：
 - en: '![Figure 10.6 – Duration view in Jaeger](img/B19423_10_06.jpg)'
+  id: totrans-158
   prefs: []
   type: TYPE_IMG
+  zh: '![图 10.6 – Jaeger 中的持续时间视图](img/B19423_10_06.jpg)'
 - en: Figure 10.6 – Duration view in Jaeger
+  id: totrans-159
   prefs: []
   type: TYPE_NORMAL
+  zh: 图 10.6 – Jaeger 中的持续时间视图
 - en: 'We see that most of the calls are fast (around 100 ms), but there is one that
     takes longer than a second. If we click on it, Jaeger will open the corresponding
     trace, like the one shown in *Figure 10**.7*:'
+  id: totrans-160
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们看到大多数调用都很快（大约 100 毫秒），但有一个调用时间超过一秒。如果我们点击它，Jaeger 将打开相应的跟踪，就像 *图 10.7* 所示的：
 - en: '![Figure 10.7 – Long trace with errors](img/B19423_10_07.jpg)'
+  id: totrans-161
   prefs: []
   type: TYPE_IMG
+  zh: '![图 10.7 – 带有错误的长时间跟踪](img/B19423_10_07.jpg)'
 - en: Figure 10.7 – Long trace with errors
+  id: totrans-162
   prefs: []
   type: TYPE_NORMAL
+  zh: 图 10.7 – 带有错误的长时间跟踪
 - en: Apparently, there were three attempts to send the message – the first two were
     not successful, but the third one succeeded. So retries are the source of long
     latency. We can investigate the error by expanding the exception event – we’ll
     see a full stack trace there.
+  id: totrans-163
   prefs: []
   type: TYPE_NORMAL
+  zh: 显然，发送消息尝试了三次 – 前两次没有成功，但第三次成功了。因此，重试是导致长时间延迟的原因。我们可以通过展开异常事件来调查错误 – 我们将在那里看到一个完整的堆栈跟踪。
 - en: Notably, we see retries only on the service side here. There is just one gRPC
     span on the client side. What happens here is that we enable a retry policy on
     the gRPC client channel, which internally adds a retry handler to the `HttpClient`
     level. So, our tracing interceptor is not called on tries and traces the logical
     part of the gRPC call.
+  id: totrans-164
   prefs: []
   type: TYPE_NORMAL
+  zh: 值得注意的是，在这里我们只看到服务端有重试。客户端只有一个 gRPC 跨度。这里发生的情况是我们为 gRPC 客户端通道启用了一个重试策略，这会在内部为
+    `HttpClient` 层添加一个重试处理器。因此，我们的追踪拦截器在尝试和追踪 gRPC 调用的逻辑部分时不会被调用。
 - en: The official `OpenTelemetry.Instrumentation.GrpcNetClient` instrumentation works
     properly and traces individual tries on the client as well.
+  id: totrans-165
   prefs: []
   type: TYPE_NORMAL
+  zh: 官方的 `OpenTelemetry.Instrumentation.GrpcNetClient` 仪表化工作正常，并且能够追踪客户端的个别尝试。
 - en: 'Let’s look at another problem. Send the following request: `http://localhost:5051/streaming/hello?count=10`.
     It will return a few messages and then stop. If we look into Jaeger traces, we’ll
     see a lot of errors for individual messages. Some of them will have just a client
     span, like the one shown in *Figure 10**.8*:'
+  id: totrans-166
   prefs: []
   type: TYPE_NORMAL
+  zh: 让我们看看另一个问题。发送以下请求：`http://localhost:5051/streaming/hello?count=10`。它将返回几条消息然后停止。如果我们查看
+    Jaeger 跟踪，我们会看到针对个别消息的大量错误。其中一些将只有一个客户端跨度，就像 *图 10.8* 所示的：
 - en: '![Figure 10.8 – Client error without server span](img/B19423_10_08.jpg)'
+  id: totrans-167
   prefs: []
   type: TYPE_IMG
+  zh: '![图 10.8 – 没有服务器跨度的客户端错误](img/B19423_10_08.jpg)'
 - en: Figure 10.8 – Client error without server span
+  id: totrans-168
   prefs: []
   type: TYPE_NORMAL
+  zh: 图 10.8 – 没有服务器跨度的客户端错误
 - en: 'There is not much information in the span, but luckily, we have a link to the
     gRPC call. Let’s follow it to see whether it explains something. The corresponding
     trace is shown in *Figure 10**.9*:'
+  id: totrans-169
   prefs: []
   type: TYPE_NORMAL
+  zh: 跨度中信息不多，但幸运的是，我们有一个指向 gRPC 调用的链接。让我们跟随它看看是否可以解释一些情况。相应的跟踪显示在 *图 10.9* 中：
 - en: '![Figure 10.9 – Error in the middle of the gRPC stream](img/B19423_10_09.jpg)'
+  id: totrans-170
   prefs: []
   type: TYPE_IMG
+  zh: '![图 10.9 – gRPC 流中间的错误](img/B19423_10_09.jpg)'
 - en: Figure 10.9 – Error in the middle of the gRPC stream
+  id: totrans-171
   prefs: []
   type: TYPE_NORMAL
+  zh: 图 10.9 – gRPC 流中间的错误
 - en: Here, we see a familiar trace, but the processing has failed while parsing the
     message text. The server span has six events, indicating that two messages were
     received and the response was successfully sent to the server. The third one was
     received but then instead of the response, we see an exception with a stack trace
     to help us investigate further.
+  id: totrans-172
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这里，我们看到一个熟悉的跟踪，但在解析消息文本时处理失败了。服务器跨度有六个事件，表明收到了两条消息，并且响应已成功发送到服务器。第三条消息收到了，但随后我们没有看到响应，而是看到一个异常，其中包含堆栈跟踪以帮助我们进一步调查。
 - en: If we expand the client gRPC span, we’ll see more exceptions for each message
     that was attempted to be sent after the server error has happened.
+  id: totrans-173
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果我们展开客户端 gRPC 跨度，我们将看到在服务器错误发生后尝试发送的每条消息的更多异常。
 - en: But there were no retries – why? In our case, gRPC retries, as we’ve seen in
     the previous example, are applied on the HTTP level. In the case of streaming,
     it means that after the first response is received from the server, the HTTP response,
     including status codes and headers, is received and the rest of the communication
     happens within the request and response streams. You can read more about this
     in the Microsoft gRPC documentation at [https://learn.microsoft.com/en-us/aspnet/core/grpc/retries](https://learn.microsoft.com/en-us/aspnet/core/grpc/retries).
+  id: totrans-174
   prefs: []
   type: TYPE_NORMAL
+  zh: 但没有重试——为什么？在我们的情况下，gRPC 重试，如我们之前在示例中看到的，是在 HTTP 层上应用的。在流的情况下，这意味着在从服务器收到第一个响应之后，包括状态码和头部的
+    HTTP 响应被接收，其余的通信在请求和响应流中进行。你可以在 Microsoft gRPC 文档中了解更多信息：[https://learn.microsoft.com/en-us/aspnet/core/grpc/retries](https://learn.microsoft.com/en-us/aspnet/core/grpc/retries)。
 - en: So, once an unhandled exception is thrown on the server for a particular message,
     it ends the gRPC call and corresponding request and response streams on the client
     and server. It affects all remaining messages on the client and explains the partial
     response we noticed.
+  id: totrans-175
   prefs: []
   type: TYPE_NORMAL
+  zh: 因此，一旦在服务器上对特定消息抛出未处理的异常，它就会结束客户端和服务器上的 gRPC 调用以及相应的请求和响应流。它影响了客户端上剩余的所有消息，并解释了我们注意到的部分响应。
 - en: Distributed tracing helps us see what happens and learn more about the technologies
     we use. In addition to tracing, OpenTelemetry defines a set of metrics to monitor
     on the client and server sides, which includes the duration, the failure rate
     that can be derived from it, the number of requests and responses, and the payload
     sizes.
+  id: totrans-176
   prefs: []
   type: TYPE_NORMAL
+  zh: 分布式跟踪帮助我们了解发生了什么，并更多地了解我们使用的科技。除了跟踪之外，OpenTelemetry 定义了一套在客户端和服务器端监控的指标，包括持续时间、从中可以推导出的失败率、请求数和响应数以及有效载荷大小。
 - en: Summary
+  id: totrans-177
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 摘要
 - en: In this chapter, we got hands-on experience in instrumenting network calls using
     gRPC as an example. Before starting instrumentation, we learned about the available
     instrumentation libraries and what OpenTelemetry semantic conventions recommend
     recording for gRPC.
+  id: totrans-178
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本章中，我们通过以 gRPC 为例来实际操作网络调用进行了仪表化。在开始仪表化之前，我们了解了可用的仪表化库以及 OpenTelemetry 语义约定建议为
+    gRPC 记录的内容。
 - en: First, we instrumented unary calls with client and server spans and propagated
     context through gRPC metadata. Then, we experimented with gRPC streaming, which
     needs a different approach to tracing. The generic instrumentation of streaming
@@ -782,31 +1158,44 @@
     the stream and provides a basic level of observability. Depending on our scenarios
     and observability needs, we can add another layer of instrumentation to trace
     individual messages. These custom spans work on top of the generic gRPC instrumentation.
+  id: totrans-179
   prefs: []
   type: TYPE_NORMAL
+  zh: 首先，我们使用客户端和服务器跨度对单例调用进行了仪表化，并通过 gRPC 元数据传播上下文。然后，我们实验了 gRPC 流，这需要不同的跟踪方法。流调用的通用仪表化建议为流中的每个单独的请求和响应消息创建一个事件，并提供基本级别的可观察性。根据我们的场景和可观察性需求，我们可以添加另一层仪表化来跟踪单个消息。这些自定义跨度建立在通用
+    gRPC 仪表化之上。
 - en: Finally, we used tracing to get insights into high latency and transient error
     scenarios, which also helped us understand gRPC internals.
+  id: totrans-180
   prefs: []
   type: TYPE_NORMAL
+  zh: 最后，我们使用了跟踪来深入了解高延迟和短暂错误场景，这也有助于我们理解 gRPC 内部机制。
 - en: You’re now ready to instrument your network stack with tracing or enrich existing
     instrumentation libraries by adding custom layers of instrumentation specific
     to your application. In the next chapter, we’ll look into messaging scenarios
     and dive even deeper into observability for asynchronous processing.
+  id: totrans-181
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在，你已经准备好使用跟踪来仪表化你的网络堆栈，或者通过添加针对你应用程序特定的自定义仪表化层来丰富现有的仪表化库。在下一章中，我们将探讨消息场景，并更深入地研究异步处理的可观察性。
 - en: Questions
+  id: totrans-182
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 问题
 - en: When using gRPC, would you write your own instrumentation or reuse an existing
     one?
+  id: totrans-183
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 当使用 gRPC 时，你会编写自己的仪表化工具还是重用现有的一个？
 - en: Let’s imagine we want to instrument gRPC communication between the client and
     server when the client initiates a connection at startup time and keeps it open
     forever (until the server or client stops) and then reuses this connection for
     all the communication. Which tracing approach would you choose? Why?
+  id: totrans-184
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 让我们假设我们想在客户端在启动时发起连接并永远保持打开（直到服务器或客户端停止）的情况下，对客户端和服务器之间的 gRPC 通信进行仪表化，并且然后重用这个连接进行所有通信。你会选择哪种跟踪方法？为什么？

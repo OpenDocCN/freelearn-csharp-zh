@@ -1,11 +1,15 @@
 - en: '12'
+  id: totrans-0
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: '12'
 - en: Instrumenting Database Calls
+  id: totrans-1
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 仪器化数据库调用
 - en: In this chapter, we’re going to continue exploring instrumentation approaches
     for popular distributed patterns and will look into database instrumentation.
     We’ll use MongoDB as an example and combine it with Redis cache. We’ll add tracing
@@ -14,506 +18,740 @@
     addition to client-side instrumentation, we’ll see how to also scrape Redis server
     metrics with the OpenTelemetry Collector Finally, we’ll explore the generated
     telemetry and see how it helps with analyzing application performance.
+  id: totrans-2
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本章中，我们将继续探索流行分布式模式的仪器化方法，并将探讨数据库仪器化。我们将以MongoDB为例，并结合Redis缓存。我们将为数据库和缓存调用添加跟踪和指标仪器化，并讨论如何在这些复合场景中添加应用程序上下文和提供可观察性。除了客户端仪器化之外，我们还将看到如何使用OpenTelemetry
+    Collector抓取Redis服务器指标。最后，我们将探索生成的遥测数据，并了解它是如何帮助分析应用程序性能的。
 - en: 'Here’s what you’ll learn about:'
+  id: totrans-3
   prefs: []
   type: TYPE_NORMAL
+  zh: 下面是你将了解的内容：
 - en: Tracing MongoDB operations
+  id: totrans-4
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 跟踪MongoDB操作
 - en: Tracing Redis cache and logical calls
+  id: totrans-5
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 跟踪Redis缓存和逻辑调用
 - en: Adding client- and server-side metrics
+  id: totrans-6
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 添加客户端和服务器端指标
 - en: Using telemetry to analyze failures and performance
+  id: totrans-7
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 使用遥测分析故障和性能
 - en: By the end of this chapter, you’ll be familiar with generic database instrumentations
     and will be able to instrument your own applications using databases or caches
     and analyze their performance.
+  id: totrans-8
   prefs: []
   type: TYPE_NORMAL
+  zh: 到本章结束时，你将熟悉通用的数据库仪器化，并能够使用数据库或缓存仪器化自己的应用程序并分析其性能。
 - en: Technical requirements
+  id: totrans-9
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 技术要求
 - en: The code for this chapter is available in the book’s repository on GitHub at
     [https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/tree/main/chapter12](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/tree/main/chapter12).
+  id: totrans-10
   prefs: []
   type: TYPE_NORMAL
+  zh: 本章的代码可在GitHub上本书的仓库中找到，网址为[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/tree/main/chapter12](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/tree/main/chapter12)。
 - en: 'To run the samples and perform analysis, we’ll need the following tools:'
+  id: totrans-11
   prefs: []
   type: TYPE_NORMAL
+  zh: 运行示例和执行分析，我们需要以下工具：
 - en: .NET SDK 7.0 or later
+  id: totrans-12
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: .NET SDK 7.0或更高版本
 - en: Docker and `docker-compose`
+  id: totrans-13
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: Docker和`docker-compose`
 - en: Instrumenting database calls
+  id: totrans-14
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 仪器化数据库调用
 - en: Databases are used in almost every distributed application. Many databases provide
     advanced monitoring capabilities on the server side, which include database-specific
     metrics, logs, or expensive query detection and analysis tools. Client instrumentation
     complements it by providing observability on the client side of this communication,
     correlating database operations, and adding application-specific context.
+  id: totrans-15
   prefs: []
   type: TYPE_NORMAL
+  zh: 数据库几乎被用于每个分布式应用程序中。许多数据库在服务器端提供高级监控能力，包括数据库特定的指标、日志或昂贵的查询检测和分析工具。客户端仪器化通过提供通信的客户端可观察性、关联数据库操作以及添加应用程序特定的上下文来补充它。
 - en: Client instrumentation describes an application’s communication with a database
     ORM system, driver, or client library, which can be quite complicated performing
     load balancing or batching operations in the background.
+  id: totrans-16
   prefs: []
   type: TYPE_NORMAL
+  zh: 客户端仪器化描述了应用程序与数据库ORM系统、驱动程序或客户端库之间的通信，这可能在后台执行负载均衡或批处理操作时相当复杂。
 - en: In some cases, it could be possible to trace network-level communication between
     the client library and the database cluster. For example, if a database uses gRPC
     or HTTP protocols, the corresponding auto-instrumentation would capture transport-level
     spans. In this case, we would see transport-level spans as children of a logical
     database operation initiated by the application.
+  id: totrans-17
   prefs: []
   type: TYPE_NORMAL
+  zh: 在某些情况下，可能可以跟踪客户端库和数据库集群之间的网络级通信。例如，如果数据库使用gRPC或HTTP协议，相应的自动仪器化将捕获传输级别的跨度。在这种情况下，我们将看到传输级别的跨度作为由应用程序启动的逻辑数据库操作的子跨度。
 - en: Here, we’re going to instrument the logical level of the MongoDB C# driver to
     demonstrate the principles that apply to other database instrumentations.
+  id: totrans-18
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这里，我们将仪器化MongoDB C#驱动程序的逻辑级别，以展示适用于其他数据库仪器化的原则。
 - en: Note
+  id: totrans-19
   prefs: []
   type: TYPE_NORMAL
+  zh: 注意
 - en: Generic instrumentation for `MongoDB.Driver` is available in the `MongoDB.Driver.Core.Extensions.OpenTelemetry`
     NuGet package.
+  id: totrans-20
   prefs: []
   type: TYPE_NORMAL
+  zh: '`MongoDB.Driver`的通用仪器化可在`MongoDB.Driver.Core.Extensions.OpenTelemetry` NuGet包中找到。'
 - en: Before we start the instrumentation, let’s check out OpenTelemetry semantic
     conventions for databases.
+  id: totrans-21
   prefs: []
   type: TYPE_NORMAL
+  zh: 在我们开始仪器化之前，让我们了解一下OpenTelemetry数据库语义约定。
 - en: OpenTelemetry semantic conventions for databases
+  id: totrans-22
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: OpenTelemetry数据库语义约定
 - en: The conventions are available at [https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/database.md](https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/database.md).
     They have an experimental status and may have changed by the time you access the
     link.
+  id: totrans-23
   prefs: []
   type: TYPE_NORMAL
+  zh: 这些约定可在[https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/database.md](https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/database.md)找到。它们处于实验状态，您访问链接时可能已经发生变化。
 - en: 'Conventions define attributes for both logical and physical calls. In our case,
     we are not instrumenting transport-level communication, so we will only use the
     ones applicable to logical operations:'
+  id: totrans-24
   prefs: []
   type: TYPE_NORMAL
+  zh: 约定定义了逻辑和物理调用都适用的属性。在我们的案例中，我们不会对传输层通信进行配置，因此我们只会使用适用于逻辑操作的属性：
 - en: '`db.system`: This is a required attribute that tracing backends use to distinguish
     database spans from all others. It should match the `mongodb` string, which observability
     backends may use to provide database or even MongoDB-specific analysis and visualizations.'
+  id: totrans-25
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`db.system`: 这是一个必需的属性，跟踪后端使用它来区分数据库跨度与其他所有跨度。它应与`mongodb`字符串匹配，该字符串是可观察后端可能用于提供数据库或甚至MongoDB特定分析和可视化的字符串。'
 - en: '`db.connection_string`: This is a recommended attribute. It’s also recommended
     to strip credentials before providing it. We’re not going to add it to our custom
     instrumentation. There could be cases where it’s useful to capture the connection
     string (without credentials) as it can help detect configuration issues or we
     can also log it once at start time.'
+  id: totrans-26
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`db.connection_string`: 这是一个推荐属性。也建议在提供之前删除凭据。我们不会将其添加到我们的自定义配置中。可能存在一些情况，其中捕获连接字符串（不包含凭据）是有用的，因为它可以帮助检测配置问题，或者我们也可以在启动时记录一次。'
 - en: '`db.user`: This is yet another recommended attribute that captures user information
     and is useful to detect configuration and access issues. We’re not going to capture
     it since we have just one user.'
+  id: totrans-27
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`db.user`: 这又是另一个推荐属性，用于捕获用户信息，并有助于检测配置和访问问题。由于我们只有一个用户，我们不会捕获它。'
 - en: '`db.name`: This is a required attribute defining the database name.'
+  id: totrans-28
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`db.name`: 这是一个必需的属性，用于定义数据库名称。'
 - en: '`db.operation`: This is a required attribute that captures the name of the
     operation being executed, which should match the MongoDB command name.'
+  id: totrans-29
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`db.operation`: 这是一个必需的属性，用于捕获正在执行的操作的名称，该名称应与MongoDB命令名称匹配。'
 - en: '`db.mongodb.collection`: This is a required attribute that represents the MongoDB
     collection name.'
+  id: totrans-30
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`db.mongodb.collection`: 这是一个必需的属性，代表MongoDB集合名称。'
 - en: In addition to database-specific attributes, we’re going to populate MongoDB
     host information with `net.peer.name` and `net.peer.port` – generic network attributes.
+  id: totrans-31
   prefs: []
   type: TYPE_NORMAL
+  zh: 除了数据库特定的属性之外，我们还将使用`net.peer.name`和`net.peer.port`填充MongoDB主机信息——通用网络属性。
 - en: Populating network-level attributes on logical calls is not always possible
     or useful. For example, when a MongoDB driver is configured with multiple hosts,
     we don’t necessarily know which one is used for a particular command. In practice,
     we should use auto-instrumentation that operates on the command level, subscribing
     to command events with `IEventSubscriber` (as described in the MongoDB documentation
     at [http://mongodb.github.io/mongo-csharp-driver/2.11/reference/driver_core/events](http://mongodb.github.io/mongo-csharp-driver/2.11/reference/driver_core/events)).
+  id: totrans-32
   prefs: []
   type: TYPE_NORMAL
+  zh: 在逻辑调用上填充网络级属性并不总是可能或有用。例如，当MongoDB驱动程序配置了多个主机时，我们不一定知道哪个用于特定的命令。在实践中，我们应该使用在命令级别操作的自动配置，通过`IEventSubscriber`订阅命令事件（如MongoDB文档中所述[http://mongodb.github.io/mongo-csharp-driver/2.11/reference/driver_core/events](http://mongodb.github.io/mongo-csharp-driver/2.11/reference/driver_core/events)）。
 - en: In addition to attributes, semantic conventions require the use of the client
     kind on spans and providing a low-cardinality span name that includes the operation
     and database name. We’re going to use the `{db.operation} {``db.name}.{db.mongodb.collection}`
     pattern.
+  id: totrans-33
   prefs: []
   type: TYPE_NORMAL
+  zh: 除了属性之外，语义约定还要求在跨度上使用客户端类型，并提供一个低基数跨度名称，该名称包括操作和数据库名称。我们将使用`{db.operation} {db.name}.{db.mongodb.collection}`模式。
 - en: Now that we know what information to include in spans, let’s go ahead and instrument
     a MongoDB operation.
+  id: totrans-34
   prefs: []
   type: TYPE_NORMAL
+  zh: 既然我们已经知道在跨度中包含哪些信息，那么我们就继续对MongoDB操作进行配置。
 - en: Tracing implementation
+  id: totrans-35
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 跟踪实现
 - en: In our application, we store records in a MongoDB collection and handle all
     communication with the collection in a custom `DatabaseService` class.
+  id: totrans-36
   prefs: []
   type: TYPE_NORMAL
+  zh: 在我们的应用程序中，我们在MongoDB集合中存储记录，并在自定义的`DatabaseService`类中处理与集合的所有通信。
 - en: 'Let’s start by instrumenting an operation that reads a single record from a
     collection:'
+  id: totrans-37
   prefs: []
   type: TYPE_NORMAL
+  zh: 首先，我们来对读取集合中单个记录的操作进行追踪：
 - en: DatabaseService.cs
+  id: totrans-38
   prefs: []
   type: TYPE_NORMAL
+  zh: DatabaseService.cs
 - en: '[PRE0]'
+  id: totrans-39
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE0]'
 - en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter12/database/DatabaseService.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter12/database/DatabaseService.cs)'
+  id: totrans-40
   prefs: []
   type: TYPE_NORMAL
+  zh: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter12/database/DatabaseService.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter12/database/DatabaseService.cs)'
 - en: Here, we trace the `Find` method call. We use the `GetOperation` constant as
     the operation name, which is set to `FindSingleOrDefault` – a synthetic name describing
     what we do here. If the MongoDB command throws an exception, we set the activity
     status to `error`.
+  id: totrans-41
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这里，我们追踪`Find`方法调用。我们使用`GetOperation`常量作为操作名称，它被设置为`FindSingleOrDefault`——一个合成名称，描述了我们在这里所做的事情。如果MongoDB命令抛出异常，我们将活动状态设置为`error`。
 - en: 'Let’s look in the `StartMongoActivity` method implementation:'
+  id: totrans-42
   prefs: []
   type: TYPE_NORMAL
+  zh: 让我们来看看`StartMongoActivity`方法的具体实现：
 - en: DatabaseService.cs
+  id: totrans-43
   prefs: []
   type: TYPE_NORMAL
+  zh: DatabaseService.cs
 - en: '[PRE1]'
+  id: totrans-44
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE1]'
 - en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter12/database/DatabaseService.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter12/database/DatabaseService.cs)'
+  id: totrans-45
   prefs: []
   type: TYPE_NORMAL
+  zh: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter12/database/DatabaseService.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter12/database/DatabaseService.cs)'
 - en: Here, we populate the activity name, kind, and attributes from the semantic
     conventions mentioned previously. The host, port, database name, and collection
     name are populated from the MongoDB settings provided via configuration and captured
     at construction time.
+  id: totrans-46
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这里，我们从之前提到的语义约定中填充活动名称、类型和属性。主机、端口、数据库名和集合名称是从配置中提供的MongoDB设置以及在构建时捕获的。
 - en: 'A similar approach could be used for any other operation. For bulk operations,
     we may consider adding more context to describe individual requests in the array
     attribute, as shown in this code snippet:'
+  id: totrans-47
   prefs: []
   type: TYPE_NORMAL
+  zh: 对于任何其他操作，可以使用类似的方法。对于批量操作，我们可能需要考虑在数组属性中添加更多上下文来描述单个请求，如下代码片段所示：
 - en: DatabaseService.cs
+  id: totrans-48
   prefs: []
   type: TYPE_NORMAL
+  zh: DatabaseService.cs
 - en: '[PRE2]'
+  id: totrans-49
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE2]'
 - en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter12/database/DatabaseService.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter12/database/DatabaseService.cs)'
+  id: totrans-50
   prefs: []
   type: TYPE_NORMAL
+  zh: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter12/database/DatabaseService.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter12/database/DatabaseService.cs)'
 - en: This instrumentation is very generic – it does not record anything application-specific
     even though it knows the type of the record. For example, we could add a record
     identifier as an attribute or set the status to `error` if no records were found.
     These are all valid things to do if you’re going to stick with specialized manual
     instrumentation, but it’s more common to use a shared one when possible.
+  id: totrans-51
   prefs: []
   type: TYPE_NORMAL
+  zh: 这种追踪非常通用——即使它知道记录的类型，它也不会记录任何特定于应用程序的内容。例如，我们可以添加一个记录标识符作为属性，或者在找不到记录时将状态设置为`error`。如果你坚持使用专门的手动追踪，这些都是有效的事情，但更常见的是在可能的情况下使用共享的追踪。
 - en: So, how do we record application-specific context along with generic database
     instrumentation? One solution would be to enrich auto-collected activities as
     we did in [*Chapter 5*](B19423_05.xhtml#_idTextAnchor083), *Configuration and*
     *Control Plane*.
+  id: totrans-52
   prefs: []
   type: TYPE_NORMAL
+  zh: 那么，我们如何记录与通用数据库追踪一起的应用程序特定上下文呢？一个解决方案是在[*第五章*](B19423_05.xhtml#_idTextAnchor083)中，*配置*和*控制平面*中我们所做的那样，丰富自动收集的活动。
 - en: Another solution is to add another layer of logical activities around database
     and cache calls. Before we do this, let’s learn how to trace cache calls.
+  id: totrans-53
   prefs: []
   type: TYPE_NORMAL
+  zh: 另一种解决方案是在数据库和缓存调用周围添加另一层逻辑活动。在我们这样做之前，让我们学习如何追踪缓存调用。
 - en: Tracing cache calls
+  id: totrans-54
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 追踪缓存调用
 - en: Caches such as Redis and Memcached are a special class of databases and are
     covered by database semantic conventions too. Instrumenting cache calls according
     to conventions is beneficial as it helps you to stay consistent across all services
     and to get the most out of your tracing backends in terms of visualization and
     analysis.
+  id: totrans-55
   prefs: []
   type: TYPE_NORMAL
+  zh: 如Redis和Memcached之类的缓存是数据库的特殊类别，也受到数据库语义约定的覆盖。根据约定对缓存调用进行追踪是有益的，因为它有助于你在所有服务中保持一致性，并从可视化和分析方面充分利用你的追踪后端。
 - en: So, let’s instrument Redis according to database conventions and add cache-specific
     context. There is nothing specifically defined in OpenTelemetry for caches, so
     let’s design something of our own.
+  id: totrans-56
   prefs: []
   type: TYPE_NORMAL
+  zh: 因此，让我们根据数据库约定来仪表化 Redis 并添加缓存特定上下文。OpenTelemetry 对于缓存没有特别定义，所以让我们设计一些自己的东西。
 - en: Note
+  id: totrans-57
   prefs: []
   type: TYPE_NORMAL
+  zh: 注意
 - en: Auto-instrumentation for the `StackExchange.Redis` client is available in the
     `OpenTelemetry.Instrumentation.StackExchangeRedis` NuGet package.
+  id: totrans-58
   prefs: []
   type: TYPE_NORMAL
+  zh: '`StackExchange.Redis` 客户端的自动仪表化功能可在 `OpenTelemetry.Instrumentation.StackExchangeRedis`
+    NuGet 包中找到。'
 - en: 'When it comes to tracing, we want to know typical things: how long a call took,
     whether there was an error, and what operation was attempted. Cache-specific things
     include an indication whether an item was retrieved from the cache or the expiration
     strategy (if it’s conditional) for set operations.'
+  id: totrans-59
   prefs: []
   type: TYPE_NORMAL
+  zh: 当涉及到跟踪时，我们想知道典型的事情：调用花费了多长时间，是否发生了错误，以及尝试了什么操作。缓存特定的事情包括指示是否从缓存中检索了项目或集合操作的过期策略（如果它是条件性的）。
 - en: 'Let’s go ahead and instrument a `Get` call – it looks pretty similar to the
     database instrumentation we saw in the previous section:'
+  id: totrans-60
   prefs: []
   type: TYPE_NORMAL
+  zh: 让我们继续仪表化一个 `Get` 调用 – 它看起来与我们在上一节中看到的数据库仪表化非常相似：
 - en: CacheService.cs
+  id: totrans-61
   prefs: []
   type: TYPE_NORMAL
+  zh: CacheService.cs
 - en: '[PRE3]'
+  id: totrans-62
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE3]'
 - en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter12/database/CacheService.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter12/database/CacheService.cs)'
+  id: totrans-63
   prefs: []
   type: TYPE_NORMAL
+  zh: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter12/database/CacheService.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter12/database/CacheService.cs)'
 - en: Here, we created an activity to trace a `GetString` call to Redis. If a record
     is found, we set the `cache.hit` attribute to `true`, and if an exception happens,
     we set the activity status to `error` and include an exception message.
+  id: totrans-64
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这里，我们创建了一个活动来跟踪对 Redis 的 `GetString` 调用。如果找到记录，我们将 `cache.hit` 属性设置为 `true`，如果发生异常，我们将活动状态设置为
+    `error` 并包含异常信息。
 - en: 'Let’s take a look at the attributes that are set in the `StartCacheActivity`
     method:'
+  id: totrans-65
   prefs: []
   type: TYPE_NORMAL
+  zh: 让我们看看在 `StartCacheActivity` 方法中设置的属性：
 - en: CacheService.cs
+  id: totrans-66
   prefs: []
   type: TYPE_NORMAL
+  zh: CacheService.cs
 - en: '[PRE4]'
+  id: totrans-67
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE4]'
 - en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter12/database/CacheService.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter12/database/CacheService.cs)'
+  id: totrans-68
   prefs: []
   type: TYPE_NORMAL
+  zh: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter12/database/CacheService.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter12/database/CacheService.cs)'
 - en: In this snippet, we start a client activity with the name matching the operation
     name. We also set all the applicable database and network attributes and add a
     Redis-specific attribute defined by OpenTelemetry – `db.redis.database_index`.
     Network attributes, which describe the host, port, IP address, and network family,
     are populated from Redis configuration options. The `SetTagIfNotNull` method is
     an extension method defined in our project.
+  id: totrans-69
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这个片段中，我们使用与操作名称匹配的名称启动客户端活动。我们还设置了所有适用的数据库和网络属性，并添加了一个由 OpenTelemetry 定义的 Redis
+    特定属性 – `db.redis.database_index`。描述主机、端口、IP 地址和网络家族的网络属性是从 Redis 配置选项中填充的。`SetTagIfNotNull`
+    方法是我们项目中定义的一个扩展方法。
 - en: Here, we have the same problem as with MongoDB – Redis configuration options
     may include multiple servers and we don’t know which one is going to be used for
     a specific call. The instrumentation in the `OpenTelemetry.Instrumentation.StackExchangeRedis`
     package (we took a quick look at it in [*Chapter 3*](B19423_03.xhtml#_idTextAnchor052),
     *The .NET Observability Ecosystem*) provides more precise information.
+  id: totrans-70
   prefs: []
   type: TYPE_NORMAL
+  zh: 这里，我们与 MongoDB 遇到相同的问题 – Redis 配置选项可能包括多个服务器，而我们不知道哪个服务器将被用于特定的调用。`OpenTelemetry.Instrumentation.StackExchangeRedis`
+    包中的仪表化（我们在 [*第 3 章*](B19423_03.xhtml#_idTextAnchor052)，*.NET 可观察性生态系统）中提供了更精确的信息。
 - en: This instrumentation is very generic for the same reasons as for MongoDB – in
     most cases, we’d rather enrich auto-instrumentation or add another layer of application-specific
     spans than write a custom instrumentation. So, let’s see how we can add the context
     by adding another layer of instrumentation.
+  id: totrans-71
   prefs: []
   type: TYPE_NORMAL
+  zh: 由于与 MongoDB 相同的原因，这种仪表化非常通用 – 在大多数情况下，我们更愿意丰富自动仪表化或添加另一层特定于应用程序的跨度，而不是编写自定义仪表化。所以，让我们看看我们如何通过添加另一层仪表化来添加上下文。
 - en: Instrumenting composite calls
+  id: totrans-72
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 仪表化复合调用
 - en: With MongoDB and Redis calls instrumented independently and in a generic way,
     it could be hard to answer questions such as “How long did it take to retrieve
     a record with a specific ID?” or “How long did retrieval take?” given it involved
     a call to the cache, a call to the database, and then another call to the cache.
+  id: totrans-73
   prefs: []
   type: TYPE_NORMAL
+  zh: 由于MongoDB和Redis调用独立且以通用方式进行了仪器化，因此，考虑到涉及对缓存的调用、对数据库的调用以及随后对缓存的另一个调用，要回答诸如“检索具有特定ID的记录需要多长时间？”或“检索需要多长时间？”等问题可能会很困难。
 - en: We did not add a record identifier attribute to query on and we only know the
     duration of individual calls that don’t really describe the overall operation.
+  id: totrans-74
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们没有添加一个记录标识符属性来查询，我们只知道单个调用的持续时间，而这些调用并不能真正描述整体操作。
 - en: 'In the following example, we’re adding an extra layer of instrumentation that
     traces logical operations with a record identifier:'
+  id: totrans-75
   prefs: []
   type: TYPE_NORMAL
+  zh: 在以下示例中，我们正在添加一个额外的仪器层，该层使用记录标识符跟踪逻辑操作：
 - en: RecordsController.cs
+  id: totrans-76
   prefs: []
   type: TYPE_NORMAL
+  zh: RecordsController.cs
 - en: '[PRE5]'
+  id: totrans-77
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE5]'
 - en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter12/database/Controllers/RecordsController.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter12/database/Controllers/RecordsController.cs)'
+  id: totrans-78
   prefs: []
   type: TYPE_NORMAL
+  zh: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter12/database/Controllers/RecordsController.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter12/database/Controllers/RecordsController.cs)'
 - en: 'Here, we wrap the sequence of calls in the `GetRecord` activity – it has an
     `internal` kind and just two attributes: `app.record.id` (which captures the record
     identifier) and `cache.hit` (describing whether the record was retrieved from
     the database).'
+  id: totrans-79
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这里，我们将调用序列包装在`GetRecord`活动内 – 它具有`internal`类型，并且只有两个属性：`app.record.id`（它捕获记录标识符）和`cache.hit`（描述记录是否从数据库中检索）。
 - en: We also provide a `not found` status description when nothing is found and can
     report other known issues in the same way.
+  id: totrans-80
   prefs: []
   type: TYPE_NORMAL
+  zh: 当没有找到任何内容时，我们还提供`not found`状态描述，并以相同的方式报告其他已知问题。
 - en: In the case of our demo application, the encompassing database and cache spans
     almost match the ASP.NET Core ones in terms of status and duration, but in practice,
     controller methods do many other things. The encompassing operation helps us separate
     all spans and logs related to record retrieval.
+  id: totrans-81
   prefs: []
   type: TYPE_NORMAL
+  zh: 在我们的演示应用程序中，包含数据库和缓存的跨度几乎与ASP.NET Core中的状态和持续时间相匹配，但在实际应用中，控制器方法会做很多其他事情。包含的操作帮助我们分离所有与记录检索相关的跨度和对数。
 - en: Now that we have an idea of how to approach tracing, let’s explore metrics.
+  id: totrans-82
   prefs: []
   type: TYPE_NORMAL
+  zh: 既然我们已经了解了如何处理跟踪，让我们来探索指标。
 - en: Adding metrics
+  id: totrans-83
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 添加指标
 - en: With databases, it’s common to monitor connections and query execution count
     and duration, contention, and resource utilization in addition to technology-specific
     things. The MongoDB cluster reports a set of such metrics that you can receive
     with OpenTelemetry Collector (check it out at https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/mongodbreceiver).
     These metrics provide the server side of the story. We should also add client-side
     duration metrics. It’d help us account for connectivity issues and network latency.
+  id: totrans-84
   prefs: []
   type: TYPE_NORMAL
+  zh: 对于数据库，除了技术特定的东西之外，通常还会监控连接、查询执行次数和持续时间、竞争和资源利用率。MongoDB集群报告了一系列此类指标，您可以使用OpenTelemetry
+    Collector（在https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/mongodbreceiver查看）接收这些指标。这些指标提供了服务器端的故事。我们还应该添加客户端持续时间指标。这将帮助我们处理连接问题和网络延迟。
 - en: OpenTelemetry semantic conventions only document connection metrics for now.
     We could record them by implementing an `IEventSubscriber` interface and listening
     to connection events.
+  id: totrans-85
   prefs: []
   type: TYPE_NORMAL
+  zh: OpenTelemetry语义约定目前仅记录连接指标。我们可以通过实现`IEventSubscriber`接口并监听连接事件来记录它们。
 - en: Instead, we’re going to record the basic operation duration, which also allows
     us to derive the throughput and failure rate and slice and dice by operation,
     database, or collection name.
+  id: totrans-86
   prefs: []
   type: TYPE_NORMAL
+  zh: 相反，我们将记录基本操作持续时间，这还允许我们推导出吞吐量和故障率，并按操作、数据库或集合名称进行切片和切块。
 - en: 'Let’s get back to the `Get` operation code and see how the metric can be added.
     First, we’ll create a duration histogram:'
+  id: totrans-87
   prefs: []
   type: TYPE_NORMAL
+  zh: 让我们回到`Get`操作代码，看看如何添加指标。首先，我们将创建一个持续时间直方图：
 - en: DatabaseService.cs
+  id: totrans-88
   prefs: []
   type: TYPE_NORMAL
+  zh: DatabaseService.cs
 - en: '[PRE6]'
+  id: totrans-89
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE6]'
 - en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter12/database/DatabaseService.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter12/database/DatabaseService.cs)'
+  id: totrans-90
   prefs: []
   type: TYPE_NORMAL
+  zh: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter12/database/DatabaseService.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter12/database/DatabaseService.cs)'
 - en: 'Now that we have a histogram, we can record the duration for each operation:'
+  id: totrans-91
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在我们有了直方图，我们可以记录每个操作的持续时间：
 - en: DatabaseService.cs
+  id: totrans-92
   prefs: []
   type: TYPE_NORMAL
+  zh: DatabaseService.cs
 - en: '[PRE7]'
+  id: totrans-93
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE7]'
 - en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter12/database/DatabaseService.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter12/database/DatabaseService.cs)'
+  id: totrans-94
   prefs: []
   type: TYPE_NORMAL
+  zh: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter12/database/DatabaseService.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter12/database/DatabaseService.cs)'
 - en: 'Here, we call into the `TrackDuration` method and pass a stopwatch that tracks
     the duration, the low-cardinality operation name, and an exception (if any). Here’s
     the `TrackDuration` method:'
+  id: totrans-95
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这里，我们调用`TrackDuration`方法并传递一个跟踪持续时间的计时器，低基数操作名称以及一个异常（如果有）。以下是`TrackDuration`方法：
 - en: DatabaseStatus.cs
+  id: totrans-96
   prefs: []
   type: TYPE_NORMAL
+  zh: DatabaseStatus.cs
 - en: '[PRE8]'
+  id: totrans-97
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE8]'
 - en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter12/database/DatabaseService.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter12/database/DatabaseService.cs)'
+  id: totrans-98
   prefs: []
   type: TYPE_NORMAL
+  zh: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter12/database/DatabaseService.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter12/database/DatabaseService.cs)'
 - en: Here, we add all the attributes we used for tracing and a new one – `db.mongodb.status`.
     We use the exception type as a status to make sure that metric cardinality stays
     low.
+  id: totrans-99
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这里，我们添加了我们用于跟踪的所有属性以及一个新的属性 – `db.mongodb.status`。我们使用异常类型作为状态以确保度量值的基数保持较低。
 - en: While the idea of using the exception type looks compelling and easy, it only
     works when we use the same MongoDB driver in the same language across the system.
     Even then, statuses might change over time with driver updates. In a real production
     scenario, I would recommend mapping known exceptions to language-agnostic status
     codes. It also makes sense to test corresponding cases and check that proper error
     codes are captured. It’s important if your alerts are based on specific codes.
+  id: totrans-100
   prefs: []
   type: TYPE_NORMAL
+  zh: 虽然使用异常类型的想法看起来很有吸引力且简单，但它仅在我们在整个系统中使用相同语言的相同MongoDB驱动程序时才有效。即使如此，状态也可能随着驱动程序的更新而随时间变化。在实际的生产场景中，我建议将已知的异常映射到语言无关的状态代码。测试相应的案例并检查是否捕获了适当的错误代码也是有意义的。如果你的警报基于特定的代码，那么这一点很重要。
 - en: The duration histogram and the metrics we can derive from it at query time cover
     common monitoring needs (throughput, latency, and error rate). We could also use
     it to do capacity analysis and make better design decisions. For example, before
     adding a cache in front of the database, we could check the read-to-write ratio
     to see whether caching would be helpful.
+  id: totrans-101
   prefs: []
   type: TYPE_NORMAL
+  zh: 持续时间直方图以及我们可以在查询时从中导出的度量值涵盖了常见的监控需求（吞吐量、延迟和错误率）。我们还可以用它来进行容量分析和做出更好的设计决策。例如，在数据库前添加缓存之前，我们可以检查读写比例以查看缓存是否有帮助。
 - en: With custom queries over traces, we could also estimate how frequently the same
     records are accessed. This would help us pick a suitable expiration strategy.
+  id: totrans-102
   prefs: []
   type: TYPE_NORMAL
+  zh: 通过对跟踪的定制查询，我们还可以估计相同的记录被访问的频率。这将帮助我们选择合适的过期策略。
 - en: Recording Redis metrics
+  id: totrans-103
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 记录Redis度量值
 - en: 'In addition to common database concerns, we want to measure cache-specific
     things: the hit-to-miss ratio, key expiration, and the eviction rate. This helps
     optimize and scale the cache.'
+  id: totrans-104
   prefs: []
   type: TYPE_NORMAL
+  zh: 除了常见的数据库问题之外，我们还想测量与缓存相关的特定指标：命中率、键过期和驱逐率。这有助于优化和扩展缓存。
 - en: These metrics are reported by Redis and can be captured with the Redis receiver
     for OpenTelemetry Collector, available at https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/redisreceiver.
+  id: totrans-105
   prefs: []
   type: TYPE_NORMAL
+  zh: 这些指标由Redis报告，并且可以使用OpenTelemetry Collector的Redis接收器捕获，该接收器位于https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/redisreceiver。
 - en: 'We can enable them with the following configuration:'
+  id: totrans-106
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们可以通过以下配置来启用它们：
 - en: configs/otel-collector-config.yml
+  id: totrans-107
   prefs: []
   type: TYPE_NORMAL
+  zh: configs/otel-collector-config.yml
 - en: '[PRE9]'
+  id: totrans-108
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE9]'
 - en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter12/configs/otel-collector-config.yml](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter12/configs/otel-collector-config.yml)'
+  id: totrans-109
   prefs: []
   type: TYPE_NORMAL
+  zh: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter12/configs/otel-collector-config.yml](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter12/configs/otel-collector-config.yml)'
 - en: OpenTelemetry Collector connects to a Redis instance and scrapes available metrics
     from it. Redis exposes multiple metrics, including uptime and resource utilization
     metrics and, most importantly, counters measuring command rate, hits, misses,
     expirations, evictions, and average time to live. With these, we can monitor Redis’
     health and see whether it’s used efficiently and where the bottlenecks are.
+  id: totrans-110
   prefs: []
   type: TYPE_NORMAL
+  zh: OpenTelemetry Collector 连接到 Redis 实例并从中抓取可用的指标。Redis 提供多个指标，包括运行时间和资源利用率指标，最重要的是，计数器测量命令速率、命中、未命中、过期、淘汰和平均生存时间。有了这些，我们可以监控
+    Redis 的健康状态，并查看它是否被有效使用以及瓶颈在哪里。
 - en: For example, a low hit-to-miss ratio could indicate that we’re not utilizing
     the cache well and potentially could tune caching parameters to make it more efficient.
     First, we should make sure caching makes sense – usually, it does when at least
     some items are read more frequently than they are modified. We also need the interval
     between reads to be relatively low.
+  id: totrans-111
   prefs: []
   type: TYPE_NORMAL
+  zh: 例如，低命中率到未命中率的比率可能表明我们没有很好地利用缓存，并且可能需要调整缓存参数以提高其效率。首先，我们应该确保缓存是有意义的——通常，当至少有一些项目被读取的频率高于它们被修改的频率时，它是合理的。我们还需要读取之间的间隔相对较低。
 - en: 'If, based on the collected data, we decided to add a cache, we can optimize
     its configuration further by looking into other cache metrics:'
+  id: totrans-112
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果根据收集的数据，我们决定添加缓存，我们可以通过查看其他缓存指标进一步优化其配置：
 - en: A high key eviction rate can tell us if we don’t have enough memory and keys
     are evicted before items are read. We might want to scale Redis vertically or
     horizontally or change the eviction policy to better match the usage pattern.
     For example, if we have a relatively low number of periodically accessed items,
     a **least frequently used** (**LFU**) policy could be more efficient than the
     **least recently used** (**LRU**) one.
+  id: totrans-113
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 高键值淘汰率可以告诉我们是否内存不足，键值在读取项目之前被淘汰。我们可能需要垂直或水平扩展 Redis，或者更改淘汰策略以更好地匹配使用模式。例如，如果我们有相对较少的定期访问项目，**最少使用**（**LFU**）策略可能比**最近最少使用**（**LRU**）策略更有效。
 - en: If we see a low eviction but high expiration rate, it could mean that the expiration
     time is too low – items are read less frequently than we expected. We can try
     to gradually increase the expiration time or disable it and rely on eviction policy
     instead.
+  id: totrans-114
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 如果我们看到低淘汰率但高过期率，这可能意味着过期时间太低——项目的读取频率低于预期。我们可以尝试逐渐增加过期时间或禁用它并依赖淘汰策略。
 - en: In addition to server-side metrics, we’ll also add a client-side duration histogram.
     It allows us to record call duration distribution with command and other database-specific
     dimensions. The implementation is almost identical to the MongoDB duration metric.
@@ -521,240 +759,363 @@
     metrics for the `GetString` operation. This could be helpful when server-side
     metrics are not available or there are multiple different operations we want to
     measure a hit ratio for independently of each other.
+  id: totrans-115
   prefs: []
   type: TYPE_NORMAL
+  zh: 除了服务器端指标外，我们还将添加客户端持续时间直方图。这允许我们使用命令和其他数据库特定维度记录调用持续时间分布。实现几乎与 MongoDB 持续时间指标相同。唯一的区别是我们将向
+    `GetString` 操作的指标中添加 `cache.hit` 属性。当服务器端指标不可用或存在多个不同的操作，我们希望独立测量其命中率时，这可能很有帮助。
 - en: Now that we have all the database traces and metrics in place, let’s bring all
     the pieces together and see how we use this telemetry in practice.
+  id: totrans-116
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在我们已经设置了所有数据库跟踪和指标，让我们将所有部件组合起来，看看我们如何在实践中使用这种遥测。
 - en: Analyzing performance
+  id: totrans-117
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 分析性能
 - en: Let’s first run the demo application using the `$ docker-compose up --build`
     command. It will start local MongoDB and Redis instances along the application
     and observability stack.
+  id: totrans-118
   prefs: []
   type: TYPE_NORMAL
+  zh: 让我们先使用 `$ docker-compose up --build` 命令运行演示应用程序。它将启动本地 MongoDB 和 Redis 实例以及应用程序和可观察性堆栈。
 - en: 'You can create some records with a tool such as `curl`:'
+  id: totrans-119
   prefs: []
   type: TYPE_NORMAL
+  zh: 您可以使用 `curl` 等工具创建一些记录：
 - en: '[PRE10]'
+  id: totrans-120
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE10]'
 - en: It should return a list of record identifiers the service created.
+  id: totrans-121
   prefs: []
   type: TYPE_NORMAL
+  zh: 它应该返回服务创建的记录标识符列表。
 - en: 'Now, let’s look at the Jaeger trace at `http://localhost:16686`, like the one
     shown in *Figure 12**.1*:'
+  id: totrans-122
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在，让我们查看 `http://localhost:16686` 上的 Jaeger 跟踪，就像 *图 12.1* 中所示的那样：
 - en: '![Figure 12.1 – Trace showing bulk record creation](img/B19423_12_01.jpg)'
+  id: totrans-123
   prefs: []
   type: TYPE_IMG
+  zh: '![图 12.1 – 显示批量记录创建的跟踪图](img/B19423_12_01.jpg)'
 - en: Figure 12.1 – Trace showing bulk record creation
+  id: totrans-124
   prefs: []
   type: TYPE_NORMAL
+  zh: 图 12.1 – 显示批量记录创建的跟踪图
 - en: We see a controller span (`Records`) and then `CreateRecords`, which describes
     a database-and-cache-encompassing operation. It’s a parent of the `BulkWrite`
     span, which describes a MongoDB call and three individual Redis spans – one for
     each record.
+  id: totrans-125
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们看到一个控制器跨度（`Records`）和`CreateRecords`，它描述了一个包括数据库和缓存的操作。它是`BulkWrite`跨度的父级，描述了一个MongoDB调用和三个单独的Redis跨度——每个记录一个。
 - en: Note that the controller and the `CreateRecords` spans end before caching is
     complete, because we don’t wait for it. Anything that happens within the `SetString`
     operation would still be properly correlated despite the parent request being
     complete.
+  id: totrans-126
   prefs: []
   type: TYPE_NORMAL
+  zh: 注意，由于我们不等待它，控制器和`CreateRecords`跨度在缓存完成之前就结束了。因此，在`SetString`操作中发生的任何事情，尽管父请求已完成，仍然会被正确关联。
 - en: 'If we were to wait about 10 seconds and try to get one of the records (by calling
     `http://localhost:5051/records/{id}`), we’d see a trace like the one shown in
     *Figure 12**.2*:'
+  id: totrans-127
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果我们等待大约10秒钟并尝试获取其中一条记录（通过调用`http://localhost:5051/records/{id}`），我们会看到如图*图12.2*所示的跟踪：
 - en: '![Figure 12.2 – Trace showing record retrieval from the database](img/B19423_12_02.jpg)'
+  id: totrans-128
   prefs: []
   type: TYPE_IMG
+  zh: '![图12.2 – 显示从数据库检索记录的跟踪](img/B19423_12_02.jpg)'
 - en: Figure 12.2 – Trace showing record retrieval from the database
+  id: totrans-129
   prefs: []
   type: TYPE_NORMAL
+  zh: 图12.2 – 显示从数据库检索记录的跟踪
 - en: 'If we get the same record within 10 seconds, we’ll see it’s returned from the
     cache, as shown in *Figure 12**.3*:'
+  id: totrans-130
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果我们在10秒内获取相同的记录，我们会看到它是从缓存中返回的，如图*图12.3*所示：
 - en: "![Figure 12.3 – Trace showing record retrieval from\uFEFF the cache](img/B19423_12_03.jpg)"
+  id: totrans-131
   prefs: []
   type: TYPE_IMG
+  zh: '![图12.3 – 显示从缓存检索记录的跟踪](img/B19423_12_03.jpg)'
 - en: Figure 12.3 – Trace showing record retrieval from the cache
+  id: totrans-132
   prefs: []
   type: TYPE_NORMAL
+  zh: 图12.3 – 显示从缓存检索记录的跟踪
 - en: By looking at individual traces, we can now quickly see whether records were
     retrieved from the cache or the database. We can also find all operations that
     happened across all traces for a specific record using the `app.record.id` attribute
     or write ad hoc queries using the `cache.hit` flag.
+  id: totrans-133
   prefs: []
   type: TYPE_NORMAL
+  zh: 通过查看单个跟踪，我们现在可以快速看到记录是从缓存还是从数据库检索的。我们还可以使用`app.record.id`属性找到特定记录的所有跨跟踪操作，或者使用`cache.hit`标志编写即席查询。
 - en: Let’s now simulate a failure by stopping the Redis container with `$ docker`
     `stop chapter12-redis-1`.
+  id: totrans-134
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在，让我们通过停止Redis容器来模拟一个故障：`$ docker` `stop chapter12-redis-1`。
 - en: If we try to get one of the records again, the application will return the `500
     – Internal Server Error` response. The trace predictably shows that the call to
     Redis failed with `RedisConnectionException`. We might want to change this behavior,
     and if the Redis call fails, retrieve the record from the database.
+  id: totrans-135
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果我们再次尝试获取一条记录，应用程序将返回`500 – Internal Server Error`响应。跟踪可预测地显示Redis调用失败，并抛出`RedisConnectionException`异常。我们可能想要改变这种行为，如果Redis调用失败，则从数据库检索记录。
 - en: 'If we did this, we’d see a trace similar to the one shown in *Figure 12**.4*:'
+  id: totrans-136
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果我们这样做，我们会看到类似于*图12.4*所示的跟踪：
 - en: '![Figure 12.4 – Trace showing Redis call failures with fallback to database](img/B19423_12_04.jpg)'
+  id: totrans-137
   prefs: []
   type: TYPE_IMG
+  zh: '![图12.4 – 显示Redis调用失败并回退到数据库的跟踪](img/B19423_12_04.jpg)'
 - en: Figure 12.4 – Trace showing Redis call failures with fallback to database
+  id: totrans-138
   prefs: []
   type: TYPE_NORMAL
+  zh: 图12.4 – 显示Redis调用失败并回退到数据库的跟踪
 - en: Here, calls to Redis failed, but the overall operation succeeded. You can reproduce
     it if you comment out the `throw` statement on line 63 in `CacheService.cs` and
     then rerun the application with `$ docker-compose` `up --build`.
+  id: totrans-139
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这里，对Redis的调用失败了，但整体操作成功了。如果你在`CacheService.cs`的第63行取消注释`throw`语句，然后使用`$ docker-compose`
+    `up --build`重新运行应用程序，你可以重现它。
 - en: Let’s check what happens with metrics in this case. We can start by applying
     some load with `loadgenerator$ dotnet run -c Release --rate 50`. Give it a few
     minutes to stabilize and let’s check our application’s performance.
+  id: totrans-140
   prefs: []
   type: TYPE_NORMAL
+  zh: 让我们检查在这种情况下度量指标会发生什么。我们可以通过运行以下命令来应用一些负载：`loadgenerator$ dotnet run -c Release
+    --rate 50`。给它几分钟时间稳定下来，然后检查我们应用程序的性能。
 - en: 'Let’s first check out the service throughput with the following query in Prometheus
     (at `http://localhost:9090`):'
+  id: totrans-141
   prefs: []
   type: TYPE_NORMAL
+  zh: 让我们首先使用以下查询在Prometheus中检查服务吞吐量（在`http://localhost:9090`）：
 - en: '[PRE11]'
+  id: totrans-142
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE11]'
 - en: As we’ll see in *Figure 12**.6*, throughput stabilizes at around 40-50 requests
     per second – that’s what we configured in the `rate` parameter.
+  id: totrans-143
   prefs: []
   type: TYPE_NORMAL
+  zh: 正如我们在*图12.6*中将要看到的，吞吐量稳定在大约每秒40-50个请求——这正是我们在`rate`参数中配置的。
 - en: 'Then, we can check the 50th percentile for latency with the following query:'
+  id: totrans-144
   prefs: []
   type: TYPE_NORMAL
+  zh: 然后，我们可以使用以下查询检查延迟的第50百分位数：
 - en: '[PRE12]'
+  id: totrans-145
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE12]'
 - en: Later, in *Figure 12**.7*, we’ll see that responses are blazing fast – the 50th
     percentile for latency is just a few milliseconds.
+  id: totrans-146
   prefs: []
   type: TYPE_NORMAL
+  zh: 之后，在*图12.7*中，我们将看到响应速度非常快——延迟的第50百分位数仅为几毫秒。
 - en: Spoiler
+  id: totrans-147
   prefs: []
   type: TYPE_NORMAL
+  zh: 揭示
 - en: If we checked the 95th percentile for latency, we’d notice it is much bigger,
     reaching 200-300 milliseconds. MongoDB shows these spikes in latency because container
     resources are constrained for demo purposes.
+  id: totrans-148
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果我们检查延迟的95百分位数，我们会发现它要大得多，达到200-300毫秒。MongoDB显示这些延迟峰值是因为容器资源在演示目的下受到限制。
 - en: 'Let’s now check the cache hit rate. We can derive it from Redis server metrics
     or a client operation duration histogram. The following query uses the latter
     approach:'
+  id: totrans-149
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在我们来检查缓存命中率。我们可以从Redis服务器指标或客户端操作持续时间直方图中推导它。以下查询使用后者方法：
 - en: '[PRE13]'
+  id: totrans-150
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE13]'
 - en: 'The query gets the rate of the `GetString` operation on Redis with the `cache.hit`
     attribute set to `true` and divides it by the overall `GetString` operation success
     rate. It also multiplies the ratio by 100 to calculate the hit percentage, which
     is around 80%, as we can see in *Figure 12**.5*:'
+  id: totrans-151
   prefs: []
   type: TYPE_NORMAL
+  zh: 该查询获取Redis上`GetString`操作的速率，其中`cache.hit`属性设置为`true`，并将其除以整体`GetString`操作成功率。它还通过乘以比率来计算命中率，该比率约为80%，正如我们在*图12.5*中可以看到的：
 - en: '![Figure 12.5 – Redis hit rate for the GetString method](img/B19423_12_05.jpg)'
+  id: totrans-152
   prefs: []
   type: TYPE_IMG
+  zh: '![图12.5 – GetString方法的Redis命中率](img/B19423_12_05.jpg)'
 - en: Figure 12.5 – Redis hit rate for the GetString method
+  id: totrans-153
   prefs: []
   type: TYPE_NORMAL
+  zh: 图12.5 – GetString方法的Redis命中率
 - en: So, the cache is used and it handles 80% of read requests. Let’s see what happens
     if we stop it with the `$ docker stop` `chapter12-redis-1` command.
+  id: totrans-154
   prefs: []
   type: TYPE_NORMAL
+  zh: 因此，缓存被使用，并且它处理了80%的读请求。让我们看看如果我们使用`$ docker stop chapter12-redis-1`命令停止它会发生什么。
 - en: Tip
+  id: totrans-155
   prefs: []
   type: TYPE_NORMAL
+  zh: 提示
 - en: 'With this exercise, you may find it interesting to explore the effect of recording
     exceptions from Redis. Once the Redis container is stopped, every call to Redis
     will result in an exception being recorded. In the case of our tiny application,
     it alone increases the telemetry volume tenfold. Check it out yourself with the
     following Prometheus query:'
+  id: totrans-156
   prefs: []
   type: TYPE_NORMAL
+  zh: 通过这个练习，你可能会对探索从Redis记录异常的效果感兴趣。一旦Redis容器停止，每次调用Redis都会导致记录一个异常。在我们的小型应用程序中，仅此一项就将遥测量增加了十倍。你可以使用以下Prometheus查询自己检查：
 - en: '[PRE14]'
+  id: totrans-157
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE14]'
 - en: 'Immediately after the Redis container is stopped (at around 14:48), the application
     throughput starts to decrease to less than one record per second, as shown in
     *Figure 12**.6*:'
+  id: totrans-158
   prefs: []
   type: TYPE_NORMAL
+  zh: 在Redis容器停止后立即（大约14:48），应用程序吞吐量开始下降到每秒不到一条记录，如图*图12.6*所示：
 - en: '![Figure 12.6 – Application throughput before and after the Redis container
     is stopped](img/B19423_12_06.jpg)'
+  id: totrans-159
   prefs: []
   type: TYPE_IMG
+  zh: '![图12.6 – Redis容器停止前后应用吞吐量](img/B19423_12_06.jpg)'
 - en: Figure 12.6 – Application throughput before and after the Redis container is
     stopped
+  id: totrans-160
   prefs: []
   type: TYPE_NORMAL
+  zh: 图12.6 – Redis容器停止前后应用吞吐量
 - en: 'HTTP latency (the 50th percentile) increases from a few milliseconds to several
     seconds, as you can see in *Figure 12**.7*:'
+  id: totrans-161
   prefs: []
   type: TYPE_NORMAL
+  zh: HTTP延迟（第50百分位数）从几毫秒增加到几秒，正如你在*图12.7*中可以看到的：
 - en: '![Figure 12.7 – Application latency 50th percentile before and after Redis
     container is stopped](img/B19423_12_07.jpg)'
+  id: totrans-162
   prefs: []
   type: TYPE_IMG
+  zh: '![图12.7 – Redis容器停止前后应用延迟50百分位数](img/B19423_12_07.jpg)'
 - en: Figure 12.7 – Application latency 50th percentile before and after Redis container
     is stopped
+  id: totrans-163
   prefs: []
   type: TYPE_NORMAL
+  zh: 图12.7 – Redis容器停止前后应用延迟50百分位数
 - en: 'The spikes in HTTP latency are consistent with the MongoDB latency increase
     shown in *Figure 12**.8*:'
+  id: totrans-164
   prefs: []
   type: TYPE_NORMAL
+  zh: HTTP延迟的峰值与*图12.8*中显示的MongoDB延迟增加一致：
 - en: '![Figure 12.8 – MongoDB latency (p50) in milliseconds](img/B19423_12_08.jpg)'
+  id: totrans-165
   prefs: []
   type: TYPE_IMG
+  zh: '![图12.8 – 毫秒级的MongoDB延迟（p50）](img/B19423_12_08.jpg)'
 - en: Figure 12.8 – MongoDB latency (p50) in milliseconds
+  id: totrans-166
   prefs: []
   type: TYPE_NORMAL
+  zh: 图12.8 – 毫秒级的MongoDB延迟（p50）
 - en: 'Finally, we should check what happened with MongoDB throughput: since Redis
     no longer handles 80% of read requests, the load on the database increases and,
     initially, it tries to catch up, as you can see in *Figure 12**.9*:'
+  id: totrans-167
   prefs: []
   type: TYPE_NORMAL
+  zh: 最后，我们应该检查MongoDB吞吐量发生了什么：由于Redis不再处理80%的读请求，数据库的负载增加，并且最初它试图赶上，正如你在*图12.9*中可以看到的：
 - en: '![Figure 12.9 – MongoDB throughput before and after the container is stopped](img/B19423_12_09.jpg)'
+  id: totrans-168
   prefs: []
   type: TYPE_IMG
+  zh: '![图12.9 – 容器停止前后MongoDB吞吐量](img/B19423_12_09.jpg)'
 - en: Figure 12.9 – MongoDB throughput before and after the container is stopped
+  id: totrans-169
   prefs: []
   type: TYPE_NORMAL
+  zh: 图12.9 – 容器停止前后MongoDB吞吐量
 - en: The resources on a MongoDB container are significantly constrained and it can’t
     handle such a load.
+  id: totrans-170
   prefs: []
   type: TYPE_NORMAL
+  zh: MongoDB容器上的资源受到显著限制，无法处理这种负载。
 - en: 'If we check the traces, we’ll see the MongoDB call takes significantly longer
     and is the root cause of slow application responses and low throughput. An example
     of such a trace is shown in *Figure 12**.10*:'
+  id: totrans-171
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果我们检查跟踪，我们会看到MongoDB调用明显变长，并且是缓慢的应用程序响应和低吞吐量的根本原因。一个这样的跟踪示例显示在*图12.10*中：
 - en: "![Figure 12.10 – Trace showing \uFEFFa long MongoDB request when Redis is stopped](img/B19423_12_10.jpg)"
+  id: totrans-172
   prefs: []
   type: TYPE_IMG
+  zh: '![图12.10 – 当Redis停止时显示长时间MongoDB请求的跟踪图](img/B19423_12_10.jpg)'
 - en: Figure 12.10 – Trace showing a long MongoDB request when Redis is stopped
+  id: totrans-173
   prefs: []
   type: TYPE_NORMAL
+  zh: 图12.10 – 当Redis停止时显示长时间MongoDB请求的跟踪图
 - en: If you now start Redis with the `$ docker start chapter12-redis-1` command,
     the throughput and latency will be restored to the original values within a few
     minutes.
+  id: totrans-174
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果你现在使用`$ docker start chapter12-redis-1`命令启动Redis，吞吐量和延迟将在几分钟内恢复到原始值。
 - en: We did this analysis knowing the root cause, but it also works as a general
     approach – when service-level indicators such as latency and throughput change
     drastically, we should check the state and health of service dependencies. The
@@ -762,82 +1123,116 @@
     adding a few more (potentially smaller) Redis instances that would handle the
     load if one of them goes down. We may also consider rate-limiting calls to the
     database on the service side, so it stays responsive, even with lower throughput.
+  id: totrans-175
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们在知道根本原因的情况下进行了此分析，但它也作为一个通用方法 – 当服务级别指标如延迟和吞吐量发生剧烈变化时，我们应该检查服务依赖项的状态和健康。这里的发现是我们需要更好地保护数据库，例如，通过添加一些更多（可能更小）的Redis实例，以便在其中一个实例出现故障时处理负载。我们还可以考虑在服务端对数据库调用进行速率限制，以便即使在较低的吞吐量下也能保持响应。
 - en: Summary
+  id: totrans-176
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 摘要
 - en: In this chapter, we explored database instrumentation. We started by looking
     into OpenTelemetry semantic conventions for databases and implemented tracing
     for MongoDB. Then, we added similar instrumentation for Redis and encompassing
     calls. We saw how to provide application-specific context on encompassing spans
     and record whether data was retrieved from the cache or database to improve performance
     analysis across traces.
+  id: totrans-177
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本章中，我们探讨了数据库监控。我们首先研究了OpenTelemetry数据库语义约定，并为MongoDB实现了跟踪。然后，我们添加了类似的监控对Redis和包含调用。我们看到了如何在包含跨度上提供特定于应用程序的上下文，并记录数据是从缓存还是数据库检索的，以改善跨跟踪的性能分析。
 - en: Then, we added metrics, including client duration histograms for MongoDB and
     Redis along with server-side metrics for Redis that help analyze and optimize
     cache usage, starting with the hit ratio, which we were able to measure.
+  id: totrans-178
   prefs: []
   type: TYPE_NORMAL
+  zh: 然后，我们添加了指标，包括MongoDB和Redis的客户端持续时间直方图以及Redis的服务端指标，这些指标有助于分析和优化缓存使用，从命中率开始，我们能够对其进行测量。
 - en: Finally, we simulated a Redis outage and saw how collecting telemetry makes
     it easy to detect and analyze what went wrong and how the outage progressed. We
     also found several issues in our application that make it unreliable.
+  id: totrans-179
   prefs: []
   type: TYPE_NORMAL
+  zh: 最后，我们模拟了Redis故障，并看到了如何通过收集遥测数据使检测和分析故障原因以及故障进展变得容易。我们还发现了我们应用程序中的几个问题，使其变得不可靠。
 - en: Now you’re ready to start instrumenting database calls in your application or
     enrich auto-collected telemetry with additional traces and metrics.
+  id: totrans-180
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在你可以开始在你的应用程序中监控数据库调用，或者通过添加额外的跟踪和指标来丰富自动收集的遥测数据。
 - en: This concludes our journey through instrumentation recipes. In the next chapter,
     we’ll talk about organizational aspects of adopting and evolving tracing and observability.
+  id: totrans-181
   prefs: []
   type: TYPE_NORMAL
+  zh: 这标志着我们通过监控配方之旅的结束。在下一章中，我们将讨论采用和演进跟踪和可观察性的组织方面。
 - en: Questions
+  id: totrans-182
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 问题
 - en: How would you approach instrumenting a database change feed (the event stream
     exposed by the database that notifies about changes to database records)? For
     example, an application can subscribe to a notification that the cloud provider
     will send when a blob is created, updated, or removed from cloud storage (which
     we can consider to be a database).
+  id: totrans-183
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 你会如何监控数据库更改流（数据库暴露的事件流，用于通知数据库记录的变化）？例如，一个应用程序可以订阅云提供商发送的通知，当云存储中的blob被创建、更新或删除时（我们可以将其视为数据库）。
 - en: Would it make sense to record calls to Redis as events/logs instead of spans?
+  id: totrans-184
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 记录Redis调用为事件/日志而不是跨度是否有意义？
 - en: Try removing resource limitations on the MongoDB container and check what happens
     if we kill Redis now.
+  id: totrans-185
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 尝试移除MongoDB容器的资源限制，并检查如果我们现在杀死Redis会发生什么。
 - en: 'Part 4: Implementing Distributed Tracing in Your Organization'
+  id: totrans-186
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 第4部分：在您的组织中实现分布式跟踪
 - en: This part walks through the sociotechnical aspects of observability adoption
     – making an initial push and improving it further, developing telemetry standards
     within your company, and instrumenting new parts of a system in the presence of
     legacy services.
+  id: totrans-187
   prefs: []
   type: TYPE_NORMAL
+  zh: 本部分概述了可观察性采用的社技术方面 – 进行初步推动并进一步改进，在公司内部开发遥测标准，以及在存在遗留服务的情况下监控系统的新的部分。
 - en: 'This part has the following chapters:'
+  id: totrans-188
   prefs: []
   type: TYPE_NORMAL
+  zh: 本部分包含以下章节：
 - en: '[*Chapter 13*](B19423_13.xhtml#_idTextAnchor206), *Driving Change*'
+  id: totrans-189
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '[*第13章*](B19423_13.xhtml#_idTextAnchor206), *推动变革*'
 - en: '[*Chapter 14*](B19423_14.xhtml#_idTextAnchor220), *Creating Your Own Conventions*'
+  id: totrans-190
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '[*第14章*](B19423_14.xhtml#_idTextAnchor220), *创建您自己的约定*'
 - en: '[*Chapter 15*](B19423_15.xhtml#_idTextAnchor233), *Instrumenting Brownfield
     Applications*'
+  id: totrans-191
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '[*第15章*](B19423_15.xhtml#_idTextAnchor233), *对现有应用进行配置*'

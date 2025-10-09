@@ -1,479 +1,724 @@
 - en: '6'
+  id: totrans-0
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: '6'
 - en: Tracing Your Code
+  id: totrans-1
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 跟踪您的代码
 - en: In the previous chapters, we talked about instrumentation libraries and learned
     how to use auto-collected telemetry to monitor and debug distributed systems.
     Auto-instrumentations, when available, provide necessary and reasonable coverage
     for network calls, but you may want to trace additional logical operations, I/Os,
     sockets, or other calls that don’t have shared instrumentation available.
+  id: totrans-2
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前面的章节中，我们讨论了仪器库，并学习了如何使用自动收集的遥测来监控和调试分布式系统。自动仪器化，当可用时，为网络调用提供必要的合理覆盖，但您可能希望跟踪额外的逻辑操作、I/O、套接字或其他没有共享仪器可用的调用。
 - en: This chapter provides an in-depth guide to manual tracing using the `System.Diagnostics`
     primitives or the OpenTelemetry API and explains the mechanism behind auto-instrumentation.
     We will cover the `Activity` properties and how to populate them and show you
     how to record events. We’ll then learn how to use links to represent complex relationships
     between spans. Finally, we’ll cover the testing aspects of instrumentation.
+  id: totrans-3
   prefs: []
   type: TYPE_NORMAL
+  zh: 本章提供了使用 `System.Diagnostics` 原语或 OpenTelemetry API 进行手动跟踪的深入指南，并解释了自动仪器化背后的机制。我们将涵盖
+    `Activity` 属性以及如何填充它们，并展示如何记录事件。然后，我们将学习如何使用链接来表示跨度之间的复杂关系。最后，我们将涵盖仪器的测试方面。
 - en: 'You’ll learn how to do the following:'
+  id: totrans-4
   prefs: []
   type: TYPE_NORMAL
+  zh: 您将学习如何执行以下操作：
 - en: Create activities using the .NET API or with the OpenTelemetry API shim
+  id: totrans-5
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 使用 .NET API 或 OpenTelemetry API 适配器创建活动
 - en: Use ambient context propagation with `Activity.Current` and understand its limitations
+  id: totrans-6
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 使用 `Activity.Current` 进行环境上下文传播并了解其限制
 - en: Use `ActivityEvent` and understand when to use logs instead
+  id: totrans-7
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 使用 `ActivityEvent` 并了解何时使用日志
 - en: Represent complex relationships between traces with links
+  id: totrans-8
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 使用链接表示跟踪之间的复杂关系
 - en: Validate your instrumentations
+  id: totrans-9
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 验证您的仪器
 - en: By the end of this chapter, you should be able to cover your application needs
     with manual tracing.
+  id: totrans-10
   prefs: []
   type: TYPE_NORMAL
+  zh: 到本章结束时，您应该能够使用手动跟踪来满足您的应用程序需求。
 - en: Technical requirements
+  id: totrans-11
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 技术要求
 - en: The code for this chapter can be found in this book’s GitHub repository at [https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/tree/main/chapter6](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/tree/main/chapter6).
+  id: totrans-12
   prefs: []
   type: TYPE_NORMAL
+  zh: 本章的代码可以在本书的 GitHub 仓库中找到：[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/tree/main/chapter6](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/tree/main/chapter6)。
 - en: 'We’ll need the following tools for it:'
+  id: totrans-13
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们需要以下工具来完成这项工作：
 - en: NET SDK 7.0 or newer
+  id: totrans-14
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: NET SDK 7.0 或更高版本
 - en: Visual Studio or Visual Studio Code with C# development setup is recommended,
     but any text editor will work
+  id: totrans-15
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 推荐使用带有 C# 开发设置的 Visual Studio 或 Visual Studio Code，但任何文本编辑器都可以工作
 - en: Docker
+  id: totrans-16
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: Docker
 - en: 'If you want to explore traces from sample applications in Jaeger, you can run
     it with the following command:'
+  id: totrans-17
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果您想探索 Jaeger 中的示例应用程序的跟踪，可以使用以下命令运行它：
 - en: '[PRE0]'
+  id: totrans-18
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE0]'
 - en: Tracing with System.Diagnostics or the OpenTelemetry API shim
+  id: totrans-19
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 使用 System.Diagnostics 或 OpenTelemetry API 适配器进行跟踪
 - en: 'As we saw in the previous chapters, distributed tracing in .NET relies on primitives
     in the `System.Diagnostics` namespace: `Activity` and `ActivitySource`. They’re
     used by HTTP Client and ASP.NET Core instrumentations.'
+  id: totrans-20
   prefs: []
   type: TYPE_NORMAL
+  zh: 正如我们在前面的章节中看到的，.NET 中的分布式跟踪依赖于 `System.Diagnostics` 命名空间中的原语：`Activity` 和 `ActivitySource`。它们被
+    HTTP 客户端和 ASP.NET Core 仪器化所使用。
 - en: 'The terminology used by .NET and OpenTelemetry is different: `Activity` represents
     the OpenTelemetry span, `ActivitySource` maps to the tracer, and tags map to attributes.'
+  id: totrans-21
   prefs: []
   type: TYPE_NORMAL
+  zh: .NET 和 OpenTelemetry 使用的术语不同：`Activity` 代表 OpenTelemetry 跨度，`ActivitySource`
+    映射到跟踪器，而标签映射到属性。
 - en: The `OpenTelemetry.Api` NuGet package also provides `TelemetrySpan`, `Tracer`,
     and several more auxiliary classes in the `OpenTelemetry.Trace` namespace. These
     APIs are a **shim** over .NET tracing APIs – a thin wrapper that does not provide
     any additional functionality on top of .NET tracing APIs.
+  id: totrans-22
   prefs: []
   type: TYPE_NORMAL
+  zh: '`OpenTelemetry.Api` NuGet 包还提供了 `TelemetrySpan`、`Tracer` 以及 `OpenTelemetry.Trace`
+    命名空间中的几个辅助类。这些 API 是 .NET 跟踪 API 的 **适配器** – 一个不提供任何额外功能的薄层包装，它不会在 .NET 跟踪 API
+    上提供任何额外功能。'
 - en: You are probably wondering which one you should use. The rule of thumb is to
     use .NET APIs unless you want to stick to OpenTelemetry terminology. Shim is just
     an additional layer, which brings a small performance overhead.
+  id: totrans-23
   prefs: []
   type: TYPE_NORMAL
+  zh: 您可能想知道应该使用哪一个。一般来说，除非您想坚持使用 OpenTelemetry 术语，否则应使用 .NET API。适配器只是一个额外的层，它带来了一点点性能开销。
 - en: Tracing with System.Diagnostics
+  id: totrans-24
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 使用 System.Diagnostics 进行跟踪
 - en: Let’s say we want to instrument an operation – for example, a method that processes
     a work item. It might break down into smaller, potentially auto-instrumented operations
     such as HTTP requests. In this case, spans describing individual requests won’t
     show us the overall duration and result of processing, so we need to create a
     new logical `Activity` to describe it.
+  id: totrans-25
   prefs: []
   type: TYPE_NORMAL
+  zh: 假设我们想要仪器化一个操作——例如，一个处理工作项的方法。它可能分解为更小的、可能自动仪器化的操作，如 HTTP 请求。在这种情况下，描述单个请求的跨度不会显示处理的整体持续时间和结果，因此我们需要创建一个新的逻辑
+    `Activity` 来描述它。
 - en: 'Activities should be created from `ActivitySource`, which notifies OpenTelemetry
     and other potential listeners about them. Using this approach, we can instrument
     our work processing operation with the following code:'
+  id: totrans-26
   prefs: []
   type: TYPE_NORMAL
+  zh: 活动应该从 `ActivitySource` 创建，它会通知 OpenTelemetry 和其他潜在监听器有关它们的信息。使用这种方法，我们可以使用以下代码对我们的工作处理操作进行仪器化：
 - en: Worker.cs
+  id: totrans-27
   prefs: []
   type: TYPE_NORMAL
+  zh: Worker.cs
 - en: '[PRE1]'
+  id: totrans-28
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE1]'
 - en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/tracing-with-net/Worker.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/tracing-with-net/Worker.cs)'
+  id: totrans-29
   prefs: []
   type: TYPE_NORMAL
+  zh: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/tracing-with-net/Worker.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/tracing-with-net/Worker.cs)'
 - en: In this example, the actual processing happens in the `DoWorkImpl` method. We
     created a new activity before calling into this method and implicitly ended it.
     If the method throws an exception, we set the status of the activity to `Error`
     while providing an exception message in the description. The activity is disposed
     of (and ended) when control leaves the scope, but we could also call the `Activity.Stop`
     method to stop it explicitly.
+  id: totrans-30
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这个例子中，实际的处理发生在 `DoWorkImpl` 方法中。我们在调用此方法之前创建了一个新的活动，并隐式地结束了它。如果该方法抛出异常，我们将活动的状态设置为
+    `Error`，并在描述中提供异常消息。当控制离开作用域时，活动将被处置（并结束），但我们也可以调用 `Activity.Stop` 方法来显式停止它。
 - en: We created `ActivitySource` as a static singleton here since we’re assuming
     we need it for the application’s lifetime. If you decide to make it an instance
     variable and tie its lifetime to some long-living client or service in your application,
     make sure to dispose of it.
+  id: totrans-31
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们在这里创建 `ActivitySource` 作为静态单例，因为我们假设我们需要它在应用程序的生命周期内使用。如果你决定将其作为实例变量，并将其生命周期绑定到你的应用程序中的某个长期存在的客户端或服务，请确保将其处置掉。
 - en: The only thing we configured in this example is the `Activity` name – we passed
     `DoWork` to the `ActivitySource.StartActivity` method.
+  id: totrans-32
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这个例子中，我们唯一配置的是 `Activity` 名称——我们将 `DoWork` 传递给 `ActivitySource.StartActivity`
+    方法。
 - en: Note
+  id: totrans-33
   prefs: []
   type: TYPE_NORMAL
+  zh: 注意
 - en: The activity returned by `ActivitySource.StartActivity` is nullable. It can
     be null if there are no listeners for this source, or if the listener sampled
     out this activity in a specific way by returning `ActivitySamplingResult.None`.
+  id: totrans-34
   prefs: []
   type: TYPE_NORMAL
+  zh: 由 `ActivitySource.StartActivity` 返回的活动是可空的。如果没有为此源设置监听器，或者监听器以返回 `ActivitySamplingResult.None`
+    的方式以特定方式采样此活动，则它可以是 null。
 - en: We’ll learn more about APIs in a moment, but first, let’s learn how to export
     generated activities.
+  id: totrans-35
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们将在稍后了解更多关于 API 的内容，但首先，让我们学习如何导出生成的活动。
 - en: Exporting activities with OpenTelemetry
+  id: totrans-36
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 使用 OpenTelemetry 导出活动
 - en: 'So far, we have used the `OpenTelemetry.Extensions.Hosting` NuGet package to
     configure OpenTelemetry in ASP.NET Core applications. Here, we’re going to use
     plain OpenTelemetry SDK configuration, which still looks quite similar to what
     we saw in [*Chapter 5*](B19423_05.xhtml#_idTextAnchor083), *Configuration and*
     *Control Plane*:'
+  id: totrans-37
   prefs: []
   type: TYPE_NORMAL
+  zh: 到目前为止，我们已经使用 `OpenTelemetry.Extensions.Hosting` NuGet 包在 ASP.NET Core 应用程序中配置了
+    OpenTelemetry。在这里，我们将使用纯 OpenTelemetry SDK 配置，它看起来与我们之前在 [*第 5 章*](B19423_05.xhtml#_idTextAnchor083)
+    中看到的相当相似，*配置和* *控制平面*：
 - en: Program.cs
+  id: totrans-38
   prefs: []
   type: TYPE_NORMAL
+  zh: Program.cs
 - en: '[PRE2]'
+  id: totrans-39
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE2]'
 - en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/tracing-with-net/Program.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/tracing-with-net/Program.cs)'
+  id: totrans-40
   prefs: []
   type: TYPE_NORMAL
+  zh: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/tracing-with-net/Program.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/tracing-with-net/Program.cs)'
 - en: In this example, we’re building the `TracerProvider` instance by setting the
     service name to `activity-sample` and enabling `ActivitySource` with `Worker`
     – the one we used to create the activity in the previous example. We are also
     using the console exporter along with Jaeger – spans will be exported to both.
+  id: totrans-41
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这个例子中，我们通过将服务名称设置为 `activity-sample` 并启用 `ActivitySource`（我们在上一个示例中用它来创建活动）来构建
+    `TracerProvider` 实例。我们还在使用控制台导出器的同时使用 Jaeger – 跨度将被导出到两者中。
 - en: OpenTelemetry needs explicit configuration to listen to `ActivitySource`, but
     you can enable a group of them with wildcards, as we saw in [*Chapter 3*](B19423_03.xhtml#_idTextAnchor052),
     *The .NET* *Observability Ecosystem*.
+  id: totrans-42
   prefs: []
   type: TYPE_NORMAL
+  zh: OpenTelemetry 需要显式配置以监听 `ActivitySource`，但您可以使用通配符启用一组它们，正如我们在 [*第 3 章*](B19423_03.xhtml#_idTextAnchor052)
+    中所看到的，*The .NET* *Observability Ecosystem*。
 - en: 'Let’s run these examples using the following command:'
+  id: totrans-43
   prefs: []
   type: TYPE_NORMAL
+  zh: 让我们使用以下命令运行这些示例：
 - en: '[PRE3]'
+  id: totrans-44
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE3]'
 - en: 'We should see `Activity` exported to the console:'
+  id: totrans-45
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们应该看到 `Activity` 被导出到控制台：
 - en: '[PRE4]'
+  id: totrans-46
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE4]'
 - en: When we configure OpenTelemetry to listen to the `Worker` source, it leverages
     the `System.Diagnostics.ActivityListener` primitive. If you use OpenTelemetry,
     you probably won’t need to use the listener directly, but you may still find it
     useful for testing purposes or when debugging instrumentation issues. Let’s see
     how it works.
+  id: totrans-47
   prefs: []
   type: TYPE_NORMAL
+  zh: 当我们配置 OpenTelemetry 以监听 `Worker` 源时，它利用了 `System.Diagnostics.ActivityListener`
+    原语。如果您使用 OpenTelemetry，您可能不需要直接使用监听器，但您可能仍然会发现它在测试目的或调试仪表问题时很有用。让我们看看它是如何工作的。
 - en: Listening to activities with ActivityListener
+  id: totrans-48
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 使用 ActivityListener 监听活动
 - en: '`ActivityListener` allows us to subscribe to any `ActivitySource` instance
     using its name and get notifications when activities created by one of the enabled
     sources start or end. The following example shows how to write a listener:'
+  id: totrans-49
   prefs: []
   type: TYPE_NORMAL
+  zh: '`ActivityListener` 允许我们通过其名称订阅任何 `ActivitySource` 实例，并在由启用源创建的活动开始或结束时接收通知。以下示例展示了如何编写一个监听器：'
 - en: Program.cs
+  id: totrans-50
   prefs: []
   type: TYPE_NORMAL
+  zh: Program.cs
 - en: '[PRE5]'
+  id: totrans-51
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE5]'
 - en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/tracing-with-net/Program.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/tracing-with-net/Program.cs)'
+  id: totrans-52
   prefs: []
   type: TYPE_NORMAL
+  zh: '[Modern Distributed Tracing in .NET](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/tracing-with-net/Program.cs)'
 - en: Here, we’re subscribing to `ActivitySource` with `Worker` and specifying that
     we sample in all activities. When `Activity` ends, we call our `PrintActivity`
     method. We could also provide the `ActivityStarted` callback when needed.
+  id: totrans-53
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这里，我们通过 `Worker` 订阅 `ActivitySource` 并指定我们在所有活动中进行采样。当 `Activity` 结束时，我们调用我们的
+    `PrintActivity` 方法。我们也可以在需要时提供 `ActivityStarted` 回调。
 - en: 'So, let’s go ahead and run this sample with this command:'
+  id: totrans-54
   prefs: []
   type: TYPE_NORMAL
+  zh: 因此，让我们使用以下命令运行此示例：
 - en: '[PRE6]'
+  id: totrans-55
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE6]'
 - en: 'You should see something like this:'
+  id: totrans-56
   prefs: []
   type: TYPE_NORMAL
+  zh: 您应该看到类似以下内容：
 - en: '[PRE7]'
+  id: totrans-57
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE7]'
 - en: Now that you know how OpenTelemetry and `ActivitySource` work together, it’s
     time to explore other tracing APIs.
+  id: totrans-58
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在您已经了解了 OpenTelemetry 和 `ActivitySource` 如何协同工作，是时候探索其他跟踪 API 了。
 - en: Starting activities
+  id: totrans-59
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 开始活动
 - en: The `ActivitySource` class defines several `CreateActivity` and `StartActivity`
     method overloads.
+  id: totrans-60
   prefs: []
   type: TYPE_NORMAL
+  zh: '`ActivitySource` 类定义了多个 `CreateActivity` 和 `StartActivity` 方法重载。'
 - en: 'Calling into `StartActivity` is equivalent to calling `CreateActivity` and
     then starting it later with the `Activity.Start` method:'
+  id: totrans-61
   prefs: []
   type: TYPE_NORMAL
+  zh: 调用 `StartActivity` 等同于调用 `CreateActivity` 并稍后使用 `Activity.Start` 方法启动它：
 - en: '[PRE8]'
+  id: totrans-62
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE8]'
 - en: The `Start` methods generate a new span ID, capture the start time, and populate
     the ambient context via the `Activity.Current` property. `Activity` can’t be used
     until it’s started. So, in most cases, the `StartActivity` method is the easiest
     choice and `CreateActivity` might only be useful if you want to construct an activity
     instance but start it later.
+  id: totrans-63
   prefs: []
   type: TYPE_NORMAL
+  zh: '`Start` 方法生成一个新的 span ID，捕获开始时间，并通过 `Activity.Current` 属性填充环境上下文。`Activity`
+    在启动之前不能使用。因此，在大多数情况下，`StartActivity` 方法是最简单选择，而 `CreateActivity` 可能仅在你想要构造一个活动实例但稍后启动它时有用。'
 - en: Note
+  id: totrans-64
   prefs: []
   type: TYPE_NORMAL
+  zh: 注意
 - en: Sampling callback happens during activity creation, so you must pass all properties
     that affect the sampling decision to the `StartActivity` or `CreateActivity` method.
+  id: totrans-65
   prefs: []
   type: TYPE_NORMAL
+  zh: 采样回调发生在活动创建期间，因此您必须将影响采样决策的所有属性传递给 `StartActivity` 或 `CreateActivity` 方法。
 - en: 'Here are the start time properties:'
+  id: totrans-66
   prefs: []
   type: TYPE_NORMAL
+  zh: 这里是开始时间属性：
 - en: '`Internal`, indicating local or logical operation. `Client` and `Server` spans
     describe the client and server side of synchronous remote calls such as HTTP requests.
     Similarly, the `Producer` and `Consumer` spans describe corresponding sides of
     asynchronous operations, such as asynchronous messaging.'
+  id: totrans-67
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`Internal` 表示本地或逻辑操作。`Client` 和 `Server` span 描述了同步远程调用（如 HTTP 请求）的客户端和服务器端。同样，`Producer`
+    和 `Consumer` span 描述了异步操作（如异步消息）的相应端。'
 - en: Observability backends rely on span kinds for visualizations such as service
     maps and semi-automated performance analysis.
+  id: totrans-68
   prefs: []
   type: TYPE_NORMAL
+  zh: 可观察性后端依赖于 span 类型进行可视化，例如服务图和半自动化的性能分析。
 - en: '`ActivityContext` struct. This is usually based on the W3C Trace Context standard
     for HTTP and might be different for other protocols. `ActivityContext` contains
     the trace ID, span ID, trace flags, and trace state.'
+  id: totrans-69
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`ActivityContext` 结构体。这通常基于 W3C Trace Context 标准（适用于 HTTP）并可能对其他协议有所不同。`ActivityContext`
+    包含跟踪 ID、跨度 ID、跟踪标志和跟踪状态。'
 - en: Another option is to pass the `traceparent` value in W3C Trace Context format
     to the `StartActivity` method as a string. You can set `tracestate` later after
     the activity starts, but then, of course, you won’t be able to use it to make
     sampling decisions.
+  id: totrans-70
   prefs: []
   type: TYPE_NORMAL
+  zh: 另一个选项是将 W3C Trace Context 格式的 `traceparent` 值作为字符串传递给 `StartActivity` 方法。活动启动后，您可以稍后设置
+    `tracestate`，但当然，您将无法使用它来做出采样决策。
 - en: If the parent context is not provided, `Activity.Current` is used.
+  id: totrans-71
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果未提供父上下文，则使用 `Activity.Current`。
 - en: '`Activity` starts and should affect sampling decisions. If you don’t use attributes
     to make head-based sampling decisions, it’s best not to populate them and minimize
     the performance overhead for sampled-out activities.'
+  id: totrans-72
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`Activity` 启动并应影响采样决策。如果您不使用属性来做出基于头的采样决策，最好不填充它们，并最小化采样活动性能开销。'
 - en: '**Links**: Links can correlate different traces and represent relationships
     between spans other than parent-child ones. We’ll learn more about them later
     in this chapter.'
+  id: totrans-73
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**链接**：链接可以关联不同的跟踪，并代表跨度之间的关系，而不仅仅是父子关系。我们将在本章后面了解更多关于它们的内容。'
 - en: '`Activity` starts.'
+  id: totrans-74
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`Activity` 启动。'
 - en: '`Activity` also supports custom trace context formats – for example, legacy
     hierarchical ones.'
+  id: totrans-75
   prefs: []
   type: TYPE_NORMAL
+  zh: '`Activity` 也支持自定义跟踪上下文格式——例如，传统的分层格式。'
 - en: After `Activity` starts, we can always add more attributes, change the start
     and end times, update the sampling decision, set `tracestate`, and record events.
+  id: totrans-76
   prefs: []
   type: TYPE_NORMAL
+  zh: 在 `Activity` 启动后，我们可以随时添加更多属性，更改开始和结束时间，更新采样决策，设置 `tracestate`，并记录事件。
 - en: 'Before adding new events or attribute, make sure to check the `IsAllDataRequested`
     flag, which specifies whether the activity has been sampled. We can use it to
     minimize the performance impact of the instrumentation by guarding any expensive
     operations:'
+  id: totrans-77
   prefs: []
   type: TYPE_NORMAL
+  zh: 在添加新事件或属性之前，请确保检查 `IsAllDataRequested` 标志，该标志指定活动是否已被采样。我们可以使用它通过保护任何昂贵的操作来最小化仪表化的性能影响：
 - en: StartSamples.cs
+  id: totrans-78
   prefs: []
   type: TYPE_NORMAL
+  zh: StartSamples.cs
 - en: '[PRE9]'
+  id: totrans-79
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE9]'
 - en: https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/tracing-with-net/StartSamples.cs
+  id: totrans-80
   prefs: []
   type: TYPE_NORMAL
+  zh: https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/tracing-with-net/StartSamples.cs
 - en: The `Activity` and `ActivitySource` APIs are the foundation for any instrumentation.
     We’ll cover additional APIs allowing to populate events and links later in this
     chapter and see more examples throughout the rest of this book. For now, let’s
     take a quick look at how we can use the OpenTelemetry API shim.
+  id: totrans-81
   prefs: []
   type: TYPE_NORMAL
+  zh: '`Activity` 和 `ActivitySource` API 是任何仪表化的基础。我们将在本章后面介绍允许填充事件和链接的附加 API，并在本书的其余部分提供更多示例。现在，让我们快速看一下如何使用
+    OpenTelemetry API shim。'
 - en: Tracing with the OpenTelemetry API shim
+  id: totrans-82
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 使用 OpenTelemetry API shim 进行跟踪
 - en: The OpenTelemetry API shim does not provide any additional features on top of
     .NET APIs; it only aligns terminology with OpenTelemetry. If you use OpenTelemetry
     in other languages, then it might be more appealing to you. If you decide to go
     down this path, keep in mind that the behavior of `Tracer` and `Span` matches
     `ActivitySource` and `Activity`. For example, this means that you still have to
     enable each tracer when configuring OpenTelemetry.
+  id: totrans-83
   prefs: []
   type: TYPE_NORMAL
+  zh: OpenTelemetry API shim 在 .NET API 之上不提供任何附加功能；它仅将术语与 OpenTelemetry 对齐。如果您在其他语言中使用
+    OpenTelemetry，那么它可能对您更有吸引力。如果您决定走这条路，请记住，`Tracer` 和 `Span` 的行为与 `ActivitySource`
+    和 `Activity` 相匹配。例如，这意味着您仍然需要在配置 OpenTelemetry 时启用每个追踪器。
 - en: 'Let’s repeat our processing instrumentation using the `Tracer` and `TelemetrySpan`
     classes:'
+  id: totrans-84
   prefs: []
   type: TYPE_NORMAL
+  zh: 让我们重复使用 `Tracer` 和 `TelemetrySpan` 类来对我们的处理仪表化进行操作：
 - en: Worker.cs
+  id: totrans-85
   prefs: []
   type: TYPE_NORMAL
+  zh: Worker.cs
 - en: '[PRE10]'
+  id: totrans-86
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE10]'
 - en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/tracing-with-shim/Worker.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/tracing-with-shim/Worker.cs)'
+  id: totrans-87
   prefs: []
   type: TYPE_NORMAL
+  zh: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/tracing-with-shim/Worker.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/tracing-with-shim/Worker.cs)'
 - en: 'The overall flow is the same: we create an instance of `Tracer` instead of
     `ActivitySource`, then use it to create a span. Adding attributes and setting
     the status is done similarly to the `ActivitySource` example.'
+  id: totrans-88
   prefs: []
   type: TYPE_NORMAL
+  zh: 整体流程是相同的：我们创建一个 `Tracer` 实例而不是 `ActivitySource`，然后使用它来创建一个跨度。添加属性和设置状态的方式与 `ActivitySource`
+    示例类似。
 - en: If we were to look under the hood of `Tracer` and `TelemetrySpan`, we’d see
     that they fully rely on `ActivitySource` and `Activity`. As a result, enabling
     this instrumentation and enriching and customizing it is the same as enabling
     an `ActivitySource`-based one – it’s done by using the `AddSource` method on `TracerProviderBuilder`
     (the source name matches the tracer name).
+  id: totrans-89
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果我们要查看`Tracer`和`TelemetrySpan`的内部，我们会看到它们完全依赖于`ActivitySource`和`Activity`。因此，启用此仪表化和丰富以及自定义它与启用基于`ActivitySource`的仪表化相同——这是通过在`TracerProviderBuilder`上使用`AddSource`方法来完成的（源名称与跟踪器名称匹配）。
 - en: 'Even though the APIs look similar, there are a few important differences:'
+  id: totrans-90
   prefs: []
   type: TYPE_NORMAL
+  zh: 尽管API看起来很相似，但有一些重要的区别：
 - en: Spans are not nullable. You always get an instance of a span, even if there
     is no listener to the underlying `ActivitySource` (but then it’s an optimized,
     inoperative instance).
+  id: totrans-91
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: Span不是可空的。你总是得到一个Span的实例，即使没有监听底层的`ActivitySource`（但那时它是一个优化后的、不可操作的实例）。
 - en: All operations on spans are internally guarded with the `TelemetrySpan.IsRecording`
     flag, which is equivalent to the `activity?.IsAllDataRequested == true` check.
     However, it could still be useful to guard expensive operations to calculate attribute
     values and other span properties behind the `IsRecording` flag.
+  id: totrans-92
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 所有对Span的操作都由`TelemetrySpan.IsRecording`标志内部保护，该标志等同于`activity?.IsAllDataRequested
+    == true`检查。然而，在`IsRecording`标志后面保护计算属性值和其他Span属性等昂贵的操作可能仍然很有用。
 - en: Spans are not active (that is, current) by default. While you can’t start an
     activity without making it current, that’s not the case for `TelemetrySpan`. You
     probably noticed that we used the `Tracer.StartActiveSpan` method for the `DoWork`
     span, which populates `Activity.Current`.
+  id: totrans-93
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: Span默认不是活动的（即，当前的）。虽然你不能在没有使其成为当前的情况下启动一个活动，但对于`TelemetrySpan`来说并非如此。你可能已经注意到，我们在`DoWork`
+    Span中使用了`Tracer.StartActiveSpan`方法，它填充了`Activity.Current`。
 - en: If we were to use the `Tracer.StartSpan` method, we’d get a started activity,
     but `Activity.Current` would not point to it. To make it current, we could call
     into the `Tracer.WithSpan` method.
+  id: totrans-94
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果我们使用`Tracer.StartSpan`方法，我们会得到一个已启动的活动，但`Activity.Current`不会指向它。为了使其成为当前，我们可以调用`Tracer.WithSpan`方法。
 - en: If we run the previous OpenTelemetry API example with the `tracing-with-otel-api$
     dotnet run` command, we’ll see the same trace as before with plain .NET tracing
     APIs.
+  id: totrans-95
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果我们使用`tracing-with-otel-api$ dotnet run`命令运行之前的OpenTelemetry API示例，我们会看到与之前使用纯.NET跟踪API相同的跟踪。
 - en: Now, let’s see how we can create hierarchies of activities and enrich them using
     ambient context.
+  id: totrans-96
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在，让我们看看我们如何创建活动的层次结构并使用环境上下文来丰富它们。
 - en: Using ambient context
+  id: totrans-97
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 使用环境上下文
 - en: In complex applications, we usually have multiple layers of spans in each trace.
     These spans are emitted by different libraries that are not aware of each other.
     Still, they are correlated because of the ambient context propagated in the `Activity.Current`
     property.
+  id: totrans-98
   prefs: []
   type: TYPE_NORMAL
+  zh: 在复杂的应用程序中，我们通常在每个跟踪中都有多层的Span。这些Span是由不同的库发出的，这些库彼此之间并不知情。然而，由于在`Activity.Current`属性中传播的环境上下文，它们仍然相关联。
 - en: 'Let’s create two layers of activities – we’ll make processing more resilient
     by retrying failed operations and instrumenting tries and the logical `DoWork`
     operation:'
+  id: totrans-99
   prefs: []
   type: TYPE_NORMAL
+  zh: 让我们创建两层活动——我们将通过重试失败的操作并对尝试和逻辑`DoWork`操作进行仪表化来使处理更加健壮：
 - en: Worker.cs
+  id: totrans-100
   prefs: []
   type: TYPE_NORMAL
+  zh: Worker.cs
 - en: '[PRE11]'
+  id: totrans-101
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE11]'
 - en: https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/tracing-with-net/Worker.cs
+  id: totrans-102
   prefs: []
   type: TYPE_NORMAL
+  zh: https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/tracing-with-net/Worker.cs
 - en: 'In this example, we have `workActivity`, which describes the logical operation,
     and `tryActivity`, which describes a try. Let’s run it with the following command:'
+  id: totrans-103
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这个例子中，我们有一个`workActivity`，它描述了逻辑操作，还有一个`tryActivity`，它描述了一个尝试。让我们用以下命令来运行它：
 - en: '[PRE12]'
+  id: totrans-104
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE12]'
 - en: 'Check out the trace in Jaeger at `http://localhost:16686`. You should see something
     similar to the trace shown in *Figure 6**.1*:'
+  id: totrans-105
   prefs: []
   type: TYPE_NORMAL
+  zh: 在Jaeger中查看跟踪，网址为`http://localhost:16686`。你应该看到与*图6.1*中显示的跟踪类似的内容：
 - en: '![Figure 6.1 – Work item processing](img/B19423_06_01.jpg)'
+  id: totrans-106
   prefs: []
   type: TYPE_IMG
+  zh: '![图6.1 – 工作项处理](img/B19423_06_01.jpg)'
 - en: Figure 6.1 – Work item processing
+  id: totrans-107
   prefs: []
   type: TYPE_NORMAL
+  zh: 图6.1 – 工作项处理
 - en: Here, we can see that there were two attempts to process a work item – the first
     one failed with an exception and then the operation succeeded after the second
     try. By looking at this trace, it’s clear why the `DoWork` operation took this
     much time – it was spent between tries.
+  id: totrans-108
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这里，我们可以看到有两个尝试来处理一个工作项——第一个尝试失败并抛出异常，然后在第二次尝试后操作成功。通过查看这个跟踪，可以清楚地了解为什么`DoWork`操作花费了这么多时间——它是在尝试之间花费的。
 - en: Note that we didn’t do anything special to correlate `workActivity` and `tryActivity`.
     This happened because `workActivity` was current when `tryActivity` started –
     since we didn’t provide any parent, it defaulted to the `Activity.Current` instance.
+  id: totrans-109
   prefs: []
   type: TYPE_NORMAL
+  zh: 注意，我们没有对`workActivity`和`tryActivity`进行任何特殊的关联操作。这是因为当`tryActivity`开始时`workActivity`是当前的——因为我们没有提供任何父活动，它默认为`Activity.Current`实例。
 - en: To troubleshoot instrumentation issues, we can always check the parent of `Activity`
     on the started activity by looking at its properties. `Activity.Parent` represents
     an implicit parent. When we start an activity, we can also provide `traceparent`
@@ -483,403 +728,589 @@
     Tracing *Network Calls*. `Activity.ParentId` is the equivalent of the `traceparent`
     header and `Activity.ParentSpanId` represents the `span-id` portion of it. These
     properties are populated if `Activity` has any parent at all.
+  id: totrans-110
   prefs: []
   type: TYPE_NORMAL
+  zh: 要解决工具问题，我们可以通过查看其属性来检查启动活动上的`Activity`的父级。`Activity.Parent`代表一个隐式父级。当我们启动一个活动时，我们也可以显式提供字符串形式的`traceparent`或父`ActivityContext`——在这些情况下，`Parent`属性将为null。你可以在[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/tracing-with-net/StartSamples.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/tracing-with-net/StartSamples.cs)找到一些示例，我们将在[*第10章*](B19423_10.xhtml#_idTextAnchor161)中看到更多关于上下文传播的示例，即*跟踪网络调用*。`Activity.ParentId`等同于`traceparent`头，而`Activity.ParentSpanId`代表它的`span-id`部分。如果`Activity`有任何父级，这些属性将被填充。
 - en: Getting back to our example, what happens if all the tries fail? Should we set
     an error on the `DoWork` activity? Well, we can do this inside the `DoWithRetry`
     method with `Activity.Current?.SetStatus(ActivityStatusCode.Error)`. We can use
     the current activity here because we control when and how the `DoWithRetry` method
     is called.
+  id: totrans-111
   prefs: []
   type: TYPE_NORMAL
+  zh: 回到我们的例子，如果所有尝试都失败了会发生什么？我们是否应该在`DoWork`活动上设置一个错误？嗯，我们可以在`DoWithRetry`方法内部这样做，使用`Activity.Current?.SetStatus(ActivityStatusCode.Error)`。我们可以在这里使用当前活动，因为我们控制着何时以及如何调用`DoWithRetry`方法。
 - en: As a rule of thumb, avoid adding attributes, events, or setting a status on
     `Activity.Current` unless you know for sure it’s the right one. With suppression,
     filtering, or some new activities created in between, `Current` can point to some
     other activity. So, make sure to pass instances of activities within your instrumentations
     explicitly.
+  id: totrans-112
   prefs: []
   type: TYPE_NORMAL
+  zh: 作为一条经验法则，除非你确信它是正确的，否则请避免添加属性、事件或在`Activity.Current`上设置状态。由于抑制、过滤或中间创建的新活动，`Current`可能指向其他活动。所以，请确保在你的工具中显式传递活动实例。
 - en: If you want to enrich an auto-collected `Activity`, accessing the `Current`
     property in one of the enrichment callbacks provided when enabling instrumentation
     should be safe.
+  id: totrans-113
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果你想要丰富一个自动收集的`Activity`，在启用工具时提供的丰富回调中访问`Current`属性应该是安全的。
 - en: Some instrumentations may also provide access to the created `Activity`. For
     example, ASP.NET Core does so with the `IHttpActivityFeature` interface. It’s
     also possible to walk up the activity tree using the `Parent` property to find
     the one you want to enrich.
+  id: totrans-114
   prefs: []
   type: TYPE_NORMAL
+  zh: 一些工具可能也提供了对创建的`Activity`的访问权限。例如，ASP.NET Core通过`IHttpActivityFeature`接口这样做。你也可以使用`Parent`属性向上遍历活动树，以找到你想要丰富的那一个。
 - en: '`Activity.Current` works on top of `AsyncLocal`, so the .NET runtime propagates
     it through asynchronous calls. This does not work with background processing or
     manual manipulations with threads, but you can always pass activities explicitly
     and set the `Activity.Current` value manually as needed.'
+  id: totrans-115
   prefs: []
   type: TYPE_NORMAL
+  zh: '`Activity.Current`是在`AsyncLocal`之上工作的，因此.NET运行时会通过异步调用传播它。这在与后台处理或手动线程操作中不起作用，但你可以始终显式传递活动并手动设置所需的`Activity.Current`值。'
 - en: Now, we know how to create hierarchies of activities and use attributes to describe
     our scenarios. But sometimes, we need something more lightweight, such as events
     – let’s take a closer look at them.
+  id: totrans-116
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在，我们知道如何创建活动层次结构并使用属性来描述我们的场景。但有时，我们需要更轻量级的东西，比如事件——让我们更仔细地看看它们。
 - en: Recording events
+  id: totrans-117
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 记录事件
 - en: Spans describe operations that have a duration and a result, but sometimes,
     creating a span could be too verbose and expensive – for example, for busy socket-level
     communication. Common use cases for events include recording exceptions or individual
     messages in gRPC streaming calls.
+  id: totrans-118
   prefs: []
   type: TYPE_NORMAL
+  zh: Span描述了具有持续时间和结果的操作，但有时创建span可能过于冗长和昂贵 - 例如，对于繁忙的套接字级通信。事件常见的用例包括记录gRPC流调用中的异常或单个消息。
 - en: To represent something that happened at a certain point in time, we should use
     events or logs. In OpenTelemetry, the difference between logs and events is semantical
     – it’s the same data structure with the same over-the-wire format but different
     attributes. For example, logs have mandatory severity, which does not apply to
     events. Events, on the other hand, have mandatory names.
+  id: totrans-119
   prefs: []
   type: TYPE_NORMAL
+  zh: 要表示在某个时间点发生的事情，我们应该使用事件或日志。在OpenTelemetry中，日志和事件之间的区别是语义上的 - 它们是相同的数据结构，具有相同的网络格式，但属性不同。例如，日志有强制性的严重性，这并不适用于事件。另一方面，事件有强制性的名称。
 - en: They are also different in terms of their API and implementation (at least with
     .NET 7.0 and prior versions). In this section, we will explore Activity’s events
     API; we will look at logs in [*Chapter 8*](B19423_08.xhtml#_idTextAnchor131),
     *Writing Structured and* *Correlated Logs*.
+  id: totrans-120
   prefs: []
   type: TYPE_NORMAL
+  zh: 它们在API和实现方面也有所不同（至少在.NET 7.0和之前的版本中）。在本节中，我们将探索Activity的事件API；我们将在[*第8章*](B19423_08.xhtml#_idTextAnchor131)中查看日志，*编写结构化和*
+    *关联日志*。
 - en: When to use events
+  id: totrans-121
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 何时使用事件
 - en: To create an activity event, we need an instance of an activity, which is not
     the case, for example, at startup time.
+  id: totrans-122
   prefs: []
   type: TYPE_NORMAL
+  zh: 要创建一个活动事件，我们需要一个活动实例，但这在例如启动时并不适用。
 - en: Activity events depend on sampling – we can add them to a sampled-out `Activity`,
     but in general, they’ll be dropped along with it.
+  id: totrans-123
   prefs: []
   type: TYPE_NORMAL
+  zh: 活动事件依赖于采样 - 我们可以将它们添加到一个已采样的`Activity`中，但通常情况下，它们会随着它一起被丢弃。
 - en: An event’s lifetime is tightly coupled with the `Activity` instance, so it’ll
     stay in memory until it’s garbage-collected. There is no limit regarding how many
     events you can have on the .NET side, but OpenTelemetry exporters limit the number
     of exported events. It is set to 128 by default and can be controlled with the
     `OTEL_SPAN_ATTRIBUTE_COUNT_LIMIT` environment variable.
+  id: totrans-124
   prefs: []
   type: TYPE_NORMAL
+  zh: 事件的生命周期与`Activity`实例紧密耦合，因此它将保留在内存中，直到被垃圾回收。在.NET侧，你可以有的事件数量没有限制，但OpenTelemetry导出器限制了导出事件的数量。默认设置为128，可以通过`OTEL_SPAN_ATTRIBUTE_COUNT_LIMIT`环境变量来控制。
 - en: Note
+  id: totrans-125
   prefs: []
   type: TYPE_NORMAL
+  zh: 注意
 - en: Activity events should be used to express operations that don’t deserve a span,
     don’t have a duration or are too short, and have a predictable outcome. Events
     must happen in the scope of some `Activity` and should only be exported if `Activity`
     is sampled in. There should also be a reasonable number of them under a single
     `Activity` instance. Given these limitations, logs are usually a better choice,
     as long as your observability backend supports them.
+  id: totrans-126
   prefs: []
   type: TYPE_NORMAL
+  zh: 活动事件应该用来表达那些不值得创建span、没有持续时间或太短，并且有可预测结果的操作。事件必须在某个`Activity`的作用域内发生，并且只有在`Activity`被采样时才应该导出。在单个`Activity`实例下，也应该有合理数量的它们。考虑到这些限制，只要你的可观察性后端支持，日志通常是一个更好的选择。
 - en: Now that we know these limitations, we’re finally ready to play with events.
+  id: totrans-127
   prefs: []
   type: TYPE_NORMAL
+  zh: 既然我们已经知道了这些限制，我们终于可以开始玩转事件了。
 - en: The ActivityEvent API
+  id: totrans-128
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: ActivityEvent API
 - en: An event is represented with the `ActivityEvent` class. To create one, we must
     provide an event name, and can optionally specify a timestamp (that defaults to
     the time the event was constructed), as well as a collection of attributes.
+  id: totrans-129
   prefs: []
   type: TYPE_NORMAL
+  zh: 事件用`ActivityEvent`类表示。要创建一个事件，我们必须提供一个事件名称，并且可以可选地指定一个时间戳（默认为事件构造时的时间），以及一组属性。
 - en: 'The event’s name is a low-cardinality string that implies the event’s structure:
     events with the same name are expected to describe occurrences of the same thing
     and should use the same set of attributes.'
+  id: totrans-130
   prefs: []
   type: TYPE_NORMAL
+  zh: 事件名称是一个低基数字符串，它暗示了事件的结构：具有相同名称的事件预期描述的是同一件事物的发生，并且应该使用相同的属性集。
 - en: Let’s enrich HTTP client instrumentation with events. Imagine that we have read
     a long stream over HTTP and want to control content buffering.
+  id: totrans-131
   prefs: []
   type: TYPE_NORMAL
+  zh: 让我们用事件丰富HTTP客户端的检测。想象一下，我们已经通过HTTP读取了一个长流，并想要控制内容缓冲。
 - en: To achieve this, we can pass the `HttpCompletionOption.ResponseHeadersRead`
     flag to the `HttpClient.SendAsync` method. The HTTP client will then return a
     response before reading the response body. It’s useful to know the point in time
     when we got the response so that we know how long it took to read a response.
+  id: totrans-132
   prefs: []
   type: TYPE_NORMAL
+  zh: 要实现这一点，我们可以将 `HttpCompletionOption.ResponseHeadersRead` 标志传递给 `HttpClient.SendAsync`
+    方法。然后 HTTP 客户端将在读取响应体之前返回响应。了解我们收到响应的时间点很有用，这样我们就可以知道读取响应花费了多长时间。
 - en: 'The following example demonstrates this:'
+  id: totrans-133
   prefs: []
   type: TYPE_NORMAL
+  zh: 以下示例演示了这一点：
 - en: Worker.cs
+  id: totrans-134
   prefs: []
   type: TYPE_NORMAL
+  zh: Worker.cs
 - en: '[PRE13]'
+  id: totrans-135
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE13]'
 - en: https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/events/Worker.cs
+  id: totrans-136
   prefs: []
   type: TYPE_NORMAL
+  zh: https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/events/Worker.cs
 - en: In this example, we start `Activity` to track overall logical request processing
     through the HTTP client pipeline and then record the `response_headers` event.
     This event does not have any attributes – its sole purpose is to record the timestamp
     when we got a response from the server.
+  id: totrans-137
   prefs: []
   type: TYPE_NORMAL
+  zh: 在此示例中，我们通过 HTTP 客户端管道启动 `Activity` 以跟踪整体逻辑请求处理，然后记录 `response_headers` 事件。此事件没有任何属性
+    – 它的唯一目的是记录我们从服务器收到响应的时间戳。
 - en: Let’s add more events! Assuming we use throttling or circuit-breaking in our
     HTTP pipeline, we won’t have any physical HTTP requests and no spans reported
     by auto-instrumentation. Events can provide observability into it.
+  id: totrans-138
   prefs: []
   type: TYPE_NORMAL
+  zh: 让我们添加更多事件！假设我们在 HTTP 管道中使用节流或断路器，我们将不会有任何物理 HTTP 请求，也不会有自动仪表化报告的跨度。事件可以提供对其的可观察性。
 - en: 'We’ll implement client-side throttling using the `RateLimiter` class, which
     is available in .NET 7 and included in the `System.Threading.RateLimiting` NuGet
     package. We’ll do so in the `DelegatingHandler` class, as shown in this example:'
+  id: totrans-139
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们将使用 .NET 7 中可用的 `RateLimiter` 类实现客户端节流，该类包含在 `System.Threading.RateLimiting`
+    NuGet 包中。我们将在 `DelegatingHandler` 类中这样做，如下例所示：
 - en: RateLimitingHandler.cs
+  id: totrans-140
   prefs: []
   type: TYPE_NORMAL
+  zh: RateLimitingHandler.cs
 - en: '[PRE14]'
+  id: totrans-141
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE14]'
 - en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/events/RateLimitingHandler.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/events/RateLimitingHandler.cs)'
+  id: totrans-142
   prefs: []
   type: TYPE_NORMAL
+  zh: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/events/RateLimitingHandler.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/events/RateLimitingHandler.cs)'
 - en: 'Here, we are trying to acquire a lease from the rate limiter. If it’s successfully
     acquired, we call into the `base.SendAsync` method, letting this request process
     further. Otherwise, we must throttle the request, as demonstrated in the following
     code snippet:'
+  id: totrans-143
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这里，我们正在尝试从速率限制器获取租约。如果成功获取，我们将调用 `base.SendAsync` 方法，让此请求进一步处理。否则，我们必须像以下代码片段中所示那样节流请求：
 - en: RateLimitingHandler.cs
+  id: totrans-144
   prefs: []
   type: TYPE_NORMAL
+  zh: RateLimitingHandler.cs
 - en: '[PRE15]'
+  id: totrans-145
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE15]'
 - en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/events/RateLimitingHandler.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/events/RateLimitingHandler.cs)'
+  id: totrans-146
   prefs: []
   type: TYPE_NORMAL
+  zh: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/events/RateLimitingHandler.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/events/RateLimitingHandler.cs)'
 - en: In the `Throttle` method, we emit the `exception` event and provide a message
     alongside the `retry_after` attribute. We got a value of this attribute from the
     rate limiter; it provides a hint regarding when it will make sense to retry this
     request.
+  id: totrans-147
   prefs: []
   type: TYPE_NORMAL
+  zh: 在 `Throttle` 方法中，我们发出 `exception` 事件，并提供与 `retry_after` 属性相关的消息。我们从速率限制器获取了此属性的值；它提供了有关何时重试此请求将是有意义的提示。
 - en: The example in the `events` folder demonstrates a full rate-limiting solution
     – it configures the rate limiter to allow one request every 5 seconds but sends
     two requests in parallel so that the first one comes through and the second one
     is throttled.
+  id: totrans-148
   prefs: []
   type: TYPE_NORMAL
+  zh: '`events` 文件夹中的示例演示了一个完整的速率限制解决方案 – 它配置速率限制器每 5 秒允许一个请求，但并行发送两个请求，以便第一个请求通过，而第二个请求被节流。'
 - en: Go ahead and run the sample with `events$ dotnet run` and then switch to Jaeger
     to see two traces from the `events-sample` service.
+  id: totrans-149
   prefs: []
   type: TYPE_NORMAL
+  zh: 运行示例 `events$ dotnet run`，然后切换到 Jaeger，以查看 `events-sample` 服务发出的两个跟踪。
 - en: 'One trace has two spans and represents a successful operation, as shown in
     *Figure 6**.2*:'
+  id: totrans-150
   prefs: []
   type: TYPE_NORMAL
+  zh: 一个跟踪有两个跨度，代表一个成功的操作，如图 *6**.2* 所示：
 - en: '![Figure 6.2 – A trace with logical and physical HTTP spans and the response_headers
     event](img/B19423_06_02.jpg)'
+  id: totrans-151
   prefs: []
   type: TYPE_IMG
+  zh: '![图 6.2 – 带有逻辑和物理 HTTP 跨度和 response_headers 事件的跟踪](img/B19423_06_02.jpg)'
 - en: Figure 6.2 – A trace with logical and physical HTTP spans and the response_headers
     event
+  id: totrans-152
   prefs: []
   type: TYPE_NORMAL
+  zh: 图 6.2 – 带有逻辑和物理 HTTP 跨度和 response_headers 事件的跟踪
 - en: Here, we can see that the time to first byte was around 110 milliseconds. Then,
     we got the `response_headers` event; the rest of the logical `DoWork` operation
     was spent on reading stream contents.
+  id: totrans-153
   prefs: []
   type: TYPE_NORMAL
+  zh: 这里，我们可以看到第一个字节的传输时间大约为110毫秒。然后，我们得到了`response_headers`事件；逻辑`DoWork`操作的其余部分都花在了读取流内容上。
 - en: 'The other trace has just one span and represents a failed operation; it’s shown
     in *Figure 6**.3*:'
+  id: totrans-154
   prefs: []
   type: TYPE_NORMAL
+  zh: 另一个跟踪只有一个跨度，表示一个失败的操作；它在*图6.3*中显示：
 - en: '![Figure 6.3 – A trace with a logical call and the rate_is_limited exception
     event](img/B19423_06_03.jpg)'
+  id: totrans-155
   prefs: []
   type: TYPE_IMG
+  zh: '![图6.3 – 带有逻辑调用和rate_is_limited异常事件的跟踪](img/B19423_06_03.jpg)'
 - en: Figure 6.3 – A trace with a logical call and the rate_is_limited exception event
+  id: totrans-156
   prefs: []
   type: TYPE_NORMAL
+  zh: 图6.3 – 带有逻辑调用和rate_is_limited异常事件的跟踪
 - en: 'Here, we can see a logical `DoWork` span, which ended with an error. If we
     expand the attributes, we’ll see a status description stating `Response status
     code does not indicate success: 429 (Too Many Requests)`. This could give us an
     idea of what happened, even if we didn’t have an event. There is no physical HTTP
     span here and it could be confusing and unclear where the response came from.'
+  id: totrans-157
   prefs: []
   type: TYPE_NORMAL
+  zh: '这里，我们可以看到一个逻辑`DoWork`跨度，它以错误结束。如果我们展开属性，我们会看到一个状态描述，表明`Response status code
+    does not indicate success: 429 (Too Many Requests)`。这可能会给我们一些关于发生了什么的线索，即使我们没有事件。这里没有物理HTTP跨度，这可能会令人困惑且不清楚响应来自何处。'
 - en: With the `rate_is_limited` event, we can populate additional attributes such
     as `retry_after_ms`, but most importantly, we can easily understand the root cause
     of the problem and find the place in our code where the event is sent from.
+  id: totrans-158
   prefs: []
   type: TYPE_NORMAL
+  zh: 使用`rate_is_limited`事件，我们可以填充额外的属性，如`retry_after_ms`，但最重要的是，我们可以轻松理解问题的根本原因，并找到事件发送的代码位置。
 - en: Recording exceptions
+  id: totrans-159
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 记录异常
 - en: In the previous example, we created an event that represents an error, which
     is a special event defined in OpenTelemetry. It has `exception` as its name and
     the `exception.type`, `exception.message`, and `exception.stacktrace` attributes.
     Either `type` or `message` is required.
+  id: totrans-160
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前面的例子中，我们创建了一个表示错误的事件，这是一个在OpenTelemetry中定义的特殊事件。它的名称是`exception`，并且具有`exception.type`、`exception.message`和`exception.stacktrace`属性。需要`type`或`message`之一。
 - en: If we had an exception object, we could have used a `RecordException` extension
     method declared in the `OpenTelemetry.Trace.ActivityExtensions` class. We could
     record exceptions using `activity?.RecordException(ex)` and then pass custom tag
     collection to add to the event.
+  id: totrans-161
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果我们有一个异常对象，我们就可以使用在`OpenTelemetry.Trace.ActivityExtensions`类中声明的`RecordException`扩展方法。我们可以使用`activity?.RecordException(ex)`记录异常，然后传递自定义标签集合以添加到事件中。
 - en: This method calls into the `Activity.AddEvent` method under the hood, filling
     in all the exception attributes, including the stack trace. Since stack traces
     can be huge, it’s a good idea to record them for unhandled exceptions and only
     once.
+  id: totrans-162
   prefs: []
   type: TYPE_NORMAL
+  zh: 此方法在底层调用`Activity.AddEvent`方法，填写所有异常属性，包括堆栈跟踪。由于堆栈跟踪可能非常大，记录未处理的异常并只记录一次是一个好主意。
 - en: Correlating spans with links
+  id: totrans-163
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 将跨度与链接关联
 - en: So far, we have talked about parent-child relationships between spans. They
     cover request-response scenarios well and allow us to describe distributed call
     stacks as a tree, where each span has at most one parent and as many children
     as needed.
+  id: totrans-164
   prefs: []
   type: TYPE_NORMAL
+  zh: 到目前为止，我们讨论了跨度之间的父子关系。它们很好地覆盖了请求-响应场景，并允许我们将分布式调用堆栈描述为一棵树，其中每个跨度最多有一个父级，所需的孩子数量。
 - en: But what if our scenarios are more complicated? For example, how do we express
     receiving temperature data from multiple sensors and aggregating it on the backend,
     as shown in *Figure 6**.4*?
+  id: totrans-165
   prefs: []
   type: TYPE_NORMAL
+  zh: 但如果我们的场景更复杂呢？例如，如何表达从多个传感器接收温度数据并在后端聚合，如图*图6.4*所示？
 - en: '![Figure 6.4 – Batch processing](img/B19423_06_04.jpg)'
+  id: totrans-166
   prefs: []
   type: TYPE_IMG
+  zh: '![图6.4 – 批处理](img/B19423_06_04.jpg)'
 - en: Figure 6.4 – Batch processing
+  id: totrans-167
   prefs: []
   type: TYPE_NORMAL
+  zh: 图6.4 – 批处理
 - en: In this example, sensors send data to the aggregator in the scope of different
     traces. The aggregator must start a third one – it shouldn’t continue one of the
     sensor’s traces.
+  id: totrans-168
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这个例子中，传感器在不同的跟踪范围内将数据发送到聚合器。聚合器必须启动第三个跟踪 – 它不应该继续传感器的任何跟踪。
 - en: We can use links to connect `trace3` to both `trace1` and `trace2`, allowing
     us to correlate all of them. Links don’t specify exact relationships between spans,
     but in the scope of this example, we can think about them as multiple parents
     for a single span.
+  id: totrans-169
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们可以使用链接将`trace3`连接到`trace1`和`trace2`，这样我们就可以关联所有这些跟踪。链接不指定跨度之间的确切关系，但在本例的范围内，我们可以将它们视为单个跨度的多个父级。
 - en: Links are mostly used in messaging scenarios where messages are sent and received
     in batches to optimize network usage, or could be also processed together.
+  id: totrans-170
   prefs: []
   type: TYPE_NORMAL
+  zh: 链接主要用于消息场景，在这些场景中，消息以批量的形式发送和接收以优化网络使用，或者也可以一起处理。
 - en: 'Links have two properties: a linked trace context and a collection of attributes.
     Currently, they can only be provided to the `StartActivity` method and may be
     used to make sampling decisions. This is an OpenTelemetry specification limitation
     that might be removed in the future.'
+  id: totrans-171
   prefs: []
   type: TYPE_NORMAL
+  zh: 链接有两个属性：一个链接跟踪上下文和一组属性。目前，它们只能提供给 `StartActivity` 方法，并且可以用于做出采样决策。这是 OpenTelemetry
+    规范的限制，未来可能会被移除。
 - en: Using links
+  id: totrans-172
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 使用链接
 - en: Let’s see how we can use links to instrument batch processing scenarios with
     an in-memory queue. With background processing, we can’t rely on `Activity.Current`
     to flow from the enqueue operation to processing. So, we’ll pass `ActivityContext`
     along with the work item through the queue.
+  id: totrans-173
   prefs: []
   type: TYPE_NORMAL
+  zh: 让我们看看如何使用链接来使用内存队列对批量处理场景进行仪器化。在后台处理中，我们不能依赖于 `Activity.Current` 从入队操作流向处理。因此，我们将
+    `ActivityContext` 与工作项一起通过队列传递。
 - en: 'But first, we need to create an `Activity` for the enqueue operation so that
     we have some context to capture and pass around:'
+  id: totrans-174
   prefs: []
   type: TYPE_NORMAL
+  zh: 但首先，我们需要为入队操作创建一个 `Activity`，以便我们有上下文来捕获和传递：
 - en: Producer.cs
+  id: totrans-175
   prefs: []
   type: TYPE_NORMAL
+  zh: Producer.cs
 - en: '[PRE16]'
+  id: totrans-176
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE16]'
 - en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/links/Producer.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/links/Producer.cs)'
+  id: totrans-177
   prefs: []
   type: TYPE_NORMAL
+  zh: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/links/Producer.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/links/Producer.cs)'
 - en: While it’s important to instrument publish calls for remote queues, it’s not
     essential in this example. We only did it here to have some valid `ActivityContext`
     captured. If we had any other activity, we could use its context instead.
+  id: totrans-178
   prefs: []
   type: TYPE_NORMAL
+  zh: 虽然对远程队列的发布调用进行仪器化很重要，但在本例中并非必需。我们在这里这样做只是为了捕获一些有效的 `ActivityContext`。如果我们有任何其他活动，我们可以使用其上下文。
 - en: 'Now, we’re ready to instrument the work item processor:'
+  id: totrans-179
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在，我们已经准备好对工作项处理器进行仪器化：
 - en: BatchProcessor.cs
+  id: totrans-180
   prefs: []
   type: TYPE_NORMAL
+  zh: BatchProcessor.cs
 - en: '[PRE17]'
+  id: totrans-181
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE17]'
 - en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/links/BatchProcessor.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/links/BatchProcessor.cs)'
+  id: totrans-182
   prefs: []
   type: TYPE_NORMAL
+  zh: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/links/BatchProcessor.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/links/BatchProcessor.cs)'
 - en: Here, we iterated over work items and created an `ActivityLink` for each of
     them by using the trace context passed alongside the `WorkItem` instance.
+  id: totrans-183
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这里，我们遍历工作项，并为每个工作项使用随 `WorkItem` 实例传递的跟踪上下文创建了一个 `ActivityLink`。
 - en: Then, we added the `work_item.id` attribute with an array containing all received
     IDs to the `BatchProcessing` activity. Ideally, we’d put attributes on the links
     themselves via the `ActivityLink` constructor, but I’m not aware of any observability
     backend that supports it now. As an alternative, we can also create an event for
     each work item and populate attributes on them.
+  id: totrans-184
   prefs: []
   type: TYPE_NORMAL
+  zh: 然后，我们将包含所有接收到的 ID 的数组添加到 `BatchProcessing` 活动中的 `work_item.id` 属性。理想情况下，我们会在
+    `ActivityLink` 构造函数上为链接本身添加属性，但我不了解现在有任何可观察性后端支持它。作为替代方案，我们也可以为每个工作项创建一个事件，并在它们上填充属性。
 - en: 'Let’s run the sample with `links$ dotnet run`. It will enqueue three work items
     and then process them all in one batch. In Jaeger, we should see four independent
     traces – one for each enqueue operation and one for batch processing. An example
     of the latter is shown in *Figure 6**.5*:'
+  id: totrans-185
   prefs: []
   type: TYPE_NORMAL
+  zh: 让我们运行带有 `links$ dotnet run` 的示例。它将入队三个工作项，然后一次性处理它们。在 Jaeger 中，我们应该看到四个独立的跟踪
+    – 一个用于每个入队操作，一个用于批量处理。后者如图 *6**.5* 所示：
 - en: '![Figure 6.5 – Processing span with links](img/B19423_06_05.jpg)'
+  id: totrans-186
   prefs: []
   type: TYPE_IMG
+  zh: '![图 6.5 – 使用链接处理跨度](img/B19423_06_05.jpg)'
 - en: Figure 6.5 – Processing span with links
+  id: totrans-187
   prefs: []
   type: TYPE_NORMAL
+  zh: 图 6.5 – 使用链接处理跨度
 - en: 'We can see that it has three references (links in Jaeger terminology), which
     we can click on and land on the corresponding `Enqueue` operation, as shown in
     *Figure 6**.6*:'
+  id: totrans-188
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们可以看到它有三个引用（在 Jaeger 术语中称为链接），我们可以点击它们并到达相应的 `Enqueue` 操作，如图 *6**.6* 所示：
 - en: '![Figure 6.6 – Enqueue span](img/B19423_06_06.jpg)'
+  id: totrans-189
   prefs: []
   type: TYPE_IMG
+  zh: '![图 6.6 – 入队跨度](img/B19423_06_06.jpg)'
 - en: Figure 6.6 – Enqueue span
+  id: totrans-190
   prefs: []
   type: TYPE_NORMAL
+  zh: 图 6.6 – 入队跨度
 - en: 'In Jaeger, it’s not possible to navigate from the `Enqueue` span to the `ProcessBatch`
     span. But some of the observability backends support navigation in both directions.
     For example, *Figure 6**.7* shows the `Enqueue` operation linked to processing
     in Azure Monitor:'
+  id: totrans-191
   prefs: []
   type: TYPE_NORMAL
+  zh: 在Jaeger中，无法从`Enqueue`跨度导航到`ProcessBatch`跨度。但一些可观察性后端支持双向导航。例如，*图6**.7显示了与Azure
+    Monitor中处理相关的`Enqueue`操作：
 - en: '![Figure 6.7 – Two linked traces visualized in Azure Monitor ](img/B19423_06_07.jpg)'
+  id: totrans-192
   prefs: []
   type: TYPE_IMG
+  zh: '![图6.7 – 在Azure Monitor中可视化的两个链接跟踪](img/B19423_06_07.jpg)'
 - en: Figure 6.7 – Two linked traces visualized in Azure Monitor
+  id: totrans-193
   prefs: []
   type: TYPE_NORMAL
+  zh: 图6.7 – 在Azure Monitor中可视化的两个链接跟踪
 - en: Note that there are two different operations IDs (trace IDs) that have been
     correlated using a link. We’ll see more examples of links in messaging scenarios
     in [*Chapter 11*](B19423_11.xhtml#_idTextAnchor174), *Instrumenting Messaging
     Scenarios*. For now, let’s learn how to test our instrumentations.
+  id: totrans-194
   prefs: []
   type: TYPE_NORMAL
+  zh: 注意，已经使用链接关联了两个不同的操作ID（跟踪ID）。我们将在[*第11章*](B19423_11.xhtml#_idTextAnchor174)中看到更多关于消息场景中链接的示例，*消息场景的仪器化*。现在，让我们学习如何测试我们的仪器化。
 - en: Testing your instrumentation
+  id: totrans-195
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 测试你的仪器
 - en: The idea of testing logs might look wild – logs are not intended to stay in
     one place or retain a specific structure. It’s not the case for traces.
+  id: totrans-196
   prefs: []
   type: TYPE_NORMAL
+  zh: 测试日志的想法可能看起来很疯狂 – 日志不是为了停留在某个地方或保留特定的结构。跟踪就不是这样。
 - en: Instrumentation directly affects your ability to evaluate production health
     and usage. Testing auto-instrumentation could be limited to basic happy case validation
     – we only need to check that it’s enabled and emits some data in the right format.
     This would help us detect potential problems with dependency updates. Manual instrumentation
     needs more attention.
+  id: totrans-197
   prefs: []
   type: TYPE_NORMAL
+  zh: 仪器化直接影响你评估生产健康和使用的功能。测试自动仪器化可能仅限于基本快乐案例验证 – 我们只需要检查它是否启用并且以正确的格式发出一些数据。这将帮助我们检测依赖项更新的潜在问题。手动仪器化需要更多的关注。
 - en: Let’s see how we can test any instrumentation in ASP.NET Core applications.
     We’re going to rely on the integration testing capabilities provided by the `Microsoft.AspNetCore.Mvc.Testing`
     NuGet package. You can find more details about it in the ASP.NET Core testing
@@ -887,84 +1318,125 @@
     It allows us to modify the ASP.NET Core application’s configuration for test purposes.
     In this section, we’ll use it to change the OpenTelemetry pipeline and intercept
     activities.
+  id: totrans-198
   prefs: []
   type: TYPE_NORMAL
+  zh: 让我们看看我们如何在ASP.NET Core应用程序中测试任何仪器。我们将依赖`Microsoft.AspNetCore.Mvc.Testing` NuGet包提供的集成测试功能。您可以在https://learn.microsoft.com/aspnet/core/test/integration-tests中找到更多详细信息。它允许我们为了测试目的修改ASP.NET
+    Core应用程序的配置。在本节中，我们将使用它来更改OpenTelemetry管道并拦截活动。
 - en: Intercepting activities
+  id: totrans-199
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 拦截活动
 - en: 'There are a few different ways to intercept activities; let’s list them:'
+  id: totrans-200
   prefs: []
   type: TYPE_NORMAL
+  zh: 有几种不同的方法可以拦截活动；让我们列出它们：
 - en: We can add a span processor, similar to how we enriched activities in [*Chapter
     5*](B19423_05.xhtml#_idTextAnchor083), *Configuration and Control Plane*. Since
     processors run synchronously, we can validate the `Activity` attributes against
     the ambient context – for example, `Baggage.Current`. We can also check (when
     needed) that attributes are provided at start time in the `OnStart` callback.
+  id: totrans-201
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 我们可以添加一个跨度处理器，类似于我们在[*第5章*](B19423_05.xhtml#_idTextAnchor083)中丰富活动的方式，*配置和控制平面*。由于处理器是同步运行的，我们可以验证`Activity`属性与环境上下文
+    – 例如，`Baggage.Current` – 的对应关系。我们还可以检查（当需要时）属性是否在`OnStart`回调的开始时间提供。
 - en: We can implement a test exporter. The downside of this approach is that we’ll
     only see completed activities. Also, exporters run asynchronously and there will
     be no ambient context to validate against.
+  id: totrans-202
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 我们可以实现一个测试导出器。这种方法的不利之处在于，我们只能看到已完成的活动。此外，导出器是异步运行的，并且将没有环境上下文来验证。
 - en: We can write a custom `ActivityListener` implementation. This approach would
     not allow us to test the customization and configurations we’ve done with OpenTelemetry.
     We won’t even be able to validate whether OpenTelemetry is configured to listen
     to specific `ActivitySource` instances or check whether sampling works as expected.
+  id: totrans-203
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 我们可以编写一个自定义的`ActivityListener`实现。这种方法将不允许我们测试我们使用OpenTelemetry所做的自定义和配置。我们甚至无法验证OpenTelemetry是否配置为监听特定的`ActivitySource`实例或检查采样是否按预期工作。
 - en: So, `ActivityListener` could be a great choice for unit testing, and the processor
     gives the most flexibility in terms of integration testing, which we’re going
     to focus on here. Let’s see how we can inject a processor into the OpenTelemetry
     pipeline in tests.
+  id: totrans-204
   prefs: []
   type: TYPE_NORMAL
+  zh: 因此，`ActivityListener` 可以是一个很好的单元测试选择，处理器在集成测试方面提供了最大的灵活性，这是我们在这里要关注的重点。让我们看看如何在测试中向
+    OpenTelemetry 管道中注入处理器。
 - en: The `OpenTelemetry.Extensions.Hosting` NuGet package allows us to customize
     the pipeline with the `ConfigureOpenTelemetryTracerProvider` extension method.
     It’s called after the OpenTelemetry pipeline is configured, right before the `TracerProvider`
     instance is built. If you are using vanilla OpenTelemetry, you will have to implement
     a callback for tests to alter the pipeline.
+  id: totrans-205
   prefs: []
   type: TYPE_NORMAL
+  zh: '`OpenTelemetry.Extensions.Hosting` NuGet 包允许我们使用 `ConfigureOpenTelemetryTracerProvider`
+    扩展方法自定义管道。它在 OpenTelemetry 管道配置之后、`TracerProvider` 实例构建之前被调用。如果你使用的是纯 OpenTelemetry，你将不得不为测试实现一个回调来更改管道。'
 - en: 'Here’s an example of adding a test processor:'
+  id: totrans-206
   prefs: []
   type: TYPE_NORMAL
+  zh: 下面是添加测试处理器的示例：
 - en: TestFactory.cs
+  id: totrans-207
   prefs: []
   type: TYPE_NORMAL
+  zh: TestFactory.cs
 - en: '[PRE18]'
+  id: totrans-208
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE18]'
 - en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/testing/app.tests/TestFactory.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/testing/app.tests/TestFactory.cs)'
+  id: totrans-209
   prefs: []
   type: TYPE_NORMAL
+  zh: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/testing/app.tests/TestFactory.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/testing/app.tests/TestFactory.cs)'
 - en: 'The `TestFactory` class allows us to set up an ASP.NET Core application for
     testing, which we’re doing in the `ConfigureWebHost` method. There, we call into
     the `ConfigureOpenTelemetryTracerProvider` method, where we change the OpenTelemetry
     pipeline and inject our test processor. Here’s the minimalistic processor implementation:'
+  id: totrans-210
   prefs: []
   type: TYPE_NORMAL
+  zh: '`TestFactory` 类允许我们为测试设置 ASP.NET Core 应用程序，我们在 `ConfigureWebHost` 方法中这样做。在那里，我们调用
+    `ConfigureOpenTelemetryTracerProvider` 方法，在那里我们更改 OpenTelemetry 管道并注入我们的测试处理器。以下是简约的处理器实现：'
 - en: TestActivityProcessor.cs
+  id: totrans-211
   prefs: []
   type: TYPE_NORMAL
+  zh: TestActivityProcessor.cs
 - en: '[PRE19]'
+  id: totrans-212
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE19]'
 - en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/testing/app.tests/TestActivityProcessor.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/testing/app.tests/TestActivityProcessor.cs)'
+  id: totrans-213
   prefs: []
   type: TYPE_NORMAL
+  zh: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/testing/app.tests/TestActivityProcessor.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/testing/app.tests/TestActivityProcessor.cs)'
 - en: We’re almost ready to write some tests, but there is another challenge – how
     do we filter activities related to a specific test?
+  id: totrans-214
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们几乎准备好编写一些测试了，但还有一个挑战——我们如何过滤与特定测试相关的活动？
 - en: Filtering relevant activities
+  id: totrans-215
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 过滤相关活动
 - en: When we run tests in parallel, we effectively register multiple OpenTelemetry
     pipelines that listen to the same `ActivitySource` instances. With unit tests
     covering our instrumentations, we can control this better, but in the case of
@@ -972,81 +1444,120 @@
     global – if we run tests in parallel, we’ll see activities from all of them in
     the processor. We need to filter relevant activities that belong to our test,
     which we can do using distributed tracing.
+  id: totrans-216
   prefs: []
   type: TYPE_NORMAL
+  zh: 当我们并行运行测试时，我们实际上注册了多个监听相同 `ActivitySource` 实例的 OpenTelemetry 管道。通过覆盖我们的工具化的单元测试，我们可以更好地控制这一点，但在集成测试的情况下，`ActivitySource`
+    及其监听器实际上是静态的和全局的——如果我们并行运行测试，我们将在处理器中看到所有这些活动。我们需要过滤与我们的测试相关的相关活动，我们可以使用分布式跟踪来完成这一点。
 - en: We’ll start a new activity for each test and propagate the context to the service
     under test. Then, we can filter processed activities based on their trace IDs.
     This approach is implemented in `TracingTests` ([https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/testing/app.tests/TracingTests.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/testing/app.tests/TracingTests.cs)).
+  id: totrans-217
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们将为每个测试启动一个新的活动并将上下文传播到被测试的服务。然后，我们可以根据它们的跟踪 ID 过滤处理过的活动。这种方法在 `TracingTests`
+    中实现（[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/testing/app.tests/TracingTests.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/testing/app.tests/TracingTests.cs)）。
 - en: Validation
+  id: totrans-218
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 验证
 - en: 'Once we can filter all the activities related to this test execution, we’re
     ready to do some checks on them. It’s useful to check all the properties you rely
     upon in your monitoring and debugging tasks. For example, the following code validates
     a few properties of ASP.NET Core’s `Activity`:'
+  id: totrans-219
   prefs: []
   type: TYPE_NORMAL
+  zh: 一旦我们可以过滤与这次测试执行相关的所有活动，我们就可以对它们进行检查。检查你在监控和调试任务中依赖的所有属性是有用的。例如，以下代码验证了 ASP.NET
+    Core 的 `Activity` 的几个属性：
 - en: TracingTests.cs
+  id: totrans-220
   prefs: []
   type: TYPE_NORMAL
+  zh: TracingTests.cs
 - en: '[PRE20]'
+  id: totrans-221
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE20]'
 - en: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/testing/app.tests/TracingTests.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/testing/app.tests/TracingTests.cs)'
+  id: totrans-222
   prefs: []
   type: TYPE_NORMAL
+  zh: '[https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/testing/app.tests/TracingTests.cs](https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter6/testing/app.tests/TracingTests.cs)'
 - en: Now, you’re ready to write and test your instrumentations! You may also find
     it useful to use distributed tracing for your general integration testing needs
     – relying on it to validate intended test behavior and investigate flaky tests
     or unstable service behavior. You could also use traces as one of the inputs to
     validate service behavior.
+  id: totrans-223
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在，你已经准备好编写和测试你的仪器化了！你可能会发现使用分布式跟踪来满足你的通用集成测试需求也很有用——依靠它来验证预期的测试行为，并调查不可靠的测试或不稳定的服务行为。你还可以使用跟踪作为验证服务行为的一个输入。
 - en: Summary
+  id: totrans-224
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 摘要
 - en: In this chapter, we explored manual distributed tracing instrumentation using
     .NET diagnostics primitives. `Activity` and `ActivitySource` are the default ways
     to instrument your code – create, start, end, and enrich activities with attributes
     and events. You can achieve the same functionality with `Tracer` and `TelemetrySpan`,
     from the OpenTelemetry API package. They provide a thin wrapper over .NET diagnostics
     APIs while using OpenTelemetry terminology.
+  id: totrans-225
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这一章中，我们探讨了使用 .NET 诊断原语的手动分布式跟踪仪器化。`Activity` 和 `ActivitySource` 是默认的代码仪器化方式——创建、开始、结束和丰富活动属性和事件。你可以使用
+    OpenTelemetry API 包中的 `Tracer` 和 `TelemetrySpan` 实现相同的功能。它们在 .NET 诊断 API 上提供了一个薄薄的包装，同时使用
+    OpenTelemetry 术语。
 - en: We also looked into the ambient context propagation with `Activity.Current`
     and how it makes multiple instrumentation layers work together. Then, we learned
     about events and their limitations and used links to correlate different traces.
+  id: totrans-226
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们还研究了使用 `Activity.Current` 的环境上下文传播以及它是如何使多个仪器层协同工作的。然后，我们了解了事件及其限制，并使用链接关联不同的跟踪。
 - en: Finally, we covered testing – since instrumentation can be critical for monitoring,
     we should validate it as any other feature. We learned how to reliably do this
     in ASP.NET Core applications.
+  id: totrans-227
   prefs: []
   type: TYPE_NORMAL
+  zh: 最后，我们涵盖了测试——因为仪器化对于监控可能是关键的，所以我们应该像验证其他功能一样验证它。我们学习了如何在 ASP.NET Core 应用程序中可靠地做到这一点。
 - en: With this, you should be able to write rich tracing instrumentations and troubleshoot
     and validate custom tracing code. To achieve better observability, we can combine
     multiple signals with minimal duplication, so in the next chapter, we’re going
     to look at manual metrics instrumentation and see how it can work along with tracing.
+  id: totrans-228
   prefs: []
   type: TYPE_NORMAL
+  zh: 通过这种方式，你应该能够编写丰富的跟踪仪器，并调试和验证自定义跟踪代码。为了实现更好的可观察性，我们可以将多个信号结合在一起，尽量减少重复，因此，在下一章中，我们将探讨手动指标仪器化，并看看它如何与跟踪一起工作。
 - en: Questions
+  id: totrans-229
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 问题
 - en: Let’s say you started `Activity` using `ActivitySource`. How do you configure
     OpenTelemetry to listen to it? How does it work?
+  id: totrans-230
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 假设你使用 `ActivitySource` 开始了 `Activity`，你该如何配置 OpenTelemetry 来监听它？它是如何工作的？
 - en: When should you use `Activity` events? What are the alternatives?
+  id: totrans-231
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 你应该在什么时候使用 `Activity` 事件？有哪些替代方案？
 - en: What do we need links for? How can we use them?
+  id: totrans-232
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 我们需要链接做什么？我们如何使用它们？

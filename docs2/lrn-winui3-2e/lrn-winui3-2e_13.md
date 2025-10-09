@@ -1,6 +1,6 @@
 
 
-# 使用 Uno Platform 将您的应用程序跨平台化
+# 第十三章：使用 Uno Platform 将您的应用程序跨平台化
 
 **Uno Platform** 允许开发者在一个代码库中编写 XAML 标记和 C# 代码，并将应用程序部署到多个平台。目前 Uno 支持 iOS、Android、Windows、macOS、Linux、Tizen 以及网页（通过 **WebAssembly**）。Uno Platform 使用与 WinUI 相同的 XAML 语法，使得 WinUI 开发者可以轻松地跳转到 Uno，同时重用大量现有的 XAML 和 C# 代码。我们将探讨如何将 **My Media Collection** 示例应用程序适配到使用 Uno Platform 在这些其他平台上运行。
 

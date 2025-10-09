@@ -1,6 +1,6 @@
 
 
-# Unity 和 C# 入门 – 游戏对象和组件
+# 第一章：Unity 和 C# 入门 – 游戏对象和组件
 
 在开始之前，我想讨论一下错误。这是我们都会犯的事情，正如约翰·鲍威尔所说，*唯一的真正错误是我们从中学不到东西*（[`www.goodreads.com/quotes/118431-the-only-real-mistake-is-the-one-from-which-we`](https://www.goodreads.com/quotes/118431-the-only-real-mistake-is-the-one-from-which-we)）。我们正在尽一切努力确保这本书尽可能准确。在提交这个草案后，将由团队对主题进行审查。我会收到反馈，任何错误都会得到纠正。
 

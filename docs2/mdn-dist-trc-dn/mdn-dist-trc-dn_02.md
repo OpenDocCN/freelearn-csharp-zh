@@ -1,6 +1,6 @@
 
 
-# .NET 的原生监控
+# 第二章：.NET 的原生监控
 
 在本章中，我们将探索现代 .NET 应用程序的即用型诊断功能，从日志和临时诊断开始，然后继续探讨 OpenTelemetry 在此之上提供的内容。我们将创建一个示例应用程序并对其进行工具化，展示跨进程日志关联，并学习如何使用 `dotnet-monitor` 捕获详细日志。然后，我们将调查 .NET 运行时计数器并将它们导出到 Prometheus。最后，我们将配置 OpenTelemetry 以从 .NET、ASP.NET Core 和 Entity Framework 收集跟踪和指标，并查看基本的自动工具化如何满足可观察性需求。
 

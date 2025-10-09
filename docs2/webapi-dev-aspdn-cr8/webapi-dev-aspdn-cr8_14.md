@@ -1,6 +1,6 @@
 
 
-# 使用 Azure Pipelines 和 GitHub Actions 进行 ASP.NET Core 的 CI/CD
+# 第十四章：使用 Azure Pipelines 和 GitHub Actions 进行 ASP.NET Core 的 CI/CD
 
 在前面的章节中，我们已经探讨了构建、测试和运行 ASP.NET Core 应用程序的基础知识。我们还讨论了如何使用 `dotnet run` 命令从数据库中访问数据以在本地运行我们的应用程序。现在，是我们继续我们的 ASP.NET Core 之旅并学习如何将我们的应用程序部署到云中的时候了。
 

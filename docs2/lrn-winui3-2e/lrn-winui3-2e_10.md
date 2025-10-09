@@ -1,6 +1,6 @@
 
 
-# 使用 Template Studio 加速应用开发
+# 第十章：使用 Template Studio 加速应用开发
 
 从零开始启动新项目可能会令人望而却步。应用架构和项目布局的最佳实践是什么？**Template Studio for WinUI** 是一个开源项目，最初是为 UWP 和 WPF 应用程序开发的 **Windows Template Studio**。Template Studio 的每个版本都是 Visual Studio 的扩展。现在它支持 WinUI，并创建了将生成 **.NET MAUI** 和 **Uno Platform** 项目的变体。
 

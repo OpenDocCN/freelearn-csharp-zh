@@ -1,6 +1,6 @@
 
 
-# 使用 .NET MAUI Shell 构建新闻应用
+# 第四章：使用 .NET MAUI Shell 构建新闻应用
 
 在本章中，我们将创建一个利用微软 .NET MAUI 团队提供的 **Shell** 导航功能构建的新闻应用。我们之前使用 **ContentPage**、**FlyoutPage**、**TabbedPage** 或 **NavigationPage** 作为主页的方法仍然有效，就像我们在 *第二章* 中所做的那样，但我们确信您会喜欢定义应用程序结构的新方法。此外，您还可以混合使用新旧方法。
 

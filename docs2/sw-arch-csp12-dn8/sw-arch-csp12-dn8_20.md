@@ -1,6 +1,6 @@
 
 
-# Kubernetes
+# 第二十章：Kubernetes
 
 本章致力于描述 Kubernetes 容器编排器及其在 Azure 中的实现，称为 **Azure Kubernetes 服务**（**AKS**）。我们在第十一章“将微服务架构应用于您的企业应用”的“*哪些工具需要用于管理微服务？*”部分讨论了编排器的重要性和处理任务。在这里，值得回顾的是 Kubernetes 是编排器的既定标准。
 

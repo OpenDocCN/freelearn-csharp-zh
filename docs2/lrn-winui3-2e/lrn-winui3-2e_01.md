@@ -1,6 +1,6 @@
 
 
-# WinUI 简介
+# 第一章：WinUI 简介
 
 **WinUI 3**是一套**用户界面**（**UI**）控件和库，Windows 开发者可以在他们的桌面应用程序中使用。它是 Windows App SDK 的 UI 部分，之前被称为**Project Reunion**。UWP 开发者使用**Windows 软件开发工具包**（**Windows SDK**）来构建他们的应用程序，并在项目属性中必须选择一个目标 SDK 版本。通过从 Windows SDK 中提取 UWP 控件和 UI 组件，为.NET 使用重写它们，并以 WinUI 的名称在**Windows App SDK**中作为一系列库发布，微软能够以比 Windows 本身更快的节奏发布版本（因为 Windows SDK 版本与 Windows 版本相关联）。这种分离还使得控件可以在较旧的 Windows 10 版本上使用。虽然使用 WinUI 构建桌面应用程序是当前的建议，但了解 WinUI 和 Windows App SDK 在更大的 Windows 开发领域中的位置是很重要的。
 

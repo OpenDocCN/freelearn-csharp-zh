@@ -1,6 +1,6 @@
 
 
-# 探索 Unity 的脚本结构
+# 第四章：探索 Unity 的脚本结构
 
 在 Unity 中构建你的 C#编程基础之上，其中我们涵盖了语法、变量、控制结构和基本调试，我们现在将过渡到 Unity 的脚本功能。这个基础对于深入理解 MonoBehaviour 至关重要，它是 Unity 中用于将脚本附加到 GameObject 的主要类。MonoBehaviour 使 C#脚本在 Unity 引擎中生动起来，控制从初始设置到实时游戏响应的一切。
 

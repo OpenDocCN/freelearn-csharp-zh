@@ -1,6 +1,6 @@
 
 
-# 将 Xamarin.Forms 应用转换为.NET MAUI
+# 第三章：将 Xamarin.Forms 应用转换为.NET MAUI
 
 在我们深入.NET MAUI 之前，我们将回顾一个现有的 Xamarin.Forms 应用，并将其转换为.NET MAUI。本章将指导您通过将运行在 Mono 上的现有 Xamarin.Forms 应用转换为运行在.NET 7 上的.NET MAUI 应用的步骤。我们将讨论两种将您的 Xamarin.Forms 应用程序转换为.NET MAUI 的不同方法。第一种方法将使用新的.NET MAUI 项目，并将我们旧的 Xamarin.Forms 代码移动到新项目中。第二种方法将使用**.NET 升级助手**工具为我们完成一些升级工作。
 

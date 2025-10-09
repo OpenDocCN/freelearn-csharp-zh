@@ -1,6 +1,6 @@
 
 
-# 展示 ASP.NET Core
+# 第十七章：展示 ASP.NET Core
 
 在本章中，你将学习如何实现 Web 应用程序和基于 Web 的表示层。更具体地说，你将了解 ASP.NET Core 以及如何基于 ASP.NET Core MVC 实现 Web 应用程序表示层。
 

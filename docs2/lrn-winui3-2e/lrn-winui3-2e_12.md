@@ -1,6 +1,6 @@
 
 
-# 在 WinUI 中托管 Blazor 应用程序
+# 第十二章：在 WinUI 中托管 Blazor 应用程序
 
 WinUI 3 中的 `WebView2` 控件，Windows 开发者可以在他们的 WinUI 客户端应用程序中运行云托管的 Blazor 应用程序。这些选项在 .NET 8 中随着 **渲染模式** 的引入有所变化。我们将讨论这些新模式及其各自的优点。
 

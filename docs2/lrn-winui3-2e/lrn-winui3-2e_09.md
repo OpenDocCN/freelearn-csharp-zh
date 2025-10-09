@@ -1,6 +1,6 @@
 
 
-# 使用社区工具包增强应用程序
+# 第九章：使用社区工具包增强应用程序
 
 **Windows 社区工具包**（**WCT**）和**.NET 社区工具包**是面向 Windows 和.NET 开发者的开源库集合。这些工具包包含可以由**Windows UI 库**（**WinUI**）、**通用 Windows 平台**（**UWP**）、.**NET 多平台应用程序 UI**（**.NET MAUI**）、**Windows 表现基础**（**WPF**）和**Windows 窗体**（**WinForms**）应用程序利用的控件和库。在**Microsoft Store**中，有一个 WCT 的配套示例应用程序，开发者可以安装它来探索控件并学习如何使用它们。
 

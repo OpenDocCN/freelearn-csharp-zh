@@ -1,6 +1,6 @@
 
 
-# 应用开放封闭原则
+# 第十一章：应用开放封闭原则
 
 开放封闭原则归功于伯特兰·梅耶（Bertrand Meyer），该原则在他的 1988 年著作《面向对象软件构造》（*Object-Oriented Software Construction*）中首次出现（[`en.wikipedia.org/wiki/Object-Oriented_Software_Construction`](https://en.wikipedia.org/wiki/Object-Oriented_Software_Construction)）。这本书描述了以下我们可以应用到我们的软件中的原则：
 

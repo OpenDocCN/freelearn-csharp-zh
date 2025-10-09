@@ -1,6 +1,6 @@
 
 
-# 使用 Kubernetes 实践微服务组织
+# 第八章：使用 Kubernetes 实践微服务组织
 
 本章致力于微服务应用程序的基本构建块：编排器！重点是 **Kubernetes**，但在这里学到的概念对于理解其他编排选项也是基本的。特别是，**Azure Container Apps** 是 Kubernetes 的无服务器替代方案，它本身是用 Kubernetes 实现的，并使用简化的配置选项，但配置的对象和涉及的概念完全相同。Azure Container Apps 在 *第九章* *简化容器和 Kubernetes：Azure Container Apps* *和其他工具* 中进行描述。
 

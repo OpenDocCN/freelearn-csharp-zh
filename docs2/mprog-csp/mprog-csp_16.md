@@ -1,6 +1,6 @@
 
 
-# 生成代码
+# 第十六章：生成代码
 
 到目前为止，本书中我们已经探讨了元编程在.NET 运行时是多么强大。在运行时做所有事情的好处是能够适应运行时发生的事情。在运行时做这件事的缺点是它会影响性能。这正是 C# Roslyn 编译器真正发光的地方。我们过去有能力使用像 PostSharp ([`www.postsharp.net/`](https://www.postsharp.net/)) 或**中间语言**（**IL**）编织这样的商业产品来生成代码，使用 Fody ([`github.com/Fody/Fody`](https://github.com/Fody/Fody))等项目。但有了 Roslyn，代码生成真正实现了民主化，并且变得对任何人来说都很容易做到。
 

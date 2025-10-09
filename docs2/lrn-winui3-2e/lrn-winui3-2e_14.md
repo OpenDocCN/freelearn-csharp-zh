@@ -1,6 +1,6 @@
 
 
-# 打包和部署 WinUI 应用程序
+# 第十四章：打包和部署 WinUI 应用程序
 
 WinUI 开发者有几种选项来打包和部署他们的应用程序。开发者可以在 **Microsoft Store** 上创建一个账户，并将打包的应用程序上传到 **Microsoft Partner Center** 以供公众消费。应用程序包也可以创建，以便通过 **Microsoft Endpoint Manager** 和 **Microsoft Intune** 由组织分发，或者由个人在 Windows PC 上侧载。
 

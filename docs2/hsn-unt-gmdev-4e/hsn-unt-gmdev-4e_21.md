@@ -1,6 +1,6 @@
 
 
-# 动画现实：使用 Animator、Cinemachine 和 Timeline 创建动画
+# 第十七章：动画现实：使用 Animator、Cinemachine 和 Timeline 创建动画
 
 有时，我们需要以预定的方式移动对象，例如使用过场动画，或特定的角色动画，如跳跃、奔跑等。在本章中，我们将介绍几个 Unity 动画系统，以创建我们可以通过脚本获得的所有可能的物体运动。
 

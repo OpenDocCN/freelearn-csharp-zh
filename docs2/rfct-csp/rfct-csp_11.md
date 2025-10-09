@@ -1,6 +1,6 @@
 
 
-# 使用 GitHub Copilot 进行 AI 辅助重构
+# 第十一章：使用 GitHub Copilot 进行 AI 辅助重构
 
 变化是技术的常态，这在 .NET 生态系统中尤为如此。每年，Microsoft 都会发布一个新的 .NET 和 C# 版本，其中包含新功能，以保持语言在技术变化中的兴奋、有用和相关性。但过去两年中，对 .NET 开发影响最大的变化可能并非来自主要语言版本，而是来自人工智能领域，例如 GitHub Copilot 和 ChatGPT 这样的 AI 代理。
 

@@ -1,6 +1,6 @@
 
 
-# JavaScript 互操作
+# 第十章：JavaScript 互操作
 
 在本章中，我们将探讨 JavaScript。在特定场景中，我们仍然需要使用 JavaScript，或者我们可能想使用依赖于 JavaScript 的现有库。Blazor 使用 JavaScript 来更新 **文档对象模型**（**DOM**），下载文件，并访问客户端上的本地存储。
 

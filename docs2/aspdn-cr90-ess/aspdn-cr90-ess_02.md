@@ -1,6 +1,6 @@
 
 
-# 使用 Razor Pages、MVC 和 Blazor 构建动态 UI
+# 第二章：使用 Razor Pages、MVC 和 Blazor 构建动态 UI
 
 ASP.NET Core 9 提供了一个完整的 UI 框架，适用于不同类型的方法和应用程序，允许在客户端和服务器端使用页面渲染策略。在本章中，我们将了解 ASP.NET Core UI 框架中可用的选项，以及了解如何为每个场景定义最佳选项。
 

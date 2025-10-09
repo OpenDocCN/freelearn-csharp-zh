@@ -1,6 +1,6 @@
 
 
-# C# Fundamentals in Unity – Variables, Loops, and Troubleshooting Techniques
+# 第三章：C# Fundamentals in Unity – Variables, Loops, and Troubleshooting Techniques
 
 在本章中，您将通过探索使游戏栩栩如生的核心编程概念来加深对 Unity 和 C# 的理解。在设置 Unity 并掌握 C# 的基本知识后，我们将探索 C# 语法，以了解有效代码编写的结构。您将了解不同类型的数据存储以及如何在游戏中管理信息。
 

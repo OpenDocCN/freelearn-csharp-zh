@@ -1,6 +1,6 @@
 
 
-# SignalR 入门
+# 第十三章：SignalR 入门
 
 在 *第一章* 中，我们介绍了实时 Web API 的概念。可以使用各种技术来实现实时 Web API，例如 gRPC 流、长轮询、**服务器端事件**（**SSE**）、WebSockets 等。Microsoft 提供了一个名为 SignalR 的开源库，用于简化实时 Web API 的实现。在本章中，我们将介绍 SignalR 的基础知识以及如何使用 SignalR 实现实时 Web API。
 

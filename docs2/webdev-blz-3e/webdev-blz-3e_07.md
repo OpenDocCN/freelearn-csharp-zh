@@ -1,6 +1,6 @@
 
 
-# 创建 API
+# 第七章：创建 API
 
 当使用 WebAssembly 运行 Blazor（InteractiveWebAssembly 或 InteractiveAuto）时，我们需要能够检索数据并更改我们的数据。为了实现这一点，我们需要一个 API 来访问数据。在本章中，我们将使用 **Minimal API** 创建一个 Web API。
 

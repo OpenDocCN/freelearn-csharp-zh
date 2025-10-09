@@ -1,6 +1,6 @@
 
 
-# 使用 CollectionView 和 CarouselView 构建 Photo Gallery 应用程序
+# 第六章：使用 CollectionView 和 CarouselView 构建 Photo Gallery 应用程序
 
 在本章中，我们将构建一个应用程序，展示用户设备相册（照片库）中的照片。用户还可以选择照片作为收藏夹。然后我们将探讨不同的照片显示方式——在轮播图中和在多列网格控件中。通过使用 .NET MAUI `CarouselView` 控件显示一组图像，用户可以滑动查看每张图像。为了显示大量图像，我们将使用 .NET MAUI `CollectionView` 控件和垂直滚动，以便用户查看所有图像。通过学习如何使用这些控件，我们将在构建实际应用程序时能够将它们用于许多其他情况。
 

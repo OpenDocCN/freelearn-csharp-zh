@@ -1,6 +1,6 @@
 
 
-# 云原生模式
+# 第十七章：云原生模式
 
 在前面的章节中，我们已经涵盖了使用 ASP.NET Core 开发 Web API 的各种基本技能。我们讨论了不同的 API 开发风格，如 REST、gRPC 和 GraphQL，以及如何使用 Entity Framework Core 实现数据访问层。我们还介绍了如何使用 ASP.NET Core Identity 框架来保护 Web API。此外，我们还学习了如何为 Web API 应用程序编写单元测试和集成测试，以及 API 开发中的常见实践，如测试、缓存、可观察性等。我们还讨论了如何通过 CI/CD 管道将容器化的 Web API 应用程序部署到云端。这些都是 Web API 开发的基本技能。
 

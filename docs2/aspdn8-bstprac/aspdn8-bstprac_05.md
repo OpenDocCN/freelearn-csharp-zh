@@ -1,6 +1,6 @@
 
 
-# 使用 Entity Framework Core 优化数据访问
+# 第五章：使用 Entity Framework Core 优化数据访问
 
 在 2008 年 Entity Framework 介绍之前，开发者使用 **ActiveX 数据对象**（**ADOs**）和 **对象链接和嵌入数据库**（**OLE DB**）来访问其应用程序的数据。自其引入以来，Entity Framework 在这些年来已经发展成为一个高性能的桥梁，连接 **面向对象**（**OO**）系统和关系数据库。它使开发者能够使用 **语言集成查询**（**LINQ**）语法，通过 C# 执行复杂的查询。然而，一些 LINQ 语句可能会让新开发者感到不知所措。由于这是数据访问中最常讨论的话题之一，我们将涵盖使用 Entity Framework Core 时各种标准和实现。
 

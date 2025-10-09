@@ -1,6 +1,6 @@
 
 
-# 使用 gRPC 入门
+# 第十一章：使用 gRPC 入门
 
 除了 RESTful API 之外，还有其他类型的 API。其中之一是基于**远程过程调用**（**RPC**）的 API，我们在*第一章*中介绍了它。gRPC 是由 Google 开发的一个高性能 RPC 框架。现在，它是一个在 **Cloud Native Computing Foundation**（**CNCF**）下的开源项目，并且越来越受欢迎。
 

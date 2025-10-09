@@ -1,6 +1,6 @@
 
 
-# Azure Functions
+# 第六章：Azure Functions
 
 确定您的 API 的执行环境可能会对它们的运行方式、扩展方式、成本以及默认功能产生重大影响。Azure Functions 提供了一种不同的托管选项，它通过关注事件驱动的执行来补充现有的 Azure 服务。虽然 Functions 提供了许多方式来响应系统中的不同事物，但我们将专注于一个特定的事件：HTTP 请求。
 

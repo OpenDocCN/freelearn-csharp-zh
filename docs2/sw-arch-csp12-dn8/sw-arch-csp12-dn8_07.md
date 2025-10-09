@@ -1,6 +1,6 @@
 
 
-# 理解软件解决方案中的不同领域
+# 第七章：理解软件解决方案中的不同领域
 
 本章致力于一种现代软件开发技术，称为**领域驱动设计**（**DDD**），它最初由埃里克·埃文斯（Eric Evans）提出（参见《领域驱动设计*》：[`www.amazon.com/exec/obidos/ASIN/0321125215/domainlanguag-20`](https://www.amazon.com/exec/obidos/ASIN/0321125215/domainlanguag-20)）。虽然 DDD 已经存在了 15 多年，但由于其解决两个重要问题的能力，它在过去几年取得了巨大的成功。
 

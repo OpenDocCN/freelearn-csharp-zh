@@ -1,6 +1,6 @@
 
 
-# 使用 .NET MAUI Blazor 构建 Calculator
+# 第十一章：使用 .NET MAUI Blazor 构建 Calculator
 
 在本章中，我们将探讨 .NET `BlazorWebView`。我们还将实现 Blazor 和 .NET MAUI 之间的通信。
 

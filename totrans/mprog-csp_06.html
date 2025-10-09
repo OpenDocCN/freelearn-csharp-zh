@@ -1,0 +1,652 @@
+<html><head></head><body>
+		<div id="_idContainer022">
+			<h1 id="_idParaDest-72" class="chapter-number"><a id="_idTextAnchor098"/>6</h1>
+			<h1 id="_idParaDest-73"><a id="_idTextAnchor099"/>Dynamic Proxy Generation</h1>
+			<p>In the previous chapters, we looked at how powerful it is to have the type of metadata that the .NET runtime provides us with, combining that with the power of creating your own metadata, the capability to analyze it, and turn it into useful information or take actions based on it. We’re now going to explore even further and let code make new code based <span class="No-Break">on metadata.</span></p>
+			<p>In this chapter, we will look into how we can take advantage of the fact that your code runs in a managed runtime environment and how that can be used to create new code at runtime after your code has <span class="No-Break">been compiled.</span></p>
+			<p>We will cover the <span class="No-Break">following topics:</span></p>
+			<ul>
+				<li>An introduction to IL <span class="No-Break">and Reflection.Emit</span></li>
+				<li>Creating a dynamic assembly <span class="No-Break">and module</span></li>
+				<li>Virtual members <span class="No-Break">and overrides</span></li>
+				<li>Implementing <span class="No-Break">an interface</span></li>
+			</ul>
+			<p>Upon completion of this chapter, you should understand the power of the .NET runtime and how you can turn metadata into new code to make you <span class="No-Break">more productive.</span></p>
+			<h1 id="_idParaDest-74"><a id="_idTextAnchor100"/>Technical requirements</h1>
+			<p>The source code specific to the chapter can be found on <span class="No-Break">GitHub (</span><a href="https://github.com/PacktPublishing/Metaprogramming-in-C-Sharp/tree/main/Chapter6"><span class="No-Break">https://github.com/PacktPublishing/Metaprogramming-in-C-Sharp/tree/main/Chapter6</span></a><span class="No-Break">).</span></p>
+			<h1 id="_idParaDest-75"><a id="_idTextAnchor101"/>An introduction to IL and Reflection.Emit</h1>
+			<p>In <a href="B19418_02.xhtml#_idTextAnchor026"><span class="No-Break"><em class="ita ic">Chapter 2</em></span></a>, <em class="ita ic">Metaprogramming Concepts</em>, we <a id="_idIndexMarker178"/>touched<a id="_idIndexMarker179"/> on what the C# compiler turns your code into. <strong class="bo d">IL</strong>, short for <strong class="bo d">Intermediate Language</strong>, is a representation of instructions the .NET runtime understands and translates to CPU instructions for the target CPU your code is <span class="No-Break">running on.</span></p>
+			<p>Since the .NET runtime operates dynamically on your code in this manner, it means that it is not a too far a jump to conclude that you should be able to generate code as your program executes. And luckily, that is the case. The .NET APIs include a whole namespace dedicated to generating code – <span class="No-Break"><strong class="source-in ine">System.Reflection.Emit</strong></span><span class="No-Break">.</span></p>
+			<p>With the <strong class="source-in ine">Emit</strong> APIs, you can go and create any constructs you want from scratch, introduce new types that do not exist in any source code, or create new types that inherit from other types and add <span class="No-Break">new capabilities.</span></p>
+			<p>For all the different types of artifacts, you can create class, method, properties, and more. There are specific builder types – <strong class="source-in ine">TypeBuilder</strong> for classes and <strong class="source-in ine">MethodBuilder</strong> for methods. Properties are also considered methods and are based on a convention of a prefix having the name of <strong class="source-in ine">get_</strong> or <strong class="source-in ine">set_</strong>, which then represents a <strong class="source-in ine">get</strong> or <strong class="source-in ine">set</strong> <span class="No-Break">method respectively.</span></p>
+			<p>With a builder, you can call a method called <strong class="source-in ine">.GetILGenerator()</strong>. This method will then return a type called <strong class="source-in ine">ILGenerator</strong>. The <strong class="source-in ine">ILGenerator</strong> method is where all the magic happens. This is the type you can use to generate the actual code. The primary method<a id="_idIndexMarker180"/> you<a id="_idIndexMarker181"/> use is the <strong class="source-in ine">.Emit()</strong> method. The <strong class="source-in ine">.Emit()</strong> method has several overloads to it and is the method used to add instructions that constitute your program. Instructions are referred to as an <strong class="bo d">op-code</strong>, and there<a id="_idIndexMarker182"/> is a class with all the allowed instructions, or op-codes, <span class="No-Break">called </span><span class="No-Break"><strong class="source-in ine">OpCodes</strong></span><span class="No-Break">.</span></p>
+			<p>All the different op-codes are well defined and well documented, and you can find the documentation for all of them on Microsoft’s documentation <span class="No-Break">pages (</span><a href="https://learn.microsoft.com/en-us/dotnet/api/system.reflection.emit.opcodes?view=net-7.0#fields"><span class="No-Break">https://learn.microsoft.com/en-us/dotnet/api/system.reflection.emit.opcodes?view=net-7.0#fields</span></a><span class="No-Break">).</span></p>
+			<p>Even though they’re well defined and well documented, the preparation involved to get the right instructions in the right order can be hard and daunting. Therefore, it’s a good idea to derive the instructions from real code instead. A great resource for doing so is to use something<a id="_idIndexMarker183"/> such as <strong class="bo d">Sharplab</strong> (<a href="https://sharplab.io">https://sharplab.io</a>). With Sharplab, you can take regular C# code and see the instructions needed to be able to <span class="No-Break">reproduce it.</span></p>
+			<p>In order to get to the point of actually generating IL code, you need to jump through a couple <span class="No-Break">more h<a id="_idTextAnchor102"/>oops.</span></p>
+			<h1 id="_idParaDest-76"><a id="_idTextAnchor103"/>Creating a dynamic assembly and module</h1>
+			<p>When your<a id="_idIndexMarker184"/> code has <a id="_idIndexMarker185"/>gone through the compiler and been outputted to a binary that runs. That code is considered static and cannot be modified. The binary represented as an assembly is completely static; not only can you not modify code in it but you also cannot add to it either. It would be a security risk if arbitrary code could go and modify <span class="No-Break">running code.</span></p>
+			<p>To overcome this, you have to explicitly create a new assembly on the fly that only exists in memory. This is <a id="_idIndexMarker186"/>known as a <span class="No-Break"><strong class="bo d">dynamic assembly</strong></span><span class="No-Break">.</span></p>
+			<p>All assemblies have also the concept of modules. An assembly must have at least one module. A module is a container that holds the concrete IL code and only metadata related to it, while an assembly is a higher-order abstract container that contains more metadata and could, in fact, refer to multiple <strong class="source-in ine">.dll</strong> files. Generally, you’ll only see a one-to-one relationship between an <strong class="bo d">assembly</strong> and <span class="No-Break">a </span><span class="No-Break"><strong class="bo d">module</strong></span><span class="No-Break">.</span></p>
+			<p>It is very easy to get started <span class="No-Break">with this:</span></p>
+			<pre class="source-code">
+using System.Reflection;
+using System.Reflection.Emit;
+var assemblyName = new AssemblyName("MyDynamicAssembly");
+var dynamicAssembly = AssemblyBuilder.Define
+  DynamicAssembly(assemblyName, AssemblyBuilderAccess.Run);
+var dynamicModule = dynamicAssembly.DefineDynamicModule
+  ("MyDynamicModule");</pre>
+			<p>The code defines the two containers you need – first, the <strong class="source-in ine">.DefineDynamicAssembly()</strong> method creates the dynamic assembly, and you tell it to give you an assembly that you will use to run code from. Once you have the dynamic assembly, you call <strong class="source-in ine">.DefineDynamicModule()</strong> to get the container where you’ll generate the actual code that <span class="No-Break">will run.</span></p>
+			<p>One thing you should take into consideration is the name of both the dynamic assembly and dynamic module. Assembly names need to be unique within a running process, and within an assembly, every module needs a unique name as well. So, if you’re going to create multiple dynamic assemblies and multiple modules within them, you need to guarantee <span class="No-Break">unique names.</span></p>
+			<p>The simplest way to do that is to leverage <strong class="source-in ine">Guid</strong> and mix it into your name. The following code will give a <span class="No-Break">unique name:</span></p>
+			<pre class="source-code">
+static string CreateUniqueName(string prefix)
+{
+    var uid = Guid.NewGuid().ToString();
+    uid = uid.Replace('-', '_');
+    return $"{prefix}{uid}";
+}</pre>
+			<p>The code generates a new <strong class="source-in ine">Guid</strong> and combines it with a prefix. The purpose of the prefix is to be able to recognize the different assemblies with a friendly name. There are some limitations to what characters can be used in an assembly name; that’s why you see that <strong class="source-in ine">-</strong> is replaced <span class="No-Break">with </span><span class="No-Break"><strong class="source-in ine">_</strong></span><span class="No-Break">.</span></p>
+			<p>If your code only needs one dynamic assembly and a dynamic module within it, the need to create a unique name might not be needed, as you can quite easily just give it a <span class="No-Break">unique name.</span></p>
+			<p>You might<a id="_idIndexMarker187"/> not<a id="_idIndexMarker188"/> even need to have multiple dynamic assemblies and, most likely, not even multiple modules within the dynamic assembly. It is perfectly fine to have one global dynamic assembly. It all depends on your code and whether or not you’ll be generating types with the same name for different purposes that should then be grouped into specific assembly/module <span class="No-Break">pair containers.</span></p>
+			<p>With a dynamic assembly and a dynamic module in place, we can start generating <span class="No-Break">some code.</span></p>
+			<p>Let’s dynamically create a simple type without its source code that can print out a message. The target type we’re aiming for would look something like the following if we wrote it <span class="No-Break">in C#:</span></p>
+			<pre class="source-code">
+public class MyType
+{
+    public void SaySomething(string message)
+    {
+        System.Console.WriteLine(message);
+    }
+}</pre>
+			<p>If we put this into Sharplab (<a href="https://sharplab.io">https://sharplab.io</a>), we can see the IL code that is behind it and use it as the template for what we’re trying <span class="No-Break">to achieve:</span></p>
+			<div>
+				<div id="_idContainer021" class="IMG---Figure">
+					<img src="image/B19418_06_1.jpg" alt=""/>
+				</div>
+			</div>
+			<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Figure 6.1 – IL code</p>
+			<ol>
+				<li>Start by <a id="_idIndexMarker189"/>creating<a id="_idIndexMarker190"/> a folder called <strong class="source-in ine">Chapter6</strong>. Open this folder in your command-line interface and create a new <span class="No-Break">console project:</span><pre class="console">
+<strong class="bo d">dotnet new console</strong></pre></li>
+			</ol>
+			<p>Add a file called <strong class="source-in ine">MyTypeGenerator.cs</strong>. Start by making the file look like the following:</p>
+			<pre class="console">
+using System.Reflection;
+using System.Reflection.Emit;
+namespace Chapter6;
+public class MyTypeGenerator
+{
+    public static Type Generate()
+    {
+        // Do the generation
+    }
+}</pre>
+			<ol>
+				<li value="2">As you can see, we have pulled in two namespaces – <strong class="source-in ine">System.Reflection</strong> and <strong class="source-in ine">System.Reflection.Emit</strong>. These hold the APIs we will <span class="No-Break">be needing.</span></li>
+			</ol>
+			<p>The first thing we <a id="_idIndexMarker191"/>want to do <a id="_idIndexMarker192"/>is create the assembly and module, and add the following to the <strong class="source-in ine">Generate</strong> method:</p>
+			<pre class="console">
+var name = new AssemblyName("MyDynamicAssembly");
+var assembly = AssemblyBuilder.DefineDynamicAssembly(name,
+  AssemblyBuilderAccess.Run);
+var module = assembly.DefineDynamicModule
+  ("MyDynamicModule");</pre>
+			<p>From the module, we can create a new type, and within the type, a method. Then, we append the following to the <strong class="source-in ine">Generate</strong> method after the module has been defined:</p>
+			<pre class="console">
+var typeBuilder = module.DefineType("MyType",
+  TypeAttributes.Public | TypeAttributes.Class);
+var methodBuilder = typeBuilder.DefineMethod
+  ("SaySomething", MethodAttributes.Public);
+methodBuilder.SetParameters(typeof(string));
+methodBuilder.DefineParameter(0, ParameterAttributes.None,
+  "message");</pre>
+			<p>The code creates a public class called <strong class="source-in ine">MyType</strong> and then defines a public method called <strong class="source-in ine">SaySomething</strong>. In the method, we then set that it has parameters. The method accepts <strong class="source-in ine">param</strong> that allows us to define one or more parameter types. The last thing we do is define the parameter. This is done by giving it the parameter index it has and a name.</p>
+			<p class="ca out-heading">Important note</p>
+			<p class="ca out">The <strong class="source-in ine">ParameterAttributes</strong> value you give the parameter indicates that there is nothing special with it; it is a regular parameter. If you wanted it to be an <strong class="source-in ine">out</strong> or <strong class="source-in ine">ref</strong> parameter, you would tell <span class="No-Break">it that.</span></p>
+			<ol>
+				<li value="3">You now<a id="_idIndexMarker193"/> have <a id="_idIndexMarker194"/>the definition in place of the method with the expected signature. It is now time for you to fill in the <span class="No-Break">actual code.</span></li>
+			</ol>
+			<p>The code for this method is very simple, as we’re just taking the parameter coming in and passing it to another method.</p>
+			<p>With the method definition in place, you can start building out the code. Append the following code to the <strong class="source-in ine">Generate</strong> method:</p>
+			<pre class="console">
+var consoleType = typeof(Console);
+var writeLineMethod = consoleType.GetMethod(nameof
+  (Console.WriteLine), new[] { typeof(string) })!;
+var methodILGenerator = methodBuilder.GetILGenerator();
+methodILGenerator.Emit(OpCodes.Ldarg_1);
+methodILGenerator.EmitCall(OpCodes.Call, writeLineMethod,
+  new[] { typeof(string) });
+methodILGenerator.Emit(OpCodes.Ret);</pre>
+			<p>The code starts off by getting the <strong class="source-in ine">System.Console</strong> type and the method called <strong class="source-in ine">WriteLine</strong>, which accepts a simple <strong class="source-in ine">string</strong>. The method is what you are going to use to call and forward the incoming parameter that will eventually produce the message in the console. Once you have the <strong class="source-in ine">WriteLine</strong> method, you need <strong class="source-in ine">ILGenerator</strong> for the <strong class="source-in ine">SaySomething</strong> method you’re building. Then, the first thing you do is to emit an instruction to load the actual argument given to the parameter into what is <a id="_idIndexMarker195"/>known as the <strong class="bo d">evaluation stack</strong>. <strong class="source-in ine">OpCodes.Ldarg_1</strong> refers to 1, which might seem counterintuitive. In the context of an instance type, <strong class="source-in ine">OpCodes.Ldarg_0</strong> would represent the value of <strong class="source-in ine">this</strong>. With the argument loaded onto the stack, you emit code that calls the <strong class="source-in ine">WriteLine</strong> method on <strong class="source-in ine">Console</strong>, giving it the type of parameter to use. Finishing off <a id="_idIndexMarker196"/>your <a id="_idIndexMarker197"/>method, you emit a return instruction from the method.</p>
+			<ol>
+				<li value="4">The last piece of the <strong class="source-in ine">Generate</strong> method is building out the actual <strong class="source-in ine">Type</strong> and returning it. Append the following to the <span class="No-Break"><strong class="source-in ine">Generate</strong></span><span class="No-Break"> method:</span><pre class="console">
+return typeBuilder.CreateType()!;</pre></li>
+			</ol>
+			<p>The full listing of the <strong class="source-in ine">MyTypeGenerator</strong> class should now look like the following:</p>
+			<pre class="console">
+using System.Reflection;
+using System.Reflection.Emit;
+namespace Chapter6;
+public class MyTypeGenerator
+{
+    public static Type Generate()
+    {
+        var name = new AssemblyName("MyDynamicAssembly");
+        var assembly = AssemblyBuilder.DefineDynamic
+          Assembly(name, AssemblyBuilderAccess.Run);
+        var module = assembly.DefineDynamicModule
+          ("MyDynamicModule");
+        var typeBuilder = module.DefineType("MyType",
+          TypeAttributes.Public | TypeAttributes.Class);
+        var methodBuilder = typeBuilder.DefineMethod
+          ("SaySomething", MethodAttributes.Public);
+        methodBuilder.SetParameters(typedoc(string));
+        var parameterBuilder = methodBuilder
+          .DefineParameter(0, ParameterAttributes.None,
+            "message");
+        var consoleType = typeof(Console);
+        var writeLineMethod = consoleType.GetMethod
+          (nameof(Console.WriteLine), new[] { typeof
+            (string) })!;
+        var methodILGenerator = methodBuilder
+          .GetILGenerator();
+        methodILGenerator.Emit(OpCodes.Ldarg_1);
+        methodILGenerator.EmitCall(OpCodes.Call,
+          writeLineMethod, new[] { typeof(string) });
+        methodILGenerator.Emit(OpCodes.Ret);
+        return typeBuilder.CreateType()!;
+    }
+}</pre>
+			<p>With your first code generator in place, you want to take it out for a spin. Since this is a type that is completely unknown to the compiler, there is really no way to write standard C# code that can call it. You will have to revert to reflection to do so.</p>
+			<p>In the <strong class="source-in ine">Program.cs</strong> file <a id="_idIndexMarker198"/>of the <strong class="source-in ine">Chapter6</strong> project, replace the<a id="_idIndexMarker199"/> existing code with the following:</p>
+			<pre class="console">
+using Chapter6;
+var myType = MyTypeGenerator.Generate();
+var method = myType.GetMethod("SaySomething")!;
+var myTypeInstance = Activator.CreateInstance(myType);
+method.Invoke(myTypeInstance, new[] { "Hello world" });</pre>
+			<p>The code calls into your new generator to get the generated <strong class="source-in ine">Type</strong>. Next, it asks the generated type to get the method called <strong class="source-in ine">SaySomething</strong>. You then go and create an instance of the type by using the <strong class="source-in ine">Activator</strong> type in .NET. From the method, you can then invoke it and give the instance as the first parameter, and then add in the parameter it is expecting in the array that follows.</p>
+			<p>Running this using <strong class="source-in ine">dotnet run</strong> or, if you prefer, your IDE, you should get a simple message:</p>
+			<pre class="console">
+<strong class="bo d">Hello world</strong></pre>
+			<p>The intermediate language and how the runtime actually works with instructions is logical, but it might not be intuitive compared to writing C#. However, it gives you <a id="_idIndexMarker200"/>great<a id="_idIndexMarker201"/> powers and <a id="_idTextAnchor104"/>enables new scenarios.</p>
+			<h1 id="_idParaDest-77"><a id="_idTextAnchor105"/>Virtual members and overrides</h1>
+			<p>From my own<a id="_idIndexMarker202"/> experience, generating <a id="_idIndexMarker203"/>new types from scratch that didn’t exist at compile time is not the most common use case. I’ve found myself, more often than not, just wanting to automate something that I find tedious and forced upon me from libraries that I have <span class="No-Break">to use.</span></p>
+			<p>When that is the case, it is common to take a type and create a new one that inherits from this and then starts <span class="No-Break">overriding behavior.</span></p>
+			<p>Since C# doesn’t have all its members as virtual, as the case is with Java, members have to be explicitly virtual. An example of a method that is virtual is one that all objects inherit – the <span class="No-Break"><strong class="source-in ine">ToString</strong></span><span class="No-Break"> method.</span></p>
+			<p>Let’s continue the work on the <strong class="source-in ine">MyTypeGenerator</strong> code by adding an override of the <strong class="source-in ine">ToString</strong> method, just to see the mechanics of how it <span class="No-Break">is done:</span></p>
+			<ol>
+				<li>In the <strong class="source-in ine">Generate</strong> method of the <strong class="source-in ine">MyTypeGenerator</strong> class, before you return the type, you need to define a new method that will be the <strong class="source-in ine">MyType</strong> implementation of the <span class="No-Break"><strong class="source-in ine">ToString</strong></span><span class="No-Break"> method:</span><pre class="console">
+var toStringMethod = typeof(object).GetMethod(nameof
+  (object.ToString))!;
+var newToStringMethod = typeBuilder.DefineMethod(nameof
+  (object.ToString), toStringMethod.Attributes,
+    typeof(string), Array.Empty&lt;Type&gt;());
+var toStringGenerator = newToStringMethod.GetILGenerator();
+toStringGenerator.Emit(OpCodes.Ldstr, "A message from
+  ToString()");
+toStringGenerator.Emit(OpCodes.Ret);
+typeBuilder.DefineMethodOverride(newToStringMethod,
+  toStringMethod);</pre></li>
+			</ol>
+			<p>First, the code gets a reference to the method it wants to override from the base class. Since this type doesn’t have a specific base type, it will implicitly just be <strong class="source-in ine">object</strong>. Then, you start defining the new <strong class="source-in ine">ToString</strong> method and specify that it will return a <strong class="source-in ine">string</strong> type. Since the <strong class="source-in ine">ToString</strong> method doesn’t take any parameters, you just pass it an empty array of <strong class="source-in ine">Type</strong>. From the method definition, you go and do as before – get <strong class="source-in ine">ILGenerator</strong>. You then simply load the string into the evaluation stack, which will be the only thing there, and return <a id="_idIndexMarker204"/>from <a id="_idIndexMarker205"/>the method. To make it an override method, you then call <strong class="source-in ine">.DefineMethodOverride()</strong> on the type builder to tell it which method you’re overriding and give it the original <strong class="source-in ine">ToString</strong> method.</p>
+			<ol>
+				<li value="2">Open the <strong class="source-in ine">Program.cs</strong> file and add a line of code that will invoke the <strong class="source-in ine">ToString</strong> method to see that <span class="No-Break">it works:</span><pre class="console">
+using Chapter6;
+var myType = MyTypeGenerator.Generate();
+var method = myType.GetMethod("SaySomething")!;
+var myTypeInstance = Activator.CreateInstance(myType);
+method.Invoke(myTypeInstance, new[] { "Hello world" });
+Console.WriteLine(myTypeInstance); // Added line</pre></li>
+			</ol>
+			<p>Running the program should then print out the message:</p>
+			<pre class="console">
+<strong class="bo d">A message from ToString()</strong></pre>
+			<p>With what you’ve learned thus far in this chapter, you should now have the basic building blocks to create types with members on them and also override virtual members from inherited base types. All of these things will get you pretty far. Now that we’ve looked<a id="_idIndexMarker206"/> at the <a id="_idIndexMarker207"/>mechanics of how to generate code, let’s m<a id="_idTextAnchor106"/>ake a more <span class="No-Break">concrete example.</span></p>
+			<h1 id="_idParaDest-78"><a id="_idTextAnchor107"/>Implementing an interface</h1>
+			<p>In addition to <a id="_idIndexMarker208"/>overriding virtual members from a base type, there is often the need to implement interfaces that satisfy a need for a third-party library you are using. The implementation of the interface might not be important to your own code, but it is something that is forced on you to enable <span class="No-Break">certain behaviors.</span></p>
+			<p>Anyone who has been doing any XAML-flavored development will have come across an interface called <strong class="source-in ine">INotifyPropertyChanged</strong>. The <strong class="source-in ine">INotifyPropertyChanged</strong> interface is something that the data binding engine recognizes and will automatically use if a type implements it. Its purpose is to notify anyone using your object when a property changes. This is very useful when you have a UI element automatically reflecting changes being done in the data behind <span class="No-Break">the scenes.</span></p>
+			<p>The <strong class="source-in ine">INotifyPropertyChanged</strong> interface itself is very simple and looks <span class="No-Break">like this:</span></p>
+			<pre class="source-code">
+public interface INotifyPropertyChanged
+{
+    event PropertyChangedEventHandler? PropertyChanged;
+}</pre>
+			<p>For an object implementing <strong class="source-in ine">INotifyPropertyChanged</strong>, it means it needs to implement the logic for every property when its value is set. This can be very tedious and will bloat your code base with code that is not part of <span class="No-Break">your domain.</span></p>
+			<p>Let’s say you have an object representing <span class="No-Break">a person:</span></p>
+			<pre class="source-code">
+public class Employee
+{
+    public string FirstName { get; set; }
+    public string LastName { get; set; }
+}</pre>
+			<p>With the <strong class="source-in ine">INotifyPropertyChanged</strong> requirement for binding purposes, the object would, for just <a id="_idIndexMarker209"/>one of the properties, need to explode into <span class="No-Break">the following:</span></p>
+			<pre class="source-code">
+using System.ComponentModel;
+public class Employee : INotifyPropertyChanged
+{
+    private string _firstName;
+    public string FirstName
+    {
+        get { return _firstName; }
+        set
+        {
+            _firstName = value;
+            RaisePropertyChanged("FirstName");
+        }
+    }
+    public event PropertyChangedEventHandler
+      PropertyChanged;
+    protected void RaisePropertyChanged(string
+      propertyName)
+    {
+        if (PropertyChanged != null)
+        {
+            PropertyChanged(this, new Property
+              ChangedEventArgs(propertyName));
+        }
+    }
+}</pre>
+			<p>As you can see, the code goes from simple one-liners per property to something that explicitly has a getter, setter, and private field to hold the actual value. In the setter, you have to then raise the <strong class="source-in ine">PropertyChanged</strong> event, and a typical pattern is to have a convenience method that is reused for all properties to <span class="No-Break">do that.</span></p>
+			<p>Thanks to code generation, you can make it all go away and get your code back to being readable and more maintainable, making you more productive in <span class="No-Break">the process.</span></p>
+			<p>In the <strong class="source-in ine">Chapter6</strong> folder, go and create a new file called <strong class="source-in ine">Person.cs</strong> and make it look like <span class="No-Break">the following:</span></p>
+			<pre class="source-code">
+namespace Chapter6;
+public class Employee
+{
+    public virtual string FirstName { get; set; }
+    public virtual string LastName { get; set; }
+}</pre>
+			<p>The <strong class="source-in ine">Person</strong> class now represents the target version without any of the <strong class="source-in ine">INotifyPropertyChanged</strong> things. At compile-time, it does not implement the <strong class="source-in ine">INotifyPropertyChanged</strong> interface, but we will make it do so <span class="No-Break">at runtime.</span></p>
+			<p>Since we’ve<a id="_idIndexMarker210"/> made the properties <strong class="source-in ine">virtual</strong>, we can create a new type that inherits from the <strong class="source-in ine">Person</strong> type and overrides the<a id="_idTextAnchor108"/> properties to do what <span class="No-Break">we want.</span></p>
+			<h2 id="_idParaDest-79"><a id="_idTextAnchor109"/>NotifyObjectWeaver class</h2>
+			<p>To be<a id="_idIndexMarker211"/> able to <a id="_idIndexMarker212"/>do what we want, we need to do <span class="No-Break">the following:</span></p>
+			<ol>
+				<li>Create a <span class="No-Break">new type.</span></li>
+				<li>Inherit from the <span class="No-Break">existing type.</span></li>
+				<li>Implement the <span class="No-Break"><strong class="source-in ine">INotifyPropertyChanged</strong></span><span class="No-Break"> interface.</span></li>
+				<li>Add a method that handles the logic for when a property <span class="No-Break">is changed.</span></li>
+				<li>Override any virtual methods and implement the code needed for notification when <span class="No-Break">properties change.</span></li>
+			</ol>
+			<p>In addition to this, it is also common to have properties that are dependent on other properties – for instance, to compose multiple properties together. These should also notify you of their change, so you want something to handle that <span class="No-Break">as well.</span></p>
+			<p>Start by adding a file called <strong class="source-in ine">NotifyObjectWeaver.cs</strong> in the <strong class="source-in ine">Chapter6</strong> project. Then, add<a id="_idIndexMarker213"/> the<a id="_idIndexMarker214"/> following to <span class="No-Break">the file:</span></p>
+			<pre class="source-code">
+using System.ComponentModel;
+using System.Linq.Expressions;
+using System.Reflection;
+using System.Reflection.Emit;
+namespace Chapter6;
+public static class NotifyingObjectWeaver
+{
+    const string DynamicAssemblyName = "Dynamic Assembly";
+    const string DynamicModuleName = "Dynamic Module";
+    const string PropertyChangedEventName = nameof
+      (INotifyPropertyChanged.PropertyChanged);
+    const string OnPropertyChangedMethodName =
+      "OnPropertyChanged";
+    static readonly Type VoidType = typeof(void);
+    static readonly Type DelegateType = typeof(Delegate);
+    const MethodAttributes EventMethodAttributes =
+        MethodAttributes.Public | MethodAttributes
+          .HideBySig | MethodAttributes.Virtual;
+    const MethodAttributes OnPropertyChanged
+      MethodAttributes =
+        MethodAttributes.Public | MethodAttributes
+          .HideBySig;
+}</pre>
+			<p>The code adds the common constants and statics you’ll be using in the code generation, ensuring that you do not have to repeat them throughout and that they gather at the top <a id="_idIndexMarker215"/>for <span class="No-Break">better</span><span class="No-Break"><a id="_idIndexMarker216"/></span><span class="No-Break"> structure.</span></p>
+			<p>With this, you now have the s<a id="_idTextAnchor110"/>tart of the <span class="No-Break"><strong class="source-in ine">NotifyObjectWeaver</strong></span><span class="No-Break"> class.</span></p>
+			<h3>Creating the type</h3>
+			<p>The first thing you’re<a id="_idIndexMarker217"/> going to start with is the code to define the type. It is pretty much what you’ve done before, only that we are now going to make your dynamically created type inherit from a base type and also implement <span class="No-Break">an interface:</span></p>
+			<pre class="source-code">
+static TypeBuilder DefineType(Type type)
+{
+    var name = $"{type.Name}_Proxy";
+    var typeBuilder = DynamicModule.DefineType(name,
+      TypeAttributes.Public | TypeAttributes.Class);
+    typeBuilder.SetParent(type);
+    var interfaceType = typeof(INotifyPropertyChanged);
+    typeBuilder.AddInterfaceImplementation(interfaceType);
+    return typeBuilder;
+}</pre>
+			<p>The call to <strong class="source-in ine">.SetParent()</strong> is the key to the inheritance. It instructs the builder to take the <strong class="source-in ine">Type</strong> input given to the method as the parent. The next thing you do is to instruct the builder that <a id="_idIndexMarker218"/>you will be implementin<a id="_idTextAnchor111"/>g the <span class="No-Break"><strong class="source-in ine">INotifyPropertyChanged</strong></span><span class="No-Break"> interface.</span></p>
+			<h3>Implementing the INotifyPropertyChanged interface</h3>
+			<p>The <strong class="source-in ine">INotifyPropertyChanged</strong> interface<a id="_idIndexMarker219"/> only has one field on it, the <strong class="source-in ine">PropertyChanged</strong> event <a id="_idIndexMarker220"/>field that we need to implement. We need to add code that defines the event and also implements the logic to add and remove event handlers from <span class="No-Break">the event.</span></p>
+			<p>In the <strong class="source-in ine">NotifyObjectWeaver</strong> class, add the <span class="No-Break">following method:</span></p>
+			<pre class="source-code">
+static void DefineEvent(TypeBuilder typeBuilder, Type
+  eventHandlerType, FieldBuilder fieldBuilder)
+{
+    var eventBuilder = typeBuilder.DefineEvent(nameof
+      (INotifyPropertyChanged.PropertyChanged),
+        EventAttributes.None, eventHandlerType);
+    DefineAddMethodForEvent(typeBuilder, eventHandlerType,
+      fieldBuilder, eventBuilder);
+    DefineRemoveMethodForEvent(typeBuilder,
+      eventHandlerType, fieldBuilder, eventBuilder);
+}</pre>
+			<p>The <strong class="source-in ine">DefineEvent</strong> method defines the actual event on the type and then calls two methods to define the <strong class="source-in ine">add</strong> and <strong class="source-in ine">remove</strong> methods for <span class="No-Break">the event.</span></p>
+			<p>Add the<a id="_idIndexMarker221"/> following <a id="_idIndexMarker222"/>method to the <span class="No-Break"><strong class="source-in ine">NotifyObjectWeaver</strong></span><span class="No-Break"> class:</span></p>
+			<pre class="source-code">
+static void DefineAddMethodForEvent(TypeBuilder
+  typeBuilder, Type eventHandlerType, FieldBuilder
+    fieldBuilder, EventBuilder eventBuilder)
+{
+    var combineMethodInfo = DelegateType.GetMethod
+      ("Combine", BindingFlags.Public |
+        BindingFlags.Static, null,
+          new[] { DelegateType, DelegateType }, null)!;
+    var addEventMethod = string.Format("add_{0}",
+      PropertyChangedEventName);
+    var addMethodBuilder = typeBuilder.DefineMethod
+      (addEventMethod, EventMethodAttributes, VoidType,
+        new[] { eventHandlerType });
+    var addMethodGenerator = addMethodBuilder
+      .GetILGenerator();
+    addMethodGenerator.Emit(OpCodes.Ldarg_0);
+    addMethodGenerator.Emit(OpCodes.Ldarg_0);
+    addMethodGenerator.Emit(OpCodes.Ldfld, fieldBuilder);
+    addMethodGenerator.Emit(OpCodes.Ldarg_1);
+    addMethodGenerator.EmitCall(OpCodes.Call,
+      combineMethodInfo, null);
+    addMethodGenerator.Emit(OpCodes.Castclass,
+      eventHandlerType);
+    addMethodGenerator.Emit(OpCodes.Stfld, fieldBuilder);
+    addMethodGenerator.Emit(OpCodes.Ret);
+    eventBuilder.SetAddOnMethod(addMethodBuilder);
+}</pre>
+			<p>The code adds a method that by convention will be used when event handlers are added, <strong class="source-in ine">add_PropertyChanged</strong>. It uses the <strong class="source-in ine">Delegate</strong> type that you added at the beginning of the class to get the <strong class="source-in ine">Combine</strong> method that will <span class="No-Break">be called.</span></p>
+			<p>It then generates the needed IL code that adds the incoming callback to be called when a change happens, by calling the retrieved <span class="No-Break"><strong class="source-in ine">Combine</strong></span><span class="No-Break"> method.</span></p>
+			<p>You should<a id="_idIndexMarker223"/> also, for<a id="_idIndexMarker224"/> good measure, add the opposite – the method that will remove a callback that has been added. Add the following method to the <span class="No-Break"><strong class="source-in ine">NotifyObjectWeaver</strong></span><span class="No-Break"> class:</span></p>
+			<pre class="source-code">
+static void DefineRemoveMethodForEvent(TypeBuilder
+  typeBuilder, Type eventHandlerType, FieldBuilder
+    fieldBuilder, EventBuilder eventBuilder)
+{
+    var removeEventMethod = string.Format("remove_{0}",
+      PropertyChangedEventName)!;
+    var removeMethodInfo = DelegateType.GetMethod("Remove",
+      BindingFlags.Public | BindingFlags.Static, null,
+        new[] { DelegateType, DelegateType }, null)!;
+    var removeMethodBuilder = typeBuilder.DefineMethod
+      (removeEventMethod, EventMethodAttributes, VoidType,
+        new[] { eventHandlerType });
+    var removeMethodGenerator = removeMethodBuilder
+      .GetILGenerator();
+    removeMethodGenerator.Emit(OpCodes.Ldarg_0);
+    removeMethodGenerator.Emit(OpCodes.Ldarg_0);
+    removeMethodGenerator.Emit(OpCodes.Ldfld,
+      fieldBuilder);
+    removeMethodGenerator.Emit(OpCodes.Ldarg_1);
+    removeMethodGenerator.EmitCall(OpCodes.Call,
+      removeMethodInfo, null);
+    removeMethodGenerator.Emit(OpCodes.Castclass,
+      eventHandlerType);
+    removeMethodGenerator.Emit(OpCodes.Stfld,
+      fieldBuilder);
+    removeMethodGenerator.Emit(OpCodes.Ret);
+    eventBuilder.SetRemoveOnMethod(removeMethodBuilder);
+}</pre>
+			<p>The<a id="_idIndexMarker225"/> implementation <a id="_idIndexMarker226"/>of <strong class="source-in ine">remove</strong> is pretty much the same as for <strong class="source-in ine">add</strong>, with the difference of getting the <strong class="source-in ine">Remove</strong> method from the <a id="_idTextAnchor112"/><strong class="source-in ine">Delegate</strong> type and <span class="No-Break">calling </span><span class="No-Break"><strong class="source-in ine">.SetRemoveOnMethod()</strong></span><span class="No-Break">.</span></p>
+			<h3>The OnPropertyChanged method</h3>
+			<p>With the <a id="_idIndexMarker227"/>event logic in place, you now<a id="_idIndexMarker228"/> need a private method that all properties will call – an <strong class="source-in ine">OnPropertyChanged</strong> method that will be doing all the <span class="No-Break">heavy lifting.</span></p>
+			<p>Start by adding the following method in the <span class="No-Break"><strong class="source-in ine">NotifyObjectWeaver</strong></span><span class="No-Break"> class:</span></p>
+			<pre class="source-code">
+static MethodBuilder DefineOnPropertyChangedMethod
+  (TypeBuilder typeBuilder, FieldBuilder
+    propertyChangedFieldBuilder)
+{
+    var onPropertyChangedMethodBuilder =
+      typeBuilder.DefineMethod(OnPropertyChangedMethodName,
+        OnPropertyChangedMethodAttributes, VoidType,
+    new[] { typeof(string) });
+    var onPropertyChangedMethodGenerator =
+      onPropertyChangedMethodBuilder.GetILGenerator();
+    var invokeMethod = typeof(PropertyChangedEventHandler)
+      .GetMethod(nameof(PropertyChangedEventHandler
+        .Invoke))!;
+}</pre>
+			<p>The code defines the <strong class="source-in ine">OnPropertyChanged</strong> method with a signature that takes <strong class="source-in ine">string</strong>, with the name of the property <span class="No-Break">that changed.</span></p>
+			<p>Then, add the following at the end of <strong class="source-in ine">DefineOnPropertyChangedMethod</strong> to declare a <a id="_idIndexMarker229"/>local <a id="_idIndexMarker230"/>variable that holds the type of event args the code <span class="No-Break">will create:</span></p>
+			<pre class="source-code">
+var propertyChangedEventArgsType = typeof(
+  PropertyChangedEventArgs);
+onPropertyChangedMethodGenerator.DeclareLocal(
+  propertyChangedEventArgsType);</pre>
+			<p>Now, you need code that checks whether the <strong class="source-in ine">PropertyChanged</strong> event field is null or not and has the <strong class="source-in ine">propertyChangedNullLabel</strong> label that the code can jump to if the value <span class="No-Break">is null.</span></p>
+			<p>Add the following code at the end of the <span class="No-Break"><strong class="source-in ine">DefineOnPropertyChangedMethod</strong></span><span class="No-Break"> method:</span></p>
+			<pre class="source-code">
+var propertyChangedNullLabel = onPropertyChangedMethod
+  Generator.DefineLabel();
+onPropertyChangedMethodGenerator.Emit(OpCodes.Ldnull);
+onPropertyChangedMethodGenerator.Emit(OpCodes.Ldarg_0);
+onPropertyChangedMethodGenerator.Emit(OpCodes.Ldfld,
+  propertyChangedFieldBuilder);
+onPropertyChangedMethodGenerator.Emit(OpCodes.Ceq);
+onPropertyChangedMethodGenerator.Emit(OpCodes.Brtrue_S,
+  propertyChangedNullLabel);</pre>
+			<p>Now, you <a id="_idIndexMarker231"/>need to add code<a id="_idIndexMarker232"/> that creates the <strong class="source-in ine">PropertyChangedEventArgs</strong> instance with the argument that was passed into the <strong class="source-in ine">OnPropertyChanged</strong> method. Then, call the <span class="No-Break"><strong class="source-in ine">invoke</strong></span><span class="No-Break"> method:</span></p>
+			<pre class="source-code">
+onPropertyChangedMethodGenerator.Emit(OpCodes.Ldarg_1);
+onPropertyChangedMethodGenerator.Emit(OpCodes.Newobj,
+  propertyChangedEventArgsType.GetConstructor(new[] {
+    typeof(string) })!);
+onPropertyChangedMethodGenerator.Emit(OpCodes.Stloc_0);
+onPropertyChangedMethodGenerator.Emit(OpCodes.Ldarg_0);
+onPropertyChangedMethodGenerator.Emit(OpCodes.Ldfld,
+  propertyChangedFieldBuilder);
+onPropertyChangedMethodGenerator.Emit(OpCodes.Ldarg_0);
+onPropertyChangedMethodGenerator.Emit(OpCodes.Ldloc_0);
+onPropertyChangedMethodGenerator.EmitCall(OpCodes.Callvirt,
+  invokeMethod, null);</pre>
+			<p>The last piece of the puzzle is to mark the label that the null check will jump to if it is null, and then return from the method. Add the following to the end of the <span class="No-Break"><strong class="source-in ine">DefineOnPropertyChangedMethod</strong></span><span class="No-Break"> method:</span></p>
+			<pre class="source-code">
+onPropertyChangedMethodGenerator.MarkLabel(propertyChanged
+  NullLabel);
+onPropertyChangedMethodGenerator.Emit(OpCodes.Ret);
+return onPropertyChangedMethodBuilder;</pre>
+			<p>The code <a id="_idIndexMarker233"/>to<a id="_idIndexMarker234"/> define the <strong class="source-in ine">OnPropertyChanged</strong> meth<a id="_idTextAnchor113"/>od is now done. Now, you need to define <span class="No-Break">the properties.</span></p>
+			<h3>The overriding properties</h3>
+			<p>One of the <a id="_idIndexMarker235"/>requirements we had at the beginning was that we wanted to be able to notify other properties to make composites or, if it’s relevant, for another property <span class="No-Break">to re-evaluate:</span></p>
+			<ol>
+				<li>Add a file called <strong class="source-in ine">NotifyChangedForAttribute.cs</strong> and make it look like <span class="No-Break">the following:</span><pre class="console">
+namespace Chapter6;
+[AttributeUsage(AttributeTargets.Property)]
+public class NotifyChangesForAttribute : Attribute
+{
+    public NotifyChangesForAttribute(params string[]
+      propertyNames)
+    {
+        PropertyNames = propertyNames;
+    }
+    public string[] PropertyNames { get; }
+}</pre></li>
+			</ol>
+			<p>This custom attribute takes a <strong class="source-in ine">param</strong> array of property names that will be called for a change, in addition to the property that changed.</p>
+			<ol>
+				<li value="2">For convenience, you should add a method to get the properties to notify, based on <strong class="source-in ine">PropertyInfo</strong> for the property. In the <strong class="source-in ine">NotifyingObjectWeaver</strong> class, add<a id="_idIndexMarker236"/> the <span class="No-Break">following method:</span><pre class="console">
+static string[] GetPropertiesToNotifyFor(PropertyInfo
+  property)
+{
+    var properties = new List&lt;string&gt;
+    {
+        property.Name
+    };
+    foreach (var attribute in (NotifyChangesForAttribute[])
+      property.GetCustomAttributes(typeof(NotifyChangesFor
+        Attribute), true))
+    {
+        properties.AddRange(attribute.PropertyNames);
+    }
+    return properties.ToArray();
+}</pre></li>
+			</ol>
+			<p>The code combines the name of the property, looks for the <strong class="source-in ine">NotifyChangesForAttribute</strong> attribute, and adds the declared names.</p>
+			<ol>
+				<li value="3">You’re now ready to add the method that defines all the properties on the new type. Add the following method to the <span class="No-Break"><strong class="source-in ine">NotifyingObjectWeaver</strong></span><span class="No-Break"> class:</span><pre class="console">
+static void DefineProperties(TypeBuilder typeBuilder, Type
+  baseType, MethodBuilder onPropertyChangedMethodBuilder)
+{
+    var properties = baseType.GetProperties();
+    var query = from p in properties
+                where p.GetGetMethod()!.IsVirtual &amp;&amp; !p
+                  .GetGetMethod()!.IsFinal
+                select p;
+    foreach (var property in query)
+    {
+        DefineGetMethodForProperty(property, typeBuilder);
+        DefineSetMethodForProperty(property, typeBuilder,
+          onPropertyChangedMethodBuilder);
+    }
+}</pre></li>
+			</ol>
+			<p>The code<a id="_idIndexMarker237"/> looks at the base type and gets all the properties and filters down to only virtual methods. Then, for all the properties it found, it goes and defines the <strong class="source-in ine">get</strong> and <strong class="source-in ine">set</strong> methods for the property.</p>
+			<ol>
+				<li value="4">Add the following method to the <span class="No-Break"><strong class="source-in ine">NotifyingObjectWeaver</strong></span><span class="No-Break"> class:</span><pre class="console">
+static void DefineSetMethodForProperty(PropertyInfo
+  property, TypeBuilder typeBuilder, MethodBuilder
+    onPropertyChangedMethodBuilder)
+{
+    var setMethodToOverride = property.GetSetMethod();
+    if (setMethodToOverride is null)
+    {
+        return;
+    }
+    var setMethodBuilder = typeBuilder.DefineMethod
+      (setMethodToOverride.Name, setMethodToOverride
+        .Attributes, VoidType, new[] { property
+          .PropertyType });
+    var setMethodGenerator = setMethodBuilder
+      .GetILGenerator();
+    var propertiesToNotifyFor = GetPropertiesToNotifyFor
+      (property);
+    setMethodGenerator.Emit(OpCodes.Ldarg_0);
+    setMethodGenerator.Emit(OpCodes.Ldarg_1);
+    setMethodGenerator.Emit(OpCodes.Call,
+      setMethodToOverride);
+    foreach (var propertyName in propertiesToNotifyFor)
+    {
+        setMethodGenerator.Emit(OpCodes.Ldarg_0);
+        setMethodGenerator.Emit(OpCodes.Ldstr,
+          propertyName);
+        setMethodGenerator.Emit(OpCodes.Call,
+          onPropertyChangedMethodBuilder);
+    }
+    setMethodGenerator.Emit(OpCodes.Ret);
+    typeBuilder.DefineMethodOverride(setMethodBuilder,
+      setMethodToOverride);
+}</pre></li>
+			</ol>
+			<p>The <strong class="source-in ine">set_*</strong> method is the method that will perform the notification. The code defines the method and first adds a call to the base type’s <strong class="source-in ine">set</strong> method so that the base<a id="_idIndexMarker238"/> type can handle the value being set for itself. Then, it loops through all the properties to notify for and adds code to call the <strong class="source-in ine">OnPropertyChanged</strong> method with the name of the property.</p>
+			<ol>
+				<li value="5">Getting the value is slightly different, as you only want it to read through to the base type and get the value <span class="No-Break">from it.</span></li>
+			</ol>
+			<p>Add the following method to the <strong class="source-in ine">NotifyingObjectWeaver</strong> class:</p>
+			<pre class="console">
+static void DefineGetMethodForProperty(PropertyInfo
+  property, TypeBuilder typeBuilder)
+{
+    var getMethodToOverride = property.GetGetMethod()!;
+    var getMethodBuilder = typeBuilder.DefineMethod
+      (getMethodToOverride.Name, getMethodToOverride
+        .Attributes, property.PropertyType,
+          Array.Empty&lt;Type&gt;());
+    var getMethodGenerator = getMethodBuilder
+      .GetILGenerator();
+    var label = getMethodGenerator.DefineLabel();
+    getMethodGenerator.DeclareLocal(property.PropertyType);
+    getMethodGenerator.Emit(OpCodes.Ldarg_0);
+    getMethodGenerator.Emit(OpCodes.Call,
+      getMethodToOverride);
+    getMethodGenerator.Emit(OpCodes.Stloc_0);
+    getMethodGenerator.Emit(OpCodes.Br_S, label);
+    getMethodGenerator.MarkLabel(label);
+    getMethodGenerator.Emit(OpCodes.Ldloc_0);
+    getMethodGenerator.Emit(OpCodes.Ret);
+    typeBuilder.DefineMethodOverride(getMethodBuilder,
+      getMethodToOverride);
+}</pre>
+			<p>You now <a id="_idIndexMarker239"/>have all the code for doing the code generation needed for the proper<a id="_idTextAnchor114"/>ties and also the method to raise the <span class="No-Break"><strong class="source-in ine">PropertyChanged</strong></span><span class="No-Break"> event.</span></p>
+			<h3>Initialization and public API</h3>
+			<p>The last <a id="_idIndexMarker240"/>piece of <a id="_idIndexMarker241"/>the puzzle will be to do the main initialization that defines the dynamic assembly <span class="No-Break">and module.</span></p>
+			<p>Add the following in the <span class="No-Break"><strong class="source-in ine">NotifyingObjectWeaver</strong></span><span class="No-Break"> class:</span></p>
+			<pre class="source-code">
+static readonly AssemblyBuilder DynamicAssembly;
+static readonly ModuleBuilder DynamicModule;
+static readonly Dictionary&lt;Type, Type&gt; Proxies = new();
+static NotifyingObjectWeaver()
+{
+    var assemblyName = new AssemblyName
+      (DynamicAssemblyName);
+    DynamicAssembly = AssemblyBuilder
+      .DefineDynamicAssembly(assemblyName,
+        AssemblyBuilderAccess.Run);
+    DynamicModule = DynamicAssembly.DefineDynamicModule
+      (DynamicModuleName);
+}
+The code introduces a private <strong class="source-in ine">Proxies</strong> field. This will serve as a cache to avoid generating<a id="_idIndexMarker242"/> the same type multiple times every time<a id="_idIndexMarker243"/> one needs a proxy of a type.</pre>
+			<p>You now need a public API that can be called from the outside to get a proxy type of <span class="No-Break">another type.</span></p>
+			<p>Add the following code to the <span class="No-Break"><strong class="source-in ine">NotifyingObjectWeaver</strong></span><span class="No-Break"> class:</span></p>
+			<pre class="source-code">
+public static Type GetProxyType(Type type)
+{
+    Type proxyType;
+    if (Proxies.ContainsKey(type))
+    {
+        proxyType = Proxies[type];
+    }
+    else
+    {
+        proxyType = CreateProxyType(type);
+        Proxies[type] = proxyType;
+    }
+    return proxyType;
+}</pre>
+			<p>The <strong class="source-in ine">GetProxyType</strong> method checks first whether there is a proxy type for the given type and <a id="_idIndexMarker244"/>returns <a id="_idIndexMarker245"/>the existing one if that’s the<a id="_idTextAnchor115"/> case, creating the proxy type if it doesn’t have it in <span class="No-Break">the cache.</span></p>
+			<h3>Using NotifyingObjectWeaver</h3>
+			<p>You now have a<a id="_idIndexMarker246"/> fully functional object weaver. Let’s take it out for a spin. In the <strong class="source-in ine">Program.cs</strong> file, add the <span class="No-Break">following code:</span></p>
+			<pre class="source-code">
+var type = NotifyingObjectWeaver.GetProxyType
+  (typeof(Person));
+Console.WriteLine($"Type name : {type}");
+var instance = (Activator.CreateInstance(type) as
+  INotifyPropertyChanged)!;
+instance.PropertyChanged += (sender, e) =&gt;
+  Console.WriteLine($"{e.PropertyName} changed");
+var instanceAsViewModel = (instance as Person)!;
+instanceAsViewModel.FirstName = "John";</pre>
+			<p>The code asks for a wrapped-up type and then creates an instance of it. Since it now implements <strong class="source-in ine">INotifyPropertyChanged</strong>, we can simply cast it to that type and interact with the <span class="No-Break"><strong class="source-in ine">PropertyChanged</strong></span><span class="No-Break"> event.</span></p>
+			<p>And since the new type inherits from the <strong class="source-in ine">Person</strong> class, we can also cast it to that type and set the property <span class="No-Break">on it.</span></p>
+			<p>When you run this program, you should see <span class="No-Break">the following:</span></p>
+			<pre class="console">
+Type name : Person6e46bfa7_e47a_4299_8ae6_f928b8a027ee
+FirstName changed</pre>
+			<p>Now would be <a id="_idIndexMarker247"/>a good time to try out the <strong class="source-in ine">NotifyChangesFor</strong> functionality you added. Open the <strong class="source-in ine">Person.cs</strong> file and change it to look like <span class="No-Break">the following:</span></p>
+			<pre class="source-code">
+public class Person
+{
+    [NotifyChangesFor(nameof(FullName))]
+    public virtual string FirstName { get; set; } =
+      string.Empty;
+    [NotifyChangesFor(nameof(FullName))]
+    public virtual string LastName { get; set; } =
+      string.Empty;
+    public virtual string FullName =&gt; $"{FirstName}
+      {LastName}";
+}</pre>
+			<p>Since <strong class="source-in ine">FullName</strong> is a composite of both <strong class="source-in ine">FirstName</strong> and <strong class="source-in ine">LastName</strong>, it makes sense to be notified if either of those <span class="No-Break">properties changes.</span></p>
+			<p>Running the program should now give you <span class="No-Break">the following:</span></p>
+			<pre class="console">
+Type name : Person6e46bfa7_e47a_4299_8ae6_f928b8a027ee
+FirstName changed
+FullName changed</pre>
+			<p>The code in the GitHub repository has more capabilities that sit there as a reference. For instance, if the base type has a constructor that takes parameters, you should implement the same constructor in the type and pass along the constructor parameters to the <span class="No-Break">base constructor.</span></p>
+			<p>Another common occurrence you may run into is the need to be able to ignore properties. Since the implementation<a id="_idIndexMarker248"/> in this chapter is an <strong class="bo d">opt-out</strong> model, all virtual properties are considered properties that notify about changes. This might not be true, but it is most likely what you need from most properties. Therefore, you want to have a way to <span class="No-Break">ignore </span><span class="No-Break"><a id="_idIndexMarker249"/></span><span class="No-Break">these.</span></p>
+			<p>Look at the complete listing in the <a id="_idTextAnchor116"/>GitHub repository, where you can see how these things <span class="No-Break">are implemented.</span></p>
+			<h1 id="_idParaDest-80"><a id="_idTextAnchor117"/>Summary</h1>
+			<p>In this chapter, we have learned about the power of having a managed runtime environment, seeing how we can take full advantage of it by dynamically creating code that will be executed in the same premises as <span class="No-Break">pre-compiled code.</span></p>
+			<p>The possibilities are pretty much endless with such a power. It is super helpful as a way to automate tedious tasks and optimize the developer experience, but it can be used for so much more. For instance, if you have a system that dynamically connects to other systems and the types are dynamically created through configuration or similar, instead of going through untyped mechanisms such as the <strong class="source-in ine">Dictionary&lt;,&gt;</strong> type to hold property values, an optimization would be to create types on the fly. The benefit is that you’d have something that was type-safe within the runtime. It could also prove to be a performance boost to your system, as you wouldn’t be looking up values from <span class="No-Break">the dictionary.</span></p>
+			<p>In the next chapter, we will dive into a constructor called <strong class="source-in ine">Expression</strong>, how it can be used to represent code and logic, and how you can extract information from <span class="No-Break">an </span><span class="No-Break"><strong class="source-in ine">Expression</strong></span><span class="No-Break">.</span></p>
+		</div>
+	</body></html>

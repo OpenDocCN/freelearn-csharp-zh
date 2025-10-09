@@ -1,0 +1,477 @@
+<html><head></head><body>
+		<div id="_idContainer063">
+			<h1 id="_idParaDest-135" class="chapter-number"><a id="_idTextAnchor135"/>6</h1>
+			<h1 id="_idParaDest-136"><a id="_idTextAnchor136"/>Leveraging Data and Services</h1>
+			<p>Managing data is central to the operation of most applications. Learning how to load, maintain, and save that data is an important aspect of WinUI development. Two of the most important aspects of data management <a id="_idIndexMarker425"/>are <strong class="bold">state management</strong> and <a id="_idIndexMarker426"/>the <strong class="bold">service locator pattern</strong>. We will be covering these concepts and putting some of them to use in <span class="No-Break">our application.</span></p>
+			<p>In this chapter, we will cover the <span class="No-Break">following topics:</span></p>
+			<ul>
+				<li>Understanding the WinUI <span class="No-Break">application lifecycle</span></li>
+				<li>Learning to use <strong class="bold">SQLite</strong> to store <span class="No-Break">application data</span></li>
+				<li>Learning to use the <strong class="bold">object-relational mapper</strong> (<strong class="bold">ORM</strong>) <strong class="bold">Dapper</strong> to quickly map objects in a <span class="No-Break">data service</span></li>
+				<li>Continuing to explore the service locator pattern and implementing it with our <span class="No-Break">data service</span></li>
+			</ul>
+			<p>By the end of this chapter, you will have a working understanding of the WinUI application lifecycle and will know how to manage data and state in <span class="No-Break">your projects.</span></p>
+			<h1 id="_idParaDest-137"><a id="_idTextAnchor137"/>Technical requirements</h1>
+			<p>To follow along with the examples in this chapter, the following software <span class="No-Break">is required:</span></p>
+			<ul>
+				<li>Windows 10 version 1803 (version 17134) <span class="No-Break">or newer</span></li>
+				<li>Visual Studio 2022 or newer, with the .NET desktop development workload configured for Windows App <span class="No-Break">SDK development</span></li>
+			</ul>
+			<p>The source code for this chapter is available on GitHub <span class="No-Break">at </span><a href="https://github.com/PacktPublishing/Learn-WinUI-3-Second-Edition/tree/master/Chapter06"><span class="No-Break">https://github.com/PacktPublishing/Learn-WinUI-3-Second-Edition/tree/master/Chapter06</span></a><span class="No-Break">.</span></p>
+			<h1 id="_idParaDest-138"><a id="_idTextAnchor138"/>Managing application state with app lifecycle events</h1>
+			<p>Before <a id="_idIndexMarker427"/>working with data in any application, it is important to understand the application lifecycle for the target application platform. We have touched on these concepts briefly, but now, it’s time to take a deeper dive into the Windows application<a id="_idIndexMarker428"/> lifecycle for <strong class="bold">WinUI on </strong><span class="No-Break"><strong class="bold">Desktop</strong></span><span class="No-Break"> applications.</span></p>
+			<h2 id="_idParaDest-139"><a id="_idTextAnchor139"/>Exploring Windows application lifecycle events</h2>
+			<p>WinUI on desktop applications<a id="_idIndexMarker429"/> has a slightly <a id="_idIndexMarker430"/>different set of lifecycle events than other desktop .NET applications. WPF and <strong class="bold">Windows Forms</strong> (<strong class="bold">WinForms</strong>) applications<a id="_idIndexMarker431"/> are either running or they’re not. There are several events that occur while launching and shutting down WPF and <span class="No-Break">WinForms applications:</span></p>
+			<div>
+				<div id="_idContainer060" class="IMG---Figure">
+					<img src="image/B20908_06_01.jpg" alt="Figure 6.1 – WPF and WinForms application life﻿cycle events"/>
+				</div>
+			</div>
+			<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Figure 6.1 – WPF and WinForms application lifecycle events</p>
+			<p class="callout-heading">Note</p>
+			<p class="callout">We won’t go into the details here, as our primary focus is building WinUI 3 applications. However, for the two WPF events that fall outside of the launch and close, their sequences are <span class="No-Break">as follows:</span></p>
+			<p class="callout">1. <strong class="source-inline">FrameworkElement.Unloaded</strong>: This<a id="_idIndexMarker432"/> event fires when an element is removed from the WPF visual tree. It does not fire during <span class="No-Break">application shutdown.</span></p>
+			<p class="callout">2. <strong class="source-inline">Application.SessionEnding</strong>: This <a id="_idIndexMarker433"/>event fires when the current Windows user logs off or shuts down Windows. In the event handler, you can request that Windows cancels the process by setting the <strong class="source-inline">SessionEndingCancelEventArgs.Cancel</strong> property <span class="No-Break">to </span><span class="No-Break"><strong class="source-inline">true</strong></span><span class="No-Break">.</span></p>
+			<h2 id="_idParaDest-140"><a id="_idTextAnchor140"/>Lifecycle events of WinUI applications</h2>
+			<p>Let’s talk about<a id="_idIndexMarker434"/> the WinUI lifecycle. Lifecycle events give you a chance to initialize any data and state when your application starts execution, and this allows you to clean up or save the state when the application is closed. In UWP applications, you also had the ability to handle events when the application was suspended or resumed because of a user or operating system action. WinUI, like other .NET desktop applications, doesn’t have <span class="No-Break">this ability.</span></p>
+			<p>In the <strong class="source-inline">Application</strong> and <strong class="source-inline">Window</strong> classes, there are only a couple of events that can be handled. Every <strong class="source-inline">Application</strong> class overrides the <strong class="source-inline">OnLaunched</strong> method. This method will be invoked exactly once, when the application is launched either by a user or the operating system. We’ve already worked with the <strong class="source-inline">OnLaunched</strong> method in our sample application. It’s where <strong class="source-inline">MainWindow</strong> is created and where we added a call to the method to configure our IOC container. In a new WinUI application, the <strong class="source-inline">OnLaunched</strong> method will look <span class="No-Break">like this:</span></p>
+			<pre class="source-code">
+protected override void OnLaunched(Microsoft.UI.Xaml.LaunchActivatedEventArgs args)
+{
+    m_window = new MainWindow();
+    m_window.Activate();
+}</pre>			<p>The <strong class="source-inline">Application</strong> and <strong class="source-inline">Window</strong> classes only inherit from the .NET <strong class="source-inline">Object</strong> class, so there are no inherited events to leverage either. This is not the case with the <strong class="source-inline">Page</strong> class, which we will discuss shortly. First, we’re going to discuss <strong class="source-inline">Window</strong>, which has a couple of events we can leverage when managing an <span class="No-Break">app’s lifecycle.</span></p>
+			<p>The <strong class="source-inline">Window</strong> class<a id="_idIndexMarker435"/> in WinUI does not have a <strong class="source-inline">Loaded</strong> event, which is used in a WPF <strong class="source-inline">Window</strong> class to indicate that the window and its contents are loaded and available for interaction. The <strong class="source-inline">Window.Activated</strong> event can be used in place of a <strong class="source-inline">Loaded</strong> event, but the <strong class="source-inline">Activated</strong> event fires every time the window receives focus. If this is your only option, you will need to add a flag to check whether it’s the first time that <strong class="source-inline">Activated</strong> <span class="No-Break">has fired.</span></p>
+			<p>The other lifecycle event in <strong class="source-inline">Window</strong> is the <strong class="source-inline">Closed</strong> event, which fires when the window has closed. If it is the last remaining window, usually <strong class="source-inline">MainWindow</strong>, the application will end after the window closes. This is where you should save any application data and <span class="No-Break">state information.</span></p>
+			<p>This is the extent of the application lifecycle events provided out of the box by the <strong class="source-inline">Application</strong> and <strong class="source-inline">Window</strong> classes. However, you can tap into some other events provided by <strong class="source-inline">FrameworkElement</strong>, which is a base class of <strong class="source-inline">Page</strong> and all the other controls <span class="No-Break">in WinUI.</span></p>
+			<h2 id="_idParaDest-141"><a id="_idTextAnchor141"/>Additional lifecycle events with FrameworkElement objects</h2>
+			<p>Every control in WinUI inherits from <strong class="source-inline">Control</strong>, which inherits from <strong class="source-inline">FrameworkElement</strong>. Even <a id="_idIndexMarker436"/>the <strong class="source-inline">Page</strong> control, which we added to the <strong class="bold">My Media Collection</strong> app to provide navigation to an item details view, inherits from <strong class="source-inline">Control</strong>, through its inheritance <span class="No-Break">from </span><span class="No-Break"><strong class="source-inline">UserControl</strong></span><span class="No-Break">.</span></p>
+			<p>The <strong class="source-inline">FrameworkElement</strong> class provides<a id="_idIndexMarker437"/> three useful events that developers can leverage for the <span class="No-Break">application lifecycle:</span></p>
+			<ul>
+				<li><strong class="source-inline">Loading</strong>: This<a id="_idIndexMarker438"/> event occurs when the loading process has started. This event can be leveraged to start fetching and processing data from services or other sources. You could also start loading data sooner, in the constructor of the current <strong class="source-inline">Window</strong> or <strong class="source-inline">Page</strong>, or even <span class="No-Break">in </span><span class="No-Break"><strong class="source-inline">Application.OnLoaded</strong></span><span class="No-Break">.</span></li>
+				<li><strong class="source-inline">Loaded</strong>: The <strong class="source-inline">Loaded</strong> event<a id="_idIndexMarker439"/> is invoked when the current element and all its children are loaded and ready for interaction. Do not try to manipulate these elements before they are loaded, or the app will raise a <span class="No-Break">runtime exception.</span></li>
+				<li><strong class="source-inline">Unloaded</strong>: This <a id="_idIndexMarker440"/>event is fired when the current element has been unloaded and removed from<a id="_idIndexMarker441"/> the <strong class="bold">visual tree</strong>. If you are handling this event for <strong class="source-inline">Page</strong>, you can use this to clean up resources or save any state for <span class="No-Break">the page.</span></li>
+			</ul>
+			<p class="callout-heading">Note</p>
+			<p class="callout">We haven’t discussed the WinUI visual tree up to this point. The concept of trees, physical and logical, in WinUI is the same as in other XAML frameworks. We will discuss the physical tree and logical tree in more detail when we discuss debugging WinUI applications in <a href="B20908_11.xhtml#_idTextAnchor330"><span class="No-Break"><em class="italic">Chapter 11</em></span></a>, <em class="italic">Debugging WinUI Apps with Visual Studio</em>. To learn more now, Microsoft Learn has a great WPF article about <span class="No-Break">trees: </span><a href="https://learn.microsoft.com/dotnet/desktop/wpf/advanced/trees-in-wpf"><span class="No-Break">https://learn.microsoft.com/dotnet/desktop/wpf/advanced/trees-in-wpf</span></a><span class="No-Break">.</span></p>
+			<p>You can handle the <strong class="source-inline">Loaded</strong> event<a id="_idIndexMarker442"/> for any control in your <a id="_idIndexMarker443"/>current view, whether it’s <strong class="source-inline">Window</strong> or <strong class="source-inline">Page</strong>, but always keep performance in mind. The <strong class="source-inline">Loaded</strong> event for the topmost <strong class="source-inline">FrameworkElement</strong> in the visual tree will not be fired until those of all its children have been completed. Network and filesystem operations can be expensive, so try to minimize and consolidate the calls to load the data needed to present your view <span class="No-Break">whenever possible.</span></p>
+			<p class="callout-heading">Note</p>
+			<p class="callout">For more <a id="_idIndexMarker444"/>information about handling lifecycle events, read the following Microsoft Learn <span class="No-Break">page: </span><a href="https://learn.microsoft.com/windows/apps/windows-app-sdk/applifecycle/applifecycle"><span class="No-Break">https://learn.microsoft.com/windows/apps/windows-app-sdk/applifecycle/applifecycle</span></a><span class="No-Break">.</span></p>
+			<p>Now that you have a solid understanding of WinUI’s lifecycle, let’s start working with some real data that will need to be persisted between <span class="No-Break">user sessions.</span></p>
+			<h1 id="_idParaDest-142"><a id="_idTextAnchor142"/>Creating a SQLite data store</h1>
+			<p>Until this <a id="_idIndexMarker445"/>point, the <strong class="bold">My Media Collection</strong> project has only worked <a id="_idIndexMarker446"/>with data stored inside in-memory collections. This means that every time the application is closed, all the user’s data is lost. It has also meant calling a method to populate all the lists with hardcoded seed data each time the application <span class="No-Break">is launched.</span></p>
+			<p>In the previous chapter, we took the first step in creating a maintainable data service for the application. By creating a data service class that implements <strong class="source-inline">IDataService</strong>, no changes will be required in the <strong class="source-inline">ViewModel</strong> classes when we start loading data from a database. This section will focus on creating a new <strong class="source-inline">SqliteDataService</strong> class so that we can use <strong class="bold">SQLite</strong> for data access. The starting code for this chapter can be found on GitHub <span class="No-Break">at </span><a href="https://github.com/PacktPublishing/Learn-WinUI-3-Second-Edition/tree/master/Chapter06/Start"><span class="No-Break">https://github.com/PacktPublishing/Learn-WinUI-3-Second-Edition/tree/master/Chapter06/Start</span></a><span class="No-Break">.</span></p>
+			<h2 id="_idParaDest-143"><a id="_idTextAnchor143"/>What is SQLite?</h2>
+			<p><strong class="bold">SQLite</strong> (found at <a href="https://sqlite.org/">https://sqlite.org/</a>) is a<a id="_idIndexMarker447"/> SQL-based database that is frequently <a id="_idIndexMarker448"/>used by mobile apps and simple desktop applications. It is a popular choice because it is small, fast, and self-contained in a single file. There are SQLite libraries available for virtually every platform. We <a id="_idIndexMarker449"/>will use Microsoft’s <strong class="bold">Microsoft.Data.Sqlite</strong> ADO.NET provider <span class="No-Break">for SQLite.</span></p>
+			<p class="callout-heading">Note</p>
+			<p class="callout">For <a id="_idIndexMarker450"/>more information about Microsoft’s SQLite provider, you can read <a href="https://learn.microsoft.com/dotnet/standard/data/sqlite/">https://learn.microsoft.com/dotnet/standard/data/sqlite/</a>. To learn more about using SQLite with WinUI projects, check <a id="_idIndexMarker451"/>out this Microsoft Learn <span class="No-Break">article: </span><a href="https://learn.microsoft.com/windows/apps/develop/data-access/sqlite-data-access"><span class="No-Break">https://learn.microsoft.com/windows/apps/develop/data-access/sqlite-data-access</span></a><span class="No-Break">.</span></p>
+			<h2 id="_idParaDest-144"><a id="_idTextAnchor144"/>Adding SQLite as a data service</h2>
+			<p>Follow<a id="_idIndexMarker452"/> <span class="No-Break">these steps:</span></p>
+			<ol>
+				<li>Start by adding the <strong class="bold">Microsoft.Data.Sqlite</strong> NuGet package to the <strong class="bold">MyMediaCollection</strong> project by opening <strong class="bold">Package Manager Console</strong> from <strong class="bold">View</strong> | <strong class="bold">Other Windows</strong> | <strong class="bold">Package Manager Console</strong> and running the following command. Also, make sure the <strong class="bold">MyMediaCollection</strong> project is selected in the <strong class="bold">Package Manager Console</strong> window’s project dropdown before running <span class="No-Break">this command:</span><pre class="source-code">
+Install-Package Microsoft.Data.Sqlite</pre><p class="list-inset">Running this command is equivalent to finding and adding the package from the <strong class="bold">NuGet Package </strong><span class="No-Break"><strong class="bold">Manager</strong></span><span class="No-Break"> window.</span></p></li>				<li>When the process is complete, create a new class named <strong class="source-inline">SqliteDataService</strong> in the <strong class="bold">Services</strong> folder, and copy the contents of the <strong class="source-inline">DataService</strong> class into it as a <span class="No-Break">starting point.</span></li>
+				<li>Now, open <strong class="bold">SqliteDataService.cs</strong> and start by adding four <strong class="source-inline">using</strong> statements to the top of <span class="No-Break">the file:</span><pre class="source-code">
+using Microsoft.Data.Sqlite;
+using System.IO;
+using System.Threading.Tasks;
+using Windows.Storage;</pre><p class="list-inset">The <strong class="source-inline">System.IO</strong> and <strong class="source-inline">Windows.Storage</strong> namespaces will be used when we initialize the SQLite database file, and we’ll need the <strong class="source-inline">System.Threading.Tasks</strong> namespace imported to work with some <span class="No-Break"><strong class="source-inline">async</strong></span><span class="No-Break"> tasks.</span></p></li>				<li>Next, add a new constant to the class to hold the <span class="No-Break">database’s filename:</span><pre class="source-code">
+private const string DbName = "mediaCollectionData.db";</pre></li>				<li>Now, let’s<a id="_idIndexMarker453"/> create a private method to create or open the database file, create a <strong class="source-inline">SqliteConnection</strong> class for the database, open it, and return it to the caller. This method can be used throughout the class whenever a new database connection is needed. The database file will be created in the user’s <strong class="source-inline">LocalFolder</strong>, which means the application’s data will be saved with the user’s local Windows <span class="No-Break">profile data:</span><pre class="source-code">
+private async Task&lt;SqliteConnection&gt; GetOpenConnectionAsync()
+{
+    await ApplicationData.Current.LocalFolder.CreateFileAsync(DbName, CreationCollisionOption.OpenIfExists).AsTask().ConfigureAwait(false);
+    string dbPath = Path.Combine(ApplicationData.Current.LocalFolder.Path, DbName);
+    var cn = new SqliteConnection($"Filename={dbPath}");
+    cn.Open();
+    return cn;
+}</pre><p class="list-inset">Note that we have declared this method as <strong class="source-inline">async</strong> and that it uses the <strong class="source-inline">await</strong> keyword when opening or creating the file. It is a good practice to use async/await when using external resources such as files, network connections, or databases to keep your <span class="No-Break">application responsive.</span></p></li>			</ol>
+			<p class="callout-heading">Note</p>
+			<p class="callout">To find out more about <a id="_idIndexMarker454"/>async/await with C# and .NET, Microsoft Learn has a great article to get you <span class="No-Break">started: </span><a href="https://learn.microsoft.com/dotnet/csharp/asynchronous-programming/"><span class="No-Break">https://learn.microsoft.com/dotnet/csharp/asynchronous-programming/</span></a><span class="No-Break">.</span></p>
+			<ol>
+				<li value="6">Next, create <a id="_idIndexMarker455"/>two methods that will create the <strong class="source-inline">MediaItems</strong> and <strong class="source-inline">Mediums</strong> tables in the database. These will be called each time the app launches, but the SQL code only creates the tables if they do not exist. The <strong class="source-inline">SqliteCommand</strong> object accepts the <strong class="source-inline">tableCommand</strong> query string and <strong class="source-inline">SqliteConnection</strong>. It has several methods it can use to execute the command, depending on whether any data is expected to be returned by the query. In our case, no return values are expected, so <strong class="source-inline">ExecuteNonQueryAsync</strong> is the best of the async options for these <span class="No-Break">two methods:</span><pre class="source-code">
+private async Task CreateMediumTableAsync(SqliteConnection db)
+{
+    string tableCommand = @"CREATE TABLE IF NOT
+        EXISTS Mediums (Id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+        Name NVARCHAR(30) NOT NULL,
+        MediumType INTEGER NOT NULL)";
+    using var createTable = new SqliteCommand(tableCommand, db);
+    await createTable.ExecuteNonQueryAsync();
+}
+private async Task CreateMediaItemTableAsync(SqliteConnection db)
+{
+    string tableCommand = @"CREATE TABLE IF NOT
+        EXISTS MediaItems (Id INTEGER PRIMARY KEY AUTOINCREMENT,
+        Name NVARCHAR(1000) NOT NULL,
+        ItemType INTEGER NOT NULL,
+        MediumId INTEGER NOT NULL,
+        LocationType INTEGER,
+        CONSTRAINT fk_mediums
+        FOREIGN KEY(MediumId)
+        REFERENCES Mediums(Id))";
+    using var createTable = new SqliteCommand(tableCommand, db);
+    await createTable.ExecuteNonQueryAsync();
+}</pre></li>				<li>Now, create<a id="_idIndexMarker456"/> a method for the <strong class="source-inline">Mediums</strong> table to insert a row into <span class="No-Break">the table:</span><pre class="source-code">
+private async Task InsertMediumAsync(SqliteConnection db, Medium medium)
+{
+    using var insertCommand = new SqliteCommand
+    {
+        Connection = db,
+        CommandText = "INSERT INTO Mediums VALUES (NULL, @Name, @MediumType);"
+    };
+    insertCommand.Parameters.AddWithValue("@Name", medium.Name);
+    insertCommand.Parameters.AddWithValue("@MediumType", (int)medium.MediaType);
+    await insertCommand.ExecuteNonQueryAsync();
+}</pre></li>				<li>Now, we <a id="_idIndexMarker457"/>need another method that will read all the rows from the <span class="No-Break"><strong class="source-inline">Mediums</strong></span><span class="No-Break"> table:</span><pre class="source-code">
+private async Task&lt;IList&lt;Medium&gt;&gt; GetAllMediumsAsync(SqliteConnection db)
+{
+    IList&lt;Medium&gt; mediums = new List&lt;Medium&gt;();
+    using var selectCommand = new SqliteCommand("SELECT Id, Name, MediumType FROM Mediums", db);
+    using SqliteDataReader query = await selectCommand.ExecuteReaderAsync();
+    while (query.Read())
+    {
+        var medium = new Medium
+        {
+            Id = query.GetInt32(0),
+            Name = query.GetString(1),
+            MediaType = (ItemType)query.GetInt32(2)
+        };
+        mediums.Add(medium);
+    }
+    return mediums;
+}</pre></li>			</ol>
+			<p>There’s a bit of code needed for these two simple operations. The insert method needs to add parameters for<a id="_idIndexMarker458"/> each property to be saved in the table, and the select method uses a <strong class="source-inline">while</strong> loop to add each table’s record to the collection. Let’s see whether we can simplify this in the <span class="No-Break">next section.</span></p>
+			<p>Before we implement the remaining methods for the <strong class="bold">Create, Read, Update, Delete </strong>(<strong class="bold">CRUD</strong>) operations, a <a id="_idIndexMarker459"/>new library must be added to the project to simplify the data access code we <span class="No-Break">will write.</span></p>
+			<h2 id="_idParaDest-145"><a id="_idTextAnchor145"/>Leveraging a Micro ORM to simplify data access</h2>
+			<p>As you <a id="_idIndexMarker460"/>saw in the previous section, writing data access code for even the simplest application can take <span class="No-Break">some time.</span></p>
+			<p>ORMs, such <a id="_idIndexMarker461"/>as <strong class="bold">Entity Framework Core</strong> (<strong class="bold">EF Core</strong>), can greatly simplify and reduce the code required, but they can be overkill for a small app with just a handful of tables. In this chapter, we’ll look at a <strong class="bold">Micro ORM</strong>. Micro ORMs are lightweight frameworks that handle mapping data between objects and <span class="No-Break">data queries.</span></p>
+			<p class="callout-heading">Note</p>
+			<p class="callout">EF Core is a popular ORM for .NET developers. If you want to learn more about how to use EF Core with your projects, you can view the Packt video <em class="italic">Entity Framework Core – a Full Tour</em> <span class="No-Break">at </span><a href="https://www.packtpub.com/product/entity-framework-core-a-full-tour-net-5-and-up-video/9781803242231"><span class="No-Break">https://www.packtpub.com/product/entity-framework-core-a-full-tour-net-5-and-up-video/9781803242231</span></a><span class="No-Break">.</span></p>
+			<p>The framework we will be using for data access in our project, Dapper, is an open source .NET Micro ORM that was created by the developers <a id="_idIndexMarker462"/>at <strong class="bold">Stack Overflow</strong>. You can learn more about <a id="_idIndexMarker463"/>Dapper at <a href="https://dapperlib.github.io/Dapper/">https://dapperlib.github.io/Dapper/</a> and get the package<a id="_idIndexMarker464"/> on <span class="No-Break">NuGet: </span><a href="https://www.nuget.org/packages/Dapper"><span class="No-Break">https://www.nuget.org/packages/Dapper</span></a><span class="No-Break">.</span></p>
+			<p>Dapper is <a id="_idIndexMarker465"/>popular within the .NET community. While it doesn’t offer some of the features of EF Core, such as model generation or entity change tracking, it does make it very easy to write a fast, slim data layer. When you add the <strong class="source-inline">Dapper.Contrib</strong> library (<a href="https://www.nuget.org/packages/Dapper.Contrib">https://www.nuget.org/packages/Dapper.Contrib</a>) into the mix, it is <a id="_idIndexMarker466"/>even easier to write the CRUD methods needed for <span class="No-Break">your applications.</span></p>
+			<h2 id="_idParaDest-146"><a id="_idTextAnchor146"/>Adding Dapper to the project</h2>
+			<p>Let’s dive right <span class="No-Break">into it:</span></p>
+			<ol>
+				<li>Start <a id="_idIndexMarker467"/>by adding <strong class="source-inline">Dapper</strong> and <strong class="source-inline">Dapper.Contrib</strong> to the <strong class="bold">MyMediaCollection</strong> project. Open the <strong class="bold">Package Manager Console</strong> window <a id="_idIndexMarker468"/>again and add the two packages to <span class="No-Break">your project:</span><pre class="source-code">
+Install-Package Dapper
+Install-Package Dapper.Contrib</pre></li>				<li>Now, revisit the <strong class="source-inline">InsertMediaAsync</strong> method. If we use the <strong class="source-inline">QueryAsync</strong> method provided by Dapper, we can reduce the code from our original method <span class="No-Break">to this:</span><pre class="source-code">
+private async Task InsertMediumAsync(SqliteConnection db, Medium medium)
+{
+    var newIds = await db.QueryAsync&lt;long&gt;(
+        $@"INSERT INTO Mediums
+            ({nameof(medium.Name)}, MediumType)
+            VALUES
+            (@{nameof(medium.Name)}, @{nameof(medium.MediaType)});
+        SELECT last_insert_rowid()", medium);
+    medium.Id = (int)newIds.First();
+}</pre><p class="list-inset">The code we wrote to set the values of the query parameters is now gone. Dapper maps them for us from the <strong class="source-inline">medium</strong> object, which is passed into its <strong class="source-inline">QueryAsync</strong> method. You must ensure that the parameter names in the SQLite query match the property names on our object for Dapper’s automatic mapping <span class="No-Break">to work.</span></p></li>				<li>As a bonus, we<a id="_idIndexMarker469"/> can also get the generated ID back from the <strong class="source-inline">QueryAsync</strong> call by adding the following SQLite code, which<a id="_idIndexMarker470"/> will return it after the <strong class="source-inline">INSERT</strong> <span class="No-Break">operation completes:</span><pre class="source-code">
+SELECT last_insert_rowid();</pre></li>				<li>Next, update the code for <strong class="source-inline">GetAllMediumsAsync</strong> to <span class="No-Break">use Dapper:</span><pre class="source-code">
+private async Task&lt;IList&lt;Medium&gt;&gt; GetAllMediumsAsync(SqliteConnection db)
+{
+    var mediums =
+        await db.QueryAsync&lt;Medium&gt;(@"SELECT Id,
+                                             Name,
+                                             MediumType AS MediaType
+                                      FROM Mediums");
+    return mediums.ToList();
+}</pre><p class="list-inset">We’ve gone from 14 lines of code to only 2. Note, in the highlighted part of the query, how we use an alias of <strong class="source-inline">MediaType</strong> for the <strong class="source-inline">MediumType</strong> field. This is an easy way to map data to an object property that doesn’t match the database field name, by simply renaming the field that’s returned as part of the SQL select statement. Dapper has also helped us by directly returning a list of our <strong class="source-inline">Medium</strong> objects, instead of us having to use a <strong class="source-inline">while</strong> loop to iterate over the <span class="No-Break">result set.</span></p></li>				<li>Next, create a query that will get all the media items to populate the main <strong class="source-inline">ListView</strong> control. This query is a little more complex because we join two tables, <strong class="source-inline">MediaItems</strong> and <strong class="source-inline">Mediums</strong>, on <strong class="source-inline">MediumId</strong> and return the data to be mapped to two corresponding objects, <strong class="source-inline">item</strong> and <strong class="source-inline">medium</strong>. These types are indicated by the first two generic types provided to the <strong class="source-inline">QueryAsync</strong> method. To perform this mapping, we give Dapper a lambda expression that directs it to set <strong class="source-inline">medium</strong> as the <strong class="source-inline">MediumInfo</strong> property of the item for each row that’s returned from <a id="_idIndexMarker471"/>the query. The type of the returned object is defined by the third generic type provided to the <strong class="source-inline">QueryAsync</strong> method. The remaining parameters will be mapped automatically by <a id="_idIndexMarker472"/>Dapper based on their <span class="No-Break">property names:</span><pre class="source-code">
+private async Task&lt;List&lt;MediaItem&gt;&gt; GetAllMediaItemsAsync(SqliteConnection db)
+{
+    var itemsResult = await db.QueryAsync&lt;MediaItem, Medium, MediaItem&gt;
+            (
+                @"SELECT
+                    [MediaItems].[Id],
+                    [MediaItems].[Name],
+                    [MediaItems].[ItemType] AS MediaType,
+                    [MediaItems].[LocationType] AS Location,
+                    [Mediums].[Id],
+                    [Mediums].[Name],
+                    [Mediums].[MediumType] AS MediaType
+                FROM
+                    [MediaItems]
+                JOIN
+                    [Mediums]
+                ON
+                    [Mediums].[Id] = [MediaItems].[MediumId]",
+                (item, medium) =&gt;
+                {
+                    item.MediumInfo = medium;
+                    return item;
+                }
+            );
+    return itemsResult.ToList();
+}</pre></li>				<li>Next, add the <a id="_idIndexMarker473"/>code to create the insert and<a id="_idIndexMarker474"/> update methods for our <span class="No-Break">media items:</span><pre class="source-code">
+private async Task&lt;int&gt; InsertMediaItemAsync(SqliteConnection db, MediaItem item)
+{
+    var newIds = await db.QueryAsync&lt;long&gt;(
+        @"INSERT INTO MediaItems
+            (Name, ItemType, MediumId, LocationType)
+            VALUES
+            (@Name, @MediaType, @MediumId, @Location);
+        SELECT last_insert_rowid()", item);
+    (int)newIds.First();
+}
+private async Task UpdateMediaItemAsync(SqliteConnection db, MediaItem item)
+{
+    await db.QueryAsync(
+        @"UPDATE MediaItems
+          SET Name = @Name,
+              ItemType = @MediaType,
+              MediumId = @MediumId,
+              LocationType = @Location
+          WHERE Id = @Id;", item);
+}</pre><p class="list-inset">The code in <strong class="source-inline">InsertMediaItemAsync</strong> should look familiar. It’s very similar to what we<a id="_idIndexMarker475"/> did when we inserted data into the <strong class="source-inline">Mediums</strong> table. The code to update a row in <strong class="source-inline">MediaItems</strong> is <a id="_idIndexMarker476"/>technically only one line now, thanks <span class="No-Break">to Dapper.</span></p></li>				<li>There’s one new read-only property that’s been added to the <strong class="source-inline">MediaItem</strong> object in our model. This property allows Dapper to map <strong class="source-inline">MediumId</strong> to the <span class="No-Break"><strong class="source-inline">MediaItems</strong></span><span class="No-Break"> table:</span><pre class="source-code">
+public int MediumId =&gt; MediumInfo.Id;</pre></li>				<li>Now, add the <strong class="source-inline">Computed</strong> attribute to the <strong class="source-inline">MediaItem.MediumInfo</strong> property. This tells Dapper to ignore the property when we attempt to insert or update rows in the database. We only need to have <strong class="source-inline">MediumId</strong> saved. Users are unable to make changes to the rows in the <span class="No-Break"><strong class="source-inline">Mediums</strong></span><span class="No-Break"> table:</span><pre class="source-code">
+<strong class="bold">[Computed]</strong>
+public Medium MediumInfo { get; set; }</pre></li>				<li>Finally, let’s<a id="_idIndexMarker477"/> create a method that will delete items from the <strong class="source-inline">MediaItems</strong> table. This code is a little different, thanks to <strong class="source-inline">Dapper.Contrib</strong>. We don’t need to write any parameterized SQL in the code because <strong class="source-inline">Dapper.Contrib</strong> has a <strong class="source-inline">DeleteAsync</strong> method that generates the code to delete from <strong class="source-inline">MediaItems</strong>, based <a id="_idIndexMarker478"/>on the <strong class="source-inline">Id</strong> property of the <strong class="source-inline">MediaItem</strong> <span class="No-Break">class provided:</span><pre class="source-code">
+private async Task DeleteMediaItemAsync(SqliteConnection db, int id)
+{
+    await db.DeleteAsync&lt;MediaItem&gt;(new MediaItem { Id = id });
+}</pre><p class="list-inset">To make this work, you must decorate the primary key properties of your model classes with <span class="No-Break"><strong class="source-inline">Key</strong></span><span class="No-Break"> attributes:</span></p><pre class="source-code">public class MediaItem
+{
+    [Key]
+    public int Id { get; set; }
+    ...
+}</pre></li>			</ol>
+			<p>Make sure that every model class that uses one of the <strong class="source-inline">Dapper.Contrib</strong> attributes adds a <strong class="source-inline">using</strong> statement <span class="No-Break">for </span><span class="No-Break"><strong class="source-inline">Dapper.Contrib.Extensions</strong></span><span class="No-Break">.</span></p>
+			<p>Before we update all the public CRUD methods of the <strong class="source-inline">SqliteDataService</strong> class to call these private methods, we will complete the code that initializes the service when the <span class="No-Break">application launches.</span></p>
+			<h2 id="_idParaDest-147"><a id="_idTextAnchor147"/>Updating the data service’s initialization</h2>
+			<p>Let’s <span class="No-Break">get started:</span></p>
+			<ol>
+				<li>First, create a <a id="_idIndexMarker479"/>version of the <strong class="source-inline">DataService.PopulateMediums</strong> method <span class="No-Break">in </span><span class="No-Break"><strong class="source-inline">Sqlite</strong></span><strong class="source-inline"> DataService</strong>, make it <strong class="source-inline">async</strong>, and rename it <strong class="source-inline">PopulateMediumsAsync</strong>. Update this method so that it fetches the data from SQLite. The method will also create any required data if this is the first time the application has been launched for the <span class="No-Break">current user:</span><pre class="source-code">
+private async Task PopulateMediumsAsync(SqliteConnection db)
+{
+    _mediums = await GetAllMediumsAsync(db);
+    if (_mediums.Count == 0)
+    {
+        var cd = new Medium { Id = 1, MediaType = ItemType.Music, Name = "CD" };
+        var vinyl = new Medium { Id = 2, MediaType = ItemType.Music, Name = "Vinyl" };
+        var hardcover = new Medium { Id = 3, MediaType = ItemType.Book, Name = "Hardcover" };
+        var paperback = new Medium { Id = 4, MediaType = ItemType.Book, Name = "Paperback" };
+        var dvd = new Medium { Id = 5, MediaType = ItemType.Video, Name = "DVD" };
+        var bluRay = new Medium { Id = 6, MediaType = ItemType.Video, Name = "Blu Ray" };
+        var mediums = new List&lt;Medium&gt;
+        {
+            cd, vinyl, hardcover, paperback, dvd, bluRay
+        };
+        foreach (var medium in mediums)
+        {
+            await InsertMediumAsync(db, medium);
+        }
+        _mediums = await GetAllMediumsAsync(db);
+    }
+}</pre></li>				<li>Second, remove <strong class="source-inline">PopulateItems</strong> from <strong class="source-inline">SqliteDataService</strong>, <strong class="source-inline">DataService</strong>, and <strong class="source-inline">IDataService</strong>. It will not be needed because we now persist all data between sessions. You can also remove the <strong class="source-inline">_items</strong> <span class="No-Break">private variable.</span></li>
+				<li>Now, take the <a id="_idIndexMarker480"/>code from the <strong class="source-inline">SqliteDataService</strong> constructor, move it to a new public method named <strong class="source-inline">InitializeDataAsync</strong>, and update the code so that it uses the new private initialization methods. Don’t forget to remove the call to populate the items collection. The <strong class="source-inline">SqliteConnection</strong> object should always be part of a <strong class="source-inline">using</strong> block to ensure that the connection is closed and the object is <span class="No-Break">disposed of:</span><pre class="source-code">
+public async Task InitializeDataAsync()
+{
+    using (var db = await GetOpenConnectionAsync())
+    {
+        await CreateMediumTableAsync(db);
+        await CreateMediaItemTableAsync(db);
+        SelectedItemId = -1;
+        PopulateItemTypes();
+        await PopulateMediumsAsync(db);
+        PopulateLocationTypes();
+    }
+}</pre></li>				<li>This new initialization method will need to be added to <strong class="source-inline">IDataService</strong> to make it available to objects that resolve the service through our DI container. If you keep the <a id="_idIndexMarker481"/>original <strong class="source-inline">DataService</strong> class in your project, you will need to add an implementation of <strong class="source-inline">InitializeDataAsync</strong> so that the project <span class="No-Break">will compile:</span><pre class="source-code">
+public interface IDataService
+{
+    Task InitializeDataAsync();
+    ...
+}</pre></li>				<li>After changing the location of the code that initializes <strong class="source-inline">SqliteDataService</strong>, the <strong class="source-inline">RegisterComponents</strong> method in <strong class="source-inline">App.xaml.cs</strong> will need to be updated to use the new <strong class="source-inline">SqliteDataService</strong> and call <strong class="source-inline">InitializeDataAsync</strong>. While we’re at it, rename the method to reflect its new <span class="No-Break">async status:</span><pre class="source-code">
+private <strong class="bold">async Task RegisterComponentsAsync</strong>(Frame rootFrame)
+{
+    var navigationService = new NavigationService(rootFrame);
+    navigationService.Configure(nameof(MainPage), typeof(MainPage));
+    navigationService.Configure(nameof(ItemDetailsPage), typeof(ItemDetailsPage));
+<strong class="bold">    var dataService = new SqliteDataService();</strong>
+<strong class="bold">    await dataService.InitializeDataAsync();</strong>
+    HostContainer = Host.CreateDefaultBuilder()
+        .ConfigureServices(services =&gt;
+        {
+            services.AddSingleton&lt;INavigationService&gt;(navigationService);
+            <strong class="bold">services.AddSingleton&lt;IDataService&gt;(dataService);</strong>
+            services.AddTransient&lt;MainViewModel&gt;();
+            services.AddTransient&lt;ItemDetailsViewModel&gt;();
+        }).Build();
+}</pre></li>			</ol>
+			<p>Don’t <a id="_idIndexMarker482"/>forget to update <strong class="source-inline">OnLaunched</strong> so that it’s <strong class="source-inline">async</strong> and await the call to the renamed <span class="No-Break"><strong class="source-inline">RegisterComponentsAsync</strong></span><span class="No-Break">.</span></p>
+			<p>Now that the application initializes the data service when it launches, it’s time to update the public CRUD methods so they use the async private methods we created to fetch data <span class="No-Break">from SQLite.</span></p>
+			<h1 id="_idParaDest-148"><a id="_idTextAnchor148"/>Retrieving data via services</h1>
+			<p>Let’s start <a id="_idIndexMarker483"/>retrieving and saving SQLite data with our service methods. It will only be necessary to update the create, update, and delete operations. All the media items are stored in <strong class="source-inline">List&lt;MediaItem&gt;</strong> in <strong class="source-inline">DataService</strong>, so the public methods used to retrieve items can remain as they were in the previous chapter. Let’s <span class="No-Break">get started:</span></p>
+			<ol>
+				<li>Start by updating the create, update, and delete methods for the media items in <strong class="source-inline">SqliteDataService.cs</strong>. Each of these will get an open connection to the database from <strong class="source-inline">GetOpenConnectionAsync</strong> and call its corresponding private <span class="No-Break">method asynchronously:</span><pre class="source-code">
+public async Task&lt;int&gt; AddItemAsync(MediaItem item)
+{
+    using var db = await GetOpenConnectionAsync();
+    return await InsertMediaItemAsync(db, item);
+}
+public async Task UpdateItemAsync(MediaItem item)
+{
+    using var db = await GetOpenConnectionAsync();
+    await UpdateMediaItemAsync(db, item);
+}
+public async Task DeleteItemAsync(MediaItem item)
+{
+    using var db = await GetOpenConnectionAsync();
+    await DeleteMediaItemAsync(db, item.Id);
+}</pre></li>				<li>Update the public methods that fetch items to <span class="No-Break">be async:</span><pre class="source-code">
+public async Task&lt;MediaItem&gt; GetItemAsync(int id)
+{
+    IList&lt;MediaItem&gt; mediaItems;
+    using var db = await GetOpenConnectionAsync();
+    mediaItems = await GetAllMediaItemsAsync(db);
+    // Filter the list to get the item for our Id.
+    return mediaItems.FirstOrDefault(i =&gt; i.Id == id);
+}
+public async Task&lt;IList&lt;MediaItem&gt;&gt; GetItemsAsync()
+{
+    using var db = await GetOpenConnectionAsync();
+    return await GetAllMediaItemsAsync(db);
+}</pre></li>			</ol>
+			<p class="callout-heading">Note</p>
+			<p class="callout">If you need to do a lot of filtering when querying data, Entity Framework is a more robust ORM that can provide more extensive options. SQLite is best suited for simpler applications. Note that, in the preceding code, <strong class="source-inline">GetItemAsync</strong> queries all the items and then filters to the item that matches the provided ID by using a <span class="No-Break">lambda expression.</span></p>
+			<ol>
+				<li value="3">The<a id="_idIndexMarker484"/> method names have been updated to include <strong class="source-inline">Async</strong>, all uses of the <strong class="source-inline">_items</strong> collection have been removed, and each method has been changed to return <strong class="source-inline">Task</strong>. So, update the <strong class="source-inline">IDataService</strong> interface members to reflect the same changes. Also, either remove <strong class="source-inline">DataService</strong> from the project or update its methods to also be async. It’s best to try and anticipate that data access methods will need to be async when you set out, thus preventing breaking changes to <span class="No-Break">your interfaces:</span><pre class="source-code">
+<strong class="bold">Task&lt;int&gt;</strong> <strong class="bold">AddItemAsync</strong>(MediaItem item);
+<strong class="bold">Task</strong> <strong class="bold">UpdateItemAsync</strong>(MediaItem item);
+<strong class="bold">Task</strong> <strong class="bold">DeleteItemAsync</strong>(MediaItem item);
+<strong class="bold">Task&lt;IList&lt;MediaItem&gt;&gt;</strong> <strong class="bold">GetItemsAsync</strong>();
+<strong class="bold">Task&lt;MediaItem&gt;</strong> <strong class="bold">GetItemAsync</strong>(int id);</pre></li>				<li>In <strong class="source-inline">MainViewModel.cs</strong>, the <strong class="source-inline">Delete</strong> method will be updated to use async/await with its data service call. Don’t forget to rename it <strong class="source-inline">DeleteAsync</strong> to follow best <a id="_idIndexMarker485"/>practices when naming async methods. You will also need to add a <strong class="source-inline">using</strong> statement to the file for the <span class="No-Break"><strong class="source-inline">System.Threading.Tasks</strong></span><span class="No-Break"> namespace:</span><pre class="source-code">
+private <strong class="bold">async Task DeleteAsync</strong>()
+{
+    <strong class="bold">await _dataService.DeleteItemAsync(SelectedMediaItem);</strong>
+    Items.Remove(SelectedMediaItem);
+    allItems.Remove(SelectedMediaItem);
+}</pre></li>				<li>Update the <strong class="source-inline">PopulateData</strong> method so that it’s named <strong class="source-inline">PopulateDataAsync</strong>, and use the async method of <span class="No-Break">getting items:</span><pre class="source-code">
+public <strong class="bold">async Task PopulateDataAsync</strong>()
+{
+    items.Clear();
+    foreach(var item in <strong class="bold">await _dataService.GetItemsAsync()</strong>)
+    {
+        items.Add(item);
+    }
+    allItems = new ObservableCollection&lt;MediaItem&gt;(Items);
+    mediums = new ObservableCollection&lt;string&gt;
+    {
+        AllMediums
+    };
+    foreach(var itemType in _dataService.GetItemTypes())
+    {
+        mediums.Add(itemType.ToString());
+    }
+    selectedMedium = Mediums[0];
+}</pre></li>				<li>Now, you will <a id="_idIndexMarker486"/>have to update the <strong class="source-inline">MainViewModel</strong> constructor to call to <strong class="source-inline">PopulateDataAsync</strong> at the end of <span class="No-Break">the constructor:</span><pre class="source-code">
+public MainViewModel(INavigationService navigationService, IDataService dataService)
+{
+    _navigationService = navigationService;
+    _dataService = dataService;
+    <strong class="bold">PopulateDataAsync();</strong>
+}</pre></li>				<li>Some similar changes will be needed in <strong class="source-inline">ItemDetailsViewModel</strong>. Update the <strong class="source-inline">Save</strong> method so that it’s async and awaits the data service calls to <strong class="source-inline">AddItemAsync</strong>, <strong class="source-inline">GetItemAsync</strong>, and <strong class="source-inline">UpdateItemAsync</strong>. Don’t forget to rename <strong class="source-inline">Save</strong> to <strong class="source-inline">SaveAsync</strong> and<a id="_idIndexMarker487"/> add a <strong class="source-inline">using</strong> statement for the <span class="No-Break"><strong class="source-inline">System.Threading.Tasks</strong></span><span class="No-Break"> namespace:</span><pre class="source-code">
+private <strong class="bold">async Task SaveAsync</strong>()
+{
+    MediaItem item;
+    if (_itemId &gt; 0)
+    {
+        item = <strong class="bold">await _dataService.GetItemAsync(_itemId)</strong>;
+        item.Name = ItemName;
+        item.Location = (LocationType)Enum.Parse(typeof(LocationType), SelectedLocation);
+        item.MediaType = (ItemType)Enum.Parse(typeof(ItemType), SelectedItemType);
+        item.MediumInfo = _dataService.GetMedium(SelectedMedium);
+        <strong class="bold">await _dataService.UpdateItemAsync(item);</strong>
+    }
+    else
+    {
+        item = new MediaItem
+        {
+            Name = ItemName,
+            Location = (LocationType)Enum.Parse(typeof(LocationType), SelectedLocation),
+            MediaType = (ItemType)Enum.Parse(typeof(ItemType), SelectedItemType),
+            MediumInfo = _dataService.GetMedium(SelectedMedium)
+        };
+        <strong class="bold">await _dataService.AddItemAsync(item);</strong>
+    }
+}</pre></li>				<li>Next, update<a id="_idIndexMarker488"/> the <strong class="source-inline">SaveItemAndReturn</strong> and <strong class="source-inline">SaveAndContinue</strong> methods so that they also <span class="No-Break">use async/await:</span><pre class="source-code">
+private <strong class="bold">async Task SaveItemAndReturnAsync</strong>()
+{
+    <strong class="bold">await SaveItemAsync();</strong>
+    _navigationService.GoBack();
+}
+private <strong class="bold">async Task SaveItemAndContinueAsync</strong>()
+{
+    <strong class="bold">await SaveItemAsync();</strong>
+    _dataService.SelectedItemId = 0;
+    _itemId = 0;
+    ItemName = "";
+    SelectedMedium = null;
+    SelectedLocation = null;
+    SelectedItemType = null;
+    IsDirty = false;
+}</pre></li>				<li>Finally, update <strong class="source-inline">ItemDetailsViewModel.xaml</strong> so that the save buttons use the <a id="_idIndexMarker489"/>async methods when they bind their <span class="No-Break"><strong class="source-inline">Click</strong></span><span class="No-Break"> methods:</span><pre class="source-code">
+&lt;SplitButton x:Name="SaveButton"
+             Content="Save and Return"
+             Margin="8,8,0,8"
+             Click="{x:Bind ViewModel.<strong class="bold">SaveItemAndReturnAsync</strong>}"
+             IsEnabled="{x:Bind ViewModel.IsDirty, Mode=OneWay}"&gt;
+...
+&lt;Button Content="Save and Create New"
+    Click="{x:Bind ViewModel.<strong class="bold">SaveItemAndContinueAsync</strong>}"
+    IsEnabled="{x:Bind ViewModel.IsDirty, Mode=OneWay}"
+    Background="Transparent"/&gt;
+&lt;Button Content="Save and Return"
+    Click="{x:Bind ViewModel.<strong class="bold">SaveItemAndReturnAsync</strong>}"
+    IsEnabled="{x:Bind ViewModel.IsDirty, Mode=OneWay}"
+    Background="Transparent"/&gt;</pre></li>			</ol>
+			<p class="callout-heading">Note</p>
+			<p class="callout">If you have any issues<a id="_idIndexMarker490"/> with the <strong class="bold">Media Type</strong> <strong class="source-inline">ComboBox</strong> not populating on the main page after adding or editing a media item, update <strong class="source-inline">Mode</strong> of its <strong class="source-inline">ItemsSource</strong> data binding to <strong class="source-inline">OneWay</strong>. The completed source code in GitHub has been updated to reflect <span class="No-Break">this change.</span></p>
+			<p>That’s it. Run the application and see how it works. Since we’re no longer creating any dummy data for the <a id="_idIndexMarker491"/>media items list, the media collection in <strong class="source-inline">ListView</strong> will be empty when the app launches for the <span class="No-Break">first time:</span></p>
+			<div>
+				<div id="_idContainer061" class="IMG---Figure">
+					<img src="image/B20908_06_02.jpg" alt="Figure 6.2 – Launching with a database for the first time"/>
+				</div>
+			</div>
+			<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Figure 6.2 – Launching with a database for the first time</p>
+			<p>Try adding, updating, and removing some items. Then, close the application and run it again. You should see the same items on the list that were there when you <span class="No-Break">closed it:</span></p>
+			<div>
+				<div id="_idContainer062" class="IMG---Figure">
+					<img src="image/B20908_06_03.jpg" alt="Figure 6.3 – Relaunching with saved data"/>
+				</div>
+			</div>
+			<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Figure 6.3 – Relaunching with saved data</p>
+			<p>Users can <a id="_idIndexMarker492"/>now retain their saved data. If you would like to browse your SQLite data outside your app, there are tools you can use to connect to a local <strong class="source-inline">db</strong> and inspect it. One of them<a id="_idIndexMarker493"/> is <strong class="bold">DB Browser for SQLite</strong>. Covering this tool is beyond the scope of this book, but you can explore it for <a id="_idIndexMarker494"/>yourself <span class="No-Break">at </span><a href="https://sqlitebrowser.org/"><span class="No-Break">https://sqlitebrowser.org/</span></a><span class="No-Break">.</span></p>
+			<p>Let’s wrap up and review what we’ve learned about working with data in a <span class="No-Break">WinUI application.</span></p>
+			<h1 id="_idParaDest-149"><a id="_idTextAnchor149"/>Summary</h1>
+			<p>We have covered a lot of important material in this chapter. You learned how to read and write data to a local SQLite database. Then, you learned how to simplify your data access code by leveraging Dapper, an ORM for .NET developers. Using an ORM will save you time creating boilerplate mapping code in your data access layers for WinUI projects (or any other .NET projects). All this data access code was made async to keep the UI responsive for <span class="No-Break">the user.</span></p>
+			<p>In the next chapter, we will learn how to create a beautiful <strong class="bold">Fluent UI</strong> with Microsoft’s Fluent UI <span class="No-Break">design principles.</span></p>
+			<h1 id="_idParaDest-150"><a id="_idTextAnchor150"/>Questions</h1>
+			<ol>
+				<li>When will Windows put a WinUI 3 app into a <span class="No-Break">suspended state?</span></li>
+				<li>When should you save the app state to ensure it is not lost if an application <span class="No-Break">is closed?</span></li>
+				<li>What is the event you can handle on a <strong class="source-inline">Page</strong> class to perform some logic when every element on a page has <span class="No-Break">finished loading?</span></li>
+				<li>What is a <span class="No-Break">Micro ORM?</span></li>
+				<li>What is the name of the Dapper package that adds CRUD helpers such as <strong class="source-inline">Delete</strong> <span class="No-Break">and </span><span class="No-Break"><strong class="source-inline">DeleteAsync</strong></span><span class="No-Break">?</span></li>
+				<li>What is one of the powerful features of some more full-featured ORMs, such as <span class="No-Break">Entity Framework?</span></li>
+				<li>What is the name of a tool that can be used to inspect data in a <span class="No-Break">SQLite database?</span></li>
+			</ol>
+		</div>
+	
+
+		<div id="_idContainer064" class="Content">
+			<h1 id="_idParaDest-151" lang="en-US" xml:lang="en-US"><a id="_idTextAnchor151"/>Part 2:Extending WinUI and Modernizing Applications</h1>
+			<p>In this part, you will build on what you have learned about WinUI application development and expand on it, with design concepts, platform options, and open source libraries. The Fluent design system that is native to WinUI controls provides Windows application users with a familiar look and feel. You will also learn how to integrate app notifications with the Windows App SDK. Then, you will explore the Windows Community Toolkit and .NET Community Toolkit, a set of open source packages that offer controls and helpers to WinUI developers. Finally, Template Studio will give WinUI developers a head-start with best practices when starting a <span class="No-Break">new project.</span></p>
+			<p>This part has the <span class="No-Break">following chapters:</span></p>
+			<ul>
+				<li><a href="B20908_07.xhtml#_idTextAnchor152"><em class="italic">Chapter 7</em></a>, <em class="italic">Fluent Design System for Windows Applications</em></li>
+				<li><a href="B20908_08.xhtml#_idTextAnchor197"><em class="italic">Chapter 8</em></a>, <em class="italic">Adding Windows Notifications to WinUI Applications</em></li>
+				<li><a href="B20908_09.xhtml#_idTextAnchor209"><em class="italic">Chapter 9</em></a>, <em class="italic">Enhancing Applications with </em><em class="italic">the Windows </em><em class="italic">Community Toolkits</em></li>
+				<li><a href="B20908_10.xhtml#_idTextAnchor315"><em class="italic">Chapter 10</em></a>, <em class="italic">Accelerating App Development with Template Studio</em></li>
+			</ul>
+		</div>
+		<div>
+			<div id="_idContainer065">
+			</div>
+		</div>
+		<div>
+			<div id="_idContainer066" class="Basic-Graphics-Frame">
+			</div>
+		</div>
+	</body></html>

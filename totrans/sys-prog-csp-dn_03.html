@@ -1,0 +1,504 @@
+<html><head></head><body>
+		<div id="_idContainer021">
+			<h1 class="chapter-number" id="_idParaDest-78"><a id="_idTextAnchor077"/>3</h1>
+			<h1 id="_idParaDest-79"><a id="_idTextAnchor078"/>The One with the  Memory Games</h1>
+			<p><em class="italic">Efficient </em><span class="No-Break"><em class="italic">Memory Management</em></span></p>
+			<p>Performance is critical for system programming. We discussed this in the previous chapter and outlined why it is crucial. Memory consumption is just as important, however. The trouble is that better performance often leads to worse memory usage. And trying to optimize for memory usage often leads to worse performance. As in all things in life, it is a matter <span class="No-Break">of compromising.</span></p>
+			<p>That being said, you might also encounter situations where you get both simultaneously – for instance, using the stack instead of the heap (or value types instead of reference types) results in faster code using <span class="No-Break">less memory.</span></p>
+			<p>However, you usually don’t get one item for free while pursuing the other. You have to make informed decisions and the correct choices. And that is what this chapter is all about. I hope you remember most of it once we reach the end of <span class="No-Break">this chapter!</span></p>
+			<p>In this chapter, we’ll cover the <span class="No-Break">following topics:</span></p>
+			<ul>
+				<li>An overview of <span class="No-Break">memory management</span></li>
+				<li>An overview of the <strong class="bold">garbage </strong><span class="No-Break"><strong class="bold">collector</strong></span><span class="No-Break"> (</span><span class="No-Break"><strong class="bold">GC</strong></span><span class="No-Break">)</span></li>
+				<li>How to correctly <span class="No-Break">use </span><span class="No-Break"><strong class="source-inline">IDisposable</strong></span></li>
+				<li>A long list of tips and tricks on how to <span class="No-Break">save memory</span></li>
+				<li>Unsafe code <span class="No-Break">and pointers</span></li>
+			</ul>
+			<h1 id="_idParaDest-80"><a id="_idTextAnchor079"/>Technical requirements</h1>
+			<p>Everything in this chapter can be done in a plain installation of C#. The only thing you might need extra if you’re following along is the NuGet <strong class="source-inline">MessagePack</strong> package. You can install that through Visual Studio Code or using the following <span class="No-Break">CLI command:</span></p>
+			<pre class="console">
+dotnet add package MessagePack</pre>			<p>An overview of <span class="No-Break">the GC</span></p>
+			<p>.NET is a <a id="_idIndexMarker187"/>managed system. As discussed earlier, many issues developers had to deal with are now handled by <a id="_idIndexMarker188"/>the <strong class="bold">Common Language Runtime</strong> (<strong class="bold">CLR</strong>). The CLR abstracts away most of the tedious tasks a developer faces so that they can focus on <span class="No-Break">functionality instead.</span></p>
+			<p><strong class="bold">Memory management</strong> is a<a id="_idIndexMarker189"/> tricky thing to do right, but also very important. Doing this wrong usually leads to memory leakage or instability in the software. Although no software should have that, system programming needs to avoid this. It might lead to unstable systems, making the whole computer unusable. Therefore, it is good that .NET developers don’t have to worry about this. The GC manages much of the memory and deals with those <span class="No-Break">intricate details.</span></p>
+			<p>Learning how the GC works is worth it so that your code is much more memory efficient. That means knowing how memory allocation functions <span class="No-Break">in .NET.</span></p>
+			<p>We already discussed the difference between the stack and the heap. But just as a reminder, the stack is the short-term, smaller, but faster piece of memory that’s used for value types, while the heap is longer-term and much more extensive but <span class="No-Break">also slower.</span></p>
+			<p>If you declare an integer in a code block, the CLR puts it on the stack. That memory is released at the end of that block’s scope. The heap works differently. Since items on the heap can live much longer, we need another way of handling this memory. That’s where GC <span class="No-Break">comes in.</span></p>
+			<p>The GC process can run on a separate thread or in the main or user thread. For now, it is easiest to assume that the GC runs on a background thread. We will deal with the real-world situation a bit later. </p>
+			<h2 id="_idParaDest-81"><a id="_idTextAnchor080"/>GC and its generations</h2>
+			<p>GC is a<a id="_idIndexMarker190"/> generational system. This means it works with generations. Does that help? I guess not. Okay, let <span class="No-Break">me elaborate.</span></p>
+			<p>Look at the following <span class="No-Break">code snippet:</span></p>
+			<pre class="source-code">
+1: {
+2:     object a = new object();
+3: }
+4: {
+5:     object b = new object();
+6: }</pre>			<p>This snippet is not our most exciting piece of code, but we must start somewhere. The curly braces are necessary <span class="No-Break">here, though.</span></p>
+			<p>The preceding code snippet results in less activity than expected, especially if you come from a C or <span class="No-Break">C++ background.</span></p>
+			<p>The following figures will help you make sense of what’s going on when we run the preceding <span class="No-Break">code snippet:</span></p>
+			<div>
+				<div class="IMG---Figure" id="_idContainer016">
+					<img alt="Figure ﻿3.1: The empty, allocated heap" src="image/B20924_04_01.jpg"/>
+				</div>
+			</div>
+			<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Figure 3.1: The empty, allocated heap</p>
+			<p>During the <a id="_idIndexMarker191"/>program’s startup, the CLR allocates a continuous memory block. This block isn’t very big but big enough to house all the startup objects, plus anything else it can determine is needed. At that point, a pointer is created that points to the first area available for the project <span class="No-Break">to use.</span></p>
+			<p>On line 1, we begin a code block. Then, on line 2, we create an instance of the <strong class="source-inline">Object</strong> type and store that in the <strong class="source-inline">a</strong> variable. The memory of all data that belongs to that object lives on the heap. The runtime initializes, calculates how big that memory for <strong class="source-inline">a</strong> should be, and moves the allocation pointer up to the next available piece of memory in the block. A pointer is created on the stack (we call it <strong class="source-inline">a</strong>), and that pointer points to the memory block on the heap where its <span class="No-Break">data lives:</span></p>
+			<div>
+				<div class="IMG---Figure" id="_idContainer017">
+					<img alt="Figure ﻿3.2: The heap after creating object a" src="image/B20924_04_02.jpg"/>
+				</div>
+			</div>
+			<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Figure 3.2: The heap after creating object a</p>
+			<p>On line 3, we <a id="_idIndexMarker192"/>end the scope of that variable. As we have learned, variables on the stack live only as long as the scope they belong to. Thus, <strong class="source-inline">a</strong> pointer is cleared, and its occupied memory is released. But on the heap, nothing happens. The data for <strong class="source-inline">a</strong> is still there, and the allocation pointer still points to the <span class="No-Break">same place:</span></p>
+			<div>
+				<div class="IMG---Figure" id="_idContainer018">
+					<img alt="Figure ﻿3.3: The heap after a goes out of scope" src="image/B20924_04_03.jpg"/>
+				</div>
+			</div>
+			<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Figure 3.3: The heap after a goes out of scope</p>
+			<p>Then, on line 4, we create a <a id="_idIndexMarker193"/>new scope block; on line 5, we create a new instance of <strong class="source-inline">Object</strong> and call it <strong class="source-inline">b</strong>. The whole circus starts all over again, but the data for <strong class="source-inline">b</strong> is now stored on top of <strong class="source-inline">a</strong>. Nobody knows about this; the data for <strong class="source-inline">a</strong> has become unreachable. But it is <span class="No-Break">still there!</span></p>
+			<div>
+				<div class="IMG---Figure" id="_idContainer019">
+					<img alt="Figure ﻿3.4: The heap when we allocate object b" src="image/B20924_04_04.jpg"/>
+				</div>
+			</div>
+			<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Figure 3.4: The heap when we allocate object b</p>
+			<p>And, of course, on<a id="_idIndexMarker194"/> line 6, the scope ends, so the stack variable, <strong class="source-inline">b</strong>, is removed again. Again, nothing happens to <span class="No-Break">the heap:</span></p>
+			<div>
+				<div class="IMG---Figure" id="_idContainer020">
+					<img alt="" role="presentation" src="image/B20924_04_05.jpg"/>
+				</div>
+			</div>
+			<p class="IMG---Figure">Figure3.5: The heap after b also goes out of scope</p>
+			<p>As you can see, we<a id="_idIndexMarker195"/> don’t allocate or deallocate memory on the heap. Here, a pointer moves up whenever we need a new object. Moving a pointer is much faster than allocating and freeing memory. Allocating and deallocating, or freeing memory, are very expensive performance-wise. Avoiding these operations as much as possible is one of the reasons applications in .NET can run <span class="No-Break">so fast.</span></p>
+			<p>However, you have probably seen a potential problem. What happens when we run out of space on the heap? The allocation pointer cannot move beyond the end of that block, so what <span class="No-Break">happens then?</span></p>
+			<p>I’m glad you asked. That’s when the GC comes into play. The moment we run out of memory in the block we allocated initially, the GC will have a look at all the items in <span class="No-Break">that block.</span></p>
+			<p>First, it goes through all objects in the heap and sees which still have active pointers pointing to them. In our example, we have none, but imagine that we have some other objects allocated that are still <span class="No-Break">in scope.</span></p>
+			<p>The GC marks all those orphaned memory locations to know it can reclaim that memory. But what about the items that the GC <span class="No-Break">cannot remove?</span></p>
+			<p>The answer to that question concerns the GC being “generational.” The CLR places each object in a particular part of the heap marked with a generation number. All new objects are in <span class="No-Break">generation 0.</span></p>
+			<p>When <a id="_idIndexMarker196"/>the GC does its trick, it moves all objects still alive and in scope to the next generation. They are now in the generation <span class="No-Break">1 heap.</span></p>
+			<p class="callout-heading">A bit more detail</p>
+			<p class="callout">In reality, there <a id="_idIndexMarker197"/>are only two heaps: one for all generations and one for the <strong class="bold">large object heap</strong> (<strong class="bold">LOH</strong>) (we’ll cover this in more detail later). The heap is divided into sections, one for each generation. However, we can think of each generation as having its own heap. Although this isn’t technically correct, thinking about the layout like this makes it a bit easier to understand what’s <span class="No-Break">going on.</span></p>
+			<p>Now, all objects that survived the garbage collection process are in the generation 1 heap; all objects that can no longer be reached are ready to be cleaned up. The GC clears out the memory and sets the allocation pointer back to the beginning of the heap. Now, the whole thing can start all <span class="No-Break">over again.</span></p>
+			<p>That’s pretty neat, isn’t it? But there’s another problem. What happens if our generation 1 heap <span class="No-Break">fills up?</span></p>
+			<p>In that case, we see a similar behavior. Everything in generation 1 that is no longer reachable (and that includes not being reachable from objects that are in other generations) is marked for deletion; the GC promotes all others to <span class="No-Break">generation 2.</span></p>
+			<p>Okay; let’s continue. What happens when generation 2 fills up? You would be wrong if you guessed that all reachable items move to generation 3. There’s no generation 3. If we fill up generation 2, the runtime allocates a new block that’s big enough to hold the current heap and sufficient to add more objects. Then, it moves all objects to the new heap and returns the old heap to the <span class="No-Break">operating system.</span></p>
+			<p>Sometimes, the CLR asks for more memory for the heap and gets a slap on the wrist from the operating system. There’s no more memory available. In that case, we see the dreaded <span class="No-Break"><strong class="source-inline">OutOfMemoryException</strong></span><span class="No-Break"> error.</span></p>
+			<p class="callout-heading">Handling OutOfM emoryException errors</p>
+			<p class="callout">The rule with handling exceptions is that you should only catch exceptions you know how to <a id="_idIndexMarker198"/>handle so that you can bring the system back into a stable state. With <strong class="source-inline">OutOfMemory</strong>, you have no way of doing that. The <strong class="source-inline">OutOfMemoryException</strong> error is one of the exceptions you’d better just let go. You can’t do much here <span class="No-Break">to help.</span></p>
+			<h2 id="_idParaDest-82"><a id="_idTextAnchor081"/>The LOH</h2>
+			<p>You can <a id="_idIndexMarker199"/>probably imagine that moving data in memory takes a lot of time and will hinder your performance. And that is correct: performance takes a huge hit when the <span class="No-Break">GC runs.</span></p>
+			<p>The GC is <a id="_idIndexMarker200"/>optimized to prevent that as much as possible, but memory operations are inherently expensive. Reallocating memory and moving the bytes around to all the different locations in particular take a lot of time <span class="No-Break">to perform.</span></p>
+			<p>One of the things the CLR designers did to alleviate that problem a little bit was to declare a special heap called <span class="No-Break">the LOH.</span></p>
+			<p>As the name implies, it is a heap for large objects. Currently, it deals with large objects – that is, objects bigger than <span class="No-Break">85,000 bytes.</span></p>
+			<p>Objects of that size or bigger do not go to the regular heap. They are not subject to the generational behavior of the rest of <span class="No-Break">the system.</span></p>
+			<p>The GC does help with keeping the LOH clean, but it runs far less frequently. Also, it doesn’t have generations for <span class="No-Break">the LOH.</span></p>
+			<p>When the GC clears objects from the LOH, the memory gets fragmented. What this means is that after a while, our block of memory looks a bit like Swiss cheese: there are holes everywhere. Areas of the memory that were once occupied by objects, which have been reclaimed, are now empty. After a while, the memory consists of valid objects and empty space. That means that although technically there is enough memory to allocate new objects, the system cannot find one continuous block of memory.  If that happens, the GC will compact the LOH to make the memory contiguous again. But that only happens on very rare occasions. This way of working means the LOH is much slower than the <span class="No-Break">other heaps.</span></p>
+			<p>Also, the LOH doesn’t have a predefined size. It grows if needed. Again, this is a costly and <span class="No-Break">slow operation.</span></p>
+			<p>The good news is that these large objects are out of your way in the usual heaps, so they don’t slow down the <span class="No-Break">GC there.</span></p>
+			<p>Be mindful when creating large objects. They can bring your application to a <span class="No-Break">grinding halt.</span></p>
+			<h2 id="_idParaDest-83"><a id="_idTextAnchor082"/>Finalizers</h2>
+			<p>You may <a id="_idIndexMarker201"/>have been programming in .NET for over a decade and have never seen or used a finalizer. If that is the case, good job. We don’t need them. Well, we mostly don’t. There are some edge cases when we do; one is when you use the <strong class="source-inline">IDisposable</strong> pattern. This pattern has a whole section dedicated to it later in <span class="No-Break">this chapter.</span></p>
+			<p>I want to show you what happens with the GC if you add a finalizer to <span class="No-Break">your classes.</span></p>
+			<p class="callout-heading">Fun fact!</p>
+			<p class="callout">Finalizers are often mistaken for destructors. That makes sense: if we have a constructor at the start of the lifetime of an object, why not have destructors at the end of that? C++ has them, after all. But we don’t. So, never call finalizers as destructors. They don’t destroy. They are pacifists who just want to clean up <span class="No-Break">after them.</span></p>
+			<p>Let me briefly explain what a finalizer is. A <strong class="bold">finalizer</strong> is a method in a C# class that the runtime <a id="_idIndexMarker202"/>calls just before the object is cleaned up and removed. Just like a constructor, it has a special name. The following code block provides an example of <span class="No-Break">a finalizer:</span></p>
+			<pre class="source-code">
+class MyClass
+ {
+     public MyClass()
+     {
+         // Initialize everything here...
+     }
+     ~MyClass()
+     {
+         // Clean up here
+         // (well, don't. Use IDisposable for that).
+     }
+}</pre>			<p>This class, <strong class="source-inline">MyClass</strong>, has both a constructor and a finalizer. The constructor has the name of the class, an access modifier (<strong class="source-inline">public</strong>, in this case), no return type (since it is not a method), and it might have some parameters. I have no parameters here, but I could have added them <span class="No-Break">if needed.</span></p>
+			<p>This <a id="_idIndexMarker203"/>constructor is called after the CLR has allocated the memory. You can think of it as being called as part of a “new” operation. You know when it is called: as soon as you create an instance, the CLR invokes the constructor. Simple <span class="No-Break">enough, right?</span></p>
+			<p>So, an instance of a class can be created <span class="No-Break">like so:</span></p>
+			<pre class="source-code">
+var myClass = new MyClass();</pre>			<p>The finalizer is<a id="_idIndexMarker204"/> a bit different. It has no access modifier, no return type, and no parameters. It is the name of the class that is preceded by a tilde (<strong class="source-inline">~</strong>). You never call this code. The CLR does. You cannot set any <span class="No-Break">parameters here.</span></p>
+			<p>The question is, of course, when is it called? And the answer is that we <span class="No-Break">don’t know.</span></p>
+			<p>Let’s go back to the GC run. Generation 0 is getting full, so the GC must clean up. It looks for all objects that are out of scope to remove that memory. Let’s assume <strong class="source-inline">myClass</strong> is also out <span class="No-Break">of scope.</span></p>
+			<p>I explained how the GC cleans up memory previously but left out two steps the GC <span class="No-Break">also takes.</span></p>
+			<p>The first extra step is that after it finds all the locations in memory without active variables pointing to them, it looks for objects in those areas with a finalizer. If it finds one, it will place a pointer to that memory structure in a special queue called <strong class="source-inline">FReachableQueue</strong> (the F stands for finalizer). Then, it leaves it alone. The memory on the heap for that object is not reclaimed. It is also not moved to another generation. It just survives the cleaning up. Now, it just sits there <span class="No-Break">once more.</span></p>
+			<p>Well, only until the GC runs again. That’s where the second step comes into play. Just before it cleans up the generation, it goes through <strong class="source-inline">FReachableQueue</strong>. For all objects in that queue, the <a id="_idIndexMarker205"/>CG calls the finalizers. Then, it removes the pointer from <strong class="source-inline">FReachableQueue</strong>, and the object is now finally ready to be <span class="No-Break">garbage collected.</span></p>
+			<p>This has some<a id="_idIndexMarker206"/> <span class="No-Break">profound implications:</span></p>
+			<ul>
+				<li>Objects with finalizers survive an extra round of garbage collection. They stick around longer, adding to the <span class="No-Break">memory pressure.</span></li>
+				<li>Objects with finalizers will have their finalizers called, but we have no idea when. We don’t know when the GC runs, <span class="No-Break">after all.</span></li>
+				<li>Moving the pointers around is an extra step for the GC, making things <span class="No-Break">even slower.</span></li>
+			</ul>
+			<p>Finalizers are a huge performance drain. They are better not used at all. Unless, of course, you use the <strong class="source-inline">IDisposable</strong> pattern to clean up. We’ll discuss <span class="No-Break">this next.</span></p>
+			<h2 id="_idParaDest-84"><a id="_idTextAnchor083"/>IDisposable</h2>
+			<p>.NET is a<a id="_idIndexMarker207"/> managed environment. I have said that before, and <a id="_idIndexMarker208"/>I will mention it again. I keep repeating this because many think “managed” means “I don’t have to take care of stuff.” And as we have seen, that is simply not true. Yes, the CLR takes away a lot of the pain other developers suffer, but still, there’s a lot that you have to do yourself – especially if you are, like we are, writing <span class="No-Break">system software.</span></p>
+			<p>One of the things the CLR does is clean up resources after us. Value types are on the stack and don’t need to be cleaned up. Reference types need to be cleaned up, but the GC takes care of that. However, as we have seen, cleaning up doesn’t always happen when we expect it <span class="No-Break">to happen.</span></p>
+			<p>And there is another problem: the GC doesn’t clean up all used resources. The CLR only cleans up managed objects. Non-managed objects are yours to clean up and dispose of. Most examples that explain this behavior mention classes such as files and database connections. And to be honest, for most developers, those are the only real-life occurrences they will find when dealing with unmanaged resources. For us, this is a bit different. When writing system software, we, more often than usual, encounter things from low-level APIs, external hardware, interfacing with third-party software, attaching our code to external debuggers, and so on. We will see examples of these later in this book when we talk <a id="_idIndexMarker209"/>about the filesystem, networking, and interfacing with <span class="No-Break">other hardware.</span></p>
+			<p>So, you <a id="_idIndexMarker210"/>must understand how to clean up if the GC doesn’t do this for you. And that is where <strong class="source-inline">IDisposable</strong> comes <span class="No-Break">into play.</span></p>
+			<p>The <strong class="source-inline">IDisposable</strong> interface is very simple. This is what it <span class="No-Break">looks like:</span></p>
+			<pre class="source-code">
+public interface IDisposable
+{
+    void Dispose();
+}</pre>			<p>Classes that implement this interface must ensure they have a <strong class="source-inline">void</strong> method without parameters <span class="No-Break">called </span><span class="No-Break"><strong class="source-inline">Dispose</strong></span><span class="No-Break">.</span></p>
+			<p>It is an interface, so it doesn’t do anything. If you add it to a class, nothing happens. The CLR ignores it. This statement is important. I will repeat it: the CLR does nothing with classes that implement <span class="No-Break">this interface.</span></p>
+			<p>The <strong class="source-inline">IDisposable</strong> interface is more like a contract. We add it to classes that deal with unmanaged resources. Other developers see that interface in the class declaration and assume they must handle <span class="No-Break">unmanaged resources.</span></p>
+			<p>And that <span class="No-Break">is it.</span></p>
+			<p>So, how do we implement it? Let’s have a look at the <span class="No-Break">following sample:</span></p>
+			<pre class="source-code">
+class ResourceUser
+{
+    private readonly IntPtr _ptr;
+    public ResourceUser()
+    {
+        // Allocate an 8 KB block of memory
+        _ptr = Marshal.AllocHGlobal(8 * 1024);//
+    }
+    ~ResourceUser()
+    {
+        Marshal.FreeHGlobal(_ptr);
+    }
+}</pre>			<p>In the<a id="_idIndexMarker211"/> constructor, we allocate a block of memory of <strong class="source-inline">8 KB</strong>. We store the pointer to that block <span class="No-Break">in </span><span class="No-Break"><strong class="source-inline">ptr;</strong></span><span class="No-Break">.</span></p>
+			<p>This block of <a id="_idIndexMarker212"/>memory is unmanaged. So, it is up to us to clean it up as well. We decided to do that in the finalizer. After all, it is guaranteed to run, so we are <span class="No-Break">good here!</span></p>
+			<p>But we have already established that we aren’t sure when this will happen. And we don’t want a block of perfectly fine memory just being allocated until the GC decides to run (twice, since it is in a finalizer!). That’s just wasting memory and a lot of <span class="No-Break">CPU cycles.</span></p>
+			<p>We need another way to clean up. Let’s rewrite <span class="No-Break">the code:</span></p>
+			<pre class="source-code">
+class ResourceUser
+{
+    private IntPtr _ptr;
+    public ResourceUser()
+    {
+        // Allocate an 8 KB block of memory
+        _ptr = Marshal.AllocHGlobal(8 * 1024);//
+    }
+    ~ResourceUser()
+    {
+        //nothing to do here!
+    }
+    public void Cleanup()
+    {
+        if (_ptr == IntPtr.Zero) return;
+        Marshal.FreeHGlobal(_ptr);
+        _ptr = IntPtr.Zero;
+    }
+}</pre>			<p>This code <a id="_idIndexMarker213"/>moves the cleanup code to a new method called <strong class="source-inline">Cleanup</strong>. If we want to use this class, we can simply create an instance and then<a id="_idIndexMarker214"/> make sure we always call <strong class="source-inline">Cleanup()</strong>. We can ensure that by using a <strong class="source-inline">try-finally</strong> block. Let’s <span class="No-Break">do this:</span></p>
+			<pre class="source-code">
+var myClass = new ResourceUser();
+try
+{
+    // Do something with myClass
+}
+finally
+{
+    myClass.Cleanup();
+}</pre>			<p>This is pretty simple, right? And to be honest, that is all there is to it for the <strong class="source-inline">IDispose</strong> interface. The most significant difference is that instead of having a method called <strong class="source-inline">Cleanup()</strong>, we have a method called <strong class="source-inline">Dispose()</strong>. And we mark our class with the correct interface, just<a id="_idIndexMarker215"/> as a courtesy to other developers. That way, they know they must clean up after using our class. Let’s do this using the following <span class="No-Break">code block:</span></p>
+			<pre class="source-code">
+class ResourceUser : IDisposable
+{
+    private IntPtr _ptr;
+    public ResourceUser()
+    {
+        // Allocate an 8 KB block of memory
+        _ptr = Marshal.AllocHGlobal(8 * 1024);//
+    }
+    ~ResourceUser()
+    {}
+    public void Dispose()
+    {
+        if (_ptr == IntPtr.Zero) return;
+        Marshal.FreeHGlobal(_ptr);
+        _ptr = IntPtr.Zero;
+    }
+}</pre>			<p>And that’s all we <a id="_idIndexMarker216"/>need to do. In our calling code, we should call <strong class="source-inline">Dispose()</strong> instead of <strong class="source-inline">Cleanup()</strong> so that our code compiles. Let’s do that. I won’t show you that code here as I’m sure you know how to do that. However, I will show <a id="_idIndexMarker217"/>you the <strong class="bold">Intermediate Language</strong> (<strong class="bold">IL</strong>) code. As a reminder, IL is a language that is not quite C# but also not machine code. It sits in between. But it does give us a <a id="_idIndexMarker218"/>nice indication of what the compiler makes of our code before it turns it into actual machine code. The IL code looks <span class="No-Break">like this:</span></p>
+			<pre class="source-code">
+01: .method private hidebysig static void  '&lt;Main&gt;$'(string[] args) cil managed
+02: {
+03:   .entrypoint
+04:   // Code size       21 (0x15)
+05:   .maxstack  1
+06:   .locals init (class ConsoleApp1.ResourceUser V_0)
+07:   IL_0000:  newobj     instance void ConsoleApp1.ResourceUser::.ctor()
+08:   IL_0005:  stloc.0
+09:   .try
+10:   {
+11:     IL_0006:  nop
+12:     IL_0007:  nop
+13:     IL_0008:  leave.s    IL_0014
+14:   }  // end .try
+15:   finally
+16:   {
+17:     IL_000a:  nop
+18:     IL_000b:  ldloc.0
+19:     IL_000c:  callvirt   instance void ConsoleApp1.ResourceUser::Dispose()
+20:     IL_0011:  nop
+21:     IL_0012:  nop
+22:     IL_0013:  endfinally
+23:   }  // end handler
+24:   IL_0014:  ret
+25: } // end of method Program::'&lt;Main&gt;$'</pre>			<p>The IL code looks almost identical to our C# code. The critical part for us is on lines 15 through 23. This is the <strong class="source-inline">finally</strong> block, containing the call to the <strong class="source-inline">Dispose()</strong> method. We now know<a id="_idIndexMarker219"/> that, no matter what, our resources will be <span class="No-Break">cleaned up.</span></p>
+			<p>This is brilliant. It’s so useful (and important) that the people behind the C# language gave us a new construct that helps us in doing so: they gave us the <span class="No-Break"><strong class="source-inline">using</strong></span><span class="No-Break"> statement.</span></p>
+			<p>Using that <a id="_idIndexMarker220"/>statement means that <strong class="source-inline">Dispose()</strong> is called when you don’t need the resource anymore. That calling can be done in two ways: as a block statement or as an <span class="No-Break">inline statement.</span></p>
+			<p>The block statement looks <span class="No-Break">like this:</span></p>
+			<pre class="source-code">
+using (var myClass = new ResourceUser())
+{
+    // Do something with myClass
+}</pre>			<p>Here, <strong class="source-inline">using</strong> starts a new scoping block. The resource can be deallocated and cleaned up at the end of <span class="No-Break">the scope.</span></p>
+			<p>The inline variant is <span class="No-Break">even easier:</span></p>
+			<pre class="source-code">
+using var myClass = new ResourceUser();
+// Do something with myClass</pre>			<p>The compiler will detect when <strong class="source-inline">myClass</strong> goes out of scope automatically. As soon as that happens, the typical workflow of the <strong class="source-inline">using</strong> <span class="No-Break">statement resumes.</span></p>
+			<p>“But,” I can almost hear you say, “you just told me that the CLR does nothing with that IDisposable interface, yet here it understands what to do <span class="No-Break">with it!”</span></p>
+			<p>That’s a smart <a id="_idIndexMarker221"/>observation, but the knowledge about <strong class="source-inline">IDisposable</strong> is not in the CLR here. The compiler is the one who’s that smart. If we take the inline version of <strong class="source-inline">using</strong>, build our program, and inspect the IL, we’ll see the <span class="No-Break">following code:</span></p>
+			<pre class="source-code">
+ .method private hidebysig static void  '&lt;Main&gt;$'(string[] args) cil managed
+ {
+   .entrypoint
+   // Code size       20 (0x14)
+   .maxstack  1
+   .locals init (class ConsoleApp1.ResourceUser V_0)
+   IL_0000:  newobj     instance void ConsoleApp1.ResourceUser::.ctor()
+   IL_0005:  stloc.0
+   .try
+   {
+     IL_0006:  leave.s    IL_0013
+   }  // end .try
+   finally
+   {
+     IL_0008:  ldloc.0
+     IL_0009:  brfalse.s  IL_0012
+     IL_000b:  ldloc.0
+     IL_000c:  callvirt   instance void [System.Runtime]System.IDisposable::Dispose()
+     IL_0011:  nop
+     IL_0012:  endfinally
+   }  // end handler
+   IL_0013:  ret
+ } // end of method Program::'&lt;Main&gt;$'</pre>			<p>There are<a id="_idIndexMarker222"/> tiny differences between this code and the one where we called <strong class="source-inline">Dispose()</strong> ourselves, but these differences are not important. What’s important is that the compiler looked at <a id="_idIndexMarker223"/>our code and translated that into a <strong class="source-inline">try-finally</strong> block with the <strong class="source-inline">Dispose()</strong> method being called in that <strong class="source-inline">finally</strong> part. In other words, it does precisely the <span class="No-Break">same thing.</span></p>
+			<p>So, <strong class="source-inline">using</strong> is just a convenient shorthand to instruct the compiler. If we had used <strong class="source-inline">Cleanup()</strong> instead of <strong class="source-inline">Dispose()</strong>, the compiler would not have understood it. But in the end, the code that gets run on the processor is the same. There’s no difference. There’s no magic involved in <span class="No-Break">using </span><span class="No-Break"><strong class="source-inline">IDisposable()</strong></span><span class="No-Break">.</span></p>
+			<h3>The IDisposable pattern</h3>
+			<p>Unfortunately, we aren’t done yet. The preceding code works. It cleans up and does this when we don’t need the resources anymore. But we rely on the user of our <strong class="source-inline">ResourceUser</strong> class to do the right thing: they have to use <strong class="source-inline">Dispose()</strong> or a <strong class="source-inline">using</strong> statement. If they don’t, we might have a memory leak. And don’t forget that the developer who fails to do that is probably you, 6 months after you have forgotten what <span class="No-Break">you did.</span></p>
+			<p>We need a better way to <span class="No-Break">do this.</span></p>
+			<p>The <strong class="source-inline">IDisposable</strong> pattern is a recipe to make sure the resources get cleaned up, no <span class="No-Break">matter what.</span></p>
+			<p>For instance, what happens if the user of our class doesn’t call <strong class="source-inline">Dispose()</strong>, either directly or through the <strong class="source-inline">using</strong> statement? We need to clean up no matter what. Fortunately, we can do that. We have the finalizer. This always runs, although it might not run at the best time. But at least we can be sure that our resources get cleaned <span class="No-Break">up eventually.</span></p>
+			<p>We could copy the cleaning-up code to our finalizer. However, we don’t want to clean up twice. The preferred way to ensure our resources are disposed of is to write an overloaded <a id="_idIndexMarker224"/>version of <strong class="source-inline">Dispose</strong>. The whole implementation looks <span class="No-Break">like this:</span></p>
+			<pre class="source-code">
+01: class ResourceUser : IDisposable
+02: {
+03:     private IntPtr _ptr;
+04:     private IDisposable? _someOtherDisposableClass;
+05:     private bool _isDisposed;
+06:     public ResourceUser()
+07:     {
+08:         // Allocate an 8 KB block of Memory
+09:         _ptr = Marshal.AllocHGlobal(8 * 1024); //
+10:     }
+11:     public void Dispose()
+12:     {
+13:         Dispose(true);
+14:         GC.SuppressFinalize(this);
+15:     }
+16:     ~ResourceUser()
+17:     {
+18:         Dispose(false);
+19:     }
+20:     private void Dispose(bool isDisposing)
+21:     {
+22:         if (_isDisposed)
+23:             return;
+24:         if (isDisposing)
+25:         {
+26:             _someOtherDisposableClass?.Dispose();
+27:         }
+28:         if (_ptr != IntPtr.Zero)
+29:         {
+30:             Marshal.FreeHGlobal(_ptr);
+31:             _ptr = IntPtr.Zero;
+32:         }
+33:         _isDisposed = true;
+34:     }
+35: }</pre>			<p>Let’s see what <span class="No-Break">happens here.</span></p>
+			<p>On line 3, we<a id="_idIndexMarker225"/> have the pointer to our unmanaged memory block. On line 4, I added a new field for another class that implements <strong class="source-inline">IDisposable</strong>. This field could be anything, such as a file or a database. What it is isn’t important here. All we need to know here is that it is a managed class we must clean up after use. On line 5, I added a Boolean that we use to see if the instance of this class has already been <span class="No-Break">disposed of.</span></p>
+			<p>Lines 6 through 10 comprise the constructor’s body in which we allocate our 8K <span class="No-Break">memory block.</span></p>
+			<p>On line 11, we <a id="_idIndexMarker226"/>have our <strong class="source-inline">Dispose</strong> method. In that, I first call an overloaded method of <strong class="source-inline">Dispose</strong> and give it a <strong class="source-inline">true</strong> parameter. We use this parameter to keep track of who calls the overloaded <strong class="source-inline">Dispose</strong>. What this parameter does is something I explain in a couple of lines below, but before I do that, I have to explain the <strong class="source-inline">GC.SuppressFinalize(this)</strong> line. This is the magic line. It tells the GC not to move this instance to <strong class="source-inline">FReachableQueue</strong> when it’s doing its magic. Effectively, this removes the finalizer code from our class so that when the GC runs, it can clear away the memory on the stack immediately instead of waiting for <span class="No-Break">another run.</span></p>
+			<p>After this, we have the finalizer. The finalizer only gets called if the class user forgets to call <strong class="source-inline">Dispose</strong> (or <strong class="source-inline">using</strong>) due to the <strong class="source-inline">GC.SuppressFinalize(this)</strong> call. This time, we <span class="No-Break">call </span><span class="No-Break"><strong class="source-inline">Dispose(false)</strong></span><span class="No-Break">.</span></p>
+			<p>Let’s discuss <a id="_idIndexMarker227"/>the parameter I added to the <strong class="source-inline">Dispose()</strong> method and that I promised to explain. On line 20, we have the actual code for the cleanup. By now, I hope that you understand what the <strong class="source-inline">isDisposing</strong> flag does. If that flag is set to <strong class="source-inline">true</strong>, we got here because the user of the class called <strong class="source-inline">Dispose()</strong>. If the flag is <strong class="source-inline">false</strong>, the developer didn’t use <strong class="source-inline">Dispose()</strong> and left it to <span class="No-Break">the finalizer.</span></p>
+			<p>Of course, we first check if we didn’t already clean up by checking the <strong class="source-inline">_isDisposed</strong> variable on <span class="No-Break">line 22.</span></p>
+			<p>Line 24 is essential. Our class has a managed resource that we need to clean up. But if we came from the finalizer, we have no idea when this code will run. It might be the case that the GC already cleaned up the memory allocated by <strong class="source-inline">_someOtherDisposableClass</strong>. There’s no way of knowing. If it had already been deallocated, calling <strong class="source-inline">Dispose()</strong> on it would result in a severe error and potentially crash our system. So, we must ensure we only call <strong class="source-inline">Dispose</strong> on that member if we are sure it is still around. If we got in this method via the finalizer, we cannot be sure. The order in which things are destroyed is non-deterministic. The only time we can be sure is when we got here through the call <span class="No-Break">to </span><span class="No-Break"><strong class="source-inline">Dispose()</strong></span><span class="No-Break">.</span></p>
+			<p>The <a id="_idIndexMarker228"/>memory block, however, is something else. That block is unmanaged, so we know that the GC didn’t clean it up already. It can’t. That’s why we call it unmanaged. So, we clean it up here on lines 28 through 32, no <span class="No-Break">matter what.</span></p>
+			<p>And that is it. Things get a little bit more complicated if you have a derived class that stems from this class but isn’t so complex that you can’t figure it out yourself (hint: make <strong class="source-inline">void Dispose(bool isDisposing)</strong> <span class="No-Break">protected virtual),</span></p>
+			<p>The <strong class="source-inline">IDisposable</strong> interface is very important if you want your code to use memory as efficiently as possible. Here, you learned how to implement it properly and how to code in such a way as to remove memory leaks. Again, since we as system programmers are more likely to have to deal with unmanaged code compared to other developers, this is <span class="No-Break">crucial knowledge.</span></p>
+			<p>But knowing about <strong class="source-inline">IDisposable</strong> is not enough. There are many more tips and tricks I want to share with you about saving memory in <span class="No-Break">your app.</span></p>
+			<h1 id="_idParaDest-85"><a id="_idTextAnchor084"/>Memory-saving tips and tricks</h1>
+			<p>System programmers need to be aware of the memory that’s used by the systems they write on. So, I want to share tips that will help you reduce <strong class="bold">memory pressure</strong>. Memory pressure<a id="_idIndexMarker229"/> is a fancy word to indicate how much memory is<a id="_idIndexMarker230"/> used compared to the amount of memory available. Again, some of these tips will make your system slower. As a system programmer, you must make informed choices and trade-offs between fast and memory-efficient code writing. Sometimes, you get lucky, and you get both. Other times, you must look at the options and pick the lesser of two evils. The<a id="_idIndexMarker231"/> following will cover specific things you can do to reduce memory pressure on <span class="No-Break">your system.</span></p>
+			<ul>
+				<li><strong class="bold">Use value types over reference types</strong>: Values types on the stack are usually smaller than reference types. The overhead of the pointer to the class and the pointers in the heap themselves can be a reason to move to value types, such as structs, instead of using reference types, such as classes. However, you’ll probably notice a performance hit if your structs get too big. Value types are copied by value when used as parameters, and copying big structures takes <span class="No-Break">much longer.</span></li>
+				<li><strong class="bold">Pool objects</strong>: Sometimes, it is a feasible option to pool objects. Pooling means an instance of an <strong class="source-inline">ObjectPool&lt;T&gt;</strong> class holds a pool of objects you can use and return when you’re done with them. Instead of creating an instance of your class and waiting for the GC to clean it up, you can make a couple and store them in the pool. Initially, this might increase memory pressure, but depending on your scenario, it might save you some <span class="No-Break">memory usage.</span></li>
+				<li><strong class="bold">Use arrays over collections</strong>: An array of items is smaller and much more memory efficient than collections such as <strong class="source-inline">List&lt;T&gt;</strong>. The list does offer a lot of functionality. It can be very flexible but comes with a higher <span class="No-Break">memory consumption.</span></li>
+				<li><strong class="bold">Optimize data structures</strong>: Speaking of <strong class="source-inline">List&lt;T&gt;</strong>, sometimes, it is tempting to use it to store some items. The same applies to <strong class="source-inline">Dictionary&lt;TKey, TValue&gt;</strong>. But you don’t always need it. If you know what you want to store in your classes, it might be more efficient to declare simpler variables for this and use <span class="No-Break">those instead.</span><p class="list-inset">I have seen people using <strong class="source-inline">Dictionary&lt;TKey, TValue&gt;</strong> to store a username and an email address. Using two fixed strings for that would have been much<a id="_idIndexMarker232"/> easier, faster, and memory efficient. Be a <span class="No-Break">smart developer!</span></p></li>
+				<li><strong class="bold">Use Span&lt;T&gt; and Memory &lt;T&gt;</strong>: Assume you have an array of integers. Nothing special, just something <span class="No-Break">like this:</span><pre class="source-code">
+int[] myBuffer = new int[100];</pre></li>			</ul>
+			<p>Arrays are reference types, so this allocates a memory block on the heap. There’s nothing wrong with that. You want to split the array into two parts for some reason. There are multiple ways of doing that, but the simplest (although not the fastest) is using Linq, as shown here:</p>
+			<pre class="source-code">
+int[] firstHalf = myBuffer.Take(50).ToArray();
+int[] secondHalf = myBuffer.Skip(50).ToArray();</pre>			<p class="list-inset">Now, we have three arrays on the heap. One is the original, and the others are the two new ones. That uses a lot of memory. That’s without me even mentioning the performance hit we get by copying all <span class="No-Break">that data.</span></p>
+			<p class="list-inset">Maybe you need a copy. If so, then this is a good approach. However, you should use <strong class="source-inline">Span&lt;T&gt;</strong> if you just need to split. This class is a view on the memory you give it. It isn’t copying; it’s just a window on the <span class="No-Break">original data.</span></p>
+			<p class="list-inset">That code looks <span class="No-Break">like this:</span></p>
+			<pre class="source-code">
+var firstHalf = new Span&lt;int&gt;(myBuffer, 0, 50);
+var secondHalf = new Span&lt;int&gt;(myBuffer, 50, 50);</pre>			<p class="list-inset">This code sample doesn’t copy the data or allocate a new array. It just gives you a view of <span class="No-Break">the data.</span></p>
+			<p class="list-inset">Of course, if the original array is garbage collected, the span points to <span class="No-Break">invalid memory.</span></p>
+			<p class="list-inset">Here, <strong class="source-inline">Memory&lt;T&gt;</strong> is more or less the same, but it’s better when you’re using async operations. Next to that, a span always lives on the stack. So, you cannot have a span as a field in a class (remember, classes are reference types, so all their data is stored on the heap). In contrast, <strong class="source-inline">Memory&lt;T&gt;</strong> can be used on the heap so that you can use them as fields <span class="No-Break">in classes.</span></p>
+			<ul>
+				<li><strong class="bold">Avoid boxing</strong>: Value<a id="_idIndexMarker233"/> types are fast and memory-efficient, so long as they stay value types. As we discussed previously, value types suddenly have the annoying habit of turning into reference types. We call this <a id="_idIndexMarker234"/>process <strong class="bold">boxing</strong>. Boxing takes a lot more memory than the simple value type. So, try to be aware of those situations and avoid them <span class="No-Break">if possible.</span></li>
+				<li><strong class="bold">Use lazy initialization</strong>: If you create an instance of a complicated class, you might not need to initialize all fields in the constructor. Sometimes, it’s better to do that only when needed. This way <a id="_idIndexMarker235"/>of working is called <strong class="bold">lazy initialization</strong>: try to postpone that initialization for as long <span class="No-Break">as possible.</span></li>
+				<li><strong class="bold">Compress data</strong>: You can compress classes with a lot of data you don’t frequently use to save memory. Of course, compressing data takes a lot of CPU time, but if the classes need to stay around but you only use them occasionally, compressing might be worth it. There is a whole namespace dedicated to this: <strong class="source-inline">System.IO.Compression</strong>. This contains many classes that help you compress and deflate <span class="No-Break">your data.</span></li>
+				<li><strong class="bold">Unload unnecessary data</strong>: You could choose to remove data you don’t need lying around all the time. Then, when you need it, you can reload it on demand. The overhead of doing this might be worth it if you have large datasets and don’t always <span class="No-Break">need them.</span></li>
+				<li><strong class="bold">Use weak references</strong>: As we learned earlier, the GC cleans up all resources that are no longer reachable. All objects with no pointer to them are cleaned up when the generation doesn’t have enough space for <span class="No-Break">more objects.</span><p class="list-inset">If you have an object you don’t need, you can create a <strong class="source-inline">WeakReference&lt;T&gt;</strong> reference. This means you tell the GC to remove the object if needed. Let me show you <a id="_idIndexMarker236"/>what <span class="No-Break">I mean:</span></p><pre class="source-code">
+var myObject = new object();
+var myObjectReference = new
+WeakReference&lt;object&gt;(myObject);
+// Much further in the code, we might need myObject
+if (myObjectReference.TryGetTarget(out var retrievedObject))
+{
+    // Do something with retrievedObject
+}
+else
+{
+    // We need to recreate myObject
+    myObject = new object();
+    myObjectReference.SetTarget(myObject);
+}</pre><p class="list-inset">First, we create an instance of an object, called <strong class="source-inline">myObject</strong>. Then, we get a weak reference to it. Let’s assume that later in our code, we need <strong class="source-inline">myObject</strong> again. First, we ask <strong class="source-inline">WeakReference</strong> if the object is still available or if the GC has collected it. If it is available, we can use it. Otherwise, we recreate it and store the new pointer in <strong class="source-inline">WeakReference</strong>. <span class="No-Break">Pretty neat.</span></p></li>				<li><strong class="bold">Compact object representations</strong>: Sometimes, you can save some memory by smartly combining data into other data structures. Let me show you. We can express<a id="_idIndexMarker237"/> three states a customer can have in the <span class="No-Break">following manner:</span><pre class="source-code">
+bool customerHasPayed= false;
+bool customerHasCredit = true;
+bool customerPaymentIsLate = true;</pre><p class="list-inset">Here, <strong class="source-inline">bool</strong> is usually internally represented by a byte. So, this takes <span class="No-Break">3 bytes.</span></p></li>			</ul>
+			<p>We could rewrite this as follows. First, we create a new <strong class="source-inline">enum</strong> value:</p>
+			<pre class="source-code">
+[Flags]
+enum CustomerPaymentStatus : byte
+{
+    CustomerHasPayed = 1 &lt;&lt; 0,
+    CustomerHasCredit = 1 &lt;&lt; 1,
+    CustomerPaymentIsLate = 1 &lt;&lt; 2
+};</pre>			<p class="list-inset">The notation I have used to assign the values reminds me where I am in the sequence: by doing a left shift, I can easily number the items (<strong class="source-inline">0</strong>, <strong class="source-inline">1</strong>, <span class="No-Break">and </span><span class="No-Break"><strong class="source-inline">2</strong></span><span class="No-Break">).</span></p>
+			<p class="callout-heading">Shifting bits</p>
+			<p class="callout">In system programming, we work with bits and bytes a lot. So, you should be aware of this kind <span class="No-Break">of notation.</span></p>
+			<p class="callout"> The <strong class="source-inline">&lt;&lt;</strong> operator takes all the bits in a byte and moves them one step to the left, effectively multiplying the value by 2. So, <strong class="source-inline">1 &lt;&lt; 0</strong> moves nothing, <strong class="source-inline">1 &lt;&lt; 1</strong> moves all bits 1 step and results in the value 2, while <strong class="source-inline">1 &lt;&lt; 2</strong> moves the bits 2 steps, resulting in 4. In binary, the results are <strong class="source-inline">00000001</strong>, <strong class="source-inline">00000010</strong>, <span class="No-Break">and </span><span class="No-Break"><strong class="source-inline">00000100</strong></span><span class="No-Break">.</span></p>
+			<p class="list-inset">We can set a variable <span class="No-Break">as follows:</span></p>
+			<pre class="source-code">
+CustomerPaymentStatus customerStatus =
+    CustomerPaymentStatus.CustomerHasCredit &amp;
+    CustomerPaymentStatus.CustomerPaymentIsLate;</pre>			<p class="list-inset">We have the same information as we had in the first example, but this time, we’re only using one byte. That’s a 66% reduction in <span class="No-Break">memory usage!</span></p>
+			<ul>
+				<li><strong class="bold">Set large collections and objects to null</strong>: This tip should be obvious now, but setting<a id="_idIndexMarker238"/> large collections and objects to <strong class="source-inline">null</strong> allows them to be cleaned up. Since the CLR stores large objects on the much less frequently cleaned-up LOH, setting them to <strong class="source-inline">null</strong> enables the GC to clean them <span class="No-Break">up there.</span></li>
+				<li><strong class="bold">Consider using static classes</strong>:Instance classes have many pointers going back and forth between the members and their data. These pointers and the member data can take up extra memory. Using static classes eliminates this overhead. The savings can be <span class="No-Break">pretty significant.</span></li>
+			</ul>
+			<p>At this point, I want to reiterate that for system developers, it is very important to be as memory-efficient as we can. The tips and tricks I just shared with you should be part of your development style. Saving memory frees up time from the GC and it makes your programs faster to load and usually also to execute. It helps in getting a better experience for the user. Of course, these tips and tricks can be applied to all sorts of C# programming. Every program could use better memory management. The same thing, however, cannot be said about unsafe code and pointers. Those are topics that most developers will rarely encounter. However, we, as system programmers, probably cannot avoid them. So, I think we should spend some time looking <span class="No-Break">at them.</span></p>
+			<h1 id="_idParaDest-86"><a id="_idTextAnchor085"/>Unsafe code and pointers in C#</h1>
+			<p>If you’re<a id="_idIndexMarker239"/> concerned about the memory, you could take over from the CLR and the GC and do it all yourself. I wouldn’t recommend this, but sometimes, you have no choice. Although the compiler, the CLR, and the GC do amazing things, they cannot <a id="_idIndexMarker240"/>always predict what you are trying to achieve or what your limitations are. Especially for system developers, this can sometimes hinder you in achieving your goals. In those cases, you might have to resort to managing memory yourself. I think an example is in <span class="No-Break">order here.</span></p>
+			<p>Let’s start with a <span class="No-Break">simple class:</span></p>
+			<pre class="source-code">
+[MessagePackObject]
+public class SimpleClass
+{
+    [Key(0)]
+    public int X { get; set; }
+    [Key(1)]
+    public string Y { get; set; }
+}</pre>			<p>The <strong class="source-inline">MessagePackObject</strong> and <strong class="source-inline">Key</strong> attributes come from the <strong class="source-inline">MessagePack</strong> <span class="No-Break">NuGet library.</span></p>
+			<p>The <strong class="source-inline">MessagePack</strong> library is a tool that enables you to serialize and deserialize instances of classes into a binary representation. Another popular serializer format is JSON, which is far less efficient regarding memory. That is why we’re using binary <span class="No-Break">formatting here.</span></p>
+			<p>I have written two methods: one to serialize and one to deserialize. The serializer <span class="No-Break">comes first:</span></p>
+			<pre class="source-code">
+public static byte[] SerializeToByteArray(SimpleClass simpleClass)
+{
+    byte[] data = MessagePackSerializer.Serialize(simpleClass);
+    return data;
+}</pre>			<p>This is <a id="_idIndexMarker241"/>pretty<a id="_idIndexMarker242"/> simple. We get an object and give it to the <strong class="source-inline">Serialize</strong> method of the <strong class="source-inline">MessagePackSerializer</strong> static class. That will return a <strong class="source-inline">byte[]</strong> value that we return to the caller of <span class="No-Break">this method.</span></p>
+			<p>Of course, this also <span class="No-Break">needs deserialization:</span></p>
+			<pre class="source-code">
+public static SimpleClass DeserializeFromByteArray(IntPtr ptr, int length)
+{
+    byte[] data = new byte[length];
+    Marshal.Copy(ptr, data, 0, length);
+    var simpleClass = MessagePackSerializer.        Deserialize&lt;SimpleClass&gt;(data);
+    return simpleClass;
+}</pre>			<p>This method is slightly more complicated: we get a pointer to a piece of memory and the length of our data. We create a <strong class="source-inline">byte[]</strong> value of the correct size. Then, we copy the memory from the heap into the byte array so that we can deserialize it with the <strong class="source-inline">MessagePackSerializer</strong> class. The object we get is <span class="No-Break">then returned.</span></p>
+			<p>We can use these methods <span class="No-Break">as follows:</span></p>
+			<pre class="source-code">
+var simpleClass = new SimpleClass()
+{
+    X = 42,
+    Y = "Systems Programming Rules!"
+};
+var memory = IntPtr.Zero;
+try
+{
+    byte[] serializedData =
+        MemoryHandler.SerializeToByteArray(simpleClass);
+    memory = Marshal.AllocHGlobal(serializedData.Length);
+    Marshal.Copy(serializedData, 0, memory,
+        serializedData.Length);
+    SimpleClass deserializedSimpleClass =
+        MemoryHandler.DeserializeFromByteArray(
+            memory,
+            serializedData.Length);
+}
+finally
+{
+    Marshal.FreeHGlobal(memory);
+}</pre>			<p>Here, we <a id="_idIndexMarker243"/>create an instance of <strong class="source-inline">SimpleClass</strong> and give it <span class="No-Break">some data.</span></p>
+			<p>Then, we <a id="_idIndexMarker244"/>serialize that object using our new <strong class="source-inline">SerializeToByteArray</strong> method we discussed. This gives us a <strong class="source-inline">byte[]</strong> value with the raw data. Then, we allocate the memory on the heap where we want to store that data. We copy the data. Then, we can discard the <strong class="source-inline">simpleClass</strong> instance: it can be <span class="No-Break">garbage collected.</span></p>
+			<p>Note that the GC will never clean up the memory we just allocated. Our data is stored in <span class="No-Break">our memory.</span></p>
+			<p>If we want to use it, we need to deserialize it again, which is something we can do by calling <strong class="source-inline">DeserializeFromByteArray</strong>. We give the pointer to the allocated memory and the size <span class="No-Break">we occupy.</span></p>
+			<p>And, of course, we need to free the memory when we’re done with it. The GC doesn’t do that for us. We are responsible <span class="No-Break">for this.</span></p>
+			<p>In this example, we only used 29 bytes to store the data, which isn’t a lot. We can allocate <a id="_idIndexMarker245"/>that <a id="_idIndexMarker246"/>memory if needed and deallocate it when we decide. This is a very fast and efficient way of handling the memory of <span class="No-Break">our system.</span></p>
+			<p class="callout-heading">Warning</p>
+			<p class="callout">Don’t use <strong class="source-inline">BinaryFormatter</strong> to do this. Although using <strong class="source-inline">BinaryFormatter</strong> is much simpler, it is inherently unsafe. You are better off using <strong class="source-inline">MessagePack</strong>, as I showed here, or using a JSON-based serializer and deserializer. For more information, please <span class="No-Break">read </span><a href="https://aka.ms/binaryformatter"><span class="No-Break">https://aka.ms/binaryformatter</span></a><span class="No-Break">.</span></p>
+			<p>We can go a bit further with this. Using pointer arithmetic, we can manually copy all the data into our memory block. Since pointer arithmetic is unsafe, we need to tell the compiler we want to do this by using the <strong class="source-inline">unsafe</strong> keyword and setting the project options to <strong class="source-inline">allow unsafe</strong>, as we discussed at the end of the <span class="No-Break">previous chapter.</span></p>
+			<p>The serialization remains the same. Deserialization is simpler. The code to store the bits in our memory is slightly different. The whole code, however, is faster and more memory efficient. Here <span class="No-Break">it is:</span></p>
+			<pre class="source-code">
+var pointer = IntPtr.Zero;
+try
+{
+    byte[] serializedData = MemoryHandler.        SerializeToByteArray(simpleClass);
+    pointer = Marshal.AllocHGlobal(serializedData.Length);
+    unsafe
+    {
+        // copy the data using pointer arithmetic
+        byte* pByte = (byte*)pointer;
+        for (int i = 0; i &lt; serializedData.Length; i++)
+        {
+            *pByte = serializedData[i];
+            pByte++;
+        }
+        //deserialization is done here
+        byte[] deserializeData = new byte[serializedData.Length];
+        pByte = (byte*)pointer;
+        for (int i = 0; i &lt; serializedData.Length; i++)
+        {
+            deserializeData[i] = *pByte;
+            pByte++;
+        }
+        var deserializedObject = MessagePackSerializer.        Deserialize&lt;SimpleClass&gt;(deserializeData);
+    }
+}
+finally
+{
+    Marshal.FreeHGlobal(pointer);
+}</pre>			<p>We<a id="_idIndexMarker247"/> start <a id="_idIndexMarker248"/>similarly by using <strong class="source-inline">MessagePack</strong> to get a binary representation of our object. But instead of using <strong class="source-inline">Marshal.Copy()</strong>, we copy the bytes ourselves. We have a pointer to the beginning of the data; we take the first byte, copy it into the memory block we allocated, increase the pointer, and repeat this until we copy the <span class="No-Break">whole thing.</span></p>
+			<p>Deserialization works in the same way. We get the pointer to the block of memory we allocated, which now contains our data. We read the first byte, copy it into the array, and repeat until <span class="No-Break">we finish.</span></p>
+			<p>Then, we deserialize it by calling the <strong class="source-inline">MessagePackSerializer.Deserialize()</strong> method, which takes a type, and we give it the array with <span class="No-Break">all bytes.</span></p>
+			<p>Again, this is a speedy and efficient way to handle memory, but it does come with many risks. Remember, making a small mistake will mess up <span class="No-Break">your day.</span></p>
+			<p>Unsafe code <a id="_idIndexMarker249"/>and using pointers in your code can speed things up a lot. But I <a id="_idIndexMarker250"/>want to make sure you understand the implications: you’re taking over all control from the CLR. You’re responsible for making sure your program runs fine and safe. Make sure you know what you’re doing when going this route. If you do this, there are a lot of benefits when it comes to speed and <span class="No-Break">memory efficiency!</span></p>
+			<h1 id="_idParaDest-87"><a id="_idTextAnchor086"/>Next steps</h1>
+			<p>I hope you remember most of the things we discussed, but just in case you forgot, we will go through the most essential <span class="No-Break">points again.</span></p>
+			<p>First, we discussed how the CLR and GC work together to remove the pain of memory management. We looked into how the GC works, what the generations mean, and what the <span class="No-Break">LOH does.</span></p>
+			<p>We also talked about finalizers and why they can kill your performance. We also saw that they have a place when you use the <strong class="source-inline">IDisposable</strong> pattern (so long as you don’t forget to call <strong class="source-inline">GC.SupressFinalize(this)</strong> to remove the finalizer if it <span class="No-Break">is unnecessary).</span></p>
+			<p>Then, I shared a couple of techniques you can use to optimize your memory usage if you need the least amount of memory usage in <span class="No-Break">your system.</span></p>
+			<p>I want to reiterate a crucial point about memory optimization. In 99 of 100 cases, the CLR and the GC do an outstanding job. Trying to outsmart them doesn’t always result in better systems. The team behind these tools is good at what they do, and they use all the tricks in the book (and some that are not in that book!) to help you reduce <span class="No-Break">memory pressure.</span></p>
+			<p>As a system programmer, you will run into situations where the GC and the CLR are just not doing a good enough job, and that is when the topics discussed here can help. But please be very careful. Managing memory can lead to weird and even catastrophic results when <span class="No-Break">done wrong.</span></p>
+			<p>You should test and benchmark your code before tweaking memory usage. But if you follow my tips and advice, you can get exceptional results! However, things get much more complicated once you have multiple threads in your system. We need to talk about threads. A lot. And that is precisely what we are going to do in the <span class="No-Break">next chapter!</span></p>
+		</div>
+	</body></html>

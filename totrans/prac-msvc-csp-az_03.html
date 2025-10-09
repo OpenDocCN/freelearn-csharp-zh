@@ -1,0 +1,830 @@
+<html><head></head><body>
+		<div id="_idContainer036">
+			<h1 id="_idParaDest-64" class="chapter-number"><a id="_idTextAnchor063"/>3</h1>
+			<h1 id="_idParaDest-65"><a id="_idTextAnchor064"/>Writing Data to Relational and NoSQL Databases</h1>
+			<p>After creating the first implementation of the service using minimal APIs, we build on that to read and write to databases. In this chapter, we will replace the in-memory repository built in <a href="B21217_02.xhtml#_idTextAnchor031"><span class="No-Break"><em class="italic">Chapter 2</em></span></a> using <strong class="bold">Entity Framework Core</strong> (<strong class="bold">EF Core</strong>) to access a relational database – Microsoft SQL Server – and an Azure Cosmos DB NoSQL database using <span class="No-Break">EF Core.</span></p>
+			<p>You’ll create two libraries to access these databases, create EF Core context classes, specify the mappings from model classes, and configure the minimal APIs service to use one or the other database. After adding these changes, the games will be persisted and you can continue game runs when the service <span class="No-Break">is restarted.</span></p>
+			<p>In this chapter, you’ll be exploring <span class="No-Break">these topics:</span></p>
+			<ul>
+				<li>Exploring the models for the data to be stored in <span class="No-Break">the databases</span></li>
+				<li>Creating and configuring an EF Core context to access Microsoft <span class="No-Break">SQL Server</span></li>
+				<li>Creating migrations to update the <span class="No-Break">database schema</span></li>
+				<li>Creating and configuring an EF Core context to access Azure <span class="No-Break">Cosmos DB</span></li>
+			</ul>
+			<h1 id="_idParaDest-66"><a id="_idTextAnchor065"/>Technical requirements</h1>
+			<p>The code for this chapter can be found in the following GitHub <span class="No-Break">repository: </span><a href="https://github.com/PacktPublishing/Pragmatic-Microservices-with-CSharp-and-Azure"><span class="No-Break">https://github.com/PacktPublishing/Pragmatic-Microservices-with-CSharp-and-Azure</span></a><span class="No-Break">.</span></p>
+			<p>The <strong class="source-inline">ch03</strong> source code folder contains the code samples for this chapter. The most important projects for this chapter are <span class="No-Break">the following:</span></p>
+			<ul>
+				<li><strong class="source-inline">Codebreaker.Data.SqlServer</strong> – This is the new library to access Microsoft <span class="No-Break">SQL Server.</span></li>
+				<li><strong class="source-inline">Codebreaker.Data.Cosmos</strong> – This is the new library to access Azure <span class="No-Break">Cosmos DB.</span></li>
+				<li><strong class="source-inline">Codebreaker.GamesAPIs</strong> – This is the web API project created in the previous chapter. In this chapter, the <strong class="bold">dependency injection</strong> (<strong class="bold">DI</strong>) container is updated to use .NET Aspire components to use SQL Server and Azure <span class="No-Break">Cosmos DB.</span></li>
+				<li><strong class="source-inline">Codebreaker.GameAPIs.Models</strong> – This project just has a minimal change in this chapter, adding a property to the <span class="No-Break"><strong class="source-inline">Game</strong></span><span class="No-Break"> class.</span></li>
+				<li><strong class="source-inline">Codebreaker.AppHost</strong> – This project is updated with SQL Server and Azure Cosmos DB resources and forwarding <span class="No-Break">configuration values.</span></li>
+				<li><strong class="source-inline">Codebreaker.ServiceDefaults</strong> – This project is unchanged from the <span class="No-Break">previous chapter.</span></li>
+			</ul>
+			<p>The <strong class="source-inline">analyzer</strong> library from the previous chapter is not included in this chapter. Here, we’ll just use the <strong class="source-inline">CNinnovation.Codebreaker.Analyzers</strong> <span class="No-Break">NuGet package.</span></p>
+			<p>If you worked through the previous chapter to create the models and implemented the minimal APIs project, you can continue from there. You can also copy the files from the <strong class="source-inline">ch02</strong> folder if you didn’t complete the previous work and start from there. <strong class="source-inline">ch03</strong> contains all the updates from <span class="No-Break">this chapter.</span></p>
+			<p>Other than a development environment, you need Microsoft SQL Server and Azure Cosmos DB. You don’t need an Azure subscription at this point. SQL Server is installed together with Visual Studio. You can also download the SQL Server 2022 Developer Edition instead. This is easy via <strong class="source-inline">winget</strong> (but you can also download and install Windows installer <span class="No-Break">packages instead):</span></p>
+			<pre class="console">
+winget install Microsoft.SQLServer.2022.Developer</pre>
+			<p>If you use a Mac, you can use a Docker image for SQL Server. In <a href="B21217_05.xhtml#_idTextAnchor110"><span class="No-Break"><em class="italic">Chapter 5</em></span></a>, you can read more details on Docker and running SQL Server within a <span class="No-Break">Docker container.</span></p>
+			<p>For easy use of SQL Server and Azure Cosmos DB, Docker images are used in this chapter. You can also use SQL Server, which is installed together with Visual Studio, and the Azure Cosmos DB <span class="No-Break">emulator instead.</span></p>
+			<p>To run Azure Cosmos DB, an emulator to run it locally is available. You can install this NoSQL database emulator with the <span class="No-Break">following command:</span></p>
+			<pre class="console">
+winget install Microsoft.Azure.CosmosEmulator</pre>
+			<p class="callout-heading">Note</p>
+			<p class="callout">The Azure Cosmos emulator is only available on Windows. With Linux environments (and also on Windows and the Mac), you can use a Docker image to run the emulator. See <a href="https://learn.microsoft.com/en-us/azure/cosmos-db/how-to-develop-emulator">https://learn.microsoft.com/en-us/azure/cosmos-db/how-to-develop-emulator</a> for information on running the emulator. Read <a href="B21217_05.xhtml#_idTextAnchor110"><span class="No-Break"><em class="italic">Chapter 5</em></span></a> for more information <span class="No-Break">on Docker.</span></p>
+			<p>To read and write your SQL Server data, within Visual Studio you can use SQL Server Object Explorer. Outside of Visual Studio, and with more functionality, use <strong class="bold">SQL Server Management Studio</strong> (<strong class="bold">SSMS</strong>), which can be installed with the <span class="No-Break">following command:</span></p>
+			<pre class="console">
+winget install Microsoft.SQLServerManagementStudio</pre>
+			<p>The projects of this chapter and how they relate to each other are shown in <span class="No-Break"><em class="italic">Figure 3</em></span><em class="italic">.1</em> with a C4 component diagram. The <strong class="source-inline">gamesAPI</strong> and <strong class="source-inline">models</strong> components have been created in <a href="B21217_02.xhtml#_idTextAnchor031"><span class="No-Break"><em class="italic">Chapter 2</em></span></a>. In this chapter, two projects for accessing SQL Server and Azure Cosmos DB databases will be added (<strong class="source-inline">sqlDatabase</strong> and <strong class="source-inline">cosmosDatabase</strong>). Depending on the configuration, the games API will use either the in-memory repository (created in <a href="B21217_02.xhtml#_idTextAnchor031"><span class="No-Break"><em class="italic">Chapter 2</em></span></a>) or one of the other <span class="No-Break"><strong class="source-inline">IGamesRepository</strong></span><span class="No-Break"> implementations:</span></p>
+			<div>
+				<div id="_idContainer033" class="IMG---Figure">
+					<img src="image/B21217_03_01.jpg" alt="Figure 3.1 – Projects"/>
+				</div>
+			</div>
+			<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Figure 3.1 – Projects</p>
+			<p>Let’s start exploring the project containing the models while making a small change to <span class="No-Break">the models.</span></p>
+			<h1 id="_idParaDest-67"><a id="_idTextAnchor066"/>Exploring the models for database mapping</h1>
+			<p>When creating services, different <a id="_idIndexMarker113"/>models can be used for the database, the functionality, and the APIs. The database layer might have different requirements than the other layers. When creating a monolithic application, this usually is the case, but it also means that while maintaining the application and adding a field, all the different layers need to be touched and updated. When creating microservices with smaller scopes, there’s a good chance to use the same model with the database, the functionality of the application, and the APIs. This not only reduces maintenance costs but also improves performance in that not every layer creates new instances and copies the <span class="No-Break">values around.</span></p>
+			<p>With the sample application, the <strong class="source-inline">Game</strong> and <strong class="source-inline">Move</strong> types with their generic counterparts created in the previous chapter <a id="_idIndexMarker114"/>are not that simple, but it’s possible to use them directly with <span class="No-Break">EF Core.</span></p>
+			<p>Let’s look at the models and what must be mapped for the database, starting with the <span class="No-Break"><strong class="source-inline">Game</strong></span><span class="No-Break"> type:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.GameAPIs.Models/Game.cs</p>
+			<pre class="source-code">
+public class Game(
+  Guid id,
+  string gameType,
+  string playerName,
+  DateTime startTime,
+  int numberCodes,
+  int maxMoves)
+{
+  public Guid Id { get; <strong class="bold">private set;</strong> } = id;
+  public string GameType { get; <strong class="bold">private set;</strong> } = gameType;
+  public string PlayerName { get; <strong class="bold">private set;</strong> } = playerName;
+  public DateTime StartTime { get; <strong class="bold">private set;</strong> } = startTime;
+  // code removed for brevity
+<strong class="bold">  public required IDictionary&lt;string, IEnumerable&lt;string&gt;&gt; FieldValues </strong>
+<strong class="bold">    { get; init; }</strong>
+<strong class="bold">  public required string[] Codes { get; init; }</strong>
+<strong class="bold">  public ICollection&lt;Move&gt; Moves { get; } = new List&lt;Move&gt;();</strong>
+  public override string ToString() =&gt; $"{Id}:{GameType} - 
+<strong class="bold">    </strong>{StartTime}";
+}</pre>
+			<p>The <strong class="source-inline">Game</strong> class contains<a id="_idIndexMarker115"/> properties of type <strong class="source-inline">Guid</strong>, <strong class="source-inline">string</strong>, <strong class="source-inline">DateTime</strong>, <strong class="source-inline">TimeSpan</strong>, <strong class="source-inline">int</strong>, and <strong class="source-inline">bool</strong>. All these properties can easily be mapped to database columns. Just the size of the string needs to be configured. With SQL Server, the convention to map a string is <strong class="source-inline">nvarchar(max)</strong>. This can be reduced in size. What’s more interesting is <span class="No-Break">the constructor.</span></p>
+			<p>The class doesn’t define a parameterless constructor. While some tools require a parameterless constructor, both JSON serialization as well as EF Core nowadays don’t need one. EF Core supports constructors with parameters as long as the constructors map to simple properties – which is the case with the <strong class="source-inline">Game</strong> class. EF Core mapping supports properties with <strong class="source-inline">get</strong> and <strong class="source-inline">set</strong> accessors. If there’s just a <strong class="source-inline">get</strong> accessor available, the mapping will fail. A way around this is to use <strong class="source-inline">private</strong> fields. EF Core supports explicit mapping to fields. Another option is to use private <strong class="source-inline">set</strong> accessors – which are used with the <span class="No-Break"><strong class="source-inline">Game</strong></span><span class="No-Break"> class.</span></p>
+			<p>Some other interesting members are available with the <strong class="source-inline">Game</strong> class: the <strong class="source-inline">FieldValues</strong> property is of type <strong class="source-inline">IDictionary&lt;string, IEnumerable&lt;string&gt;&gt;</strong>. The field values define the possible options the user can choose from. All games of one game type usually have the same field values, but this can change over time. We shouldn’t expect these values to always stay the same. The application might change the colors or shapes to choose from over time. So, we can’t just ignore the property to be stored – this should be stored with the game. As for this type, a default mapping is not available, so we need to add <span class="No-Break">a conversion.</span></p>
+			<p>The <strong class="source-inline">Codes</strong> property is of type string array. EF Core 8.0 supports built-in mapping of collections of primitive types; that is, a list of arrays, integers, strings, and more. With the built-in functionality, the collection is stored in the JSON format in a string table. This fits the purpose. The <strong class="source-inline">Codes</strong> property contains a list of a solution. With the color-based game types, this is a list of up to five colors; with the shape game type, one string of the collection consists of a shape and a color with a delimiter. Using a version older than EF Core 8, a custom conversion would be required. With EF Core 8, this will map with the <span class="No-Break">default functionality.</span></p>
+			<p>The <strong class="source-inline">Moves</strong> property is typically a relation with relational databases. Using SQL Server, we will use the <strong class="source-inline">Moves</strong> table to store every move. It would be possible to store moves with a JSON column, but we’ll <a id="_idIndexMarker116"/>use a separate table and query for moves if needed. Using a NoSQL database, it’s a natural way to store moves within <span class="No-Break">the game.</span></p>
+			<p>Let’s look into the <span class="No-Break"><strong class="source-inline">Move</strong></span><span class="No-Break"> type:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.GameAPIs.Models/Move.cs</p>
+			<pre class="source-code">
+public class Move(Guid id, int moveNumber)
+{
+<strong class="bold">  public Guid Id { get; private set; } = id;</strong>
+<strong class="bold">  public int MoveNumber { get; private set; } = moveNumber;</strong>
+<strong class="bold">  public required string[] GuessPegs { get; init; }</strong>
+<strong class="bold">  public required string[] KeyPegs { get; init; }</strong>
+  public override string ToString() =&gt; $"{MoveNumber}. " +
+    $"{string.Join('#',GuessPegs)} : " +
+    $"{string.Join('#', KeyPegs)}";
+}</pre>
+			<p>With the <strong class="source-inline">Move</strong> class, <strong class="source-inline">GuessPegs</strong> (the guess of the player for the move) and <strong class="source-inline">KeyPegs</strong> (the result from the analyzer) can be serialized similarly to the <strong class="source-inline">Codes</strong> property from the <strong class="source-inline">Game</strong> type. What’s more interesting here is what’s <em class="italic">not</em> here. That is, the absence of a foreign key property like <strong class="source-inline">GameId</strong> or a direct <strong class="source-inline">Game</strong> property to establish a relationship between the <strong class="source-inline">Move</strong> and <strong class="source-inline">Game</strong> types. While using the <strong class="source-inline">Move</strong> type so far, this relationship was not required. With EF Core, it’s also not required to add this relationship to the model. EF Core supports a feature <a id="_idIndexMarker117"/>named <strong class="bold">shadow properties</strong>. These properties are not part of the model but are stored within the database and can be accessed while using the EF <span class="No-Break">Core context.</span></p>
+			<p>Let’s summarize what needs to be done to map the <strong class="source-inline">Game</strong> and <strong class="source-inline">Move</strong> types with <span class="No-Break">EF Core:</span></p>
+			<ol>
+				<li>For simple string properties, the size of the database string needs to be defined with <span class="No-Break">SQL Server.</span></li>
+				<li>The <strong class="source-inline">FieldValues</strong> property <a id="_idIndexMarker118"/>of type <strong class="source-inline">IDictionary&lt;string, IEnumerable&lt;string&gt;&gt;</strong> needs a <span class="No-Break"><strong class="bold">value converter</strong></span><span class="No-Break">.</span></li>
+				<li>The <strong class="source-inline">Moves</strong> property maps a collection to the <strong class="source-inline">Move</strong> type. With a relational database, <strong class="source-inline">Move</strong> objects should be stored in a separate <strong class="source-inline">Moves</strong> table. Because the <strong class="source-inline">Move</strong> type doesn’t <a id="_idIndexMarker119"/>define a primary key, <strong class="bold">shadow properties</strong> <span class="No-Break">are needed.</span></li>
+				<li>Using Azure Cosmos DB, the moves should be stored in the game <span class="No-Break">JSON document.</span></li>
+			</ol>
+			<p class="callout-heading">Note</p>
+			<p class="callout">EF Core supports mapping via conventions, annotations, and the fluent API. Conventions are provider-specific. For example, a .NET string mapping to <strong class="source-inline">nvarchar(max)</strong> is a convention. Using nullability, a non-nullable property maps to a required database column, while a nullable property is not required. Conventions are overridden using annotations. Annotations are attributes such as <strong class="source-inline">[StringLength(20)]</strong>,which not only can be used to validate user input but also to specify the column to be <strong class="source-inline">nvarchar(20)</strong>. Using the fluent API, annotations can be overridden. The fluent API offers most options and overrides all the other settings. We’ll use the fluent API in the <span class="No-Break">next sections.</span></p>
+			<p>Let’s define a mapping to work with these models, both with a relational database <span class="No-Break">and NoSQL.</span></p>
+			<h1 id="_idParaDest-68"><a id="_idTextAnchor067"/>Using EF Core with SQL Server</h1>
+			<p>Let’s start with a relational<a id="_idIndexMarker120"/> database to store games and <a id="_idIndexMarker121"/>moves in multiple tables. We<a id="_idIndexMarker122"/> need to do <span class="No-Break">the following:</span></p>
+			<ol>
+				<li>Create a class <span class="No-Break">library project</span></li>
+				<li>Create the EF <span class="No-Break">Core context</span></li>
+				<li>Customize the mapping of <span class="No-Break">simple properties</span></li>
+				<li>Create value conversions to map <span class="No-Break">complex properties</span></li>
+				<li>Define relations between games <span class="No-Break">and moves</span></li>
+				<li>Create shadow properties for the <span class="No-Break"><strong class="source-inline">Move</strong></span><span class="No-Break"> type</span></li>
+				<li>Implement the<a id="_idIndexMarker123"/> <span class="No-Break">repository contract</span></li>
+				<li>Configure the application model with <span class="No-Break">SQL Server</span></li>
+				<li>Configure the <a id="_idIndexMarker124"/>DI container <a id="_idIndexMarker125"/>with the minimal <span class="No-Break">APIs project</span></li>
+			</ol>
+			<h2 id="_idParaDest-69"><a id="_idTextAnchor068"/>Creating a data class library using SQL Server</h2>
+			<p>To create the class library project, you<a id="_idIndexMarker126"/> can use the .NET CLI as <a id="_idIndexMarker127"/>shown or use the class library project template from <span class="No-Break">Visual Studio:</span></p>
+			<pre class="console">
+dotnet new classlib --framework net8.0 -o Codebreaker.Data.SqlServer</pre>
+			<p>To access SQL Server with EF Core, add the <strong class="source-inline">Microsoft.EntityFrameworkCore.SqlServer</strong> NuGet package. This project also has a dependency on the <span class="No-Break"><strong class="source-inline">Codebreaker.GameAPIs.Models</strong></span><span class="No-Break"> project.</span></p>
+			<h2 id="_idParaDest-70"><a id="_idTextAnchor069"/>Creating an EF Core context for SQL Server</h2>
+			<p>The mapping to the database is <a id="_idIndexMarker128"/>specified with an EF Core context<a id="_idIndexMarker129"/> implemented with the <strong class="source-inline">GamesSqlServerContext</strong> class, as shown in the following <span class="No-Break">code snippet:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.Data.SqlServer/GamesSqlServerContext.cs</p>
+			<pre class="source-code">
+public class GamesSqlServerContext(DbContextOptions&lt;GamesSqlServerContext&gt; options) : <strong class="bold">DbContext</strong>(options), IGamesRepository
+{
+  protected override void OnModelCreating(ModelBuilder modelBuilder)
+  {
+<strong class="bold">    modelBuilder.HasDefaultSchema("codebreaker");</strong>
+<strong class="bold">    modelBuilder.ApplyConfiguration(new GameConfiguration());</strong>
+<strong class="bold">    modelBuilder.ApplyConfiguration(new MoveConfiguration());</strong>
+    // code removed for brevity
+  }
+<strong class="bold">  public DbSet&lt;Game&gt; Games =&gt; Set&lt;Game&gt;();</strong>
+<strong class="bold">  public DbSet&lt;Move&gt; Moves =&gt; Set&lt;Move&gt;();</strong>
+  // code removed for brevity
+}</pre>
+			<p>An EF Core context class needs to derive from the <strong class="source-inline">DbContext</strong> base class. Using the context from a DI container, the <a id="_idIndexMarker130"/>connection string can be configured outside of the context. This requires using the constructor with the <strong class="source-inline">DbContextOption</strong> parameter, which needs to be forwarded to the <span class="No-Break">base</span><span class="No-Break"><a id="_idIndexMarker131"/></span><span class="No-Break"> class.</span></p>
+			<p>The <strong class="source-inline">GamesSqlServerContext</strong> class implements the <strong class="source-inline">IGamesRepository</strong> interface, which we defined in <a href="B21217_02.xhtml#_idTextAnchor031"><span class="No-Break"><em class="italic">Chapter 2</em></span></a>, to be used by the <strong class="source-inline">GamesService</strong> class. In <a href="B21217_02.xhtml#_idTextAnchor031"><span class="No-Break"><em class="italic">Chapter 2</em></span></a>, we implemented this interface with the <strong class="source-inline">GamesMemoryRepository</strong> in-memory repository class. The EF Core context class supports the repository pattern by implementing the same interface. This way, we can easily switch the in-memory repository by using <span class="No-Break"><strong class="source-inline">GamesSqlServerContext</strong></span><span class="No-Break"> instead.</span></p>
+			<p>The overridden <strong class="source-inline">OnModelCreating</strong> method allows customization to map the model types to the database. With SQL Server, the default schema name is <strong class="source-inline">dbo</strong>. This is changed by <span class="No-Break">invoking </span><span class="No-Break"><strong class="source-inline">modelBuilder.HasDefaultSchema</strong></span><span class="No-Break">.</span></p>
+			<p>To reduce the complexity of the <strong class="source-inline">OnModelCreating</strong> method, <strong class="source-inline">GameConfiguration</strong> and <strong class="source-inline">MoveConfiguration</strong> classes are created to customize the mapping with the <strong class="source-inline">Game</strong> and <span class="No-Break"><strong class="source-inline">Move</strong></span><span class="No-Break"> types.</span></p>
+			<p>One more thing that’s required with<a id="_idIndexMarker132"/> the context class<a id="_idIndexMarker133"/> is for properties of type <strong class="source-inline">DbSet&lt;TEntity&gt;</strong> to allow using properties to access mapped <span class="No-Break">database tables.</span></p>
+			<p class="callout-heading">Note</p>
+			<p class="callout">Creating the <strong class="source-inline">codebreaker</strong> solution had several iterations. One time, an abstract base class and generically derived class were used to support all the different game types. Using EF Core, it’s also possible to map inheritance, and this is also possible with the JSON serialization and the OpenAPI<a id="_idIndexMarker134"/> definition. EF Core can map an inheritance tree to a single table (<strong class="bold">table-per-hierarchy</strong> or <strong class="bold">TpH</strong>), to a table for every type (<strong class="bold">table-per-type </strong>or <strong class="bold">TpT</strong>), and a table <a id="_idIndexMarker135"/>for every<a id="_idIndexMarker136"/> concrete type (<strong class="bold">table-per-concrete-type</strong> <span class="No-Break">or </span><span class="No-Break"><strong class="bold">TpC</strong></span><span class="No-Break">).</span></p>
+			<p class="callout">Instead of creating a complex class hierarchy for the model types to plan for future features that might be never needed, it often helps to have model types as simple as possible, depending on what’s required with the current version. A complex model design adds complexity in <span class="No-Break">multiple places.</span></p>
+			<p class="callout">The <strong class="source-inline">Game</strong> class as it is defined now fulfills requirements for a group of different <strong class="source-inline">Game</strong> types as data holders. Functionality is abstracted away and done from the <strong class="source-inline">analyzers </strong>library, which just uses a contract to access <span class="No-Break">the game.</span></p>
+			<p class="callout">As microservices are used in a<a id="_idIndexMarker137"/> smaller scope, the <strong class="bold">KISS</strong> principle (<strong class="bold">Keep It Simple, Stupid</strong>) can help not only reduce work that needs to be done but also <span class="No-Break">increase performance.</span></p>
+			<h2 id="_idParaDest-71"><a id="_idTextAnchor070"/>Customizing the mapping of simple properties</h2>
+			<p>The mapping of the <strong class="source-inline">Game</strong> class is specified with the <strong class="source-inline">GameConfiguration</strong> class. A configuration class that is applied <a id="_idIndexMarker138"/>using <strong class="source-inline">ApplyConfiguration</strong> with the context configuration needs to implement the <strong class="source-inline">IEntityTypeConfiguration</strong> <span class="No-Break">generic interface:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.Data.SqlServer/Configuration/GameConfiguration.cs</p>
+			<pre class="source-code">
+internal class GameConfiguration : IEntityTypeConfiguration&lt;Game&gt;
+{
+  public void Configure(EntityTypeBuilder&lt;Game&gt; builder)
+  {
+    builder.HasKey(g =&gt; g.Id);
+    builder.Property(g =&gt; g.GameType).HasMaxLength(20);
+    builder.Property(g =&gt; g.PlayerName).HasMaxLength(60);
+    builder.Property(g =&gt; g.Codes).HasMaxLength(120);
+    // code removed for brevity</pre>
+			<p>With the implementation of this class, the key of the table is specified to map to the <strong class="source-inline">Id</strong> property. This would not be required, as convention defines that a property with the name <strong class="source-inline">Id</strong> or an ID prefixed with the class name maps to the <span class="No-Break">primary key.</span></p>
+			<p>The fluent API <strong class="source-inline">HasMaxLength</strong> property is used to change the database types for the <strong class="source-inline">GameType</strong> and <strong class="source-inline">PlayerName</strong> properties. The <strong class="source-inline">Codes</strong> property is not such a simple property but can still be limited to a size of <span class="No-Break">120 characters.</span></p>
+			<p>This configuration for the <strong class="source-inline">Games</strong> table is applied by invoking <strong class="source-inline">ApplyConfiguration</strong> from the <span class="No-Break">context configuration.</span></p>
+			<p>The <strong class="source-inline">MoveConfiguration</strong> class specifies a similar configuration for the <strong class="source-inline">GuessPegs</strong> and <span class="No-Break"><strong class="source-inline">KeyPegs</strong></span><span class="No-Break"> properties:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.Data.SqlServer/Configuration/MoveConfiguration.cs</p>
+			<pre class="source-code">
+internal class MoveConfiguration : IentityTypeConfiguration&lt;Move&gt;
+{
+  public void Configure(EntityTypeBuilder&lt;Move&gt; builder)
+  {
+    // code removed for brevity
+    builder.Property(g =&gt; g.GuessPegs).HasMaxLength(120);
+    builder.Property(g =&gt; g.KeyPegs).HasMaxLength(60);
+  }
+}</pre>
+			<p>For the <strong class="source-inline">Move</strong> type, shadow properties <a id="_idIndexMarker139"/>will be specified later in the <em class="italic">Defining relations between games and </em><span class="No-Break"><em class="italic">moves</em></span><span class="No-Break"> section.</span></p>
+			<h2 id="_idParaDest-72"><a id="_idTextAnchor071"/>Creating value conversion to map complex properties</h2>
+			<p>To allow mapping of types not directly supported by EF Core, value conversion can be used. The <strong class="source-inline">FieldValues</strong> property of type <strong class="source-inline">IDictionary&lt;string, IEnumerable&lt;string&gt;&gt;</strong> is not directly supported with the default mapping. With the game, the content of this value is <a id="_idIndexMarker140"/>not really that huge and also doesn’t need to be searched within. This allows us to map this to a <span class="No-Break"><strong class="source-inline">nvarchar</strong></span><span class="No-Break">-type column.</span></p>
+			<p>Different options are available for the implementation. We will use a different one with SQL Server and with Azure Cosmos DB, but both options could be used with any of <span class="No-Break">these providers.</span></p>
+			<p>Let’s look at an example of what the data looks like. Let’s imagine we have a dictionary such as the following with colors <span class="No-Break">and shapes:</span></p>
+			<pre class="source-code">
+Dictionary&lt;string, IEnumerable&lt;string&gt;&gt; input = new ()
+{
+  { "colors", ["Red", "Green", "Blue"] },
+  { "shapes", ["Rectangle", "Circle"] }
+};</pre>
+			<p>This should result in <span class="No-Break">this string:</span></p>
+			<pre class="source-code">
+var expected = "colors:Red#colors:Green#colors:Blue#shapes:Rectangle#shapes:Circle";</pre>
+			<p>Every value is prefixed with the key of the value. With the source repository, you’ll find a unit test to check for the<a id="_idIndexMarker141"/> implementation of <span class="No-Break">this conversion.</span></p>
+			<p>To convert this dictionary to a string, the <strong class="source-inline">ToFieldsString</strong> extension method <span class="No-Break">is implemented:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.Data.SqlServer/MappingExtensions.cs</p>
+			<pre class="source-code">
+public static class MappingExtensions
+{
+  public static string ToFieldsString(this IDictionary&lt;string, 
+<strong class="bold">    </strong>IEnumerable&lt;string&gt;&gt; fields)
+  {
+    return string.Join('#',
+      fields.SelectMany(
+        key =&gt; key.Value
+          .Select(value =&gt; $"{key.Key}:{value}")));
+  }
+  // code removed for brevity
+}</pre>
+			<p>With the implementation, using the LINQ <strong class="source-inline">SelectMany</strong> method, for every key in the dictionary, a value is created that’s prefixed by <span class="No-Break">the key.</span></p>
+			<p>The reverse functionality converts<a id="_idIndexMarker142"/> the string to a dictionary with the <span class="No-Break"><strong class="source-inline">FromFieldsString</strong></span><span class="No-Break"> method:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.Data.SqlServer/MappingExtensions.cs</p>
+			<pre class="source-code">
+public static IDictionary&lt;string, IEnumerable&lt;string&gt;&gt; 
+<strong class="bold">  </strong>FromFieldsString(this string fieldsString)
+{
+  Dictionary&lt;string, List&lt;string&gt;&gt; fields = new();
+  foreach (var pair in fieldsString.Split('#'))
+  {
+    var index = pair.IndexOf(':');
+    if (index &lt; 0)
+    {
+      throw new ArgumentException($"Field {pair} does not contain ':' 
+      delimiter.");
+    }
+    var key = pair[..index];
+    var value = pair[(index + 1)..];
+    if (!fields.TryGetValue(key, out List&lt;string&gt;? List))
+    {
+      list = [];
+      fields[key] = list;
+    }
+    list.Add(value);
+  }
+  return fields.ToDictionary(
+    pair =&gt; pair.Key,
+    pair =&gt; (IEnumerable&lt;string&gt;)pair.Value);
+}</pre>
+			<p>With the implementation, the complete string is first split using the <strong class="source-inline">#</strong> separator. Each resulting string contains a key <a id="_idIndexMarker143"/>and value separated with <strong class="source-inline">:</strong>. These results are added to a pair, to finally return <span class="No-Break">a dictionary.</span></p>
+			<p>These methods are now used with the configuration of the <span class="No-Break"><strong class="source-inline">Game</strong></span><span class="No-Break"> class:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.Data.SqlServer/Configuration/GameConfiguration.cs</p>
+			<pre class="source-code">
+public void Configure(EntityTypeBuilder&lt;Game&gt; builder)
+{
+  // code removed for brevity
+  builder.Property(g =&gt; g.FieldValues)
+    .HasColumnName("Fields")
+    .HasColumnType("nvarchar")
+    .HasMaxLength(200)
+<strong class="bold">    .HasConversion(</strong>
+<strong class="bold">      convertToProviderExpression: fields =&gt; fields.ToFieldsString(),</strong>
+<strong class="bold">      convertFromProviderExpression: fields =&gt; fields.</strong>
+        <strong class="bold">FromFieldsString(),</strong>
+<strong class="bold">      valueComparer: new ValueComparer&lt;IDictionary&lt;string, </strong>
+        <strong class="bold">Ienumerable&lt;string&gt;&gt;&gt;(</strong>
+<strong class="bold">        equalsExpression: (a, b) =&gt; a!.SequenceEqual(b!),</strong>
+<strong class="bold">        hashCodeExpression: a =&gt; a.Aggregate(0, (result, next) =&gt; </strong>
+          <strong class="bold">HashCode.Combine(result, next.GetHashCode())),</strong>
+<strong class="bold">        snapshotExpression: a =&gt; a.ToDictionary(kv =&gt; kv.Key, kv =&gt; </strong>
+<strong class="bold">        kv.Value)));</strong>
+}</pre>
+			<p>The column name and data<a id="_idIndexMarker144"/> type are specified using the fluent API’s <strong class="source-inline">HasColumnName</strong>, <strong class="source-inline">HasColumnType</strong>, and <strong class="source-inline">HasMaxLength</strong> properties. The <strong class="source-inline">HasConversion</strong> method is used to convert a type to be mapped to the database representation. This method has several overloads for different use cases. Here, the first parameter references an expression to convert the .NET property type to the database type, while the second parameter does the reverse. Here, we invoke the previously created extension methods. With the third parameter, an instance of the <strong class="source-inline">ValueComparer</strong> class is invoked. This is used to compare the value <span class="No-Break">for equality.</span></p>
+			<h2 id="_idParaDest-73"><a id="_idTextAnchor072"/>Defining relations between games and moves</h2>
+			<p>With the relational database, the <strong class="source-inline">Games</strong> table has a relation to the <strong class="source-inline">Moves</strong> table. One game maps to a list of moves. To <a id="_idIndexMarker145"/>make this possible, with the <strong class="source-inline">Moves</strong> table a foreign key named <strong class="source-inline">GameId</strong> is defined to reference the primary key of the <span class="No-Break"><strong class="source-inline">Games</strong></span><span class="No-Break"> table:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.Data.SqlServer/Configuration/MoveConfiguration.cs</p>
+			<pre class="source-code">
+internal class MoveConfiguration : IEntityTypeConfiguration&lt;Move&gt;
+{
+  public void Configure(EntityTypeBuilder&lt;Move&gt; builder)
+  {
+<strong class="bold">    builder.Property&lt;Guid&gt;("GameId");</strong>
+    builder.Property(g =&gt; g.GuessPegs).HasMaxLength(120);
+    builder.Property(g =&gt; g.KeyPegs).HasMaxLength(60);
+  }
+}</pre>
+			<p>Using <strong class="source-inline">EntityTypeBuilder</strong> for the <strong class="source-inline">Move</strong> type, invoking the <strong class="source-inline">Property</strong> method creates a <strong class="bold">shadow property</strong> in case the <strong class="source-inline">Move</strong> type doesn’t have a property with this name. If there’s not a property<a id="_idIndexMarker146"/> with the same name, specifying the type is required as done here using the <span class="No-Break">generic parameter.</span></p>
+			<p>The following code snippet maps this relationship to <span class="No-Break">database tables:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.Data.SqlServer/GameConfiguration.cs</p>
+			<pre class="source-code">
+public void Configure(EntityTypeBuilder&lt;Game&gt; builder)
+{
+  builder.HasKey(g =&gt; g.Id);
+<strong class="bold">  builder.HasMany(g =&gt; g.Moves)</strong>
+<strong class="bold">    .WithOne()</strong>
+<strong class="bold">    .HasForeignKey("GameId");</strong>
+  // code removed for brevity
+}</pre>
+			<p>EF Core supports one-to-one, one-to-many, and many-to-many relationships. With games and moves, a one-to-many relationship is defined with the <strong class="source-inline">HasMany</strong> and <strong class="source-inline">WithOne</strong> methods. The <strong class="source-inline">HasForeignKey</strong> method specifies the <strong class="source-inline">GameId</strong> value of the <strong class="source-inline">Move</strong> class to reference the ID of the <span class="No-Break">game records.</span></p>
+			<p>After defining the mapping from the classes to the tables, let’s implement the contract of the repository and add migrations to create <span class="No-Break">the database.</span></p>
+			<h2 id="_idParaDest-74"><a id="_idTextAnchor073"/>Implementing the repository contract</h2>
+			<p>In the previous chapter, we<a id="_idIndexMarker147"/> defined the <strong class="source-inline">IGamesRepository</strong> interface and implemented it with an in-memory representation. Now, let’s implement this interface to read and write to the SQL <a id="_idIndexMarker148"/><span class="No-Break">Server database.</span></p>
+			<h3>Adding and deleting games</h3>
+			<p>Let’s add the implementation<a id="_idIndexMarker149"/> of the <strong class="source-inline">AddGameAsync</strong> and <strong class="source-inline">DeleteGameAsync</strong> methods <a id="_idIndexMarker150"/>of the contract to the <span class="No-Break"><strong class="source-inline">GamesSqlServerContext</strong></span><span class="No-Break"> class:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.Data.SqlServer/GameSqlServerContext.cs</p>
+			<pre class="source-code">
+public async Task AddGameAsync(Game game, CancellationToken cancellationToken = default)
+{
+<strong class="bold">  Games.Add(game);</strong>
+<strong class="bold">  </strong><strong class="bold">await SaveChangesAsync(cancellationToken);</strong>
+}
+public async Task&lt;bool&gt; DeleteGameAsync(Guid id, CancellationToken 
+<strong class="bold">  </strong>cancellationToken = default)
+{
+  var affected = await Games
+    .Where(g =&gt; g.Id == id)
+<strong class="bold">    .ExecuteDeleteAsync(cancellationToken);</strong>
+    return affected == 1;
+}</pre>
+			<p>With the <strong class="source-inline">AddGameAsync</strong> method, the passed <strong class="source-inline">Game</strong> object is added to the <strong class="source-inline">Games</strong> property of the EF Core context, which marks the entity as <em class="italic">added</em> with the change tracker. The <strong class="source-inline">SaveChangesAsync</strong> method creates <strong class="source-inline">INSERT</strong> statements in <span class="No-Break">the database.</span></p>
+			<p>The <strong class="source-inline">DeleteGameAsync</strong> method receives the game ID with the parameter. Here, the <strong class="source-inline">ExecuteDeleteAsync</strong> method is invoked on the record matching the ID. <strong class="source-inline">ExecuteDeleteAsync</strong> and <strong class="source-inline">ExecuteUpdateAsync</strong> methods, available since EF Core 7, don’t use tracking and directly execute <strong class="source-inline">DELETE</strong> and <strong class="source-inline">UPDATE</strong> statements. This increases performance when <a id="_idIndexMarker151"/>change tracking is not necessary. When the record was not found to be deleted, this method <a id="_idIndexMarker152"/><span class="No-Break">returns </span><span class="No-Break"><strong class="source-inline">false</strong></span><span class="No-Break">.</span></p>
+			<p>Starting a 6x4 game creates this SQL statement to store <span class="No-Break">the game:</span></p>
+			<pre class="source-code">
+INSERT INTO [codebreaker].[Games] ([Id], [Codes], [Duration], [EndTime], [Fields], [GameType], [LastMoveNumber], [MaxMoves], [NumberCodes], [PlayerName], [StartTime], [Won])
+      VALUES (@p0, @p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9, @p10, @p11);</pre>
+			<p>Let’s set a move with the <span class="No-Break">next implementation.</span></p>
+			<h3>Updating a game</h3>
+			<p>When a move is set, some game<a id="_idIndexMarker153"/> information such as the last move number is updated as well. The implementation to add a move and update the game is <span class="No-Break">shown here:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.Data.SqlServer/GameSqlServerContext.cs</p>
+			<pre class="source-code">
+public async Task AddMoveAsync(Game game, Move move, CancellationToken cancellationToken = default)
+{
+<strong class="bold">  Moves.Add(move);</strong>
+<strong class="bold">  Games.Update(game);</strong>
+<strong class="bold">  await SaveChangesAsync(cancellationToken);</strong>
+}</pre>
+			<p>The <strong class="source-inline">Move</strong> object is added to the context with the <strong class="source-inline">Add</strong> method, and the <strong class="source-inline">Game</strong> object is added with the <strong class="source-inline">Update</strong> method. This way, the change tracker is configured in that invoking the <strong class="source-inline">SaveChangesAsync</strong> method<a id="_idIndexMarker154"/> creates SQL <strong class="source-inline">UPDATE</strong> and <span class="No-Break"><strong class="source-inline">INSERT</strong></span><span class="No-Break"> statements.</span></p>
+			<p class="callout-heading">Note</p>
+			<p class="callout">By default, one invocation of <strong class="source-inline">SaveChangesAsync</strong> creates one transaction. If updating the game fails, there’s a rollback for updating the move. In case you need multiple <strong class="source-inline">SaveChangesAsync</strong> instances within one transaction, the easiest option to use is ambient transactions (using the <strong class="source-inline">TransactionScope</strong> class from the <span class="No-Break"><strong class="source-inline">System.Transactions</strong></span><span class="No-Break"> namespace).</span></p>
+			<h3>Querying games</h3>
+			<p>To retrieve games, we need to<a id="_idIndexMarker155"/> implement <strong class="source-inline">Getxx</strong> methods. Let’s start with <strong class="source-inline">GetGameAsync</strong> to get the game by using the <span class="No-Break">game ID:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.Data.SqlServer/GamesSqlServerContext.cs</p>
+			<pre class="source-code">
+public async Task&lt;Game?&gt; GetGameAsync(Guid id, CancellationToken cancellationToken = default)
+{
+<strong class="bold">  var game = await Games</strong>
+<strong class="bold">    .Include("Moves")</strong>
+<strong class="bold">    .TagWith(nameof(GetGameAsync))</strong>
+<strong class="bold">    .SingleOrDefaultAsync(g =&gt; g.Id == id, cancellationToken);</strong>
+  return game;
+}</pre>
+			<p>The <strong class="source-inline">GetGameAsync</strong> method uses the <strong class="source-inline">SingleOrDefaultAsync</strong> method to get either one or zero records. If the game ID is not found, <strong class="source-inline">null</strong> is returned. Behind the scenes, a query using <strong class="source-inline">SELECT TOP(2)</strong> is created to check if more than one record would be returned from this query. If this is the case, the <strong class="source-inline">SingleOrDefaultAsync</strong> method throws <span class="No-Break">an exception.</span></p>
+			<p>The <strong class="source-inline">Include</strong> method is <a id="_idIndexMarker156"/>used to create a query that includes moves that relate to the returned query. Here, the SQL <strong class="source-inline">LEFT JOIN</strong> statement is used to join multiple tables. EF Core writes all the queries and updates to the log output. To better see which output maps to which LINQ methods, the <strong class="source-inline">TagWith</strong> method can be used. This tag is shown as a title with the <span class="No-Break">log output.</span></p>
+			<p class="callout-heading">Note</p>
+			<p class="callout">The <strong class="source-inline">TagWith</strong> method is of great help with debugging and troubleshooting. Checking the log outputs to see SQL queries sent, the tag gives a fast way to see where this query <span class="No-Break">was generated.</span></p>
+			<p>The following snippet shows the log output from this query, including <span class="No-Break">the title:</span></p>
+			<pre class="source-code">
+-- GetGameAsync
+SELECT [t].[ Id], [t].[Codes], [t].[Duration], [t].[EndTime], [t].[Fields], [t].[GameType], [t].[LastMoveNumber], [t].[MaxMoves], [t].[NumberCodes], [t].[PlayerName], [t].[StartTime], [t].[Won], [m].[Id], [m].[GameId], [m].[GuessPegs], [m].[KeyPegs], [m].[MoveNumber]
+FROM (
+  SELECT TOP(2) [g].[Id], [g].[Codes], [g].[Duration], [g].[EndTime], [g].[Fields], [g].[GameType], [g].[LastMoveNumber], [g].[MaxMoves], [g].[NumberCodes], [g].[PlayerName], [g].[StartTime], [g].[Won]
+  FROM [codebreaker].[Games] AS [g]
+  WHERE [g].[Id] = @__Id_0
+) AS [t]
+LEFT JOIN [codebreaker].[Moves] AS [m] ON [t].[Id] = [m].[GameId]
+ORDER BY [t].[Id]</pre>
+			<p>To query by date, player name, or some <a id="_idIndexMarker157"/>other query option, pass the <strong class="source-inline">GamesQuery</strong> object to the <span class="No-Break"><strong class="source-inline">GetGamesAsync</strong></span><span class="No-Break"> method:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.Data.SqlServer/GamesSqlServerContext.cs</p>
+			<pre class="source-code">
+public async Task&lt;IEnumerable&lt;Game&gt;&gt; GetGamesAsync(GamesQuery? gamesQuery, CancellationToken cancellationToken = default)
+{
+<strong class="bold">  IQueryable&lt;Game&gt; query = Games</strong>
+<strong class="bold">    .TagWith(nameof(GetGamesAsync))</strong>
+<strong class="bold">    .Include(g =&gt; g.Moves);</strong>
+  if (gamesQuery.Date.HasValue)
+  {
+<strong class="bold">    DateTime begin = gamesQuery.Date.Value.ToDateTime(TimeOnly.</strong>
+<strong class="bold">        MinValue);</strong>
+<strong class="bold">    DateTime end = begin.AddDays(1);</strong>
+<strong class="bold">    query = query.Where(g =&gt; g.StartTime &lt; end &amp;&amp; g.StartTime &gt; </strong>
+<strong class="bold">      begin);</strong>
+  }
+  if (gamesQuery.PlayerName != null)
+<strong class="bold">    query = query.Where(g =&gt; g.PlayerName == gamesQuery.PlayerName);</strong>
+  if (gamesQuery.GameType != null)
+<strong class="bold">    query = query.Where(g =&gt; g.GameType == gamesQuery.GameType);</strong>
+  if (gamesQuery.Ended)
+  {
+<strong class="bold">    query = query.Where(g =&gt; g.EndTime != null)</strong>
+<strong class="bold">      .OrderBy(g =&gt; g.Duration);</strong>
+  }
+  else
+  {
+<strong class="bold">    query = query.OrderByDescending(g =&gt; g.StartTime);</strong>
+  }
+<strong class="bold">  query = query.Take(MaxGamesReturned);</strong>
+  return await query.ToListAsync(cancellationToken);
+}</pre>
+			<p>The implementation of this method uses the <strong class="source-inline">IQueryable</strong> variable to add different LINQ query methods. Depending on the values passed with the <strong class="source-inline">GamesQuery</strong> parameter, multiple <strong class="source-inline">Where</strong> methods <a id="_idIndexMarker158"/>are added, in addition to <strong class="source-inline">OrderBy</strong> or <strong class="source-inline">OrderByDescending</strong>, to define the order of the result. To not return all the games played, only the first 500 games based on the filter <span class="No-Break">are returned.</span></p>
+			<p>Calling this method passing the player’s name and a date results in this <span class="No-Break">SQL query:</span></p>
+			<pre class="source-code">
+SELECT [t].[Id], [t].[Codes], [t].[Duration], [t].[EndTime], [t].[Fields], [t].[GameType], [t].[IsVictory], [t].[LastMoveNumber], [t].[MaxMoves], [t].[NumberCodes], [t].[PlayerIsAuthenticated], [t].[PlayerName], [t].[StartTime], [m].[Id], [m].[GameId], [m].[GuessPegs], [m].[KeyPegs], [m].[MoveNumber]
+FROM (
+  SELECT TOP(@__p_3) [g].[Id], [g].[Codes], [g].[Duration], [g].[EndTime], [g].[Fields], [g].[GameType], [g].[IsVictory], [g].[LastMoveNumber], [g].[MaxMoves], [g].[NumberCodes], [g].[PlayerIsAuthenticated], [g].[PlayerName], [g].[StartTime]
+  FROM [codebreaker].[Games] AS [g]
+  WHERE [g].[StartTime] &lt; @__end_0 AND [g].[StartTime] &gt; @__begin_1 AND [g].[GameType] = @__gamesQuery_GameType_2
+  ORDER BY [g].[StartTime] DESC
+) AS [t]
+LEFT JOIN [codebreaker].[Moves] AS [m] ON [t].[Id] = [m].[GameId]
+ORDER BY [t].[StartTime] DESC, [t].[Id]</pre>
+			<p>The <strong class="source-inline">Include</strong> method results in a <strong class="source-inline">LEFT JOIN</strong> operation<a id="_idIndexMarker159"/> to access the <strong class="source-inline">Moves</strong> table. Because of the <strong class="source-inline">Take</strong> method, <strong class="source-inline">SELECT TOP</strong> is used. Multiple invocations of the LINQ <strong class="source-inline">Where</strong> method results in a <span class="No-Break"><strong class="source-inline">WHERE</strong></span><span class="No-Break"> clause.</span></p>
+			<h2 id="_idParaDest-75"><a id="_idTextAnchor074"/>Configuring user secrets</h2>
+			<p>To access the database, we need to retrieve some configuration values. Some of these configuration values are secrets that shouldn’t be part of the source code repository. During development time, you<a id="_idIndexMarker160"/> can use user secrets. User secrets are stored with the <span class="No-Break">user profile.</span></p>
+			<p>To initialize user secrets, use this .NET <span class="No-Break">CLI command:</span></p>
+			<pre class="console">
+cd Codebreaker.AppHost
+dotnet user-secrets init</pre>
+			<p>This creates a <strong class="source-inline">UserSecretsId</strong> property in the project file. Because all user secrets are stored with the user profile, this string is used to differentiate the configurations with <span class="No-Break">multiple applications.</span></p>
+			<p>To set a configuration value with the secrets, use the <strong class="source-inline">dotnet user-secrets </strong><span class="No-Break"><strong class="source-inline">set</strong></span><span class="No-Break"> command:</span></p>
+			<pre class="console">
+dotnet user-secrets set Parameters:sql-password [enter the password]</pre>
+			<p>With the SQL Server Docker container we use, there are some requirements for the password. Be aware that you can’t use simple passwords. Three of four sets need to match: uppercase letters, lowercase letters, base 10 digits, and symbols. You can check the log output to see if there’s an issue with <span class="No-Break">the password.</span></p>
+			<p>You can also use Visual Studio and a context menu with Visual Studio to configure <span class="No-Break">user secrets.</span></p>
+			<p>Be aware that the provider to read configuration values from user secrets by default is only used if the secret ID is configured <a id="_idIndexMarker161"/>and the application is running in the <span class="No-Break"><strong class="source-inline">Development</strong></span><span class="No-Break"> environment.</span></p>
+			<p class="callout-heading">Note</p>
+			<p class="callout">User secrets cannot be used in production. The idea of user secrets is to not store secrets with a configuration file that’s pushed to a source code repository. Every developer working on this project needs to configure the configuration values for secrets. In production, you can use other services such as Azure Key Vault. This is covered in <a href="B21217_07.xhtml#_idTextAnchor162"><span class="No-Break"><em class="italic">Chapter 7</em></span></a><span class="No-Break">.</span></p>
+			<h2 id="_idParaDest-76"><a id="_idTextAnchor075"/>Configuring the application model with SQL Server</h2>
+			<p>To run SQL Server, .NET Aspire <a id="_idIndexMarker162"/>makes it easy to<a id="_idIndexMarker163"/> run a Docker container. Just add this code to the application model in the <span class="No-Break"><strong class="source-inline">Codebreaker.AppHost</strong></span><span class="No-Break"> project:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.AppHost/Program.cs</p>
+			<pre class="source-code">
+var builder = DistributedApplication.CreateBuilder(args);
+<strong class="bold">var sqlServer = builder.AddSqlServer("sql", sqlPassword)</strong>
+<strong class="bold">  .AddDatabase("CodebreakerSql", "codebreaker");</strong></pre>
+			<p>The <strong class="source-inline">AddSqlServer</strong> method adds a SQL Server resource. Using this method, during development time, a Docker container is used. In <a href="B21217_05.xhtml#_idTextAnchor110"><span class="No-Break"><em class="italic">Chapter 5</em></span></a>, we’ll get into the details of Docker and add more configuration with this SQL Server Docker container. The name of this resource is sql. Optionally, a password can be passed to the <strong class="source-inline">AddSqlServer</strong> method. If a configuration parameter value is set with the resource name postfixed with -<strong class="source-inline">password</strong> (as we did), this <strong class="source-inline">password</strong> is used. Otherwise a random <strong class="source-inline">password</strong> is generated.. The <strong class="source-inline">AddDatabase</strong> method adds a database to the resource with the first parameter, the name of the resource that is used as a name for the connection string name, and the <span class="No-Break">database name.</span></p>
+			<p>To allow us to dynamically decide between different game repositories, we use the <strong class="source-inline">DataStore</strong> configuration to <a id="_idIndexMarker164"/>decide between in-memory, SQL Server, and Azure Cosmos DB on the startup of <span class="No-Break">the application:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.AppHost/appsettings.json</p>
+			<pre class="source-code">
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning",
+      "Aspire.Hosting.Dcp": "Warning"
+    }
+  },
+<strong class="bold">  "DataStore": "SqlServer"</strong>
+}</pre>
+			<p>Depending on the database provider you want to use, change the value <span class="No-Break">as needed.</span></p>
+			<p class="callout-heading">Note</p>
+			<p class="callout"><a href="B21217_07.xhtml#_idTextAnchor162"><span class="No-Break"><em class="italic">Chapter 7</em></span></a>, <em class="italic">Flexible Configuration</em>, goes into the details of the <strong class="source-inline">appsettings.json</strong> file and environment-specific counterparts, as well as other options to store configuration values such as environmental variables, program arguments, and Azure App Configuration instances. In this chapter, all we need is to configure settings within <strong class="source-inline">appsettings.json</strong> as well as user secrets, which are covered with Azure <span class="No-Break">Cosmos DB.</span></p>
+			<p>The configuration value is <a id="_idIndexMarker165"/>retrieved with the startup of the <span class="No-Break"><strong class="source-inline">AppHost</strong></span><span class="No-Break"> project:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.AppHost/Program.cs</p>
+			<pre class="source-code">
+<strong class="bold">string dataStore = builder.Configuration["DataStore"] ??</strong>
+<strong class="bold">  "InMemory";</strong></pre>
+			<p>In case the value is not <a id="_idIndexMarker166"/>configured, it defaults to the in-memory provider we created in the <span class="No-Break">previous chapter.</span></p>
+			<p>Now, we can change dependencies for the <span class="No-Break">game APIs:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.AppHost/Program.cs</p>
+			<pre class="source-code">
+builder.AddProject&lt;Projects.Codebreaker_GameAPIs&gt;("gameapis")
+<strong class="bold">  .WithEnvironment("DataStore", dataStore)</strong>
+<strong class="bold">  .WithReference(sqlServer);</strong>
+// code removed for brevity</pre>
+			<p>The <strong class="source-inline">WithEnvironment</strong> method creates an environment variable for the game APIs project with the <strong class="source-inline">DataStore</strong> key and the value that’s retrieved from the configuration. The <strong class="source-inline">WithReference</strong> method references the SQL Server resource and creates an environment variable for the <span class="No-Break">connection string.</span></p>
+			<p>Next, let’s configure the minimal <a id="_idIndexMarker167"/>APIs project to retrieve the configuration values from the <span class="No-Break"><strong class="source-inline">AppHost</strong></span><span class="No-Break"> project.</span></p>
+			<h2 id="_idParaDest-77"><a id="_idTextAnchor076"/>Configuring the DI container with the minimal APIs project</h2>
+			<p>After the mapping of the model to <a id="_idIndexMarker168"/>the database is completed and the resource dependencies are defined with the Aspire <strong class="source-inline">AppHost</strong> project, the DI container can be configured to use the EF <span class="No-Break">Core context.</span></p>
+			<p>The games API project needs a reference to the <strong class="source-inline">Codebreaker.Data.SqlServer</strong> project and the <strong class="source-inline">Aspire.Microsoft.EntityFrameworkCore.SqlServer</strong> <span class="No-Break">NuGet package.</span></p>
+			<p>The configuration for the <strong class="source-inline">DataStore</strong> is retrieved <a id="_idIndexMarker169"/>with the following <span class="No-Break">code snippet:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.GameAPIs/ApplicationServices.cs</p>
+			<pre class="source-code">
+public static void AddApplicationServices(this IHostApplicationBuilder builder)
+{
+  // code removed for brevity
+<strong class="bold">  string? dataStore = builder.Configuration.</strong>
+<strong class="bold">    GetValue&lt;string&gt;("DataStore");</strong>
+  switch (dataStore)
+  {
+    case "SqlServer":
+      ConfigureSqlServer(builder);
+      break;
+    default:
+      ConfigureInMemory(builder);
+      break;
+  }
+  builder.Services.AddScoped&lt;IGamesService, GamesService&gt;();
+}</pre>
+			<p>Depending on the retrieved configuration value for <strong class="source-inline">DataStore</strong>, we configure Azure Cosmos DB, SQL Server, or the in-memory repository that we implemented in the <span class="No-Break">previous chapter.</span></p>
+			<p>The configuration for SQL <a id="_idIndexMarker170"/>Server, which is called from the previous <strong class="source-inline">switch/case</strong> statement, is <span class="No-Break">shown here:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.GameAPIs/ApplicationServices.cs</p>
+			<pre class="source-code">
+static void ConfigureSqlServer(IHostApplicationBuilder builder)
+{
+  builder.<strong class="bold">AddDbContextObjectPool</strong>&lt;IGamesRepository, GamesSqlServerContext&gt;(options =&gt;
+  {
+<strong class="bold">    var connectionString = builder.Configuration.</strong>
+<strong class="bold">    GetConnectionString("CodebreakerSql")</strong> ?? throw new 
+<strong class="bold">    </strong>InvalidOperationException("Could not read SQL Server connection 
+<strong class="bold">    </strong>string");
+<strong class="bold">    options.UseSqlServer(connectionString);</strong>
+<strong class="bold">    options.UseQueryTrackingBehavior(</strong>
+<strong class="bold">    QueryTrackingBehavior.NoTracking);</strong>
+  }
+  <strong class="bold">builder.EnrichSqlServerDbContext&lt;GamesSqlServerContext&gt;();</strong>
+}</pre>
+			<p>Using the .NET Aspire SqlServer EF Core component, we can invoke the  <strong class="source-inline">AddSqlServerDbContext</strong> API to configure the EF Core context with .NET Aspire. However, this API doesn’t provide the level of flexibility we need for working with different database providers. Thus, instead, we configure the EF Core context using EF Core APIs such as <strong class="source-inline">AddDbContext</strong> and <strong class="source-inline">AddDbContextPool</strong> and add Aspire functionality by using <strong class="source-inline">EnrichSqlServerDbContext</strong>. The <strong class="source-inline">AddDbContextObjectPool</strong> method configures to use the SQL Server EF Core provider, passing the connection string, which is passed via the <strong class="source-inline">AppHost</strong> project and thus needs to match the name configured with the top-level statements in the <span class="No-Break">AppHost project.</span></p>
+			<p>Invoking the <strong class="source-inline">UseQueryTrackingBehavior</strong> method adds one interesting aspect when using EF Core. By default, all queries are tracked within the EF Core context to allow the context to know about changes. Within the API service, the context is newly created with every new HTTP request. Thus, keeping this tracking state for every context is not required. Adding and updating entities are explicitly marked with the <strong class="source-inline">Add</strong> and <strong class="source-inline">Update</strong> methods. Setting the query tracking behavior to <strong class="source-inline">QueryTrackingBehavior.NoTracking</strong> disables tracking with all queries (unless overwritten with a query using the <strong class="source-inline">AsTracking</strong> method) and thus reduces <span class="No-Break">the overhead.</span></p>
+			<p>Instead of turning tracking <a id="_idIndexMarker171"/>off by default, you can also use the option to turn tracking off with a single query using the <span class="No-Break"><strong class="source-inline">AsNoTracking</strong></span><span class="No-Break"> method.</span></p>
+			<p>The <strong class="source-inline">EnrichSqlServerDbContext</strong> method adds health checks, logging, and telemetry configuration offered by the Aspire component. Logging and telemetry configuration are covered in <a href="B21217_11.xhtml#_idTextAnchor263"><span class="No-Break"><em class="italic">Chapter 11</em></span></a>, and health checks are covered in <a href="B21217_12.xhtml#_idTextAnchor294"><span class="No-Break"><em class="italic">Chapter 12</em></span></a><span class="No-Break">.</span></p>
+			<p>As the mappings and the repository contract are implemented, we can now continue to create the database <span class="No-Break">using migrations.</span></p>
+			<h1 id="_idParaDest-78"><a id="_idTextAnchor077"/>Creating migrations with EF Core</h1>
+			<p>Using EF Core, you can create the database <a id="_idIndexMarker172"/>with the <strong class="source-inline">Database.EnsureCreatedAsync</strong> context API method. However, this does not take schema changes into account. Over time, the <a id="_idIndexMarker173"/>database schema will change as new features are added – and it’s best to do <span class="No-Break">this automatically.</span></p>
+			<p><a href="B21217_08.xhtml#_idTextAnchor183"><span class="No-Break"><em class="italic">Chapter 8</em></span></a> describes how to automatically publish services to testing and production environments. With this, updating the database is important as well. When the database schema changes, updates <a id="_idIndexMarker174"/>should be published to the environments. EF Core offers <strong class="bold">migrations</strong> to record all schema changes and update the <a id="_idIndexMarker175"/>database <span class="No-Break">schema programmatically.</span></p>
+			<p>Next, let’s do <span class="No-Break">the following:</span></p>
+			<ol>
+				<li>Add the .NET EF <span class="No-Break">Core tool</span></li>
+				<li>Add the EF Core tool and create <span class="No-Break">initial migrations</span></li>
+				<li>Update the model and <span class="No-Break">add migrations</span></li>
+				<li>Update the <span class="No-Break">database programmatically</span></li>
+			</ol>
+			<h2 id="_idParaDest-79"><a id="_idTextAnchor078"/>Adding the .NET EF Core tool</h2>
+			<p>If you don’t have the EF Core .NET <a id="_idIndexMarker176"/>command-line tool installed yet, you can install it with the <strong class="source-inline">dotnet</strong> CLI as a global or a local tool. Here, we install it as a local tool to have a specific version of this tool as part of the <span class="No-Break"><strong class="source-inline">Codebreaker.Data.SqlServer</strong></span><span class="No-Break"> project.</span></p>
+			<p>To install local tools, a <strong class="source-inline">tool-manifest</strong> file first needs to <span class="No-Break">be created:</span></p>
+			<pre class="console">
+cd Codebreaker.Data.SqlServer
+dotnet new tool-manifest</pre>
+			<p>With the <strong class="source-inline">tool-manifest</strong> template, the <strong class="source-inline">dotnet new</strong> command creates a <strong class="source-inline">.config</strong> directory with a <strong class="source-inline">dotnet-tools.json</strong> file. This manifest file will contain all the tools that should be installed when working on <span class="No-Break">the project.</span></p>
+			<p>As soon as this manifest file is available, we can install the <span class="No-Break"><strong class="source-inline">dotnet-ef</strong></span><span class="No-Break"> tool:</span></p>
+			<pre class="console">
+dotnet tool install dotnet-ef</pre>
+			<p>This command configures this tool with the tool manifest file and installs it locally. In case you’ve installed another version of this tool globally, while the current directory of your command prompt is within the project folder, you use the tool version that’s specified with the tool <span class="No-Break">manifest file.</span></p>
+			<p>To get all the tools installed <a id="_idIndexMarker177"/>and configured with a tool manifest file, you can use the <strong class="source-inline">tool </strong><span class="No-Break"><strong class="source-inline">restore</strong></span><span class="No-Break"> command:</span></p>
+			<pre class="console">
+dotnet tool restore</pre>
+			<p>The <strong class="source-inline">restore</strong> command can be practically used when you clone a repository containing a tool manifest file. Using <strong class="source-inline">dotnet tool restore</strong>, all tools specified with the project <span class="No-Break">are restored.</span></p>
+			<p>Let’s use this tool to create an initial migration for the <span class="No-Break">actual context:</span></p>
+			<pre class="console">
+dotnet ef migrations add InitGames -s ..\Codebreaker.GameAPIs</pre>
+			<p><strong class="source-inline">migrations</strong> is a command of the <strong class="source-inline">dotnet ef</strong> tool. Using <strong class="source-inline">add</strong>, a new migration is added with the name that follows the <strong class="source-inline">add</strong> command (here, <strong class="source-inline">InitGames</strong>). The <strong class="source-inline">-s</strong> (or <strong class="source-inline">--startup-project</strong>) option specifies the project where the EF Core context is configured with the DI container, and the connection string to the database is specified. This is a different project than the project where the EF Core context is implemented (<strong class="source-inline">Codebreaker.Data.Cosmos</strong> and <strong class="source-inline">Codebreaker.Data.SqlServer</strong>); that’s why this option <span class="No-Break">is needed.</span></p>
+			<p class="callout-heading">Note</p>
+			<p class="callout">In case creating the migration fails, check the error message. An error could be that you failed to specify a mapping, and here the errors are very detailed. While working around issues, you can temporarily ignore the properties of the model to see if the error is really based on a <span class="No-Break">property mapping.</span></p>
+			<p>After a successful run of this tool, you’ll see a <strong class="source-inline">Migrations</strong> folder with the project. This folder contains a snapshot of the current state of the database, including all the table mappings, the property mappings, and the relations. This class is named based on the EF Core context suffixed by <strong class="source-inline">ModelSnapshot</strong>; for <span class="No-Break">example, </span><span class="No-Break"><strong class="source-inline">GameSqlServerContextModelSnapshot</strong></span><span class="No-Break">.</span></p>
+			<p>Every time you add a new migration, the snapshot will be updated and a new <strong class="source-inline">Migration</strong>-derived class created that includes all the schema changes based on the previous migration. The migration is named with the migration name prefixed with the time. The generated class contains an <strong class="source-inline">Up</strong> method that will be invoked when the migration is applied to the SQL Server database and a <strong class="source-inline">Down</strong> method that will be invoked when the migration is <a id="_idIndexMarker178"/>dropped from <span class="No-Break">the database.</span></p>
+			<p>Next, we’ll use the <strong class="source-inline">dotnet ef</strong> tool to apply the migration to the database and create the database if it doesn’t exist yet. This can be done using the <strong class="source-inline">dotnet ef database </strong><span class="No-Break"><strong class="source-inline">update</strong></span><span class="No-Break"> command:</span></p>
+			<pre class="console">
+dotnet ef database update -s ..\Codebreaker.GameAPIs.</pre>
+			<p>This command now uses the connection string from the startup project to apply migrations to the database. Using migrations to create the database, you’ll see all the games and moves tables created – along with the <strong class="source-inline">_EFMigrationsHistory</strong> table. Reading the content of this table, you’ll see all the migration names applied to the database.  This information is checked when doing another update to the database schema <span class="No-Break">using migrations.</span></p>
+			<p class="callout-heading">Note</p>
+			<p class="callout">There are some cases where creating the database fails while creating the migration succeeds. Mapping errors can be the reason here as well. Checking the error message again gives good details on the reason for <span class="No-Break">the failure.</span></p>
+			<h2 id="_idParaDest-80"><a id="_idTextAnchor079"/>Creating or updating the database programmatically</h2>
+			<p>Instead of using the command line to apply<a id="_idIndexMarker179"/> a migration, migrations can be started programmatically invoking the EF Core context with <strong class="source-inline">context.Database.MigrateAsync</strong>. Let’s implement this functionality with the <strong class="source-inline">CreateOrUpdateDatabaseAsync</strong> method, which is called from the application startup code for easy use of <span class="No-Break">the solution:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.GameAPIs/ApplicationServices.cs</p>
+			<pre class="source-code">
+<strong class="bold">public static async Task CreateOrUpdateDatabaseAsync(this WebApplication app)</strong>
+{
+  var dataStore = app.Configuration["DataStore"] ?? "InMemory";
+  if (dataStore == "SqlServer")
+  {
+    try
+    {
+      using var scope = app.Services.CreateScope();
+      var repo = scope.ServiceProvider.GetRequiredService&lt;IGamesRepository&gt;();
+      if (repo is GamesSqlServerContext context)
+      {
+<strong class="bold">        await context.Database.MigrateAsync();</strong>
+        app.Logger.LogInformation("SQL Server database updated");
+      }
+    }
+    catch (Exception ex)
+    {
+      app.Logger.LogError(ex, "Error updating database");
+      throw;
+    }
+  }
+}</pre>
+			<p>With the implementation, we check if the solution is configured to use SQL Server. In that case, the <strong class="source-inline">MigrateAsync</strong> method is invoked to update the database to the <span class="No-Break">newest version.</span></p>
+			<p>With the <strong class="source-inline">codebreaker</strong> solution, this is really convenient – running the solution, everything is ready, including the database. From a security standpoint, in the production environment, the service <a id="_idIndexMarker180"/>running should not have a database connection string that is allowed to change the schema. Instead, a separate program can be used to update the database. This could be invoked from a GitHub action with automatic deployment. Using the <strong class="source-inline">dotnet ef</strong> tool, you can even create a standalone application to update the database schema: <strong class="source-inline">dotnet ef migrations bundle</strong> creates an application with the .NET runtime included, thus you can start this application from clients who don’t have the .NET runtime installed. You can also create a SQL script to start the migration if this is the preferred option by the database administrator: <strong class="source-inline">dotnet ef </strong><span class="No-Break"><strong class="source-inline">migrations script</strong></span><span class="No-Break">.</span></p>
+			<p>Next, let’s make a change to the model that influences the <span class="No-Break">database schema.</span></p>
+			<h2 id="_idParaDest-81"><a id="_idTextAnchor080"/>Updating the database schema</h2>
+			<p>In <a href="B21217_09.xhtml#_idTextAnchor216"><span class="No-Break"><em class="italic">Chapter 9</em></span></a>, we’ll differentiate<a id="_idIndexMarker181"/> anonymous from authenticated users. With this, game information will be stored when the game is played by an authenticated user. For this, we’ll add a <strong class="source-inline">PlayerIsAuthenticated</strong> flag to the <span class="No-Break"><strong class="source-inline">Game</strong></span><span class="No-Break"> class:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.GameAPIs.Models/Game.cs</p>
+			<pre class="source-code">
+public class Game(
+  Guid id,
+  string gameType,
+  string playerName,
+  DateTime startTime,
+  int numberCodes,
+  int maxMoves) : IGame
+{
+  public Guid Id { get; private set; } = id;
+  public string GameType { get; private set; } = gameType;
+  public string PlayerName { get; private set; } = playerName;
+  <strong class="bold">public bool PlayerIsAuthenticated { get; set; } = false;</strong>
+  // code removed for brevity</pre>
+			<p>This new property is not defined to <a id="_idIndexMarker182"/>be ignored from the database. To update the database schema, we add a <span class="No-Break">new migration:</span></p>
+			<pre class="console">
+cd Codebreaker.Data.SqlServer
+dotnet ef migrations add AddPlayerIsAuthenticated -s ..\Codebreaker.GameAPIs</pre>
+			<p>The new migration is named <strong class="source-inline">AddPlayerIsAuthenticated</strong>. This change updates the snapshot in the <strong class="source-inline">Migrations</strong> folder and adds a new migration, as shown in this <span class="No-Break">code snippet:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.Data.SqlServer/Migrations/ 20231225095931_AddPlayerIsAuthenticated.cs</p>
+			<pre class="source-code">
+public partial class AddPlayerIsAuthenticated : Migration
+{
+<strong class="bold">  </strong><strong class="bold">protected override void Up(MigrationBuilder migrationBuilder)</strong>
+  {
+<strong class="bold">    migrationBuilder.AddColumn</strong>&lt;bool&gt;(
+      name: "PlayerIsAuthenticated",
+      schema: "codebreaker",
+      table: "Games",
+      type: "bit",
+      nullable: false,
+      defaultValue: false);
+    }
+<strong class="bold">  protected override void Down(MigrationBuilder migrationBuilder)</strong>
+  {
+    <strong class="bold">migrationBuilder.DropColumn</strong>(
+      name: "PlayerIsAuthenticated",
+      schema: "codebreaker",
+      table: "Games");
+  }
+}</pre>
+			<p>With the <strong class="source-inline">Up</strong> method, updating a database from the previous version, the column is added to the database schema (<strong class="source-inline">AddColumn</strong>), and the <strong class="source-inline">Down</strong> method removes the <span class="No-Break">column (</span><span class="No-Break"><strong class="source-inline">DropColumn</strong></span><span class="No-Break">).</span></p>
+			<p>During development, you might often <a id="_idIndexMarker183"/>update the schema and create many migrations. Before publishing a new version of the application, it’s a good idea to combine migrations into one. Just pay attention to the version installed in production or staging environments. You should keep the migrations already deployed. Migrations that have been used only in your development environment can be removed with <strong class="source-inline">dotnet ef migrations remove</strong> (possibly called multiple times to always remove the last migration) – and finally, one invocation of <strong class="source-inline">dotnet ef migrations add &lt;Name of the migration&gt;</strong>, which then creates one migration with all schema changes since the <span class="No-Break">last migration.</span></p>
+			<p>Now, let’s run the solution using <span class="No-Break">SQL Server.</span></p>
+			<h2 id="_idParaDest-82"><a id="_idTextAnchor081"/>Running the application with SQL Server</h2>
+			<p>Starting the host application <a id="_idIndexMarker184"/>now, not only <a id="_idIndexMarker185"/>the game APIs service is running, but also SQL Server in a Docker container, as shown in <span class="No-Break"><em class="italic">Figure 3</em></span><span class="No-Break"><em class="italic">.2</em></span><span class="No-Break">:</span></p>
+			<div>
+				<div id="_idContainer034" class="IMG---Figure">
+					<img src="image/B21217_03_02.jpg" alt="Figure 3.2 – .NET Aspire resources with SQL Server"/>
+				</div>
+			</div>
+			<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Figure 3.2 – .NET Aspire resources with SQL Server</p>
+			<p>You can access the OpenAPI endpoint description to start games. Make sure to check into the details of the games API service. Details give information about the resource, the endpoints, and the environment variables, as shown in <span class="No-Break"><em class="italic">Figure 3</em></span><span class="No-Break"><em class="italic">.3</em></span><span class="No-Break">:</span></p>
+			<div>
+				<div id="_idContainer035" class="IMG---Figure">
+					<img src="image/B21217_03_03.jpg" alt="Figure 3.3 – Environment variables"/>
+				</div>
+			</div>
+			<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Figure 3.3 – Environment variables</p>
+			<p>With the environment variables set for this service, check <strong class="source-inline">DataStore</strong> and  <strong class="source-inline">ConnectionStrings__CodebreakerSql</strong>, which are set by the <span class="No-Break"><strong class="source-inline">AppHost</strong></span><span class="No-Break"> project.</span></p>
+			<p>Try to play a game using the HTTP files. Verify how records are added to the SQL Server database. However, when you stop the project and run the application again, the database is created from a<a id="_idIndexMarker186"/> fresh state. With<a id="_idIndexMarker187"/> Docker, we need volumes to map storage outside of the Docker container. This is covered in <a href="B21217_05.xhtml#_idTextAnchor110"><span class="No-Break"><em class="italic">Chapter 5</em></span></a><span class="No-Break">.</span></p>
+			<p>After this, let’s move over to Azure <span class="No-Break">Cosmos DB.</span></p>
+			<h1 id="_idParaDest-83"><a id="_idTextAnchor082"/>Using EF Core with Azure Cosmos DB</h1>
+			<p>With Azure Cosmos DB, Microsoft offers<a id="_idIndexMarker188"/> different databases with several APIs that make use of the same infrastructure. Most of these database offerings are NoSQL databases for different purposes. Azure Cosmos DB offers a JSON document store that<a id="_idIndexMarker189"/> can be accessed with the Mongo DB API. The Apache Cassandra API offers a wide column store where each row can have different columns. The Apache Gremlin query language can be used to access a graph version of the database. This is great to query for relations using vertices and edges. Azure Cosmos DB for PostgreSQL is a distributed high-performance relational database using the same infrastructure to read and write from a database <span class="No-Break">network worldwide.</span></p>
+			<p>For the <strong class="source-inline">codebreaker</strong> solution, we’ll use Azure Cosmos DB for NoSQL. Here, an EF Core provider is available. This allows us to use the same API as with SQL Server, but the mapping will <span class="No-Break">be different.</span></p>
+			<p>Writing the games and moves to Azure Cosmos DB, we need to do <span class="No-Break">the following:</span></p>
+			<ol>
+				<li>Create a class <span class="No-Break">library project</span></li>
+				<li>Create the EF <span class="No-Break">Core context</span></li>
+				<li>Create a value converter to map <span class="No-Break">complex types</span></li>
+				<li>Create <span class="No-Break">embedded entities</span></li>
+				<li>Implement the <span class="No-Break">repository contract</span></li>
+				<li>Configure the <span class="No-Break">application model</span></li>
+				<li>Configure the <span class="No-Break">DI container</span></li>
+			</ol>
+			<p>We created a SQL Server database when applying the migrations first. With Azure Cosmos DB, migrations are not available and are not needed. As JSON documents are stored, we are very flexible in the data to write. There<a id="_idIndexMarker190"/> is no concept of tables and relations between tables – we just store JSON documents within a container. One container can keep data of <a id="_idIndexMarker191"/>different kinds. A container can be used as a scaling unit, but you can also decide to specify the <a id="_idIndexMarker192"/>scaling with the complete database and share <strong class="bold">request units</strong> (<strong class="bold">RU/s</strong>) with different containers in <span class="No-Break">a database.</span></p>
+			<p>With containers, you also need to know about partitions. Partitions are used to scale containers for performance. Before specifying partitions, you need to know about some attributes of Azure <span class="No-Break">Cosmos DB:</span></p>
+			<ul>
+				<li>A partition is limited to 20 GB storage. The size limit of a container is <span class="No-Break">1 TB.</span></li>
+				<li>Writing to the database, a transaction can only span writing to a single partition. If different data should be written within a transaction, this data should use the same <span class="No-Break">partition key.</span></li>
+				<li>10,000 RU/s is the maximum limit for a partition. With a container, the limit is 1,000,000 RU/s (with serverless, the container RU/s limit is 20,000). For the best-performance parallel reading of data, different partition keys should <span class="No-Break">be used.</span></li>
+				<li>The maximum length of a partition key is <span class="No-Break">2048 bytes.</span></li>
+				<li>The maximum size of one item to store is <span class="No-Break">2 MB.</span></li>
+				<li>There’s no limit on the distinct values of <span class="No-Break">partition keys.</span></li>
+			</ul>
+			<p>We will use the game ID for the partition key. Games are created and updated independently of other games. It’s not necessary to write multiple games within one transaction. Running Azure Cosmos DB with a multi-region write configuration allows us to create games from different Azure regions with high performance. This makes the <strong class="source-inline">Id</strong> value of the game a good candidate for the <span class="No-Break">partition key.</span></p>
+			<p>With this information, we’ll create a class <span class="No-Break">library next.</span></p>
+			<h2 id="_idParaDest-84"><a id="_idTextAnchor083"/>Creating a class library project for EF Core with NoSQL</h2>
+			<p>Similar to creating a library for SQL <a id="_idIndexMarker193"/>Server, we use a library to access Azure <span class="No-Break">Cosmos DB:</span></p>
+			<pre class="console">
+dotnet new classlib --framework net8.0 -o Codebreaker.Data.Cosmos</pre>
+			<p>This library makes use of the <strong class="source-inline">Microsoft.EntityFrameworkCore.Cosmos</strong> NuGet package – and of course, a reference to the <strong class="source-inline">Codebreaker.GameAPIs.Models</strong> project <span class="No-Break">is needed.</span></p>
+			<h2 id="_idParaDest-85"><a id="_idTextAnchor084"/>Creating an EF Core context for Azure Cosmos DB</h2>
+			<p>Let’s create a context class to access<a id="_idIndexMarker194"/> Azure Cosmos DB, as shown with<a id="_idIndexMarker195"/> the following <span class="No-Break">code snippet:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.Data.Cosmos/GamesCosmosContext.cs</p>
+			<pre class="source-code">
+public class GamesCosmosContext(DbContextOptions&lt;GamesCosmosContext&gt; optoins) : DbContext(options), IGamesRepository
+{
+  private const string PartitionKey = nameof(PartitionKey);
+  private const string ContainerName = "GamesV3";
+  private const string DiscriminatorValue = "GameV3";
+  protected override void OnModelCreating(ModelBuilder modelBuilder)
+  {
+<strong class="bold">    modelBuilder.HasDefaultContainer(ContainerName);</strong>
+<strong class="bold">    var gameModel = modelBuilder.Entity&lt;Game&gt;();</strong>
+<strong class="bold">    gameModel.Property&lt;string&gt;(PartitionKey);</strong>
+<strong class="bold">    gameModel.HasPartitionKey(PartitionKey);</strong>
+<strong class="bold">    gameModel.HasKey(nameof(Game.Id), PartitionKey);</strong>
+<strong class="bold">    gameModel.HasDiscriminator&lt;string&gt;("Discriminator")</strong>
+<strong class="bold">      .HasValue&lt;Game&gt;(DiscriminatorValue);</strong>
+    // code removed for brevity
+  }
+<strong class="bold">  public DbSet&lt;Game&gt; Games =&gt; Set&lt;Game&gt;();</strong>
+<strong class="bold">  public static string ComputePartitionKey(Game game) =&gt; </strong>
+<strong class="bold">    game.GameId.ToString();</strong>
+<strong class="bold">  public void SetPartitionKey(Game game) =&gt;</strong>
+<strong class="bold">    Entry(game).Property(PartitionKey).CurrentValue =</strong>
+<strong class="bold">      ComputePartitionKey(game);</strong>
+  // code removed for brevity</pre>
+			<p>Similar to before, the custom context class derives from the <strong class="source-inline">DbContext</strong> base class and defines a constructor with context options, which allows us to configure the DI container with the connection string. The differences start now. With SQL Server, we defined the default schema name. This is not<a id="_idIndexMarker196"/> available with Azure Cosmos DB, but we can define the default container <a id="_idIndexMarker197"/>name using the <strong class="source-inline">HasDefaultContainer</strong> method. In case you have entities that should not be stored with the default container, these can be configured to use a different container with the help of the <strong class="source-inline">ToContainer</strong> method. The previously discussed partition key is configured by invoking the  <strong class="source-inline">HasPartitionKey</strong> method. Using the <strong class="source-inline">SetPartitionKey</strong> and <strong class="source-inline">ComputePartitionKey</strong> methods, the partition key is configured as a <strong class="bold">shadow property</strong> with the same value as the <span class="No-Break">game ID.</span></p>
+			<p>While <strong class="source-inline">Id</strong> is a good option for the partition key, other types that could be stored in the same container might not have an <strong class="source-inline">Id</strong> value. Thus, for the partition key, <strong class="source-inline">PartitionKey</strong> is used. With games, the <strong class="source-inline">Id</strong> value will be mapped <span class="No-Break">to </span><span class="No-Break"><strong class="source-inline">PartitionKey</strong></span><span class="No-Break">.</span></p>
+			<p>Writing different object types to a <a id="_idIndexMarker198"/>single container requires the use of a discriminator value. By default, the discriminator value is the name of the class. By <a id="_idIndexMarker199"/>invoking the <strong class="source-inline">HasDiscriminator</strong> method, the default discriminator configuration is overridden by specifying the <strong class="source-inline">Discriminator</strong> shadow property. For <strong class="source-inline">Game</strong> types, the <strong class="source-inline">GameV3</strong> value is written. This allows us to differentiate game objects stored with incompatible <span class="No-Break">new versions.</span></p>
+			<p>Azure Cosmos DB stores JSON documents, thus only the <strong class="source-inline">Game</strong> type needs to be specified with a <strong class="source-inline">DbSet</strong> property, and not the <strong class="source-inline">Move</strong> type, as we did with SQL Server. Defining maximum sizes for string properties is not needed as well – there’s no schema <span class="No-Break">describing this.</span></p>
+			<h2 id="_idParaDest-86"><a id="_idTextAnchor085"/>Creating a value converter to convert complex types</h2>
+			<p>In the SQL Server section, we converted the <strong class="source-inline">Idictionary</strong>-typed property, passing expressions to the <strong class="source-inline">HasConversion</strong> method to convert the dictionary to a string. The same could be done with Azure Cosmos DB, but <a id="_idIndexMarker200"/>now we’ll create a class deriving from <strong class="source-inline">ValueConverter</strong> and convert the dictionary to and from JSON, as shown in the following <span class="No-Break">code snippet:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.Data.Cosmos/Utilities/FieldValueValueConverter.cs</p>
+			<pre class="source-code">
+internal <strong class="bold">class FieldValueValueConverter : ValueConverter&lt;IDictionary&lt;string, IEnumerable&lt;string&gt;&gt;, string&gt;</strong>
+{
+  static string GetJson(IDictionary&lt;string, IEnumerable&lt;string&gt;&gt; 
+<strong class="bold">    </strong>values) =&gt; return JsonSerializer.Serialize(values);
+  static IDictionary&lt;string, IEnumerable&lt;string&gt;&gt; GetDictionary(string 
+<strong class="bold">    </strong>json) =&gt; JsonSerializer.Deserialize&lt;IDictionary&lt;string, 
+<strong class="bold">    </strong>IEnumerable&lt;string&gt;&gt;&gt;(json) ??
+      new Dictionary&lt;string, IEnumerable&lt;string&gt;&gt;();
+  public FieldValueValueConverter() : base(
+    convertToProviderExpression: v =&gt; GetJson(v),
+    convertFromProviderExpression: v =&gt; GetDictionary(v))
+  { }
+}</pre>
+			<p>An EF Core value converter derives from the <strong class="source-inline">ValueConverter</strong> base class and specifies with the generic parameter what type to convert. With the <strong class="source-inline">FieldValues</strong> property, this is <strong class="source-inline">IDictionary&lt;string, IEnumerable&lt;string&gt;&gt;</strong>. The constructor of the base class<a id="_idIndexMarker201"/> requires parameters to convert to the database data type and to convert from the database data type. With the implementation, the <strong class="source-inline">JsonSerializer</strong> class from the <strong class="source-inline">System.Text.Json</strong> namespace is used to do the serialization <span class="No-Break">and deserialization.</span></p>
+			<p>An instance of this value converter is now passed to an overload of the <strong class="source-inline">HasConversion</strong> method with the <strong class="source-inline">FieldValues</strong> <span class="No-Break">property configuration:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.Data.Cosmos/GamesCosmosContext.cs</p>
+			<pre class="source-code">
+public class GamesCosmosContext(DbContextOptions&lt;GamesCosmosContext&gt; options) : DbContext(options), IGamesRepository
+{
+<strong class="bold">  private static FieldValueValueConverter s_fieldValueConverter = new();</strong>
+<strong class="bold">  private static FieldValueComparer s_fieldValueComparer = new();</strong>
+  protected override void OnModelCreating(ModelBuilder modelBuilder)
+  {
+    // code removed for brevity
+<strong class="bold">    gameModel.Property(g =&gt; g.FieldValues)</strong>
+<strong class="bold">      </strong><strong class="bold">.HasConversion(s_fieldValueConverter, s_fieldValueComparer);</strong>
+  }</pre>
+			<p>Similar to <strong class="source-inline">FieldValueValueConverter</strong>, a <strong class="source-inline">FieldValueComparer</strong> instance is created. Instances of these two types are created to pass to the <span class="No-Break"><strong class="source-inline">HasConversion</strong></span><span class="No-Break"> method.</span></p>
+			<p>When creating the <a id="_idIndexMarker202"/>mapping for a relational database, much more was needed to configure. We reduced the code from the data context by creating configuration classes with every mapped table. This is not worthwhile doing here. The complete EF Core configuration, as well as the implementation of the repository interface, is done with the <span class="No-Break">context class.</span></p>
+			<h2 id="_idParaDest-87"><a id="_idTextAnchor086"/>Creating embedded entities</h2>
+			<p>What about the relationship between<a id="_idIndexMarker203"/> games and moves? EF Core defines the <strong class="source-inline">OwnsOne </strong>and <strong class="source-inline">OwnsMany</strong> methods to define an owned relationship. With a relational database, <strong class="source-inline">OwnsOne</strong> adds columns of the owned type to the owner type. With the Azure Cosmos DB provider, invoking <strong class="source-inline">OwnsMany</strong> from <strong class="source-inline">gameModel</strong> and referencing the <strong class="source-inline">Moves</strong> property, moves will be stored as JSON within <span class="No-Break">the game.</span></p>
+			<p>Since EF Core 7, this is the default behavior with related entity types with the Azure Cosmos DB provider. So, nothing needs to be configured to make <span class="No-Break">this happen.</span></p>
+			<h2 id="_idParaDest-88"><a id="_idTextAnchor087"/>Implementing the repository contract</h2>
+			<p>With the implementation of<a id="_idIndexMarker204"/> the repository, there are many similarities to the implementation with SQL Server, but because of the different storage, some changes are necessary. Here, we’ll concentrate on <span class="No-Break">the differences:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.Data.Cosmos/GamesCosmosContext.cs</p>
+			<pre class="source-code">
+public async Task AddGameAsync(Game game, CancellationToken cancellationToken = default)
+{
+<strong class="bold">  SetPartitionKey(game);</strong>
+  Games.Add(game);
+  await SaveChangesAsync(cancellationToken);
+}</pre>
+			<p>When adding or updating the game, the partition key needs to be set. Other than that, the code is the same as with <span class="No-Break">SQL Server.</span></p>
+			<p>There’s a difference in what happens at runtime. Instead of using SQL <strong class="source-inline">INSERT</strong> and <strong class="source-inline">UPDATE</strong> statements, the Azure Cosmos DB provider executes <strong class="source-inline">CreateItem</strong> and <strong class="source-inline">ReplaceItem</strong> functions. When you check the log output, you can see the number of RUs required for every <span class="No-Break">statement done.</span></p>
+			<p>The <strong class="source-inline">GetGamesAsync</strong> method defined previously also works with the Cosmos DB provider. This is the <span class="No-Break">query created:</span></p>
+			<pre class="source-code">
+SELECT c
+FROM root c
+WHERE (((c["Discriminator"] = "Game") AND ((c["StartTime"] &lt; @__end_0) AND (c["StartTime"] &gt; @__begin_1))) AND (c["GameType"] = @__gamesQuery_GameType_2))
+ORDER BY c["StartTime"] DESC
+OFFSET 0 LIMIT @__p_3</pre>
+			<p>Comparing this query to the query to the SQL Server database, with Cosmos DB, it’s a lot simpler: joining of tables is not required. An interesting part of this query is the filtering on <strong class="source-inline">Discriminator</strong>. By default, every object stored in a container has a <strong class="source-inline">Discriminator</strong> filter that includes the type name. This allows the storage of different documents in the container. Queries for a specific type include the <span class="No-Break"><strong class="source-inline">Discriminator</strong></span><span class="No-Break"> filter.</span></p>
+			<p>In case you only store objects of the<a id="_idIndexMarker205"/> same type within one container, you can turn off storing with the <strong class="source-inline">Discriminator</strong> filter with the <strong class="source-inline">HasNoDiscriminator</strong> model <span class="No-Break">definition method.</span></p>
+			<p>Be aware that not all LINQ queries translate successfully from the Cosmos DB provider. For example, <strong class="source-inline">Include</strong> and <strong class="source-inline">Join</strong> methods are not translated. While the <strong class="source-inline">Include</strong> method was used with SQL Server to include the moves with a query for a game, with a JSON document where the moves are stored within a game, this is not required. As there are no tables with NoSQL, <strong class="source-inline">Join</strong> is usually not required as well. In case you want to combine a list of different object types, create two queries and combine the results with <span class="No-Break">the caller.</span></p>
+			<h2 id="_idParaDest-89"><a id="_idTextAnchor088"/>Configuring the application model with Azure Cosmos DB</h2>
+			<p>With SQL Server, we’ve been using a<a id="_idIndexMarker206"/> Docker container for SQL Server. Using Azure Cosmos DB, a Docker container is available as well. However, with Cosmos DB, this is just an emulator and should not be used for production. In <a href="B21217_05.xhtml#_idTextAnchor110"><span class="No-Break"><em class="italic">Chapter 5</em></span></a>, we’ll use the database running with <span class="No-Break">Microsoft Azure.</span></p>
+			<p>To add Azure resources to the <strong class="source-inline">AppHost</strong> project, we need to add the <strong class="source-inline">Aspire.Hosting.Azure</strong> NuGet package. Let’s add Azure Cosmos DB to the Aspire <strong class="source-inline">AppHost</strong> <span class="No-Break">application model:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.AppHost/Program.cs</p>
+			<pre class="source-code">
+<strong class="bold">var cosmos = builder.AddAzureCosmosDB("codebreakercosmos")</strong>
+<strong class="bold">  .AddDatabase("codebreaker");</strong>
+<strong class="bold">  .RunAsEmulator();</strong>
+  builder.AddProject&lt;Projects.Codebreaker_GameAPIs&gt;("gameapis")
+  .WithEnvironment("DataStore", dataStore)
+<strong class="bold">  .WithReference(cosmos)</strong>
+  .WithReference(sqlServer);</pre>
+			<p>Invoking the <strong class="source-inline">AddAzureCosmosDB</strong> method registers the Azure Cosmos DB resource. <strong class="source-inline">codebreakercosmos</strong> is the resource name, which needs to be lowercase and is used as the connection string to the Azure Cosmos DB account. Here, the name of the database is not part of the connection string. The database is specified by invoking the <strong class="source-inline">AddDatabase</strong> method and defines the name of the database. The <strong class="source-inline">RunAsEmulator</strong> method specifies a Docker image to run the database within a Docker container, but only within the development <a id="_idIndexMarker207"/>environment. Similar to before, the Cosmos DB resource is referenced from the games API project, which forwards the connection string with the <strong class="source-inline">codebreakercosmos</strong> key to this project. Be aware it’s not the name passed to <strong class="source-inline">AddDatabase</strong> (which was the case with SQL Server) because the database name is not part of the <span class="No-Break">connection string.</span></p>
+			<h2 id="_idParaDest-90"><a id="_idTextAnchor089"/>Configuring the DI container</h2>
+			<p>To configure the DI container with the <a id="_idIndexMarker208"/>games API project, we have to add the  <strong class="source-inline">Aspire.Microsoft.EntityFrameworkCore.Cosmos</strong> NuGet package to use this Aspire component. The configuration of the DI container was already prepared with the configuration of the relational database. All that’s needed now is to add the Cosmos DB EF Core context, as shown in the following <span class="No-Break">code snippet:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.GameApis/ApplicationServices.cs</p>
+			<pre class="source-code">
+static void ConfigureCosmos(IHostApplicationBuilder builder)
+{
+  builder.<strong class="bold">AddDbContext</strong>&lt;IGamesRepository, GamesCosmosContext&gt;(options =&gt;
+  {
+    var connectionString = builder.Configuration.
+      GetConnectionString("codebreakercosmos") ??
+      throw new InvalidOperationException("Could not read Cosmos 
+      connection string");
+    options.UseCosmos(connectionString, "codebreaker");
+    options.UseQueryTrackingBehavior(
+    QueryTrackingBehavior.NoTracking);
+  });
+  builder.EnrichCosmosDbContext&lt;GamesCosmosContext&gt;();
+}</pre>
+			<p>The .NET Aspire Azure Cosmos<a id="_idIndexMarker209"/> DB EF Core component offers the <strong class="source-inline">AddCosmosDbContext</strong> method, but similar to before, because we need the registration of the <strong class="source-inline">IGamesRepository</strong> interface, we use the EF Core <strong class="source-inline">AddDbContext</strong> method and add the Aspire component features by invoking the <strong class="source-inline">EnrichCosmosDbContext</strong> method. The <strong class="source-inline">UseCosmos</strong> method registers to use the EF Core provider for Azure Cosmos DB and assigns the connection string that is passed from the application <span class="No-Break">model definition.</span></p>
+			<p>To create the database and the Cosmos DB container, we add the <strong class="source-inline">else</strong> part to the <span class="No-Break"><strong class="source-inline">CreateOrUpdateDatabaseAsync</strong></span><span class="No-Break"> method:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.GameApis/ApplicationServices.cs</p>
+			<pre class="source-code">
+public static async Task CreateOrUpdateDatabaseAsync(this WebApplication app)
+{
+  // code removed for brevity
+  else if (dataStore == "Cosmos")
+  {
+    try
+    {
+      using var scope = app.Services.CreateScope();
+      var repo = scope.ServiceProvider.
+        GetRequiredService&lt;IGamesRepository&gt;();
+      if (repo is GamesCosmosContext context)
+      {
+<strong class="bold">        bool created = await context.Database.EnsureCreatedAsync();</strong>
+        app.Logger.LogInformation("Cosmos database created: 
+          {created}", created);
+      }
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogError(ex, "Error updating database");
+      throw;
+    }
+  }
+}</pre>
+			<p>The <strong class="source-inline">Database.EnsureCreatedAsync</strong> method creates the database and the Azure Cosmos DB container with the partition <span class="No-Break">key specified.</span></p>
+			<p>Having the configuration in place, let’s <a id="_idIndexMarker210"/>start the application as before with SQL Server and check the stored games with your Azure Cosmos DB database while you set moves. Just make sure that the <strong class="source-inline">DataStore</strong> configuration is set to the correct database type. Using the HTTP files, don’t forget to use the returned game ID that is returned after creating <span class="No-Break">the game.</span></p>
+			<h1 id="_idParaDest-91"><a id="_idTextAnchor090"/>Summary</h1>
+			<p>In this chapter, we changed to using persistent storage with the API service using a relational and a NoSQL database. We created the database context to map the <strong class="source-inline">Game</strong> and <strong class="source-inline">Move</strong> types to tables in a relational database and to a JSON document with a NoSQL database – both using <span class="No-Break">EF Core.</span></p>
+			<p>To select which database to use in your environment, if you have relational data with a fixed schema, select SQL Server. If the schema is not required in your scenario, and changes to the data happen often, a NoSQL database can be the <span class="No-Break">best option.</span></p>
+			<p>You learned about how to map objects and how to deal with special mapping requirements based on the object model. Using a relational database, you also learned how to create migrations to update the database schema and to initially create <span class="No-Break">the database.</span></p>
+			<p>You learned how to use database resources with the .NET Aspire application model specified with the <span class="No-Break"><strong class="source-inline">AppHost</strong></span><span class="No-Break"> project.</span></p>
+			<p>Before starting the next chapter, it’s well deserved to play another game round. Just use the HTTP files to make your game run. With the state of the current implementation, the game can continue to run after you restart the service – the games and moves <span class="No-Break">are persisted.</span></p>
+			<p>In the next chapter, we create a library that can be used by client applications to invoke the web API so that it becomes more convenient to play <span class="No-Break">the game.</span></p>
+			<h1 id="_idParaDest-92"><a id="_idTextAnchor091"/>Further reading</h1>
+			<p>To learn more about the topics discussed in this chapter, you can refer to the <span class="No-Break">following links:</span></p>
+			<ul>
+				<li>Value <span class="No-Break">conversions: </span><a href="https://learn.microsoft.com/ef/core/modeling/value-conversions"><span class="No-Break">https://learn.microsoft.com/ef/core/modeling/value-conversions</span></a></li>
+				<li>Inheritance with EF <span class="No-Break">Core: </span><a href="https://learn.microsoft.com/ef/core/modeling/inheritance"><span class="No-Break">https://learn.microsoft.com/ef/core/modeling/inheritance</span></a></li>
+				<li>Owned entity <span class="No-Break">types: </span><a href="https://learn.microsoft.com/ef/core/modeling/owned-entities"><span class="No-Break">https://learn.microsoft.com/ef/core/modeling/owned-entities</span></a></li>
+				<li><span class="No-Break">Transactions: </span><a href="https://learn.microsoft.com/ef/core/saving/transactions"><span class="No-Break">https://learn.microsoft.com/ef/core/saving/transactions</span></a></li>
+				<li><span class="No-Break">Migrations: </span><a href="https://learn.microsoft.com/ef/core/managing-schemas/migrations"><span class="No-Break">https://learn.microsoft.com/ef/core/managing-schemas/migrations</span></a></li>
+				<li>Azure Cosmos DB <span class="No-Break">intro: </span><a href="https://learn.microsoft.com/azure/cosmos-db/introduction"><span class="No-Break">https://learn.microsoft.com/azure/cosmos-db/introduction</span></a></li>
+				<li>Limitations with the EF Core Cosmos <span class="No-Break">provider: </span><a href="https://learn.microsoft.com/ef/core/providers/cosmos/limitations"><span class="No-Break">https://learn.microsoft.com/ef/core/providers/cosmos/limitations</span></a></li>
+				<li>.NET Aspire SqlServer EF Core <span class="No-Break">component: </span><a href="https://learn.microsoft.com/en-us/dotnet/aspire/database/sql-server-entity-framework-component"><span class="No-Break">https://learn.microsoft.com/en-us/dotnet/aspire/database/sql-server-entity-framework-component</span></a></li>
+				<li>.NET Aspire Microsoft EF Core Cosmos DB <span class="No-Break">component: </span><a href="https://learn.microsoft.com/en-us/dotnet/aspire/database/azure-cosmos-db-entity-framework-component"><span class="No-Break">https://learn.microsoft.com/en-us/dotnet/aspire/database/azure-cosmos-db-entity-framework-component</span></a></li>
+			</ul>
+		</div>
+	</body></html>

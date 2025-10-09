@@ -1,0 +1,784 @@
+<html><head></head><body>
+		<div id="_idContainer174">
+			<h1 id="_idParaDest-295" class="chapter-number"><a id="_idTextAnchor294"/>12</h1>
+			<h1 id="_idParaDest-296"><a id="_idTextAnchor295"/>Scaling Services</h1>
+			<p>How fast is the service responding? Is the service limited to CPU cores or memory? Based on user load, when is it useful to start more server instances? If you run too many compute resources, or if they’re too big, you pay more than is necessary. If the resources you use are too small, the response time increases or the applications might not be available at all. With this, you lose customers, and your income is reduced. You should know how to find bottlenecks and know what good knobs to turn to scale the resources <span class="No-Break">as needed.</span></p>
+			<p>In <a href="B21217_10.xhtml#_idTextAnchor239"><span class="No-Break"><em class="italic">Chapter 10</em></span></a>, we created load tests to see how the service behaves under load, while in <a href="B21217_11.xhtml#_idTextAnchor263"><span class="No-Break"><em class="italic">Chapter 11</em></span></a>, we extended the service by adding telemetry data. Now, we’ll use both load tests and telemetry data to find out what scaling option <span class="No-Break">is best.</span></p>
+			<p>In this chapter, we’ll start reducing the response time with the help of telemetry data before analyzing the load, which can be run with one instance. Finally, we’ll define rules so that we can scale out to multiple instances. To automatically restart instances when the service is not responding, we’ll add <span class="No-Break">health checks.</span></p>
+			<p>In this chapter, you’ll learn how to do <span class="No-Break">the following:</span></p>
+			<ul>
+				<li>Increase performance <span class="No-Break">using caching</span></li>
+				<li>Simulate users with Azure <span class="No-Break">Load Testing</span></li>
+				<li>Scale up and scale <span class="No-Break">out services</span></li>
+				<li>Use <span class="No-Break">scale rules</span></li>
+				<li>Implement <span class="No-Break">health checks</span></li>
+			</ul>
+			<h1 id="_idParaDest-297"><a id="_idTextAnchor296"/>Technical requirements</h1>
+			<p>In this chapter, like the previous chapters, you’ll need an Azure subscription, the Azure Developer CLI (<strong class="source-inline">winget install Microsoft.Azd</strong>), and <span class="No-Break">Docker Desktop.</span></p>
+			<p>The code for this chapter can be found in this book’s GitHub <span class="No-Break">repository: </span><a href="https://github.com/PacktPublishing/Pragmatic-Microservices-With-CSharp-and-Azure"><span class="No-Break">https://github.com/PacktPublishing/Pragmatic-Microservices-with-CSharp-and-Azure</span></a><span class="No-Break">.</span></p>
+			<p>The <strong class="source-inline">ch12</strong> folder contains the projects we’ll need for this chapter, as well as their output. To add the functionality from this chapter, you can start with the source code from the <span class="No-Break">previous chapter.</span></p>
+			<p>Here are the projects we’ll be implementing in <span class="No-Break">this chapter:</span></p>
+			<ul>
+				<li><strong class="source-inline">Codebreaker.AppHost</strong>: The .NET Aspire host project. This project has been enhanced by adding a Redis resource <span class="No-Break">for caching.</span></li>
+				<li><strong class="source-inline">Codebreaker.ServiceDefaults</strong>: Here, we use a common health check configuration for all <span class="No-Break">the services.</span></li>
+				<li><strong class="source-inline">Codebreaker.GameAPIs</strong>: With this project, we implement caching games to reduce database access and add a custom <span class="No-Break">health check.</span></li>
+			</ul>
+			<p>To learn how to publish the resources to Microsoft Azure, check out the README file for <span class="No-Break">this chapter.</span></p>
+			<p class="callout-heading">Note</p>
+			<p class="callout">While working on this chapter, we created load tests with many users and changed the scale of the Azure Cosmos database. The duration of these tests and the number of virtual users you can use with them depends on the amount of money you want to spend. If you increase the RU/s with the database, make sure you delete the resources after running the tests, or at least reduce the number of RU/s again after running the tests. You might also skip running the tests with larger user numbers and just read <span class="No-Break">the results.</span></p>
+			<h1 id="_idParaDest-298"><a id="_idTextAnchor297"/>Increasing performance with caches</h1>
+			<p>Before we analyze<a id="_idIndexMarker954"/> the application’s CPU and memory needs, let’s look<a id="_idIndexMarker955"/> at where easy wins are possible to return faster responses to the client. By checking telemetry information (as we did in the previous chapter), we can see that when using distributed tracing to send a game move, several requests are made to the database. <span class="No-Break"><em class="italic">Figure 12</em></span><em class="italic">.1</em> shows the bot sending the <span class="No-Break">SetMoveAsync request:</span></p>
+			<div>
+				<div id="_idContainer151" class="IMG---Figure">
+					<img src="image/B21217_12_01.jpg" alt="Figure 12.1 – Tracing a move set"/>
+				</div>
+			</div>
+			<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Figure 12.1 – Tracing a move set</p>
+			<p>As shown in the preceding figure, when receiving a PATCH request, the game ID is used to retrieve the game from the database to verify the correctness of the data that’s received. After the move is calculated, the resulting game is written to the database. Trace information from EF Core is shown with the DATA keyword, along with the time needed <span class="No-Break">for access.</span></p>
+			<p>Performance might be good enough, but this also depends on the database load. When using the SQL Server database, having many writes can reduce the read performance because of locks with write operations. With higher database loads, increasing the number of Request Units (RU) or using bigger machines (which increases the price) can be a solution for higher loads. A better option is to cache data. Many of the database reads can be replaced by reading objects from a <span class="No-Break">memory cache.</span></p>
+			<p>An initial idea might be to store the game in the memory of the process. If it is not there, retrieve it from the database. However, if multiple instances of the service are running, the client could invoke one move with server A and another move with server B. Because the game contains the last move number, reading it from the local cache could result in an older version of the game, and thus the request fails. One option around this would be to use sticky sessions. With this, one client always gets the same service instance to fulfill a request. This requirement can easily be avoided by using a distributed <span class="No-Break">memory cache.</span></p>
+			<p class="callout-heading">Note</p>
+			<p class="callout">With a sticky session, a client always<a id="_idIndexMarker956"/> connects to the same service instance. The biggest disadvantage of sticky sessions is when the service goes down. Without sticky sessions, the client can immediately switch to another service instance, and no downtime is detected. With sticky sessions, all the session data is lost for the client. This is not the only disadvantage. What if another instance is started because of low performance? The new service instance only receives the traffic from new clients. Existing ones stick with the servers they already communicate with. There’s a delayed server utilization (only from new clients). With sticky sessions, the load can be unevenly distributed between service instances. The best thing to do is try to <span class="No-Break">avoid them.</span></p>
+			<p>When using a distributed memory cache, multiple options are available. With Microsoft Azure, Azure Cache for Redis can be used. This service offers Standard, Premium, Enterprise, and Enterprise Flash offerings based on your availability and memory size needs. Using Azure Cosmos DB, an integrated in-memory cache built into the Azure Cosmos DB gateway, can be used. One feature of this service is an item cache for point reads, which fulfills the purpose of reading the item several times while the game is running. This reduces the cost<a id="_idIndexMarker957"/> with Azure Cosmos DB because the RU/s needed<a id="_idIndexMarker958"/> to read from the cache <span class="No-Break">are 0.</span></p>
+			<p>Here, we’ll use a Docker container for Redis that can be used in the local Docker environment, as well as to run the solution with Azure <span class="No-Break">Container Apps.</span></p>
+			<h2 id="_idParaDest-299"><a id="_idTextAnchor298"/>Reading and writing from the cache</h2>
+			<p>The API of the IDistributedCache<a id="_idIndexMarker959"/> interface supports writing byte arrays and strings – the data needs to be sent across the network to a Redis cluster. For this, we’ll create methods to convert the Game class to and <span class="No-Break">from bytes:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.GameAPIs/Models/GameExtensions.cs</p>
+			<pre class="source-code">
+public static class GameExtensions
+{
+  public static byte[] ToBytes(this Game game) =&gt;
+<strong class="bold">    JsonSerializer.SerializeToUtf8Bytes(game);</strong>
+  public static Game? ToGame(this byte[] bytes) =&gt;
+<strong class="bold">    JsonSerializer.Deserialize&lt;Game&gt;(bytes);</strong>
+}</pre>
+			<p>The <strong class="source-inline">System.Text.Json</strong> serializer supports<a id="_idIndexMarker960"/> serializing the data not only to JSON but also to a byte array. The <strong class="source-inline">Game</strong> class already supports serialization with this serializer, so no other changes need to be made to the <strong class="source-inline">Game</strong> and <strong class="source-inline">Move</strong> <span class="No-Break">model types.</span></p>
+			<p>We can access the cache from the <span class="No-Break"><strong class="source-inline">GamesService</strong></span><span class="No-Break"> class:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.GameAPIs/Services/GamesService.cs</p>
+			<pre class="source-code">
+public class GamesService(
+  IGamesRepository dataRepository,
+<strong class="bold">  IDistributedCache distributedCache,</strong>
+  ILogger&lt;GamesService&gt; logger,
+  GamesMetrics metrics,
+  [FromKeyedServices("Codebreaker.GameAPIs")]
+  ActivitySource activitySource) : IGamesService
+{</pre>
+			<p>No matter what technology is used for the distributed memory cache, we can inject the <span class="No-Break"><strong class="source-inline">IDistributedCache</strong></span><span class="No-Break"> interface.</span></p>
+			<p>To update the <strong class="source-inline">Game</strong> class with the cache, we can implement the <span class="No-Break">following method:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.GameAPIs/Services/GamesService.cs</p>
+			<pre class="source-code">
+private async Task UpdateGameInCacheAsync(Game game, CancellationToken cancellationToken = default)
+{
+<strong class="bold">  await distributedCache.SetAsync(game.Id.ToString(), game.ToBytes(), </strong>
+<strong class="bold">  cancellationToken);</strong>
+}</pre>
+			<p>The game ID is used as a key to retrieve the game object from the cache. Invoking the <strong class="source-inline">SetAsync</strong> method adds the object to the cache. If the object has already been cached, it is updated with the new value. With an additional parameter of the <strong class="source-inline">DistributedEntryCacheOptions</strong> type, the object can be configured to specify the time the object should stay in the cache. Here, we need to use a typical time the user needs from one move to another. With every<a id="_idIndexMarker961"/> retrieval and update, the <strong class="bold">sliding expiration</strong> starts anew. Instead of specifying this here, we can configure <span class="No-Break">default values.</span></p>
+			<p>The <strong class="source-inline">UpdateGameInCacheAsync</strong> method needs<a id="_idIndexMarker962"/> to be invoked from the <strong class="source-inline">GamesService</strong> class when the game (<strong class="source-inline">StartGameAsync</strong>) is created, as well as after setting the game <span class="No-Break">move (</span><span class="No-Break"><strong class="source-inline">SetMoveAsync</strong></span><span class="No-Break">).</span></p>
+			<p>The implementation within the <strong class="source-inline">StartGameAsync</strong> method is <span class="No-Break">shown here:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.GameAPIs/Services/GamesService.cs</p>
+			<pre class="source-code">
+game = GamesFactory.CreateGame(gameType, playerName);
+activity?.AddTag(GameTypeTagName, game.GameType)
+  .AddTag(GameIdTagName, game.Id.ToString())
+  .Start();
+<strong class="bold">await Task.WhenAll(</strong>
+<strong class="bold">  dataRepository.AddGameAsync(game, cancellationToken),</strong>
+<strong class="bold">  </strong><strong class="bold">UpdateGameInCacheAsync(game, cancellationToken));</strong>
+metrics.GameStarted(game);</pre>
+			<p>Writing to the database and the cache can be done in parallel. We don’t need to wait until the database write is completed to add the game object to the cache to return a faster answer. If the database fails, it doesn’t matter if the game is cached <span class="No-Break">or not.</span></p>
+			<p>To read the data from the cache, we need to <span class="No-Break">implement </span><span class="No-Break"><strong class="source-inline">GetGameFromCacheOrDataStoreAsync</strong></span><span class="No-Break">:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.GameAPIs/Services/GamesService.cs</p>
+			<pre class="source-code">
+// code removed for brevity
+private async Task&lt;Game?&gt; <strong class="bold">GetGameFromCacheOrDataStoreAsync</strong>(
+  Guid id, CancellationToken cancellationToken = default)
+{
+<strong class="bold">  byte[]? bytesGame = await distributedCache.GetAsync(id.ToString(), </strong>
+<strong class="bold">  cancellationToken);</strong>
+  if (bytesGame is null)
+  {
+<strong class="bold">    return await dataRepository.GetGameAsync(id, cancellationToken);</strong>
+  }
+  else
+  {
+<strong class="bold">    return bytesGame.ToGame();</strong>
+  }
+}</pre>
+			<p>The <strong class="source-inline">GetAsync</strong> method of the cache <a id="_idIndexMarker963"/>returns a byte array of the cached data, which is then converted using the <strong class="source-inline">ToGame</strong> method. If the data is not available within the cache (the item might have been removed from the cache because too much memory was already allocated, or if the user was thinking about their next move for too long), we get the game from the database. The code in the source code repository includes a flag where you can switch off reading from the cache to easily try out not using the cache <a id="_idIndexMarker964"/>with different loads that are used to check <span class="No-Break">the results.</span></p>
+			<p><strong class="source-inline">GetGameFromCacheOrDataStoreAsync</strong> needs to be invoked from the <strong class="source-inline">SetMoveAsync</strong> and <span class="No-Break"><strong class="source-inline">GetGameAsync</strong></span><span class="No-Break"> methods.</span></p>
+			<h2 id="_idParaDest-300"><a id="_idTextAnchor299"/>Configuring the Aspire Redis component</h2>
+			<p>Regarding the<a id="_idIndexMarker965"/> <strong class="source-inline">game-apis</strong> project, we need to add the <strong class="bold">.NET Aspire StackExchange Redis component</strong> to configure the <span class="No-Break">DI </span><span class="No-Break"><a id="_idIndexMarker966"/></span><span class="No-Break">container:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.GameAPIs/ApplicationServices.cs</p>
+			<pre class="source-code">
+public static void AddApplicationServices(this IHostApplicationBuilder builder)
+{
+  // code removed for brevity
+  builder.Services.AddScoped&lt;IGamesService, GamesService&gt;();
+<strong class="bold">  builder.AddRedisDistributedCache("redis");</strong>
+}</pre>
+			<p>The <strong class="source-inline">AddRedisDistributedCache</strong> method uses the cache name that needs to be configured with the Aspire App Host project to get the connection string and configuration values. With this method, it’s also possible to specify the configuration <span class="No-Break">values programmatically.</span></p>
+			<p>Finally, a Docker container for the Redis resource is configured with <strong class="source-inline">app-model</strong> in the <span class="No-Break">AppHost project:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.AppHost/Program.cs</p>
+			<pre class="source-code">
+<strong class="bold">var redis = builder.AddRedis("redis")</strong>
+<strong class="bold">  .WithRedisCommander()</strong>
+<strong class="bold">  .PublishAsContainer();</strong>
+var cosmos = builder.AddAzureCosmosDB("cosmos")
+    .AddDatabase("codebreaker");
+var gameAPIs = builder.AddProject&lt;Projects.Codebreaker_GameAPIs&gt;("gameapis")
+  .WithReference(cosmos)
+<strong class="bold">  .WithReference(redis)</strong>
+  .WithReference(appInsights)
+  .WithEnvironment("DataStore", dataStore);</pre>
+			<p>The <strong class="source-inline">AddRedis</strong> method configures using the <strong class="source-inline">redis</strong> Docker image for this service. This<a id="_idIndexMarker967"/> needs to be configured both with <strong class="bold">Prometheus</strong> and the default Azure environment. With the Azure environment, this creates an Azure Container App running Redis. As an alternative, you can add the <strong class="source-inline">PublishAsAzureRedis</strong> API instead of <strong class="source-inline">PublishAsContainer</strong>. This method configures the PaaS offering for <strong class="bold">Azure Cache for Redis</strong>. <strong class="source-inline">WithRedisCommander</strong> adds a management<a id="_idIndexMarker968"/> UI for Redis <span class="No-Break">to </span><span class="No-Break"><strong class="source-inline">app-model</strong></span><span class="No-Break">.</span></p>
+			<p>With this configuration in place, running<a id="_idIndexMarker969"/> games via the bot provides the results shown in <span class="No-Break"><em class="italic">Figure 12</em></span><em class="italic">.2</em>. Even when using a low load on the local system, writing to SQL Server took 5.96 ms, and writing to the cache took 1.83 ms. Both were running in a <span class="No-Break">Docker container:</span></p>
+			<div>
+				<div id="_idContainer152" class="IMG---Figure">
+					<img src="image/B21217_12_02.jpg" alt="Figure 12.2 – Set move with a distributed cache"/>
+				</div>
+			</div>
+			<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Figure 12.2 – Set move with a distributed cache</p>
+			<p>Next, let’s add some load to the game-apis project to see the <span class="No-Break">resource consumption.</span></p>
+			<h1 id="_idParaDest-301"><a id="_idTextAnchor300"/>Simulating users with Azure Load Testing</h1>
+			<p>In <a href="B21217_10.xhtml#_idTextAnchor239"><span class="No-Break"><em class="italic">Chapter 10</em></span></a>, we created Playwright tests that were used to <a id="_idIndexMarker970"/>create load tests. These Playwright tests allowed us to use .NET code to easily create a complete flow so that we could play a game from a test. Using Microsoft Azure, we can use another service to create tests and get integrated analysis with Azure services: Azure <span class="No-Break">Load Testing.</span></p>
+			<p class="callout-heading">Note</p>
+			<p class="callout">At the time of writing, the <strong class="bold">Microsoft Playwright Testing</strong> cloud service is great for testing the load<a id="_idIndexMarker971"/> of web applications. However, it doesn’t support load testing APIs, so we’ll use Azure Load Testing here. You can still use Azure compute (for example, Azure Container Instances) to run Playwright tests, but Azure Load Testing has a better report configuration and <span class="No-Break">report functionality.</span></p>
+			<p>Before creating the load test, make sure you deploy the solution to Microsoft Azure using azd up. Check the README file for this chapter for more details about the different <span class="No-Break">azd versions.</span></p>
+			<p>After creating the Azure resources, open the <strong class="source-inline">game-apis</strong> Azure Container App in the Azure portal and select <strong class="bold">Application</strong> | <strong class="bold">Containers</strong> from the left bar. The container’s resource allocation<a id="_idIndexMarker972"/> will be shown as <em class="italic">0.5 CPU cores</em> and <em class="italic">1 </em><span class="No-Break"><em class="italic">Gi memory</em></span><span class="No-Break">.</span></p>
+			<p>Now, let’s make sure the first tests use just <span class="No-Break">one replica.</span></p>
+			<h2 id="_idParaDest-302"><a id="_idTextAnchor301"/>Scaling to one replica</h2>
+			<p>Scales and replicas can scale<a id="_idIndexMarker973"/> up to 300 instances. The default configuration is to scale from 1 to 10. Creating a load with many users would automatically scale out and start multiple instances. To see what the limits of one instance are, change the scale to just one instance for both Min replicas and Max replicas, as shown in <span class="No-Break"><em class="italic">Figure 12</em></span><em class="italic">.3</em>. Clicking Create creates a new revision of the app and deprovisions the existing <span class="No-Break">revision afterward:</span></p>
+			<div>
+				<div id="_idContainer153" class="IMG---Figure">
+					<img src="image/B21217_12_03.jpg" alt="Figure 12.3 – Changing replicas with Azure Container Apps"/>
+				</div>
+			</div>
+			<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Figure 12.3 – Changing replicas with Azure Container Apps</p>
+			<p>To specify scaling at deployment time, create YAML templates that specify the configuration for Azure Container Apps. Start a terminal with the current directory set to the solution and run the following command from the Azure Developer CLI (after you’ve initialized the solution with <span class="No-Break">azd init):</span></p>
+			<pre class="console">
+azd infra synth</pre>
+			<p>This tool uses the app-model manifest to create Bicep files to deploy the Azure resources of app-model (in the root infra folder). The infra folder of the AppHost project contains YAML templates that describe every Azure Container App that’s been created (from projects and Docker images). See <a href="B21217_06.xhtml#_idTextAnchor137"><span class="No-Break"><em class="italic">Chapter 6</em></span></a> for more details on <span class="No-Break">Bicep files.</span></p>
+			<p>In the AppHost project, you’ll see that a <strong class="source-inline">&lt;app&gt;.tmpl.yaml</strong> file has been generated to specify the settings for Azure <span class="No-Break">Container Apps.</span></p>
+			<p>By default, the minimum number of replicas is set to <strong class="source-inline">1</strong>. With bot-service, you can change <span class="No-Break">the configuration:</span></p>
+			<pre class="source-code">
+  template:
+    containers:
+# code removed for brevity
+<strong class="bold">    scale:</strong>
+<strong class="bold">      </strong><strong class="bold">minReplicas: 0</strong>
+<strong class="bold">      maxReplicas: 1</strong></pre>
+			<p>With bot-service, to reduce cost, you can define the scale from <strong class="source-inline">0</strong> to <strong class="source-inline">1</strong>. When the minimum instance count is set to <strong class="source-inline">0</strong>, there’s no cost for the service. Just be aware that it takes a few seconds to start up the service, and the first user accessing the service needs to wait. Because the bot is not invoked by game-playing users, and this service is not always needed, it can be scaled down to <strong class="source-inline">0</strong>. The game-apis service should always return answers fast; thus, the minimum scale should be set to <strong class="source-inline">1</strong>. If there’s no load on the service, there’s an idle price. With this, the cost of the CPU is reduced to about 10% of the normal cost, but the memory (the application is still loaded in memory) has the normal price. To test the load with exactly one replica, set the game-apis service’s minimum and maximum values to <strong class="source-inline">1</strong>. Later, when scaling out, we’ll increase the value of Max <span class="No-Break">replicas again.</span></p>
+			<p>After changing the number of replicas in the YAML file, you can re-deploy the application using az up or just using <span class="No-Break">az deploy.</span></p>
+			<p>We also need to make sure that the database allows the requests that are needed. With a load test, we can expect that we’ll need more than the 400 RU/s. Before the first test runs, change the Azure Cosmos<a id="_idIndexMarker974"/> DB throughput to Autoscale with a maximum of <span class="No-Break">1,000 RU/s.</span></p>
+			<p>Now, we are ready to create <span class="No-Break">a test.</span></p>
+			<h2 id="_idParaDest-303"><a id="_idTextAnchor302"/>Creating an Azure URL-based load test</h2>
+			<p>To create a new load test, create<a id="_idIndexMarker975"/> the Azure Load Testing resource using<a id="_idIndexMarker976"/> the Azure portal. Specify a resource group name and the name of <span class="No-Break">the resource.</span></p>
+			<p>Once the resource is available, open it in the portal and select <strong class="bold">Tests</strong> | <strong class="bold">Tests</strong> from the left bar. Then, click <strong class="bold">Create</strong> after choosing <strong class="bold">Create a URL-based test</strong>. Under <strong class="bold">Basics</strong>, specify <strong class="bold">Test name</strong> and <strong class="bold">Test description</strong> values and check the <strong class="bold">Enable advanced settings</strong> box, as shown in <span class="No-Break"><em class="italic">Figure 12</em></span><span class="No-Break"><em class="italic">.4</em></span><span class="No-Break">:</span></p>
+			<div>
+				<div id="_idContainer154" class="IMG---Figure">
+					<img src="image/B21217_12_04.jpg" alt="Figure 12.4 – Load testing – basic settings"/>
+				</div>
+			</div>
+			<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Figure 12.4 – Load testing – basic settings</p>
+			<p>With Enable advanced settings selected, a test plan consisting of up to five HTTP requests can be created. So, in the Test plan section, add five requests, as shown in <span class="No-Break"><em class="italic">Figure 12</em></span><span class="No-Break"><em class="italic">.5</em></span><span class="No-Break">:</span></p>
+			<div>
+				<div id="_idContainer155" class="IMG---Figure">
+					<img src="image/B21217_12_05.jpg" alt="Figure 12.5 – Load testing – test plans"/>
+				</div>
+			</div>
+			<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Figure 12.5 – Load testing – test plans</p>
+			<p>The first request is a POST request<a id="_idIndexMarker977"/> to create the game. The second is a PATCH<a id="_idIndexMarker978"/> request to update the game with a move. This is followed by a GET request to get information about the game, a PATCH request to end the game, and a DELETE request to delete <span class="No-Break">the game.</span></p>
+			<p>These requests can easily be configured with the UI, as shown in <span class="No-Break"><em class="italic">Figure 12</em></span><span class="No-Break"><em class="italic">.6</em></span><span class="No-Break">:</span></p>
+			<div>
+				<div id="_idContainer156" class="IMG---Figure">
+					<img src="image/B21217_12_06.jpg" alt="Figure 12.6 – Load testing – adding requests"/>
+				</div>
+			</div>
+			<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Figure 12.6 – Load testing – adding requests</p>
+			<p>Instead of getting the request information from the OpenAPI description or the HTTP files, you can copy the requests from the README file of this chapter to the Body area. The requests, including their HTTP headers, are listed. Make sure you use the links to your Azure Container App when specifying <span class="No-Break">the URL.</span></p>
+			<p>With the POST request, don’t just specify<a id="_idIndexMarker979"/> the body – also define the <a id="_idIndexMarker980"/>use of the response. With the JSON result, id is returned; this can be accessed with the $.id expression. Set this to the gameId variable. Response variables can be used with later requests – and the game ID is needed with all the following requests. When setting the game move, use ${gameId} to pass the game ID to the URL string and the HTTP body. You can check the README file for this chapter for more details about the values you should specify with the <span class="No-Break">different requests.</span></p>
+			<p>In the next dialogue, shown in <span class="No-Break"><em class="italic">Figure 12</em></span><em class="italic">.7</em>, the load can <span class="No-Break">be specified:</span></p>
+			<div>
+				<div id="_idContainer157" class="IMG---Figure">
+					<img src="image/B21217_12_07.jpg" alt="Figure 12.7 – Load testing – specifying the load"/>
+				</div>
+			</div>
+			<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Figure 12.7 – Load testing – specifying the load</p>
+			<p>Here, we’ll start small with<a id="_idIndexMarker981"/> just 5 concurrent virtual users<a id="_idIndexMarker982"/> and do other tests with more user loads and multiple engine instances, with a ramp-up time of 0.3 minutes. With one test engine instance, you can specify up to 250 virtual users and go up to 2,500 virtual users with 10 instances. The configuration also allows you to specify a Load pattern value, which increases the load over time. Having multiple test runs with different user numbers can give a good indication of what scaling rules should be used to increase the number of <span class="No-Break">service instances.</span></p>
+			<p>Be aware of the <a id="_idIndexMarker983"/>cost you can incur when testing with 2,500 virtual users and 10 virtual machines behind the scenes. Contrary to the other resources we’ve used so far, with this, you can easily go over the subscription limits with the Visual Studio Enterprise Azure subscription or the free Azure subscription. Luckily, we only pay for the time the test runs and don’t need to pay for physical machines that are only needed for a <span class="No-Break">short time.</span></p>
+			<p class="callout-heading">Note</p>
+			<p class="callout">Don’t assume virtual users are the same as real users. Real users produce a lot less load than virtual users with Azure Load Testing. A real user needs to think between moves. Several seconds, if not minutes, are spent between each move. Virtual users just continuously invoke the APIs. With the JMeter tests that are used behind the scenes, the number of virtual users configures the number of threads to be used. How many real users you can calculate compared to virtual users depends on the type of application. You need to find out how long real users think on average with Codebreaker when monitoring the application in production. In <a href="B21217_10.xhtml#_idTextAnchor239"><span class="No-Break"><em class="italic">Chapter 10</em></span></a>, we created custom metric data to monitor the time spent between moves; this is a good value <span class="No-Break">to use.</span></p>
+			<p>With the test criteria <a id="_idIndexMarker984"/>configuration (see <span class="No-Break"><em class="italic">Figure 12</em></span><em class="italic">.8</em>), you can specify when the test should fail – for example, when the response time takes too long. Before doing the first test run, you can leave the test criteria empty to see values that are reached with <span class="No-Break">low load:</span></p>
+			<div>
+				<div id="_idContainer158" class="IMG---Figure">
+					<img src="image/B21217_12_08.jpg" alt="Figure 12.8 – Load testing – test criteria"/>
+				</div>
+			</div>
+			<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Figure 12.8 – Load testing – test criteria</p>
+			<p>For the last configuration, open the Monitoring settings, as shown in <span class="No-Break"><em class="italic">Figure 12</em></span><span class="No-Break"><em class="italic">.9</em></span><span class="No-Break">:</span></p>
+			<div>
+				<div id="_idContainer159" class="IMG---Figure">
+					<img src="image/B21217_12_09.jpg" alt="Figure 12.9 – Specifying monitoring resources"/>
+				</div>
+			</div>
+			<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Figure 12.9 – Specifying monitoring resources</p>
+			<p>Select the resources<a id="_idIndexMarker985"/> that are taking part in the test, such as the <a id="_idIndexMarker986"/>gameapis and redis Azure Container Apps, and the Azure Cosmos DB resource. You can easily filter the resources based on the <span class="No-Break">resource group.</span></p>
+			<p>Now, we are ready to run <span class="No-Break">the test.</span></p>
+			<h2 id="_idParaDest-304"><a id="_idTextAnchor303"/>Running a load with virtual users</h2>
+			<p>When creating and changing<a id="_idIndexMarker987"/> a test, after clicking Save, you need to wait until<a id="_idIndexMarker988"/> the JMeter script is created; otherwise, the test will fail to start. To run the test, click the Run button and enter a test description – for example, 5 users <span class="No-Break">0.5 core.</span></p>
+			<p>After the test is completed, you will see client-side metrics from the test engine and server-side metrics from the selected Azure Container <span class="No-Break">Apps service.</span></p>
+			<p>When I did my test run, 7,834 requests were sent (a lot more than five human users would do for 2 minutes), and up to 0.49 CPU cores and 354 MB of memory were used. The response time was below 116 milliseconds for 90% of the requests, and the throughput was 67.53 requests <span class="No-Break">per second.</span></p>
+			<p class="callout-heading">Note</p>
+			<p class="callout">Don’t expect to get the same results with multiple runs. Many dependencies run these tests. What’s the network performance and latency between the different Azure services being used? For my tests, I created the Azure Load Testing service in the same Azure region where the services are running. Even in the same Azure region, different resources could be running in the same or different data centers. These differences are not an issue. Users will be located outside an Azure data center. What we need to know is how many users can be served from one instance and what settings are best for the application, such as CPU and memory resources (scale up) or running multiple replicas (scale out). We also need to see what the real bottlenecks are, and what can <span class="No-Break">be controlled.</span></p>
+			<p><span class="No-Break"><em class="italic">Figure 12</em></span><em class="italic">.10</em> shows the response time results with every <span class="No-Break">API invocation:</span></p>
+			<div>
+				<div id="_idContainer160" class="IMG---Figure">
+					<img src="image/B21217_12_10.jpg" alt="Figure 12.10 – Response time for five virtual users"/>
+				</div>
+			</div>
+			<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Figure 12.10 – Response time for five virtual users</p>
+			<p>With five virtual users, the response time is OK when considering all the requests. What might be interesting is that the <a id="_idIndexMarker989"/>delete request takes the most time to complete<a id="_idIndexMarker990"/> with Azure <span class="No-Break">Cosmos DB.</span></p>
+			<p>Five virtual users is a good start, but let’s add <span class="No-Break">more load.</span></p>
+			<h2 id="_idParaDest-305"><a id="_idTextAnchor304"/>Reaching limits with a higher load</h2>
+			<p>To change the load of a test, you<a id="_idIndexMarker991"/> can edit it. To do so, click <strong class="bold">Load</strong> and change <strong class="bold">Concurrent users per engine value</strong> to <strong class="source-inline">25</strong>. Click <strong class="bold">Apply</strong> and wait for the JMeter script to be created with <strong class="bold">Notifications</strong> in the Azure portal. At this point, you can start the <span class="No-Break">test again.</span></p>
+			<p>With my test run, increasing the number of virtual users to 25 resulted in just 11.701 total requests with 98.39 requests per second. The request to create a game needed 289 ms with a 90% percentile. <span class="No-Break"><em class="italic">Figure 12</em></span><em class="italic">.11</em> shows the number of requests per second for <span class="No-Break">this test:</span></p>
+			<div>
+				<div id="_idContainer161" class="IMG---Figure">
+					<img src="image/B21217_12_11.jpg" alt="Figure 12.11 – Requests per second"/>
+				</div>
+			</div>
+			<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Figure 12.11 – Requests per second</p>
+			<p>Comparing the results to the five<a id="_idIndexMarker992"/> users’ test runs, using 25 users resulted in just a small increase concerning the total requests and requests per second. As a result, the time for creating a game increased from 96 ms to 498 ms. This is not a good outcome. Why did this happen? The server-side metrics didn’t reach Azure Container Apps limits with CPU cores and memory. The limit was not down to Azure Container Apps but the Azure Cosmos database, as shown in <span class="No-Break"><em class="italic">Figure 12</em></span><span class="No-Break"><em class="italic">.12</em></span><span class="No-Break">:</span></p>
+			<div>
+				<div id="_idContainer162" class="IMG---Figure">
+					<img src="image/B21217_12_12.jpg" alt="Figure 12.12 – Azure Cosmos DB RU consumption"/>
+				</div>
+			</div>
+			<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Figure 12.12 – Azure Cosmos DB RU consumption</p>
+			<p>When running this test with Azure Cosmos DB, the RU<a id="_idIndexMarker993"/> was configured with <strong class="bold">autoscale</strong> throughput, and a maximum 1,000 RU/s limit was reached. This can be seen in the preceding figure. You can also dig into <strong class="bold">Application Map</strong> on App Insights and check the different Azure Cosmos DB metrics, as shown in <span class="No-Break"><em class="italic">Figure 12</em></span><span class="No-Break"><em class="italic">.13</em></span><span class="No-Break">:</span></p>
+			<div>
+				<div id="_idContainer163" class="IMG---Figure">
+					<img src="image/B21217_12_13.jpg" alt="Figure 12.13 – Requests throttled with Azure Cosmos DB"/>
+				</div>
+			</div>
+			<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Figure 12.13 – Requests throttled with Azure Cosmos DB</p>
+			<p>As we can see, the requests have been throttled; an error code of 429 has been returned to the <strong class="source-inline">game-apis</strong> service. You can use <strong class="bold">Kusto Query Language</strong> (<strong class="bold">KQL</strong>) to query for these log<a id="_idIndexMarker994"/> messages (see <a href="B21217_11.xhtml#_idTextAnchor263"><span class="No-Break"><em class="italic">Chapter 11</em></span></a> for more information <span class="No-Break">on KQL):</span></p>
+			<pre class="source-code">
+ContainerAppConsoleLogs_CL
+| where  Log_s contains "Request rate is large"</pre>
+			<p>The complete log message that’s returned states “<em class="italic">Request rate is large. More Request Units may be needed, so no changes were made. Plea</em><a href="http://aka.ms/cosmosdb-error-429"><em class="italic">se retry this request later. Lea</em></a><em class="italic">rn </em><span class="No-Break"><em class="italic">more: http://aka.ms/cosmosdb-error-429.</em></span><span class="No-Break">”</span></p>
+			<p>Earlier in this chapter, we reduced <a id="_idIndexMarker995"/>the load on Azure Cosmos DB by removing requests from the database that were not needed by using a cache. Without this change, the limit would have been <span class="No-Break">hit earlier.</span></p>
+			<p>While error code 429 has been returned to the <strong class="source-inline">game-apis</strong> service, the result of the invocation was still successful because of the built-in retry configuration with .NET Aspire. But of course, the time needed for the <span class="No-Break">request increased.</span></p>
+			<p>When creating the test, we ensured we could see the metrics data for all the resources participating in the test. That’s why we can see the Cosmos metrics with the test run and can easily fix it. Let’s use Cosmos DB to increase the RU/s. With a maximum value of 1,000 RU/s, the minimum RU/s is 100. Increasing the maximum to 10,000 sets the minimum to 1,000. Make sure you only change the maximum to higher values for a short period while running the tests, and when needed. You can view the expected cost in the dialogue where you scale the RU/s. Make sure you reduce the scale limits as you don’t need them anymore. It is possible to set the maximum to 1,000,000 RU/s, which sets the minimum to 100,000. You can view the price range when you change this throughput before clicking the <strong class="bold">Save</strong> button. Be aware that when changing the maximum value above 10,000 RU/s, it can take 4 to 6 hours for this compute power to <span class="No-Break">become available.</span></p>
+			<p>With 25 virtual users, we reached the 1,000 RU/s limit. So, let’s increase it to 10,000 RU/s. If not that many RU/s are required with a specific number of users, we’ll see this in the test results and adjust the setting according to our needs after the <span class="No-Break">test runs.</span></p>
+			<p>After increasing the RU/s limit<a id="_idIndexMarker996"/> and running the test again with 25 virtual users, Azure Cosmos DB is no longer the bottleneck. Just 12% of the RU/s are being used. So, let’s increase the number of virtual users <span class="No-Break">to 50.</span></p>
+			<h1 id="_idParaDest-306"><a id="_idTextAnchor305"/>Scaling up or scaling out services</h1>
+			<p>Let’s run the test with 50 virtual users and compare how the performance differs when increasing CPU and memory, as well as increasing the number <span class="No-Break">of replicas.</span></p>
+			<h2 id="_idParaDest-307"><a id="_idTextAnchor306"/>Configuring scaling up</h2>
+			<p>To scale up, we must increase<a id="_idIndexMarker997"/> the CPU and <span class="No-Break">memory values.</span></p>
+			<p class="callout-heading">Note</p>
+			<p class="callout">When using <strong class="source-inline">azd up</strong> to create a Container App, a <em class="italic">consumption-based</em> environment is created. There’s also the option to create a <em class="italic">workload profile</em> with <em class="italic">dedicated hardware</em>. When using dedicated hardware, you can choose the type of virtual machine that will be used. At the time of writing this book, the virtual machines were in categories D (general purpose, 4 – 32 cores, 16 – 128 GiB memory) and E (memory optimized 4 – 32 cores, 32 – 256 GiB memory, and GPU enabled with up to 4 GPUs). The type of machine also defines the available network bandwidth. Depending on the workload you have, there are great <span class="No-Break">options available.</span></p>
+			<p>To change CPU and memory in the Azure portal, within the Container App, select <strong class="bold">Containers</strong> from the left bar, click the <strong class="bold">Edit and deploy</strong> button, select the container image, and click <strong class="bold">Edit</strong>. This will open the container editor, where you can select the CPU cores and memory, as shown in <span class="No-Break"><em class="italic">Figure 12</em></span><span class="No-Break"><em class="italic">.14</em></span><span class="No-Break">:</span></p>
+			<div>
+				<div id="_idContainer164" class="IMG---Figure">
+					<img src="image/B21217_12_14.jpg" alt="Figure 12.14 – Editing the container’s settings"/>
+				</div>
+			</div>
+			<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Figure 12.14 – Editing the container’s settings</p>
+			<p>Here, we’ll change the CPU and memory<a id="_idIndexMarker998"/> values. When using the consumption-based environment, be aware that configurations need to map – for example, 0.5 cores and 1.0 Gi memory, 1.0 cores and 2.0 Gi memory, up to 2.0 cores and 4.0 Gi memory. In the consumption workload profile, you can have up to 4.0 cores and 8.0 Gi memory with <span class="No-Break">a container.</span></p>
+			<p>We can also configure this with the YAML <span class="No-Break">template file:</span></p>
+			<pre class="source-code">
+template:
+  containers:
+    - image: {{ .Image }}
+      name: gameapis
+<strong class="bold">      resources:</strong>
+<strong class="bold">        cpu: 1.0</strong>
+<strong class="bold">        memory: 2Gi</strong>
+# configuration removed for brevity</pre>
+			<p>CPU and memory resources are specified within the <strong class="source-inline">resources</strong> category. After deciding on the best configuration, specifying this with the YAML file creates the <span class="No-Break">right size.</span></p>
+			<p>Running the load test for 50 users for 2 minutes shows the following results based on <span class="No-Break">the configuration:</span></p>
+			<table id="table001-1" class="No-Table-Style _idGenTablePara-1">
+				<colgroup>
+					<col/>
+					<col/>
+					<col/>
+					<col/>
+					<col/>
+				</colgroup>
+				<tbody>
+					<tr class="No-Table-Style">
+						<td class="No-Table-Style"/>
+						<td class="No-Table-Style">
+							<p><span class="No-Break"><strong class="bold">Total Requests</strong></span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p><span class="No-Break"><strong class="bold">Throughput</strong></span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p><strong class="bold">Create </strong><span class="No-Break"><strong class="bold">Game Response</strong></span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p><span class="No-Break"><strong class="bold">10,000 RU/s</strong></span></p>
+						</td>
+					</tr>
+					<tr class="No-Table-Style">
+						<td class="No-Table-Style">
+							<p>0.5 Cores, <span class="No-Break">1 Gi</span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p><span class="No-Break">12,015</span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p><span class="No-Break">100.13/s</span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p><span class="No-Break">491 ms</span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p><span class="No-Break">16%</span></p>
+						</td>
+					</tr>
+					<tr class="No-Table-Style">
+						<td class="No-Table-Style">
+							<p>1 Cores, <span class="No-Break">2 Gi</span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p><span class="No-Break">20,621</span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p><span class="No-Break">171.84/s</span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p><span class="No-Break">383 ms</span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p><span class="No-Break">24%</span></p>
+						</td>
+					</tr>
+					<tr class="No-Table-Style">
+						<td class="No-Table-Style">
+							<p>2 Cores, <span class="No-Break">4 Gi</span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p><span class="No-Break">22,444</span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p><span class="No-Break">187.03/s</span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p><span class="No-Break">381 ms</span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p><span class="No-Break">26%</span></p>
+						</td>
+					</tr>
+				</tbody>
+			</table>
+			<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Table 12.1 – Scaling up load test results</p>
+			<p>With these configurations, we can see that increasing the compute resources to 1 core and 2 Gi of memory makes an improvement, whereas duplicating the compute resources again makes<a id="_idIndexMarker999"/> just a <span class="No-Break">small improvement.</span></p>
+			<p>Now, let’s change <span class="No-Break">the replicas.</span></p>
+			<h2 id="_idParaDest-308"><a id="_idTextAnchor307"/>Configuring scaling out</h2>
+			<p>You learned how to change the number<a id="_idIndexMarker1000"/> of replicas earlier in this chapter. In this section, we’ll change both the minimum and maximum count to the same values so that we can distribute the load across <span class="No-Break">different instances.</span></p>
+			<p>We receive the following counts when the tests use 0.5 cores and 1 Gi <span class="No-Break">of memory:</span></p>
+			<table id="table002" class="No-Table-Style _idGenTablePara-1">
+				<colgroup>
+					<col/>
+					<col/>
+					<col/>
+					<col/>
+					<col/>
+				</colgroup>
+				<tbody>
+					<tr class="No-Table-Style">
+						<td class="No-Table-Style"/>
+						<td class="No-Table-Style">
+							<p><span class="No-Break"><strong class="bold">Total Requests</strong></span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p><span class="No-Break"><strong class="bold">Throughput</strong></span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p><strong class="bold">Create </strong><span class="No-Break"><strong class="bold">Game Response</strong></span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p><span class="No-Break"><strong class="bold">10,000 RU/s</strong></span></p>
+						</td>
+					</tr>
+					<tr class="No-Table-Style">
+						<td class="No-Table-Style">
+							<p><span class="No-Break">1 replica</span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p><span class="No-Break">12,015</span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p><span class="No-Break">100.13/s</span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p><span class="No-Break">491 ms</span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p><span class="No-Break">16%</span></p>
+						</td>
+					</tr>
+					<tr class="No-Table-Style">
+						<td class="No-Table-Style">
+							<p><span class="No-Break">2 replicas</span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p><span class="No-Break">16,291</span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p><span class="No-Break">135.76/s</span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p><span class="No-Break">490 ms</span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p><span class="No-Break">20%</span></p>
+						</td>
+					</tr>
+					<tr class="No-Table-Style">
+						<td class="No-Table-Style">
+							<p><span class="No-Break">4 replicas</span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p><span class="No-Break">27,704</span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p><span class="No-Break">230.87/s</span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p><span class="No-Break">299 ms</span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p><span class="No-Break">34%</span></p>
+						</td>
+					</tr>
+				</tbody>
+			</table>
+			<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Table 12.2 – Scaling out the load test results</p>
+			<p>Using two replicas with 0.5 cores and 1 Gi of memory uses the same CPU and memory resources as one replica with 1 core and 2 Gi of memory does. One instance with 1 core was the better performing option, with 20,621 requests compared to 16,291 requests. By adding more replicas, we can scale higher than what’s possible by just adding <span class="No-Break">CPU resources.</span></p>
+			<p>A big advantage of using multiple replicas is that we can dynamically scale based on the load. We’ll create scale rules in the next section. Scale rules don’t allow us to change CPU and <span class="No-Break">memory resources.</span></p>
+			<p>One issue you need to be aware of when scaling multiple instances is whether the application is designed for this. When running the Codebreaker application while using the in-memory games store, the implementation was built with multi-threading in mind, but not with multiple machines. When one user starts a game and the next user sets a move, the first request might access the first machine where the game is stored in memory, and the second request might access the second machine where the game to set the move is not available. The Redis cache, which offers distributed memory, solves this issue. The sample application available in this chapter’s GitHub repository includes the <strong class="source-inline">DistributedMemoryGamesRepository</strong> class, which can be configured with the <strong class="source-inline">DataStore</strong> configuration set to <strong class="source-inline">DistributedMemory</strong>. To test this on your local development environment, you can change the <span class="No-Break">AppHost project:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.AppHost/Program.cs</p>
+			<pre class="source-code">
+var gameAPIs = builder.AddProject&lt;Projects.Codebreaker_GameAPIs&gt;("gameapis")
+  .WithReference(cosmos)
+  .WithReference(redis)
+  .WithReference(appInsights)
+  .WithEnvironment("DataStore", dataStore)
+  .WithEnvironment("StartupMode", startupMode)
+<strong class="bold">  .WithReplicas(2);</strong></pre>
+			<p>When adding the <strong class="source-inline">WithReplicas</strong> method when configuring a project, the number of replicas can be specified. With a value of <strong class="source-inline">2</strong>, when running the solution locally, the .NET Aspire dashboard (<span class="No-Break"><em class="italic">Figure 12</em></span><em class="italic">.15</em>) shows two instances of the <strong class="source-inline">game-apis</strong> service running. Each service has a port number that allows the specific instance to be accessed. The common port number, <strong class="source-inline">9400</strong>, is the port of the proxy client that references both <strong class="source-inline">game-apis</strong> service instances running with port numbers <strong class="source-inline">49379</strong> and <strong class="source-inline">49376</strong>. The port number that’s used by the proxy is defined with the <strong class="source-inline">launchsettings.json</strong> file, while the port number for the instances<a id="_idIndexMarker1001"/> randomly changes when a new <span class="No-Break">application starts:</span></p>
+			<div>
+				<div id="_idContainer165" class="IMG---Figure">
+					<img src="image/B21217_12_15.jpg" alt="Figure 12.15 – Two replicas for game-apis"/>
+				</div>
+			</div>
+			<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Figure 12.15 – Two replicas for game-apis</p>
+			<p>Now that we know about the improvements that we can make when running multiple replicas, let’s <span class="No-Break">scale dynamically.</span></p>
+			<h1 id="_idParaDest-309"><a id="_idTextAnchor308"/>Scaling dynamically with scale rules</h1>
+			<p>With Azure Container Apps, scale rules<a id="_idIndexMarker1002"/> can be defined based on concurrent HTTP requests, concurrent TCP requests, or custom rules. With custom rules, scaling can be based on CPU, memory, or many events based on different <span class="No-Break">data sources.</span></p>
+			<p>A microservice isn’t necessarily triggered based on HTTP requests. The service can also be triggered asynchronously, such as when a message arrives in a queue (for example, using Azure Storage Queue or Azure Service Bus) or when events occur (for example, using Azure Event Hub or <span class="No-Break">Apache Kafka).</span></p>
+			<p>Azure Container Apps<a id="_idIndexMarker1003"/> scale rules are based on <strong class="bold">Kubernetes Event-driven Autoscaling</strong> (<strong class="bold">KEDA</strong>), which offers a large list of scalers. You<a id="_idIndexMarker1004"/> can find the full list <span class="No-Break">at </span><a href="https://keda.sh"><span class="No-Break">https://keda.sh</span></a><span class="No-Break">.</span></p>
+			<p>When using a KEDA scaler<a id="_idIndexMarker1005"/> with the Azure Service Bus queue, you can specify how many messages should be in the queue when another replica should be started. What’s common with all the KEDA scalers is the configuration of the polling interval – how often the values are checked (by default, this is 30 seconds), a scaling algorithm to calculate the number of replicas, and a cooldown period (300 seconds) – the time before replicas started can be <span class="No-Break">stopped again.</span></p>
+			<p>In <a href="B21217_15.xhtml#_idTextAnchor349"><span class="No-Break"><em class="italic">Chapter 15</em></span></a>, we’ll use communication with messages and events where autoscaling will be based on event-based <span class="No-Break">KEDA scalers.</span></p>
+			<p>As we saw when we tested the load with a fixed number of instances, the best option to scale the services is using the number of HTTP requests. So, let’s configure scaling with an HTTP rule. We can do this by using the Azure portal and the <strong class="source-inline">azd infra synth</strong> generated template YAML file. This is the output from the JSON content in the <span class="No-Break">Azure portal:</span></p>
+			<pre class="source-code">
+"template": {
+      ...
+      "scale": {
+        "minReplicas": 1,
+        "maxReplicas": 8,
+<strong class="bold">        "rules": [{</strong>
+<strong class="bold">          "name": "http-rule",</strong>
+<strong class="bold">          "http": {</strong>
+<strong class="bold">            "metadata": {</strong>
+<strong class="bold">              "concurrentRequests": "30"</strong>
+<strong class="bold">            }</strong>
+<strong class="bold">          }</strong>
+<strong class="bold">        }]</strong>
+      }
+    }</pre>
+			<p>The default HTTP rule scales<a id="_idIndexMarker1006"/> with 10 concurrent requests. Based on the tests, let’s set this value to <strong class="source-inline">30</strong>. The number of replicas is in the range of <strong class="source-inline">1</strong> to <strong class="source-inline">8</strong>. What’s important to know regarding HTTP scaling is that the number of requests is calculated every 15 seconds. The total requests from within the last 15 seconds are divided by 15 so that they can be compared to the <strong class="source-inline">concurrentRequests</strong> value. Based on this, the number of replicas is calculated. So, if there are 140 requests per second, the instance count will be set <span class="No-Break">to 5.</span></p>
+			<p>When this scale rule is applied, and the instances are active, we can configure a load test with a dynamic pattern configuration, as shown in <span class="No-Break"><em class="italic">Figure 12</em></span><span class="No-Break"><em class="italic">.16</em></span><span class="No-Break">:</span></p>
+			<div>
+				<div id="_idContainer166" class="IMG---Figure">
+					<img src="image/B21217_12_16.jpg" alt="Figure 12.16 – Step load pattern"/>
+				</div>
+			</div>
+			<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Figure 12.16 – Step load pattern</p>
+			<p>With this step load pattern, two engine<a id="_idIndexMarker1007"/> instances are used to start 200 virtual users. The complete test duration is 4 minutes. The ramp-up time defines how long it takes until the 200 virtual users are reached – and 5 ramp-up steps are used to increment the users with <span class="No-Break">40 increments.</span></p>
+			<p>After the test runs are completed, you can see how the virtual users were added over time, as shown in <span class="No-Break"><em class="italic">Figure 12</em></span><span class="No-Break"><em class="italic">.17</em></span><span class="No-Break">:</span></p>
+			<div>
+				<div id="_idContainer167" class="IMG---Figure">
+					<img src="image/B21217_12_17.jpg" alt="Figure 12.17 – 200 virtual users"/>
+				</div>
+			</div>
+			<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Figure 12.17 – 200 virtual users</p>
+			<p>The number of requests per second is shown in <span class="No-Break"><em class="italic">Figure 12</em></span><span class="No-Break"><em class="italic">.18</em></span><span class="No-Break">:</span></p>
+			<div>
+				<div id="_idContainer168" class="IMG---Figure">
+					<img src="image/B21217_12_18.jpg" alt="Figure 12.18 – Requests per second"/>
+				</div>
+			</div>
+			<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Figure 12.18 – Requests per second</p>
+			<p><span class="No-Break"><em class="italic">Figure 12</em></span><em class="italic">.19</em> shows the response<a id="_idIndexMarker1008"/> time with longer times starting after 2:17 P.M. Do you have any idea what could have <span class="No-Break">happened here?</span></p>
+			<div>
+				<div id="_idContainer169" class="IMG---Figure">
+					<img src="image/B21217_12_19.jpg" alt="Figure 12.19 – Response time"/>
+				</div>
+			</div>
+			<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Figure 12.19 – Response time</p>
+			<p>The answer is that with this load, we reached the 10,000 RU/s limit using the Azure Cosmos database. This is shown in <span class="No-Break"><em class="italic">Figure 12</em></span><span class="No-Break"><em class="italic">.20</em></span><span class="No-Break">:</span></p>
+			<div>
+				<div id="_idContainer170" class="IMG---Figure">
+					<img src="image/B21217_12_20.jpg" alt="Figure 12.20 – Reaching 10,000 RU/s"/>
+				</div>
+			</div>
+			<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Figure 12.20 – Reaching 10,000 RU/s</p>
+			<p>The max RU/s were reached<a id="_idIndexMarker1009"/> after 2:16 P.M. Responses with “too many requests” are not returned immediately when this limit <span class="No-Break">is reached.</span></p>
+			<p>It’s also interesting to see the replica count for the scale rule we’ve created. This is shown in <span class="No-Break"><em class="italic">Figure 12</em></span><span class="No-Break"><em class="italic">.21</em></span><span class="No-Break">:</span></p>
+			<div>
+				<div id="_idContainer171" class="IMG---Figure">
+					<img src="image/B21217_12_21.jpg" alt="Figure 12.21 – Replica count"/>
+				</div>
+			</div>
+			<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Figure 12.21 – Replica count</p>
+			<p>The replica count started at 1 and increased up to 8 – the maximum configured replica number. <span class="No-Break"><em class="italic">Figure 12</em></span><em class="italic">.19</em> showed another issue than the RU/s limit. Directly after the start, there are some peaks in the response time. This corresponds to the reduction in requests per second in <span class="No-Break"><em class="italic">Figure 12</em></span><em class="italic">.18</em>. I had to dig into this issue after this test run. Metrics data didn’t reveal the reason, but checking the logs in the <strong class="source-inline">ContainerAppSystemLogs_CL</strong> table provided information about what the issue was. At that time, it was time to start a new replica. As indicated by the logs, a new replica was assigned, the image was pulled, and a container was created – but the <em class="italic">startup probe</em> failed, and the replica<a id="_idIndexMarker1010"/> was unhealthy. Requests are not sent to such replicas. So, for the load we generated, we still only had one replica. Faulty replicas were started two times before the third one succeeded. This is why increasing the replica count took longer than it should have been, and that’s the reason for the peak in the beginning. After this, every new replica that was created immediately succeeded. If you have some issues with a specific replica, you can use the replica’s name to query <span class="No-Break">the logs:</span></p>
+			<pre class="source-code">
+ContainerAppSystemLogs_CL
+| where ReplicaName_s == "gameapis--tc47v0x-7cb88d64b8-np8cg"
+| order  by  time_t asc</pre>
+			<p>Next, we’ll dive into health checks. This will help you understand <span class="No-Break">startup probes.</span></p>
+			<h1 id="_idParaDest-310"><a id="_idTextAnchor309"/>Implementing health checks</h1>
+			<p>The hosting platform needs<a id="_idIndexMarker1011"/> to know if the service started successfully and is available to serve requests. While the service is running, the hosting platform continuously checks the service to see if it is running or broken and needs to be restarted. This is what health checks <span class="No-Break">are for.</span></p>
+			<p>With Kubernetes, three probes can <span class="No-Break">be configured:</span></p>
+			<ul>
+				<li><strong class="source-inline">Startup</strong>: Is the container ready and did it start? When this probe succeeds, Kubernetes switches to the <span class="No-Break">other probes.</span></li>
+				<li><strong class="source-inline">Liveness</strong>: Did the application crash or deadlock? If this fails, the pod is stopped, and a new container instance <span class="No-Break">is created.</span></li>
+				<li><strong class="source-inline">Readiness</strong>: Is the application ready to receive requests? If this fails, no requests are sent to this service instance, but the pod <span class="No-Break">keeps running.</span></li>
+			</ul>
+			<p>Because Azure Container Apps is based on Kubernetes, these three probes can be configured with this Azure service <span class="No-Break">as well.</span></p>
+			<h2 id="_idParaDest-311"><a id="_idTextAnchor310"/>Adding health checks to the DI container</h2>
+			<p>Health checks<a id="_idIndexMarker1012"/> can be configured<a id="_idIndexMarker1013"/> with the DI container within the <strong class="source-inline">AddDefaultHealthChecks</strong> <span class="No-Break">extension method:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.ServiceDefaults/Extensions.cs</p>
+			<pre class="source-code">
+public static IHostApplicationBuilder AddDefaultHealthChecks(this IHostApplicationBuilder builder)
+{
+<strong class="bold">  builder.Services.AddHealthChecks()</strong>
+<strong class="bold">    .AddCheck(</strong>
+<strong class="bold">      "self",</strong>
+<strong class="bold">      () =&gt; HealthCheckResult.Healthy(),</strong>
+<strong class="bold">      tags: ["live"]);</strong>
+  return builder;
+}</pre>
+			<p>The <strong class="source-inline">AddHealthChecks</strong> method registers the <strong class="source-inline">HealthCheckService</strong> class with the DI container that will be available for health checks. The <strong class="source-inline">AddHealthChecks</strong> method can be invoked multiple times to access <strong class="source-inline">IHealthChecksBuilder</strong>, which is used to register different implementations of checks. The fluently invoked <strong class="source-inline">AddCheck</strong> method uses a delegate to return the <strong class="source-inline">HealthCheckResult.Healthy</strong> result on invocation. The last parameter defines the <strong class="source-inline">"live"</strong> tag. Tags are used with middleware to specify with which route this health check should be used. As the name suggests, this tag is good for a <strong class="source-inline">liveness</strong> probe. When the service is accessible, a result is returned. If the service is not available, nothing is returned, and thus it will be restarted. The name <strong class="source-inline">self</strong> indicates that only the service itself is used with this health check, and external resources are only consulted with readiness <span class="No-Break">health checks.</span></p>
+			<p>On startup of the <strong class="source-inline">game-apis</strong> service, using Azure<a id="_idIndexMarker1014"/> Cosmos DB, the container<a id="_idIndexMarker1015"/> is created, and with SQL Server, database migration can occur in case the database schema is updated. The application is not ready to receive requests before this is completed. With some applications, the cache needs to be filled with reference data before requests are accepted. To do this, a Boolean flag must be defined with the database update code that is set when the update is completed. Let’s add a health check to the DI container configuration <span class="No-Break">of </span><span class="No-Break"><strong class="source-inline">game-apis</strong></span><span class="No-Break">:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.GameAPIs/Program.cs</p>
+			<pre class="source-code">
+builder.Services.AddHealthChecks().AddCheck("dbupdate", () =&gt;
+{
+  <strong class="bold">return ApplicationServices.IsDatabaseUpdateComplete ?</strong>
+<strong class="bold">    HealthCheckResult.Healthy("DB update done") :</strong>
+<strong class="bold">    HealthCheckResult.Degraded("DB update not ready");</strong>
+});</pre>
+			<p>With this implementation, we return <strong class="source-inline">Healthy</strong> if the flag (the <strong class="source-inline">IsDatabaseUpdateComplete</strong> property) is true and <span class="No-Break"><strong class="source-inline">Degraded</strong></span><span class="No-Break"> otherwise.</span></p>
+			<p>When you try this out, the database migration might be too fast to see a degraded result – especially if the database has already been created  Adding a delay to the migration of the database in the <strong class="source-inline">Codebreaker.GameAPIs/ApplicationServices.cs</strong> file helps here as you can view<a id="_idIndexMarker1016"/> different <span class="No-Break">health</span><span class="No-Break"><a id="_idIndexMarker1017"/></span><span class="No-Break"> results.</span></p>
+			<p class="callout-heading">Note</p>
+			<p class="callout">Health checks should be implemented quickly. These checks are invoked quite often and shouldn’t result in a big overhead. Often, these checks involve opening a connection or checking a flag to <span class="No-Break">be set.</span></p>
+			<h2 id="_idParaDest-312"><a id="_idTextAnchor311"/>Adding health checks with .NET Aspire components</h2>
+			<p>All.NET Aspire components<a id="_idIndexMarker1018"/> have health checks<a id="_idIndexMarker1019"/> enabled – if the component supports health checks. Check out the documentation regarding these components to <span class="No-Break">learn more.</span></p>
+			<p>Similar to metrics and telemetry configuration, health checks can be enabled and disabled with the configuration settings of <span class="No-Break">the component.</span></p>
+			<p>This can be <span class="No-Break">done programmatically:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.GameAPIs/ApplicationServices.cs</p>
+			<pre class="source-code">
+            builder.Services.AddDbContextPool&lt;IGamesRepository, GamesSqlServerContext&gt;(options =&gt;
+{
+  var connectionString = builder.Configuration.GetConnectionString("CodebreakerSql") ??
+    throw new InvalidOperationException("Could not read SQL Server connection string");
+  options.UseSqlServer(connectionString);
+  options.UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking);
+});
+builder.EnrichSqlServerDbContext&lt;GamesSqlServerContext&gt;(
+<strong class="bold">  static settings =&gt;</strong>
+<strong class="bold">  {</strong>
+<strong class="bold">    settings.DisableTracing = false;</strong>
+<strong class="bold">    settings.DisableRetry = false;</strong>
+<strong class="bold">    settings.DisableHealthChecks = false;</strong>
+<strong class="bold">  });</strong></pre>
+			<p>The parameter <a id="_idIndexMarker1020"/>of the .NET Aspire SQL Server EF<a id="_idIndexMarker1021"/> Core <strong class="source-inline">EnrichSqlServerDbContext</strong> component method allows us to override the default for the component settings, such as metrics, tracing, and <span class="No-Break">health checks.</span></p>
+			<p>We can also specify this with the following .NET <span class="No-Break">Aspire configuration:</span></p>
+			<pre class="source-code">
+{
+  // code removed for brevity
+  "Aspire": {
+    "Microsoft": {
+      "EntityFrameworkCore": {
+        "SqlServer": {
+         "DbContextPooling": true,
+         "DisableTracing": false,
+<strong class="bold">         "DisableHealthCheck": false,</strong>
+         "DisableMetrics": false
+       }
+     }
+   },
+   "StackExchange": {
+     "Redis": {
+       "DisableTracing": false,
+<strong class="bold">       "DisableHealthCheck": false</strong>
+     }
+   }
+ }</pre>
+			<p>This configuration shows the settings for the Redis and SQL Server EF Core components. Both components integrate with the ready probe. What’s done with these health checks? There’s no reading or writing to the database. Health checks should be fast and not put a high load on the system. The Redis component tries to open the connection. The SQL Server EF Core component invokes the EF Core <strong class="source-inline">CanConnectAsync</strong> method. What you need to be aware<a id="_idIndexMarker1022"/> of is that when the idle pricing of an Azure Container App scales down to 1, with custom<a id="_idIndexMarker1023"/> health checks, it might never <span class="No-Break">be idle.</span></p>
+			<p>Using such a configuration ensures that this can be changed without the need to recompile <span class="No-Break">the project.</span></p>
+			<p>Now that we’ve implemented and configured health checks, let’s map these to <span class="No-Break">URL requests.</span></p>
+			<h2 id="_idParaDest-313"><a id="_idTextAnchor312"/>Mapping health checks</h2>
+			<p>Mapping health links to URLs<a id="_idIndexMarker1024"/> allows us to access them. The shared <strong class="source-inline">Codebreaker.ServiceDefaults</strong> file contains the health endpoints that have been configured with the <span class="No-Break"><strong class="source-inline">MapDefaultEndpoints</strong></span><span class="No-Break"> method:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.ServiceDefaults/Extensions.cs</p>
+			<pre class="source-code">
+public static WebApplication MapDefaultEndpoints(this WebApplication app)
+{
+  // code removed for brevity
+<strong class="bold">  app.MapHealthChecks("/alive", new HealthCheckOptions</strong>
+<strong class="bold">  {</strong>
+<strong class="bold">    Predicate = r =&gt; r.Tags.Contains("live")</strong>
+<strong class="bold">  });</strong>
+<strong class="bold">  app.MapHealthChecks("/health");</strong>
+  return app;
+}</pre>
+			<p>The <strong class="source-inline">/alive</strong> probe link has been configured to only use the health checks with the <strong class="source-inline">live</strong> tag, so the health checks are used to check if the service is alive. This link should be configured for live probing, and the service should be restarted if it does not <span class="No-Break">return </span><span class="No-Break"><strong class="source-inline">Healthy</strong></span><span class="No-Break">.</span></p>
+			<p>The <strong class="source-inline">/health</strong> probe link has been configured not to restrict the health checks based on a tag. Here, all health checks are invoked and need to be successful. This link should be used for a ready probe: is the service ready to receive requests? If this returns <strong class="source-inline">Unhealthy</strong> or <strong class="source-inline">Degraded</strong>, the service<a id="_idIndexMarker1025"/> isn’t stopped but doesn’t <span class="No-Break">receive requests.</span></p>
+			<p class="callout-heading">Note</p>
+			<p class="callout">You might be wondering why .NET Aspire is not using the <strong class="source-inline">/healthz</strong> link for the ready probes, as it is typically used with Kubernetes. <strong class="source-inline">/healthz</strong> historically comes from Google’s internal practices, z-pages, so that it doesn’t get into conflicts. The .NET Aspire team had several iterations on deciding on the different links and included <strong class="source-inline">/liveness</strong> and <strong class="source-inline">/readiness</strong>, and finally ended up with <strong class="source-inline">/alive</strong> <span class="No-Break">and </span><span class="No-Break"><strong class="source-inline">/health</strong></span><span class="No-Break">.</span></p>
+			<p>Now that we’ve mapped the health checks to URIs, let’s use <span class="No-Break">these links.</span></p>
+			<h2 id="_idParaDest-314"><a id="_idTextAnchor313"/>Using the health checks with Azure Container Apps</h2>
+			<p>You can automatically integrate<a id="_idIndexMarker1026"/> the health probes after generating <a id="_idIndexMarker1027"/>probe configuration with Azure Container Apps. You can also use these health probes with the Azure dashboard. However, this is not available with the first release of .NET Aspire and is planned for a later release. However, with a little customization, this can easily <span class="No-Break">be done.</span></p>
+			<p>For this to work, you need to have initialized the solution with <strong class="source-inline">azd init</strong>, which you did previously, before publishing the solution to Azure. Now, from the folder that contains the solution, create the code that will publish <span class="No-Break">these projects:</span></p>
+			<pre class="console">
+azd infra synth</pre>
+			<p>With this, the AppHost project contains an <strong class="source-inline">infra</strong> folder with <strong class="source-inline">&lt;app&gt;.tmpl.yaml </strong>files. Within the <strong class="source-inline">gameapis.tmpl.yaml</strong> file, specify the <span class="No-Break"><strong class="source-inline">probes</strong></span><span class="No-Break"> section:</span></p>
+			<pre class="source-code">
+  template:
+    containers:
+      - image: {{ .Image }}
+        name: gameapis
+<strong class="bold">        probes:</strong>
+<strong class="bold">          - type: liveness</strong>
+<strong class="bold">            httpGet:</strong>
+<strong class="bold">              path: /alive</strong>
+<strong class="bold">              port: 8080</strong>
+<strong class="bold">            initialDelaySeconds: 3</strong>
+<strong class="bold">            periodSeconds: 3</strong>
+<strong class="bold">          - type: readiness</strong>
+<strong class="bold">            httpGet:</strong>
+<strong class="bold">              path: /health</strong>
+<strong class="bold">              port: 8080</strong>
+<strong class="bold">            initialDelaySeconds: 10</strong>
+<strong class="bold">            periodSeconds: 5</strong>
+<strong class="bold">          - type: startup</strong>
+<strong class="bold">            tcpSocket:</strong>
+<strong class="bold">              port: 8080</strong>
+<strong class="bold">            initialDelaySeconds: 1</strong>
+<strong class="bold">            periodSeconds: 1</strong>
+<strong class="bold">            timeoutSeconds: 3</strong>
+<strong class="bold">            failureThreshold: 30</strong>
+        env:
+        - name: AZURE_CLIENT_ID
+# configuration removed for brevity</pre>
+			<p>The <strong class="source-inline">probes</strong> section<a id="_idIndexMarker1028"/> allows <strong class="source-inline">liveness</strong>, <strong class="source-inline">readiness</strong>, and <strong class="source-inline">startup</strong> probe types to be configured. The <strong class="source-inline">liveness</strong> probe<a id="_idIndexMarker1029"/> is configured to invoke the <strong class="source-inline">/alive</strong> link and the <strong class="source-inline">readiness</strong> probe is configured to invoke the <strong class="source-inline">/health</strong> link with the port of the running Docker container. Azure Container Apps have default settings. However, as soon as you specify probing, you need to configure all probe types; otherwise, the probes that haven’t been configured will be disabled. Thus, when specifying <strong class="source-inline">liveness</strong> and <strong class="source-inline">readiness</strong> probes, the <strong class="source-inline">startup</strong> probe should be configured as well. This probe uses a TCP connection to connect to the service to verify that the <span class="No-Break">connection succeeds.</span></p>
+			<p><strong class="source-inline">initialDelaySeconds</strong> specifies the seconds to wait until the first probe is done. If this fails, additional checks are done after the number of seconds specified by <strong class="source-inline">periodSeconds</strong>. A failure only counts until <strong class="source-inline">failureTreshold</strong> <span class="No-Break">is reached.</span></p>
+			<p>The default startup probe uses a TCP probe to check the ingress target port with an initial delay of 1 second, a timeout of 3 seconds, and a period of 1 second. With the failure threshold, this multiplies, and the app can take some time until it’s started successfully. When the <strong class="source-inline">startup</strong> probe has been successful once, only the <strong class="source-inline">liveness</strong> and <strong class="source-inline">readiness</strong> probes are <span class="No-Break">used afterward.</span></p>
+			<p>After making this change, from the solution folder, run the <span class="No-Break">following command:</span></p>
+			<pre class="console">
+azd deploy</pre>
+			<p>This will deploy the service to Azure and configure the <span class="No-Break">health checks.</span></p>
+			<p>Open the Azure portal, navigate<a id="_idIndexMarker1030"/> to Azure<a id="_idIndexMarker1031"/> Container Apps, and select <strong class="bold">Containers</strong> from the left pane. You’ll see a tab called <strong class="bold">Health probes</strong>, as shown in <span class="No-Break"><em class="italic">Figure 12</em></span><span class="No-Break"><em class="italic">.22</em></span><span class="No-Break">:</span></p>
+			<div>
+				<div id="_idContainer172" class="IMG---Figure">
+					<img src="image/B21217_12_22.jpg" alt="Figure 12.22 – Health probes within Azure Container Apps"/>
+				</div>
+			</div>
+			<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Figure 12.22 – Health probes within Azure Container Apps</p>
+			<p>Here, we can see the configured settings for the liveness probe in the portal. You can also verify the readiness and startup probes. <span class="No-Break"><em class="italic">Figure 12</em></span><em class="italic">.23</em> shows the status of <span class="No-Break">a container:</span></p>
+			<div>
+				<div id="_idContainer173" class="IMG---Figure">
+					<img src="image/B21217_12_23.jpg" alt="Figure 12.23 – Container app running but not ready"/>
+				</div>
+			</div>
+			<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Figure 12.23 – Container app running but not ready</p>
+			<p>Here, one replica is running, but this replica isn’t ready. The <strong class="source-inline">readiness</strong> probe didn’t return success at that time. If you configured the Redis component to offer health checks with .NET Aspire, you can stop this container using the Azure Container Apps environment. You’ll see that the <strong class="source-inline">game-apis</strong> service isn’t ready. Because the <strong class="source-inline">game-apis</strong> service has the component<a id="_idIndexMarker1032"/> health check activated, an error<a id="_idIndexMarker1033"/> is returned with the <span class="No-Break">readiness check.</span></p>
+			<h1 id="_idParaDest-315"><a id="_idTextAnchor314"/>Summary</h1>
+			<p>In this chapter, you learned how to use telemetry data and implemented a cache to reduce the number of database requests. You created health checks while differing between startup, liveness, and readiness checks. Liveness checks are used to restart services, while readiness checks are used to verify whether a service is ready to receive requests. Regarding readiness checks, you learned how to integrate .NET Aspire components. You also learned how to get information from load tests to find bottlenecks in the deployed application and to decide on the infrastructure you wish to use. By doing this, you learned how to configure the application so that it scales up when changes are made to CPU and memory, as well as how to scale out when running multiple replicas using <span class="No-Break">scaling rules.</span></p>
+			<p>This chapter has uncovered an important reason for using microservices: with scaling, great flexibility can easily <span class="No-Break">be achieved.</span></p>
+			<p>The next chapter will act as a starting point and implement different communication techniques with microservices. When adding more functionality to your application, you need to think about doing continuous load tests on the solution in a test environment and monitoring <span class="No-Break">the changes.</span></p>
+			<h1 id="_idParaDest-316"><a id="_idTextAnchor315"/>Further reading</h1>
+			<p>To learn more about the topics that were discussed in this chapter, please refer to the <span class="No-Break">following links:</span></p>
+			<ul>
+				<li><em class="italic">Distributed caching in ASP.NET </em><span class="No-Break"><em class="italic">Core</em></span><span class="No-Break">: </span><a href="https://learn.microsoft.com/en-us/aspnet/core/performance/caching/distributed"><span class="No-Break">https://learn.microsoft.com/en-us/aspnet/core/performance/caching/distributed</span></a></li>
+				<li><em class="italic">Database scalability: scaling out vs scaling </em><span class="No-Break"><em class="italic">up</em></span><span class="No-Break">: </span><a href="https://azure.microsoft.com/en-au/resources/cloud-computing-dictionary/scaling-out-vs-scaling-up/"><span class="No-Break">https://azure.microsoft.com/en-au/resources/cloud-computing-dictionary/scaling-out-vs-scaling-up/</span></a></li>
+				<li><em class="italic">Azure Virtual Machine </em><span class="No-Break"><em class="italic">Sizes</em></span><span class="No-Break">: </span><a href="https://learn.microsoft.com/en-us/azure/virtual-machines/sizes"><span class="No-Break">https://learn.microsoft.com/en-us/azure/virtual-machines/sizes</span></a></li>
+				<li><em class="italic">Workload </em><span class="No-Break"><em class="italic">Profiles</em></span><span class="No-Break">: </span><a href="https://learn.microsoft.com/en-us/azure/container-apps/workload-profiles-overview"><span class="No-Break">https://learn.microsoft.com/en-us/azure/container-apps/workload-profiles-overview</span></a></li>
+				<li><em class="italic">Container </em><span class="No-Break"><em class="italic">configuration</em></span><span class="No-Break">: </span><a href="https://learn.microsoft.com/en-us/azure/container-apps/containers#configuration"><span class="No-Break">https://learn.microsoft.com/en-us/azure/container-apps/containers#configuration</span></a></li>
+				<li><em class="italic">Azure Container Apps YAML </em><span class="No-Break"><em class="italic">specification</em></span><span class="No-Break">: </span><a href="https://learn.microsoft.com/en-us/azure/container-apps/azure-resource-manager-api-spec"><span class="No-Break">https://learn.microsoft.com/en-us/azure/container-apps/azure-resource-manager-api-spec</span></a></li>
+				<li><em class="italic">Health checks in ASP.NET </em><span class="No-Break"><em class="italic">Core</em></span><span class="No-Break">: </span><a href="https://learn.microsoft.com/en-us/aspnet/core/host-and-deploy/health-checks/"><span class="No-Break">https://learn.microsoft.com/en-us/aspnet/core/host-and-deploy/health-checks/</span></a></li>
+				<li><em class="italic">Convention for /</em><span class="No-Break"><em class="italic">healthz</em></span><span class="No-Break">:</span><span class="No-Break"><span class="hidden"> </span></span><a href="https://stackoverflow.com/questions/43380939/where-does-the-convention-of-using-healthz-for-application-health-checks-come-f"><span class="No-Break">https://stackoverflow.com/questions/43380939/where-does-the-convention-of-using-healthz-for-application-health-checks-come-f</span></a></li>
+			</ul>
+		</div>
+	
+
+		<div id="_idContainer175" class="Content">
+			<h1 id="_idParaDest-317" lang="en-US" xml:lang="en-US"><a id="_idTextAnchor316"/>Part 4: More communication options</h1>
+			<p>In this part, the focus shifts towards leveraging various communication technologies and incorporating additional Azure services to enhance the application. Real-time messaging capabilities are implemented using SignalR to deliver instantaneous updates from the application to clients. gRPC is utilized for efficient binary communication between services, enabling seamless message exchange through queues and event publication. Azure services such as Azure SignalR Services, Event Hub, Azure Queue Storage, and Apache Kafka are integrated into the application ecosystem. Additionally, a detailed examination of considerations for production environments is provided, culminating in the deployment of the application to a Kubernetes cluster, specifically Azure Kubernetes Services, <span class="No-Break">utilizing </span><span class="No-Break"><strong class="bold">Aspir8</strong></span><span class="No-Break">.</span></p>
+			<p>This part has the <span class="No-Break">following chapters:</span></p>
+			<ul>
+				<li><a href="B21217_13.xhtml#_idTextAnchor317"><em class="italic">Chapter 13</em></a>, <em class="italic">Real-time Messaging with SignalR</em></li>
+				<li><a href="B21217_14.xhtml#_idTextAnchor330"><em class="italic">Chapter 14</em></a>, <em class="italic">gRPC for Binary Communication</em></li>
+				<li><a href="B21217_15.xhtml#_idTextAnchor349"><em class="italic">Chapter 15</em></a><em class="italic">, Asynchronous Communication with Messages and Events</em></li>
+				<li><a href="B21217_16.xhtml#_idTextAnchor373"><em class="italic">Chapter 16</em></a><em class="italic">, Running Applications On-Premises and in the Cloud</em></li>
+			</ul>
+		</div>
+		<div>
+			<div id="_idContainer176">
+			</div>
+		</div>
+		<div>
+			<div id="_idContainer177">
+			</div>
+		</div>
+		<div>
+			<div id="_idContainer178">
+			</div>
+		</div>
+		<div>
+			<div id="_idContainer179">
+			</div>
+		</div>
+		<div>
+			<div id="_idContainer180">
+			</div>
+		</div>
+		<div>
+			<div id="_idContainer181" class="Basic-Graphics-Frame">
+			</div>
+		</div>
+		<div>
+			<div id="_idContainer182" class="Basic-Graphics-Frame">
+			</div>
+		</div>
+		<div>
+			<div id="_idContainer183">
+			</div>
+		</div>
+		<div>
+			<div id="_idContainer184">
+			</div>
+		</div>
+		<div>
+			<div id="_idContainer185" class="Basic-Graphics-Frame">
+			</div>
+		</div>
+	</body></html>

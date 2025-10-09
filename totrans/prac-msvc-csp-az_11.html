@@ -1,0 +1,806 @@
+<html><head></head><body>
+		<div id="_idContainer150">
+			<h1 id="_idParaDest-264" class="chapter-number"><a id="_idTextAnchor263"/>11</h1>
+			<h1 id="_idParaDest-265"><a id="_idTextAnchor264"/>Logging and Monitoring</h1>
+			<p>With a microservices solution, many services can interact with each other. When one service fails, the complete solution should not break. In the previous chapter, we covered different kinds of tests to find issues early. Here, we’ll look at finding issues in production as early as possible – probably before a user sees <span class="No-Break">a problem.</span></p>
+			<p>To find issues when the application is running and see how the application runs successfully, the solution needs to be enhanced to offer telemetry data. With <strong class="bold">logging</strong>, we see what’s going on; based<a id="_idIndexMarker822"/> on different log levels, we can differentiate between informational logs and errors. With <strong class="bold">metrics</strong> data, we can monitor counters, such as memory and CPU<a id="_idIndexMarker823"/> consumption, and the number of HTTP requests. We will also write custom counters to see the number of games played and the number of game moves needed for a win. <strong class="bold">Distributed tracing</strong> gives information on how services interact. Who is making <a id="_idIndexMarker824"/>calls to this service? Where does this error <span class="No-Break">originate from?</span></p>
+			<p><strong class="bold">OpenTelemetry</strong> is an <a id="_idIndexMarker825"/>industry standard – a collection of APIs that allows different languages and tools to instrument, generate, collect, and export telemetry data. The .NET APIs for logging, metrics, and distributed tracing support OpenTelemetry, and this is what this chapter is about. We’ll <a id="_idIndexMarker826"/>use <strong class="bold">Prometheus</strong> and <strong class="bold">Grafana</strong>, which<a id="_idIndexMarker827"/> have great graphical views for an on-premises solution, as well as <strong class="bold">Azure Application Insights</strong> for <a id="_idIndexMarker828"/>the solution to run with the Microsoft <span class="No-Break">Azure cloud.</span></p>
+			<p>In this chapter, you’ll learn how to do <span class="No-Break">the following:</span></p>
+			<ul>
+				<li>Add <span class="No-Break">log messages</span></li>
+				<li>Use and create <span class="No-Break">metrics data</span></li>
+				<li>Use <span class="No-Break">distributed tracing</span></li>
+				<li>Monitor with Azure <span class="No-Break">Application Insights</span></li>
+				<li>Monitor with Prometheus <span class="No-Break">and Grafana</span></li>
+			</ul>
+			<h1 id="_idParaDest-266"><a id="_idTextAnchor265"/>Technical requirements</h1>
+			<p>With this chapter, as with the previous chapters, you need an Azure subscription and Docker Desktop. To create all the Azure resources for the solution, you can use the Azure Developer CLI – <strong class="source-inline">azd up</strong> creates all the resources. Check the README file of this chapter in the repository <span class="No-Break">for details.</span></p>
+			<p>The code for this chapter can be found in this GitHub <span class="No-Break">repository: </span><a href="https://github.com/PacktPublishing/Pragmatic-Microservices-with-CSharp-and-Azure/"><span class="No-Break">https://github.com/PacktPublishing/Pragmatic-Microservices-with-CSharp-and-Azure/</span></a><span class="No-Break">.</span></p>
+			<p>In the <strong class="source-inline">ch11</strong> folder, you’ll see these projects with the result of this chapter. This chapter adds the Prometheus launch profile with the <strong class="source-inline">launchsettings.json</strong> file of the <strong class="source-inline">AppHost</strong> project. This also sets the <strong class="source-inline">ASPNETCORE_ENVIRONMENT</strong> and <strong class="source-inline">DOTNETCORE_ENVIRONMENT</strong> environment variables to <strong class="source-inline">Prometheus</strong>. The default launch profile uses services running with Microsoft Azure. The Prometheus launch profile is used to run Prometheus and Grafana, which can be used easily in an <span class="No-Break">on-premises environment.</span></p>
+			<p>These are the important projects for <span class="No-Break">this chapter:</span></p>
+			<ul>
+				<li><span class="No-Break"><strong class="bold">Common projects</strong></span><ul><li><strong class="source-inline">Codebreaker.AppHost</strong> – The .NET Aspire <span class="No-Break">host project.</span></li><li><strong class="source-inline">Codebreaker.ServiceDefaults</strong> – Common service configuration. This project is enhanced with service configurations <span class="No-Break">for monitoring.</span></li></ul></li>
+				<li><span class="No-Break"><strong class="bold">Services</strong></span><ul><li><strong class="source-inline">Codebreaker.GamesAPI</strong> – The service project is enhanced with logging, metrics, and <span class="No-Break">distributed tracing.</span></li><li><strong class="source-inline">Codebreaker.Bot</strong> – This project has monitoring information included and will be used to play games that can <span class="No-Break">be monitored.</span></li></ul></li>
+				<li><span class="No-Break"><strong class="bold">Configuration folders</strong></span><ul><li>The <strong class="source-inline">grafana</strong> folder contains configuration files that are used within the Grafana <span class="No-Break">Docker container.</span></li><li>The <strong class="source-inline">prometheus</strong> folder contains a configuration file that is used by the Prometheus <span class="No-Break">Docker container.</span></li></ul></li>
+			</ul>
+			<p>You can start with the source code from the previous chapter to integrate the features from <span class="No-Break">this chapter.</span></p>
+			<h1 id="_idParaDest-267"><a id="_idTextAnchor266"/>Adding log messages</h1>
+			<p>To see what’s going on successfully or not when running the solution, we add log messages. The important parts of understanding the concept of logging are <span class="No-Break">the following:</span></p>
+			<ul>
+				<li><strong class="bold">The source</strong>: Who writes<a id="_idIndexMarker829"/> log information – what is the <span class="No-Break">category name?</span></li>
+				<li><strong class="bold">The log provider</strong>: Where is log<a id="_idIndexMarker830"/> information <span class="No-Break">written to?</span></li>
+				<li><strong class="bold">The log level</strong>: What is the <a id="_idIndexMarker831"/>level of the log message? Is it just information or <span class="No-Break">an error?</span></li>
+				<li><strong class="bold">Filtering</strong>: What<a id="_idIndexMarker832"/> information <span class="No-Break">is logged?</span></li>
+			</ul>
+			<p>The source is defined using the <strong class="source-inline">ILogger&lt;T&gt;</strong> generic interface. With this generic interface, the category name is taken from the class name of the generic parameter type. In case you use the <strong class="source-inline">ILoggerFactory</strong> interface instead of <strong class="source-inline">ILogger&lt;T&gt;</strong>, the category name is passed by invoking the <strong class="source-inline">CreateLogger</strong> method. Examples of category names used by .NET are <strong class="source-inline">Microsoft.EntityFrameworkCore.Database.Command</strong>, <strong class="source-inline">System.Net.Http.HttpClient</strong>, and <strong class="source-inline">Microsoft.Hosting.Lifetime</strong>. Having hierarchical names helps with common <span class="No-Break">configuration settings.</span></p>
+			<p>To define where<a id="_idIndexMarker833"/> log messages are written, log providers are configured with the startup of the application. The <strong class="source-inline">CreateBuilder</strong> method of the <strong class="source-inline">WebApplication</strong> class configures multiple <span class="No-Break">log providers:</span></p>
+			<ul>
+				<li><strong class="source-inline">ConsoleLogProvider</strong> to write log messages to <span class="No-Break">the console</span></li>
+				<li><strong class="source-inline">DebugLoggerProvider</strong>, which only writes messages to the debug output window when a debugger <span class="No-Break">is attached</span></li>
+				<li><strong class="source-inline">EventSourceLoggerProvider</strong>, which writes log messages using <strong class="bold">Event Tracing for Windows</strong> (<strong class="bold">ETW</strong>) on<a id="_idIndexMarker834"/> Windows and <a id="_idIndexMarker835"/>the <strong class="bold">Linux Trace Toolkit: next generation</strong> (<strong class="bold">LTTng</strong>) <span class="No-Break">on Linux</span></li>
+			</ul>
+			<p>With the AOT ASP.NET <a id="_idIndexMarker836"/>Core application that was created in <a href="B21217_05.xhtml#_idTextAnchor110"><span class="No-Break"><em class="italic">Chapter 5</em></span></a>, the <strong class="source-inline">CreateSlimBuilder</strong> method was used. <strong class="source-inline">CreateSlimBuilder</strong> only configures the console provider; other providers need to be <span class="No-Break">added manually.</span></p>
+			<p>The <strong class="source-inline">ILogger</strong> interface defines a <strong class="source-inline">Log</strong> method with a <strong class="source-inline">LogLevel</strong> enum value containing <strong class="source-inline">Trace</strong> (0) – <strong class="source-inline">Debug</strong> – <strong class="source-inline">Information</strong> – <strong class="source-inline">Warning</strong> – <strong class="source-inline">Error</strong> – <strong class="source-inline">Critical</strong> (5) – <strong class="source-inline">None</strong> (6) values. With this, we can configure to only write <strong class="source-inline">Warning</strong>-level messages and higher or write every message specifying the <strong class="source-inline">Trace</strong> level and higher). This configuration can be different based on the provider and <span class="No-Break">the source.</span></p>
+			<p>The following snippet shows a customized configuration with a JSON <span class="No-Break">configuration file:</span></p>
+			<pre class="source-code">
+{
+  "<strong class="bold">Logging</strong>": {
+    "<strong class="bold">LogLevel</strong>": {
+      "<strong class="bold">Default</strong>": "Information",
+      "<strong class="bold">Microsoft.AspNetCore</strong>": "Warning",
+      "Microsoft.EntityFrameworkCore": "Warning",
+      "Codebreaker": "Trace"
+    },
+    "<strong class="bold">EventSource</strong>": {
+      "LogLevel": {
+        "<strong class="bold">Default</strong>": "Warning"
+      }
+    }
+  }
+}</pre>
+			<p>The <strong class="source-inline">Logging</strong> section with the configuration is accessed within the implementation of the <strong class="source-inline">CreateBuilder</strong> method at startup. Here, we can customize the logging configuration. With this configuration file, the default log level is specified with the <strong class="source-inline">LogLevel:Default</strong> key. Here, logging is set to <strong class="source-inline">Information</strong>, thus <strong class="source-inline">Debug</strong> and <strong class="source-inline">Trace</strong> log messages are not written. This default configuration is changed with log categories that start with <strong class="source-inline">Microsoft.AspNetCore</strong>. With this category, only warnings, errors, and critical messages are written. With the <strong class="source-inline">LogLevel</strong> key as a subkey to <strong class="source-inline">Logging</strong>, all log providers are configured, unless the configuration for the provider is overwritten. Here, this<a id="_idIndexMarker837"/> is done for the <strong class="source-inline">EventSource</strong> log provider. The <strong class="source-inline">Default</strong> log level is set <span class="No-Break">to </span><span class="No-Break"><strong class="source-inline">Warning</strong></span><span class="No-Break">.</span></p>
+			<p>Next, let’s add logging to the <span class="No-Break">games API.</span></p>
+			<h2 id="_idParaDest-268"><a id="_idTextAnchor267"/>Creating strongly typed log messages</h2>
+			<p>The games<a id="_idIndexMarker838"/> API service makes use of <strong class="bold">strongly typed logging</strong>. Strongly typed logging gives us methods with arguments that should be written to the log output. Instead of using .NET-defined <strong class="source-inline">ILogger</strong> extension methods such as <strong class="source-inline">LogError</strong> and <strong class="source-inline">LogInformation</strong>, when writing log messages, we use custom log methods as shown next. Let’s add a <strong class="source-inline">Log</strong> class to define all log messages with the games <span class="No-Break">API project:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.GameAPIs/Infrastructure/Log.cs</p>
+			<pre class="source-code">
+public static partial class Log
+{
+  <strong class="bold">[LoggerMessage(</strong>
+<strong class="bold">    EventId = 3001,</strong>
+<strong class="bold">    Level = LogLevel.Warning,</strong>
+<strong class="bold">    Message = "Game {GameId} not found")]</strong>
+<strong class="bold">  public static partial void GameNotFound(this ILogger logger, </strong>
+    <strong class="bold">Guid gameId);</strong>
+  // code removed for brevity
+  [LoggerMessage(
+    EventId = 4001,
+    Level = LogLevel.Information,
+    Message = "The move {Move} was set for {GameId} with result {Result}")]
+  public static partial void SendMove(this ILogger logger, string 
+    move, Guid gameId, string result);
+  // code removed for brevity
+}</pre>
+			<p>The <strong class="source-inline">LoggerMessage</strong> attribute<a id="_idIndexMarker839"/> is used by a source generator. For methods that are annotated with this attribute, the logger source generator creates an implementation. The method needs to be <strong class="source-inline">void</strong> with an <strong class="source-inline">ILogger</strong> parameter. The method can also be defined as an extension method, as is the case here. Parameter names need to match the expressions used within the <strong class="source-inline">Message</strong> property, such as <strong class="source-inline">gameId</strong>, <strong class="source-inline">move</strong>, <span class="No-Break">and </span><span class="No-Break"><strong class="source-inline">result</strong></span><span class="No-Break">.</span></p>
+			<p>Before the log message is written, the generated logging code checks if the log level is enabled. Sometimes, it can be useful to create custom methods that make use of generated methods, as shown in the next <span class="No-Break">code snippet:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.GameAPIs/Infrastructure/Log.cs</p>
+			<pre class="source-code">
+[LoggerMessage(
+  EventId = 4003,
+  Level = LogLevel.Information,
+  Message = "Game lost after {Seconds} seconds with game {Gameid}")]
+private static partial void GameLost(this ILogger logger, int seconds, Guid gameid);
+<strong class="bold">public static void GameEnded(this ILogger logger, Game game)</strong>
+<strong class="bold">{</strong>
+<strong class="bold">  if (logger.IsEnabled(LogLevel.Information))</strong>
+<strong class="bold">  {</strong>
+<strong class="bold">    if (game.IsVictory)</strong>
+<strong class="bold">    {</strong>
+<strong class="bold">      logger.GameWon(game.Moves.Count, game.Duration?.Seconds ?? 0, </strong>
+        <strong class="bold">game.Id);</strong>
+<strong class="bold">    }</strong>
+<strong class="bold">    else</strong>
+<strong class="bold">    {</strong>
+<strong class="bold">      logger.GameLost(game.Duration?.Seconds ?? 0, game.Id);</strong>
+<strong class="bold">    }</strong>
+<strong class="bold">  }</strong>
+<strong class="bold">}</strong></pre>
+			<p>The <strong class="source-inline">GameEnded</strong> method checks the <strong class="source-inline">Game</strong> object to see if it’s a victory or not, and depending on this, either the <strong class="source-inline">GameWon</strong> or the <strong class="source-inline">GameLost</strong> logging method is invoked. Before using any CPU and memory for this process (logging could also need to enumerate collections to produce useful log messages), it’s good practice to verify if this should be done at all – if the<a id="_idIndexMarker840"/> log level is enabled. This is checked using the <strong class="source-inline">logger.IsEnabled</strong> method and passing the <span class="No-Break">log level.</span></p>
+			<p class="callout-heading">Note</p>
+			<p class="callout">Writing logs, don’t use interpolated strings such as <strong class="source-inline">logger.LogInformation($"log message {expression}");</strong>. Instead, use <strong class="source-inline">logger.LogInformation("log message {expression}", expression);</strong>. The second form supports structured logging. The message string passed is a template. With this template, the content within the curly braces can be used to create an index, and (depending on the log collector) you can query for all log entries containing this term. Also, using the formatted string allocates a new string that needs to be garbage-collected. With the second version, there’s just one string for all log <span class="No-Break">entries written.</span></p>
+			<p>Check the<a id="_idIndexMarker841"/> GitHub repo for more methods defined with the <strong class="source-inline">Log</strong> class. Next, let’s use this class to write <span class="No-Break">log messages.</span></p>
+			<h2 id="_idParaDest-269"><a id="_idTextAnchor268"/>Writing log messages</h2>
+			<p>Log messages are mainly <a id="_idIndexMarker842"/>written from the <strong class="source-inline">GamesService</strong> class, thus we need to change <span class="No-Break">the constructor:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.GameAPIs/Services/GamesService.cs</p>
+			<pre class="source-code">
+public class GamesService(
+  IGamesRepository dataRepository,
+  <strong class="bold">ILogger&lt;GamesService&gt; logger</strong>) : IGamesService
+{
+  // code removed for brevity
+}</pre>
+			<p>With the updated constructor, the generic version of the <strong class="source-inline">ILogger</strong> interface is injected. The type parameter specifies the category name <span class="No-Break">for logging.</span></p>
+			<p class="callout-heading">Note</p>
+			<p class="callout">In this chapter, the <strong class="source-inline">GamesService</strong> class is enhanced with logging, distributed tracing, and metrics functionality. That’s why you see all these changes in the final code in the source <span class="No-Break">code repository.</span></p>
+			<p>The <strong class="source-inline">StartGameAsync</strong> method is<a id="_idIndexMarker843"/> enhanced <span class="No-Break">with logging:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.GameAPIs/Services/GamesService.cs</p>
+			<pre class="source-code">
+public async Task&lt;Game&gt; StartGameAsync(
+  string gameType,
+  string playerName,
+  CancellationToken cancellationToken = default)
+{
+  Game game;
+<strong class="bold">  try</strong>
+<strong class="bold">  {</strong>
+    game = GamesFactory.CreateGame(gameType, playerName);
+    await dataRepository.AddGameAsync(game, cancellationToken);
+<strong class="bold">    </strong><strong class="bold">logger.GameStarted(game.Id);</strong>
+  }
+<strong class="bold">  catch (CodebreakerException ex) when (ex.Code is </strong>
+<strong class="bold">    CodebreakerExceptionCodes.InvalidGameType)</strong>
+<strong class="bold">  {</strong>
+<strong class="bold">    logger.InvalidGameType(gameType);</strong>
+<strong class="bold">    throw;</strong>
+<strong class="bold">  }</strong>
+<strong class="bold">  catch (Exception ex)</strong>
+<strong class="bold">  {</strong>
+<strong class="bold">    logger.Error(ex, ex.Message);</strong>
+<strong class="bold">    throw;</strong>
+<strong class="bold">  }</strong>
+  return game;
+}</pre>
+			<p>The <strong class="source-inline">GamesFactory</strong> class can throw an exception of type <strong class="source-inline">CodebreakerException</strong>. This is caught to write a log message and to re-throw the exception. The exception will be dealt with by the endpoint implementation to finally return a specific HTTP result. Here, we just want to log this information and re-throw <span class="No-Break">the exception.</span></p>
+			<p>For generic exceptions, a strongly typed <strong class="source-inline">Error</strong> method is defined by the <strong class="source-inline">Log</strong> class and used to write this message. The <strong class="source-inline">InvalidGameType</strong> method writes a log message with the <strong class="source-inline">Warning</strong> level. Here, the client probably sent an invalid (or currently not accepted) game type. While this shouldn’t happen, it’s usually an issue with the client, and we don’t have to deal with it on the service side. It’s just good to know about such clients. The <strong class="source-inline">Error</strong> method writes a log message with the <strong class="source-inline">Error</strong> level. It could be useful to check for more specific error types and create <span class="No-Break">additional messages.</span></p>
+			<p>On a successful invocation, a<a id="_idIndexMarker844"/> log message is written by invoking the <strong class="source-inline">GameStarted</strong> method of the <strong class="source-inline">Log</strong> class, which has the <strong class="source-inline">Informational</strong> <span class="No-Break">level set.</span></p>
+			<p>Let’s check the log messages with .NET <span class="No-Break">Aspire next.</span></p>
+			<h2 id="_idParaDest-270"><a id="_idTextAnchor269"/>Viewing logs with the .NET Aspire dashboard</h2>
+			<p>The .NET <a id="_idIndexMarker845"/>Aspire-generated <strong class="source-inline">Codebreaker.ServiceDefaults</strong> library<a id="_idIndexMarker846"/> contains <span class="No-Break">logging configuration:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.ServiceDefaults/Extensions.cs</p>
+			<pre class="source-code">
+public static IHostApplicationBuilder <strong class="bold">ConfigureOpenTelemetry</strong>(this IHostApplicationBuilder builder)
+{
+<strong class="bold">  builder.Logging.AddOpenTelemetry(logging =&gt;</strong>
+<strong class="bold">  {</strong>
+<strong class="bold">    logging.IncludeFormattedMessage = true;</strong>
+<strong class="bold">    logging.IncludeScopes = true;</strong>
+<strong class="bold">  });</strong>
+  // code removed for brevity
+}</pre>
+			<p>The <strong class="source-inline">AddOpenTelemetry</strong> method adds the <strong class="source-inline">OpenTelemetry</strong> logger to the logger factory. This<a id="_idIndexMarker847"/> provider is configured to include formatted<a id="_idIndexMarker848"/> messages and to include logging scopes. Setting <strong class="source-inline">IncludeFormattedMessage</strong> to <strong class="source-inline">true</strong> specifies that if log templates are used (which we did), formatted messages are also included when creating log records for OpenTelemetry. By default, this would not be the case. Setting <strong class="source-inline">IncludeScopes</strong> to <strong class="source-inline">true</strong> specifies to include logging scope IDs with logs, which allows us to see a hierarchy of log messages when using the <strong class="source-inline">BeginScope</strong> method of the <strong class="source-inline">ILogger</strong> interface to define scopes. The <strong class="source-inline">ConfigureOpenTelemetry</strong> method is invoked from within the <strong class="source-inline">AddServiceDefaults</strong> method, which in turn is invoked both from the games API and the <span class="No-Break">bot service.</span></p>
+			<p>With this logging configuration in place, it’s time to start the services locally, running the .NET Aspire dashboard. Start the application and solution and let the bot service play some games. Then, open the .NET Aspire dashboard and select <strong class="bold">Console Logs</strong> within the <strong class="bold">Monitoring</strong> category. Here, you’ll see log outputs for games that have been started, as shown in <span class="No-Break"><em class="italic">Figure 11</em></span><em class="italic">.1</em>. You can also<a id="_idIndexMarker849"/> see log outputs from <strong class="bold">Entity Framework Core</strong> (<strong class="bold">EF Core</strong>), including queries done and ASP.NET Core logs – unless the level is set to not show <span class="No-Break">informational messages:</span></p>
+			<div>
+				<div id="_idContainer133" class="IMG---Figure">
+					<img src="image/B21217_11_01.jpg" alt="Figure 11.1 – Logs with the .NET Aspire dashboard"/>
+				</div>
+			</div>
+			<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Figure 11.1 – Logs with the .NET Aspire dashboard</p>
+			<p>Also, open the <a id="_idIndexMarker850"/>logs from the bot service. The bot service writes log output with every move set after the result is received to show how <a id="_idIndexMarker851"/>successful the move was and how many remaining options are available, as shown in <span class="No-Break"><em class="italic">Figure 11</em></span><span class="No-Break"><em class="italic">.2</em></span><span class="No-Break">:</span></p>
+			<div>
+				<div id="_idContainer134" class="IMG---Figure">
+					<img src="image/B21217_11_02.jpg" alt="Figure 11.2 – Logs from the bot service"/>
+				</div>
+			</div>
+			<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Figure 11.2 – Logs from the bot service</p>
+			<p>When you open <strong class="bold">Structured Logs</strong> in the dashboard, you can see the logs of the bot service and the games API on one screen – or just select the service from which you want to look at the logs. With a log entry, clicking on <strong class="bold">Details</strong> shows every detail information, such as the <strong class="source-inline">GameId</strong> placeholder we’ve written with the <strong class="source-inline">GameStarted</strong> event, as shown in <span class="No-Break"><em class="italic">Figure 11</em></span><em class="italic">.3</em>. Other data, such as the <strong class="source-inline">RequestPath</strong> placeholder, is coming from .NET activities, which we’ll look at later in the <em class="italic">Using distributed </em><span class="No-Break"><em class="italic">tracing</em></span><span class="No-Break"> section:</span></p>
+			<div>
+				<div id="_idContainer135" class="IMG---Figure">
+					<img src="image/B21217_11_03.jpg" alt="Figure 11.3 – Structured logging"/>
+				</div>
+			</div>
+			<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Figure 11.3 – Structured logging</p>
+			<p>With the <strong class="bold">Structured Logs</strong> view, you can add a filter, select any term that has been used with <a id="_idIndexMarker852"/>placeholders such as <strong class="source-inline">GameId</strong>, set the game<a id="_idIndexMarker853"/> identifier as the value, and read all the logs related to this game. Here, you easily can follow a single gameplay with the moves set, as shown in <span class="No-Break"><em class="italic">Figure 11</em></span><span class="No-Break"><em class="italic">.4</em></span><span class="No-Break">:</span></p>
+			<div>
+				<div id="_idContainer136" class="IMG---Figure">
+					<img src="image/B21217_11_04.jpg" alt="Figure 11.4 – Structured logging with a GameId filter"/>
+				</div>
+			</div>
+			<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Figure 11.4 – Structured logging with a GameId filter</p>
+			<p>After writing logs, let’s get started with <span class="No-Break">metrics data.</span></p>
+			<h1 id="_idParaDest-271"><a id="_idTextAnchor270"/>Using metrics data</h1>
+			<p>Metrics data is <a id="_idIndexMarker854"/>used to monitor counts such as CPU and memory consumption or the length of an HTTP queue. This information can be used to analyze resources needed by services and can scale the <span class="No-Break">services accordingly.</span></p>
+			<p>With metrics data, we get some counts. Such counts can be used for scaling services, based on memory or CPU consumption, or the length of an <span class="No-Break">HTTP queue.</span></p>
+			<p>Let’s check the built-in metrics data before we add <span class="No-Break">custom metrics.</span></p>
+			<h2 id="_idParaDest-272"><a id="_idTextAnchor271"/>Monitoring built-in .NET metrics</h2>
+			<p>As mentioned, .NET offers <a id="_idIndexMarker855"/>much built-in metrics data that can be monitored using the <strong class="source-inline">dotnet counters</strong> .NET tool (install it via <strong class="source-inline">dotnet tool install dotnet-counters -g</strong> as a global tool), and many counts are already available from the .NET Aspire dashboard by opening the <strong class="bold">Metrics</strong> view. <span class="No-Break"><em class="italic">Figure 11</em></span><em class="italic">.5</em> shows the .NET-managed heap size of the games API service at a time the bot played several games <span class="No-Break">in parallel:</span></p>
+			<div>
+				<div id="_idContainer137" class="IMG---Figure">
+					<img src="image/B21217_11_05.jpg" alt="Figure 11.5 – Metrics"/>
+				</div>
+			</div>
+			<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Figure 11.5 – Metrics</p>
+			<p>With many <a id="_idIndexMarker856"/>applications, you don’t need to create custom metrics data – but some custom counts might be interesting to see, and it’s not hard to add these, as shown in the <span class="No-Break">next section.</span></p>
+			<h2 id="_idParaDest-273"><a id="_idTextAnchor272"/>Creating custom metrics data</h2>
+			<p>With the <strong class="source-inline">Codebreaker</strong> solution, we are <a id="_idIndexMarker857"/>interested in knowing about the number of active games that are just played, the time it takes from one game move to another, the time it takes to complete a game, and how many games are won <span class="No-Break">versus lost.</span></p>
+			<p class="callout-heading">Note</p>
+			<p class="callout">With all the data we collect, we need to pay<a id="_idIndexMarker858"/> attention to the <strong class="bold">General Data Protection Regulation</strong> (<strong class="bold">GDPR</strong>). Not storing any user-related data with logging and metrics information, we are on the <span class="No-Break">safe side.</span></p>
+			<p>Let’s <a id="_idIndexMarker859"/>create a new <strong class="source-inline">GamesMetrics</strong> class that contains all the <span class="No-Break">counters needed:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.GameAPIs/Infrastructure/GamesMetrics.cs</p>
+			<pre class="source-code">
+public sealed class GamesMetrics : IDisposable
+{
+  public const string MeterName = "Codebreaker.Games";
+  public const string Version = "1.0";
+  private readonly Meter _meter;
+  private readonly UpDownCounter&lt;long&gt; _activeGamesCounter;
+  private readonly Histogram&lt;double&gt; _gameDuration;
+  private readonly Histogram&lt;double&gt; _moveThinkTime;
+  private readonly Histogram&lt;int&gt; _movesPerGameWin;
+  private readonly Counter&lt;long&gt; _invalidMoveCounter;
+  private readonly Counter&lt;long&gt; _gamesWonCounter;
+  private readonly Counter&lt;long&gt; _gamesLostCounter;
+  private readonly ConcurrentDictionary&lt;Guid, DateTime&gt; _moveTimes = new();</pre>
+			<p>The fields defined within the <strong class="source-inline">GameMetrics</strong> class are for the <strong class="source-inline">Meter</strong> class, which is needed to create all the different metric instruments. This class is defined within the <strong class="source-inline">System.Diagnostics.Metrics</strong> namespace. This class is responsible for creating all the different instruments needed to monitor metrics data. The <strong class="source-inline">Meter</strong> type needs a name that is used to specify what metrics data we are interested in. The value for the version <span class="No-Break">is optional.</span></p>
+			<p>The <strong class="source-inline">Counter</strong> type is used to count the number of games won and lost and for all invalid game moves. <strong class="source-inline">Counter</strong> can be used for positive values, and most metrics viewers show the number of counts per second but can also show cumulative values. The <strong class="source-inline">UpDownCounter</strong> type is used for positive and negative values. We use this for the number of games active. Every time a game ends, a decrement will be made. The <strong class="source-inline">Histogram</strong> type is of special interest. This metrics instrument can be used to show arbitrary values. Here, this instrument is used to show the time it takes to complete a game, the time a user needs between game moves, and the number of moves needed to win <span class="No-Break">a game.</span></p>
+			<p>With the<a id="_idIndexMarker860"/> constructor of the <strong class="source-inline">GamesMetrics</strong> class, the <strong class="source-inline">Meter</strong> class and the instruments are created <span class="No-Break">and initialized:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.GameAPIs/Infrastructure/GamesMetrics.cs</p>
+			<pre class="source-code">
+<strong class="bold">public GamesMetrics(IMeterFactory meterFactory)</strong>
+{
+<strong class="bold">  _meter = meterFactory.Create(MeterName, Version);</strong>
+<strong class="bold">  _activeGamesCounter = _meter.CreateUpDownCounter&lt;long&gt;(</strong>
+<strong class="bold">    "codebreaker.active_games",</strong>
+<strong class="bold">    unit: "{games}",</strong>
+<strong class="bold">    description: "Number of games that are currently active on the </strong>
+<strong class="bold">      server.");</strong>
+<strong class="bold">  _gameDuration = _meter.CreateHistogram&lt;double&gt;(</strong>
+<strong class="bold">    </strong><strong class="bold">"codebreaker.game_duration",</strong>
+<strong class="bold">    unit: "s",</strong>
+<strong class="bold">    description: "Duration of a game in seconds.");</strong>
+  // code removed for brevity
+}</pre>
+			<p><strong class="source-inline">IMeterFactory</strong> is a new interface since .NET 8. This allows the creation of <a id="_idIndexMarker861"/>metrics types via <strong class="bold">dependency injection</strong> (<strong class="bold">DI</strong>). <strong class="source-inline">IMeterFactory</strong> is injected with the <strong class="source-inline">GamesMetrics</strong> constructor to create a <strong class="source-inline">Meter</strong> instance and instruments. <strong class="source-inline">CreateCounter</strong>, <strong class="source-inline">CreateUpDownCounter</strong>, and <strong class="source-inline">CreateHistogram</strong> are the methods to create the different metric instruments. The name of the instrument, the unit, and the <a id="_idIndexMarker862"/>description are assigned upon creating <span class="No-Break">the instruments.</span></p>
+			<p>Before using these counters, let’s <span class="No-Break">add tags.</span></p>
+			<h2 id="_idParaDest-274"><a id="_idTextAnchor273"/>Creating tags</h2>
+			<p>Writing metrics data, <strong class="bold">tags</strong> can <a id="_idIndexMarker863"/>be added with every record written to an instrument. Tags allow us to filter metrics data – somehow similar to the filtering we’ve used with structured logging. A tag consists of a key-value pair. To make tags easier to add, these methods are added to the <span class="No-Break"><strong class="source-inline">GameMetrics</strong></span><span class="No-Break"> class:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.GameAPIs/Infrastructure/GamesMetrics.cs</p>
+			<pre class="source-code">
+private static KeyValuePair&lt;string, object?&gt; <strong class="bold">CreateGameTypeTag(string gameType)</strong> =&gt;
+  KeyValuePair.Create&lt;string, object?&gt;("GameType", gameType);
+private static KeyValuePair&lt;string, object?&gt; <strong class="bold">CreateGameIdTag(Guid id)</strong> =&gt;
+  KeyValuePair.Create&lt;string, object?&gt;("GameId", id.ToString());</pre>
+			<p><strong class="source-inline">CreateGameTypeTag</strong> is a helper method to create a tag with the name <strong class="source-inline">GameType</strong> and set the value passed with the method parameter. Similarly, <strong class="source-inline">CreateGameIdTag</strong> is a method to create a tag <span class="No-Break">for </span><span class="No-Break"><strong class="source-inline">GameId</strong></span><span class="No-Break">.</span></p>
+			<p>Now, we are ready to create methods using <span class="No-Break">the instruments.</span></p>
+			<h2 id="_idParaDest-275"><a id="_idTextAnchor274"/>Creating strongly typed methods for metrics data</h2>
+			<p>The <strong class="source-inline">GameStarted</strong> method is for<a id="_idIndexMarker864"/> writing metrics data on creating a <span class="No-Break">new game:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.GameAPIs/Infrastructure/GamesMetrics.cs</p>
+			<pre class="source-code">
+public void GameStarted(Game game)
+{
+  if (_moveThinkTime.<strong class="bold">Enabled</strong>)
+  {
+<strong class="bold">     _moveTimes.TryAdd(game.Id, game.StartTime);</strong>
+  }
+  if (_activeGamesCounter.<strong class="bold">Enabled</strong>)
+  {
+<strong class="bold">    </strong><strong class="bold">_activeGamesCounter.Add(1, CreateGameTypeTag(game.GameType));</strong>
+  }
+}</pre>
+			<p>When <a id="_idIndexMarker865"/>nobody listens to metrics data, there’s no need to take any action. Before writing values to an instrument, it should be verified that the instrument is enabled. If nobody listens to the meter, the counters <span class="No-Break">are disabled.</span></p>
+			<p>To write the delta time between moves, we need to remember the time of the previous move. For this, the <strong class="source-inline">GameMetrics</strong> class holds the <strong class="source-inline">_moveTimes</strong> dictionary. This dictionary uses the game ID for the key and the last time for the latest move (or game start) value. Calculating this information is only necessary when the <strong class="source-inline">_moveThinkTime</strong> instrument <span class="No-Break">is used.</span></p>
+			<p>The counter that’s incremented at the start of the game is <strong class="source-inline">_activeGamesCounter</strong>. With <strong class="source-inline">UpDownCounter</strong>, the <strong class="source-inline">Add</strong> method is used to change the counter value. The second – optional – argument of the <strong class="source-inline">Add</strong> method allows passing tags. Here, a tag for the game type is added. This allows us to check the metrics data filtered based on the game type. It’s interesting to compare the active game counts based on the different <span class="No-Break">game types.</span></p>
+			<p>To <a id="_idIndexMarker866"/>write a histogram value, we implement the <span class="No-Break"><strong class="source-inline">MoveSet</strong></span><span class="No-Break"> method:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.GameAPIs/Infrastructure/GamesMetrics.cs</p>
+			<pre class="source-code">
+public void MoveSet(Guid id, DateTime moveTime, string gameType)
+{
+  if (_moveThinkTime.Enabled)
+  {
+<strong class="bold">    _moveTimes.AddOrUpdate</strong>(id, moveTime, (id1, prevTime) =&gt;
+    {
+      <strong class="bold">_moveThinkTime.Record((moveTime - prevTime).TotalSeconds, </strong>
+<strong class="bold">        [CreateGameIdTag(id1), CreateGameTypeTag(gameType)]);</strong>
+      return moveTime;
+    });
+  }
+}</pre>
+			<p>With the implementation of <strong class="source-inline">MoveSet</strong>, for the received game ID, we get the previous recorded time from the dictionary, calculate the delta with the new time, use the <strong class="source-inline">Record</strong> method of the <strong class="source-inline">Histogram</strong> instrument to write the data, and write the new received time to <span class="No-Break">the dictionary.</span></p>
+			<p>On ending the game, the <strong class="source-inline">GameEnded</strong> method is implemented. Here, multiple instruments are used, but this method just needs a simple implementation to check for every instrument to be enabled and write the counts accordingly. Check the source code repository for the <span class="No-Break">complete code.</span></p>
+			<p>Next, we can change the implementation of the <strong class="source-inline">GamesService</strong> class to use a <span class="No-Break"><strong class="source-inline">GamesMetrics</strong></span><span class="No-Break"> instance.</span></p>
+			<h2 id="_idParaDest-276"><a id="_idTextAnchor275"/>Injecting and using metrics</h2>
+			<p>Let’s update<a id="_idIndexMarker867"/> the <strong class="source-inline">GamesService</strong> class for <a id="_idIndexMarker868"/><span class="No-Break">metrics data:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.GameAPIs/Services/GamesService.cs</p>
+			<pre class="source-code">
+public class GamesService(
+  IGamesRepository dataRepository,
+  ILogger&lt;GamesService&gt; logger,
+  <strong class="bold">GamesMetrics metrics</strong>) : IGamesService
+{
+  public async Task&lt;Game&gt; StartGameAsync(
+    string gameType,
+    string playerName,
+    CancellationToken cancellationToken = default)
+  {
+    Game game;
+    try
+    {
+      game = GamesFactory.CreateGame(gameType, playerName);
+      await dataRepository.AddGameAsync(game, cancellationToken);
+<strong class="bold">            metrics.GameStarted(game);</strong>
+            logger.GameStarted(game.Id);
+        }
+      // code removed for brevity
+  return game;
+}</pre>
+			<p>All that needs to be done is to inject the <strong class="source-inline">GamesMetrics</strong> class and invoke the <span class="No-Break"><strong class="source-inline">GameStarted</strong></span><span class="No-Break"> method.</span></p>
+			<p>Of course, the <strong class="source-inline">GamesMetrics</strong> class<a id="_idIndexMarker869"/> needs<a id="_idIndexMarker870"/> configuration within<a id="_idIndexMarker871"/> the <strong class="bold">DI </strong><span class="No-Break"><strong class="bold">container</strong></span><span class="No-Break"> (</span><span class="No-Break"><strong class="bold">DIC</strong></span><span class="No-Break">):</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.GameAPIs/ApplicationServices.cs</p>
+			<pre class="source-code">
+builder.Services.<strong class="bold">AddMetrics</strong>();
+builder.Services.<strong class="bold">AddSingleton&lt;GamesMetrics&gt;();</strong>
+<strong class="bold">builder.Services.AddOpenTelemetry()</strong>
+<strong class="bold">  .WithMetrics(m =&gt; m.AddMeter(GamesMetrics.MeterName));</strong></pre>
+			<p>The <strong class="source-inline">AddMetrics</strong> extension method registers an implementation for the <strong class="source-inline">IMeterFactory</strong> interface. The <strong class="source-inline">GamesMetrics</strong> class is registered as a singleton – to create the instruments once. We also configure the <strong class="source-inline">GamesMetrics</strong> class with OpenTelemetry – this way, we have a listener, and these metrics will be shown with the .NET <span class="No-Break">Aspire dashboard.</span></p>
+			<p>With this, we could run the application. However, the unit tests for the <strong class="source-inline">GamesService</strong> class no longer compile because of this additional parameter. Let’s update this before <span class="No-Break">we continue.</span></p>
+			<h2 id="_idParaDest-277"><a id="_idTextAnchor276"/>Updating unit tests to inject metrics types</h2>
+			<p>The <strong class="source-inline">GamesService</strong> class uses a <a id="_idIndexMarker872"/>concrete type – it injects <a id="_idIndexMarker873"/>the <strong class="source-inline">GamesMetrics</strong> type. This cannot be mocked directly, but we can mock the <strong class="source-inline">IMeterFactory</strong> interface to create a <span class="No-Break"><strong class="source-inline">GamesMetrics</strong></span><span class="No-Break"> instance.</span></p>
+			<p>The following code snippet shows an implementation of the <strong class="source-inline">IMeterFactory</strong> interface to be used for <span class="No-Break">unit tests:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.GameAPIs.Tests/TestMeterFactory.cs</p>
+			<pre class="source-code">
+internal sealed class <strong class="bold">TestMeterFactory : IMeterFactory</strong>
+{
+  public List&lt;Meter&gt; Meters { get; } = [];
+  <strong class="bold">public Meter Create(MeterOptions options)</strong>
+  {
+    Meter meter = new(options.Name, options.Version, Array.
+<strong class="bold">      </strong>Empty&lt;KeyValuePair&lt;string, object?&gt;&gt;(), scope: this);
+    Meters.Add(meter);
+    return meter;
+  }
+  public void Dispose()
+  {
+    foreach (var meter in Meters)
+    {
+      meter.Dispose();
+    }
+    Meters.Clear();
+  }
+}</pre>
+			<p>To implement the <strong class="source-inline">IMeterFactory</strong> interface, <strong class="source-inline">Create</strong> and <strong class="source-inline">Dispose</strong> methods need to be implemented. With the <strong class="source-inline">Create</strong> method, a new <strong class="source-inline">Meter</strong> instance is created using name, version, and<a id="_idIndexMarker874"/> <span class="No-Break">tag </span><span class="No-Break"><a id="_idIndexMarker875"/></span><span class="No-Break">information.</span></p>
+			<p>This <strong class="source-inline">TestMeterFactory</strong> class can now be used to create an instance of the <strong class="source-inline">GamesService</strong> class for the <span class="No-Break">unit test:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.GameAPIs.Tests/GamesServiceTests.cs</p>
+			<pre class="source-code">
+<strong class="bold">private GamesService GetGamesService()</strong>
+{
+  IMeterFactory meterFactory = new TestMeterFactory();
+<strong class="bold">  GamesMetrics metrics = new(meterFactory);</strong>
+  return new GamesService(
+    _gamesRepositoryMock.Object,
+    NullLogger&lt;GamesService&gt;.Instance,
+    <strong class="bold">metrics</strong>);
+}</pre>
+			<p>Creating a new <strong class="source-inline">GamesMetrics</strong> instance, the <strong class="source-inline">TestMeterFactory</strong> class is created. The unit test <a id="_idIndexMarker876"/>for<a id="_idIndexMarker877"/> the <strong class="source-inline">GamesService</strong> class now builds <span class="No-Break">successfully again.</span></p>
+			<p class="callout-heading">Note</p>
+			<p class="callout">The GitHub contains an additional parameter, <strong class="source-inline">ActivitySource</strong>, when invoking the <strong class="source-inline">GamesService</strong> constructor. The <strong class="source-inline">ActivitiySource</strong> is added in the section <em class="italic">Using distributed tracing</em>, and requires an adaption of the <span class="No-Break">unit tests.</span></p>
+			<p>There’s also a unit test for the <strong class="source-inline">GamesMetrics</strong> class needed, which we’ll <span class="No-Break">do next.</span></p>
+			<h2 id="_idParaDest-278"><a id="_idTextAnchor277"/>Creating unit tests to verify metrics</h2>
+			<p>Metric data can be <a id="_idIndexMarker878"/>important business information easily shown<a id="_idIndexMarker879"/> on monitors in the office. What’s going on with the application? How active are users? Is an error rate going up? While metrics information is not important for orders coming in and being processed, if metrics data is not written, it can easily be missed that something is not working – thus creating unit tests for metrics data should be part of creating custom <span class="No-Break">metric types.</span></p>
+			<p>First, let’s create a skeleton to return an <strong class="source-inline">IMeterFactory</strong> instance and a <span class="No-Break"><strong class="source-inline">GamesMetrics</strong></span><span class="No-Break"> instance.</span></p>
+			<h3>Meter factory skeleton</h3>
+			<p>The following code snippet defines <a id="_idIndexMarker880"/>the skeleton used by the <strong class="source-inline">GamesMetrics</strong> <span class="No-Break">unit tests:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.GameAPIs.Tests/GamesMetricsTests.cs</p>
+			<pre class="source-code">
+private static IServiceProvider CreateServiceProvider()
+{
+  ServiceCollection services = new();
+  service.AddMetrics();
+  services.AddSingleton&lt;GamesMetrics&gt;();
+  return serviceCollection.BuildServiceProvider();
+}
+private static (IMeterFactory MeterFactory, GamesMetrics Metrics) <strong class="bold">CreateMeterFactorySkeleton()</strong>
+{
+  var container = CreateServiceProvider();
+  GamesMetrics metrics = container.GetRequiredService&lt;GamesMetrics&gt;();
+  IMeterFactory meterFactory = container.GetRequiredService&lt;IMeterFactory&gt;();
+  return (meterFactory, metrics);
+}</pre>
+			<p>Here, we need the real implementation of the <strong class="source-inline">IMeterFactory</strong> Interface. This is configured with the DIC for the unit test – along with the <strong class="source-inline">GamesMetrics</strong> singleton. The <strong class="source-inline">CreateMeterFactorySkelton</strong> method now gets the <strong class="source-inline">IMeterFactory</strong> and <strong class="source-inline">GameMetrics</strong> instances <a id="_idIndexMarker881"/>from <span class="No-Break">the DIC.</span></p>
+			<h3>Unit tests</h3>
+			<p>Using this skeleton, we can create unit tests<a id="_idIndexMarker882"/> for all <span class="No-Break"><strong class="source-inline">GameMetrics</strong></span><span class="No-Break"> methods:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.GameAPIs.Tests/GamesMetricsTests.cs</p>
+			<pre class="source-code">
+public class GamesMetricsTests
+{
+  private Guid _gameId = Guid.Parse("DBDF4DD9-3A02-4B2A-87F6-FFE4BA1DCE52");
+  private DateTime <strong class="bold">_gameStartTime </strong>= new DateTime(2024, 1, 1, 12, 10, 5);
+  private DateTime <strong class="bold">_gameMove1Time </strong>= new DateTime(2024, 1, 1, 12, 10, 15);
+  [Fact]
+  public void MoveSet_Should_Record_ThinkTime()
+  {
+    // arrange
+    (IMeterFactory meterFactory, GamesMetrics metrics) = 
+<strong class="bold">      </strong>CreateMeterFactorySkeleton();
+    <strong class="bold">MetricCollector</strong>&lt;double&gt; collector = new(meterFactory, 
+<strong class="bold">      </strong>GamesMetrics.MeterName, "codebreaker.move_think_time");
+    var game = GetGame();
+    metrics.GameStarted(game);
+    // act
+    metrics.MoveSet(game.Id, _gameMove1Time, "Game6x4");
+    // assert
+<strong class="bold">    var measurements = collector.GetMeasurementSnapshot();</strong>
+<strong class="bold">    Assert.Single(measurements);</strong>
+<strong class="bold">    </strong><strong class="bold">Assert.Equal(10, measurements[0].Value);</strong>
+  }
+  // code removed for brevity</pre>
+			<p>For easy unit testing<a id="_idIndexMarker883"/> of metrics classes, the <strong class="source-inline">MetricCollector</strong> class defined in the <strong class="source-inline">Microsoft.Extensions.Diagnostics.Testing</strong> NuGet package in the <strong class="source-inline">Microsoft.Extensions.Diagnostics.Metrics.Testing</strong> namespace can register as a listener for the metrics data and collect this information. It’s also great for debugging purposes to have the metrics <span class="No-Break">instruments enabled.</span></p>
+			<p>After the <strong class="source-inline">IMeterFActory</strong> and <strong class="source-inline">GamesMetrics</strong> objects are returned from the skeleton, a collector is created. You need to create a collector for every instrument that needs to be tested. The generic type parameter and the name of the instrument need to match. The <strong class="source-inline">MoveSet</strong> method of the <strong class="source-inline">GamesMetrics</strong> class records the time between the previous move (or the game start) and the current move. Using <strong class="source-inline">Assert.Single</strong>,<strong class="source-inline"> </strong>it’s verified that exactly one measurement is written to the collector. With <strong class="source-inline">Assert.Equal</strong>, it’s checked that this one recording contains the value 10. If you calculate the values from <strong class="source-inline">_gameStartTime</strong> and <strong class="source-inline">_gameMove1Time</strong>, this matches the time difference passed with the <span class="No-Break">test data.</span></p>
+			<p>As the <strong class="source-inline">GameMetrics</strong> class tests successfully, let’s go to the .NET Aspire dashboard to see the custom <span class="No-Break">metrics data.</span></p>
+			<h2 id="_idParaDest-279"><a id="_idTextAnchor278"/>Viewing metrics data with the .NET Aspire dashboard</h2>
+			<p>We injected<a id="_idIndexMarker884"/> metrics and configured our<a id="_idIndexMarker885"/> custom <strong class="source-inline">GamesMetrics</strong> class with OpenTelemetry in the game APIs project. Now, we can use the .NET Aspire dashboard to see the <span class="No-Break">games played!</span></p>
+			<p>Running the<a id="_idIndexMarker886"/> services and starting the bot to run <a id="_idIndexMarker887"/>multiple games in parallel, we can see interesting outcomes. Sometimes, the bot doesn’t find an answer within 12 moves because it lost the game, as shown in <span class="No-Break"><em class="italic">Figure 11</em></span><span class="No-Break"><em class="italic">.6</em></span><span class="No-Break">:</span></p>
+			<div>
+				<div id="_idContainer138" class="IMG---Figure">
+					<img src="image/B21217_11_06.jpg" alt="Figure 11.6 – Counter for games lost"/>
+				</div>
+			</div>
+			<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Figure 11.6 – Counter for games lost</p>
+			<p><span class="No-Break"><em class="italic">Figure 11</em></span><em class="italic">.7</em> shows the number of games won by the bot is much higher. This figure also shows the filter for the game type that can be selected because of the <span class="No-Break">tag specified:</span></p>
+			<div>
+				<div id="_idContainer139" class="IMG---Figure">
+					<img src="image/B21217_11_07.jpg" alt="Figure 11.7 – Counter for games won"/>
+				</div>
+			</div>
+			<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Figure 11.7 – Counter for games won</p>
+			<p>While games <a id="_idIndexMarker888"/>won and lost used simple<a id="_idIndexMarker889"/> counters, <span class="No-Break"><em class="italic">Figure 11</em></span><em class="italic">.8</em> shows the up-down counter with the number of <span class="No-Break">active games:</span></p>
+			<div>
+				<div id="_idContainer140" class="IMG---Figure">
+					<img src="image/B21217_11_08.jpg" alt="Figure 11.8 – Up-down counter for active games"/>
+				</div>
+			</div>
+			<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Figure 11.8 – Up-down counter for active games</p>
+			<p><span class="No-Break"><em class="italic">Figure 11</em></span><em class="italic">.9</em> shows <a id="_idIndexMarker890"/>a histogram that allows <a id="_idIndexMarker891"/>checking the duration <span class="No-Break">of games:</span></p>
+			<div>
+				<div id="_idContainer141" class="IMG---Figure">
+					<img src="image/B21217_11_09.jpg" alt="Figure 11.9 – Histogram showing the game duration"/>
+				</div>
+			</div>
+			<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Figure 11.9 – Histogram showing the game duration</p>
+			<p>A histogram<a id="_idIndexMarker892"/> graph shows <strong class="bold">P50</strong>, <strong class="bold">P90</strong>, and <strong class="bold">P99</strong> values. These <a id="_idIndexMarker893"/>names are marks for percentiles. 50% of the finished games are within the lowest values: over the complete time, 50% of the games were finished within 25 seconds. The next higher line marks 90% of the game runs. Over time, with some peaks, we can see that sometimes 90% of the games were finished within 25 seconds, but it also took up to 50 seconds. To get to a higher number of games, 99% of the games were finished within 50 to 75 seconds. At peak time, it took 250 seconds. If a user is playing the game, this can be expected. We need more time than the bot to solve this. But here, it was just the bot playing. With different games, the bot was configured to take different times between game moves. However, the bot was never configured to take that long. Thus, this<a id="_idIndexMarker894"/> needs to be another issue, probably too high a<a id="_idIndexMarker895"/> load on the service. To find the reason more easily for such behavior, the next section covering distributed tracing <span class="No-Break">will help.</span></p>
+			<h1 id="_idParaDest-280"><a id="_idTextAnchor279"/>Using distributed tracing</h1>
+			<p>If errors happen on the service, where is this request coming from, and from where does it originate? With <a id="_idIndexMarker896"/>distributed tracing, we can see the interaction of services and resources and can easily follow information on how requests from a client flow to the different services and see when errors occur, going from the error up to <span class="No-Break">the stack.</span></p>
+			<p>Using .NET, we use <strong class="source-inline">ActivitySource</strong> and <strong class="source-inline">Activity</strong> classes to specify information for <span class="No-Break">distributed tracing.</span></p>
+			<h2 id="_idParaDest-281"><a id="_idTextAnchor280"/>Creating an ActivitySource class with the DIC</h2>
+			<p>When<a id="_idIndexMarker897"/> writing trace information, you’ll usually have <a id="_idIndexMarker898"/>one <strong class="source-inline">ActivitySource</strong> class in a project that’s used by all classes that write trace information. With the games client library, an <strong class="source-inline">ActivitySource</strong> class is used as a static member. Using an <strong class="source-inline">ActivitySource</strong> class from an executable project such as the games API, we can register this in <span class="No-Break">the DIC:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.GameAPIs/ApplicationServices.cs</p>
+			<pre class="source-code">
+public static void AddApplicationTelemetry(this IhostApplicationBuilder builder)
+{
+  // code removed for brevity
+  const string ActivitySourceName = "Codebreaker.GameAPIs";
+  const string ActivitySourceVersion = "1.0.0";
+<strong class="bold">  builder.Services.AddKeyedSingleton(ActivitySourceName, (services, _) </strong>
+<strong class="bold">  =&gt;</strong>
+<strong class="bold">    new ActivitySource(ActivitySourceName,</strong>
+<strong class="bold">      </strong><strong class="bold">ActivitySourceVersion));</strong></pre>
+			<p>The<a id="_idIndexMarker899"/> ASP.NET Core initialization already registers<a id="_idIndexMarker900"/> an <strong class="source-inline">ActivitySource</strong> class with the name <strong class="source-inline">Microsoft.AspNetCore</strong> as a singleton for the <strong class="source-inline">ActivitySource</strong> type. We don’t want to overwrite this setting with our name. The ASP.NET Core features injecting this <strong class="source-inline">ActivitySource</strong> instance should still get this instance, but for our own trace messages, the <strong class="source-inline">Codebreaker.GameAPIs</strong> activity source should be used. With .NET 8 enhancements on the DIC, we can register a named service within the DIC by invoking the <strong class="source-inline">AddKeyedSingleton</strong> method and specifying the name and version strings. One instance is created using the factory defined with the <span class="No-Break">lambda expression.</span></p>
+			<p>Next, we can inject this singleton instance with the <span class="No-Break"><strong class="source-inline">GamesService</strong></span><span class="No-Break"> class.</span></p>
+			<h2 id="_idParaDest-282"><a id="_idTextAnchor281"/>Writing trace messages</h2>
+			<p>With the constructor<a id="_idIndexMarker901"/> of the <strong class="source-inline">GamesService</strong> class, we can now inject the configured <span class="No-Break"><strong class="source-inline">ActivitySource</strong></span><span class="No-Break"> class:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.GameAPIs/Services/GamesService.cs</p>
+			<pre class="source-code">
+public class GamesService(
+  IGamesRepository dataRepository,
+  ILogger&lt;GamesService&gt; logger,
+  GamesMetrics metrics,
+<strong class="bold">  [FromKeyedServices("Codebreaker.GameAPIs")] ActivitySource </strong>
+    <strong class="bold">activitySource)</strong> :
+    IGamesService
+{
+  // code removed for brevity</pre>
+			<p>Using the <strong class="source-inline">FromKeyedServices</strong> attribute, we get the named instance from <span class="No-Break">the DIC.</span></p>
+			<p>Next, let’s <a id="_idIndexMarker902"/>update the creation of a new game by creating an <span class="No-Break"><strong class="source-inline">Activity</strong></span><span class="No-Break"> object:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.GameAPIs/Services/GamesService.cs</p>
+			<pre class="source-code">
+public async Task&lt;Game&gt; StartGameAsync(string gameType, string playerName, CancellationToken cancellationToken = default)
+{
+  Game game;
+<strong class="bold">  using var activity = activitySource.CreateActivity("StartGame", </strong>
+    <strong class="bold">ActivityKind.Server);</strong>
+  try
+  {
+    game = GamesFactory.CreateGame(gameType, playerName);
+<strong class="bold">    activity?.AddTag(GameTypeTagName, game.GameType)</strong>
+<strong class="bold">      </strong><strong class="bold">.AddTag(GameIdTagName, game.Id.ToString())</strong>
+<strong class="bold">      .Start();</strong>
+    await dataRepository.AddGameAsync(game, cancellationToken);
+    metrics.GameStarted(game);
+    logger.GameStarted(game.Id);
+<strong class="bold">    activity?.SetStatus(ActivityStatusCode.Ok);</strong>
+  }
+  catch (CodebreakerException ex) when (ex.Code is CodebreakerExceptionCodes.InvalidGameType)
+  {
+    logger.InvalidGameType(gameType);
+<strong class="bold">    activity?.SetStatus(ActivityStatusCode.Error, ex.Message);</strong>
+    throw;
+  }
+  catch (Exception ex)
+  {
+    logger.Error(ex, ex.Message);
+<strong class="bold">    activity?.SetStatus(ActivityStatusCode.Error, ex.Message);</strong>
+    throw;
+  }
+  return game;
+}</pre>
+			<p>The <strong class="source-inline">Activity</strong> object<a id="_idIndexMarker903"/> is created by invoking the <strong class="source-inline">CreateActivity</strong> method. The parameters used here are the name of the activity and the activity kind. The service specifies <strong class="source-inline">ActivityKind.Server</strong>, whereas the client library uses <strong class="source-inline">ActivityKind.Client</strong>. Other types available are <strong class="source-inline">Producer</strong> <span class="No-Break">and </span><span class="No-Break"><strong class="source-inline">Consumer</strong></span><span class="No-Break">.</span></p>
+			<p>The methods creating an <strong class="source-inline">Activity</strong> object might return <strong class="source-inline">null</strong>. If no one adds a listener to the <strong class="source-inline">ActivitySource</strong> class, the <strong class="source-inline">CreateActivity</strong> method returns <strong class="source-inline">null</strong>. This reduces the overhead but also means we always need to check for <strong class="source-inline">null</strong> values before using an <strong class="source-inline">Activity</strong> object. Using the <strong class="source-inline">null</strong> conditional operator, this is easy <span class="No-Break">to do.</span></p>
+			<p>Using the <strong class="source-inline">StartActivity</strong> method instead of the <strong class="source-inline">CreateActivity</strong> method would immediately start the activity. Here, we want to add some data to the activity that is shown with the log output. The <strong class="source-inline">AddTag</strong> method is used to add the game type and the game ID. This method adds key-value pairs to the log entries, which allows filtering and searching. The <strong class="source-inline">SetBaggage</strong> method allows adding information not only to this activity output – this information is passed to the child activities. Baggage information is used across processes and thus needs to be serializable. Invoking the <strong class="source-inline">Start</strong> method starts the activity – this writes the first log record along with tag and <span class="No-Break">baggage information.</span></p>
+			<p>An activity ends when the <strong class="source-inline">Stop</strong> method is invoked. Here, the <strong class="source-inline">using</strong> declaration is used to dispose of the activity when the <strong class="source-inline">activity</strong> variable goes out of scope. This stops the <span class="No-Break">activity implicitly.</span></p>
+			<p>Before the activity ends, the <strong class="source-inline">SetStatus</strong> method is invoked. This method specifies the outcome of the activity and is written when the activity ends. With a successful start of the game, <strong class="source-inline">ActivityStatusCode.Ok</strong> is the status of the activity. In case of errors, the status code is <strong class="source-inline">ActivityStatusCode.Error</strong> and an exception message <span class="No-Break">is written.</span></p>
+			<p>Check the <a id="_idIndexMarker904"/>other source code repo for the other activities created with the <span class="No-Break"><strong class="source-inline">GamesService</strong></span><span class="No-Break"> class.</span></p>
+			<p>With this implementation, we just need to configure the service defaults library to monitor the custom <span class="No-Break"><strong class="source-inline">ActivitySource</strong></span><span class="No-Break"> class.</span></p>
+			<h2 id="_idParaDest-283"><a id="_idTextAnchor282"/>Viewing distributed traces with the .NET Aspire dashboard</h2>
+			<p>First, let’s<a id="_idIndexMarker905"/> add a custom <strong class="source-inline">ActivitySource</strong> class to<a id="_idIndexMarker906"/> <span class="No-Break">the configuration:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.ServiceDefaults/Extensions.cs</p>
+			<pre class="source-code">
+public static IHostApplicationBuilder ConfigureOpenTelemetry(this IHostApplicationBuilder builder)
+{
+  // code removed for brevity
+  builder.Services.AddOpenTelemetry()
+    .<strong class="bold">WithTracing</strong>(tracing =&gt;
+    {
+      if (builder.Environment.IsDevelopment())
+      {
+        tracing.SetSampler(new AlaysOnSampler());
+      }
+      <strong class="bold">tracing.AddSource</strong>(
+        "<strong class="bold">Codebreaker.GameAPIs.Client</strong>",
+        "<strong class="bold">Codebreaker.GameAPIs</strong>")
+        .AddAspNetCoreInstrumentation()
+        .AddGrpcClientInstrumentation()
+        .AddHttpClientInstrumentation();</pre>
+			<p>The <strong class="source-inline">WithTracing</strong> method configures the distributed trace settings. The <strong class="source-inline">AddSource</strong> method of the <strong class="source-inline">TracerProviderBuilder</strong> class sets the sources that should be subscribed to. <strong class="source-inline">Codebreaker.GameAPIs</strong> is the activity source name that has been configured <a id="_idIndexMarker907"/>with the games API<a id="_idIndexMarker908"/> service. <strong class="source-inline">Codebreaker.GameAPIs.Client</strong> is the activity source name used from the client library, which is referenced by the bot service. The next methods invoked configure the built-in sources with ASP.NET Core, gRPC, <span class="No-Break">and </span><span class="No-Break"><strong class="source-inline">HttpClient</strong></span><span class="No-Break">.</span></p>
+			<p>Now, running a few games using the bot, you can see <em class="italic">traces</em> in the .NET Aspire dashboard, as shown in <span class="No-Break"><em class="italic">Figure 11</em></span><span class="No-Break"><em class="italic">.10</em></span><span class="No-Break">:</span></p>
+			<div>
+				<div id="_idContainer142" class="IMG---Figure">
+					<img src="image/B21217_11_10.jpg" alt="Figure 11.10 – Tracing"/>
+				</div>
+			</div>
+			<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Figure 11.10 – Tracing</p>
+			<p>Sending a <strong class="source-inline">POST</strong> request <a id="_idIndexMarker909"/>to the bot to play multiple <a id="_idIndexMarker910"/>games, the request immediately returns (the one request in the figure lists 4,84 ms). The figure also shows activities started from this request from within a background task. This task is to play games. How this relates to multiple activities (or <strong class="bold">spans</strong>, using the OpenTelemetry term, as shown in the figure) is greatly visible. The first activity, <strong class="source-inline">bot POST bot/bots</strong>, is an activity created from ASP.NET Core. The next activity, <strong class="source-inline">bot StartGameAsync</strong>, is a custom activity that was created from the games client library. <strong class="source-inline">bot POST</strong> is the next activity from <strong class="source-inline">HttpClient</strong>. From there, we switch over to the <strong class="source-inline">gameapis</strong> service. The custom activities created with the games API are <strong class="source-inline">gameapis StartGame</strong> and <span class="No-Break"><strong class="source-inline">gameapis SetMove</strong></span><span class="No-Break">.</span></p>
+			<p>With every one of these activities, you can dig deeper and get the data written, including the tags for the game ID and the game type, as shown in <span class="No-Break"><em class="italic">Figure 11</em></span><span class="No-Break"><em class="italic">.11</em></span><span class="No-Break">:</span></p>
+			<div>
+				<div id="_idContainer143" class="IMG---Figure">
+					<img src="image/B21217_11_11.jpg" alt="Figure 11.11 – Trace data"/>
+				</div>
+			</div>
+			<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Figure 11.11 – Trace data</p>
+			<p>While monitoring<a id="_idIndexMarker911"/> this data, also switch<a id="_idIndexMarker912"/> to <strong class="bold">Structured Logs</strong>. With these logs, you can see a <strong class="bold">Trace</strong> identifier. Clicking on this, you switch from the log to the trace information. It’s also working the other way around. While opening a trace, you can switch to the log information associated with <span class="No-Break">the trace.</span></p>
+			<p>Using the .NET Aspire dashboard is now great in the development environment. For production environments, we have different needs. Let’s switch over to using .NET Azure services <span class="No-Break">for monitoring.</span></p>
+			<h1 id="_idParaDest-284"><a id="_idTextAnchor283"/>Monitoring with Azure Application Insights</h1>
+			<p>Creating an Azure<a id="_idIndexMarker913"/> Container Apps environment (starting with <a href="B21217_06.xhtml#_idTextAnchor137"><span class="No-Break"><em class="italic">Chapter 6</em></span></a>) also <a id="_idIndexMarker914"/>creates an <strong class="bold">Azure Log Analytics</strong> resource. In this chapter, we add an <strong class="bold">Azure Application Insights</strong> resource, and add a<a id="_idIndexMarker915"/> Log Analytics respource explicitly to the app<a id="_idIndexMarker916"/> model. Log Analytics and Application Insights are both part of the <strong class="bold">Azure </strong><span class="No-Break"><strong class="bold">Monitor</strong></span><span class="No-Break"> service.</span></p>
+			<p>Log Analytics is used to monitor the amount of log data created and the cost associated and gives reasons when there is a higher-than-expected usage. Application Insights has a focus on application telemetry data and <span class="No-Break">user data.</span></p>
+			<h2 id="_idParaDest-285"><a id="_idTextAnchor284"/>Configuring the .NET Aspire host for Application Insights</h2>
+			<p>To add<a id="_idIndexMarker917"/> Application Insights, add the <a id="_idIndexMarker918"/>NuGet package <strong class="source-inline">Aspire.Hosting.Azure.ApplicationInsights</strong>, and update the <strong class="source-inline">Program.cs</strong> file of the .NET Aspire <span class="No-Break"><strong class="source-inline">AppHost</strong></span><span class="No-Break"> project:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.AppHost/Program.cs</p>
+			<pre class="source-code">
+var builder = DistributedApplication.CreateBuilder(args);
+// code removed for brevity
+<strong class="bold">var logs = builder.AddAzureLogAnalyticsWorkspace("logs");</strong>
+<strong class="bold">var appInsights = builder.AddAzureApplicationInsights("insights", logs);</strong>
+var cosmos = builder.AddAzureCosmosDB("codebreakercosmos")
+  .AddDatabase("codebreaker");
+var gameAPIs = builder.AddProject&lt;Projects.Codebreaker_GameAPIs&gt;("gameapis")
+    .WithReference(cosmos)
+<strong class="bold">    .WithReference(appInsights);</strong>
+var bot = builder.AddProject&lt;Projects.CodeBreaker_Bot&gt;("bot")
+    .WithReference(gameAPIs)
+<strong class="bold">    </strong><strong class="bold">.WithReference(appInsights);</strong>
+builder.Build().Run();
+// code removed for brevity</pre>
+			<p>The <a id="_idIndexMarker919"/>Application Insights resource is <a id="_idIndexMarker920"/>added invoking the AddAzureApplicationInsights method. This method requires a name and a log analytics workspace resource which is created invoking the AddAzureLogAnalytics method. Both the games API and the bot services will use this resource, thus it is forwarded using Aspire orchestration by using the <span class="No-Break"><strong class="source-inline">WithReference</strong></span><span class="No-Break"> method.</span></p>
+			<p>With this, we can configure the services to use <span class="No-Break">Application Insights.</span></p>
+			<h2 id="_idParaDest-286"><a id="_idTextAnchor285"/>Configuring the services to use Application Insights</h2>
+			<p>To use Application Insights, the <a id="_idIndexMarker921"/>common configuration project can <span class="No-Break">be updated:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.ServiceDefaults/Extensions.cs</p>
+			<pre class="source-code">
+private static IHostApplicationBuilder AddOpenTelemetryExporters(
+  this IHostApplicationBuilder builder)
+{
+<strong class="bold">  builder.Services.AddOpenTelemetry()</strong>
+<strong class="bold">    .UseAzureMonitor(options =&gt;</strong>
+<strong class="bold">    {</strong>
+<strong class="bold">      options.ConnectionString = builder.Configuration[</strong>
+<strong class="bold">        "APPLICATIONINSIGHTS_CONNECTION_STRING"];</strong>
+<strong class="bold">    });</strong>
+  // code removed for brevity
+  return builder;
+}</pre>
+			<p>The <strong class="source-inline">AddOpenTelemetryExporters</strong> method is invoked from the <strong class="source-inline">AddServiceDefaults</strong> method in the same class. <strong class="source-inline">AddServiceDefaults</strong> is called with the <strong class="source-inline">WebApplication</strong> configuration of every service project. The <strong class="source-inline">AddOpenTelemetry</strong> method is part of the OpenTelementry SDK to configure services for logging, metrics, and distributed tracing. The <strong class="source-inline">UseAzureMonitor</strong> extension method configures <a id="_idIndexMarker922"/>providers to write this information to <span class="No-Break">Azure Monitor.</span></p>
+			<p>This is all that we need to do. Let’s check the information we get from <span class="No-Break">the application.</span></p>
+			<h2 id="_idParaDest-287"><a id="_idTextAnchor286"/>Monitoring the solution with Application Insights</h2>
+			<p>As before, upon<a id="_idIndexMarker923"/> running the application when monitoring using the Aspire dashboard, use the bot to run multiple games. As Application Insights is configured, it’s not necessary to have the solution deployed to Azure; monitoring information will be available within Azure when running the application locally as well. After starting a few game runs using the bot, open the Azure Application Insights resource within the <span class="No-Break">Azure portal.</span></p>
+			<p>After playing a few games, check the Azure portal. With Application Insights, in the <strong class="bold">Investigate</strong> category on the left pane, select <strong class="bold">Application map</strong>. Here, you see how the different services communicate, as shown in <span class="No-Break"><em class="italic">Figure 11</em></span><span class="No-Break"><em class="italic">.12</em></span><span class="No-Break">:</span></p>
+			<div>
+				<div id="_idContainer144" class="IMG---Figure">
+					<img src="image/B21217_11_12.jpg" alt="Figure 11.12 – Application map"/>
+				</div>
+			</div>
+			<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Figure 11.12 – Application map</p>
+			<p>The previous figure <a id="_idIndexMarker924"/>shows the bot service invokes the game API service, and this communicates with the Azure Cosmos database. The count of messages, the time used, and errors can easily be seen from this information. Clicking on a connection, it’s possible to investigate performance by seeing the slowest calls and directly accessing <span class="No-Break">log information.</span></p>
+			<p>With the <strong class="bold">Investigate</strong> category in the Azure portal, you can dig into other interesting information such as <strong class="bold">Performance</strong>, where you get insights into slow operations, and <strong class="bold">Failures</strong>, where you can dive into errors and exceptions. Smart detection can give you notifications (alerts) when services are not behaving with usual, <span class="No-Break">expected values.</span></p>
+			<p>Within the <strong class="bold">Monitoring</strong> category in the left pane, you see the <strong class="bold">Metrics</strong> entry. Selecting this, you can select metric data, including custom metrics such as <strong class="source-inline">codebreaker.active_games</strong> and <strong class="source-inline">codebreaker.game_moves-per-win</strong>, where you can select the metric name and the aggregation type to calculate values and see graphical results, as shown in <span class="No-Break"><em class="italic">Figure 11</em></span><span class="No-Break"><em class="italic">.13</em></span><span class="No-Break">:</span></p>
+			<div>
+				<div id="_idContainer145" class="IMG---Figure">
+					<img src="image/B21217_11_13.jpg" alt="Figure 11.13 – Metrics via Application Insights"/>
+				</div>
+			</div>
+			<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Figure 11.13 – Metrics via Application Insights</p>
+			<p>With this figure, the first line shows the average duration of a game (seconds), the second line shows the average number of moves needed, and the third line shows the number of games <span class="No-Break">currently active.</span></p>
+			<p>Clicking <strong class="bold">Logs</strong>, you can see <a id="_idIndexMarker925"/>Application Insights tables stored. Here, you can <a id="_idIndexMarker926"/>use <strong class="bold">Kusto Query Language</strong> (<strong class="bold">KQL</strong>) to query all logged data and not only see text but also a graphic output. Clicking on the <strong class="source-inline">customMetrics</strong> table, you can query all the <span class="No-Break">metrics data.</span></p>
+			<p>Use this KQL query to get the average EF Core queries on a <span class="No-Break">time chart:</span></p>
+			<pre class="source-code">
+customMetrics
+| where name == "ec.Microsoft.EntityFrameworkCore.queries-per-second"
+| summarize avg(value) by bin(timestamp, 5min)
+| render timechart</pre>
+			<p>This query accesses the <strong class="source-inline">customMetrics</strong> table filtered by the <strong class="source-inline">name</strong> column to get the EF Core queries by second. This result (you can see every record fitting this query by clicking on <strong class="bold">Results</strong>) is then used to show the average values and a timestamp rendered on a time chart. Your result might<a id="_idIndexMarker927"/> look like the one shown in <span class="No-Break"><em class="italic">Figure 11</em></span><span class="No-Break"><em class="italic">.14</em></span><span class="No-Break">:</span></p>
+			<div>
+				<div id="_idContainer146" class="IMG---Figure">
+					<img src="image/B21217_11_14.jpg" alt="Figure 11.14 – EF Core average queries using KQL"/>
+				</div>
+			</div>
+			<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Figure 11.14 – EF Core average queries using KQL</p>
+			<p>The Application Insights resource can be used no matter where your services are running if they have access to this resource on Microsoft Azure. In case the complete solution needs to run on-premises, you can use Prometheus and Grafana, as we’ll <span class="No-Break">do next.</span></p>
+			<h1 id="_idParaDest-288"><a id="_idTextAnchor287"/>Monitoring with Prometheus and Grafana</h1>
+			<p>For monitoring microservices solutions, Prometheus and Grafana<a id="_idIndexMarker928"/> are often used. <strong class="bold">Prometheus</strong> uses a pull model <a id="_idIndexMarker929"/>to collect data from services. Using this data, the <strong class="bold">PromQL</strong> query language<a id="_idIndexMarker930"/> analyzes this information. <strong class="bold">Grafana</strong> can access the data collected <a id="_idIndexMarker931"/>from Prometheus to show a <span class="No-Break">graphical view.</span></p>
+			<p>We’ll use Docker containers<a id="_idIndexMarker932"/> running Prometheus and Grafana. Microsoft Azure also offers managed services for Prometheus and Grafana that can be used <span class="No-Break">as well.</span></p>
+			<p>Let’s configure Docker containers for Prometheus and <span class="No-Break">Grafana next.</span></p>
+			<h2 id="_idParaDest-289"><a id="_idTextAnchor288"/>Adding Docker containers for Prometheus and Grafana</h2>
+			<p>To<a id="_idIndexMarker933"/> use the solution with Prometheus and <a id="_idIndexMarker934"/>Grafana, you need to select the launch<a id="_idIndexMarker935"/> profile – using Visual Studio, select <strong class="bold">OnPremises</strong> in the toolbar after the <span class="No-Break">project selection.</span></p>
+			<p>Using the command line, use the <strong class="source-inline">--</strong><span class="No-Break"><strong class="source-inline">launch-profile</strong></span><span class="No-Break"> parameter:</span></p>
+			<pre class="console">
+dotnet run --project Codebreaker.AppHost.csproj --launch-profile OnPremises</pre>
+			<p>To also use SQL Server within a Docker container, set the <strong class="source-inline">DataStore</strong> configuration to <strong class="source-inline">SQLServer</strong> (see <a href="B21217_03.xhtml#_idTextAnchor063"><span class="No-Break"><em class="italic">Chapter 3</em></span></a> for details); you could also use in-memory or Cosmos instead with the same <span class="No-Break">build configuration.</span></p>
+			<p>For using a Prometheus Docker container, we need to change the .NET Aspire <span class="No-Break"><strong class="source-inline">AppHost</strong></span><span class="No-Break"> implementation:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.AppHost/Program.cs</p>
+			<pre class="source-code">
+var builder = DistributedApplication.CreateBuilder(args);
+var sqlServer = builder.AddSqlServer("sql")
+  .WithDataVolume()
+  .PublishAsContainer()
+  .AddDatabase("CodebreakerSql");
+<strong class="bold">var prometheus = builder.AddContainer("prometheus", "prom/prometheus")</strong>
+<strong class="bold">  .WithBindMount("../prometheus", "/etc/prometheus", isReadOnly: true)</strong>
+<strong class="bold">  .WithHttpEndpoint(9090, hostPort: 9090);</strong>
+// code removed for brevity</pre>
+			<p>The first <a id="_idIndexMarker936"/>Docker container we used <a id="_idIndexMarker937"/>was the container for SQL Server. For using the Docker image for SQL Server, the <strong class="source-inline">AddSqlServerContainer</strong> extension method was used. To use the Prometheus Docker image, we need <a id="_idIndexMarker938"/>to use the <strong class="source-inline">AddContainer</strong> generic method, which allows adding any Docker image. The Docker image for Prometheus can be pulled from Docker Hub using <strong class="source-inline">prom/prometheus</strong>. For the Prometheus configuration, we use the <strong class="source-inline">prometheus</strong> folder, which is stored outside of the container. Using <strong class="source-inline">WithBindMount</strong>, the <strong class="source-inline">prometheus</strong> host directory is mapped to the <strong class="source-inline">/etc/prometheus</strong> folder within the container. Prometheus used port <strong class="source-inline">9090</strong> to access its services. This port is mapped to the host port <strong class="source-inline">9090</strong> with the <strong class="source-inline">WithHttpEndpoint</strong> method to make <span class="No-Break">Prometheus available.</span></p>
+			<p>Next, add a Docker container for Grafana with the <span class="No-Break">same file:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.AppHost/Program.cs</p>
+			<pre class="source-code">
+<strong class="bold">var grafana = builder.AddContainer("grafana", "grafana/grafana")</strong>
+<strong class="bold">  .WithBindMount("../grafana/config", "/etc/grafana",</strong>
+<strong class="bold">    isReadOnly: true)</strong>
+<strong class="bold">  .WithBindMount("../grafana/dashboards",</strong>
+<strong class="bold">    "/var/lib/grafana/dashboards", isReadOnly: true)</strong>
+<strong class="bold">  .WithHttpEndpoint(containerPort: 3000, hostPort: 3000,</strong>
+<strong class="bold">    name: "grafana-http");</strong>
+var gameAPIs = builder.AddProject&lt;Projects.Codebreaker_GameAPIs&gt;("gameapis")
+  .WithReference(sqlServer)
+  .WithEnvironment("DataStore", dataStore)
+<strong class="bold">  .WithEnvironment("GRAFANA_URL",</strong>
+<strong class="bold">    grafana.GetEndpoint("grafana-http"));</strong>
+<strong class="bold">  .WithEnvironment("StartupMode", startupMode);</strong>
+  builder.AddProject&lt;Projects.CodeBreaker_Bot&gt;("bot")
+    .WithReference(gameAPIs);
+    .WithEnvironment<strong class="bold">("StartupMode", startupMode);</strong>
+// code removed for brevity</pre>
+			<p>The <a id="_idIndexMarker939"/>Docker image for Grafana is pulled from <a id="_idIndexMarker940"/>Docker Hub with the <a id="_idIndexMarker941"/>name <strong class="source-inline">grafana/grafana</strong>. This container needs mounts within the <strong class="source-inline">/etc/grafana</strong> and <strong class="source-inline">/var/lib/grafana/dashboards</strong> Docker container directories for the Grafana configuration and dashboard configurations used. For both mounts, we’ll have a local <strong class="source-inline">grafana</strong> directory. The Grafana service will be available on <span class="No-Break">port </span><span class="No-Break"><strong class="source-inline">3000</strong></span><span class="No-Break">.</span></p>
+			<p>After configuring the Docker containers, let’s add the configuration <span class="No-Break">for Prometheus.</span></p>
+			<h2 id="_idParaDest-290"><a id="_idTextAnchor289"/>Configuring Prometheus</h2>
+			<p>Prometheus is configured with <a id="_idIndexMarker942"/>this YML file in the <strong class="source-inline">prometheus</strong> folder that’s referenced with the Docker container configuration <span class="No-Break">specified previously:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">prometheus/prometheus.yml</p>
+			<pre class="source-code">
+global:
+<strong class="bold">  scrape_interval: 1s</strong>
+scrape_configs:
+<strong class="bold">  - job_name: 'codebreakergames'</strong>
+<strong class="bold">    static_configs:</strong>
+<strong class="bold">      - targets: ['host.docker.internal:9400']</strong>
+<strong class="bold">  - job_name: 'codebreakerbot'</strong>
+<strong class="bold">    static_configs:</strong>
+<strong class="bold">      </strong><strong class="bold">- targets: ['host.docker.internal:5141']</strong></pre>
+			<p>Prometheus<a id="_idIndexMarker943"/> pulls telemetry data from services. How often this is done from Prometheus is defined by the <strong class="source-inline">scrape_interval</strong> parameter. To run tests and get fast information, here, 1 second is configured. On a production system, you might increase this value to, for example, 30 seconds to decrease the load on the services. The services that are accessed from Prometheus are the games API and the bot service. Make sure to configure the ports to the port numbers of your service projects. You can see these values with the <span class="No-Break"><strong class="source-inline">Properties/launchsettings.json</strong></span><span class="No-Break"> files.</span></p>
+			<p>To add an API endpoint that’s accessed by Prometheus for scraping telemetry data, the <strong class="source-inline">MapDefaultEndpoints</strong> method of the <strong class="source-inline">Extensions</strong> class needs <span class="No-Break">an update:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.ServiceDefaults/Extensions.cs</p>
+			<pre class="source-code">
+public static WebApplication MapDefaultEndpoints(this WebApplication app)
+{
+  if (Environment.GetEnvironmentVariable("StartupMode") == "OnPremises")
+  {
+<strong class="bold">    app.MapPrometheusScrapingEndpoint();</strong>
+<strong class="bold">  }</strong>
+// code removed for brevity
+  return app;
+}</pre>
+			<p>The <strong class="source-inline">MapPrometheusScrapingEndpoint</strong> method configures an endpoint and maps the <span class="No-Break"><strong class="source-inline">PrometheusExporterMiddleware</strong></span><span class="No-Break"> middleware.</span></p>
+			<p>The <strong class="source-inline">AddOpenTelemetryExporters</strong> method needs an update <span class="No-Break">as well:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.ServiceDefaults/Extensions.cs</p>
+			<pre class="source-code">
+private static IHostApplicationBuilder AddOpenTelemetryExporters(this IHostApplicationBuilder builder)
+{
+  // code removed for brevity
+<strong class="bold">  builder.Services.AddOpenTelemetry()</strong>
+<strong class="bold">    .WithMetrics(metrics =&gt; metrics.AddPrometheusExporter());</strong>
+  return builder;
+}</pre>
+			<p>With Azure <a id="_idIndexMarker944"/>Application Insights, we used the <strong class="source-inline">UseAzureMonitor</strong> method. For Prometheus, we use the <strong class="source-inline">WithMetrics</strong> method, and <strong class="source-inline">AddPrometheusExporter</strong> adds the exporter <span class="No-Break">for Prometheus.</span></p>
+			<p>After the configuration of Prometheus, let’s <span class="No-Break">configure Grafana.</span></p>
+			<h2 id="_idParaDest-291"><a id="_idTextAnchor290"/>Configuring Grafana</h2>
+			<p>With this configuration of the<a id="_idIndexMarker945"/> Grafana Docker container, we defined using the <strong class="source-inline">grafana</strong> host folder. Here, we need to create a <strong class="source-inline">grafana.ini</strong> <span class="No-Break">configuration file:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">grafana/grafana.ini</p>
+			<pre class="source-code">
+[auth.anonymous]
+enabled = true
+org_name = Main Org.
+org_role = Admin
+hide_version = false
+[dashboards]
+default_home_dashboard_path = /var/lib/grafana/dashboards/aspnetcore.json
+min_refresh_interval = 1s</pre>
+			<p>For simple tests locally, we allow anonymous authentication and specify that non-authenticated users have admin access to change settings and customize dashboards. The home dashboard that’s used is the ASP.NET <span class="No-Break">Core dashboard.</span></p>
+			<p>To access Prometheus from <a id="_idIndexMarker946"/>Grafana, the data source needs to be specified with a <span class="No-Break">YML file:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">grafana/config/provisioning/datasources/default.yaml</p>
+			<pre class="source-code">
+apiVersion: 1
+<strong class="bold">datasources:</strong>
+<strong class="bold">  - name: Prometheus</strong>
+<strong class="bold">    type: prometheus</strong>
+<strong class="bold">    access: proxy</strong>
+<strong class="bold">    </strong><strong class="bold">url: http://host.docker.internal:9090</strong>
+<strong class="bold">    uid: PBFA97CFB590B2093</strong></pre>
+			<p>The <strong class="source-inline">datasources</strong> folder contains the configuration file for the Prometheus data source. This uses port <strong class="source-inline">9090</strong> used <span class="No-Break">by Prometheus.</span></p>
+			<p>The default dashboard is configured with a YML file <span class="No-Break">as well:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">grafana/config/provisioning/dashbaords/default.yml</p>
+			<pre class="source-code">
+apiVersion: 1
+providers:
+  - name: Default
+    folder: .NET
+    type: file
+    options:
+      path:
+        /var/lib/grafana/dashboards</pre>
+			<p>The dashboards themselves are stored within the <strong class="source-inline">grafana/dashboards</strong> folder. You can get pre-built dashboards at <a href="https://grafana.com/grafana/dashboards">https://grafana.com/grafana/dashboards</a>. The ASP.NET Core team provides the dashboards for .NET 8 named <em class="italic">ASP.NET Core Endpoint</em> (ID: 19925) and <em class="italic">ASP.NET Core</em> (ID: 19924) to monitor request durations, error rates, current connections, total requests… for ASP.NET Core metrics. Both dashboards are <a id="_idIndexMarker947"/>copied to the final solution of <span class="No-Break">this chapter.</span></p>
+			<p>When this configuration is in place, we are ready to start the solution again – running all services on the <span class="No-Break">local system.</span></p>
+			<h2 id="_idParaDest-292"><a id="_idTextAnchor291"/>Monitoring the solution with Prometheus and Grafana</h2>
+			<p>When you run the <a id="_idIndexMarker948"/>application now, three Docker containers<a id="_idIndexMarker949"/> are running: SQL Server, Prometheus, and Grafana, and the bot and game APIs projects, as shown in <span class="No-Break"><em class="italic">Figure 11</em></span><em class="italic">.15</em>. Grafana lists an endpoint that’s accessible from <span class="No-Break">the host:</span></p>
+			<div>
+				<div id="_idContainer147" class="IMG---Figure">
+					<img src="image/B21217_11_15.jpg" alt="Figure 11.15 – Aspire dashboard with Prometheus and Grafana"/>
+				</div>
+			</div>
+			<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Figure 11.15 – Aspire dashboard with Prometheus and Grafana</p>
+			<p>By accessing the bot <a id="_idIndexMarker950"/>service again to let it play some games, we can<a id="_idIndexMarker951"/> access the configured dashboards from the Grafana Docker container, as shown in <span class="No-Break"><em class="italic">Figure 11</em></span><span class="No-Break"><em class="italic">.16</em></span><span class="No-Break">:</span></p>
+			<div>
+				<div id="_idContainer148" class="IMG---Figure">
+					<img src="image/B21217_11_16.jpg" alt="Figure 11.16 – Grafana Dashboards"/>
+				</div>
+			</div>
+			<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Figure 11.16 – Grafana Dashboards</p>
+			<p>This page is opened by selecting <strong class="bold">Dashboards</strong> in the left pane. There, you can open both configured ASP.NET Core dashboards to see <span class="No-Break">these metrics.</span></p>
+			<p>You can also see the custom metric counts written, as shown in <span class="No-Break"><em class="italic">Figure 11</em></span><span class="No-Break"><em class="italic">.17</em></span><span class="No-Break">:</span></p>
+			<div>
+				<div id="_idContainer149" class="IMG---Figure">
+					<img src="image/B21217_11_17.jpg" alt="Figure 11.17 – Active games with Grafana"/>
+				</div>
+			</div>
+			<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Figure 11.17 – Active games with Grafana</p>
+			<p>The preceding <a id="_idIndexMarker952"/>figure shows the active game count (all started from the bot). To<a id="_idIndexMarker953"/> see this screen, open the <strong class="bold">Explore</strong> menu in the left pane. Then, select the value of the metric from a combobox and click the <strong class="bold">Query</strong> button. With the graph, you can select from different <span class="No-Break">display types.</span></p>
+			<p>In the previous section, you’ve seen Azure services to monitor the solution. With Prometheus and Grafana, you’ve seen services that can easily be used in an on-premises environment. In case you prefer Prometheus and Grafana while running within Microsoft Azure, one way of use is to run these services in Azure Container Apps. Azure-managed services are available as well: Azure offers Managed Grafana and Azure Monitor Managed Service for Prometheus. Using these services, the same service is available but with reduced <span class="No-Break">management needs.</span></p>
+			<h1 id="_idParaDest-293"><a id="_idTextAnchor292"/>Summary</h1>
+			<p>In this chapter, you learned about offering telemetry data from a microservice solution covering logging, metrics, and distributed tracing. With logging, you used high-performance, strongly typed logging to write information-level logs as well as errors. For metrics, you created custom metric data using the <strong class="source-inline">Meter</strong> class with instruments created. For distributed tracing, you used the <strong class="source-inline">ActivitySource</strong> and <span class="No-Break"><strong class="source-inline">Activity</strong></span><span class="No-Break"> classes.</span></p>
+			<p>To monitor all this telemetry data, you used the .NET Aspire dashboard, Azure Application Insights, and Prometheus <span class="No-Break">with Grafana.</span></p>
+			<p>In the next chapter, we’ll look into how to use metrics data to scale the services running with Azure Container Apps. We’ll find out about the memory and CPU usage of services using load tests we created in <a href="B21217_10.xhtml#_idTextAnchor239"><span class="No-Break"><em class="italic">Chapter 10</em></span></a>, combine this with metrics information from this chapter, learn about scaling services to be ready no matter how demand grows, and implement health checks to recover services when <span class="No-Break">not healthy.</span></p>
+			<h1 id="_idParaDest-294"><a id="_idTextAnchor293"/>Further reading</h1>
+			<p>To learn more about the topics discussed in this chapter, you can refer to the <span class="No-Break">following links:</span></p>
+			<ul>
+				<li><span class="No-Break">OpenTelemetry: </span><a href="https://opentelemetry.io/"><span class="No-Break">https://opentelemetry.io/</span></a></li>
+				<li>High-performance logging in .<span class="No-Break">NET: </span><a href="https://learn.microsoft.com/en-us/dotnet/core/extensions/high-performance-logging"><span class="No-Break">https://learn.microsoft.com/en-us/dotnet/core/extensions/high-performance-logging</span></a></li>
+				<li>Application <span class="No-Break">Insights: </span><a href="https://learn.microsoft.com/en-us/azure/azure-monitor/app/app-insights-overview"><span class="No-Break">https://learn.microsoft.com/en-us/azure/azure-monitor/app/app-insights-overview</span></a></li>
+				<li>KQL <span class="No-Break">repo: </span><a href="https://github.com/microsoft/Kusto-Query-Language"><span class="No-Break">https://github.com/microsoft/Kusto-Query-Language</span></a></li>
+				<li><span class="No-Break">Prometheus: </span><a href="https://prometheus.io/"><span class="No-Break">https://prometheus.io/</span></a></li>
+				<li>Grafana <span class="No-Break">repo: </span><a href="https://github.com/grafana/grafana"><span class="No-Break">https://github.com/grafana/grafana</span></a></li>
+				<li>Grafana <span class="No-Break">Dashboards: </span><a href="https://grafana.com/grafana/dashboards/"><span class="No-Break">https://grafana.com/grafana/dashboards/</span></a></li>
+			</ul>
+		</div>
+	</body></html>

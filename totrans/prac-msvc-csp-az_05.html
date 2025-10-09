@@ -1,0 +1,505 @@
+<html><head></head><body>
+		<div id="_idContainer060">
+			<h1 id="_idParaDest-111" class="chapter-number"><a id="_idTextAnchor110"/>5</h1>
+			<h1 id="_idParaDest-112"><a id="_idTextAnchor111"/>Containerization of Microservices</h1>
+			<p>After building clients and services with the previous chapters, now is the time to make the services ready for publishing. With Docker, we can prepare images that have everything included to run the <span class="No-Break">complete solution.</span></p>
+			<p>In this chapter, you’ll start learning the most important parts of Docker, building Docker images, running containers, and using .NET Aspire to run a solution consisting of multiple services locally on your developer system, including SQL Server running in a Docker container, as well as making use of native <strong class="bold">ahead-of-time</strong> (<strong class="bold">AOT</strong>) to create platform-specific <span class="No-Break">native applications.</span></p>
+			<p>In this chapter, you’ll learn about the <span class="No-Break">following topics:</span></p>
+			<ul>
+				<li>Working <span class="No-Break">with Docker</span></li>
+				<li>Building a <span class="No-Break">Docker image</span></li>
+				<li>Running the solution with .<span class="No-Break">NET Aspire</span></li>
+				<li>Using native AOT with <span class="No-Break">ASP.NET Core</span></li>
+			</ul>
+			<h1 id="_idParaDest-113"><a id="_idTextAnchor112"/>Technical requirements</h1>
+			<p>What you need to go through this chapter is <strong class="bold">Docker Desktop</strong>. Docker Desktop is free for individual developers and education and open source communities. You can download Docker Desktop from <a href="https://www.docker.com/products/docker-desktop/">https://www.docker.com/products/docker-desktop/</a>, best used with the <strong class="bold">Windows Subsystem for Linux</strong> (<strong class="bold">WSL</strong>). Check the README file of this chapter to install WSL 2 and <span class="No-Break">Docker Desktop.</span></p>
+			<p class="callout-heading">Note</p>
+			<p class="callout">The <strong class="source-inline">dotnet publish</strong> command supports building and publishing Docker images. While some features of <strong class="source-inline">dotnet publish</strong> can be used without Docker Desktop being installed, we start using Docker directly, as this also helps in understanding what can be done using the .NET CLI, and often you need a lot more in regard to Docker than offered by the .<span class="No-Break">NET CLI.</span></p>
+			<p>The code for this chapter can be found in the following GitHub <span class="No-Break">repository: </span><a href="https://github.com/PacktPublishing/Pragmatic-Microservices-with-CSharp-and-Azure"><span class="No-Break">https://github.com/PacktPublishing/Pragmatic-Microservices-with-CSharp-and-Azure</span></a><span class="No-Break">.</span></p>
+			<p>The <strong class="source-inline">ch05</strong> source code folder contains the code samples for this chapter. For different sections of this chapter, different subfolders are available. For a start, working through the instructions, you can use the <strong class="source-inline">StartXX</strong> folders. <strong class="source-inline">StartDocker</strong> contains the projects before creating Docker containers have been added and the <strong class="source-inline">FinalDocker</strong> folder contains the project in the final state after building the <span class="No-Break">Docker container.</span></p>
+			<p>The <strong class="source-inline">StartAspire</strong> folder contains multiple projects that the .NET Aspire-specific projects we created in the previous chapters are already part of. Use this as a starting point to work through the .NET Aspire part of this chapter. <strong class="source-inline">FinalAspire</strong> contains the complete result, which you can use as a reference. The <strong class="source-inline">NativeAOT</strong> folder contains the code for the games API that compiles with .NET <span class="No-Break">native AOT.</span></p>
+			<p>In the subfolders of the <strong class="source-inline">ch05</strong> folder, you’ll see <span class="No-Break">these projects:</span></p>
+			<ul>
+				<li><strong class="source-inline">Codebreaker.GameAPIs</strong> – The games API project we used in the previous chapter from our client application. In this chapter, we make minor updates to specify the connection string to the SQL Server database. This project has a reference to NuGet packages with implementations of the <strong class="source-inline">IGamesRepository</strong> interface for SQL Server and Azure <span class="No-Break">Cosmos DB.</span></li>
+				<li><strong class="source-inline">Codebreaker.Bot</strong> – This is a new project that implements a REST API and calls the games API to automatically play games with random game moves. This project makes use of the client library we created in <a href="B21217_04.xhtml#_idTextAnchor092"><span class="No-Break"><em class="italic">Chapter 4</em></span></a> – it has a reference to the <strong class="source-inline">CNinnovation.Codebreaker.Client</strong> NuGet package to call the <span class="No-Break">games API.</span></li>
+				<li><strong class="source-inline">Codebreaker.AppHost</strong> – This project is enhanced to orchestrate the <span class="No-Break">different services.</span></li>
+				<li><strong class="source-inline">Codebreaker.ServiceDefaults</strong> – This project is unchanged in <span class="No-Break">this chapter.</span></li>
+				<li><strong class="source-inline">Codebreaker.GameAPIs.NativeAOT</strong> – A new project that offers the same games API with some changes to support native AOT with .<span class="No-Break">NET 8.</span></li>
+			</ul>
+			<h1 id="_idParaDest-114"><a id="_idTextAnchor113"/>Working with Docker</h1>
+			<p>Although <a id="_idIndexMarker267"/>nowadays, it’s possible just to work with .NET tools to create microservices and run Docker containers, it helps to know about Docker. Thus, here, we look at the most important concepts about Docker, starting up a SQL Server instance running within a Docker container, creating a Dockerfile to build a Docker image for the games API service, and running these containers on the local system. In case you already know all about Docker, you can skip and move over to the <em class="italic">.NET Aspire</em> section, which does not need the Docker containers <span class="No-Break">created here.</span></p>
+			<p>Before diving into building Docker images, why do we need containers at all? When deploying an application, it often occurs that the application fails to run. Often, a reason for this is a missing runtime on the target system or wrong or missing configuration settings. One way to resolve this is to <a id="_idIndexMarker268"/>prepare <strong class="bold">virtual machines</strong> (<strong class="bold">VMs</strong>) where everything is preinstalled. The disadvantage of this is the resources that the VM needs. A VM comes with an operating system and allocates CPU and memory resources. Docker is a lot more lightweight. A Docker image can be small as an operating system is not part of the image – and multiple Docker containers can share the same CPU <span class="No-Break">and memory.</span></p>
+			<p>Here’s a brief list of important terms when using Docker before going into <span class="No-Break">the details:</span></p>
+			<ul>
+				<li>A Docker <strong class="bold">image</strong> is<a id="_idIndexMarker269"/> an executable package that contains everything to run <span class="No-Break">an application</span></li>
+				<li>One image might have different versions, which are identified by<a id="_idIndexMarker270"/> <span class="No-Break">Docker </span><span class="No-Break"><strong class="bold">tags</strong></span></li>
+				<li>A <strong class="bold">Dockerfile</strong> is a<a id="_idIndexMarker271"/> text file with instructions to build a <span class="No-Break">Docker image</span></li>
+				<li>A Docker <strong class="bold">container</strong> is<a id="_idIndexMarker272"/> the running instance of a <span class="No-Break">Docker image</span></li>
+				<li>The Docker <strong class="bold">registry</strong> is<a id="_idIndexMarker273"/> where Docker images <span class="No-Break">are stored</span></li>
+				<li>A Docker <strong class="bold">repository</strong> is a<a id="_idIndexMarker274"/> collection of different versions of a Docker image in <span class="No-Break">the registry</span></li>
+			</ul>
+			<h2 id="_idParaDest-115"><a id="_idTextAnchor114"/>Using Docker Desktop</h2>
+			<p>Docker Desktop <a id="_idIndexMarker275"/>for Windows offers an environment to build Docker images and run Docker containers on Windows. You can configure it to use Windows or Linux containers. With a previous edition of Docker Desktop for Windows, it was required to install Hyper-V. Docker Desktop then used a Linux VM to run all Linux containers on this VM. Because Windows now supports Linux more natively with WSL, Docker Desktop<a id="_idIndexMarker276"/> can use WSL and doesn’t need a VM. With the Docker Desktop configuration, you can select WSL distros (see <span class="No-Break"><em class="italic">Figure 5</em></span><em class="italic">.1</em>) that should use the same Docker environment as on the Windows system itself. Using these Linux distributions, you can use the same Docker commands to manage your <span class="No-Break">Docker environment:</span></p>
+			<div>
+				<div id="_idContainer054" class="IMG---Figure">
+					<img src="image/B21217_05_01.jpg" alt="Figure 5.1 – WSL integration in Docker Desktop"/>
+				</div>
+			</div>
+			<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Figure 5.1 – WSL integration in Docker Desktop</p>
+			<p>Instead of configuring a VM with the amount of CPU and memory you allocate, WSL shares CPU and memory with Windows – but there are some limits for WSL. With the Windows build version 20176 and later, the memory is limited to 50% and 8 GB (whichever is less); with builds before that, WSL can use 80% of the <span class="No-Break">total memory.</span></p>
+			<p>For the number<a id="_idIndexMarker277"/> of logical processors, by default, all available can be used. You can change memory and CPU limits globally for the complete subsystem but also define different limits for each Linux distribution you install. Check the settings configuration in WSL <span class="No-Break">at </span><a href="https://learn.microsoft.com/windows/wsl/wsl-config"><span class="No-Break">https://learn.microsoft.com/windows/wsl/wsl-config</span></a><span class="No-Break">.</span></p>
+			<h2 id="_idParaDest-116"><a id="_idTextAnchor115"/>Running a Docker container</h2>
+			<p>After <a id="_idIndexMarker278"/>you’ve installed Docker Desktop and you are running Windows, you can select to run Windows or Linux containers. While Windows containers are great for legacy applications that only run on Windows (for example, using .NET Framework), Linux containers offer more features, and Linux Docker images are smaller. The solution we build will run with <span class="No-Break">Linux containers.</span></p>
+			<p>The Docker Desktop environment needs to be started, then to run the first container, use <span class="No-Break">this command:</span></p>
+			<pre class="console">
+docker run hello-world</pre>
+			<p>On the first run, the <strong class="source-inline">hello-world</strong> Docker image is downloaded from the Docker registry and started. This container just writes a message to the screen to verify that everything is running. Starting it a second time, you’ll see that the image is no longer downloaded but <span class="No-Break">started immediately.</span></p>
+			<p>To see all images downloaded, you can use <span class="No-Break">this command:</span></p>
+			<pre class="console">
+docker images</pre>
+			<p>To see running containers, use the <span class="No-Break">following command:</span></p>
+			<pre class="console">
+docker container ls</pre>
+			<p>There’s also a shorthand notation to show all running containers: <span class="No-Break"><strong class="source-inline">docker ps</strong></span><span class="No-Break">.</span></p>
+			<p>You will not see the <strong class="source-inline">hello-world</strong> container because this already stopped immediately after writing <span class="No-Break">the output.</span></p>
+			<p>Running an image again and again, you start fresh again. But there’s also a state kept with a running image. This allows you to continue a previously stopped container with the same state as before. The <strong class="source-inline">docker container ls -a</strong> command not only shows running but also stopped containers. Using <strong class="source-inline">docker container prune</strong>, you can delete the state from all <span class="No-Break">stopped containers.</span></p>
+			<h2 id="_idParaDest-117"><a id="_idTextAnchor116"/>Running SQL Server in a Docker container</h2>
+			<p>In <a href="B21217_03.xhtml#_idTextAnchor063"><span class="No-Break"><em class="italic">Chapter 3</em></span></a>, we <a id="_idIndexMarker279"/>used SQL Server and an Azure Cosmos DB emulator on the local system to access it from the games service. Instead<a id="_idIndexMarker280"/> of installing these products on your local system, you can also use <span class="No-Break">Docker images.</span></p>
+			<p>Let’s start downloading the Docker image for <span class="No-Break">SQL Server:</span></p>
+			<pre class="console">
+docker pull mcr.microsoft.com/mssql/server:2022-latest</pre>
+			<p>Previously, we used <strong class="source-inline">docker run</strong> to start a container and implicitly download it from a registry. <strong class="source-inline">docker pull</strong> just downloads the image from the registry. <strong class="source-inline">mcr.microsoft.com</strong> is the Microsoft repository where Microsoft stores images. <strong class="source-inline">mssql/server</strong> is the name of the image. You can read information about this image at <a href="https://hub.docker.com/_/microsoft-mssql-server">https://hub.docker.com/_/microsoft-mssql-server</a>. This is an Ubuntu-based image. <strong class="source-inline">2022-latest</strong> is a tag name. This is the actual version of SQL Server 2022. With SQL Server, other tags are <strong class="source-inline">2019-latest</strong>, <strong class="source-inline">2017-latest</strong>, and <strong class="source-inline">latest</strong>. These correspond to SQL Server 2019 and 2017. The <strong class="source-inline">latest</strong> tag is the latest version of SQL Server. At the time of this writing, the image is the same with both the <strong class="source-inline">2022-latest </strong>and the <strong class="source-inline">latest</strong> tags. If you download both images, a second download is not needed, and you will see images with the same image ID but with <span class="No-Break">different tags.</span></p>
+			<p class="callout-heading">Note</p>
+			<p class="callout">The default configuration to use SQL Server with the Docker image is the SQL Server Developer Edition. You can also configure to use the Express, Standard, Enterprise, and Enterprise Core editions by setting an environmental variable. Pay attention to required licenses with non-developer editions. Read the image documentation for setting environment variables for the <span class="No-Break">different editions.</span></p>
+			<p class="callout">Another option to use a SQL Server edition within a Docker environment is Azure SQL Edge. Check <a href="https://learn.microsoft.com/en-us/azure/azure-sql-edge/disconnected-deployment">https://learn.microsoft.com/en-us/azure/azure-sql-edge/disconnected-deployment</a> for running Azure <span class="No-Break">SQL Edge.</span></p>
+			<p>To run the <a id="_idIndexMarker281"/>SQL Server image, you can use the <span class="No-Break">following command:</span></p>
+			<pre class="console">
+docker run -e "ACCEPT_EULA=Y" -e "MSSQL_SA_PASSWORD=Pa$$w0rd" -p 14333:1433 --name sql1 --hostname sql1 -d mcr.microsoft.com/mssql/server:2022-latest</pre>
+			<p>With this <a id="_idIndexMarker282"/>command, these options <span class="No-Break">are used:</span></p>
+			<ul>
+				<li><strong class="source-inline">-e</strong> specifies an environmental variable. With the two variables, the license is accepted, and a password for the <strong class="source-inline">sa</strong> account is defined. <strong class="source-inline">sa</strong> is a privileged account configured, and a short name for <span class="No-Break"><em class="italic">system administrator</em></span><span class="No-Break">.</span></li>
+				<li>The <strong class="source-inline">-p</strong> option maps the port from the host to the container. On the target host, the same port cannot be used for multiple applications; for example, by having a local SQL Server running, the first value cannot use 1433. Make sure to use an <span class="No-Break">available port.</span></li>
+				<li>The <strong class="source-inline">--name</strong> option specifies a name for the container. By default, a random name combined from two lists <span class="No-Break">is used.</span></li>
+				<li>The <strong class="source-inline">--hostname</strong> option specifies the hostname for <span class="No-Break">the container.</span></li>
+				<li>The <strong class="source-inline">-d</strong> option runs the container in <span class="No-Break">the background.</span></li>
+			</ul>
+			<p>For some useful information to find out what the container does, use <strong class="source-inline">docker </strong><span class="No-Break"><strong class="source-inline">container logs</strong></span><span class="No-Break">:</span></p>
+			<pre class="console">
+docker container logs sql1</pre>
+			<p>This command needs the name of the container. To connect and wait for all the logs to come, add the <strong class="source-inline">-f</strong> option (<span class="No-Break">for </span><span class="No-Break"><em class="italic">follow</em></span><span class="No-Break">).</span></p>
+			<p>To open a command prompt within the container and see what’s there, use <strong class="source-inline">docker exec -it sql1 bash</strong>, which allocates a terminal, keeps <strong class="source-inline">stdin</strong> open (interactive mode), and executes the Bash shell within <span class="No-Break">the container.</span></p>
+			<p>After the container with SQL Server is running, we can publish the database we created in <a href="B21217_03.xhtml#_idTextAnchor063"><span class="No-Break"><em class="italic">Chapter 3</em></span></a><span class="No-Break">.</span></p>
+			<h2 id="_idParaDest-118"><a id="_idTextAnchor117"/>Using volumes with a Docker container</h2>
+			<p>The Docker container<a id="_idIndexMarker283"/> for SQL Server contains state (the database files). We can start a previous running container again (using <strong class="source-inline">docker start</strong>). When using <strong class="source-inline">docker run</strong>, we start fresh again, and the previous state is not used. Using <strong class="source-inline">docker commit</strong>, you can create a new image from a container. This keeps the database and the state together, and the Docker images grow in size. A better practice is to keep the state outside of the Docker container. You can mount external directories, files, and Docker volumes within a container. Docker volumes are completely managed by Docker. Let’s use this for <span class="No-Break">SQL Server.</span></p>
+			<p>First, create <span class="No-Break">a volume:</span></p>
+			<pre class="console">
+docker volume create gamessqlstorage</pre>
+			<p>This creates a volume with the name <strong class="source-inline">gamessqlstorage</strong>. To check the volumes available, use <strong class="source-inline">docker volume ls</strong>. To get more information about a volume, execute <strong class="source-inline">docker </strong><span class="No-Break"><strong class="source-inline">volume inspect</strong></span><span class="No-Break">.</span></p>
+			<p>Let’s run the container with the database using <span class="No-Break">this volume:</span></p>
+			<pre class="console">
+docker run -e "ACCEPT_EULA=Y" -e "MSSQL_SA_PASSWORD=Pa$$w0rd" -p 14333:1433 --name codebreakersql1 --hostname codebreakersql1 -v gamessqlstorage:/var/opt/mssql -d mcr.microsoft.com/mssql/server:2022-latest</pre>
+			<p>The <strong class="source-inline">-v</strong> option mounts the <strong class="source-inline">/var/opt/mssql</strong> folder within the container to the <strong class="source-inline">gamessqlstorage</strong> volume. All data written by SQL Server to this folder now goes into this volume. The state is now kept externally from the container. So, let’s create a <span class="No-Break">database next.</span></p>
+			<p class="callout-heading">Note</p>
+			<p class="callout">When creating backups of the database, you should also <span class="No-Break">use volumes.</span></p>
+			<h2 id="_idParaDest-119"><a id="_idTextAnchor118"/>Creating a database in the Docker container</h2>
+			<p>As the <a id="_idIndexMarker284"/>container is running, you can access it with a tool such as <strong class="bold">SQL Server Object Explorer</strong> from Visual Studio or <strong class="bold">SQL Server Management Studio</strong>. The connection string you can use is shown in the following .NET <span class="No-Break">configuration file:</span></p>
+			<pre class="source-code">
+{
+  "ConnectionStrings": {
+    "GamesSqlServerConnection": <strong class="bold">"server=host.docker.internal,14333;database=CodebreakerGames;user id=sa;password=Pa$$w0rd;TrustServerCertificate=true"</strong>
+  }
+}</pre>
+			<p>With the <strong class="source-inline">appsettings.json</strong> file, you also need to change the <strong class="source-inline">DataStore</strong> key to the <span class="No-Break"><strong class="source-inline">SqlServer</strong></span><span class="No-Break"> value.</span></p>
+			<p>Using Docker with a Linux host system, you can use the IP address of the Docker container with the port number to access services within the Docker container. This might not work with Windows. That’s why the <strong class="source-inline">host.docker.internal</strong> hostname was introduced: to map to the service via a gateway using the local port number. With the connection string to the database, you need to add the port number after the hostname, separated by a comma. To pass the user and password, use the <strong class="source-inline">user id</strong> and <strong class="source-inline">password</strong> keys. Because the certificate from the server Docker container might not be from a trusted authority on the Windows system, add the <strong class="source-inline">TrustServerCertificate</strong> setting to the <span class="No-Break">connection string.</span></p>
+			<p>In <a href="B21217_03.xhtml#_idTextAnchor063"><span class="No-Break"><em class="italic">Chapter 3</em></span></a>, we published a database using the <strong class="source-inline">dotnet ef</strong> command line. Now is the time to create this database within the Docker container. With the following command, your current directory needs to be the directory of the games API service (<strong class="source-inline">Codebreaker.GameAPIs</strong>), the <strong class="source-inline">DataStorage</strong> configuration value in <strong class="source-inline">appsettings</strong> set to <strong class="source-inline">SqlServer</strong>, and the connection string specified as <span class="No-Break">shown before:</span></p>
+			<pre class="console">
+cd Codebreaker.GameAPIs
+dotnet ef database update -p ..\Codebreaker.Data.SqlServer -c GamesSqlServerContext</pre>
+			<p>With this, the database is created – or migrated to the latest version. The <strong class="source-inline">-p</strong> option is needed because the EF Core context is in a different project than the <strong class="bold">dependency injection</strong> (<strong class="bold">DI</strong>) container<a id="_idIndexMarker285"/> configuration. With the solution, we have multiple EF Core contexts; that’s why you need to specify the name of the context class <span class="No-Break">with </span><span class="No-Break"><strong class="source-inline">-c</strong></span><span class="No-Break">.</span></p>
+			<p class="callout-heading">Note</p>
+			<p class="callout">With the games service project, you have another option to create the database. For an easier way to create a SQL Server database, the <strong class="source-inline">/createsql</strong> API is offered now in addition to the other APIs. Sending a <strong class="source-inline">POST</strong> request creates or upgrades the database (if SQL Server is configured) using the EF Core <span class="No-Break"><strong class="source-inline">MigrateAsync</strong></span><span class="No-Break"> method.</span></p>
+			<p>Next, let’s <a id="_idIndexMarker286"/>create a custom Docker image for the games API service. <span class="No-Break"><em class="italic">Figure 5</em></span><em class="italic">.2</em> shows a C4 container diagram to give you an overview picture of the containers we use. The first container we create is the one on the right, hosting SQL Server. Next, we create a Docker image for the game APIs, which accesses the SQL Server container. The container on the left is the new bot project, which invokes the services running in the game APIs’ container to automatically <span class="No-Break">play games:</span></p>
+			<div>
+				<div id="_idContainer055" class="IMG---Figure">
+					<img src="image/B21217_05_02.jpg" alt="Figure 5.2 – C4 container diagram"/>
+				</div>
+			</div>
+			<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Figure 5.2 – C4 container diagram</p>
+			<h1 id="_idParaDest-120"><a id="_idTextAnchor119"/>Building a Docker image</h1>
+			<p>The .NET CLI <strong class="source-inline">dotnet publish</strong> command supports creating Docker images without using a<a id="_idIndexMarker287"/> Dockerfile. However, to understand Docker, we need to know about Dockerfiles. That’s why we start building a Docker image defining a <span class="No-Break">Dockerfile first.</span></p>
+			<p>In this section, we will do <span class="No-Break">the following:</span></p>
+			<ul>
+				<li>Create a Dockerfile for the <span class="No-Break">games API</span></li>
+				<li>Build a Docker image using <span class="No-Break">the Dockerfile</span></li>
+				<li>Run the games API with a <span class="No-Break">Docker container</span></li>
+				<li>Create a Docker image using <span class="No-Break"><strong class="source-inline">dotnet publish</strong></span></li>
+			</ul>
+			<h2 id="_idParaDest-121"><a id="_idTextAnchor120"/>Creating a Dockerfile</h2>
+			<p>Docker images<a id="_idIndexMarker288"/> are created using instructions in Dockerfiles. Using Visual Studio, you can easily create a Dockerfile from Solution Explorer, using <strong class="bold">Add</strong> | <strong class="bold">Docker Support</strong>. Make sure to select <strong class="bold">Dockerfile</strong> for the <strong class="bold">Container build type</strong> option. Adding a Dockerfile to the <strong class="source-inline">Codebreaker.GamesAPI</strong> project creates a multi-stage Dockerfile. A multi-stage Dockerfile creates interim images for <span class="No-Break">different stages.</span></p>
+			<h3>Base stage</h3>
+			<p>With the<a id="_idIndexMarker289"/> following code snippets, the different stages are explained. The first stage prepares a Docker image for the <span class="No-Break">production environment:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.GameAPIs/Dockerfile</p>
+			<pre class="source-code">
+<strong class="bold">FROM</strong> mcr.microsoft.com/dotnet/aspnet:8.0 <strong class="bold">AS</strong> base
+<strong class="bold">USER</strong> app
+<strong class="bold">WORKDIR</strong> /app
+<strong class="bold">EXPOSE</strong> 8080</pre>
+			<p>Every Dockerfile starts with a <strong class="source-inline">FROM</strong> instruction. The <strong class="source-inline">FROM</strong> instruction defines the base image that is used. <strong class="source-inline">mcr.microsoft.com/dotnet/aspnet</strong> is an image optimized for production. With .NET 8, this image is based on Debian 12 (Bookworm). The <strong class="source-inline">Debian:12-slim</strong> image is defined by a Dockerfile with <strong class="source-inline">FROM scratch</strong>, so this is the root of the hierarchy of instructions. The <strong class="source-inline">dotnet/aspnet</strong> image contains the .NET runtime and the ASP.NET Core runtime. The .NET SDK is not available with this image. The <strong class="source-inline">AS</strong> instruction defines a name that allows using the result of this stage with another stage. The <strong class="source-inline">USER</strong> instruction defines the user that should be used with the instructions of the stage. The <strong class="source-inline">WORKDIR</strong> instruction sets the working directory for following instructions. If the directory does not exist in the image, it’s created. The last step in the first stage is the <strong class="source-inline">EXPOSE</strong> instruction. With <strong class="source-inline">EXPOSE</strong>, you define the ports that the application is listening to. By default, <strong class="source-inline">TCP</strong> is used, but you can also specify to have an <span class="No-Break"><strong class="source-inline">UDP</strong></span><span class="No-Break"> receiver.</span></p>
+			<p class="callout-heading">Note</p>
+			<p class="callout">.NET 8 has some changes with Docker image generation: the default container images run with non-root users (the app user), and the default port is no longer port 80. Port 80 is a privileged port that requires the root user. The new default port is <span class="No-Break">now 8080.</span></p>
+			<h3>Build stage</h3>
+			<p>The <a id="_idIndexMarker290"/>second stage builds the ASP.NET <span class="No-Break">Core application:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.GameAPIs/Dockerfile</p>
+			<pre class="source-code">
+<strong class="bold">FROM</strong> mcr.microsoft.com/dotnet/sdk:8.0 AS build
+ARG BUILD_CONFIGURATION=Release
+<strong class="bold">WORKDIR</strong> /src
+<strong class="bold">COPY</strong> ["Codebreaker.GameAPIs/Codebreaker.GameAPIs.csproj", "Codebreaker.GameAPIs/"]
+<strong class="bold">RUN</strong> dotnet restore "./Codebreaker.GameAPIs/Codebreaker.GameAPIs.csproj"
+<strong class="bold">COPY</strong> . .
+<strong class="bold">WORKDIR</strong> "/src/Codebreaker.GameAPIs"
+<strong class="bold">RUN</strong> dotnet build "./Codebreaker.GameAPIs.csproj" -c $BUILD_CONFIGURATION -o /app/build</pre>
+			<p>With the second stage, we ignore the first stage for a moment and use a different base image: <strong class="source-inline">dotnet/sdk</strong>. This image contains the .NET SDK and is used to build the application. First, a <strong class="source-inline">src</strong> directory is created, and the current directory is set to <strong class="source-inline">src</strong>. The <strong class="source-inline">ARG</strong> instruction specifies an argument that can be passed when invoking building the Docker image. If this argument is not passed, the default value is <strong class="source-inline">Release</strong>. Next, you’ll see multiple <strong class="source-inline">COPY</strong> instructions to copy the project files to subfolders within the current directory. The project files contain the package references. In case the <strong class="source-inline">dotnet restore</strong> command that is started using the <strong class="source-inline">RUN</strong> instruction fails, there’s no need to continue with the next steps. <strong class="source-inline">dotnet restore</strong> downloads the NuGet packages. In case you use a different NuGet feed, the Dockerfile needs some changes to copy <strong class="source-inline">nuget.config</strong> as well. When <strong class="source-inline">dotnet restore</strong> succeeds, the complete source code from <strong class="source-inline">.</strong> is copied to the current directory (which is <strong class="source-inline">src</strong> at this time) with the <strong class="source-inline">COPY</strong> instruction. Next, the working directory is changed to the directory of the games API project, and the <strong class="source-inline">dotnet build</strong> command is invoked to create release code for the application. With <strong class="source-inline">dotnet build</strong>, the <strong class="source-inline">BUILD_CONFIGURATION</strong> argument is used, which was specified with <strong class="source-inline">ARG</strong>. Having the release build in the <strong class="source-inline">src/app/build</strong> folder is the result for the interim image after the <span class="No-Break">last command.</span></p>
+			<p class="callout-heading">Note</p>
+			<p class="callout">To make sure that unnecessary files are not copied with instructions such as <strong class="source-inline">COPY . .</strong>, the <strong class="source-inline">.dockerignore</strong> file is used. Similar to the <strong class="source-inline">.gitignore</strong> file where files are specified to be ignored, with a <strong class="source-inline">.dockerignore</strong> file, you specify what files should not be copied to <span class="No-Break">the image.</span></p>
+			<h3>Publish stage</h3>
+			<p>Next, the <a id="_idIndexMarker291"/>second stage is used as a base for the <span class="No-Break">third stage:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.GameAPIs/Dockerfile</p>
+			<pre class="source-code">
+<strong class="bold">FROM</strong> build AS publish
+ARG BUILD_CONFIGURATION=Release
+<strong class="bold">RUN</strong> dotnet publish "./Codebreaker.GameAPIs.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false</pre>
+			<p>The <strong class="source-inline">FROM build</strong> instruction uses the result from the previous stage and continues here. The <strong class="source-inline">dotnet publish</strong> command results in code that’s needed to publish the application. The files needed for publication are copied to the <strong class="source-inline">/src/app/publish</strong> folder. While the working directory was configured with the previous stage, continuing on the build image, the working directory is <span class="No-Break">still set.</span></p>
+			<h3>Final stage</h3>
+			<p>With the final stage, we<a id="_idIndexMarker292"/> continue with the first stage, which was <span class="No-Break">named </span><span class="No-Break"><strong class="source-inline">base</strong></span><span class="No-Break">:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.GameAPIs/Dockerfile</p>
+			<pre class="source-code">
+<strong class="bold">FROM</strong> base AS final
+<strong class="bold">WORKDIR</strong> /app
+<strong class="bold">COPY --from=publish /app/publish .</strong>
+<strong class="bold">ENTRYPOINT</strong> ["dotnet", "Codebreaker.GameAPIs.dll"]</pre>
+			<p>The first instruction with this stage is to set the working directory to <strong class="source-inline">app</strong>. Then, referencing the third state with <strong class="source-inline">--from=publish</strong>, the <strong class="source-inline">/app/publish</strong> directory from the <strong class="source-inline">publish</strong> stage is copied to the current directory. The <strong class="source-inline">ENTRYPOINT</strong> instruction defines <a id="_idIndexMarker293"/>what should be done on running the image: the <strong class="source-inline">dotnet bootstrapper</strong> command starts and receives <strong class="source-inline">Codebreaker.GameAPIs.dll</strong> as an argument. You can do this from the command line as well: <strong class="source-inline">dotnet Codebreaker.GameAPIs.dll</strong> starts the entry point of the application to kick off the Kestrel server, and the application is available to <span class="No-Break">receive requests.</span></p>
+			<p>Before building the Dockerfile, make sure the <strong class="source-inline">DataStore</strong> configuration in <strong class="source-inline">appsettings.json</strong> is set to <strong class="source-inline">InMemory</strong> to use the in-memory provider by default when starting <span class="No-Break">the container.</span></p>
+			<h2 id="_idParaDest-122"><a id="_idTextAnchor121"/>Building a Docker image with a Dockerfile</h2>
+			<p>To build<a id="_idIndexMarker294"/> the image, set the current directory to the directory of the solution, and use <span class="No-Break">this command:</span></p>
+			<pre class="console">
+docker build . -f Codebreaker.GameAPIs\Dockerfile -t codebreaker/gamesapi:3.5.3 -t codebreaker/gamesapi:latest</pre>
+			<p>With simple Dockerfiles, using just <strong class="source-inline">docker build</strong> can be enough to build the image. However, the Dockerfile we use contains references to other projects. With this, we need to pay attention to the context. With the games API service, multiple projects need to be compiled, and the paths used as specified with the Dockerfile use the parent directory. Setting the current directory to the directory of the solution, the context is set to this directory with the first argument after the build command (<strong class="source-inline">.</strong>). The <strong class="source-inline">-f</strong> option next references the location of the Dockerfile. With the <strong class="source-inline">-t</strong> option, the image is tagged. The repository name (<strong class="source-inline">codebreaker/gamesapi</strong>) needs to be lowercase, followed by the <strong class="source-inline">3.5.3</strong> tag name and the <strong class="source-inline">latest</strong> tag name. Tag names can be strings; there’s no requirement on the version. It’s just a good practice to always tag the latest version with the <strong class="source-inline">latest</strong> tag. Specifying the <strong class="source-inline">-t</strong> option two times, we get two image names that reference the same image with the same <span class="No-Break">image identifier.</span></p>
+			<p>To list the images built, use <strong class="source-inline">docker images</strong>. To restrict the output to <strong class="source-inline">codebreaker</strong> images, you can define <span class="No-Break">a filter:</span></p>
+			<pre class="console">
+docker images codebreaker/*</pre>
+			<p>To check a Docker image for how it was built, we can use the <strong class="source-inline">docker </strong><span class="No-Break"><strong class="source-inline">history</strong></span><span class="No-Break"> command:</span></p>
+			<pre class="console">
+docker history codebreaker/gamesapi:latest</pre>
+			<p><span class="No-Break"><em class="italic">Figure 5</em></span><em class="italic">.3</em> shows<a id="_idIndexMarker295"/> the result of the <strong class="source-inline">docker history</strong> command. This shows every instruction from the Dockerfile that was used to build the image. Of course, what you don’t see with the <strong class="source-inline">codebreaker/gamesapi</strong> image is the <strong class="source-inline">dotnet build</strong> and <strong class="source-inline">dotnet restore</strong> commands. The <strong class="source-inline">build</strong> and <strong class="source-inline">publish</strong> stages have only been used for interim images to build the application and to create the files needed. Comparing the output to the Dockerfile we created, you see <strong class="source-inline">ENTRYPOINT</strong> on top, followed by <strong class="source-inline">COPY</strong>, <strong class="source-inline">WORKDIR</strong>, and so on. With each of these instructions, you can also see the size result of the instruction. The <strong class="source-inline">COPY</strong> command copied 3,441 MB into the image. The <strong class="source-inline">USER</strong> instruction was the first instruction coming from our Dockerfile; the instructions before that (in the lines below the <strong class="source-inline">USER</strong> instruction) show the instructions when the base image <span class="No-Break">was created:</span></p>
+			<div>
+				<div id="_idContainer056" class="IMG---Figure">
+					<img src="image/B21217_05_03.jpg" alt="Figure 5.3 – Result of docker history command"/>
+				</div>
+			</div>
+			<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Figure 5.3 – Result of docker history command</p>
+			<p>To see the exposed ports, environmental variables, the entry point, and more of an image, use the <span class="No-Break">following command:</span></p>
+			<pre class="console">
+docker image inspect codebreaker/gamesapi:latest</pre>
+			<p>The result is presented in JSON information and shows information such as exposed ports, environment variables, the entry point, the operating system, and the architecture this image is based on. When running the image, it helps to know what port number needs to be mapped and which environment variables could be useful <span class="No-Break">to override.</span></p>
+			<h2 id="_idParaDest-123"><a id="_idTextAnchor122"/>Running the games API using Docker</h2>
+			<p>You can <a id="_idIndexMarker296"/>start the Docker image of the games API service with the <span class="No-Break">following command:</span></p>
+			<pre class="console">
+docker run -p 8080:8080 -d codebreaker/gamesapi:latest</pre>
+			<p>Then, you can check the log output using <strong class="source-inline">docker logs &lt;container-id&gt;</strong> (get the  ID of the running container with <strong class="source-inline">docker ps</strong>). You can interact with the games service using any client using the following HTTP <span class="No-Break">address: </span><span class="No-Break"><strong class="source-inline">http://localhost:8080</strong></span><span class="No-Break">.</span></p>
+			<p>With the default configuration of the data store, games are just stored in memory. To change this, we need to do <span class="No-Break">the following:</span></p>
+			<ol>
+				<li>Configure a network to let multiple Docker containers <span class="No-Break">directly communicate</span></li>
+				<li>Start the Docker container for the SQL <span class="No-Break">Server instance</span></li>
+				<li>Pass configuration values to the Docker container for the games API to use the SQL <span class="No-Break">Server instance</span></li>
+			</ol>
+			<h3>Configuring a network for Docker containers</h3>
+			<p>To let <a id="_idIndexMarker297"/>containers communicate with each other, we create <span class="No-Break">a network:</span></p>
+			<pre class="console">
+docker network create codebreakernet</pre>
+			<p>Docker supports multiple network types, which can be set using the <strong class="source-inline">--driver</strong> option. The default is a <strong class="bold">bridge network</strong> where containers within the same bridge network can directly communicate with each other. Use <strong class="source-inline">docker network ls</strong> to show <span class="No-Break">all networks.</span></p>
+			<h3>Starting the Docker container with SQL Server</h3>
+			<p>To start the<a id="_idIndexMarker298"/> Docker container for SQL Server where the database already exists, you can either use the Docker image we committed or access the state of the previous running container. Here, we do the latter, where we define the name <strong class="source-inline">sql1</strong> as the name of <span class="No-Break">the container:</span></p>
+			<pre class="console">
+docker start sql1</pre>
+			<p>Use <strong class="source-inline">docker ps</strong> to check for the running container and see the port mapping as it was <span class="No-Break">defined earlier.</span></p>
+			<p>Using the command<a id="_idIndexMarker299"/> adds the running container to the <span class="No-Break"><strong class="source-inline">codebreakernet</strong></span><span class="No-Break"> network:</span></p>
+			<pre class="console">
+docker network connect codebreakernet sql1</pre>
+			<h3>Starting the Docker container with the games API</h3>
+			<p>Now, we<a id="_idIndexMarker300"/> need to start the games API but override the configuration values. This can be done by setting environmental variables. Passing environmental variables at the start of a Docker container can not only be done by setting the <strong class="source-inline">-e</strong> option but also by using <strong class="source-inline">--env-file</strong> and passing a file with environmental variables. This is the content of the <span class="No-Break"><strong class="source-inline">gameapis.env</strong></span><span class="No-Break"> file:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">gameapis.env</p>
+			<pre class="source-code">
+DataStore=SqlServer
+ConnectionStrings__GamesSqlServerConnection=sql1,1433;database=CodebreakerGames;user id=sa;password=&lt;enter your password&gt;;TrustServerCertificate=true</pre>
+			<p>Creating the DI container of the application with the default container registers multiple configuration providers. A provider that uses environmental variables wins against the JSON file providers because of the order the providers are configured with the <strong class="source-inline">WebApplicationBuilder</strong> class (or the <strong class="source-inline">Host</strong> class). The <strong class="source-inline">DataStore</strong> key is used to select the storage provider. <strong class="source-inline">GamesSqlServerConnection</strong> is a key within the hierarchy of <strong class="source-inline">ConnectionStrings</strong>. Using command-line arguments to pass configuration values, you can specify a hierarchy of configuration values using <strong class="source-inline">:</strong> as a separator; for example, pass <strong class="source-inline">ConnectionStrings:GamesSqlServerConnection</strong>. Using <strong class="source-inline">:</strong> does not work everywhere; for example, with environmental variables on Linux. Using <strong class="source-inline">__</strong> translates to <span class="No-Break">this hierarchy.</span></p>
+			<p>With the environment variables file, the connection to the SQL Server Docker container is using the hostname of the Docker container and the port that is used by SQL Server. Being in the same network, the containers can <span class="No-Break">communicate directly.</span></p>
+			<p>Starting the container, the environmental variables file is passed <span class="No-Break">using </span><span class="No-Break"><strong class="source-inline">--env-file</strong></span><span class="No-Break">:</span></p>
+			<pre class="console">
+docker run -p 8080:8080 -d --env-file gameapis.env -d --name gamesapi codebreaker/gamesapi:latest
+docker network connect codebreakernet gamesapi</pre>
+			<p class="callout-heading">Note</p>
+			<p class="callout">In case you get an error that the container name is already in use, you can stop running containers with <strong class="source-inline">docker container stop &lt;containername&gt;</strong>. To remove the state of the container, you can use <strong class="source-inline">docker container rm &lt;containername&gt;</strong> or the <strong class="source-inline">docker rm &lt;containername&gt;</strong> shorthand notation. To delete the state of all stopped containers, use <strong class="source-inline">docker container prune</strong>. When starting a new container with <strong class="source-inline">dotnet run</strong>, you can also add the <strong class="source-inline">--rm</strong> option to remove a container <span class="No-Break">after exit.</span></p>
+			<p>Specifying<a id="_idIndexMarker301"/> the name of the <strong class="source-inline">gamesapi</strong> container, the container is added to the <strong class="source-inline">codebreakernet</strong> network. Now, we have two containers running communicating with each other, and can play games using the <span class="No-Break">games service.</span></p>
+			<p>Let’s create another Docker image, but this time without using <span class="No-Break">a Dockerfile.</span></p>
+			<h2 id="_idParaDest-124"><a id="_idTextAnchor123"/>Building a Docker image using dotnet publish</h2>
+			<p>In this chapter, we<a id="_idIndexMarker302"/> use multiple containers running at the same time. A project we didn’t use in previous chapters is <strong class="source-inline">Codebreaker.Bot</strong>. This project offers an API and is also a client to the games service – to automatically play games in the background after requested by some API calls. In this section, we’ll build a Docker image for this project – but without creating a <span class="No-Break">Dockerfile first.</span></p>
+			<p>Since .NET 7, the <strong class="source-inline">dotnet publish</strong> command <a id="_idIndexMarker303"/>directly supports creating Docker images without a Dockerfile. Using the <strong class="source-inline">docker build</strong> command, we had to pay attention to some specific .NET behaviors, such as the need to compile multiple projects. With this, it was necessary to specify the context when building the image. The .NET CLI knows about the solutions and project structure. The .NET CLI also knows about the default Docker base images that are used to build an application with <span class="No-Break">ASP.NET Core.</span></p>
+			<p>Options to configure the generation can be specified in the project file and using the parameters<a id="_idIndexMarker304"/> of <strong class="source-inline">dotnet publish</strong>. Here are some of the configurations specified in the <span class="No-Break">project file:</span></p>
+			<pre class="source-code">
+&lt;PropertyGroup&gt;
+<strong class="bold">  &lt;ContainerRegistry&gt;codebreaker/bot&lt;/ContainerRegistry&gt;</strong>
+<strong class="bold">  </strong><strong class="bold">&lt;ContainerImageTags&gt;3.5.3;latest&lt;/ContainerImageTags&gt;</strong>
+&lt;/PropertyGroup&gt;
+&lt;ItemGroup&gt;
+<strong class="bold">  &lt;ContainerPort Include="8080" Type="tcp" /&gt;</strong>
+&lt;/ItemGroup&gt;</pre>
+			<p><strong class="source-inline">ContainerImageTags</strong> and <strong class="source-inline">ContainerPort</strong> are just two of the elements that are used by <strong class="source-inline">dotnet publish</strong>. You can change the base image with <strong class="source-inline">ContainerBaseImage</strong>, specify container runtime identifiers (<strong class="source-inline">ContainerRuntimeIdentifier</strong>), name the registry (<strong class="source-inline">ContainerRegistry</strong>), define<a id="_idIndexMarker305"/> environmental variables, and more. See <a href="https://learn.microsoft.com//dotnet/core/docker/publish-as-container">https://learn.microsoft.com//dotnet/core/docker/publish-as-container</a> <span class="No-Break">for details.</span></p>
+			<p>With <strong class="source-inline">dotnet publish</strong>, the name of the repository <span class="No-Break">is specified:</span></p>
+			<pre class="console">
+cd Codebreaker.Bot
+dotnet publish Codebreaker.Bot.csproj --os linux --arch x64 /t:PublishContainer -c Release</pre>
+			<p>The bot API service communicates with the games service, and the games service uses a container running SQL Server. Now, we already have three Docker containers collaborating. The games API needs a connection to the database, and the bot needs a link to the <span class="No-Break">games API.</span></p>
+			<h1 id="_idParaDest-125"><a id="_idTextAnchor124"/>Running the solution with .NET Aspire</h1>
+			<p>In <a href="B21217_02.xhtml#_idTextAnchor031"><span class="No-Break"><em class="italic">Chapter 2</em></span></a>, we added .NET Aspire <a id="_idIndexMarker306"/>to the solution, which contained only the games API service. In <a href="B21217_03.xhtml#_idTextAnchor063"><span class="No-Break"><em class="italic">Chapter 3</em></span></a>, we added a SQL Server database running in a Docker container without keeping state. Here, we’ll extend the .NET Aspire configuration by using SQL Server running in a Docker container using a volume and configure the bot service to access the <span class="No-Break">games API.</span></p>
+			<h2 id="_idParaDest-126"><a id="_idTextAnchor125"/>Configuring a Docker container for SQL Server</h2>
+			<p>Using a <a id="_idIndexMarker307"/>Docker container with .NET Aspire can be orchestrated using .NET code – with extension methods of the <span class="No-Break"><strong class="source-inline">IDistributedApplication</strong></span><span class="No-Break"> interface:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.AppHost/Program.cs</p>
+			<pre class="source-code">
+var builder = DistributedApplication.CreateBuilder(args);
+var sqlPassword = builder.AddParameter("SqlPassword", secret: true);
+var sqlServer = builder.<strong class="bold">AddSqlServer</strong>("sql", sqlPassword)
+  WithDataVolume("codebreaker-sql-data", isReadOnly: false)
+ .<strong class="bold">AddDatabase</strong>("CodebreakerSql");
+  var gameAPIs = builder.AddProject&lt;Projects.
+<strong class="bold">    </strong>Codebreaker_GameAPIs&gt;("gameapis")
+<strong class="bold">    .WithReference(sqlServer);</strong>
+  // code removed for brevity</pre>
+			<p>The <strong class="source-inline">AddSqlServer</strong> method adds SQL Server as a .NET Aspire resource to the app model. On the developer system, a Docker container is used to run SQL Server. When we created the container before in <a href="B21217_03.xhtml#_idTextAnchor063"><span class="No-Break"><em class="italic">Chapter 3</em></span></a>, we assigned a password using the default password configuration. Here we explicitly create an app model parameter using the <strong class="source-inline">AddParameter</strong> method. With this, parameters are retrieved from the Parameters configuration section. Thus, the parameter named <strong class="source-inline">SqlConfiguration</strong> is retrieved from <strong class="source-inline">Paramters:SqlConfiguration</strong>. This parameter resource is passed with the second parameter of <strong class="source-inline">AddSqlServer</strong>. If the password is not assigned, and a parameter named with the resource (sql) postfixed with -password does not exist, a random password is created. This is great if no volume mounts are used, and the database is created newly every time the container starts up. Using a persistent volume, the<a id="_idIndexMarker308"/> same password needs to be used with every run of the container. This is done by supplying the password configuration. The password is needed with the database connection string to access the database. </p>
+			<p>The <strong class="source-inline">WithDataVolume</strong> method <a id="_idIndexMarker309"/>defines the use of a Docker volume for the SQL Server container. Within the container, the database is stored within the <strong class="source-inline">/var/opt/mssql</strong> folder. Remember – without using a volume, the database is stored within the container itself, and the state is not kept when running a new container instance. While invoking <strong class="source-inline">WithDataVolume</strong>, there's no need to know what directories of the container need to mapped. This is known by the WithDataVolume method. We just pass the optional name of the volume, and if the volume should be read-only. With this volume, the database files are written to, thus it’s not read-only. In <a href="B21217_11.xhtml#_idTextAnchor263"><span class="No-Break"><em class="italic">Chapter 11</em></span></a>, when adding Grafana and Prometheus Docker containers, we’ll use <span class="No-Break">read-only mounts.</span></p>
+			<p>The <strong class="source-inline">AddDatabase</strong> method <a id="_idIndexMarker310"/>adds the SQL Server database as a child resource to SQL Server. The name passed here defines the name of the resource and the name of <span class="No-Break">the database.</span></p>
+			<p>So that .NET Aspire adds implicit service discovery, the database is referenced from the game APIs project using the <strong class="source-inline">WithReference</strong> method. With this, the <strong class="source-inline">CodebreakerSql</strong> database name can be used to reference the <span class="No-Break">connection string.</span></p>
+			<p>Using the <strong class="source-inline">AddSqlServer</strong> method, there’s no need to know the Docker image name for SQL Server or the environment variables that need to be specified, as we’ve done this earlier using the SQL Server Docker image. All this is done within the implementation of this method. To see how any Docker image can be added to the .NET Aspire app model, let’s look at the implementation of <span class="No-Break">this method:</span></p>
+			<pre class="source-code">
+public static IResourceBuilder&lt;SqlServerServerResource&gt; 
+  AddSqlServer(this IDistributedApplicationBuilder builder, string 
+  name, string? password = null, int? port = null)
+{
+var passwordParameter = password?.Resource 
+  ??  ParameterResourceBuilderExtensions.
+  CreateDefaultPasswordPArameter(builder, $"{name}-password", 
+  minLower: 1, minUpper: 1, minNumeric: 1);
+  <strong class="bold">var sqlServer = new SqlServerServerResource(name, </strong>
+    <strong class="bold">passwordParameter);</strong>
+  return builder.<strong class="bold">AddResource</strong>(sqlServer)
+    .<strong class="bold">WithEndpoint</strong>(<strong class="bold">1433, port, null</strong>, "tcp")
+    .WithImage("mssql/server", "2022-latest")
+    .WithImageRegistry("mcr.microsoft.com")
+    .<strong class="bold">WithEnvironment</strong>("ACCEPT_EULA", "Y")
+    .<strong class="bold">WithEnvironment</strong>(context =&gt;)
+    {
+      context.EnvironmentVariables["MSSQL_SA_PASSWORD"] =
+        sqlServer.PasswordParameter;
+    });
+  }</pre>
+			<p>With this code, an <a id="_idIndexMarker311"/>endpoint is defined to map a passed port number to the port number <strong class="source-inline">1433</strong> that is used by SQL Server running in the container; the container registry, image name, and tag values are specified, and environment variables are created to accept the <strong class="bold">end-user license agreement</strong> (<strong class="bold">EULA</strong>) and <a id="_idIndexMarker312"/>to specify the password. All this is specified when invoking the <strong class="source-inline">AddSqlServer</strong> method. Using .NET Aspire, we don’t need to know this with <span class="No-Break">available components.</span></p>
+			<p>Before starting the application, make sure to set configuration via a user secret to store the password for SQL Server within the <strong class="source-inline">Codebreaker.AppHost</strong> project; for example, using the <span class="No-Break">following command:</span></p>
+			<pre class="console">
+dotnet user-secrets set Parameters:SqlPassword "Password123!"</pre>
+			<p>Now, we have to configure the .NET Aspire SQL <span class="No-Break">Server component.</span></p>
+			<h2 id="_idParaDest-127"><a id="_idTextAnchor126"/>Configuring the .NET Aspire SQL Server component</h2>
+			<p>With the<a id="_idIndexMarker313"/> games API, the EF Core context is configured with the DI container using the .NET Aspire SQL Server EF <span class="No-Break">Core component:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.GameAPIs/ApplicationServices.cs</p>
+			<pre class="source-code">
+public static class ApplicationServices
+{
+  public static void AddApplicationServices(this 
+    IHostApplicationBuilder builder)
+  {
+    static void ConfigureSqlServer(IHostApplicationBuilder builder)
+    {
+<strong class="bold">      builder.AddDbContextPool&lt;IGamesRepository, </strong>
+        <strong class="bold">GamesSqlServerContext&gt;(options =&gt;</strong>
+<strong class="bold">        {</strong>
+<strong class="bold">          var connectionString = builder.Configuration.</strong>
+            <strong class="bold">GetConnectionString("CodebreakerSql")</strong>
+            <strong class="bold">?? throw new InvalidOperationException("Could not read SQL </strong>
+            <strong class="bold">Server connection string");</strong>
+<strong class="bold">          options.UseSqlServer(connectionString);</strong>
+<strong class="bold">          options.UseQueryTrackingBehavior(</strong>
+<strong class="bold">            QueryTrackingBehavior.NoTracking);</strong>
+<strong class="bold">        });</strong>
+         <strong class="bold">builder.EnrichSqlServerDbContext&lt;GamesSqlServerContext&gt;();</strong>
+    }
+    // code removed for brevity
+    string? dataStore = builder.Configuration.
+      GetValue&lt;string&gt;("DataStore");
+    switch (dataStore)
+    {
+      case "SqlServer":
+        ConfigureSqlServer(builder);
+        break;
+      default:
+        ConfigureInMemory(builder);
+      break;
+    }
+    builder.Services.AddScoped&lt;IGamesService, GamesService&gt;();
+  }
+}</pre>
+			<p>The first <a id="_idIndexMarker314"/>part of the configuration is just the usual .NET EF Core configuration to specify the EF Core database provider and the connection string. Just make sure to use the connection string key that was used with the app model definition. The connection string is forwarded from the <strong class="source-inline">AppHost</strong> project to the games API service. The parameter with the value <strong class="source-inline">CodebreakerSql</strong> matches the name of the database that has been configured with the app model. Using .NET Aspire orchestration (which uses <strong class="source-inline">Microsoft.Extensions.ServiceDiscovery</strong>) gets the connection string with this name from the <span class="No-Break">orchestrator configuration.</span></p>
+			<p>The <strong class="source-inline">EnrichSqlServerDbContext</strong> method adds .NET Aspire configuration for retries, logging, <span class="No-Break">and metrics.</span></p>
+			<p>With this, the games API service with the database configuration is in place. Next, add interaction between the bot service and the games <span class="No-Break">API service.</span></p>
+			<h2 id="_idParaDest-128"><a id="_idTextAnchor127"/>Configuring interaction with multiple services</h2>
+			<p>Both the<a id="_idIndexMarker315"/> games API service and the bot service are configured by adding a project to the <span class="No-Break">distributed application:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.AppHost/Program.cs</p>
+			<pre class="source-code">
+<strong class="bold">var gameAPIs =</strong> builder.AddProject&lt;Projects.Codebreaker_GameAPIs&gt;("gameapis")
+  .WithReference(sqlServer);
+<strong class="bold">builder.AddProject&lt;Projects.CodeBreaker_Bot&gt;("bot")</strong>
+<strong class="bold">  .WithReference(gameAPIs);</strong></pre>
+			<p>The SQL Server Docker container was added using the <strong class="source-inline">AddSqlServer</strong> method. All .NET projects that should be orchestrated with .NET Aspire need to be added using the <strong class="source-inline">AddProject</strong> method. The class definition for the project is created from a source generator when adding a project reference to the <strong class="source-inline">AppHost</strong> project. Adding a reference to the <strong class="source-inline">Codebreaker.Bot</strong> project created a class named <strong class="source-inline">Codebreaker_Bot</strong>. All project classes are defined within the <span class="No-Break"><strong class="source-inline">Projects</strong></span><span class="No-Break"> namespace.</span></p>
+			<p>The bot service needs a reference to the games API, thus the <strong class="source-inline">WithReference</strong> method is used to generate implicit service discovery. The bot can use the name <strong class="source-inline">http://gameapis</strong> to reference the games <span class="No-Break">API service.</span></p>
+			<p>The configuration to retrieve the link to the games API is configured with the <span class="No-Break"><strong class="source-inline">HttpClient</strong></span><span class="No-Break"> configuration:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.Bot/ApplicationServices.cs</p>
+			<pre class="source-code">
+public static void AddApplicationServices(this IHostApplicationBuilder 
+  builder)
+{
+<strong class="bold">  builder.Services.AddHttpClient&lt;GamesClient&gt;(client =&gt;</strong>
+<strong class="bold">  {</strong>
+<strong class="bold">    client.BaseAddress = new Uri("http://gameapis");</strong>
+<strong class="bold">  });</strong>
+  builder.Services.AddScoped&lt;CodeBreakerTimer&gt;();
+  builder.Services.AddScoped&lt;CodeBreakerGameRunner&gt;();
+}</pre>
+			<p>The <strong class="source-inline">BaseAddress</strong> of <strong class="source-inline">HttpClient</strong> is configured with the name of the games API, as defined <a id="_idIndexMarker316"/>with the <strong class="source-inline">gameapis</strong> orchestration configuration – prefixed with <strong class="source-inline">http://</strong>. There’s no need to specify .NET configuration to configure <span class="No-Break">the link.</span></p>
+			<p>With just these few updates in place, we can start the <strong class="source-inline">Codebreaker.AppHost</strong> project in the <span class="No-Break">next step.</span></p>
+			<h2 id="_idParaDest-129"><a id="_idTextAnchor128"/>Running the solution with .NET Aspire</h2>
+			<p>Using <strong class="source-inline">dotnet run</strong> to<a id="_idIndexMarker317"/> build and run the <strong class="source-inline">Codebreaker.AppHost</strong> project starts up the Docker container for SQL Server, the games API, the bot service, and the .NET Aspire dashboard. <span class="No-Break"><em class="italic">Figure 5</em></span><em class="italic">.4</em> shows all started resources in the .NET Aspire dashboard. From here, you can see if services started successfully and access configured environment variables for services, logs, as well as <span class="No-Break">accessible endpoints:</span></p>
+			<div>
+				<div id="_idContainer057" class="IMG---Figure">
+					<img src="image/B21217_05_04.jpg" alt="Figure 5.4 – .NET Aspire resources in the dashboard"/>
+				</div>
+			</div>
+			<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Figure 5.4 – .NET Aspire resources in the dashboard</p>
+			<p>With resources, make <a id="_idIndexMarker318"/>sure to open the <strong class="bold">Details</strong> column to see the environment variables configured. When checking logs with the SQL Server Docker container, you can see issues when using an invalid password – for example, a password that doesn’t fulfill the requirements or a password that doesn’t match the volume that was <span class="No-Break">initially set.</span></p>
+			<p>Clicking on the endpoint of the bot to show the OpenAPI test page, you can start multiple game runs, as shown in <span class="No-Break"><em class="italic">Figure 5</em></span><em class="italic">.5</em>. Specify the number of games the bot should play in a sequence, the delay time between the games, and the delay time with every move, and click the <span class="No-Break"><strong class="bold">Execute</strong></span><span class="No-Break"> button:</span></p>
+			<div>
+				<div id="_idContainer058" class="IMG---Figure">
+					<img src="image/B21217_05_05.jpg" alt="Figure 5.5 – OpenAPI test page for the bot service"/>
+				</div>
+			</div>
+			<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Figure 5.5 – OpenAPI test page for the bot service</p>
+			<p>With the<a id="_idIndexMarker319"/> logs of the bot service, you can monitor live information about games played by the bot. With every move set, the bot logs information about how good the result from the move was and how many possible options are remaining to find <span class="No-Break">the solution:</span></p>
+			<div>
+				<div id="_idContainer059" class="IMG---Figure">
+					<img src="image/B21217_05_06.jpg" alt="Figure 5.6 – Structured logging of the bot service"/>
+				</div>
+			</div>
+			<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Figure 5.6 – Structured logging of the bot service</p>
+			<p>After the<a id="_idIndexMarker320"/> services are running, you can also access the games API service, see the games played today, and use the client created in the previous chapter to play some games. Monitor the running Docker container using the Docker CLI, and also check the <span class="No-Break">volume created.</span></p>
+			<p>Let’s get into an exciting feature with .NET 8 – native AOT – <span class="No-Break">next.</span></p>
+			<h1 id="_idParaDest-130"><a id="_idTextAnchor129"/>Using native AOT with ASP.NET Core</h1>
+			<p>Comparing Docker images with VM images, Docker images are a lot smaller as they don’t need to <a id="_idIndexMarker321"/>contain the operating system. With ASP.NET Core applications, the Docker image contains the application – and the .NET runtime. Over the last years, images have become smaller because more and more optimization has been done. Having smaller images means faster startup of <span class="No-Break">the application.</span></p>
+			<p>Since .NET 7, it’s possible to create native applications with C# using <strong class="bold">native AOT</strong>. With this, many changes are required with .NET. With .NET 7, the native AOT functionality was very limited. With .NET 8, we can already create ASP.NET Core services, which results in faster startup and less <span class="No-Break">memory footprint.</span></p>
+			<p>Using native AOT, an AOT compiler is used to <a id="_idIndexMarker322"/>compile <strong class="bold">Intermediate Language</strong> (<strong class="bold">IL</strong>) code to native code. At build time, we still use the normal build process and the .NET runtime because native compilation takes some time. The native AOT compilation happens with <span class="No-Break"><strong class="source-inline">dotnet publish</strong></span><span class="No-Break">.</span></p>
+			<p>Not all <a id="_idIndexMarker323"/>applications can be changed to use native AOT: libraries cannot be dynamically loaded, runtime code generation is not possible… With native AOT, the code is trimmed, and all libraries need to be native AOT compatible. With .NET 8, EF Core is not part of the libraries supporting native AOT. It’s on the roadmap, and partial support is planned with EF <span class="No-Break">Core 9.</span></p>
+			<p>By creating a solution based on microservices, it’s possible to differentiate technologies with different services. What are the most used services where native AOT can <span class="No-Break">give improvements?</span></p>
+			<p>With the <strong class="source-inline">codebreaker</strong> solution, the games service can be enhanced with faster startup and less memory footprint. This is the most important service of the solution where the users should have a fast response at every point in time. However, with the lack of support in EF Core, using .NET 8, this is only possible with the in-memory <span class="No-Break">games provider.</span></p>
+			<p>To create an API project to support native AOT, a template <span class="No-Break">is available:</span></p>
+			<pre class="console">
+dotnet new webapiaot -o Codebreaker.GameAPIs.NativeAOT</pre>
+			<p>The most important difference with this project generated is the     <strong class="source-inline">&lt;PublishAot&gt;true&lt;/PublishAot&gt;</strong> setting in the project file. With this, using <strong class="source-inline">dotnet publish</strong> compiles the application to native platform-specific code. Because the compiler needs more time to compile native code, during development time, IL code is still generated, and the .NET runtime is used. As help during development to build native code, analyzers run and give compiler errors and warnings if code might not be compatible with <span class="No-Break">native AOT.</span></p>
+			<p>With the <strong class="source-inline">Codebreaker.GameAPIs.NativeAOT</strong> project, you can start copying the code from the <strong class="source-inline">Codebreaker.GameAPIs</strong> project, but some changes are required. We’ll focus on the changes needed for native <span class="No-Break">AOT here.</span></p>
+			<p>OpenAPI document generation is removed – including methods to enhance OpenAPI documentation. This feature makes use of reflection and dynamic code generation, which is not supported. The EF Core SQL Server and Cosmos providers are removed from this project as well. Instead, the project only uses the in-memory <span class="No-Break">games repository.</span></p>
+			<p class="callout-heading">Note</p>
+			<p class="callout">.NET 7 included an extremely limited functionality for native AOT. .NET 8 brings many more features, but many libraries are not supported yet. With .NET 8, you can’t use ASP.NET Core controllers, OpenAPI documentation is not available, the authentication library cannot be used, and most EF Core providers don’t support native AOT. Over time, more features will be added to support <span class="No-Break">native AOT.</span></p>
+			<p class="callout">Native AOT doesn’t allow the creation of code dynamically at runtime. Here, source generators are of big use. Instead of using reflection emit to create code at runtime, with source generators, code is created at compile time. This is not only an advantage with native AOT; even without using native AOT, source generators can improve the <span class="No-Break">runtime performance.</span></p>
+			<h2 id="_idParaDest-131"><a id="_idTextAnchor130"/>Using the slim builder</h2>
+			<p>Native AOT services make<a id="_idIndexMarker324"/> use of a slim application builder, as shown in the following <span class="No-Break">code snippet:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.GameAPIs.NativeAOT/Program.cs</p>
+			<pre class="source-code">
+var builder = WebApplication.CreateSlimBuilder(args);</pre>
+			<p>Contrary to the default builder, the number of services registered with the DI container is reduced. Logging is reduced as well. The only logging provider that is configured with the slim builder is the simple console logging provider. In case more functionality is needed, additional services can be added. To reduce the number of registered services even further, the <strong class="source-inline">CreateEmptyBuilder</strong> method can <span class="No-Break">be used.</span></p>
+			<h2 id="_idParaDest-132"><a id="_idTextAnchor131"/>Using the JSON serializer source generator</h2>
+			<p>The use of<a id="_idIndexMarker325"/> the <strong class="source-inline">System.Text.Json</strong> serializer needs to be changed to use a source generator. Without a source generator, the serializer uses reflection and creates code at runtime. This is not supported with native AOT. To generate code at compile time, source generators are used. To use the <strong class="source-inline">System.Text.Json</strong> source generator, the <strong class="source-inline">AppJsonSerializerContext</strong> class <span class="No-Break">is added:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.GameAPIs.NativeAOT/Program.cs</p>
+			<pre class="source-code">
+[JsonSerializable(typeof(IEnumerable&lt;Game&gt;))]
+[JsonSerializable(typeof(UpdateGameRequest))]
+[JsonSerializable(typeof(UpdateGameResponse))]
+[JsonSerializable(typeof(CreateGameResponse))]
+[JsonSerializable(typeof(CreateGameRequest))]
+[JsonSerializable(typeof(Game[]))]
+internal partial class AppJsonSerializerContext : JsonSerializerContext
+{
+}</pre>
+			<p>The class<a id="_idIndexMarker326"/> is declared partial to allow the source generator to create additional sources to extend the class with additional members. For every type that’s serialized with JSON, the <strong class="source-inline">JsonSerializable</strong> attribute <span class="No-Break">is added.</span></p>
+			<p>This class is used with the DI configuration of the <span class="No-Break">JSON serialization:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.GameAPIs.NativeAOT/Program.cs</p>
+			<pre class="source-code">
+builder.Services.ConfigureHttpJsonOptions(options =&gt;
+{
+    options.SerializerOptions.TypeInfoResolverChain.Insert(0,
+       AppJsonSerializerContext.Default);
+});</pre>
+			<p>With this code, the default instance of the context class is added to the type resolvers of the <span class="No-Break"><strong class="source-inline">System.Text.Json</strong></span><span class="No-Break"> serializer.</span></p>
+			<h2 id="_idParaDest-133"><a id="_idTextAnchor132"/>Building for Windows</h2>
+			<p>After <a id="_idIndexMarker327"/>removing the code for the OpenAPI, removing SQL Server and Cosmos library references, and adding the <strong class="source-inline">PublishAot</strong> element to the project file, after a successful build, <strong class="source-inline">dotnet publish</strong> can be used to create a native application. This is the command to create a native image <span class="No-Break">for Windows:</span></p>
+			<pre class="console">
+cd Codebreaker.GameAPIs.NativeAOT
+dotnet publish -r win-x64 -c Release -o pubwin</pre>
+			<p>Using <strong class="source-inline">dotnet publish</strong> with the <strong class="source-inline">win-x64</strong> runtime identifier starts the native compiler and writes the binary to the <strong class="source-inline">pubwin</strong> directory. The code is trimmed to remove not-used types and members from the binary. As a result, you receive a trimmed native executable that doesn’t need to have the .NET runtime installed on the target system. Starting the application, you can use any client to play games with the <span class="No-Break">in-memory provider.</span></p>
+			<h2 id="_idParaDest-134"><a id="_idTextAnchor133"/>Creating a Linux Docker image</h2>
+			<p>This is<a id="_idIndexMarker328"/> the new Dockerfile we need for the native AOT <span class="No-Break">games service:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.GameAPIs.NativeAOT/Dockerfile</p>
+			<pre class="source-code">
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+<strong class="bold">RUN apt-get update \</strong>
+<strong class="bold">    &amp;&amp; apt-get install -y --no-install-recommends \</strong>
+<strong class="bold">    clang zlib1g-dev</strong>
+ARG BUILD_CONFIGURATION=Release
+WORKDIR /src
+COPY ["Codebreaker.GameAPIs.NativeAOT.csproj", "."]
+RUN dotnet restore "./Codebreaker.GameAPIs.NativeAOT.csproj"
+COPY . .
+WORKDIR "/src/."
+RUN dotnet build "./Codebreaker.GameAPIs.NativeAOT.csproj" -c $BUILD_CONFIGURATION -o /app/build
+FROM build AS publish
+ARG BUILD_CONFIGURATION=Release
+RUN dotnet publish "./Codebreaker.GameAPIs.NativeAOT.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=true
+<strong class="bold">FROM mcr.microsoft.com/dotnet/runtime-deps:8.0 AS final</strong>
+WORKDIR /app
+EXPOSE 8080
+COPY --from=publish /app/publish .
+ENTRYPOINT ["./Codebreaker.GameAPIs.NativeAOT"]</pre>
+			<p>To compile the<a id="_idIndexMarker329"/> application to native code, using the same SDK-included base image, the <strong class="source-inline">clang</strong> and <strong class="source-inline">zlib1g-dev</strong> dependencies need to be installed with the Linux environment. This is done as the first step before copying the project files. For production, a different base image is used: <strong class="source-inline">dotnet/runtime-deps</strong>. This is the new base image containing native dependencies needed by .NET. This image does not include the .NET runtime; instead, it can be used for <span class="No-Break">self-contained applications.</span></p>
+			<p>Building the Docker image can be done using the <span class="No-Break">following command:</span></p>
+			<pre class="console">
+docker build . -f Codebreaker.GameAPIs.NativeAOT\Dockerfile -t codebreaker/gamesapi-aot:latest -t codebreaker/gamesapi-aot:3.5.6</pre>
+			<h2 id="_idParaDest-135"><a id="_idTextAnchor134"/>Running the solution with the native AOT container</h2>
+			<p>After <a id="_idIndexMarker330"/>building the image, you can start the Docker container and use different clients (for example, the bot service, the HTTP files, and the client from the previous chapter) to test the service. With this, you can also do some performance comparisons – but remember that some features have been removed to be native <span class="No-Break">AOT compatible.</span></p>
+			<p class="callout-heading">Note</p>
+			<p class="callout">With .NET 8, native AOT is in its early stages. I expect many libraries to be updated to support native AOT in time. With a microservices architecture, for services that can improve from fast startup times, it can be useful to already use native AOT. A native AOT service can make use of gRPC (covered in <a href="B21217_14.xhtml#_idTextAnchor330"><span class="No-Break"><em class="italic">Chapter 14</em></span></a>, <em class="italic">gRPC for Binary Communication</em>), and the service accessible via gRPC can access the database. In any case, non-AOT services can also get improvements from features you’ve seen here, such as the slim builder or the JSON serializer <span class="No-Break">source generator.</span></p>
+			<h1 id="_idParaDest-136"><a id="_idTextAnchor135"/>Summary</h1>
+			<p>In this chapter, you learned the foundation of Docker, pulling, creating, and running Docker images. You used containers that store state with volumes running databases in Docker containers, passed environmental variables and secrets to running Docker containers, and used .NET Aspire to run multiple containers <span class="No-Break">at once.</span></p>
+			<p>Using .NET Aspire, you configured orchestration for multiple services – including the configuration of a SQL Server Docker container. Comparing this to the work needed with Docker, this was an easy task – but it’s still useful to understand <span class="No-Break">the foundations.</span></p>
+			<p>With native AOT, you reduced startup times and the memory footprint, which you might be able to use with some of <span class="No-Break">your services.</span></p>
+			<p>Before moving on to the next chapter, using the bot, you can now easily play thousands of games. The bot uses a simple algorithm to set random moves from a list of possible moves. Using the games query, check the number of moves the bot needs to find the result. Try to play a game using the client you created in the previous chapter to access the Docker container from this chapter. Can you solve games in <span class="No-Break">fewer moves?</span></p>
+			<p>As you’ve seen in this chapter, you can run databases in Docker containers. With this, you still need to manage your database in the same way as you manage your natively installed on-premises database. Another option you’ll see in the next chapter is to use <strong class="bold">platform-as-a-service</strong> (<strong class="bold">PaaS</strong>) cloud services such as Azure Cosmos DB. In the next chapter, we’ll create Azure resources and publish Docker images we created in this chapter to <strong class="bold">Azure Container Registry</strong> (<strong class="bold">ACR</strong>) and Azure <span class="No-Break">Container Apps.</span></p>
+			<h1 id="_idParaDest-137"><a id="_idTextAnchor136"/>Further reading</h1>
+			<p>To learn more about the topics discussed in this chapter, you can refer to the <span class="No-Break">following links:</span></p>
+			<ul>
+				<li><em class="italic">Get started with Docker remote containers on WSL </em><span class="No-Break"><em class="italic">2</em></span><span class="No-Break">: </span><a href="https://learn.microsoft.com/windows/wsl/tutorials/wsl-containers"><span class="No-Break">https://learn.microsoft.com/windows/wsl/tutorials/wsl-containers</span></a></li>
+				<li><em class="italic">How does Docker generate container names?</em>:  <a href="https://frightanic.com/computers/docker-default-container-names/"><span class="No-Break">https://frightanic.com/computers/docker-default-container-names/</span></a></li>
+				<li><em class="italic">Configure and customize SQL Server Docker </em><span class="No-Break"><em class="italic">containers</em></span><span class="No-Break">: </span><a href="https://learn.microsoft.com/sql/linux/sql-server-linux-docker-container-configure"><span class="No-Break">https://learn.microsoft.com/sql/linux/sql-server-linux-docker-container-configure</span></a></li>
+				<li>Azure SQL Edge Docker <span class="No-Break">image: </span><a href="https://hub.docker.com/_/microsoft-azure-sql-edge"><span class="No-Break">https://hub.docker.com/_/microsoft-azure-sql-edge</span></a></li>
+				<li>Run the Azure Cosmos DB emulator on Docker for <span class="No-Break">Linux:</span><span class="No-Break"><span class="P---URL"> </span></span><a href="https://learn.microsoft.com/azure/cosmos-db/docker-emulator-linux"><span class="No-Break">https://learn.microsoft.com/azure/cosmos-db/docker-emulator-linux</span></a></li>
+				<li>Dockerfile <span class="No-Break">instructions: </span><a href="https://docs.docker.com/engine/reference/builder/"><span class="No-Break">https://docs.docker.com/engine/reference/builder/</span></a></li>
+				<li><em class="italic">Containerize a .NET app with dotnet </em><span class="No-Break"><em class="italic">publish</em></span><span class="No-Break">: </span><a href="https://learn.microsoft.com/dotnet/core/docker/publish-as-container"><span class="No-Break">https://learn.microsoft.com/dotnet/core/docker/publish-as-container</span></a></li>
+				<li>.NET service <span class="No-Break">discovery: </span><a href="https://learn.microsoft.com/en-us/dotnet/core/extensions/service-discovery"><span class="No-Break">https://learn.microsoft.com/en-us/dotnet/core/extensions/service-discovery</span></a></li>
+				<li><em class="italic">.NET Aspire </em><span class="No-Break"><em class="italic">documentation</em></span><span class="No-Break">: </span><a href="https://learn.microsoft.com/en-us/dotnet/aspire"><span class="No-Break">https://learn.microsoft.com/en-us/dotnet/aspire</span></a></li>
+				<li><em class="italic">Native AOT </em><span class="No-Break"><em class="italic">deployment</em></span><span class="No-Break">:</span><span class="No-Break"><span class="P---URL"> </span></span><a href="https://learn.microsoft.com/dotnet/core/deploying/native-aot/"><span class="No-Break">https://learn.microsoft.com/dotnet/core/deploying/native-aot/</span></a></li>
+			</ul>
+		</div>
+	</body></html>

@@ -1,0 +1,496 @@
+<html><head></head><body>
+		<div id="_idContainer088">
+			<h1 id="_idParaDest-163" class="chapter-number"><a id="_idTextAnchor162"/>7</h1>
+			<h1 id="_idParaDest-164"><a id="_idTextAnchor163"/>Flexible Configurations</h1>
+			<p>.NET offers flexible configurations<a id="_idIndexMarker433"/> using a provider-based model to read configurations from different sources. In the last chapter, we configured environment variables with Azure Container Apps to override the JSON <span class="No-Break">file configuration.</span></p>
+			<p>In <a id="_idIndexMarker434"/>this chapter, you will learn how to use the app configuration with .NET and how to add a configuration provider to use a central configuration store: <strong class="bold">Azure App Configuration</strong>. For secrets, we have another Azure service<a id="_idIndexMarker435"/> available: <strong class="bold">Azure Key Vault</strong>. In this chapter, you’ll also learn how to combine Azure Key Vault with Azure App Configuration and reduce the number of secrets you need to store by<a id="_idIndexMarker436"/> using <strong class="bold">Azure </strong><span class="No-Break"><strong class="bold">managed identities</strong></span><span class="No-Break">.</span></p>
+			<p>In this chapter, you’ll learn how to do <span class="No-Break">the following:</span></p>
+			<ul>
+				<li>Explore the functionality of .<span class="No-Break">NET configurations</span></li>
+				<li>Store configurations with Azure <span class="No-Break">App Configuration</span></li>
+				<li>Store secrets with Azure <span class="No-Break">Key Vault</span></li>
+				<li>Reduce the number of secrets needed using <span class="No-Break">managed identities</span></li>
+				<li>Use environments with Azure <span class="No-Break">App Configuration</span></li>
+			</ul>
+			<h1 id="_idParaDest-165"><a id="_idTextAnchor164"/>Technical requirements</h1>
+			<p>Similar to the previous chapter, an Azure subscription, the Azure CLI, Azure Developer CLI, and Docker Desktop <span class="No-Break">are required.</span></p>
+			<p>The code for this chapter can be found in the following GitHub <span class="No-Break">repository: </span><a href="https://github.com/PacktPublishing/Pragmatic-Microservices-with-CSharp-and-Azure"><span class="No-Break">https://github.com/PacktPublishing/Pragmatic-Microservices-with-CSharp-and-Azure</span></a><span class="No-Break">.</span></p>
+			<p>In the <strong class="source-inline">ch07</strong> folder, you’ll see these projects with the final result of <span class="No-Break">this chapter:</span></p>
+			<ul>
+				<li><strong class="source-inline">ConfigurationPrototype</strong> – This is a new project that shows some concepts with configuration before implementing this with the games API and the <span class="No-Break">bot service.</span></li>
+				<li><strong class="source-inline">Codebreaker.InitializeAppConfig</strong> – This is a new project to initialize values with Azure <span class="No-Break">App Configuration.</span></li>
+				<li><strong class="source-inline">Codebreaker.AppHost</strong> – The app model defined with this project is enhanced to include the <strong class="source-inline">ConfigurationPrototype</strong> and <strong class="source-inline">Codebreaker.InitializeAppConfig</strong> projects and add App Configuration and Azure Key Vault resources to the <span class="No-Break">app model.</span></li>
+				<li><strong class="source-inline">Codebreaker.GameAPIs</strong> – The games API project we used in the previous chapter is enhanced using <span class="No-Break">App Configuration.</span></li>
+				<li><strong class="source-inline">Codebreaker.Bot</strong> – This is the implementation of the bot service that plays games. This project is enhanced with App Configuration <span class="No-Break">as well.</span></li>
+			</ul>
+			<p>You can start with the results from the previous chapter to work on your own through <span class="No-Break">this chapter.</span></p>
+			<p>To publish the solution to Azure (which is needed later in this chapter when we use managed identities), use the Azure Developer CLI with the current directory set to the <span class="No-Break"><strong class="source-inline">solution</strong></span><span class="No-Break"> folder:</span></p>
+			<pre class="console">
+azd init
+azd up</pre>
+			<p>With <strong class="source-inline">azd init</strong>, select to analyze the code in the folder, accept to deploy Azure Container Apps, specify an environment such as <strong class="source-inline">codebreaker-07</strong>, and select the game APIs, the bot, and the configuration prototype to be accessible from the Ingress controller. With <strong class="source-inline">azd up</strong>, the resources are deployed to your <span class="No-Break">configured environment.</span></p>
+			<p>Check the README file of the <strong class="source-inline">ch07</strong> folder of the repository for the <span class="No-Break">latest updates.</span></p>
+			<h1 id="_idParaDest-166"><a id="_idTextAnchor165"/>Experiencing .NET configurations</h1>
+			<p>In<a id="_idIndexMarker437"/> this chapter, we will create a new Web API project to try out .NET configuration features before adding configuration features to the game APIs and the <span class="No-Break">bot service:</span></p>
+			<pre class="console">
+dotnet new webapi -o ConfigurationPrototype</pre>
+			<p>.NET is flexible in how to read configuration values. Configuration values can be retrieved from different sources such as JSON files, environment variables, and command-line arguments. Depending on the environment (for example, production and development), different configuration values are also retrieved. Using this core .NET feature, it’s easily possible to add other configuration sources and <span class="No-Break">customize environments.</span></p>
+			<p>Behind the scenes, the <strong class="source-inline">ConfigurationManager</strong> class is used to configure sources for the application configuration. This configuration is done at application startup when <span class="No-Break">invoking </span><span class="No-Break"><strong class="source-inline">WebApplication.CreateBuilder</strong></span><span class="No-Break">.</span></p>
+			<p class="callout-heading">Note</p>
+			<p class="callout">With .NET 8, other builder methods, such as <strong class="source-inline">CreateSlimBuilder</strong> and <strong class="source-inline">CreateEmptyBuilder</strong>, are available. With these builders, the number of services registered is reduced to <span class="No-Break">increase performance.</span></p>
+			<p>With the default configuration as done by <strong class="source-inline">WebApplicationBulder.CreateBuilder</strong>, a list of configuration providers has already <span class="No-Break">been added:</span></p>
+			<ul>
+				<li><strong class="bold">Memory configuration provider</strong>: The memory configuration provider is great for values<a id="_idIndexMarker438"/> that can be<a id="_idIndexMarker439"/> retrieved programmatically during runtime. For example, the <strong class="source-inline">webroot</strong> key is set to the path of the web directory. Instead of using other APIs to get this information, you can retrieve it using <span class="No-Break">configuration keys.</span></li>
+				<li><strong class="bold">Environment variable configuration provider</strong>: For <a id="_idIndexMarker440"/>accessing environment variables, multiple <a id="_idIndexMarker441"/>providers are configured. Built-in provider configurations add environment variables with the <strong class="source-inline">ASPNETCORE_</strong> and <strong class="source-inline">DOTNETCORE_</strong> prefixes to have them available early in the process, which allows overriding the values by all providers following. Another environment variable configuration provider adds all other environment variables. The <strong class="source-inline">ASPNETCORE_HTTP_PORTS</strong> and <strong class="source-inline">ASPNETCORE_HTTPS_PORTS</strong> environment variables are new since .NET 8 to easily change the listening ports of the Kestrel server. .NET Aspire passes environment variables to the <a id="_idIndexMarker442"/><span class="No-Break">configured projects.</span></li>
+				<li><strong class="bold">JSON configuration provider</strong>: The JSON configuration provider<a id="_idIndexMarker443"/> is one of the file<a id="_idIndexMarker444"/> providers. XML and INI providers are available as well to read configuration values from files with the defined syntax. The files that are referenced with the built-in configuration are <strong class="source-inline">appsettings.json</strong> and <strong class="source-inline">appsettings.{environmentName}.json</strong>. In case the environment name is <strong class="source-inline">Development</strong>, the values from  <strong class="source-inline">appsettings.Development.json</strong> are retrieved. This overwrites settings from the previously loaded <span class="No-Break"><strong class="source-inline">appsettings.json</strong></span><span class="No-Break"> file.</span><p class="list-inset">In your environment, you can use multiple JSON files (for example, <strong class="source-inline">connectionstrings.json</strong>) in case you prefer to have all the connection <span class="No-Break">strings separated:</span></p><pre class="source-code">
+builder.Configuration.AddJsonFile("connectionstrings.json", optional: true);</pre><p class="list-inset">The <strong class="source-inline">AddJsonFile</strong> extension method adds the filename as another JSON configuration provider. If the <strong class="source-inline">optional</strong> parameter is not configured to be <strong class="source-inline">true</strong>, an exception is thrown in case the file cannot <span class="No-Break">be found.</span></p></li>
+				<li><strong class="bold">Command-line configuration provider</strong>: The command-line provider allows overriding<a id="_idIndexMarker445"/> all the <a id="_idIndexMarker446"/>settings (because it is last in the providers’ list). Starting the application, you can pass configuration values to overwrite <span class="No-Break">other settings.</span><p class="list-inset">Imagine a case where a hierarchical setting is specified with JSON, such as this <span class="No-Break">connection string:</span></p><pre class="source-code">
+{</pre><pre class="source-code">
+  "ConnectionStrings": {</pre><pre class="source-code">
+    "GamesSqlServerConnection": "server=(localdb)\\mssqllocaldb;database=CodebreakerGames;trusted_connection=true"</pre><pre class="source-code">
+  }</pre><pre class="source-code">
+}</pre><p class="list-inset">In such a case, you can pass the value using command-line arguments with a <strong class="source-inline">:</strong> <span class="No-Break">separator:</span></p><pre class="source-code">
+ConnectionStrings:GamesSqlServerConnection = "the new connection string"</pre><p class="list-inset">Using <strong class="source-inline">:</strong> is not <a id="_idIndexMarker447"/>possible with <a id="_idIndexMarker448"/>environment variables. As you saw in the previous chapter, when passing environment variables for hierarchical configurations, two underscores (<strong class="source-inline">__</strong>) are used <span class="No-Break">as separators.</span></p></li>
+				<li><strong class="bold">User secrets configuration provider</strong>: The user <a id="_idIndexMarker449"/>secrets provider<a id="_idIndexMarker450"/> is only used during development time. Don’t add secrets to the source code repository. With this, configuration values are stored within the user profile and thus not stored in the directory of the source code. But be aware that every developer running the application locally needs to configure the needed <span class="No-Break">user secrets.</span><p class="list-inset">The user secrets provider is only added by the default builder if the application is running in debug mode and a value for <strong class="source-inline">UserSecretsId</strong> is set with the <span class="No-Break">project file:</span></p><pre class="source-code">
+<strong class="bold">cd ConfigurationPrototype</strong></pre><pre class="source-code">
+<strong class="bold">dotnet user-secrets init</strong></pre><p class="list-inset">This command adds <strong class="source-inline">UserSecretsId</strong> to the project file and uses a unique identifier to reference the corresponding secrets from the <span class="No-Break">user profile.</span></p><p class="list-inset">To add a secret, use <span class="No-Break">this command:</span></p><pre class="source-code">
+<strong class="bold">dotnet user-secrets set SecretKey1 "This is a secret"</strong></pre><p class="list-inset">Use <strong class="source-inline">dotnet user-secrets -h</strong> to see<a id="_idIndexMarker451"/> the other <a id="_idIndexMarker452"/><span class="No-Break">commands available.</span></p></li>
+			</ul>
+			<p class="callout-heading">Note</p>
+			<p class="callout">Running a .NET Aspire solution on the development system, the app model with its dependencies is used to create environment variables containing referenced information with the processes running the services. When deploying the solution to Microsoft Azure, with Azure Container Apps, environment variables and secrets are created. Because environment variables by default are configured as configuration providers, nothing special needs to be done running <span class="No-Break">the services.</span></p>
+			<h2 id="_idParaDest-167"><a id="_idTextAnchor166"/>Retrieving configuration values</h2>
+			<p>How can <a id="_idIndexMarker453"/>we access configuration values? To get custom configuration values, let’s enhance the <span class="No-Break"><strong class="source-inline">appsettings.json</strong></span><span class="No-Break"> file:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">ConfigurationPrototype/appsettings.json</p>
+			<pre class="source-code">
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  },
+  "AllowedHosts": "*",
+<strong class="bold">  "Config1": "config 1 value",</strong>
+<strong class="bold">  "Service1": {</strong>
+<strong class="bold">    "Config1": "config 1 value",</strong>
+<strong class="bold">    "Config2": "config 2 value"</strong>
+<strong class="bold">  }</strong>
+}</pre>
+			<p>The <strong class="source-inline">Config1</strong> key is<a id="_idIndexMarker454"/> added to the root elements of the file. With <strong class="source-inline">Service1</strong>, we use a parent-child relationship and define multiple child elements, <strong class="source-inline">Config1</strong> <span class="No-Break">and </span><span class="No-Break"><strong class="source-inline">Config2</strong></span><span class="No-Break">.</span></p>
+			<p>To retrieve configuration values, we just need to inject the <strong class="source-inline">IConfiguration</strong> interface, as shown in the following code snippet. You need to add this code snippet before the <span class="No-Break"><strong class="source-inline">app.Run</strong></span><span class="No-Break"> method:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">ConfigurationPrototype/Program.cs</p>
+			<pre class="source-code">
+app.MapGet("/readconfig", (<strong class="bold">IConfiguration config</strong>) =&gt;
+{
+  string? config1 = <strong class="bold">config["Config1"];</strong>
+  return $"config1: {config1}";
+});</pre>
+			<p>The <strong class="source-inline">IConfiguration</strong> interface is injected in the <strong class="source-inline">GET</strong> request of the API implementation. Using a C# indexer, we retrieve the value for the <strong class="source-inline">Config1</strong> key. To retrieve child elements, we can use the <strong class="source-inline">GetSection</strong> method and use the indexer from the returned section. <strong class="source-inline">GetSection</strong> returns an object implementing the <strong class="source-inline">IConfigurationSection</strong> interface. This interface itself derives from <strong class="source-inline">IConfiguration</strong>, thus the members of the <strong class="source-inline">IConfiguration</strong> interface <span class="No-Break">are available.</span></p>
+			<p>Try it out: start the <strong class="source-inline">ConfigurationPrototype</strong> app, and with the OpenAPI test page, test the <strong class="source-inline">/</strong><span class="No-Break"><strong class="source-inline">readconfig</strong></span><span class="No-Break"> endpoint.</span></p>
+			<p>To retrieve<a id="_idIndexMarker455"/> the children, we’ll use a different approach with <span class="No-Break">options next.</span></p>
+			<h2 id="_idParaDest-168"><a id="_idTextAnchor167"/>Using options</h2>
+			<p>When <a id="_idIndexMarker456"/>configuration values are needed, many .NET services make use of the <strong class="bold">options pattern</strong>. This adds some flexibility in where to get these values – this can be the configuration, but these service configuration values can also be <span class="No-Break">assigned programmatically.</span></p>
+			<p>Strongly typed configuration values are another feature of this pattern. Add this class to map the <span class="No-Break">configuration values:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">ConfigurationPrototype/Program.cs</p>
+			<pre class="source-code">
+internal class Service1Options
+{
+  public required string Config1 { get; set; }
+  public string? Config2 { get; set; }
+}</pre>
+			<p>The class to map the configuration values needs a parameter-less constructor and properties that match the <span class="No-Break">configuration values.</span></p>
+			<p>To fill the<a id="_idIndexMarker457"/> values, the <strong class="source-inline">Service1Options</strong> class is configured with the <strong class="bold">dependency injection container</strong> (<strong class="bold">DIC</strong>). Add this code before the <span class="No-Break"><strong class="source-inline">builder.Build</strong></span><span class="No-Break"> method:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">ConfigurationPrototype/Program.cs</p>
+			<pre class="source-code">
+<strong class="bold">builder.Services.Configure&lt;Service1Options&gt;</strong>(
+  builder.Configuration.GetSection("Service1"));</pre>
+			<p>The <strong class="source-inline">IServiceCollection</strong> <strong class="source-inline">Configure</strong> extension method offers two overloads. With one overload, a delegate can be assigned to fill the <strong class="source-inline">Service1Options</strong> instance programmatically. The second overload – which is used here – receives an <strong class="source-inline">IConfiguration</strong> parameter. Remember – in the configuration file created earlier, a <strong class="source-inline">Service1</strong> parent element was defined. The <strong class="source-inline">GetSection</strong> method retrieves the values within this section. Because the configuration keys map to the class, the values <span class="No-Break">are filled.</span></p>
+			<p class="callout-heading">Note</p>
+			<p class="callout">A new .NET 8 feature with a binding configuration is a source generator. Using native AOT (see <a href="B21217_05.xhtml#_idTextAnchor110"><span class="No-Break"><em class="italic">Chapter 5</em></span></a>), this source generator is enabled by default. With non-AOT projects, <strong class="source-inline">EnableConfigurationBindingGenerator</strong> can be added to the project file to turn off this <span class="No-Break">source generator.</span></p>
+			<p>With this configuration in place, let’s retrieve these configuration values. Add this code before <strong class="source-inline">app.Run</strong> to configure <span class="No-Break">the endpoint:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">ConfigurationPrototype/Program.cs</p>
+			<pre class="source-code">
+app.MapGet("/readoptions", (IOptions&lt;Service1Options&gt; options) =&gt;
+{
+  return $"options - config1: {options.Value.Config1}; config 2: 
+    {options.Value.Config2}";
+});</pre>
+			<p>The <strong class="source-inline">IOptions</strong> interface <a id="_idIndexMarker458"/>with the <strong class="source-inline">Service1Options</strong> generic parameter is injected, and with this, the configured values can <span class="No-Break">be used.</span></p>
+			<p>After you have made these code changes, run the <strong class="source-inline">ConfigurationPrototype</strong> project again. Use the <strong class="source-inline">/readoptions</strong> endpoint to retrieve the <span class="No-Break">configured values.</span></p>
+			<h2 id="_idParaDest-169"><a id="_idTextAnchor168"/>Using environments</h2>
+			<p>As the application runs in different <a id="_idIndexMarker459"/>environments (for example, production, staging, and development), there’s a need for different configuration values. For example, in the development environment, you don’t want to use the production database. The .NET configuration easily supports <span class="No-Break">different environments.</span></p>
+			<p>With the default configuration, an <strong class="source-inline">appsettings.{environment}.json</strong> file is loaded to specify environment-specific configuration values – for example, <strong class="source-inline">appsettings.staging.json</strong> in the <span class="No-Break">staging environment.</span></p>
+			<p>Aside from using different filenames to load environment-specific configuration values, we can programmatically verify the <span class="No-Break">current environment.</span></p>
+			<p>The template-generated code contains <span class="No-Break">this code:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">ConfigurationPrototype/Program.cs</p>
+			<pre class="source-code">
+<strong class="bold">if (app.Environment.IsDevelopment())</strong>
+{
+  // code removed for brevity
+}</pre>
+			<p>The <strong class="source-inline">IsDevelopment</strong> extension method compares the environment with the <strong class="source-inline">Development</strong> string. <strong class="source-inline">Environment</strong> is a property of the <strong class="source-inline">WebApplication</strong> class. Other methods available are <strong class="source-inline">IsProduction</strong>, <strong class="source-inline">IsStaging</strong>, and <strong class="source-inline">IsEnvironment</strong>. Invoking the <strong class="source-inline">IsEnvironment</strong> method, any string can be passed to check if the application is running in the specified environment. Instead of using the <strong class="source-inline">IsEnvironment</strong> method, you can also create a custom extension method extending the <strong class="source-inline">IHostEnvironment</strong> type to compare with <span class="No-Break">the environment.</span></p>
+			<p>What<a id="_idIndexMarker460"/> environment the application is running in is defined by the <strong class="source-inline">ASPNETCORE_ENVIRONMENT</strong> environment variable, as mentioned earlier. While debugging locally, the <strong class="source-inline">launchsettings.json</strong> file (in the <strong class="source-inline">Properties</strong> folder) defines the environment to the <strong class="source-inline">Development</strong> value. If the environment variable is not set, the default environment is <strong class="source-inline">Production</strong>. For all other environments, you need to set this <span class="No-Break">environment variable.</span></p>
+			<h1 id="_idParaDest-170"><a id="_idTextAnchor169"/>Using configurations with Azure Container Apps</h1>
+			<p>Azure Container Apps <a id="_idIndexMarker461"/>supports specifying environment <a id="_idIndexMarker462"/>variables, and secrets. In <a href="B21217_06.xhtml#_idTextAnchor137"><span class="No-Break"><em class="italic">Chapter 6</em></span></a>, when we created the container app, we configured environment variables and secrets. Environment variables of a container app can be configured on creating the application or afterward when updating the application – for example, using <strong class="source-inline">az </strong><span class="No-Break"><strong class="source-inline">containerapp update</strong></span><span class="No-Break">.</span></p>
+			<p>Environment variables may be visible in log files. For secrets, this can be a security issue. Security sniffers can catch secrets that are configured in environment variables and alert system administrators when these are found. With container apps, secrets are stored within the scope of an application but independent of revisions of <span class="No-Break">the application.</span></p>
+			<p>To get even better security for secrets, container app secrets can be connected to secrets with the Azure Key Vault service. The Key Vault service and additional features we get for secrets are discussed later in <span class="No-Break">this chapter.</span></p>
+			<p>When you use multiple <a id="_idIndexMarker463"/>Azure services (for example, Azure App Service, Azure Functions, Azure Container Apps…), how configuration is managed<a id="_idIndexMarker464"/> is different from service to service. Also if you just run a large list of services within only container apps, you might prefer a central place where all the configuration is managed. Azure App Configuration offers this functionality without the need to create a custom <span class="No-Break">configuration service.</span></p>
+			<h1 id="_idParaDest-171"><a id="_idTextAnchor170"/>Using configurations with Azure App Configuration</h1>
+			<p>In<a id="_idIndexMarker465"/> this chapter, we add Azure App<a id="_idIndexMarker466"/> Configuration and Azure Key Vault to the solution, as shown in <span class="No-Break"><em class="italic">Figure 7</em></span><span class="No-Break"><em class="italic">.1</em></span><span class="No-Break">:</span></p>
+			<div>
+				<div id="_idContainer078" class="IMG---Figure">
+					<img src="image/B21217_07_01.jpg" alt="Figure 7.1 – Azure services"/>
+				</div>
+			</div>
+			<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Figure 7.1 – Azure services</p>
+			<p>Both of<a id="_idIndexMarker467"/> these services can be used with any <a id="_idIndexMarker468"/>service that needs configuration values. The Key Vault service is used to store secrets and adds great features <span class="No-Break">for this.</span></p>
+			<p>Let’s create an Azure App <span class="No-Break">Configuration resource.</span></p>
+			<h2 id="_idParaDest-172"><a id="_idTextAnchor171"/>Creating an Azure App Configuration service</h2>
+			<p>We use .NET <a id="_idIndexMarker469"/>Aspire to create an Azure App Configuration service. To use the .NET Aspire <strong class="source-inline">AppHost</strong> configuration from the <strong class="source-inline">ConfigurationPrototype</strong> project, add <strong class="bold">.NET Aspire Orchestrator Support</strong> to this <a id="_idIndexMarker470"/>project (which adds a project reference to the <strong class="source-inline">AppHost</strong> project and references the project with the app <span class="No-Break">model definition):</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.AppHost/Program.cs</p>
+			<pre class="source-code">
+var builder = DistributedApplication.CreateBuilder(args);
+<strong class="bold">var appConfig = builder.AddAzureAppConfiguration("codebreakerconfig")</strong>
+<strong class="bold">  .WithParameter("sku", "Standard");</strong>
+<strong class="bold">builder.AddProject&lt;Projects.ConfigurationPrototype&gt;("configurationprototype")</strong>
+<strong class="bold">  .WithReference(appConfig);</strong>
+// code removed for brevity</pre>
+			<p>For<a id="_idIndexMarker471"/> using the Azure App Configuration resource with the <strong class="source-inline">AppHost</strong> project, we also need to add the <strong class="source-inline">Aspire.Hosting.Azure.AppConfiguration</strong> NuGet package. Calling the <strong class="source-inline">AddAzureAppConfiguration</strong> method adds the resource to the app model. In case you don’t use any App Configuration features with your Azure subscription yet, you can set the <strong class="source-inline">sku</strong> value to <strong class="source-inline">Free</strong> to use a free version of the App Configuration service. The free version does not offer any SLAs and is limited to 1,000 invocations per day, but for development, this limit can be fine. The App Configuration service is referenced from the <strong class="source-inline">ConfigurationPrototype</strong> project with the <span class="No-Break"><strong class="source-inline">WithReference</strong></span><span class="No-Break"> method.</span></p>
+			<p>Starting the <strong class="source-inline">AppHost</strong> project, the resources are provisioned. Remember to have user secrets configured with the <span class="No-Break"><strong class="source-inline">AppHost</strong></span><span class="No-Break"> project:</span></p>
+			<pre class="source-code">
+{
+  "Azure": {
+    "SubscriptionId": "&lt;enter your subscription id&gt;",
+    "Location": "westeurope"
+    "CredentialSource": "AzureCli"
+  }
+}</pre>
+			<p>Change the subscription ID to your subscription ID and change the location to your chosen Azure region. It can also be helpful to specify the source of credentials used to create Azure resources. Setting the value to <strong class="source-inline">AzureCli</strong>, the same account is used that you used to log in with the <span class="No-Break">Azure CLI.</span></p>
+			<p>Because user secrets store the configuration inside the user profile, when using the same <strong class="source-inline">UserSecretsId</strong> value with multiple projects, this information might already show up. .NET Aspire also adds information about resources created to <span class="No-Break">user secrets.</span></p>
+			<p>When<a id="_idIndexMarker472"/> you start the application, an additional Azure resource will be created. After this is completed successfully, as you can see with the .NET Aspire dashboard, let’s add some <span class="No-Break">configuration values.</span></p>
+			<h2 id="_idParaDest-173"><a id="_idTextAnchor172"/>Configuring values with Azure App Configuration</h2>
+			<p>After the creation <a id="_idIndexMarker473"/>process of the App Configuration<a id="_idIndexMarker474"/> service is completed, we can define configuration values using the Configuration explorer in the Azure portal (see <span class="No-Break"><em class="italic">Figure 7</em></span><span class="No-Break"><em class="italic">.2</em></span><span class="No-Break">):</span></p>
+			<div>
+				<div id="_idContainer079" class="IMG---Figure">
+					<img src="image/B21217_07_02.jpg" alt="Figure 7.2 – Configuration explorer"/>
+				</div>
+			</div>
+			<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Figure 7.2 – Configuration explorer</p>
+			<p>With App Configuration, key-value pairs are stored. Creating a <strong class="source-inline">ConfigurationPrototype:ConnectionStrings:SqlServer</strong> key, we define a string value for a database connection. As the configuration values for all <strong class="source-inline">Codebreaker</strong> services can be configured in one place, it’s good practice to use the first part of the key with the name of the service – this way, we know which configuration values belong to which service. It’s also possible to use JSON content with the value, as we’ll do later with the games API. This reduces the number of requests for this service and<a id="_idIndexMarker475"/> can simplify <span class="No-Break">the</span><span class="No-Break"><a id="_idIndexMarker476"/></span><span class="No-Break"> configuration.</span></p>
+			<p>Next, let’s get the configuration from the <span class="No-Break"><strong class="source-inline">ConfigurationPrototype</strong></span><span class="No-Break"> project.</span></p>
+			<h2 id="_idParaDest-174"><a id="_idTextAnchor173"/>Initializing app configuration values</h2>
+			<p>We can also add configuration <a id="_idIndexMarker477"/>values programmatically when the application is deployed. To do this, let’s create a background service that <span class="No-Break">runs once.</span></p>
+			<p>Create a new background <span class="No-Break">worker service:</span></p>
+			<pre class="console">
+dotnet new worker -o Codebreaker.InitializeAppConfig</pre>
+			<p>To publish a worker project as a Docker image, you also need to enable SDK <span class="No-Break">container support:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.InitializeAppConfig/Codebreaker.InitializeAppConfig.csproj</p>
+			<pre class="source-code">
+&lt;PropertyGroup&gt;
+<strong class="bold">  &lt;IsPublishable&gt;true&lt;/IsPublishable&gt;</strong>
+<strong class="bold">  &lt;EnableSdkContainerSupport&gt;true&lt;/EnableSdkContainerSupport&gt;</strong>
+&lt;/PropertyGroup&gt;</pre>
+			<p>When creating worker projects, without this setting, a Docker image cannot be created using <span class="No-Break"><strong class="source-inline">dotnet publish</strong></span><span class="No-Break">.</span></p>
+			<p>Add this project to the .NET Aspire orchestration (use .NET Aspire Orchestrator Support, or add a reference to the <strong class="source-inline">ServiceDefaults</strong> project and add a project reference from the <strong class="source-inline">AppHost</strong> project to this project). Rename the <strong class="source-inline">Worker</strong> class that’s created from this template <span class="No-Break">to </span><span class="No-Break"><strong class="source-inline">AppConfigInitializer</strong></span><span class="No-Break">.</span></p>
+			<p>Add the <strong class="source-inline">Azure.Data.AppConfiguration</strong> and <strong class="source-inline">Microsoft.Extensions.Azure</strong> NuGet packages. The <strong class="source-inline">Azure.Data.AppConfiguration</strong> package offers functionality to access the App Configuration API to create, read, and update settings. <strong class="source-inline">Microsoft.Extensions.Azure</strong> provides integration with <a id="_idIndexMarker478"/>the <strong class="bold">dependency injection</strong> (<span class="No-Break"><strong class="bold">DI</strong></span><span class="No-Break">) system.</span></p>
+			<p>To <a id="_idIndexMarker479"/>write configuration settings, add this code to the <span class="No-Break"><strong class="source-inline">AppConfigInitializer</strong></span><span class="No-Break"> class:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.InitializeAppConfig/AppConfigInitializer.cs</p>
+			<pre class="source-code">
+public class AppConfigInitializer(<strong class="bold">ConfigurationClient configurationClient, IHostApplicationLifetime hostApplicationLifetime, ILogger&lt;AppConfigInitializer&gt; logger</strong>) : BackgroundService
+{
+  private Dictionary&lt;string, string&gt; s_6x4Colors = new()
+  {
+    { "color1", "Red" },
+    { "color2", "Green" },
+    { "color3", "Blue" },
+    { "color4", "Yellow" },
+    { "color5", "Orange" },
+    { "color6", "Purple" }
+  };
+  protected override async Task ExecuteAsync(CancellationToken 
+    stoppingToken)
+  {
+    foreach ((string key, string color) in s_6x4Colors)
+    {
+<strong class="bold">      ConfigurationSetting setting = new($"GameAPIs.Game6x4.{key}", </strong>
+        <strong class="bold">color);</strong>
+<strong class="bold">      await configurationClient.AddConfigurationSettingAsync(setting);</strong>
+<strong class="bold">      </strong><strong class="bold">logger.LogInformation("added setting for key {key}", key);</strong>
+    }
+  }
+}</pre>
+			<p>With the<a id="_idIndexMarker480"/> constructor of the <strong class="source-inline">AppConfigInitializer</strong> class, the <strong class="source-inline">ConfigurationClient</strong> class and the <strong class="source-inline">IHostApplicationLifetime</strong> interface are injected. <strong class="source-inline">ConfigurationClient</strong> is the class to communicate with App Configuration. We add settings by invoking the <strong class="source-inline">AddConfigurationSettingAsync</strong> method. <strong class="source-inline">IHostApplicationLifetime</strong> is the interface for background services to be informed about start and stop events and is used to stop the service at the end. After the settings are written, the application ends, invoking the <span class="No-Break"><strong class="source-inline">StopApplication</strong></span><span class="No-Break"> method.</span></p>
+			<p>Now, we can configure the <strong class="source-inline">AppConfigInitializer</strong> class with the <span class="No-Break">DIC configuration:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.InitializeAppConfig/Program.cs</p>
+			<pre class="source-code">
+using Codebreaker.InitalizeAppConfig;
+using Microsoft.Extensions.Azure;
+var builder = Host.CreateApplicationBuilder(args);
+builder.AddServiceDefaults();
+<strong class="bold">builder.Services.AddHostedService&lt;AppConfigInitializer&gt;();</strong>
+<strong class="bold">builder.Services.AddAzureClients(clients =&gt;</strong>
+<strong class="bold">{</strong>
+<strong class="bold">  string appConfigUrl = builder.Configuration.</strong>
+  <strong class="bold">GetConnectionString("codebreakerconfig") ??</strong>
+<strong class="bold">    throw new InvalidOperationException("codebreakerconfig not </strong>
+    <strong class="bold">configured");</strong>
+<strong class="bold">  clients.AddConfigurationClient(new Uri(appConfigUrl));</strong>
+<strong class="bold">});</strong>
+var host = builder.Build();
+host.Run();</pre>
+			<p>The <strong class="source-inline">AddHostedService</strong> method requires an object to implement the <strong class="source-inline">IHostedService</strong> interface. This interface is implemented with the base class of the <strong class="source-inline">AppConfigInitializer</strong> class, <strong class="source-inline">BackgroundService</strong>. When the service is started, the <strong class="source-inline">StartAsync</strong> method of <strong class="source-inline">BackgroundService</strong> is invoked, which in turn invokes the <strong class="source-inline">ExecuteAsync</strong> method of <strong class="source-inline">AppConfigInitializer</strong> where the configuration values <span class="No-Break">are set.</span></p>
+			<p><strong class="source-inline">AddAzureClients</strong> is an extension method that allows configuring clients to access many of the Azure services. Here, we use the <strong class="source-inline">AddConfigurationClient</strong> extension method, passing the URL of the App <span class="No-Break">Configuration resource.</span></p>
+			<p>Starting this initializer project now adds configuration settings to the App Configuration service. The game APIs service can now be changed to read colors for games from the configuration, which <a id="_idIndexMarker481"/>allows easy changes of colors <span class="No-Break">without recompiling.</span></p>
+			<p class="callout-heading">Note</p>
+			<p class="callout">Before .NET Aspire was available, I configured non-secret configuration values such as URLs to different Azure resources with Azure App Configuration. As the orchestration of .NET Aspire covers this aspect and makes it easy to run the solution with different environments and automatically configures these dependencies, App Configuration is now mainly used for other application-specific <span class="No-Break">configuration values.</span></p>
+			<p>With this initialization in place, let’s continue to read configuration values from <span class="No-Break">the application.</span></p>
+			<h2 id="_idParaDest-175"><a id="_idTextAnchor174"/>Using Azure App Configuration from the application</h2>
+			<p>To <a id="_idIndexMarker482"/>use the Azure App Configuration service from the .NET application, we need to add the <strong class="source-inline">Microsoft.Azure.AppConfiguration.AspNetCore</strong> NuGet package. This NuGet package offers a <span class="No-Break">configuration provider.</span></p>
+			<p>This provider is configured with the following <span class="No-Break">code snippet:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">ConfigurationPrototype/Program.cs</p>
+			<pre class="source-code">
+var builder = WebApplication.CreateBuilder(args);
+<strong class="bold">builder.Configuration.AddAzureAppConfiguration</strong>(appConfigOptions =&gt;
+{
+<strong class="bold">  DefaultAzureCredential cred = new();</strong>
+  string appConfigUrl = <strong class="bold">builder.Configuration.</strong>
+    <strong class="bold">GetConnectionString("codebreakerconfig")</strong> ??
+    throw new InvalidOperationException("could not read 
+    codebreakerconfig");
+<strong class="bold">  appConfigOptions.Connect(new Uri(appConfigUrl), cred);</strong>
+});
+// the code from the repository also includes the Key Vault configuration added later</pre>
+			<p>The <strong class="source-inline">AddAzureAppConfiguration</strong> extension method adds the App Configuration service to the configuration providers. One overload uses a string parameter to pass a connection string including a secret. The default orchestration configuration of .NET Aspire just passes the URL from the App Configuration service without the secret. <strong class="bold">Role-based access control</strong> (<strong class="bold">RBAC</strong>) is<a id="_idIndexMarker483"/> configured, which doesn’t need a secret. When an App Configuration resource is created with Aspire provisioning, your identity is added to role-based access to allow access to the configuration values. During development time, your user credentials can be used as well, programmatically accessing the API. This is the role of the <strong class="source-inline">DefaultAzureCredential</strong> class. This class uses a defined order to try different<a id="_idIndexMarker484"/> credentials, including <em class="italic">Visual Studio credentials</em>, <em class="italic">Azure CLI credentials</em>, and <em class="italic">Azure Developer CLI credentials</em>. The first credentials that are successfully retrieved are used to access the configuration service. The URL to the App Configuration service is forwarded from the .NET Aspire orchestrator and retrieved with the configuration API. After this, invoking the <strong class="source-inline">Connect</strong> method of the <strong class="source-inline">AzureAppConfigurationOptions</strong> class, the URL of the configuration service as well as the credentials are used to connect. After adding this configuration provider, App Configuration can be used like any other <span class="No-Break">configuration provider.</span></p>
+			<p class="callout-heading">Note</p>
+			<p class="callout">When a solution is deployed to Azure, the local credentials cannot be used. A managed identity is used when the solution is running within Azure. This is covered later in <span class="No-Break">this chapter.</span></p>
+			<p>Now, all that needs to be done is to retrieve the configuration values. There’s no difference where the configuration is <span class="No-Break">coming from:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">ConfigurationPrototype/Program.cs</p>
+			<pre class="source-code">
+app.MapGet("/azureconfig", (<strong class="bold">IConfiguration config</strong>) =&gt;
+{
+  string? connectionString = <strong class="bold">config.</strong>
+    <strong class="bold">GetSection("ConfigurationPrototype")</strong>
+<strong class="bold">    .GetConnectionString("SqlServer");</strong>
+  return $"Configuration value from Azure App Configuration: 
+    {connectionString}";
+});</pre>
+			<p>Again, the <strong class="source-inline">IConfiguration</strong> interface is injected. The key configured with App Configuration has a hierarchical name: <strong class="source-inline">ConfigurationPrototype:ConnectionStrings:SqlServer</strong>. The first hierarchy is accessed using the <strong class="source-inline">GetSection</strong> method. Next, the <strong class="source-inline">GetConnectionString</strong> method is used. This accesses the section named <strong class="source-inline">ConnectionString</strong> and then uses the <strong class="source-inline">SqlServer</strong> key to get <span class="No-Break">its value.</span></p>
+			<p>With this last change, you can run the application and retrieve the configuration value from the App <span class="No-Break">Configuration service!</span></p>
+			<p>Using the<a id="_idIndexMarker485"/> environment on your local system <a id="_idIndexMarker486"/>uses <strong class="bold">user secrets</strong>. In the production environment, you already know from the previous chapter how to configure secrets with Azure Container Apps to add a connection string to App Configuration in a secure manner with secrets of container apps. The Azure Key Vault service covered next offers an even more <span class="No-Break">secure environment.</span></p>
+			<h1 id="_idParaDest-176"><a id="_idTextAnchor175"/>Storing secrets with Azure Key Vault</h1>
+			<p>To <a id="_idIndexMarker487"/>get secret <a id="_idIndexMarker488"/>configuration values, the Azure Key Vault service can be used. The Key Vault service can be used to store secrets such<a id="_idIndexMarker489"/> as <strong class="bold">passwords</strong>, <strong class="bold">certificates</strong>, and <strong class="bold">keys</strong>. This<a id="_idIndexMarker490"/> service adds hardware-level encryption, automatic certificate <a id="_idIndexMarker491"/>renewals, and granular access control. With predefined roles, the service decides who is allowed to read secrets (<em class="italic">Key Vault Secrets User</em>, the application), who is allowed to create and update secrets but not read secrets (<em class="italic">Key Vault Contributor</em>), and who is allowed to monitor which users use secrets but not to create and read secrets (<em class="italic">Key Vault </em><span class="No-Break"><em class="italic">Secrets Officer</em></span><span class="No-Break">).</span></p>
+			<p>With .NET applications, the Key Vault service can be added as a configuration provider, as with Azure App Configuration. Another way to use this service is to link secrets stored with Key Vault to an Azure App Configuration instance. We will use the <span class="No-Break">second option.</span></p>
+			<p>When you add a key to App Configuration, instead of just supplying a key and value, the key can be linked to a secret stored within the Key Vault service. While the same API as used with App Configuration can be used with secrets, the user running the service needs access to the Key <span class="No-Break">Vault service.</span></p>
+			<p>Let’s create a key vault using the .NET Aspire <span class="No-Break">app model:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.AppHost/Program.cs</p>
+			<pre class="source-code">
+var appConfig = builder.AddAzureAppConfiguration("codebreakerconfig");
+<strong class="bold">var keyVault = builder.AddAzureKeyVault("codebreakervault");</strong>
+builder.AddProject&lt;Projects.ConfigurationPrototype&gt;("configurationprototype")
+  .WithReference(appConfig)
+<strong class="bold">  .WithReference(keyVault);</strong></pre>
+			<p>The <strong class="source-inline">AddAzureKeyVault</strong> method adds a Key Vault resource to the app model. This resource <a id="_idIndexMarker492"/>is referenced from the following project configuration to<a id="_idIndexMarker493"/> pass the URL. As with the App Configuration before, secret information is not part of this <span class="No-Break">URL passed.</span></p>
+			<p>Run the application to create the resource. Then, you can verify the <strong class="bold">Access configuration</strong> page (in the <strong class="bold">Settings</strong> section) to verify the permission model, as shown in <span class="No-Break"><em class="italic">Figure 7</em></span><span class="No-Break"><em class="italic">.3</em></span><span class="No-Break">:</span></p>
+			<div>
+				<div id="_idContainer080" class="IMG---Figure">
+					<img src="image/B21217_07_03.jpg" alt="Figure 7.3 – Key Vault access configuration"/>
+				</div>
+			</div>
+			<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Figure 7.3 – Key Vault access configuration</p>
+			<p>The Azure <a id="_idIndexMarker494"/>Key Vault <a id="_idIndexMarker495"/>service supports two access permission models: <strong class="bold">vault access policy</strong> is the older (legacy) option. <strong class="bold">Azure role-based access control</strong> is the preferred configuration. User roles are defined to allow read or write access to different Key Vault objects such as keys, secrets, and certificates. Another setting in this category is<a id="_idIndexMarker496"/> for allowing <strong class="bold">Azure Resource Manager</strong> (<strong class="bold">ARM</strong>)-based deployment (which includes Bicep); for this specific resource, access needs to <span class="No-Break">be granted.</span></p>
+			<p>After the key vault creation succeeds, you can create<a id="_idIndexMarker497"/> and<a id="_idIndexMarker498"/> import <strong class="bold">secrets</strong>, <strong class="bold">keys</strong>, and <strong class="bold">certificates</strong>. In<a id="_idIndexMarker499"/> this chapter, we just use the secrets from the Key Vault service. Create a secret, as shown in <span class="No-Break"><em class="italic">Figure 7</em></span><span class="No-Break"><em class="italic">.4</em></span><span class="No-Break">:</span></p>
+			<div>
+				<div id="_idContainer081" class="IMG---Figure">
+					<img src="image/B21217_07_04.jpg" alt="Figure 7.4 – Creating a secret"/>
+				</div>
+			</div>
+			<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Figure 7.4 – Creating a secret</p>
+			<p>In addition<a id="_idIndexMarker500"/> to the name and the secret value, you can set <a id="_idIndexMarker501"/>activation and <span class="No-Break">expiration dates.</span></p>
+			<p>After creating the secret, we can switch back to the Azure App Configuration service. Create a Key Vault reference to map a configuration value to a value from the Azure Key Vault service (as shown in <span class="No-Break"><em class="italic">Figure 7</em></span><span class="No-Break"><em class="italic">.5</em></span><span class="No-Break">):</span></p>
+			<p class="IMG---Figure"> </p>
+			<div>
+				<div id="_idContainer082" class="IMG---Figure">
+					<img src="image/B21217_07_05.jpg" alt="Figure 7.5 – Mapping Key Vault secrets with App Configuration"/>
+				</div>
+			</div>
+			<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Figure 7.5 – Mapping Key Vault secrets with App Configuration</p>
+			<p>Adding a <a id="_idIndexMarker502"/>Key Vault reference from the Configuration <a id="_idIndexMarker503"/>explorer, key values can be specified that correspond to the configuration keys, but for the value, a Key Vault resource and a secret <span class="No-Break">are referenced.</span></p>
+			<p>To connect the App Configuration service to the Key Vault service, the App Configuration service needs to <span class="No-Break">be updated:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">ConfigurationPrototype/Program.cs</p>
+			<pre class="source-code">
+builder.Configuration.AddAzureAppConfiguration(appConfigOptions =&gt;
+{
+  DefaultAzureCredentialOptions credentialOptions = new();
+  DefaultAzureCredential cred = new();
+  string appConfigUrl = builder.Configuration.
+<strong class="bold">    </strong>GetConnectionString("codebreakerconfig") ?? throw new 
+<strong class="bold">    </strong>InvalidOperationException("could not read codebreakerconfig");
+<strong class="bold">  appConfigOptions.Connect(new Uri(appConfigUrl), cred)</strong>
+<strong class="bold">    .ConfigureKeyVault(keyVaultOptions =&gt;</strong>
+<strong class="bold">    {</strong>
+<strong class="bold">      keyVaultOptions.SetCredential(cred);</strong>
+<strong class="bold">    });</strong>
+});</pre>
+			<p>The <strong class="source-inline">Connect</strong> method <a id="_idIndexMarker504"/>of the <strong class="source-inline">AzureAppConfigurationOptions</strong> class is a fluent API that returns the same options type. With this, the <strong class="source-inline">ConfigureKeyVault</strong> method is now invoked to connect the Key Vault service to the<a id="_idIndexMarker505"/> same App Configuration resource. The <strong class="source-inline">SetCredential</strong> method defines the credentials that should be used to access the secrets. Here, we use the same credentials as used with the App Configuration service, but it’s also possible to use <span class="No-Break">different credentials.</span></p>
+			<p>With this configuration in place, secrets can be accessed in the same way as other <span class="No-Break">configuration values:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">ConfigurationPrototype/Program.cs</p>
+			<pre class="source-code">
+app.MapGet("/secret", (<strong class="bold">IConfiguration</strong> config) =&gt;
+{
+  string? connectionString = <strong class="bold">config.</strong>
+<strong class="bold">    </strong><strong class="bold">GetSection("ConfigurationPrototype").GetConnectionString("Cosmos");</strong>
+  return $"Configuration value from Azure Key Vault via App 
+<strong class="bold">    </strong>Configuration: {connectionString}";
+});</pre>
+			<p>Having the Key Vault service connected to the App Configuration service, we can use the same configuration API we used previously. Behind the scenes, different access mechanisms <span class="No-Break">are used.</span></p>
+			<p>Run the<a id="_idIndexMarker506"/> application and check how secrets can be retrieved <a id="_idIndexMarker507"/>successfully using the <span class="No-Break"><strong class="source-inline">DefaultAzureCredential</strong></span><span class="No-Break"> type.</span></p>
+			<p>Before we integrate the App Configuration and Key Vault services with our game APIs and bot services, we can get rid of some needed secrets with configuration values using <span class="No-Break">managed identities.</span></p>
+			<h1 id="_idParaDest-177"><a id="_idTextAnchor176"/>Reducing the need for secrets with managed identities</h1>
+			<p>Managed identities (now known<a id="_idIndexMarker508"/> by the full name <strong class="bold">Microsoft Entra managed identities for Azure resources</strong>) remove the hassles we had with service principals. Managed identities abstract service principals, creating and deleting <span class="No-Break">them automatically.</span></p>
+			<p>Using an <a id="_idIndexMarker509"/>Azure service (such as Azure Container Apps), the identity of the service can be configured to run with a managed identity. Services that are accessed (such as Azure App Configuration) use role management, whereby you configure who has access to this resource – which includes a simple option to select a <span class="No-Break">managed identity.</span></p>
+			<p>The <a id="_idIndexMarker510"/>kinds of <a id="_idIndexMarker511"/>managed identities that are available are <strong class="bold">system-assigned managed identities</strong> and <strong class="bold">user-assigned </strong><span class="No-Break"><strong class="bold">managed identities</strong></span><span class="No-Break">:</span></p>
+			<ul>
+				<li>A system-assigned managed identity is directly associated with the Azure resource. If the Azure resource is deleted, the managed identity and its role-based access are removed <span class="No-Break">as well.</span></li>
+				<li>A user-assigned managed identity is created independent of an Azure service. As with other Azure resources, user-assigned managed identities are resources within a <span class="No-Break">resource group.</span></li>
+			</ul>
+			<p>Each of these two options has advantages but <span class="No-Break">also disadvantages.</span></p>
+			<p>Properties and advantages<a id="_idIndexMarker512"/> of system-assigned managed identities include <span class="No-Break">the following:</span></p>
+			<ul>
+				<li>They have the same lifetime as <span class="No-Break">the service</span></li>
+				<li>Deleting the service also deletes the managed identity and its <span class="No-Break">role assignments</span></li>
+			</ul>
+			<p>Advantages<a id="_idIndexMarker513"/> of user-assigned managed identities include <span class="No-Break">the following:</span></p>
+			<ul>
+				<li>One user-assigned managed identity can be used by <span class="No-Break">multiple services.</span></li>
+				<li>Deleting the service does not delete the managed identity – it can be used from <span class="No-Break">other services.</span></li>
+				<li>Multiple services can use the same managed identity. If multiple services need the same permissions, you only need to specify this once with the shared <span class="No-Break">managed identity.</span></li>
+			</ul>
+			<p>One service can use<a id="_idIndexMarker514"/> multiple user-assigned managed identities. This also includes a disadvantage: using a user-assigned managed identity requires you to configure the principal ID to specify which managed identity <span class="No-Break">to use.</span></p>
+			<p><span class="No-Break"><em class="italic">Figure 7</em></span><em class="italic">.6</em> shows a user-assigned managed identity that is used with the bot service and the games API to access the App Configuration and Key <span class="No-Break">Vault services:</span></p>
+			<div>
+				<div id="_idContainer083" class="IMG---Figure">
+					<img src="image/B21217_07_06.jpg" alt="Figure 7.6 – Assigning managed identities"/>
+				</div>
+			</div>
+			<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Figure 7.6 – Assigning managed identities</p>
+			<p>Let’s create a managed identity and assign permissions to this <span class="No-Break">managed identity.</span></p>
+			<h2 id="_idParaDest-178"><a id="_idTextAnchor177"/>Creating a managed identity and assigning roles</h2>
+			<p>Running the<a id="_idIndexMarker515"/> application from the local system, managed identities are not used. To use managed identities within Azure, let’s deploy the solution to Azure, as described in the <em class="italic">Technical </em><span class="No-Break"><em class="italic">requirements</em></span><span class="No-Break"> section.</span></p>
+			<p>After the resources are successfully deployed, open the Azure Container App service for the game APIs with the Azure portal and select <strong class="bold">Identity</strong> in the <strong class="bold">Settings</strong> section, as shown in <span class="No-Break"><em class="italic">Figure 7</em></span><span class="No-Break"><em class="italic">.7</em></span><span class="No-Break">:</span></p>
+			<div>
+				<div id="_idContainer084" class="IMG---Figure">
+					<img src="image/B21217_07_07.jpg" alt="Figure 7.7 – Managed identity"/>
+				</div>
+			</div>
+			<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Figure 7.7 – Managed identity</p>
+			<p>The system-assigned identity is<a id="_idIndexMarker516"/> turned off, but a user-assigned managed identity is created. If you open the identity configuration with the other container apps, you can see that the same managed identity is assigned to all these apps, making it easy to <span class="No-Break">define permissions.</span></p>
+			<p>Clicking on this managed<a id="_idIndexMarker517"/> identity, select <strong class="bold">Add role assignment</strong>, as shown in <span class="No-Break"><em class="italic">Figure 7</em></span><span class="No-Break"><em class="italic">.8</em></span><span class="No-Break">:</span></p>
+			<div>
+				<div id="_idContainer085" class="IMG---Figure">
+					<img src="image/B21217_07_08.jpg" alt="Figure 7.8 – Role-based access for the managed identity"/>
+				</div>
+			</div>
+			<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Figure 7.8 – Role-based access for the managed identity</p>
+			<p>Here, you see that this managed identity already has several roles assigned – it can pull Docker images from the Azure<a id="_idIndexMarker518"/> Container Registry service, which is needed on deployment of the Azure Container App service, it can access the Azure Key Vault, and it has access to the Azure App Configuration service with the <strong class="bold">App Configuration Data Owner</strong> role. This allows setting configuration values that could be changed to read access if the configuration values are not set by an application running with <span class="No-Break">this identity.</span></p>
+			<p class="callout-heading">Note</p>
+			<p class="callout">You might wonder why the managed identity has the administrator role assigned to the Key Vault service and the <strong class="bold">App Configuration Data Owner</strong> role with the App Configuration service. This managed identity is also used during deployment. When the Azure Container Apps service is deployed, a secret containing the connection string of the Azure Cosmos DB database is added to the Key Vault service. Specifying configuration values can be supplied to the App <span class="No-Break">Configuration service.</span></p>
+			<p class="callout">To support the <strong class="bold">principle of least privilege</strong> (<strong class="bold">PoLP</strong>), only the necessary permissions should be applied. You can create <a id="_idIndexMarker519"/>multiple managed identities for different container apps or use system-assigned managed identities, whereby every container app has a different identity, and specify the required roles for every identity. A container app can have just one system-assigned managed identity but multiple user-assigned managed identities. Different identities can be used for deployment and while running <span class="No-Break">the application.</span></p>
+			<p>Let’s get back to some C# code – the games API, the bot service, and the configuration prototype startup code to configure Azure App Configuration with a <span class="No-Break">managed identity.</span></p>
+			<h2 id="_idParaDest-179"><a id="_idTextAnchor178"/>Configuring the Azure App Configuration provider with managed identities</h2>
+			<p>Previously, with<a id="_idIndexMarker520"/> the <strong class="source-inline">ConfigurationPrototype</strong> project, we <a id="_idIndexMarker521"/>already used the <strong class="source-inline">AddAzureAppConfiguration</strong> method overload, which doesn’t require a connection string containing a secret. Invoking the <strong class="source-inline">Connect</strong> method, we supplied a <strong class="source-inline">DefaultAzureCredential</strong> instance. Using a user-assigned managed identity, a change is needed here. An application can have just one system-assigned managed identity assigned but multiple user-assigned managed identities. The one we use needs to <span class="No-Break">be specified.</span></p>
+			<p>Let’s<a id="_idIndexMarker522"/> check the<a id="_idIndexMarker523"/> configuration that has been applied to Azure Container Apps. Open the configuration prototype container app in the Azure portal, and within the <strong class="bold">Settings</strong> category, open <strong class="bold">Secrets</strong>, as shown in <span class="No-Break"><em class="italic">Figure 7</em></span><span class="No-Break"><em class="italic">.9</em></span><span class="No-Break">:</span></p>
+			<div>
+				<div id="_idContainer086" class="IMG---Figure">
+					<img src="image/B21217_07_09.jpg" alt="Figure 7.9 – Secrets with Azure Container Apps"/>
+				</div>
+			</div>
+			<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Figure 7.9 – Secrets with Azure Container Apps</p>
+			<p>The connection strings to the Azure App Configuration and Azure Key Vault services are stored with the <strong class="bold">Secrets</strong> configuration. This wouldn’t really be required as secret keys are not part of these links – but it would help if the configuration were changed to not only the endpoint link but also the connection string containing the endpoint and <span class="No-Break">the secret.</span></p>
+			<p>Because the secret is not part of this secret configuration, check the environment variables configured. This setting is available in the <strong class="bold">Application</strong> category. Click on <strong class="bold">Containers</strong> and select <strong class="bold">Environment variables</strong>, as shown in <span class="No-Break"><em class="italic">Figure 7</em></span><span class="No-Break"><em class="italic">.10</em></span><span class="No-Break">:</span></p>
+			<div>
+				<div id="_idContainer087" class="IMG---Figure">
+					<img src="image/B21217_07_10.jpg" alt="Figure 7.10 – Environment variables with Azure Container Apps"/>
+				</div>
+			</div>
+			<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Figure 7.10 – Environment variables with Azure Container Apps</p>
+			<p>The<a id="_idIndexMarker524"/> identifier of <a id="_idIndexMarker525"/>the user-assigned managed ID is passed as an environment variable named <strong class="source-inline">AZURE_CLIENT_ID</strong>. This environment variable can be used to select the managed identity. Let’s use this to configure the <strong class="source-inline">DefaultAzureCredential</strong> object. We used this class earlier, but now it’s time to investigate the different options offered. <strong class="source-inline">DefaultAzureCredential</strong> uses accounts in <span class="No-Break">this order:</span></p>
+			<ul>
+				<li><strong class="source-inline">EnvironmentCredential</strong> – This authentication needs environmental variables containing client IDs, tenant IDs, and secrets to be set. We don’t use <span class="No-Break">this here.</span></li>
+				<li><strong class="source-inline">WorkloadIdentityCredential</strong> – When<a id="_idIndexMarker526"/> running on <strong class="bold">Azure Kubernetes Service</strong> (<strong class="bold">AKS</strong>), Microsoft Entra workload identities can <span class="No-Break">be enabled.</span></li>
+				<li><strong class="source-inline">ManagedIdentityCredential</strong> – This is the authentication used when the application runs with managed identities configured within <span class="No-Break">Microsoft Azure.</span></li>
+				<li><strong class="source-inline">SharedTokenCacheCredential</strong> – This is a legacy mechanism that has been replaced <span class="No-Break">by </span><span class="No-Break"><strong class="source-inline">VisualStudioCredential</strong></span><span class="No-Break">.</span></li>
+				<li><strong class="source-inline">VisualStudioCredential</strong> – Using Visual Studio, in the options dialog, you can configure the account to be used with Azure Service authentication. This is the account used with <strong class="source-inline">VisualStudioCredential</strong>. Just make sure within Visual Studio that you don’t need to re-authenticate – otherwise, authentication via <strong class="source-inline">DefaultAzureCredential</strong> might <span class="No-Break">not succeed.</span></li>
+				<li><strong class="source-inline">VisualStudioCodeCredential</strong> – This is a similar mechanism to <strong class="source-inline">VisualStudioCredential</strong> for Visual Studio Code but doesn’t work with the current version of the <em class="italic">Azure Account extension</em>. A new authentication mechanism is going to be built for Visual Studio Code, but this requires some time before it’s ready. Using Visual Studio Code, use the <span class="No-Break">next option.</span></li>
+				<li><strong class="source-inline">AzureCliCredential</strong> – This is<a id="_idIndexMarker527"/> the account used by the Azure CLI. With the <strong class="source-inline">az account list</strong> command, you can <a id="_idIndexMarker528"/>see the Azure accounts and subscriptions you are logged in to. <strong class="source-inline">az account show</strong> gives you the default account and subscription that will be used. If this is not the correct one, use <strong class="source-inline">az account set</strong> to set the current <span class="No-Break">active subscription.</span></li>
+			</ul>
+			<p class="callout-heading">Note</p>
+			<p class="callout">In case you have issues using the <strong class="source-inline">DefaultAzureCredential</strong> class in your development environment, you can enable diagnostic information and also enable or disable specific accounts explicitly to find the issues. Check this troubleshooting guide in case you have any <span class="No-Break">errors: </span><a href="https://github.com/Azure/azure-sdk-for-net/blob/main/sdk/identity/Azure.Identity/TROUBLESHOOTING.md"><span class="No-Break">https://github.com/Azure/azure-sdk-for-net/blob/main/sdk/identity/Azure.Identity/TROUBLESHOOTING.md</span></a><span class="No-Break">.</span></p>
+			<p>Let’s update the configuration to use Azure App Configuration while the application is running <span class="No-Break">within Azure:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">ConfigurationPrototype/Program.cs</p>
+			<pre class="source-code">
+builder.Configuration.AddAzureAppConfiguration(appConfigOptions =&gt;
+{
+#if DEBUG
+  DefaultAzureCredential credential = new();
+#else
+<strong class="bold">  string managedIdentityClientId = builder.Configuration["AZURE_</strong>
+<strong class="bold">    CLIENT_ID"] ?? string.Empty;</strong>
+<strong class="bold">  DefaultAzureCredentialOptions credentialOptions = new()</strong>
+<strong class="bold">  {</strong>
+<strong class="bold">    ManagedIdentityClientId = managedIdentityClientId,</strong>
+<strong class="bold">    ExcludeEnvironmentCredential = true,</strong>
+<strong class="bold">    ExcludeWorkloadIdentitiyCredential = true</strong>
+<strong class="bold">  };</strong>
+<strong class="bold">  DefaultAzureCredential credential = new(credentialOptions);</strong>
+#endif
+  string appConfigUrl = builder.Configuration.
+<strong class="bold">    </strong>GetConnectionString("codebreakerconfig") ??
+    throw new InvalidOperationException("could not read 
+<strong class="bold">    </strong>codebreakerconfig");
+  appConfigOptions.Connect(new Uri(appConfigUrl), credential)
+<strong class="bold">    .Select("ConfigurationPrototype*")</strong>
+    .ConfigureKeyVault(keyVaultOptions =&gt;
+    {
+      keyVaultOptions.SetCredential(cred);
+    });
+});</pre>
+			<p><strong class="source-inline">DefaultAzureCredential</strong> not only works in the development environment but also when the application runs within Azure. Using system-assigned managed identities, a change would not be required. With user-assigned managed identities, the <strong class="source-inline">ManagedIdentityClientId</strong> property needs to be set to the ID of the managed identity. We do this by reading the <strong class="source-inline">AZURE_CLIENT_ID</strong> environment variable and passing the value to <span class="No-Break">this setting.</span></p>
+			<p>Using the <strong class="source-inline">Select</strong> method with the <strong class="source-inline">AzureAppConfigurationOptions</strong> class returned from the <strong class="source-inline">Connect</strong> method filters the configuration value. Because configuration<a id="_idIndexMarker529"/> values are <a id="_idIndexMarker530"/>specified for all services of the solution, we just need the ones that start with the <strong class="source-inline">ConfigurationPrototype</strong> key. With the bot and the game API services, the filtering is done with the <strong class="source-inline">bot</strong> and <span class="No-Break"><strong class="source-inline">gameapis</strong></span><span class="No-Break"> keys.</span></p>
+			<p>Run the configuration prototype with these changes, and then let’s continue using .NET environments with <span class="No-Break">App Configuration.</span></p>
+			<h1 id="_idParaDest-180"><a id="_idTextAnchor179"/>Using environments with Azure App Configuration</h1>
+			<p>The<a id="_idIndexMarker531"/> Azure container apps are deployed and<a id="_idIndexMarker532"/> running, using all the Azure services we have created so far. What’s missing with App Configuration are the different environments that are supported with the .NET configuration. Is the application running in the local development environment, in the Azure test environment, or on the production server? Running in the test environment, the production database should not <span class="No-Break">be used.</span></p>
+			<p>.NET configuration supports different environments – depending on the environment, either <strong class="source-inline">appsettings.development.json</strong> or <strong class="source-inline">appsettings.production.json</strong> is loaded. Similar functionality is possible with Azure App Configuration <a id="_idIndexMarker533"/>using <strong class="bold">labels</strong>. We can specify development, production, and testing labels to differentiate environment configurations. This can be mapped to .<span class="No-Break">NET environments.</span></p>
+			<p class="callout-heading">Note</p>
+			<p class="callout">It’s a good practice to separate the production and the development environments across different Azure subscriptions, probably also using different Azure Active Directory services. Here, you also use separate Azure App Configuration services. Some environments can use the same subscription; for example, the production and the staging environments can be configured to run in the same subscription. In such cases, labels can be used to map different configuration values <span class="No-Break">to environments.</span></p>
+			<h2 id="_idParaDest-181"><a id="_idTextAnchor180"/>Using App Configuration labels to map .NET environments</h2>
+			<p>In<a id="_idIndexMarker534"/> the Azure portal, open the Azure App Configuration service again. Create a new key-value pair and use the <strong class="source-inline">BotService</strong> key again, but this time, set the label to <strong class="source-inline">Development</strong>. The default setting of this key should contain the <strong class="source-inline">ApiBase</strong> configuration to the games API running in the container app, whereas the <strong class="source-inline">Development</strong> label should <span class="No-Break">reference </span><span class="No-Break"><strong class="source-inline">localhost</strong></span><span class="No-Break">.</span></p>
+			<p>With the startup code of the bot service, we can now change the <span class="No-Break">filtering code:</span></p>
+			<p class="SC---Heading" lang="en-US" xml:lang="en-US">Codebreaker.Bot/Program.cs</p>
+			<pre class="source-code">
+builder.Configuration.AddAzureAppConfiguration(options =&gt;
+{
+  options.Connect(new Uri(endpoint), credential)
+<strong class="bold">    .Select("BotService*", labelFilter: LabelFilter.Null)</strong>
+<strong class="bold">    .Select("BotService*", builder.Environment.EnvironmentName);</strong>
+});</pre>
+			<p>Invoking the <strong class="source-inline">Select</strong> method multiple times works the same way as you saw at the beginning of this chapter with multiple configuration providers. If a setting is configured multiple times, the last one wins. The first <strong class="source-inline">Select</strong> method loads all configuration values where the key starts with <strong class="source-inline">BotService</strong>, and no label filter is applied. Next, all configuration values where, again, the key starts with the name <strong class="source-inline">BotService</strong> are loaded, but this time, only values where a label with the same name as the current environment name are loaded. All configuration values that are not overwritten from the specific environment label are unchanged – the value is the active one. With all keys with a matching label, the new value is <span class="No-Break">now active.</span></p>
+			<p>This is all that <a id="_idIndexMarker535"/>needs to be done to map different environment configuration values with the Azure App <span class="No-Break">Configuration service.</span></p>
+			<p class="callout-heading">Note</p>
+			<p class="callout">If you don’t need the Azure resources for some time, delete the resource group. In the next chapter, we’ll re-create the services again. <strong class="source-inline">azd up</strong> makes <span class="No-Break">this easy!</span></p>
+			<h1 id="_idParaDest-182"><a id="_idTextAnchor181"/>Summary</h1>
+			<p>This was quite a journey around using Azure services for common needs such as Azure App Configuration and Azure Key Vault in relation to configuration with .NET. You learned how .NET configuration offers features to attach different providers and used Azure App Configuration for storing configuration values for a large list of services. The Azure Key Vault service was used to store secrets. In addition to this, you learned about using managed identities, which can help get rid of a lot <span class="No-Break">of secrets.</span></p>
+			<p>In this chapter, we used the Azure Developer CLI to create Docker images, publish them to the Azure Container Registry service, and create new replicas of Azure container apps using the new image. While <strong class="source-inline">azd up</strong> makes this easy, this can be automated. This is of special interest in testing, staging, and production environments. In the next chapter, we will automate these activities using GitHub Actions. There’s also more that can be done with Azure App Configuration – using feature flags with modern deployment patterns. This is covered in <a href="B21217_08.xhtml#_idTextAnchor183"><span class="No-Break"><em class="italic">Chapter 8</em></span></a> <span class="No-Break">as well.</span></p>
+			<h1 id="_idParaDest-183"><a id="_idTextAnchor182"/>Further reading</h1>
+			<p>To learn more about the topics discussed in this chapter, you can refer to the <span class="No-Break">following links:</span></p>
+			<ul>
+				<li>Configuration providers in .<span class="No-Break">NET: </span><a href="https://learn.microsoft.com/en-us/dotnet/core/extensions/configuration-providers"><span class="No-Break">https://learn.microsoft.com/en-us/dotnet/core/extensions/configuration-providers</span></a></li>
+				<li>Options pattern in .<span class="No-Break">NET: </span><a href="https://learn.microsoft.com/dotnet/core/extensions/options"><span class="No-Break">https://learn.microsoft.com/dotnet/core/extensions/options</span></a></li>
+				<li>Microsoft Entra managed <span class="No-Break">identities: </span><a href="https://learn.microsoft.com/azure/active-directory/managed-identities-azure-resources/"><span class="No-Break">https://learn.microsoft.com/azure/active-directory/managed-identities-azure-resources/</span></a></li>
+				<li>Troubleshooting with <span class="No-Break"><strong class="source-inline">AzureDefaultCredential</strong></span><span class="No-Break">: </span><a href="https://github.com/Azure/azure-sdk-for-net/blob/main/sdk/identity/Azure.Identity/TROUBLESHOOTING.md"><span class="No-Break">https://github.com/Azure/azure-sdk-for-net/blob/main/sdk/identity/Azure.Identity/TROUBLESHOOTING.md</span></a></li>
+				<li>Built-in <span class="No-Break">roles: </span><a href="https://learn.microsoft.com/azure/role-based-access-control/built-in-roles"><span class="No-Break">https://learn.microsoft.com/azure/role-based-access-control/built-in-roles</span></a></li>
+				<li>Azure Key Vault keys, secrets, and <span class="No-Break">certificates: </span><a href="https://learn.microsoft.com/en-us/azure/key-vault/general/about-keys-secrets-certificates"><span class="No-Break">https://learn.microsoft.com/en-us/azure/key-vault/general/about-keys-secrets-certificates</span></a></li>
+				<li><span class="No-Break">PoLP: </span><a href="https://learn.microsoft.com/en-us/entra/identity-platform/secure-least-privileged-access"><span class="No-Break">https://learn.microsoft.com/en-us/entra/identity-platform/secure-least-privileged-access</span></a></li>
+				<li>Microsoft Entra Workload <span class="No-Break">ID: </span><a href="https://learn.microsoft.com/en-us/azure/aks/workload-identity-overview"><span class="No-Break">https://learn.microsoft.com/en-us/azure/aks/workload-identity-overview</span></a></li>
+			</ul>
+		</div>
+	</body></html>

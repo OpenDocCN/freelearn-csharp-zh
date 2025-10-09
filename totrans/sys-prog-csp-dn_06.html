@@ -1,0 +1,930 @@
+<html><head></head><body>
+		<div id="_idContainer024">
+			<h1 class="chapter-number" id="_idParaDest-139"><a id="_idTextAnchor140"/>6 </h1>
+			<h1 id="_idParaDest-140"><a id="_idTextAnchor141"/>The One Where  Processes Whisper</h1>
+			<p><em class="italic">Interprocess </em><span class="No-Break"><em class="italic">Communication (IPC)</em></span></p>
+			<p>In the previous chapter, we talked about input/output. Most of our attention was on files. Files are one of the first things that spring to mind when people think about sharing data with other systems. Another often-used method is networking. However, there are other ways systems can communicate with one another. Files are great if you want to keep data around for a more extended time. Network connections are an excellent way to connect more directly between systems on different machines. But files and networking are more about the underlying technology to transmit data. We also must decide <a id="_idIndexMarker439"/>how to connect to systems using those methods. That is what <strong class="bold">interprocess communication</strong> (<strong class="bold">IPC</strong>) in short, is all about. How can we have two systems talk to <span class="No-Break">each other?</span></p>
+			<p>In this chapter, we will cover the <span class="No-Break">following topics:</span></p>
+			<ul>
+				<li>What <span class="No-Break">is IPC?</span></li>
+				<li>What considerations do we have to worry about when <span class="No-Break">designing IPC?</span></li>
+				<li>Windows Messages – a Windows-native way <span class="No-Break">of messaging</span></li>
+				<li>Pipes – both named <span class="No-Break">and anonymous</span></li>
+				<li>Sockets – a network-based <span class="No-Break">messaging system</span></li>
+				<li>Shared memory – a quick and simple local <span class="No-Break">messaging system</span></li>
+				<li><strong class="bold">Remote procedure call</strong> (<strong class="bold">RPC</strong>) – controlling <span class="No-Break">other machines</span></li>
+				<li><strong class="bold">Google remote procedure call</strong> (<strong class="bold">gRPC</strong>) – the newest kid on <span class="No-Break">the block</span></li>
+			</ul>
+			<p>Welcome to the beautiful world of <span class="No-Break">whispering systems!</span></p>
+			<h1 id="_idParaDest-141"><a id="_idTextAnchor142"/>Technical requirements</h1>
+			<p>You will find all the code in this chapter in the following <span class="No-Break">link: </span><a href="https://github.com/PacktPublishing/Systems-Programming-with-C-Sharp-and-.NET/tree/main/SystemsProgrammingWithCSharpAndNet/Chapter06"><span class="No-Break">https://github.com/PacktPublishing/Systems-Programming-with-C-Sharp-and-.NET/tree/main/SystemsProgrammingWithCSharpAndNet/Chapter06</span></a><span class="No-Break">.</span></p>
+			<h1 id="_idParaDest-142"><a id="_idTextAnchor143"/>Overview of IPC and its importance in modern computing</h1>
+			<p>Most<a id="_idIndexMarker440"/> software has a user interface. After all, that is how the user should interact with the application. The user clicks buttons, enters text, and reads the response on the screen. The screen is how data, the user, and the application exchange data <span class="No-Break">and instructions.</span></p>
+			<p>People <a id="_idIndexMarker441"/>do not use systems software. Other software does. So, it needs a different way to interact. I suppose it would technically be possible to write a regular user interface and use tricks to read or enter data, but that is not <span class="No-Break">really efficient.</span></p>
+			<p>Applications communicate differently when they are talking amongst themselves. They have their own language and their own protocols. This is what IPC is all about – the communication <span class="No-Break">between processes.</span></p>
+			<p>Given the nature of systems, we must consider several key points when designing the interface between systems. We make different choices when designing this interface than if we were designing a user interface meant for people. There are many factors to consider here. Let’s go <span class="No-Break">through them.</span></p>
+			<ul>
+				<li><strong class="bold">Choose your language wisely:</strong> Systems <a id="_idIndexMarker442"/>can use many different ways to talk to one another, and, just like human conversations, it helps tremendously if all parties involved speak the same language. This chapter describes how we can make the systems talk to each other, but there are many more. Some ways are better suited for a particular environment or use case than others, so you must think it through. Do not pick the one you feel most comfortable with because you know that solution. Think of all the use case scenarios and then pick the <span class="No-Break">proper protocol.</span></li>
+				<li><strong class="bold">Security</strong>: Security<a id="_idIndexMarker443"/> is a huge topic, especially in systems programming. We are dealing with data, and the systems are hidden deep in our computers. Most people do not know that multiple processes are running on their machines, so they are not very likely to inspect them and assess their level <span class="No-Break">of security.</span></li>
+				<li><strong class="bold">Data format and serialization</strong>: You<a id="_idIndexMarker444"/> must consider the best way to transform your data as it moves from one system to another. The data must be part of a package, envelope, or other transmitting method. There are many different formats and ways to serialize, but which one you choose depends on many factors. For instance, if you use a direct memory connection between two 64-bit processes on the same Windows machine, you can use a very efficient, lightweight binary representation. However, suppose you have to talk to a machine running a different operating system on the other side of the globe. In that case, you must devise a serialization mechanism both <span class="No-Break">systems understand.</span></li>
+				<li><strong class="bold">Error handling and robustness</strong>: Software <a id="_idIndexMarker445"/>can go wrong. We all know that. The problems with bugs and availability scale up exponentially if you are talking about multiple independent systems. So, you must be mindful of that. You also have to consider what your requirements are. Do you need guaranteed delivery? Do you need error recovery? Those two things might be handy, but they come with a price. Nothing comes for free, after all. You need to think about those scenarios. Usually, you must devise a solution you can get away with and not go overboard on error <span class="No-Break">correction schemes.</span></li>
+				<li><strong class="bold">Performance and scalability</strong>: Transferring <a id="_idIndexMarker446"/>blocks of memory inside a process is pretty quick. Moving data between processes can be really slow or even unimaginably slow. Moving a block of bits to another machine over a <strong class="bold">Transmission Control Protocol</strong> (<strong class="bold">TCP</strong>) connection<a id="_idIndexMarker447"/> is thousands of times slower than doing that in memory. Writing data to a disk, even a speedy SSD, is even slower <span class="No-Break">than that.</span></li>
+				<li>That means <a id="_idIndexMarker448"/>you must ensure optimal IO strategy for those use cases. Setting up a connection or creating a file is slow, but you have to do that only once for each transfer. Once you have that, you can write the data. If you have lots of tiny packets, you might want to bundle them so you only have to initiate it once. As we have stated before, it might be a good idea to compress data before transmitting. Yes, compression takes CPU cycles, but it might be worth it since transferring that data to another system is orders of <span class="No-Break">magnitude slower.</span></li>
+				<li><strong class="bold">Synchronization and deadlocks</strong>: Once<a id="_idIndexMarker449"/> your data leaves your system, you no longer know what is happening to it. Other processes might also be asking for the <a id="_idIndexMarker450"/>recipient’s attention, or the recipient might be out of data. You have to be very careful to ensure the data is synchronized. Or not. It depends on your use case, of course. Also, deadlocks can occur. You might wait for an operation to finish on the recipient’s side, but if that one waits for your system, you have a problem. Be mindful of those <span class="No-Break">problem areas.</span></li>
+				<li><strong class="bold">Documentation and maintainability</strong>: Sharing data <a id="_idIndexMarker451"/>with other systems means sharing your data structures with other developers. Do not forget that “other developers” could be yourself in six months when you look at what you did and wonder what you were thinking. Documenting your work, your thoughts, and the structures of your data saves you and your peers a lot of headaches further down the road. Do yourself a favor and document your data and its structure, what you did to satisfy all the constraints, and your assumptions. That makes your code much more maintainable. Of course, this applies to data-sharing scenarios and all software development, but it is so much more important when you need to share data with other systems. Do not skip <span class="No-Break">on this!</span></li>
+				<li><strong class="bold">Platform and environment constraints</strong>: You might <a id="_idIndexMarker452"/>not always be aware of the kind of hardware your data will be shared with. If you do not know this, you must consider all available options. Assume the worst and plan for that. For instance, if you transmit data packets of a couple of gigabytes, encrypted and wrapped in a compression algorithm, you might get complaints that the recipient is a very low-end IOT device with limited memory and <span class="No-Break">CPU power.</span></li>
+			</ul>
+			<p>Not all platforms support all of the strategies I outline in this chapter. For instance, Windows Messages, which we discuss next, is only available on Windows. The name sort of gives it away, doesn’t it? Be aware of the platform and environment constraints and design your data sharing <span class="No-Break">around those.</span></p>
+			<p>So, now that you know the considerations to take when choosing a communication method, let’s look at what methods we have available. We start with a classic: <span class="No-Break">Windows Messages.</span></p>
+			<h1 id="_idParaDest-143"><a id="_idTextAnchor144"/>Windows Messages</h1>
+			<p><strong class="bold">Windows Messages</strong> are <a id="_idIndexMarker453"/>the oldest type of IPC in Windows. They may not be the best choice when writing systems software, but they can be helpful. More importantly, they are extremely fast and lightweight. However, as the name suggests, they are a <span class="No-Break">Windows-only feature.</span></p>
+			<p>Messages work with windows. I do not mean the operating system; I am talking about the screens on your monitor. Almost everything on the GUI in Windows is a window. The windows obviously are, but so are buttons, edit boxes, text boxes, sliders, and so on. The operating system communicates with your application by sending messages to a window. Your application has at least one main window, which then distributes the message to the <em class="italic">subwindows </em>or handles the messages for those subwindows. However, each window can have its own <span class="No-Break">message-handling logic.</span></p>
+			<p>Since messages work with graphical screen elements, such as buttons, labels, and list boxes, you might think they cannot be used on console applications or Windows services. That is technically correct, but we can get around that. We can create a hidden window that can receive <span class="No-Break">the messages.</span></p>
+			<p>A message is straightforward. It is nothing but a structure containing four numeric parameters. This is what the parameters are and what they are <span class="No-Break">used for.</span></p>
+			<table class="No-Table-Style _idGenTablePara-1" id="table001-6">
+				<colgroup>
+					<col/>
+					<col/>
+					<col/>
+				</colgroup>
+				<thead>
+					<tr class="No-Table-Style">
+						<td class="No-Table-Style">
+							<p><span class="No-Break"><strong class="bold">Name</strong></span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p><strong class="bold">Type / </strong><span class="No-Break"><strong class="bold">C# Type</strong></span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p><span class="No-Break"><strong class="bold">Description</strong></span></p>
+						</td>
+					</tr>
+				</thead>
+				<tbody>
+					<tr class="No-Table-Style">
+						<td class="No-Table-Style">
+							<p><span class="No-Break"><strong class="source-inline">hWnd</strong></span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p>HWND / <span class="No-Break">IntPtr</span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p>The unique handle of the window that is to receive <span class="No-Break">the message</span></p>
+						</td>
+					</tr>
+					<tr class="No-Table-Style">
+						<td class="No-Table-Style">
+							<p><span class="No-Break"><strong class="source-inline">Msg</strong></span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p>UINT / <span class="No-Break">uint</span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p>The ID of <span class="No-Break">the message</span></p>
+						</td>
+					</tr>
+					<tr class="No-Table-Style">
+						<td class="No-Table-Style">
+							<p><span class="No-Break"><strong class="source-inline">wParam</strong></span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p>WPARAM / <span class="No-Break">IntPtr</span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p>An additional parameter, or pointer to a <span class="No-Break">data structure</span></p>
+						</td>
+					</tr>
+					<tr class="No-Table-Style">
+						<td class="No-Table-Style">
+							<p><span class="No-Break"><strong class="source-inline">lParam</strong></span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p>LPARAM / <span class="No-Break">IntPtr</span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p>An additional parameter, or pointer to a <span class="No-Break">data structure</span></p>
+						</td>
+					</tr>
+				</tbody>
+			</table>
+			<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Table 6.1: Parameters in a Windows Message</p>
+			<p>That is all that <a id="_idIndexMarker454"/>a message has. The <strong class="source-inline">wParam</strong> and <strong class="source-inline">lParam</strong> pointers point to some memory containing the payload. They can also be just a number if that is all you want to send. In 16-bit Windows, <strong class="source-inline">wParam</strong> was 16 bits, and <strong class="source-inline">lParam</strong> was 32. In 32-bit versions of Windows, they are both 32-bit long, and in 64-bit versions, they are both 64-bit long. So, there is no real difference between <strong class="source-inline">wParam</strong> and <strong class="source-inline">lParam</strong> anymore <span class="No-Break">regarding length.</span></p>
+			<p>These messages are all communications from the operating system to your application. If the user moves the mouse over your window, you get notified. Well, in the case of the mouse movement, you get hundreds of notifications. If the user presses a key, you get a message. If the user resizes the window, you get another message. Anything that happens on the operating system that might be interesting for your application is sent to you as a message. There are hundreds, if not thousands, of messages sent to your application all the time. Your application is required to listen to those messages. We shall see how that <span class="No-Break">works shortly.</span></p>
+			<p>The message identifier can be predefined; it can be a number you choose, or the operating system can <span class="No-Break">generate it.</span></p>
+			<p>Let me explain what I mean <span class="No-Break">by that.</span></p>
+			<p>If Windows <a id="_idIndexMarker455"/>sends a message, it is one of the predefined ones. For instance, if the mouse has moved, you get the <strong class="source-inline">WM_MOUSEMOVE</strong> message. <strong class="source-inline">WM_MOUSEMOVE</strong> is a constant with the <strong class="source-inline">0x0200</strong> value. <strong class="source-inline">wParam</strong> contains information about the state of the mouse buttons and keys, such as the <em class="italic">Ctrl</em> key on your keyboard. You can decode these flags to see whether a button is pressed while the mouse moves. <strong class="source-inline">lParam</strong> contains both the <em class="italic">X</em> and the <em class="italic">Y</em> position of the mouse relative to the upper-left corner of the window that receives the message (the first half of <strong class="source-inline">lParam</strong> contains the <em class="italic">Y</em> coordinate, and the second half contains the <span class="No-Break"><em class="italic">X</em></span><span class="No-Break"> coordinate).</span></p>
+			<p>An interesting message is <strong class="source-inline">WM_CLOSE</strong>. This has the <strong class="source-inline">0x0010</strong> value. If a window receives that message, the user wants to close it. If that happens on your main window, the <span class="No-Break">application ends.</span></p>
+			<p>You can also define your own message. There is a constant called <strong class="source-inline">WM_USER</strong> (with a value of <strong class="source-inline">0x0400</strong>). You can freely use any of the values between <strong class="source-inline">WM_USER</strong> and <strong class="source-inline">0x7FFF</strong> in your application to define your message. One caveat: you can only use them if you send those messages to your application’s other windows. You cannot use them to communicate with other applications. The reason is simple: you have no idea who uses those values outside <span class="No-Break">your system.</span></p>
+			<p>If you want to send messages to other applications, you need to register that with Windows. You can call an API to reserve a unique and reserved number as long as the computer stays on. If two applications reserve the same message name, they get the same ID. This is something you can use to communicate between processes, and that is precisely what we will be <span class="No-Break">doing now.</span></p>
+			<h2 id="_idParaDest-144"><a id="_idTextAnchor145"/>A sample</h2>
+			<p>To work<a id="_idIndexMarker456"/> with messages, we need to use a lot of Win32 APIs. The logic is not complex, but this sample requires a lot <span class="No-Break">of setup.</span></p>
+			<p>We can break it down <span class="No-Break">as follows:</span></p>
+			<ol>
+				<li><strong class="bold">Register a Window class</strong>: Since the operating system sends all messages to a window, we must create a window first. But before you can do that, you need to create a definition of that window. That is the <strong class="source-inline">Window</strong> class. It’s just like object-oriented programming: you define a class first and then create instances. Windows are just <span class="No-Break">like that.</span></li>
+				<li><strong class="bold">Define the message loop method</strong>: This method gets called as soon as a message <span class="No-Break">is available.</span></li>
+				<li><strong class="bold">Create the window</strong>: As soon as that happens, the messages start <span class="No-Break">flowing in.</span></li>
+				<li><strong class="bold">In the message loop, see whether there is a message available</strong>: If that message happens to be <strong class="source-inline">WM_CLOSE</strong>, close the application. If you want to handle the message, do so. If not, pass it on to the default handler that all <span class="No-Break">apps get.</span></li>
+			</ol>
+			<p>That is all there is <span class="No-Break">to it.</span></p>
+			<p>The source code<a id="_idIndexMarker457"/> on the GitHub repository for this book contains a sample. I have not included it here since the sample requires a lot of boilerplate code that takes up several pages. I decided to leave it out of this chapter since Windows Messages are not used except for certain specialized cases. However, if you are interested, just look at the sample code. With the preceding explanation, you can follow along <span class="No-Break">just nicely.</span></p>
+			<p>Now you know how Windows Messages work, we can take the next step and look into other means. We begin simple <span class="No-Break">enough: pipes.</span></p>
+			<h1 id="_idParaDest-145"><a id="_idTextAnchor146"/>Working with pipes for local IPC</h1>
+			<p><strong class="bold">Pipes</strong> originally<a id="_idIndexMarker458"/> came from Unix but have also found their way to other platforms. A <a id="_idIndexMarker459"/>pipe is like a direct connection between two systems. It is very lightweight and easy to set up. You can use them to communicate between processes on the same machine and between machines across a network. Theoretically, you can communicate between Linux and Windows using pipes. I said theoretically because since the implementation of the pipes on both platforms is so different, you have to jump through many loops to get that working. In fact, the work you must do to get it working is so intensive that you might as well use other ways, such as sockets, to achieve that same result. That will be much easier to <span class="No-Break">pull off.</span></p>
+			<p>There <a id="_idIndexMarker460"/>are two<a id="_idIndexMarker461"/> types of pipes: <strong class="bold">named pipe</strong> and <strong class="bold">anonymous pipe</strong>. The named pipe is the simplest <span class="No-Break">of them.</span></p>
+			<h2 id="_idParaDest-146"><a id="_idTextAnchor147"/>Named pipes</h2>
+			<p><strong class="bold">Named pipes</strong> are a <a id="_idIndexMarker462"/>great solution if you want to communicate from one process to another on the same machine. Communicating over a network is <a id="_idIndexMarker463"/>not complex but requires more thought concerning security and <span class="No-Break">access rights.</span></p>
+			<p>In .NET, you can use the <strong class="source-inline">NamedPipeServerStream</strong> and <strong class="source-inline">NamedPipeClientStream</strong> classes to get <span class="No-Break">this working.</span></p>
+			<p>The code is straightforward. For example, let us look at a server waiting for a connection. We also added a client that connects to that server. As soon as the connection is established, the server sends a message to the client, which will be displayed on <span class="No-Break">the screen.</span></p>
+			<p>Here is the <span class="No-Break">server code:</span></p>
+			<pre class="source-code">
+using System.IO.Pipes;
+"Starting the server".Dump(ConsoleColor.Cyan);
+await using var server = new
+    NamedPipeServerStream("SystemsProgrammersPipe");
+"Waiting for connection".Dump(ConsoleColor.Cyan);
+await server.WaitForConnectionAsync();
+await using var writer = new StreamWriter(server);
+writer.AutoFlush = true;
+writer.WriteLine("Hello from the server!");</pre>			<p>Again, I am using my <strong class="source-inline">Dump()</strong> extension method here to colorize the messages on the <span class="No-Break">screen quickly.</span></p>
+			<p>First, I create an instance of <strong class="source-inline">NamedPipeServerStream</strong>. As a parameter, I give it a unique name. If I use a name that is already registered, I get access to that other named pipe. The names are unique on your machine but are gone once <strong class="source-inline">NamedPipeServerStream</strong> is <span class="No-Break">disposed of.</span></p>
+			<p>Then, we wait for a connection. When a client connects, we create <strong class="source-inline">StreamWriter</strong>, give it the named pipe server stream, and write the data to <span class="No-Break">the stream.</span></p>
+			<p>We use <strong class="source-inline">AutoFlush</strong> on the writer: we don’t want data <span class="No-Break">hanging around.</span></p>
+			<p>Let’s look at <a id="_idIndexMarker464"/>the <span class="No-Break">client code:</span></p>
+			<pre class="source-code">
+using System.IO.Pipes;
+await using var client = new NamedPipeClientStream(".",     "SystemsProgrammersPipe");
+"Connecting to the server".Dump(ConsoleColor.Yellow);
+await client.ConnectAsync();
+using var reader = new StreamReader(client);
+string? message = await reader.ReadLineAsync();
+message.Dump(ConsoleColor.Yellow);</pre>			<p>This code<a id="_idIndexMarker465"/> should look familiar. We create an instance of <strong class="source-inline">NamedPipeClientStream</strong> (instead of a server) and give it two parameters. The first is the name of the computer on the network (in our case, our own computer as specified by the dot). The second parameter is the name of the pipe. Obviously, this should be the same as we used for the <span class="No-Break">server stream.</span></p>
+			<p>We connect the client to the pipe, create an instance of <strong class="source-inline">StreamReader</strong> with that client, and read the data. Lastly, we display the data coming from <span class="No-Break">the server.</span></p>
+			<h2 id="_idParaDest-147"><a id="_idTextAnchor148"/>Anonymous pipes</h2>
+			<p><strong class="bold">Anonymous pipes</strong> work<a id="_idIndexMarker466"/> more or less the same way as named pipes do. They<a id="_idIndexMarker467"/> provide a lightweight way of connecting processes to each other. However, there are differences between the named pipes and the anonymous pipes. The following table highlights the most <span class="No-Break">important ones:</span></p>
+			<table class="No-Table-Style _idGenTablePara-1" id="table002-5">
+				<colgroup>
+					<col/>
+					<col/>
+					<col/>
+				</colgroup>
+				<thead>
+					<tr class="No-Table-Style">
+						<td class="No-Table-Style">
+							<p><span class="No-Break"><strong class="bold">Feature</strong></span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p><span class="No-Break"><strong class="bold">Named pipes</strong></span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p><span class="No-Break"><strong class="bold">Anonymous pipes</strong></span></p>
+						</td>
+					</tr>
+				</thead>
+				<tbody>
+					<tr class="No-Table-Style">
+						<td class="No-Table-Style">
+							<p><span class="No-Break"><strong class="bold">Identification</strong></span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p>Named. You can find them using <span class="No-Break">the name.</span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p>Unnamed. You have to know the runtime handle <span class="No-Break">to connect.</span></p>
+						</td>
+					</tr>
+					<tr class="No-Table-Style">
+						<td class="No-Table-Style">
+							<p><span class="No-Break"><strong class="bold">Communication</strong></span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p>Both local <span class="No-Break">and networked.</span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p><span class="No-Break">Only local.</span></p>
+						</td>
+					</tr>
+					<tr class="No-Table-Style">
+						<td class="No-Table-Style">
+							<p><span class="No-Break"><strong class="bold">Peers</strong></span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p>Multiple clients per server. Can be set up to handle <span class="No-Break">bidirectional conversations.</span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p>One-on-one only. Also, one <span class="No-Break">way only</span></p>
+						</td>
+					</tr>
+					<tr class="No-Table-Style">
+						<td class="No-Table-Style">
+							<p><span class="No-Break"><strong class="bold">Complexity</strong></span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p>More complex. Allows for asynchronous communications, also able to do <span class="No-Break">fire-and-forget scenarios.</span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p>More simple. Straightforward one-way <span class="No-Break">parent-child communication.</span></p>
+						</td>
+					</tr>
+					<tr class="No-Table-Style">
+						<td class="No-Table-Style">
+							<p><span class="No-Break"><strong class="bold">Security</strong></span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p>Supports ACL to enable <span class="No-Break">secure communications.</span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p>No security features <span class="No-Break">are available.</span></p>
+						</td>
+					</tr>
+					<tr class="No-Table-Style">
+						<td class="No-Table-Style">
+							<p><span class="No-Break"><strong class="bold">Speed</strong></span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p>Slower due to <span class="No-Break">more control.</span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p>Fast. Almost <span class="No-Break">no overhead.</span></p>
+						</td>
+					</tr>
+				</tbody>
+			</table>
+			<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Table 6.2: Comparison of features between named pipes and anonymous pipes.</p>
+			<p>The<a id="_idIndexMarker468"/> code to <a id="_idIndexMarker469"/>set up an anonymous pipe is actually quite simple. Let’s start with the <span class="No-Break">server code:</span></p>
+			<pre class="source-code">
+using System.IO.Pipes;
+await using var pipeServer = new     AnonymousPipeServerStream(PipeDirection.Out, HandleInheritability.    Inheritable);
+$"The pipe handle is: {pipeServer.GetClientHandleAsString()}".    Dump(ConsoleColor.Cyan);
+pipeServer.DisposeLocalCopyOfClientHandle();
+await using var sw = new StreamWriter(pipeServer);
+sw.AutoFlush = true;
+sw.WriteLine("From server");
+pipeServer.WaitForPipeDrain();</pre>			<p>Let me walk you <span class="No-Break">through this.</span></p>
+			<p>First, I <a id="_idIndexMarker470"/>create an instance of <strong class="source-inline">AnonymousPipeServerStream</strong>. This class handles all the setting up of the communication. We can tell that it can either send or receive code. We cannot use the supplied <strong class="source-inline">PipeDirection.InOut</strong> enum: that will throw an exception. Remember: anonymous pipes <span class="No-Break">are one-way.</span></p>
+			<p>We need <a id="_idIndexMarker471"/>to make sure the handle can be inherited as well. This is because the client needs to “inherit” this handle. After all, this is the only way we can identify the pipe. There is no name; it <span class="No-Break">is anonymous!</span></p>
+			<p>We call <strong class="source-inline">GetClientHandleAsString</strong> so we know what to use on the <span class="No-Break">client side.</span></p>
+			<p>When you create <strong class="source-inline">AnonymousPipeServerStream</strong>, it automatically creates a client as well. This can be handy if you want to communicate inside your process. However, if another process needs to talk to this server, you have a problem. Anonymous pipes are single-connection only. The call to <strong class="source-inline">DisposeLocalCopyOfClientHandle</strong> removes the local client, so we have room for <span class="No-Break">another client.</span></p>
+			<p>Then, we create a stream, give it the pipe, and write <span class="No-Break">to it.</span></p>
+			<p>Finally, we call <strong class="source-inline">WaitForPipeDrain</strong>, a blocking call that only continues if the client has read all <span class="No-Break">the data.</span></p>
+			<p>The client is even <span class="No-Break">more simple:</span></p>
+			<pre class="source-code">
+"Enter the pipeHandle".Dump(ConsoleColor.Yellow);
+var pipeHandle = Console.ReadLine();
+using var pipeClient = new AnonymousPipeClientStream(PipeDirection.In, pipeHandle);
+using var sr = new StreamReader(pipeClient);
+while (sr.ReadLine() is { } temp)
+    temp?.Dump(ConsoleColor.Yellow);</pre>			<p>We read the handle from the console first. This is the output from our server, so we have that available. Then, we create the client by creating an instance of <strong class="source-inline">AnonymousPipeClientStream</strong>, telling it to be ready for incoming data, and giving it <span class="No-Break">the handle.</span></p>
+			<p>Then, we create <strong class="source-inline">stream</strong> and read from it. <span class="No-Break">That’s it!</span></p>
+			<p>There is <a id="_idIndexMarker472"/>one big caveat. Suppose you write these two console applications and you run them. In that case, you see that as soon as you try to create an instance of that <strong class="source-inline">AnonymousPipeClientStream</strong>, you get an <strong class="source-inline">InvalidHandle</strong> exception. The reason is that Windows separates the processes, ensuring security is as high as possible. If you run two processes, they cannot reach each other’s handles. So, it <a id="_idIndexMarker473"/>cannot access the pipe, which means you cannot communicate. I am afraid there is nothing we can do about that. If you think about it, it does make sense, though. You can only have one-on-one communications. So, if multiple console apps connect to the server, how do you ensure this one-on-one behavior? The answer is: <span class="No-Break">you cannot.</span></p>
+			<p>If you want separate console apps, you should use named <span class="No-Break">pipes instead.</span></p>
+			<p>However, if you want to use the example I supplied, you can ensure the client and the server run in the same address space. You do this by launching the client from the server. That looks <span class="No-Break">like this:</span></p>
+			<pre class="source-code">
+Process pipeClient = new Process();
+pipeClient.StartInfo.FileName = @"pipeClient.exe";
+// Pass the client process a handle to the server.
+pipeClient.StartInfo.Arguments =
+    pipeServer.GetClientHandleAsString();
+pipeClient.StartInfo.UseShellExecute = false;
+pipeClient.Start();</pre>			<p>Do not forget to change the client to get the handle from the <strong class="source-inline">args</strong> parameter given to the <strong class="source-inline">Main</strong> method instead of getting it from the user through <span class="No-Break">the console.</span></p>
+			<p>The secret here is the line where we set <strong class="source-inline">UseShellExecute</strong> to <strong class="source-inline">False</strong>. If it is <strong class="source-inline">True</strong>, the client starts in another shell, thus isolating it from the server. By setting this to <strong class="source-inline">False</strong>, we prevent that and can access the handle and, consequently, <span class="No-Break">the pipe.</span></p>
+			<p>If they fit your scenario, anonymous pipes are a great addition to your communications toolbelt. They are<a id="_idIndexMarker474"/> fast and lightweight, just the sort of thing we love as <a id="_idIndexMarker475"/>systems programmers. However, there are other ways to communicate that might even be better, although they are not as simple. Let’s talk <span class="No-Break">about sockets…</span></p>
+			<h1 id="_idParaDest-148"><a id="_idTextAnchor149"/>Using sockets to establish network-based IPC</h1>
+			<p>Sockets are <a id="_idIndexMarker476"/>awesome. They are a bit like the Swiss Army knife for communications. The<a id="_idIndexMarker477"/> downsides of pipes and Windows messages are gone when you move to sockets. Of course, nothing comes for free, so be prepared to spend a lot of time thinking about error handling and memory management. Still, once you get the idea, sockets are not hard <span class="No-Break">to use.</span></p>
+			<p><strong class="bold">Sockets</strong> are endpoints of a connection over a network between two systems. Of course, the systems can live on the same machine, but they can also be at different ends of the world. Thanks to all the hard work people have done building networks since the 1960s, we can now reach all sorts of <span class="No-Break">machines worldwide.</span></p>
+			<h2 id="_idParaDest-149"><a id="_idTextAnchor150"/>Networking 101</h2>
+			<p>Computer <a id="_idIndexMarker478"/>networks have been around for a long time. However, each supplier had its own way of making machines talk to one another. Over time, standards emerged. As it goes with standards, there were many to choose from. These days, we have more or less standardized on setting up a network, so you no longer have to worry <span class="No-Break">about that.</span></p>
+			<p>But before <a id="_idIndexMarker479"/>we dive into the specifics, we need to talk about <strong class="bold">Open Systems Interconnection</strong> (<span class="No-Break"><strong class="bold">OSI</strong></span><span class="No-Break">) first.</span></p>
+			<p>OSI is a layered architecture where you can describe how a network works. Each layer builds on top of the previous one (with the apparent exception of the <span class="No-Break">first layer).</span></p>
+			<p>There are seven layers, and this is what <span class="No-Break">they describe:</span></p>
+			<ul>
+				<li><strong class="bold">Level 1 – Physical</strong>: This <a id="_idIndexMarker480"/>is what describes the hardware. For example, what a cable looks like, how the switches are working, the electrical voltages that are applied, and <span class="No-Break">so on.</span></li>
+				<li><strong class="bold">Level 2 – Data Link</strong>: This describes how systems connect over the physical layers. Here, we describe how ethernet or Wi-Fi works. The MAC addresses (unique number per network device) are <span class="No-Break">defined here.</span></li>
+				<li><strong class="bold">Level 3 – Network</strong>: This<a id="_idIndexMarker481"/> one is all about routing and addressing. There are several protocols defined on level 3, such<a id="_idIndexMarker482"/> as <strong class="bold">Internet Control Message Protocol</strong> (<strong class="bold">ICMP</strong>), which is used for network diagnostics and error<a id="_idIndexMarker483"/> reporting, <strong class="bold">Address Resolution Protocol</strong> (<strong class="bold">ARP</strong>), used for<a id="_idIndexMarker484"/> address resolution, Bluetooth, and, of course, <strong class="bold">Internet Protocol</strong> (<strong class="bold">IP</strong>), both v4 <span class="No-Break">and v6.</span></li>
+				<li><strong class="bold">Level 4 – Transport</strong>: This layer is responsible for end-to-end communication and reliability. TCP <a id="_idIndexMarker485"/>and <strong class="bold">User Datagram Protocol</strong> (<strong class="bold">UDP</strong>), the topics of this chapter, live in <span class="No-Break">this layer.</span></li>
+				<li><strong class="bold">Level 5 – Session</strong>: this manages the sessions <span class="No-Break">between applications.</span></li>
+				<li><strong class="bold">Level 6 – Presentation</strong>: This layer ensures the data is presented in a format other systems <span class="No-Break">can understand.</span></li>
+				<li><strong class="bold">Level 7 – Application</strong>: here are the applications that use <span class="No-Break">the network.</span></li>
+			</ul>
+			<p>The hardware and the operating system handle levels 1 through 4. Levels 5 through 7 are ours to take <span class="No-Break">care of.</span></p>
+			<p>Almost all systems use TCP as a transport layer, but sometimes people choose UDP. I start by explaining TCP and how to use it, and I move to UDP at the end of this part. IP is more or less a given. We could choose other network-level protocols, but that would make life <span class="No-Break">unnecessarily complicated.</span></p>
+			<p>Setting up the session (level 5) is where we write the code to set up the connection on the client or server. The presentation, level 6, is about how we package the data: how we serialize, what encoding to use, and so on. We have covered that already extensively. Level 7 is just our app; I leave that one <span class="No-Break">to you.</span></p>
+			<p>So, let’s write some level <span class="No-Break">5 code!</span></p>
+			<h2 id="_idParaDest-150"><a id="_idTextAnchor151"/>A TCP-based chat app</h2>
+			<p>The “hello-world” application <a id="_idIndexMarker486"/>for networking is a chat app. That sort of app allows us to investigate how systems can connect and exchange data without dealing with technicalities about what kind of data is passed between them. The type of data is part of the application, which we learned is level 7 in the OSI model. We do not care about that here. Level 6 is presentation, but for a simple chat application, we can get away with something straightforward: we take a string and encode that in UTF8 bytes (and back again, of course). Since the OS takes care of levels 1 up to 3, we only have to deal with 4 <span class="No-Break">and 5.</span></p>
+			<p>Let’s make <span class="No-Break">it happen.</span></p>
+			<p>I want to use TCP here, which is an excellent protocol that gives us reliability and guarantees the order in which the data arrives. It is also effortless to <span class="No-Break">set up.</span></p>
+			<p>The server looks <span class="No-Break">like this:</span></p>
+			<pre class="source-code">
+01: using System.Net;
+02: using System.Net.Sockets;
+03: using System.Text;
+04:
+05: "Server is starting up.".Dump();
+06:
+07: var server = new TcpListener(IPAddress.Loopback, 8080);
+08: server.Start();
+09:
+10: "Waiting for a connection.".Dump();
+11:
+12: var client = await server.AcceptTcpClientAsync();
+13: "Client connected".Dump();
+14:
+15: var stream = client.GetStream();
+16: while (true)
+17: {
+18:     var buffer = new byte[1024];
+19:     var bytes = await stream.ReadAsync(buffer, 0, buffer.Length);
+20:     var message = Encoding.UTF8.GetString(buffer, 0, bytes);
+21:     $"Received message: {message}".Dump();
+22:
+23:     if (message.ToLower() == "bye")
+24:         break;
+25:
+26:     "Say something back".Dump();
+27:     var response = Console.ReadLine();
+28:     var responseBytes = Encoding.UTF8.GetBytes(response);
+29:     await stream.WriteAsync(responseBytes, 0, responseBytes.           Length);
+30:
+31:     if (response.ToLower() == "bye")
+32:         break;
+33: }
+34:
+35: client.Close();
+36: server.Stop();
+37: "Connection closed.".Dump();</pre>			<p>Since so much is happening, I decided to use line numbers here. That makes it a bit easier to refer to what I <span class="No-Break">am explaining.</span></p>
+			<p>In line 7, we <a id="_idIndexMarker487"/>create a new instance of the <strong class="source-inline">TcpListener</strong> class. This class handles all the details about communications, but it needs some information from us about that. We give the constructor two parameters that tell it all it needs to know. The first is the address we use. The address is the unique identifier for a network adapter, such as your ethernet or Wi-Fi adapter. This IP address is part of level 3, the network level of the OSI model. It is part of the IP specifications. However, multiple applications can simultaneously use a network adapter in a computer. We can specify a port number to ensure all the applications get the data they need and send it to the correct application on the other end of the line. This more or less arbitrary number decides what application connected to that IP address gets the data. This port number is part of level 4 of the OSI model. I said the number is more or less arbitrary. Technically, you can choose whatever number you desire, but there are conventions about these numbers. Since the port decides what application gets or sends the data, standards help ensure we all use the same ports for the same applications. Web servers, for instance, listen to port <strong class="source-inline">80</strong> unless they use the secure HTTPS protocol. That one uses port <strong class="source-inline">443</strong>. There are a lot of “reserved” numbers, but technically, nothing stops you from using port <strong class="source-inline">80</strong> for your chat application. I would not recommend doing so, though: it confuses <span class="No-Break">other people.</span></p>
+			<p>I want to ensure our chat server listens on port <strong class="source-inline">8080</strong>, a “free to <span class="No-Break">use” number.</span></p>
+			<p>I have used the word “listening” a few times here. Listening means that the application waits for another process, either on our machine or on an external one, to connect. Compare it to waiting for the phone to ring: you are listening for your ringtone and ready to pick it up if <span class="No-Break">it goes.</span></p>
+			<p>Since your machine can have multiple network adapters, you must specify which one you want to listen to. In this case, I chose a fixed IP address, <strong class="source-inline">IPAddress.Loopback</strong>, which translates to the <strong class="source-inline">127.0.0.1</strong> IPv4 address. This address is the local machine, not attached to any actual adapter. In other words, we only listen to connections from the same <span class="No-Break">physical machine.</span></p>
+			<p>Line 8 is straightforward: we start the server. With the call to <strong class="source-inline">AcceptTcpClienAsync</strong> in line 14, we tell the server to accept any <span class="No-Break">incoming connection.</span></p>
+			<p>Multiple clients can connect to the same server at the same time. The client here is what represents the connected client. We only expect one client, so we do not have to deal with <a id="_idIndexMarker488"/>sessions. Remember: session management is level 5 of the OSI model. We assume one and only one client, and we store that in the variable client. The type of client is <strong class="source-inline">TcpClient</strong>, in case you <span class="No-Break">were wondering.</span></p>
+			<p>This call is blocking, and only continues when a client is connected, something we tell the user with the message on <span class="No-Break">line 15.</span></p>
+			<p>As soon as we have established a connection, we open a stream to access the client’s data or to enable us to send data to that client. This stream, of the <strong class="source-inline">NetworkStream</strong> type, is bidirectional. We store that stream in the variable stream in <span class="No-Break">line 17.</span></p>
+			<p>Data comes in binary. Therefore, we use <strong class="source-inline">ReadAsync</strong> to read a buffer of data. I assume that no incoming data exceeds 1,024 bytes. You probably cannot make that assumption in a real-world application, so you must keep reading until you have all the data. Here, we store that data in a byte array of 1,024 bytes long (lines 20 and 21) and convert that to a UTF8 string (lines 22). This is how our data is presented, which is level 6 of the OSI model. As soon as we have that string, we display it. If the string is “bye” we take it that the client wants to disconnect. Otherwise, we allow the user on the server end to enter a response and send that string to the client after converting it to another byte array. We use the same <span class="No-Break">stream here.</span></p>
+			<p>If the stream contains no more data or someone uses the word “bye” in the conversation, we close the connection (line 37) and stop listening (<span class="No-Break">line 38).</span></p>
+			<p>The client is very similar in code. Here <span class="No-Break">it is:</span></p>
+			<pre class="source-code">
+01: using System.Net.Sockets;
+02: using System.Text;
+03:
+04: "Client is starting up.".Dump(ConsoleColor.Yellow);
+05:
+06: var client = new TcpClient("127.0.0.1", 8080);
+07: "Connected to the server. Let's chat!".Dump(ConsoleColor.Yellow);
+08: var stream = client.GetStream();
+09:
+10: while (true)
+11: {
+12:     "Say something".Dump(ConsoleColor.Yellow);
+13:     var message = Console.ReadLine();
+14:     var data = Encoding.UTF8.GetBytes(message);
+15:     await stream.WriteAsync(data, 0, data.Length);
+16:     if (message.ToLower() == "bye")
+17:         break;
+18:
+19:     var buffer = new byte[1024];
+20:     var bytesRead = await stream.ReadAsync(buffer, 0, buffer.            Length);
+21:     var response = Encoding.UTF8.GetString(buffer, 0, bytesRead);
+22:     $"Server says: {response}".Dump(ConsoleColor.Yellow);
+23:     if (response.ToLower() == "bye")
+24:         break;
+25: }
+26:
+27: client.Close();
+28: "Connection closed.".Dump(ConsoleColor.Yellow);</pre>			<p>In line 6, we <a id="_idIndexMarker489"/>create a new instance of the <strong class="source-inline">TcpClient</strong> class. Again, we have to give it an IP address and a port. This time, we have to use an actual number. We use <strong class="source-inline">127.0.0.1</strong>, so we are looking for a server on the same machine. The port is again <strong class="source-inline">8080</strong>; otherwise, our server never sees any connection <span class="No-Break">coming in.</span></p>
+			<p>This call is again blocking, so it will not continue until a connection has been made. We can access the stream once we have a connection, as in line 8. This stream is, once again, of the <strong class="source-inline">NetworkStream</strong> type, so we have a <span class="No-Break">bidirectional connection.</span></p>
+			<p>We do the <a id="_idIndexMarker490"/>same thing as we did for the server. We assume a message size of 1,024 bytes or less. We convert strings to and from byte arrays using UTF8 as encoding. We use the word “bye” to signal a desire to stop talking, and we use <strong class="source-inline">client.Close()</strong> to finalize <span class="No-Break">the connection.</span></p>
+			<p>As you can see, the code is very similar to the server’s. We simplified many things here: we do not consider having multiple clients connecting to one server. We make many assumptions about the message size and have to fall back or retry mechanisms in case things go wrong. When working with connections across machines, things go wrong often, so you must be aware of that and code accordingly. However, since that has nothing to do with the actual networking code, as I have shown you here, I can safely leave that to you to <span class="No-Break">figure out.</span></p>
+			<h2 id="_idParaDest-151"><a id="_idTextAnchor152"/>UDP</h2>
+			<p>TCP is a<a id="_idIndexMarker491"/> great protocol, but it is not the only one. <strong class="bold">UDP</strong> is more straightforward and lighter. Of course, that comes with disadvantages as well. I outline <a id="_idIndexMarker492"/>the differences between the two protocols in the <span class="No-Break">following table:</span></p>
+			<table class="No-Table-Style _idGenTablePara-1" id="table003-4">
+				<colgroup>
+					<col/>
+					<col/>
+					<col/>
+				</colgroup>
+				<thead>
+					<tr class="No-Table-Style">
+						<td class="No-Table-Style">
+							<p><span class="No-Break"><strong class="bold">Consideration</strong></span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p><span class="No-Break"><strong class="bold">TCP</strong></span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p><span class="No-Break"><strong class="bold">UDP</strong></span></p>
+						</td>
+					</tr>
+				</thead>
+				<tbody>
+					<tr class="No-Table-Style">
+						<td class="No-Table-Style">
+							<p><span class="No-Break">Main objective</span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p><span class="No-Break">Reliability</span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p><span class="No-Break">Speed</span></p>
+						</td>
+					</tr>
+					<tr class="No-Table-Style">
+						<td class="No-Table-Style">
+							<p><span class="No-Break">Ordering</span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p><span class="No-Break">Order guaranteed</span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p>No guarantee about the order <span class="No-Break">of messages</span></p>
+						</td>
+					</tr>
+					<tr class="No-Table-Style">
+						<td class="No-Table-Style">
+							<p><span class="No-Break">Handshaking</span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p><span class="No-Break">Yes</span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p><span class="No-Break">No</span></p>
+						</td>
+					</tr>
+					<tr class="No-Table-Style">
+						<td class="No-Table-Style">
+							<p><span class="No-Break">Error Checking</span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p><span class="No-Break">Yes</span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p><span class="No-Break">No</span></p>
+						</td>
+					</tr>
+					<tr class="No-Table-Style">
+						<td class="No-Table-Style">
+							<p><span class="No-Break">Congestion control</span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p><span class="No-Break">Yes</span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p><span class="No-Break">No</span></p>
+						</td>
+					</tr>
+					<tr class="No-Table-Style">
+						<td class="No-Table-Style">
+							<p><span class="No-Break">Use case</span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p>Web browsing, chatting, file <span class="No-Break">transfer, email</span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p>Video streaming, online <span class="No-Break">gaming, VOIP</span></p>
+						</td>
+					</tr>
+				</tbody>
+			</table>
+			<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Table 6.3: TCP and UDP compared</p>
+			<p>TCP is reliable. Message<a id="_idIndexMarker493"/> almost always arrives. When things go wrong, TCP tries to resend the data until it has been delivered. UDP doesn’t care about that. It just tries to get the data out there as fast <span class="No-Break">as possible.</span></p>
+			<p>TCP ensures that messages arrive in the same order as they have been sent. UDP, however, does not: messages could arrive at the destination in a different order than how they left <span class="No-Break">the origin.</span></p>
+			<p>TCP makes sure the other end is ready to communicate. UDP just starts <span class="No-Break">sending data.</span></p>
+			<p>TCP checks the data to see whether errors have occurred during transmission and can even fix some. UDP does not care: as long as the data is sent, it is happy <span class="No-Break">with it.</span></p>
+			<p>If the network gets congested, TCP can slow down transmission to help alleviate that. UDP dumps data as fast as possible, regardless of <span class="No-Break">network conditions.</span></p>
+			<p>TCP is best used when you must have a reliable, error-free way of transmitting data. For instance, with chat, the message must come across as intended, in the correct order. UDP, however, is all about speed. Video streaming comes to mind: if part of the data stream is lost sometimes, it is not a big deal. Slow streams, however, are killing <span class="No-Break">the experience.</span></p>
+			<p>UDP is not often used, but it can be a valuable tool in <span class="No-Break">your belt.</span></p>
+			<h1 id="_idParaDest-152"><a id="_idTextAnchor153"/>Using shared memory to exchange data between processes</h1>
+			<p>So far, we have <a id="_idIndexMarker494"/>been sending messages to other processes on the same computer. With named pipes and sockets, we could have used other machines as well. That’s the beauty of those protocols: they are network agnostic. However, if you are sure you want to stay on the same machine, using pipes or sockets can be a burden. These methods are not the fastest way to communicate. In those cases, you might be better off using <span class="No-Break"><strong class="bold">shared memory</strong></span><span class="No-Break">.</span></p>
+			<p>Shared memory <a id="_idIndexMarker495"/>is effortless to set up. And yes, of course, that comes with downsides. There is almost no way to secure the data or to prevent collisions. However, it is fast; really, really fast. So, let’s look at <span class="No-Break">a sample.</span></p>
+			<p>First, we look at how to write data to <span class="No-Break">shared memory:</span></p>
+			<pre class="source-code">
+using System.IO.MemoryMappedFiles;
+"Ready to write data to share memory.\nPress Enter to do     so.".Dump(ConsoleColor.Cyan);
+Console.ReadLine();
+using var mmf = MemoryMappedFile.CreateNew("SharedData", 1024);
+// Create a view accessor to write data
+using MemoryMappedViewAccessor accessor = mmf.CreateViewAccessor();
+byte[] data = System.Text.Encoding.UTF8.GetBytes("Hello from Process     1");
+accessor.WriteArray(0, data, 0, data.Length);
+"Data written to shared memory. Press any key to     exit.".Dump(ConsoleColor.Cyan);
+Console.ReadKey();</pre>			<p>Shared memory is <a id="_idIndexMarker496"/>like having a file that only exists in memory. It’s a block reserved in memory. It has a name you can use to identify it. Again, it is just like a file. Here, we create a new instance of the <strong class="source-inline">MemoryMappedFile</strong> class, giving it a name and a size. (in our case, 1,024 bytes). If you want to use that file, you must get <strong class="source-inline">MemoryMappedViewAccessor</strong>. You can get that by calling <strong class="source-inline">CreateViewAccessor</strong> on the <span class="No-Break"><strong class="source-inline">MemoryMappedFile</strong></span><span class="No-Break"> instance.</span></p>
+			<p>You can then read and write data to and from <span class="No-Break">that accessor.</span></p>
+			<p>Reading from that shared file is just as easy. Here is <span class="No-Break">the code:</span></p>
+			<pre class="source-code">
+using System.IO.MemoryMappedFiles;
+"Wait for the server to finish. \nPress Enter to read the shared     data.".Dump(ConsoleColor.Yellow);
+Console.ReadLine();
+using var mmf = MemoryMappedFile.OpenExisting("SharedData");
+// Create a view accessor to read data
+using MemoryMappedViewAccessor accessor = mmf.CreateViewAccessor();
+byte[] data = new byte[1024];
+accessor.ReadArray(0, data, 0, data.Length);
+$"Received message: {System.Text.Encoding.UTF8.GetString(data)}".    Dump(ConsoleColor.Yellow);</pre>			<p>We <a id="_idIndexMarker497"/>use almost the same code as the writer. However, instead of creating a new file in memory, we open an existing one. We do not have to specify the size but must know <span class="No-Break">the name.</span></p>
+			<p>Once we have that file, we can use the same code to get an accessor. With that, we can read the data and display it. Simple, <span class="No-Break">isn’t it?</span></p>
+			<p>Again, this is a speedy way to share data between processes on the same machine. However, the downsides are something to be aware of. For instance, any process that knows the name of the shared memory block can access it. There is no security whatsoever. Of course, you can circumvent that by <span class="No-Break">using encryption.</span></p>
+			<p>Another downside is that there is no built-in mechanism to notify processes of new or changed data. You have to use things such as semaphores and mutexes to do that. You can set up <strong class="source-inline">FileSystemWatcher</strong> with actual files to get notified, but that is not available for these shared files <span class="No-Break">in memory.</span></p>
+			<p>Another potential downside is that it is Windows only. That might limit your options for deployment <span class="No-Break">later on.</span></p>
+			<p>But all in all, shared memory is a great way to quickly share large amounts of data across processes on the same Windows machine. Use it to <span class="No-Break">your advantage!</span></p>
+			<h1 id="_idParaDest-153"><a id="_idTextAnchor154"/>Overview of RPCs and how to use them for IPC</h1>
+			<p>So far, we<a id="_idIndexMarker498"/> have looked at ways we can share data. In most cases, developers use this to do just data: send a payload from one system to another. However, the payload can also be something else. They can be commands to instruct a piece of software to do something. Instead of storing, transforming, and using data in systems, we can tell other systems to perform actions. In that case, we talk <span class="No-Break">about RPC.</span></p>
+			<p>To control <a id="_idIndexMarker499"/>a system from the outside, establish a communication line, ensure your security is in order, and define <span class="No-Break">a protocol.</span></p>
+			<p>There are many ways to do this. In the old days, we used to have SOAP, DCOM, WCF, and other techniques to <span class="No-Break">do so.</span></p>
+			<p class="callout-heading">RESTFul services versus RPC</p>
+			<p class="callout">You could <a id="_idIndexMarker500"/>consider RESTFul services to be some kind of RPC. However, they are not the same, and I do not want to go into RESTful services here. There are many similarities, but the basic idea behind RESTful services is that they are all about resources. Calls to web services are usually used to retrieve data from a server. Technically, you could set up RESTful services to accept commands only, in which way they are RPC. It’s like calling a calzone a pizza. Technically, that is correct, but there are enough differences in practice to warrant a different approach. Therefore, I have decided not to include RESTful services in this book. If you choose to use RESTful services to communicate with your system, by all means, be <span class="No-Break">my guest.</span></p>
+			<p>Basically, it’s all very simple. You think of a way to structure and send commands over the line. This works fine as long as both parties understand what is going on. Of course, you don’t have to reinvent the wheel: several well-established standards exist to do this. Later in this chapter, I show you how to do this with gRPC. However, as with all standards, they come with a cost. Sometimes, you do not need the additional complexity an established framework gives you. Sometimes, you just want to send a simple command to a system. Suppose your scenario allows for a less secure and unknown protocol. In that case, you can improve your speed and memory by having your <span class="No-Break">own protocol.</span></p>
+			<p>JSON RPC is one of the most used ways to do this yourself. Let’s have <span class="No-Break">a look.</span></p>
+			<h2 id="_idParaDest-154"><a id="_idTextAnchor155"/>JSON RPC</h2>
+			<p>JSON RPC is<a id="_idIndexMarker501"/> just encapsulating your commands in <a id="_idIndexMarker502"/>a JSON structure, sending them off over the wire, intercepting them at the other end, and doing whatever the command tells the system <span class="No-Break">to do.</span></p>
+			<p>Let’s begin with defining a command we want <span class="No-Break">to send:</span></p>
+			<pre class="source-code">
+[Serializable]
+internal class ShowDateCommand
+{
+    public bool IncludeTime { get; set; }
+}</pre>			<p>I want the client to inform the server that it needs to print the current date. I might want to include the current time as well. So, this is the command we created: <strong class="source-inline">ShowDateCommand</strong> with the <span class="No-Break"><strong class="source-inline">IncludeTime</strong></span><span class="No-Break"> field.</span></p>
+			<p>In my sample, I have put the client and the server in the same application, each running on a different task. I did that for the sake of simplicity. Of course, if you want to send commands to a different part of the same application, RPC is overkill. It’s not even correct: it’s not remote at all. However, for this demo, it works <span class="No-Break">just fine.</span></p>
+			<p>For communications, I have chosen a named pipe. It’s easy to set up and could be used to send messages across the network. Besides those considerations, I had no real reason to choose this option, so you can do whatever <span class="No-Break">you want.</span></p>
+			<p>The server part looks <span class="No-Break">like this:</span></p>
+			<pre class="source-code">
+internal class Server(CancellationToken cancellationToken)
+{
+    public async Task StartServer()
+    {
+        "Starting the server".Dump(ConsoleColor.Cyan);
+        await using var server = new             NamedPipeServerStream("CommandsPipe");
+        "Waiting for connection".Dump(ConsoleColor.Cyan);
+        await server.WaitForConnectionAsync(cancellationToken);
+        using var reader = new StreamReader(server);
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            var line = await reader.ReadLineAsync();
+            if (line == null) break;
+            $"Received this command: {line}".Dump(ConsoleColor.Cyan);
+            var command = JsonSerializer.                Deserialize&lt;ShowDateCommand&gt;(line);
+            if (command is { IncludeTime: true })
+                DateTime.Now.ToString("yyyy-MM-dd
+                    HH:mm:ss").Dump(ConsoleColor.Cyan);
+            else
+                DateTime.Now.ToString("yyyy-MM-dd").Dump(ConsoleColor.                    Cyan);
+        }
+    }
+}</pre>			<p>The <a id="_idIndexMarker503"/>class, called <strong class="source-inline">Server</strong>, has one method named <strong class="source-inline">StartServer</strong>. It creates an instance of <strong class="source-inline">NamePipeServerStream</strong> with the <strong class="source-inline">CommandsPipe</strong> name. Then, it waits for a client to connect. As soon as that happens, we <a id="_idIndexMarker504"/>read the data coming in. As soon as we get a string, we deserialize it to the correct format and perform the task it is told to perform: it prints out the current date and optionally includes <span class="No-Break">the time.</span></p>
+			<p>The client looks <span class="No-Break">like this:</span></p>
+			<pre class="source-code">
+internal class Client(CancellationToken cancellationToken)
+{
+    public async Task StartClient()
+    {
+        var newCommand = new ShowDateCommand
+        {
+            IncludeTime = true
+        };
+        var newCommandAsJson = JsonSerializer.Serialize(newCommand);
+        "Starting the client".Dump(ConsoleColor.Yellow);
+        await using var client = new             NamedPipeClientStream("CommandsPipe");
+        await client.ConnectAsync(cancellationToken);
+        await using var writer = new StreamWriter(client);
+        $"Sending this command: {newCommandAsJson}".Dump(ConsoleColor.            Yellow);
+        await writer.WriteLineAsync(newCommandAsJson);
+        await writer.FlushAsync();
+    }
+}</pre>			<p>The client <a id="_idIndexMarker505"/>creates an instance of <strong class="source-inline">ShowDateCommand</strong> and sets <strong class="source-inline">IncludeTime</strong> to <strong class="source-inline">true</strong>. Then, it creates <strong class="source-inline">NamedPipeClientStream</strong> with the correct name and connects to the server. Finally, it sends<a id="_idIndexMarker506"/> the JSON over the wire. That’s all there is <span class="No-Break">to it.</span></p>
+			<p>For completeness, I give you the code that initializes both the server and the client in the <strong class="source-inline">Main</strong> method of <span class="No-Break">the program:</span></p>
+			<pre class="source-code">
+var cancellationTokenSource = new CancellationTokenSource();
+"Starting the server".Dump(ConsoleColor.Green);
+var server = new Server(cancellationTokenSource.Token);
+Task.Run(() =&gt; server.StartServer(), cancellationTokenSource.Token);
+var client = new Client(cancellationTokenSource.Token);
+    Task.Run(() =&gt; client.StartClient(),
+    cancellationTokenSource.Token);
+"Server and client are running, press a key to stop".    Dump(ConsoleColor.Green);
+var input = Console.ReadKey();
+"Stopping all".Dump(ConsoleColor.Green);</pre>			<p>I create<a id="_idIndexMarker507"/> instances of <strong class="source-inline">Server</strong> and <strong class="source-inline">Client</strong>, starting them in <strong class="source-inline">Task.Run()</strong> and wait for the user to press a key. In the background, <strong class="source-inline">Server</strong> and <strong class="source-inline">Client</strong> do their thing, telling you all about it with the calls to <strong class="source-inline">Dump()</strong>. Please <a id="_idIndexMarker508"/>pay attention to the thread IDs in <strong class="source-inline">Dump</strong> – they can be pretty informative for learning about threading (or refreshing <span class="No-Break">your memory).</span></p>
+			<p>This technique is simple and very fast. However, it only works if you know both ends of the equation: the server and the client must follow your proprietary protocol. If that is not the case, you are better off using a standard. One of those standards is gRPC. Let’s look at <span class="No-Break">that next.</span></p>
+			<h1 id="_idParaDest-155"><a id="_idTextAnchor156"/>Overview of gRPC and how to use it for IPC</h1>
+			<p>One of the<a id="_idIndexMarker509"/> leading ways to establish a straightforward way of communication between processes these days is gRPC. The acronym <strong class="bold">gRPC</strong> stands for either <strong class="bold">Google remote procedure call</strong> or the recursive name gRPC remote procedure call. You can pick whichever you like. Google developed it as a public version and improvement of their internal <span class="No-Break">framework, Stubby.</span></p>
+			<p>gRPC uses <strong class="bold">Protocol Buffers</strong> (<strong class="bold">Protobufs</strong>). This is a<a id="_idIndexMarker510"/> format that describes the available commands, the <a id="_idIndexMarker511"/>messages, and the parameters you can pass. Protobufs are compiled into a binary form, resulting in faster data transfers. The system is built on HTTP/2, so we can use multiplexing (multiple requests over the same TCP connection). HTTP/2 has many more advantages over the older HTTP/1.x, most of which <span class="No-Break">involve efficiency.</span></p>
+			<p>Cross-language and platform support was also one of the leading drivers. So, you can be sure gRPC can be used on <span class="No-Break">many devices.</span></p>
+			<p>Suppose we want to rebuild our example of a system that can be remotely instructed to display the current date (with or without time). In that case, we first have to define the message structure. However, before we do that, we need to add a couple of NuGet packages to our <span class="No-Break">server application:</span></p>
+			<table class="No-Table-Style _idGenTablePara-1" id="table004-2">
+				<colgroup>
+					<col/>
+					<col/>
+				</colgroup>
+				<thead>
+					<tr class="No-Table-Style">
+						<td class="No-Table-Style">
+							<p><span class="No-Break"><strong class="bold">Package</strong></span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p><span class="No-Break"><strong class="bold">Description</strong></span></p>
+						</td>
+					</tr>
+				</thead>
+				<tbody>
+					<tr class="No-Table-Style">
+						<td class="No-Table-Style">
+							<p><span class="No-Break"><strong class="source-inline">Google.Protobuf</strong></span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p>Handles the <span class="No-Break">proto files</span></p>
+						</td>
+					</tr>
+					<tr class="No-Table-Style">
+						<td class="No-Table-Style">
+							<p><span class="No-Break"><strong class="source-inline">Grpc.Core</strong></span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p>The core implementation <span class="No-Break">of gRPC</span></p>
+						</td>
+					</tr>
+					<tr class="No-Table-Style">
+						<td class="No-Table-Style">
+							<p><span class="No-Break"><strong class="source-inline">Grpc.Tools</strong></span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p>Contains, amongst others, the compiler for <span class="No-Break">proto files</span></p>
+						</td>
+					</tr>
+					<tr class="No-Table-Style">
+						<td class="No-Table-Style">
+							<p><span class="No-Break"><strong class="source-inline">Grpc.AspNetCore</strong></span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p>Needed to host the server in <span class="No-Break">our application</span></p>
+						</td>
+					</tr>
+				</tbody>
+			</table>
+			<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Table 6.4: NuGet packages for our gRPC server</p>
+			<p>In a C# console <a id="_idIndexMarker512"/>application, add a new file called <strong class="source-inline">displayer.proto</strong>. This is just a text file. I like to put them in a separate folder, which I call <strong class="source-inline">Protos</strong>. The compiler takes this file and creates a lot of C# <span class="No-Break">for us.</span></p>
+			<p>The file looks <span class="No-Break">like this:</span></p>
+			<pre class="source-code">
+syntax = "proto3";
+option csharp_namespace = "_02_GRPC_Server";
+service TimeDisplayer {
+    rpc DisplayTime (DisplayTimeRequest) returns (DisplayTimeReply);
+}
+message DisplayTimeRequest{
+    string name = 1;
+    bool wantsTime = 2;
+}
+message DisplayTimeReply{
+    string message = 1;
+}</pre>			<p>Let’s <span class="No-Break">dissect this.</span></p>
+			<p>First, we <a id="_idIndexMarker513"/>tell the system what format this is. We use <strong class="source-inline">proto3</strong>, which is the latest and <span class="No-Break">recommended version.</span></p>
+			<p>Then, we tell the system what namespace to put them in when it generates the C# files. As you can imagine, this option is C# only. It is a helper option that helps us keep our <span class="No-Break">code organized.</span></p>
+			<p>Then, we define the service. We have one service called <strong class="source-inline">TimeDisplayer</strong>. It has one RPC method called <strong class="source-inline">DisplayTime</strong>. It takes <strong class="source-inline">DisplayTimeRequest</strong> as a parameter and returns something of the <span class="No-Break"><strong class="source-inline">DisplayTimeReply</strong></span><span class="No-Break"> type.</span></p>
+			<p><strong class="source-inline">DisplayTimeRequest</strong> and <strong class="source-inline">DisplayTimeReply</strong> types are defined below that. They are messages, and they can contain parameters. I added a name to show you how to add a string. For the request, I also added a bool, indicating whether we want to show <span class="No-Break">the time.</span></p>
+			<p>The parameters need to be ordered and numbered. This way, if somehow the message gets scrambled, both systems still know what the data looked <span class="No-Break">like initially.</span></p>
+			<p>Visual Studio usually knows how to handle this if you add a <strong class="source-inline">.proto</strong> file to your application. However, if this doesn’t happen (and I have seen it go wrong occasionally), you must <a id="_idIndexMarker514"/>instruct the compiler on how to handle this file. In your <strong class="source-inline">csproj</strong> file, just add the <span class="No-Break">following section:</span></p>
+			<pre class="source-code">
+&lt;ItemGroup&gt;
+  &lt;ProtoBuf Include="Protos\displayer.proto" GrpcServices="Server" /&gt;
+&lt;/ItemGroup&gt;</pre>			<p>That should be enough to get the compiler on <span class="No-Break">the way.</span></p>
+			<p>Let’s build <span class="No-Break">the server!</span></p>
+			<p>I have added the code for the server in my console application. Since the compiler takes our <strong class="source-inline">.proto</strong> file and compiles all the necessary code for us, we can use <span class="No-Break">the following:</span></p>
+			<pre class="source-code">
+internal class TimeDisplayerService : TimeDisplayer.TimeDisplayerBase
+{
+    public override Task&lt;DisplayTimeReply&gt; DisplayTime(
+        DisplayTimeRequest request,
+        ServerCallContext context)
+    {
+        var result = request.WantsTime
+            ? DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
+            : DateTime.Now.ToString("yyyy-MM-dd");
+        result.Dump();
+        return Task.FromResult(new DisplayTimeReply
+        {
+            Message = $"I printed {result}"
+        });
+    }
+}</pre>			<p>Our <strong class="source-inline">TimeDisplayerService</strong> class is derived from the <strong class="source-inline">TimeDisplayer.TimeDisplayerBase</strong> base class. This base class is generated out of our <strong class="source-inline">.proto</strong> file. As you can see, the <strong class="source-inline">TimeDisplayer</strong> name matches what we have in that <strong class="source-inline">.</strong><span class="No-Break"><strong class="source-inline">proto</strong></span><span class="No-Break"> file.</span></p>
+			<p>We have one method here, called <strong class="source-inline">DisplayTime</strong>. Again, this matches what we have in our <strong class="source-inline">.proto</strong> file. The code is pretty simple; it just takes an instance of <strong class="source-inline">DisplayTimeRequest</strong>, looks at the <strong class="source-inline">WantsTime</strong> parameter, and returns <span class="No-Break">the result.</span></p>
+			<p>Usually, gRPC servers<a id="_idIndexMarker515"/> run on some sort of webserver, and adding this code to an ASP.NET application is straightforward. But, of course, you can run it anywhere you want, which is something we, as systems programmers, really can use. So, if you’re going to run this code in a console application, you can set that up as follows. In the primary method of your program, add <span class="No-Break">the following:</span></p>
+			<pre class="source-code">
+"Starting gRPC server...".Dump();
+var port = 50051;
+var server = new Server
+{
+    Services = {TimeDisplayer.BindService(new         TimeDisplayerService())},
+    Ports = {new ServerPort("localhost", port, ServerCredentials.        Insecure)}
+};
+server.Start();
+Console.WriteLine("Greeter server listening on port " + port);
+Console.WriteLine("Press any key to stop the server...");
+Console.ReadKey();
+await server.ShutdownAsync();</pre>			<p>We create a <a id="_idIndexMarker516"/>new instance of the <strong class="source-inline">Server</strong> class. This comes from the <strong class="source-inline">gRPC.Core </strong>NuGet package we installed. We give it the services we want to use (in our case, <strong class="source-inline">TimeDisplayerService</strong>) and define the network address and port we decide to use. I do not care about credentials here, but you can use SSL, TLS, and other ways <span class="No-Break">of security.</span></p>
+			<p>We start the server and wait for the user to press any key. Then, we stop the <span class="No-Break">server again.</span></p>
+			<p>Up next: <span class="No-Break">the client.</span></p>
+			<p>Again, we need to add <a id="_idIndexMarker517"/>some NuGet packages to our console application. These are the ones <span class="No-Break">you need:</span></p>
+			<table class="No-Table-Style _idGenTablePara-1" id="table005-1">
+				<colgroup>
+					<col/>
+					<col/>
+				</colgroup>
+				<thead>
+					<tr class="No-Table-Style">
+						<td class="No-Table-Style">
+							<p><span class="No-Break"><strong class="bold">Package</strong></span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p><span class="No-Break"><strong class="bold">Description</strong></span></p>
+						</td>
+					</tr>
+				</thead>
+				<tbody>
+					<tr class="No-Table-Style">
+						<td class="No-Table-Style">
+							<p><span class="No-Break"><strong class="source-inline">Google.Protobuf</strong></span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p>Handles the <span class="No-Break">proto files</span></p>
+						</td>
+					</tr>
+					<tr class="No-Table-Style">
+						<td class="No-Table-Style">
+							<p><span class="No-Break"><strong class="source-inline">Grpc.Net.Client</strong></span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p>The client implementation <span class="No-Break">for gRPC</span></p>
+						</td>
+					</tr>
+					<tr class="No-Table-Style">
+						<td class="No-Table-Style">
+							<p><span class="No-Break"><strong class="source-inline">Grpc.Tools</strong></span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p>Contains, amongst others, the compiler for <span class="No-Break">proto files</span></p>
+						</td>
+					</tr>
+				</tbody>
+			</table>
+			<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Table 6.5: NuGet packages for our gRPC client</p>
+			<p>First, we need a <strong class="source-inline">.prot</strong>o file. To be more precise, we need the same <strong class="source-inline">.proto</strong> file we used on the server. So, it is best to link to that file instead of recreating it. However, if you like typing, be my guest and create a new one. Just make sure these files remain in sync when you <span class="No-Break">make changes.</span></p>
+			<p>We do not need a specific client class; we only have to add the following code to our <strong class="source-inline">Main</strong> method in <span class="No-Break">the program:</span></p>
+			<pre class="source-code">
+"Starting gRPC client... Press ENTER to connect.".Dump(ConsoleColor.Yellow);
+Console.ReadLine();
+var channel = GrpcChannel.ForAddress("http://localhost:50051");
+var client = new
+TimeDisplayer.TimeDisplayerClient(channel);
+var reply =
+    await client.DisplayTimeAsync(
+        new DisplayTimeRequest
+        {
+            Name = "World",
+            WantsTime = false
+        });
+Console.WriteLine("From server: " + reply.Message);</pre>			<p>We <a id="_idIndexMarker518"/>start with a wait for the user to press a key. Since I start the server and the client simultaneously in my solution, I might get timing issues if the client is slightly faster than the server in setting up <span class="No-Break">the connection.</span></p>
+			<p>Then, we call <strong class="source-inline">GrpcChannel.ForAddress()</strong> with the correct parameters to set up the connection. With that connection, we call the <strong class="source-inline">DisplayTimeAsync</strong> method with a correct <strong class="source-inline">DisplayTimeRequest</strong> setup. The result should come back and show you what the <span class="No-Break">server did.</span></p>
+			<p>That is all there is to it! We now have a fully functional server and client application, talking to one another <span class="No-Break">over gRPC.</span></p>
+			<h2 id="_idParaDest-156"><a id="_idTextAnchor157"/>Differences between JSON RPC and gRPC</h2>
+			<p>As you<a id="_idIndexMarker519"/> saw, setting up a gRPC server and client is not too complicated. But still, it adds a bit of complexity to your code. If you do <a id="_idIndexMarker520"/>not need the advantages of gRPC, you can use JSON RPC instead. But when do you pick <span class="No-Break">which one?</span></p>
+			<p>If your messages get big, gRPC is the far better choice. Remember when I said IO takes a long time? Well, JSON files are usually much bigger than their binary equivalent. gRPC uses that smaller binary format, so data transmission is much faster when <span class="No-Break">using that.</span></p>
+			<p>However, JSON is <a id="_idIndexMarker521"/>more readable, more debuggable, and easier to interpret for humans. The code is also easier to set up. The <strong class="source-inline">.proto</strong> files are something you have to get used to. Next to that, the compiler needs to transform the <strong class="source-inline">.proto</strong> files into C# classes, and they make your system <span class="No-Break">more complex.</span></p>
+			<p>All in all, it <a id="_idIndexMarker522"/>depends on your scenario. However, for easy reference, I have outlined the differences between JSON RPC and gRPC in the <span class="No-Break">following table:</span></p>
+			<table class="No-Table-Style _idGenTablePara-1" id="table006">
+				<colgroup>
+					<col/>
+					<col/>
+					<col/>
+				</colgroup>
+				<thead>
+					<tr class="No-Table-Style">
+						<td class="No-Table-Style">
+							<p><span class="No-Break"><strong class="bold">Feature</strong></span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p><span class="No-Break"><strong class="bold">gRPC</strong></span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p><strong class="bold"> RPC </strong><span class="No-Break"><strong class="bold">with JSON</strong></span></p>
+						</td>
+					</tr>
+				</thead>
+				<tbody>
+					<tr class="No-Table-Style">
+						<td class="No-Table-Style">
+							<p><span class="No-Break"><strong class="bold">Serialization format</strong></span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p>Protobufs (<span class="No-Break">binary format)</span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p> JSON (<span class="No-Break">text format)</span></p>
+						</td>
+					</tr>
+					<tr class="No-Table-Style">
+						<td class="No-Table-Style">
+							<p><span class="No-Break"><strong class="bold">Performance</strong></span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p>Generally higher due to binary serialization, initial setup and connection might <span class="No-Break">be slower</span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p>Lower than binary formats but quicker to set up (depending on the <span class="No-Break">communication setup)</span></p>
+						</td>
+					</tr>
+					<tr class="No-Table-Style">
+						<td class="No-Table-Style">
+							<p><span class="No-Break"><strong class="bold">Protocol</strong></span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p><span class="No-Break">HTTP/2</span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p><span class="No-Break">Typically HTTP/1.1</span></p>
+						</td>
+					</tr>
+					<tr class="No-Table-Style">
+						<td class="No-Table-Style">
+							<p><span class="No-Break"><strong class="bold">Streaming</strong></span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p>Supports <span class="No-Break">bidirectional streaming</span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p>Limited support, usually <span class="No-Break">request-response only</span></p>
+						</td>
+					</tr>
+					<tr class="No-Table-Style">
+						<td class="No-Table-Style">
+							<p><span class="No-Break"><strong class="bold">Type safety</strong></span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p>Strongly-typed <span class="No-Break">contracts (Protobuf)</span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p>Loosely typed, prone to <span class="No-Break">runtime errors</span></p>
+						</td>
+					</tr>
+					<tr class="No-Table-Style">
+						<td class="No-Table-Style">
+							<p><strong class="bold">Language </strong><span class="No-Break"><strong class="bold">interoperability</strong></span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p>High (supports many <span class="No-Break">languages natively)</span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p>High (JSON is <span class="No-Break">universally supported)</span></p>
+						</td>
+					</tr>
+					<tr class="No-Table-Style">
+						<td class="No-Table-Style">
+							<p><span class="No-Break"><strong class="bold">Network efficiency</strong></span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p>More efficient (smaller payload, <span class="No-Break">HTTP/2 features)</span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p>Less efficient (larger <span class="No-Break">payload, HTTP/1.1)</span></p>
+						</td>
+					</tr>
+					<tr class="No-Table-Style">
+						<td class="No-Table-Style">
+							<p><span class="No-Break"><strong class="bold">Error handling</strong></span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p>Rich error handling with explicit <span class="No-Break">error codes</span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p>Typically relies on HTTP <span class="No-Break">status codes</span></p>
+						</td>
+					</tr>
+					<tr class="No-Table-Style">
+						<td class="No-Table-Style">
+							<p><strong class="bold"> </strong><span class="No-Break"><strong class="bold">Deadline/timeouts</strong></span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p>Native support for specifying <span class="No-Break">call deadlines</span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p>Usually managed at the <span class="No-Break">application level</span></p>
+						</td>
+					</tr>
+					<tr class="No-Table-Style">
+						<td class="No-Table-Style">
+							<p><span class="No-Break"><strong class="bold">Security</strong></span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p>Supports various <span class="No-Break">authentication mechanisms</span></p>
+						</td>
+						<td class="No-Table-Style">
+							<p>Varies, usually added at the <span class="No-Break">application layer</span></p>
+						</td>
+					</tr>
+				</tbody>
+			</table>
+			<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Table 6.6: Differences between gRPC and JSON RPC</p>
+			<p>As you can see, although gRPC and RPC with JSON share many features, each has their own use case. Pick whichever works best for <span class="No-Break">your scenario.</span></p>
+			<h1 id="_idParaDest-157"><a id="_idTextAnchor158"/>Next steps</h1>
+			<p><em class="italic">Everybody needs somebody</em>. That truth has even been the title of a song. The same goes for systems, especially those not meant to be used by humans. They need something to tell them what to do and what data to do it with. They need to communicate with each other. You have now seen the many ways you can use to set <span class="No-Break">up communications.</span></p>
+			<p>We have looked at Windows Messages, the old-school communication style (although Windows still uses it for internal communications). We have looked at both named and anonymous pipes. Then, we looked at the most used way for computers to talk to one another: sockets. While at it, we investigated the OSI model a bit to understand where we need to write code and where we can leave that <span class="No-Break">to others.</span></p>
+			<p>We also looked at a speedy way to share data on the same machine using <span class="No-Break">shared memory.</span></p>
+			<p>Finally, we investigated how we can issue commands by using JSON RPC <span class="No-Break">and gRPC.</span></p>
+			<p>Now, we should be ready to take the next step. After all, besides talking to our code, we can use the operating system to help us. Windows offers many services we might need or can use to our advantage, which is the topic of the <span class="No-Break">next chapter.</span></p>
+		</div>
+	</body></html>

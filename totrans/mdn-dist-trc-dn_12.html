@@ -1,0 +1,411 @@
+<html><head></head><body>
+<div id="_idContainer136">
+<h1 class="chapter-number" id="_idParaDest-193"><a id="_idTextAnchor192"/><span class="koboSpan" id="kobo.1.1">12</span></h1>
+<h1 id="_idParaDest-194"><a id="_idTextAnchor193"/><span class="koboSpan" id="kobo.2.1">Instrumenting Database Calls</span></h1>
+<p><span class="koboSpan" id="kobo.3.1">In this chapter, we’re going to continue exploring instrumentation approaches for popular distributed patterns and will look into database instrumentation. </span><span class="koboSpan" id="kobo.3.2">We’ll use MongoDB as an example and combine it with Redis cache. </span><span class="koboSpan" id="kobo.3.3">We’ll add tracing and metrics instrumentation for database and cache calls and discuss how to add application context and provide observability in these composite scenarios. </span><span class="koboSpan" id="kobo.3.4">In addition to client-side instrumentation, we’ll see how to also scrape Redis server metrics with the OpenTelemetry Collector Finally, we’ll explore the generated telemetry and see how it helps with analyzing </span><span class="No-Break"><span class="koboSpan" id="kobo.4.1">application performance.</span></span></p>
+<p><span class="koboSpan" id="kobo.5.1">Here’s what you’ll </span><span class="No-Break"><span class="koboSpan" id="kobo.6.1">learn about:</span></span></p>
+<ul>
+<li><span class="koboSpan" id="kobo.7.1">Tracing </span><span class="No-Break"><span class="koboSpan" id="kobo.8.1">MongoDB operations</span></span></li>
+<li><span class="koboSpan" id="kobo.9.1">Tracing Redis cache and </span><span class="No-Break"><span class="koboSpan" id="kobo.10.1">logical calls</span></span></li>
+<li><span class="koboSpan" id="kobo.11.1">Adding client- and </span><span class="No-Break"><span class="koboSpan" id="kobo.12.1">server-side metrics</span></span></li>
+<li><span class="koboSpan" id="kobo.13.1">Using telemetry to analyze failures </span><span class="No-Break"><span class="koboSpan" id="kobo.14.1">and performance</span></span></li>
+</ul>
+<p><span class="koboSpan" id="kobo.15.1">By the end of this chapter, you’ll be familiar with generic database instrumentations and will be able to instrument your own applications using databases or caches and analyze </span><span class="No-Break"><span class="koboSpan" id="kobo.16.1">their performance.</span></span></p>
+<h1 id="_idParaDest-195"><a id="_idTextAnchor194"/><span class="koboSpan" id="kobo.17.1">Technical requirements</span></h1>
+<p><span class="koboSpan" id="kobo.18.1">The code for this chapter is available in the book’s repository on GitHub </span><span class="No-Break"><span class="koboSpan" id="kobo.19.1">at </span></span><a href="https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/tree/main/chapter12"><span class="No-Break"><span class="koboSpan" id="kobo.20.1">https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/tree/main/chapter12</span></span></a><span class="No-Break"><span class="koboSpan" id="kobo.21.1">.</span></span></p>
+<p><span class="koboSpan" id="kobo.22.1">To run the samples and perform analysis, we’ll need the </span><span class="No-Break"><span class="koboSpan" id="kobo.23.1">following tools:</span></span></p>
+<ul>
+<li><span class="koboSpan" id="kobo.24.1">.NET SDK 7.0 </span><span class="No-Break"><span class="koboSpan" id="kobo.25.1">or later</span></span></li>
+<li><span class="koboSpan" id="kobo.26.1">Docker </span><span class="No-Break"><span class="koboSpan" id="kobo.27.1">and </span></span><span class="No-Break"><strong class="source-inline"><span class="koboSpan" id="kobo.28.1">docker-compose</span></strong></span></li>
+</ul>
+<h1 id="_idParaDest-196"><a id="_idTextAnchor195"/><span class="koboSpan" id="kobo.29.1">Instrumenting database calls</span></h1>
+<p><span class="koboSpan" id="kobo.30.1">Databases are</span><a id="_idIndexMarker637"/><span class="koboSpan" id="kobo.31.1"> used in almost every distributed application. </span><span class="koboSpan" id="kobo.31.2">Many databases provide advanced monitoring capabilities on the server side, which include database-specific metrics, logs, or expensive query detection and analysis tools. </span><span class="koboSpan" id="kobo.31.3">Client instrumentation complements it by providing observability on the client side of this communication, correlating database operations, and adding </span><span class="No-Break"><span class="koboSpan" id="kobo.32.1">application-specific context.</span></span></p>
+<p><span class="koboSpan" id="kobo.33.1">Client instrumentation describes an application’s communication with a database ORM system, driver, or client library, which can be quite complicated performing load balancing or batching operations in </span><span class="No-Break"><span class="koboSpan" id="kobo.34.1">the background.</span></span></p>
+<p><span class="koboSpan" id="kobo.35.1">In some cases, it could be possible to trace network-level communication between the client library and the database cluster. </span><span class="koboSpan" id="kobo.35.2">For example, if a database uses gRPC or HTTP protocols, the corresponding auto-instrumentation would capture transport-level spans. </span><span class="koboSpan" id="kobo.35.3">In this case, we would see transport-level spans as children of a logical database operation initiated by </span><span class="No-Break"><span class="koboSpan" id="kobo.36.1">the application.</span></span></p>
+<p><span class="koboSpan" id="kobo.37.1">Here, we’re going to instrument the logical level of the MongoDB C# driver to demonstrate the principles that apply to other </span><span class="No-Break"><span class="koboSpan" id="kobo.38.1">database instrumentations.</span></span></p>
+<p class="callout-heading"><span class="koboSpan" id="kobo.39.1">Note</span></p>
+<p class="callout"><span class="koboSpan" id="kobo.40.1">Generic instrumentation for </span><strong class="source-inline"><span class="koboSpan" id="kobo.41.1">MongoDB.Driver</span></strong><span class="koboSpan" id="kobo.42.1"> is available in the </span><strong class="source-inline"><span class="koboSpan" id="kobo.43.1">MongoDB.Driver.Core.Extensions.OpenTelemetry</span></strong> <span class="No-Break"><span class="koboSpan" id="kobo.44.1">NuGet package.</span></span></p>
+<p><span class="koboSpan" id="kobo.45.1">Before we start the instrumentation, let’s check out OpenTelemetry semantic conventions </span><span class="No-Break"><span class="koboSpan" id="kobo.46.1">for databases.</span></span></p>
+<h2 id="_idParaDest-197"><a id="_idTextAnchor196"/><span class="koboSpan" id="kobo.47.1">OpenTelemetry semantic conventions for databases</span></h2>
+<p><span class="koboSpan" id="kobo.48.1">The </span><a id="_idIndexMarker638"/><span class="koboSpan" id="kobo.49.1">conventions are available at </span><a href="https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/database.md"><span class="koboSpan" id="kobo.50.1">https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/database.md</span></a><span class="koboSpan" id="kobo.51.1">. </span><span class="koboSpan" id="kobo.51.2">They have an experimental status and may have changed by the time you access </span><span class="No-Break"><span class="koboSpan" id="kobo.52.1">the link.</span></span></p>
+<p><span class="koboSpan" id="kobo.53.1">Conventions define attributes for both logical and physical calls. </span><span class="koboSpan" id="kobo.53.2">In our case, we are not instrumenting transport-level communication, so we will only use the ones applicable to </span><span class="No-Break"><span class="koboSpan" id="kobo.54.1">logical operations:</span></span></p>
+<ul>
+<li><strong class="source-inline"><span class="koboSpan" id="kobo.55.1">db.system</span></strong><span class="koboSpan" id="kobo.56.1">: This is a required attribute that tracing backends use to distinguish database spans from all others. </span><span class="koboSpan" id="kobo.56.2">It should match the </span><strong class="source-inline"><span class="koboSpan" id="kobo.57.1">mongodb</span></strong><span class="koboSpan" id="kobo.58.1"> string, which observability backends may use to provide database or even MongoDB-specific analysis </span><span class="No-Break"><span class="koboSpan" id="kobo.59.1">and visualizations.</span></span></li>
+<li><strong class="source-inline"><span class="koboSpan" id="kobo.60.1">db.connection_string</span></strong><span class="koboSpan" id="kobo.61.1">: This is a recommended attribute. </span><span class="koboSpan" id="kobo.61.2">It’s also recommended to strip credentials before providing it. </span><span class="koboSpan" id="kobo.61.3">We’re not going to add it to our custom instrumentation. </span><span class="koboSpan" id="kobo.61.4">There could be cases where it’s useful to capture the connection string (without credentials) as it can help detect configuration issues or we can also log it once at </span><span class="No-Break"><span class="koboSpan" id="kobo.62.1">start time.</span></span></li>
+<li><strong class="source-inline"><span class="koboSpan" id="kobo.63.1">db.user</span></strong><span class="koboSpan" id="kobo.64.1">: This is yet another recommended attribute that captures user information and is useful to detect configuration and access issues. </span><span class="koboSpan" id="kobo.64.2">We’re not going to capture it since we have just </span><span class="No-Break"><span class="koboSpan" id="kobo.65.1">one user.</span></span></li>
+<li><strong class="source-inline"><span class="koboSpan" id="kobo.66.1">db.name</span></strong><span class="koboSpan" id="kobo.67.1">: This is a required attribute defining the </span><span class="No-Break"><span class="koboSpan" id="kobo.68.1">database name.</span></span></li>
+<li><strong class="source-inline"><span class="koboSpan" id="kobo.69.1">db.operation</span></strong><span class="koboSpan" id="kobo.70.1">: This is a required attribute that captures the name of the operation being executed, which should match the MongoDB </span><span class="No-Break"><span class="koboSpan" id="kobo.71.1">command name.</span></span></li>
+<li><strong class="source-inline"><span class="koboSpan" id="kobo.72.1">db.mongodb.collection</span></strong><span class="koboSpan" id="kobo.73.1">: This is a required attribute that represents the MongoDB </span><span class="No-Break"><span class="koboSpan" id="kobo.74.1">collection name.</span></span></li>
+</ul>
+<p><span class="koboSpan" id="kobo.75.1">In addition to </span><a id="_idIndexMarker639"/><span class="koboSpan" id="kobo.76.1">database-specific attributes, we’re going to populate MongoDB host information with </span><strong class="source-inline"><span class="koboSpan" id="kobo.77.1">net.peer.name</span></strong><span class="koboSpan" id="kobo.78.1"> and </span><strong class="source-inline"><span class="koboSpan" id="kobo.79.1">net.peer.port</span></strong><span class="koboSpan" id="kobo.80.1"> – generic </span><span class="No-Break"><span class="koboSpan" id="kobo.81.1">network attributes.</span></span></p>
+<p><span class="koboSpan" id="kobo.82.1">Populating network-level attributes on logical calls is not always possible or useful. </span><span class="koboSpan" id="kobo.82.2">For example, when a MongoDB driver is configured with multiple hosts, we don’t necessarily know which one is used for a particular command. </span><span class="koboSpan" id="kobo.82.3">In practice, we should use auto-instrumentation that operates on the command level, subscribing to command events with </span><strong class="source-inline"><span class="koboSpan" id="kobo.83.1">IEventSubscriber</span></strong><span class="koboSpan" id="kobo.84.1"> (as described in the MongoDB documentation </span><span class="No-Break"><span class="koboSpan" id="kobo.85.1">at </span></span><a href="http://mongodb.github.io/mongo-csharp-driver/2.11/reference/driver_core/events"><span class="No-Break"><span class="koboSpan" id="kobo.86.1">http://mongodb.github.io/mongo-csharp-driver/2.11/reference/driver_core/events</span></span></a><span class="No-Break"><span class="koboSpan" id="kobo.87.1">).</span></span></p>
+<p><span class="koboSpan" id="kobo.88.1">In addition to attributes, semantic conventions require the use of the client kind on spans and providing a low-cardinality span name that includes the operation and database name. </span><span class="koboSpan" id="kobo.88.2">We’re going to use the </span><strong class="source-inline"><span class="koboSpan" id="kobo.89.1">{db.operation} {</span></strong><span class="No-Break"><strong class="source-inline"><span class="koboSpan" id="kobo.90.1">db.name}.{db.mongodb.collection}</span></strong></span><span class="No-Break"><span class="koboSpan" id="kobo.91.1"> pattern.</span></span></p>
+<p><span class="koboSpan" id="kobo.92.1">Now that we </span><a id="_idIndexMarker640"/><span class="koboSpan" id="kobo.93.1">know what information to include in spans, let’s go ahead and instrument a </span><span class="No-Break"><span class="koboSpan" id="kobo.94.1">MongoDB operation.</span></span></p>
+<h2 id="_idParaDest-198"><a id="_idTextAnchor197"/><span class="koboSpan" id="kobo.95.1">Tracing implementation</span></h2>
+<p><span class="koboSpan" id="kobo.96.1">In our application, we </span><a id="_idIndexMarker641"/><span class="koboSpan" id="kobo.97.1">store records in a MongoDB collection and handle all communication with the collection in a custom </span><span class="No-Break"><strong class="source-inline"><span class="koboSpan" id="kobo.98.1">DatabaseService</span></strong></span><span class="No-Break"><span class="koboSpan" id="kobo.99.1"> class.</span></span></p>
+<p><span class="koboSpan" id="kobo.100.1">Let’s start by instrumenting an operation that reads a single record from </span><span class="No-Break"><span class="koboSpan" id="kobo.101.1">a collection:</span></span></p>
+<p class="SC---Heading" lang="en-US" xml:lang="en-US"><span class="koboSpan" id="kobo.102.1">DatabaseService.cs</span></p>
+<pre class="source-code">
+<strong class="bold"><span class="koboSpan" id="kobo.103.1">using var act = StartMongoActivity(GetOperation);</span></strong><span class="koboSpan" id="kobo.104.1">
+try {
+  var rec = await _records.Find(r =&gt; r.Id == id)
+    .SingleOrDefaultAsync();
+  ...
+</span><span class="koboSpan" id="kobo.104.2">  return rec;
+} catch (Exception ex) {
+</span><strong class="bold"><span class="koboSpan" id="kobo.105.1">  act?.SetStatus(ActivityStatusCode.Error,</span></strong>
+<strong class="bold"><span class="koboSpan" id="kobo.106.1">    ex.GetType().Name);</span></strong><span class="koboSpan" id="kobo.107.1">
+  ...
+</span><span class="koboSpan" id="kobo.107.2">}</span></pre>
+<p class="SC---Link" lang="en-US" xml:lang="en-US"><a href="https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter12/database/DatabaseService.cs"><span class="koboSpan" id="kobo.108.1">https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter12/database/DatabaseService.cs</span></a></p>
+<p><span class="koboSpan" id="kobo.109.1">Here, we trace the </span><strong class="source-inline"><span class="koboSpan" id="kobo.110.1">Find</span></strong><span class="koboSpan" id="kobo.111.1"> method call. </span><span class="koboSpan" id="kobo.111.2">We use the </span><strong class="source-inline"><span class="koboSpan" id="kobo.112.1">GetOperation</span></strong><span class="koboSpan" id="kobo.113.1"> constant as the operation name, which is set to </span><strong class="source-inline"><span class="koboSpan" id="kobo.114.1">FindSingleOrDefault</span></strong><span class="koboSpan" id="kobo.115.1"> – a synthetic name describing what we do here. </span><span class="koboSpan" id="kobo.115.2">If the MongoDB command throws an exception, we set the activity status </span><span class="No-Break"><span class="koboSpan" id="kobo.116.1">to </span></span><span class="No-Break"><strong class="source-inline"><span class="koboSpan" id="kobo.117.1">error</span></strong></span><span class="No-Break"><span class="koboSpan" id="kobo.118.1">.</span></span></p>
+<p><span class="koboSpan" id="kobo.119.1">Let’s look in the </span><strong class="source-inline"><span class="koboSpan" id="kobo.120.1">StartMongoActivity</span></strong> <span class="No-Break"><span class="koboSpan" id="kobo.121.1">method implementation:</span></span></p>
+<p class="SC---Heading" lang="en-US" xml:lang="en-US"><span class="koboSpan" id="kobo.122.1">DatabaseService.cs</span></p>
+<pre class="source-code"><span class="koboSpan" id="kobo.123.1">
+var act = MongoSource.StartActivity(
+    $"{operation} {_dbName}.{_collectionName}",
+    ActivityKind.Client);
+  if (act?.IsAllDataRequested != true) return act;
+  return act.SetTag("db.system", "mongodb")
+    .SetTag("db.name", _dbName)
+    .SetTag("db.mongodb.collection", _collectionName)
+    .SetTag("db.operation", operation)
+    .SetTag("net.peer.name", _host)
+    .SetTag("net.peer.port", _port);</span></pre>
+<p class="SC---Link" lang="en-US" xml:lang="en-US"><a href="https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter12/database/DatabaseService.cs"><span class="koboSpan" id="kobo.124.1">https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter12/database/DatabaseService.cs</span></a></p>
+<p><span class="koboSpan" id="kobo.125.1">Here, we populate</span><a id="_idIndexMarker642"/><span class="koboSpan" id="kobo.126.1"> the activity name, kind, and attributes from the semantic conventions mentioned previously. </span><span class="koboSpan" id="kobo.126.2">The host, port, database name, and collection name are populated from the MongoDB settings provided via configuration and captured at </span><span class="No-Break"><span class="koboSpan" id="kobo.127.1">construction time.</span></span></p>
+<p><span class="koboSpan" id="kobo.128.1">A similar approach could be used for any other operation. </span><span class="koboSpan" id="kobo.128.2">For bulk operations, we may consider adding more context to describe individual requests in the array attribute, as shown in this </span><span class="No-Break"><span class="koboSpan" id="kobo.129.1">code snippet:</span></span></p>
+<p class="SC---Heading" lang="en-US" xml:lang="en-US"><span class="koboSpan" id="kobo.130.1">DatabaseService.cs</span></p>
+<pre class="source-code"><span class="koboSpan" id="kobo.131.1">
+private static void AddBulkAttributes&lt;T&gt;(
+  IEnumerable&lt;WriteModel&lt;T&gt;&gt; requests, Activity? </span><span class="koboSpan" id="kobo.131.2">act)
+{
+  if (act?.IsAllDataRequested == true)
+  {
+    act.SetTag("db.mongodb.bulk_operations",
+      requests.Select(r =&gt; r.ModelType).ToArray());
+  }
+}</span></pre>
+<p class="SC---Link" lang="en-US" xml:lang="en-US"><a href="https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter12/database/DatabaseService.cs"><span class="koboSpan" id="kobo.132.1">https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter12/database/DatabaseService.cs</span></a></p>
+<p><span class="koboSpan" id="kobo.133.1">This instrumentation is very generic – it does not record anything application-specific even though it knows the type of the record. </span><span class="koboSpan" id="kobo.133.2">For example, we could add a record identifier as an attribute or set the status to </span><strong class="source-inline"><span class="koboSpan" id="kobo.134.1">error</span></strong><span class="koboSpan" id="kobo.135.1"> if no records were found. </span><span class="koboSpan" id="kobo.135.2">These are all valid things to do if you’re going to stick with specialized manual instrumentation, but it’s more common to use a shared one </span><span class="No-Break"><span class="koboSpan" id="kobo.136.1">when possible.</span></span></p>
+<p><span class="koboSpan" id="kobo.137.1">So, how do we record application-specific context along with generic database instrumentation? </span><span class="koboSpan" id="kobo.137.2">One solution would be to enrich auto-collected activities as we did in </span><a href="B19423_05.xhtml#_idTextAnchor083"><span class="No-Break"><em class="italic"><span class="koboSpan" id="kobo.138.1">Chapter 5</span></em></span></a><span class="koboSpan" id="kobo.139.1">, </span><em class="italic"><span class="koboSpan" id="kobo.140.1">Configuration and </span></em><span class="No-Break"><em class="italic"><span class="koboSpan" id="kobo.141.1">Control Plane</span></em></span><span class="No-Break"><span class="koboSpan" id="kobo.142.1">.</span></span></p>
+<p><span class="koboSpan" id="kobo.143.1">Another</span><a id="_idIndexMarker643"/><span class="koboSpan" id="kobo.144.1"> solution is to add another layer of logical activities around database and cache calls. </span><span class="koboSpan" id="kobo.144.2">Before we do this, let’s learn how to trace </span><span class="No-Break"><span class="koboSpan" id="kobo.145.1">cache calls.</span></span></p>
+<h1 id="_idParaDest-199"><a id="_idTextAnchor198"/><span class="koboSpan" id="kobo.146.1">Tracing cache calls</span></h1>
+<p><span class="koboSpan" id="kobo.147.1">Caches such as Redis and </span><a id="_idIndexMarker644"/><span class="koboSpan" id="kobo.148.1">Memcached are a special class of databases and are covered by database semantic conventions too. </span><span class="koboSpan" id="kobo.148.2">Instrumenting cache calls according to conventions is beneficial as it helps you to stay consistent across all services and to get the most out of your tracing backends in terms of visualization </span><span class="No-Break"><span class="koboSpan" id="kobo.149.1">and analysis.</span></span></p>
+<p><span class="koboSpan" id="kobo.150.1">So, let’s instrument Redis according to database conventions and add cache-specific context. </span><span class="koboSpan" id="kobo.150.2">There is nothing specifically defined in OpenTelemetry for caches, so let’s design something of </span><span class="No-Break"><span class="koboSpan" id="kobo.151.1">our own.</span></span></p>
+<p class="callout-heading"><span class="koboSpan" id="kobo.152.1">Note</span></p>
+<p class="callout"><span class="koboSpan" id="kobo.153.1">Auto-instrumentation for the </span><strong class="source-inline"><span class="koboSpan" id="kobo.154.1">StackExchange.Redis</span></strong><span class="koboSpan" id="kobo.155.1"> client is available in the </span><strong class="source-inline"><span class="koboSpan" id="kobo.156.1">OpenTelemetry.Instrumentation.StackExchangeRedis</span></strong> <span class="No-Break"><span class="koboSpan" id="kobo.157.1">NuGet package.</span></span></p>
+<p><span class="koboSpan" id="kobo.158.1">When it comes to tracing, we want to know typical things: how long a call took, whether there was an error, and what operation was attempted. </span><span class="koboSpan" id="kobo.158.2">Cache-specific things include an indication whether an item was retrieved from the cache or the expiration strategy (if it’s conditional) for </span><span class="No-Break"><span class="koboSpan" id="kobo.159.1">set operations.</span></span></p>
+<p><span class="koboSpan" id="kobo.160.1">Let’s go ahead and instrument a </span><strong class="source-inline"><span class="koboSpan" id="kobo.161.1">Get</span></strong><span class="koboSpan" id="kobo.162.1"> call – it looks pretty similar to the database instrumentation</span><a id="_idIndexMarker645"/><span class="koboSpan" id="kobo.163.1"> we saw in the </span><span class="No-Break"><span class="koboSpan" id="kobo.164.1">previous section:</span></span></p>
+<p class="SC---Heading" lang="en-US" xml:lang="en-US"><span class="koboSpan" id="kobo.165.1">CacheService.cs</span></p>
+<pre class="source-code">
+<strong class="bold"><span class="koboSpan" id="kobo.166.1">using var act = StartCacheActivity(GetOperationName);</span></strong><span class="koboSpan" id="kobo.167.1">
+try
+{
+  var record = await _cache.GetStringAsync(id);
+</span><strong class="bold"><span class="koboSpan" id="kobo.168.1">  act?.SetTag("cache.hit", record != null);</span></strong><span class="koboSpan" id="kobo.169.1">
+  ...
+</span><span class="koboSpan" id="kobo.169.2">}
+catch (Exception ex)
+{
+  act?.SetStatus(ActivityStatusCode.Error,
+    ex.GetType().Name);
+  ...
+</span><span class="koboSpan" id="kobo.169.3">}</span></pre>
+<p class="SC---Link" lang="en-US" xml:lang="en-US"><a href="https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter12/database/CacheService.cs"><span class="koboSpan" id="kobo.170.1">https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter12/database/CacheService.cs</span></a></p>
+<p><span class="koboSpan" id="kobo.171.1">Here, we created an activity to trace a </span><strong class="source-inline"><span class="koboSpan" id="kobo.172.1">GetString</span></strong><span class="koboSpan" id="kobo.173.1"> call to Redis. </span><span class="koboSpan" id="kobo.173.2">If a record is found, we set the </span><strong class="source-inline"><span class="koboSpan" id="kobo.174.1">cache.hit</span></strong><span class="koboSpan" id="kobo.175.1"> attribute to </span><strong class="source-inline"><span class="koboSpan" id="kobo.176.1">true</span></strong><span class="koboSpan" id="kobo.177.1">, and if an exception happens, we set the activity status to </span><strong class="source-inline"><span class="koboSpan" id="kobo.178.1">error</span></strong><span class="koboSpan" id="kobo.179.1"> and include an </span><span class="No-Break"><span class="koboSpan" id="kobo.180.1">exception message.</span></span></p>
+<p><span class="koboSpan" id="kobo.181.1">Let’s take a look at the attributes that are set in the </span><span class="No-Break"><strong class="source-inline"><span class="koboSpan" id="kobo.182.1">StartCacheActivity</span></strong></span><span class="No-Break"><span class="koboSpan" id="kobo.183.1"> method:</span></span></p>
+<p class="SC---Heading" lang="en-US" xml:lang="en-US"><span class="koboSpan" id="kobo.184.1">CacheService.cs</span></p>
+<pre class="source-code"><span class="koboSpan" id="kobo.185.1">
+var act = RedisSource.StartActivity(operation,
+  ActivityKind.Client);
+if (act?.IsAllDataRequested != true) return act;
+return act.SetTag("db.operation", operation)
+    .SetTag("db.system", "redis")
+    .SetTagIfNotNull("db.redis.database_index", _dbIndex)
+    .SetTagIfNotNull("net.peer.name", _host)
+    .SetTagIfNotNull("net.peer.port", _port)
+    .SetTagIfNotNull("net.sock.peer.addr", _address)
+    .SetTagIfNotNull("net.sock.family", _networkFamily);</span></pre>
+<p class="SC---Link" lang="en-US" xml:lang="en-US"><a href="https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter12/database/CacheService.cs"><span class="koboSpan" id="kobo.186.1">https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter12/database/CacheService.cs</span></a></p>
+<p><span class="koboSpan" id="kobo.187.1">In this snippet, we</span><a id="_idIndexMarker646"/><span class="koboSpan" id="kobo.188.1"> start a client activity with the name matching the operation name. </span><span class="koboSpan" id="kobo.188.2">We also set all the applicable database and network attributes and add a Redis-specific attribute defined by OpenTelemetry – </span><strong class="source-inline"><span class="koboSpan" id="kobo.189.1">db.redis.database_index</span></strong><span class="koboSpan" id="kobo.190.1">. </span><span class="koboSpan" id="kobo.190.2">Network attributes, which describe the host, port, IP address, and network family, are populated from Redis configuration options. </span><span class="koboSpan" id="kobo.190.3">The </span><strong class="source-inline"><span class="koboSpan" id="kobo.191.1">SetTagIfNotNull</span></strong><span class="koboSpan" id="kobo.192.1"> method is an extension method defined in </span><span class="No-Break"><span class="koboSpan" id="kobo.193.1">our project.</span></span></p>
+<p><span class="koboSpan" id="kobo.194.1">Here, we have the same problem as with MongoDB – Redis configuration options may include multiple servers and we don’t know which one is going to be used for a specific call. </span><span class="koboSpan" id="kobo.194.2">The instrumentation in the </span><strong class="source-inline"><span class="koboSpan" id="kobo.195.1">OpenTelemetry.Instrumentation.StackExchangeRedis</span></strong><span class="koboSpan" id="kobo.196.1"> package (we took a quick look at it in </span><a href="B19423_03.xhtml#_idTextAnchor052"><span class="No-Break"><em class="italic"><span class="koboSpan" id="kobo.197.1">Chapter 3</span></em></span></a><span class="koboSpan" id="kobo.198.1">, </span><em class="italic"><span class="koboSpan" id="kobo.199.1">The .NET Observability Ecosystem</span></em><span class="koboSpan" id="kobo.200.1">) provides more </span><span class="No-Break"><span class="koboSpan" id="kobo.201.1">precise information.</span></span></p>
+<p><span class="koboSpan" id="kobo.202.1">This instrumentation is very generic for the same reasons as for MongoDB – in most cases, we’d rather enrich auto-instrumentation or add another layer of application-specific spans than write a custom instrumentation. </span><span class="koboSpan" id="kobo.202.2">So, let’s see how we can add the context by adding </span><a id="_idIndexMarker647"/><span class="koboSpan" id="kobo.203.1">another layer </span><span class="No-Break"><span class="koboSpan" id="kobo.204.1">of instrumentation.</span></span></p>
+<h2 id="_idParaDest-200"><a id="_idTextAnchor199"/><span class="koboSpan" id="kobo.205.1">Instrumenting composite calls</span></h2>
+<p><span class="koboSpan" id="kobo.206.1">With MongoDB and </span><a id="_idIndexMarker648"/><span class="koboSpan" id="kobo.207.1">Redis calls instrumented </span><a id="_idIndexMarker649"/><span class="koboSpan" id="kobo.208.1">independently and in a generic way, it could be hard to answer questions such as “How long did it take to retrieve a record with a specific ID?” </span><span class="koboSpan" id="kobo.208.2">or “How long did retrieval take?” </span><span class="koboSpan" id="kobo.208.3">given it involved a call to the cache, a call to the database, and then another call to </span><span class="No-Break"><span class="koboSpan" id="kobo.209.1">the cache.</span></span></p>
+<p><span class="koboSpan" id="kobo.210.1">We did not add a record identifier attribute to query on and we only know the duration of individual calls  that don’t really describe the </span><span class="No-Break"><span class="koboSpan" id="kobo.211.1">overall operation.</span></span></p>
+<p><span class="koboSpan" id="kobo.212.1">In the following example, we’re adding an extra layer of instrumentation that traces logical operations with a </span><span class="No-Break"><span class="koboSpan" id="kobo.213.1">record identifier:</span></span></p>
+<p class="SC---Heading" lang="en-US" xml:lang="en-US"><span class="koboSpan" id="kobo.214.1">RecordsController.cs</span></p>
+<pre class="source-code">
+<strong class="bold"><span class="koboSpan" id="kobo.215.1">using var act = Source.StartActivity("GetRecord");</span></strong>
+<strong class="bold"><span class="koboSpan" id="kobo.216.1">act?.SetTag("app.record.id", id);</span></strong><span class="koboSpan" id="kobo.217.1">
+try
+{
+  var recordStr = await _cache.GetRecord(id);
+  if (recordStr != null) return recordStr;
+</span><strong class="bold"><span class="koboSpan" id="kobo.218.1">  act?.SetTag("cache.hit", false);</span></strong><span class="koboSpan" id="kobo.219.1">
+  var record = await _database.Get(id);
+  if (record != null) return await Cache(record);
+}
+catch (Exception ex)
+{
+</span><strong class="bold"><span class="koboSpan" id="kobo.220.1">  act?.SetStatus(ActivityStatusCode.Error,</span></strong>
+<strong class="bold"><span class="koboSpan" id="kobo.221.1">    ex.GetType().Name);</span></strong><span class="koboSpan" id="kobo.222.1">
+  throw;
+}
+</span><strong class="bold"><span class="koboSpan" id="kobo.223.1">act?.SetStatus(ActivityStatusCode.Error, "not found");</span></strong></pre>
+<p class="SC---Link" lang="en-US" xml:lang="en-US"><a href="https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter12/database/Controllers/RecordsController.cs"><span class="koboSpan" id="kobo.224.1">https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter12/database/Controllers/RecordsController.cs</span></a></p>
+<p><span class="koboSpan" id="kobo.225.1">Here, we wrap the sequence of calls in the </span><strong class="source-inline"><span class="koboSpan" id="kobo.226.1">GetRecord</span></strong><span class="koboSpan" id="kobo.227.1"> activity – it has an </span><strong class="source-inline"><span class="koboSpan" id="kobo.228.1">internal</span></strong><span class="koboSpan" id="kobo.229.1"> kind and just two attributes: </span><strong class="source-inline"><span class="koboSpan" id="kobo.230.1">app.record.id</span></strong><span class="koboSpan" id="kobo.231.1"> (which captures the record identifier) and </span><strong class="source-inline"><span class="koboSpan" id="kobo.232.1">cache.hit</span></strong><span class="koboSpan" id="kobo.233.1"> (describing whether the record was retrieved from </span><span class="No-Break"><span class="koboSpan" id="kobo.234.1">the database).</span></span></p>
+<p><span class="koboSpan" id="kobo.235.1">We also provide a </span><strong class="source-inline"><span class="koboSpan" id="kobo.236.1">not found</span></strong><span class="koboSpan" id="kobo.237.1"> status description when nothing is found and can report other known issues in the </span><span class="No-Break"><span class="koboSpan" id="kobo.238.1">same way.</span></span></p>
+<p><span class="koboSpan" id="kobo.239.1">In the case of our demo application, the encompassing database and cache spans almost match the ASP.NET Core ones in terms of status and duration, but in practice, controller methods do many other things. </span><span class="koboSpan" id="kobo.239.2">The encompassing operation helps us separate all</span><a id="_idIndexMarker650"/><span class="koboSpan" id="kobo.240.1"> spans and logs related to </span><span class="No-Break"><span class="koboSpan" id="kobo.241.1">record </span></span><span class="No-Break"><a id="_idIndexMarker651"/></span><span class="No-Break"><span class="koboSpan" id="kobo.242.1">retrieval.</span></span></p>
+<p><span class="koboSpan" id="kobo.243.1">Now that we have an idea of how to approach tracing, let’s </span><span class="No-Break"><span class="koboSpan" id="kobo.244.1">explore metrics.</span></span></p>
+<h1 id="_idParaDest-201"><a id="_idTextAnchor200"/><span class="koboSpan" id="kobo.245.1">Adding metrics</span></h1>
+<p><span class="koboSpan" id="kobo.246.1">With databases, it’s </span><a id="_idIndexMarker652"/><span class="koboSpan" id="kobo.247.1">common to monitor connections and query execution count and duration, contention, and resource utilization in addition to technology-specific things. </span><span class="koboSpan" id="kobo.247.2">The MongoDB cluster reports a set of such metrics that you can receive with OpenTelemetry Collector (check it out at https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/mongodbreceiver). </span><span class="koboSpan" id="kobo.247.3">These metrics provide the server side of the story. </span><span class="koboSpan" id="kobo.247.4">We should also add client-side duration metrics. </span><span class="koboSpan" id="kobo.247.5">It’d help us account for connectivity issues and </span><span class="No-Break"><span class="koboSpan" id="kobo.248.1">network latency.</span></span></p>
+<p><span class="koboSpan" id="kobo.249.1">OpenTelemetry semantic conventions only document connection metrics for now. </span><span class="koboSpan" id="kobo.249.2">We could record them by implementing an </span><strong class="source-inline"><span class="koboSpan" id="kobo.250.1">IEventSubscriber</span></strong><span class="koboSpan" id="kobo.251.1"> interface and listening to </span><span class="No-Break"><span class="koboSpan" id="kobo.252.1">connection events.</span></span></p>
+<p><span class="koboSpan" id="kobo.253.1">Instead, we’re going to record the basic operation duration, which also allows us to derive the throughput and failure rate and slice and dice by operation, database, or </span><span class="No-Break"><span class="koboSpan" id="kobo.254.1">collection name.</span></span></p>
+<p><span class="koboSpan" id="kobo.255.1">Let’s get back to the </span><strong class="source-inline"><span class="koboSpan" id="kobo.256.1">Get</span></strong><span class="koboSpan" id="kobo.257.1"> operation code and see how the metric can be added. </span><span class="koboSpan" id="kobo.257.2">First, we’ll create a </span><span class="No-Break"><span class="koboSpan" id="kobo.258.1">duration </span></span><span class="No-Break"><a id="_idIndexMarker653"/></span><span class="No-Break"><span class="koboSpan" id="kobo.259.1">histogram:</span></span></p>
+<p class="SC---Heading" lang="en-US" xml:lang="en-US"><span class="koboSpan" id="kobo.260.1">DatabaseService.cs</span></p>
+<pre class="source-code"><span class="koboSpan" id="kobo.261.1">
+private static readonly Meter MongoMeter = new("MongoDb");
+private readonly Histogram&lt;double&gt; _operationDuration;
+…
+public DatabaseService(IOptions&lt;MongoDbSettings&gt; settings) {
+  ...
+</span><span class="koboSpan" id="kobo.261.2">  _operationDuration = MongoMeter.CreateHistogram&lt;double&gt;(
+    "db.operation.duration", "ms",
+    "Database call duration");
+}</span></pre>
+<p class="SC---Link" lang="en-US" xml:lang="en-US"><a href="https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter12/database/DatabaseService.cs"><span class="koboSpan" id="kobo.262.1">https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter12/database/DatabaseService.cs</span></a></p>
+<p><span class="koboSpan" id="kobo.263.1">Now that we have a histogram, we can record the duration for </span><span class="No-Break"><span class="koboSpan" id="kobo.264.1">each operation:</span></span></p>
+<p class="SC---Heading" lang="en-US" xml:lang="en-US"><span class="koboSpan" id="kobo.265.1">DatabaseService.cs</span></p>
+<pre class="source-code"><span class="koboSpan" id="kobo.266.1">
+var start = _operationDuration.Enabled ?
+</span><span class="koboSpan" id="kobo.266.2">    Stopwatch.StartNew() : null;
+using var act = StartMongoActivity(GetOperation);
+try
+{
+  var rec = await _records.Find(r =&gt; r.Id == id)
+    .SingleOrDefaultAsync();
+  </span><strong class="bold"><span class="koboSpan" id="kobo.267.1">TrackDuration(start, GetOperation);</span></strong><span class="koboSpan" id="kobo.268.1">
+  return rec;
+}
+catch (Exception ex)
+{
+  ...
+</span><span class="koboSpan" id="kobo.268.2">  </span><strong class="bold"><span class="koboSpan" id="kobo.269.1">TrackDuration(start, GetOperation, ex);</span></strong><span class="koboSpan" id="kobo.270.1">
+  throw;
+}</span></pre>
+<p class="SC---Link" lang="en-US" xml:lang="en-US"><a href="https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter12/database/DatabaseService.cs"><span class="koboSpan" id="kobo.271.1">https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter12/database/DatabaseService.cs</span></a></p>
+<p><span class="koboSpan" id="kobo.272.1">Here, we call into</span><a id="_idIndexMarker654"/><span class="koboSpan" id="kobo.273.1"> the </span><strong class="source-inline"><span class="koboSpan" id="kobo.274.1">TrackDuration</span></strong><span class="koboSpan" id="kobo.275.1"> method and pass a stopwatch that tracks the duration, the low-cardinality operation name, and an exception (if any). </span><span class="koboSpan" id="kobo.275.2">Here’s the </span><span class="No-Break"><strong class="source-inline"><span class="koboSpan" id="kobo.276.1">TrackDuration</span></strong></span><span class="No-Break"><span class="koboSpan" id="kobo.277.1"> method:</span></span></p>
+<p class="SC---Heading" lang="en-US" xml:lang="en-US"><span class="koboSpan" id="kobo.278.1">DatabaseStatus.cs</span></p>
+<pre class="source-code"><span class="koboSpan" id="kobo.279.1">
+private void TrackDuration(Stopwatch? </span><span class="koboSpan" id="kobo.279.2">start,
+  string operation, Exception? </span><span class="koboSpan" id="kobo.279.3">ex = null)
+{
+  if (start == null) return;
+  string status = ex?.GetType()?.Name ?? </span><span class="koboSpan" id="kobo.279.4">"ok";
+</span><strong class="bold"><span class="koboSpan" id="kobo.280.1">  _operationDuration.Record(start.ElapsedMilliseconds,</span></strong>
+<strong class="bold"><span class="koboSpan" id="kobo.281.1">    new TagList() {</span></strong>
+<strong class="bold"><span class="koboSpan" id="kobo.282.1">      { "db.name", _dbName },</span></strong>
+<strong class="bold"><span class="koboSpan" id="kobo.283.1">      { "db.mongodb.collection", _collectionName },</span></strong>
+<strong class="bold"><span class="koboSpan" id="kobo.284.1">      { "db.system", "mongodb"},</span></strong>
+<strong class="bold"><span class="koboSpan" id="kobo.285.1">      { "db.operation", operation },</span></strong>
+<strong class="bold"><span class="koboSpan" id="kobo.286.1">      { "db.mongodb.status", status },</span></strong>
+<strong class="bold"><span class="koboSpan" id="kobo.287.1">      { "net.peer.name", _host },</span></strong>
+<strong class="bold"><span class="koboSpan" id="kobo.288.1">      { "net.peer.port", _port }});</span></strong><span class="koboSpan" id="kobo.289.1">
+}</span></pre>
+<p class="SC---Link" lang="en-US" xml:lang="en-US"><a href="https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter12/database/DatabaseService.cs"><span class="koboSpan" id="kobo.290.1">https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter12/database/DatabaseService.cs</span></a></p>
+<p><span class="koboSpan" id="kobo.291.1">Here, we add all the attributes we used for tracing and a new one – </span><strong class="source-inline"><span class="koboSpan" id="kobo.292.1">db.mongodb.status</span></strong><span class="koboSpan" id="kobo.293.1">. </span><span class="koboSpan" id="kobo.293.2">We use the exception type as a status to make sure that metric cardinality </span><span class="No-Break"><span class="koboSpan" id="kobo.294.1">stays low.</span></span></p>
+<p><span class="koboSpan" id="kobo.295.1">While the idea of using the exception type looks compelling and easy, it only works when we use the same MongoDB driver in the same language across the system. </span><span class="koboSpan" id="kobo.295.2">Even then, statuses might change over time with driver updates. </span><span class="koboSpan" id="kobo.295.3">In a real production scenario, I would recommend mapping known exceptions to language-agnostic status codes. </span><span class="koboSpan" id="kobo.295.4">It also makes sense to test corresponding cases and check that proper error codes are captured. </span><span class="koboSpan" id="kobo.295.5">It’s important if your alerts are based on </span><span class="No-Break"><span class="koboSpan" id="kobo.296.1">specific codes.</span></span></p>
+<p><span class="koboSpan" id="kobo.297.1">The duration histogram and the metrics we can derive from it at query time cover common monitoring needs (throughput, latency, and error rate). </span><span class="koboSpan" id="kobo.297.2">We could also use it to do capacity analysis and make better design decisions. </span><span class="koboSpan" id="kobo.297.3">For example, before adding a cache in front of the database, we could check the read-to-write ratio to see whether caching would </span><span class="No-Break"><span class="koboSpan" id="kobo.298.1">be helpful.</span></span></p>
+<p><span class="koboSpan" id="kobo.299.1">With custom</span><a id="_idIndexMarker655"/><span class="koboSpan" id="kobo.300.1"> queries over traces, we could also estimate how frequently the same records are accessed. </span><span class="koboSpan" id="kobo.300.2">This would help us pick a suitable </span><span class="No-Break"><span class="koboSpan" id="kobo.301.1">expiration strategy.</span></span></p>
+<h2 id="_idParaDest-202"><a id="_idTextAnchor201"/><span class="koboSpan" id="kobo.302.1">Recording Redis metrics</span></h2>
+<p><span class="koboSpan" id="kobo.303.1">In addition to </span><a id="_idIndexMarker656"/><span class="koboSpan" id="kobo.304.1">common database concerns, we want to measure cache-specific things: the hit-to-miss ratio, key expiration, and the eviction rate. </span><span class="koboSpan" id="kobo.304.2">This helps optimize and scale </span><span class="No-Break"><span class="koboSpan" id="kobo.305.1">the cache.</span></span></p>
+<p><span class="koboSpan" id="kobo.306.1">These metrics are reported by Redis and can be captured with the Redis receiver for OpenTelemetry Collector, available </span><span class="No-Break"><span class="koboSpan" id="kobo.307.1">at </span></span><span class="No-Break"><span class="koboSpan" id="kobo.308.1">https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/redisreceiver</span></span><span class="No-Break"><span class="koboSpan" id="kobo.309.1">.</span></span></p>
+<p><span class="koboSpan" id="kobo.310.1">We can enable them with the </span><span class="No-Break"><span class="koboSpan" id="kobo.311.1">following configuration:</span></span></p>
+<p class="SC---Heading" lang="en-US" xml:lang="en-US"><span class="koboSpan" id="kobo.312.1">configs/otel-collector-config.yml</span></p>
+<pre class="source-code"><span class="koboSpan" id="kobo.313.1">
+receivers:
+...
+</span><strong class="bold"><span class="koboSpan" id="kobo.314.1">  redis:</span></strong>
+<strong class="bold"><span class="koboSpan" id="kobo.315.1">    endpoint: "redis:6379"</span></strong>
+<strong class="bold"><span class="koboSpan" id="kobo.316.1">    collection_interval: 5s</span></strong><span class="koboSpan" id="kobo.317.1">
+...
+</span><span class="koboSpan" id="kobo.317.2">service:
+  pipelines:
+    ...
+</span><span class="koboSpan" id="kobo.317.3">    metrics:
+      receivers: [otlp, </span><strong class="bold"><span class="koboSpan" id="kobo.318.1">redis</span></strong><span class="koboSpan" id="kobo.319.1">]
+...</span></pre>
+<p class="SC---Link" lang="en-US" xml:lang="en-US"><a href="https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter12/configs/otel-collector-config.yml"><span class="koboSpan" id="kobo.320.1">https://github.com/PacktPublishing/Modern-Distributed-Tracing-in-.NET/blob/main/chapter12/configs/otel-collector-config.yml</span></a></p>
+<p><span class="koboSpan" id="kobo.321.1">OpenTelemetry</span><a id="_idIndexMarker657"/><span class="koboSpan" id="kobo.322.1"> Collector connects to a Redis instance and scrapes available metrics from it. </span><span class="koboSpan" id="kobo.322.2">Redis exposes multiple metrics, including uptime and resource utilization metrics and, most importantly, counters measuring command rate, hits, misses, expirations, evictions, and average time to live. </span><span class="koboSpan" id="kobo.322.3">With these, we can monitor Redis’ health and see whether it’s used efficiently and where the </span><span class="No-Break"><span class="koboSpan" id="kobo.323.1">bottlenecks are.</span></span></p>
+<p><span class="koboSpan" id="kobo.324.1">For example, a low hit-to-miss ratio could indicate that we’re not utilizing the cache well and potentially could tune caching parameters to make it more efficient. </span><span class="koboSpan" id="kobo.324.2">First, we should make sure caching makes sense – usually, it does when at least some items are read more frequently than they are modified. </span><span class="koboSpan" id="kobo.324.3">We also need the interval between reads to be </span><span class="No-Break"><span class="koboSpan" id="kobo.325.1">relatively low.</span></span></p>
+<p><span class="koboSpan" id="kobo.326.1">If, based on the collected data, we decided to add a cache, we can optimize its configuration further by looking into other </span><span class="No-Break"><span class="koboSpan" id="kobo.327.1">cache metrics:</span></span></p>
+<ul>
+<li><span class="koboSpan" id="kobo.328.1">A high key eviction rate can tell us if we don’t have enough memory and keys are evicted before items are read. </span><span class="koboSpan" id="kobo.328.2">We might want to scale Redis vertically or horizontally or change the eviction policy to better match the usage pattern. </span><span class="koboSpan" id="kobo.328.3">For example, if we have a relatively low number of periodically accessed items, a </span><strong class="bold"><span class="koboSpan" id="kobo.329.1">least frequently used</span></strong><span class="koboSpan" id="kobo.330.1"> (</span><strong class="bold"><span class="koboSpan" id="kobo.331.1">LFU</span></strong><span class="koboSpan" id="kobo.332.1">) policy </span><a id="_idIndexMarker658"/><span class="koboSpan" id="kobo.333.1">could be more efficient </span><a id="_idIndexMarker659"/><span class="koboSpan" id="kobo.334.1">than the </span><strong class="bold"><span class="koboSpan" id="kobo.335.1">least recently used</span></strong><span class="koboSpan" id="kobo.336.1"> (</span><span class="No-Break"><strong class="bold"><span class="koboSpan" id="kobo.337.1">LRU</span></strong></span><span class="No-Break"><span class="koboSpan" id="kobo.338.1">) one.</span></span></li>
+<li><span class="koboSpan" id="kobo.339.1">If we see a low eviction but high expiration rate, it could mean that the expiration time is too low – items are read less frequently than we expected. </span><span class="koboSpan" id="kobo.339.2">We can try to gradually increase the expiration time or disable it and rely on eviction </span><span class="No-Break"><span class="koboSpan" id="kobo.340.1">policy instead.</span></span></li>
+</ul>
+<p><span class="koboSpan" id="kobo.341.1">In addition to server-side metrics, we’ll also add a client-side duration histogram. </span><span class="koboSpan" id="kobo.341.2">It allows us to record </span><a id="_idIndexMarker660"/><span class="koboSpan" id="kobo.342.1">call duration distribution with command and other database-specific dimensions. </span><span class="koboSpan" id="kobo.342.2">The implementation is almost identical to the MongoDB duration metric. </span><span class="koboSpan" id="kobo.342.3">The only difference is that we’re going to add the </span><strong class="source-inline"><span class="koboSpan" id="kobo.343.1">cache.hit</span></strong><span class="koboSpan" id="kobo.344.1"> attribute to the metrics for the </span><strong class="source-inline"><span class="koboSpan" id="kobo.345.1">GetString</span></strong><span class="koboSpan" id="kobo.346.1"> operation. </span><span class="koboSpan" id="kobo.346.2">This could be helpful when server-side metrics are not available or there are multiple different operations we want to measure a hit ratio for independently of </span><span class="No-Break"><span class="koboSpan" id="kobo.347.1">each other.</span></span></p>
+<p><span class="koboSpan" id="kobo.348.1">Now that we have all the database traces and metrics in place, let’s bring all the pieces together and see how we use this telemetry </span><span class="No-Break"><span class="koboSpan" id="kobo.349.1">in practice.</span></span></p>
+<h1 id="_idParaDest-203"><a id="_idTextAnchor202"/><span class="koboSpan" id="kobo.350.1">Analyzing performance</span></h1>
+<p><span class="koboSpan" id="kobo.351.1">Let’s first run the</span><a id="_idIndexMarker661"/><span class="koboSpan" id="kobo.352.1"> demo application using the </span><strong class="source-inline"><span class="koboSpan" id="kobo.353.1">$ docker-compose up --build</span></strong><span class="koboSpan" id="kobo.354.1"> command. </span><span class="koboSpan" id="kobo.354.2">It will start local MongoDB and Redis instances along the application and </span><span class="No-Break"><span class="koboSpan" id="kobo.355.1">observability stack.</span></span></p>
+<p><span class="koboSpan" id="kobo.356.1">You can create some records with a tool such </span><span class="No-Break"><span class="koboSpan" id="kobo.357.1">as </span></span><span class="No-Break"><strong class="source-inline"><span class="koboSpan" id="kobo.358.1">curl</span></strong></span><span class="No-Break"><span class="koboSpan" id="kobo.359.1">:</span></span></p>
+<pre class="console"><span class="koboSpan" id="kobo.360.1">
+$ curl -X POST http://localhost:5051/records \
+  -H "Content-Type: application/json" \
+  -d '[{"name":"foo"},{"name":"bar"},{"name":"baz"}]'</span></pre>
+<p><span class="koboSpan" id="kobo.361.1">It should return a list of record identifiers the </span><span class="No-Break"><span class="koboSpan" id="kobo.362.1">service created.</span></span></p>
+<p><span class="koboSpan" id="kobo.363.1">Now, let’s look at the Jaeger trace at </span><strong class="source-inline"><span class="koboSpan" id="kobo.364.1">http://localhost:16686</span></strong><span class="koboSpan" id="kobo.365.1">, like the one shown in </span><span class="No-Break"><em class="italic"><span class="koboSpan" id="kobo.366.1">Figure 12</span></em></span><span class="No-Break"><em class="italic"><span class="koboSpan" id="kobo.367.1">.1</span></em></span><span class="No-Break"><span class="koboSpan" id="kobo.368.1">:</span></span></p>
+<div>
+<div class="IMG---Figure" id="_idContainer126">
+<span class="koboSpan" id="kobo.369.1"><img alt="Figure 12.1 – Trace showing bulk record creation" src="image/B19423_12_01.jpg"/></span>
+</div>
+</div>
+<p class="IMG---Caption" lang="en-US" xml:lang="en-US"><span class="koboSpan" id="kobo.370.1">Figure 12.1 – Trace showing bulk record creation</span></p>
+<p><span class="koboSpan" id="kobo.371.1">We see a controller span (</span><strong class="source-inline"><span class="koboSpan" id="kobo.372.1">Records</span></strong><span class="koboSpan" id="kobo.373.1">) and then </span><strong class="source-inline"><span class="koboSpan" id="kobo.374.1">CreateRecords</span></strong><span class="koboSpan" id="kobo.375.1">, which describes a database-and-cache-encompassing operation. </span><span class="koboSpan" id="kobo.375.2">It’s a parent of the </span><strong class="source-inline"><span class="koboSpan" id="kobo.376.1">BulkWrite</span></strong><span class="koboSpan" id="kobo.377.1"> span, which describes a MongoDB call and three individual Redis spans – one for </span><span class="No-Break"><span class="koboSpan" id="kobo.378.1">each record.</span></span></p>
+<p><span class="koboSpan" id="kobo.379.1">Note that the controller and the </span><strong class="source-inline"><span class="koboSpan" id="kobo.380.1">CreateRecords</span></strong><span class="koboSpan" id="kobo.381.1"> spans end before caching is complete, because </span><a id="_idIndexMarker662"/><span class="koboSpan" id="kobo.382.1">we don’t wait for it. </span><span class="koboSpan" id="kobo.382.2">Anything that happens within the </span><strong class="source-inline"><span class="koboSpan" id="kobo.383.1">SetString</span></strong><span class="koboSpan" id="kobo.384.1"> operation would still be properly correlated despite the parent request </span><span class="No-Break"><span class="koboSpan" id="kobo.385.1">being complete.</span></span></p>
+<p><span class="koboSpan" id="kobo.386.1">If we were to wait about 10 seconds and try to get one of the records (by calling </span><strong class="source-inline"><span class="koboSpan" id="kobo.387.1">http://localhost:5051/records/{id}</span></strong><span class="koboSpan" id="kobo.388.1">), we’d see a trace like the one shown in </span><span class="No-Break"><em class="italic"><span class="koboSpan" id="kobo.389.1">Figure 12</span></em></span><span class="No-Break"><em class="italic"><span class="koboSpan" id="kobo.390.1">.2</span></em></span><span class="No-Break"><span class="koboSpan" id="kobo.391.1">:</span></span></p>
+<div>
+<div class="IMG---Figure" id="_idContainer127">
+<span class="koboSpan" id="kobo.392.1"><img alt="Figure 12.2 – Trace showing record retrieval from the database" src="image/B19423_12_02.jpg"/></span>
+</div>
+</div>
+<p class="IMG---Caption" lang="en-US" xml:lang="en-US"><span class="koboSpan" id="kobo.393.1">Figure 12.2 – Trace showing record retrieval from the database</span></p>
+<p><span class="koboSpan" id="kobo.394.1">If we get the same record within 10 seconds, we’ll see it’s returned from the cache, as shown in </span><span class="No-Break"><em class="italic"><span class="koboSpan" id="kobo.395.1">Figure 12</span></em></span><span class="No-Break"><em class="italic"><span class="koboSpan" id="kobo.396.1">.3</span></em></span><span class="No-Break"><span class="koboSpan" id="kobo.397.1">:</span></span></p>
+<div>
+<div class="IMG---Figure" id="_idContainer128">
+<span class="koboSpan" id="kobo.398.1"><img alt="Figure 12.3 – Trace showing record retrieval from﻿ the cache" src="image/B19423_12_03.jpg"/></span>
+</div>
+</div>
+<p class="IMG---Caption" lang="en-US" xml:lang="en-US"><span class="koboSpan" id="kobo.399.1">Figure 12.3 – Trace showing record retrieval from the cache</span></p>
+<p><span class="koboSpan" id="kobo.400.1">By looking at individual traces, we can now quickly see whether records were retrieved from the cache or the database. </span><span class="koboSpan" id="kobo.400.2">We can also find all operations that happened across all traces for a specific record using the </span><strong class="source-inline"><span class="koboSpan" id="kobo.401.1">app.record.id</span></strong><span class="koboSpan" id="kobo.402.1"> attribute or write ad hoc queries using the </span><span class="No-Break"><strong class="source-inline"><span class="koboSpan" id="kobo.403.1">cache.hit</span></strong></span><span class="No-Break"><span class="koboSpan" id="kobo.404.1"> flag.</span></span></p>
+<p><span class="koboSpan" id="kobo.405.1">Let’s now simulate a failure by stopping the Redis container with </span><strong class="source-inline"><span class="koboSpan" id="kobo.406.1">$ docker </span></strong><span class="No-Break"><strong class="source-inline"><span class="koboSpan" id="kobo.407.1">stop chapter12-redis-1</span></strong></span><span class="No-Break"><span class="koboSpan" id="kobo.408.1">.</span></span></p>
+<p><span class="koboSpan" id="kobo.409.1">If we try to get one of the records again, the application will return the </span><strong class="source-inline"><span class="koboSpan" id="kobo.410.1">500 – Internal Server Error</span></strong><span class="koboSpan" id="kobo.411.1"> response. </span><span class="koboSpan" id="kobo.411.2">The trace predictably shows that the call to Redis failed with </span><strong class="source-inline"><span class="koboSpan" id="kobo.412.1">RedisConnectionException</span></strong><span class="koboSpan" id="kobo.413.1">. </span><span class="koboSpan" id="kobo.413.2">We might want to change this behavior, and if</span><a id="_idIndexMarker663"/><span class="koboSpan" id="kobo.414.1"> the Redis call fails, retrieve the record from </span><span class="No-Break"><span class="koboSpan" id="kobo.415.1">the database.</span></span></p>
+<p><span class="koboSpan" id="kobo.416.1">If we did this, we’d see a trace similar to the one shown in </span><span class="No-Break"><em class="italic"><span class="koboSpan" id="kobo.417.1">Figure 12</span></em></span><span class="No-Break"><em class="italic"><span class="koboSpan" id="kobo.418.1">.4</span></em></span><span class="No-Break"><span class="koboSpan" id="kobo.419.1">:</span></span></p>
+<div>
+<div class="IMG---Figure" id="_idContainer129">
+<span class="koboSpan" id="kobo.420.1"><img alt="Figure 12.4 – Trace showing Redis call failures with fallback to database" src="image/B19423_12_04.jpg"/></span>
+</div>
+</div>
+<p class="IMG---Caption" lang="en-US" xml:lang="en-US"><span class="koboSpan" id="kobo.421.1">Figure 12.4 – Trace showing Redis call failures with fallback to database</span></p>
+<p><span class="koboSpan" id="kobo.422.1">Here, calls to Redis failed, but the overall operation succeeded. </span><span class="koboSpan" id="kobo.422.2">You can reproduce it if you comment out the </span><strong class="source-inline"><span class="koboSpan" id="kobo.423.1">throw</span></strong><span class="koboSpan" id="kobo.424.1"> statement on line 63 in </span><strong class="source-inline"><span class="koboSpan" id="kobo.425.1">CacheService.cs</span></strong><span class="koboSpan" id="kobo.426.1"> and then rerun the application with </span><strong class="source-inline"><span class="koboSpan" id="kobo.427.1">$ docker-compose </span></strong><span class="No-Break"><strong class="source-inline"><span class="koboSpan" id="kobo.428.1">up --build</span></strong></span><span class="No-Break"><span class="koboSpan" id="kobo.429.1">.</span></span></p>
+<p><span class="koboSpan" id="kobo.430.1">Let’s check what happens with metrics in this case. </span><span class="koboSpan" id="kobo.430.2">We can start by applying some load with </span><strong class="source-inline"><span class="koboSpan" id="kobo.431.1">loadgenerator$ dotnet run -c Release --rate 50</span></strong><span class="koboSpan" id="kobo.432.1">. </span><span class="koboSpan" id="kobo.432.2">Give it a few minutes to stabilize and let’s check our </span><span class="No-Break"><span class="koboSpan" id="kobo.433.1">application’s performance.</span></span></p>
+<p><span class="koboSpan" id="kobo.434.1">Let’s first check out the service throughput with the following query in Prometheus (</span><span class="No-Break"><span class="koboSpan" id="kobo.435.1">at </span></span><span class="No-Break"><strong class="source-inline"><span class="koboSpan" id="kobo.436.1">http://localhost:9090</span></strong></span><span class="No-Break"><span class="koboSpan" id="kobo.437.1">):</span></span></p>
+<pre class="console"><span class="koboSpan" id="kobo.438.1">
+sum by (http_route, http_status_code)
+  (rate(http_server_duration_milliseconds_count[1m])
+)</span></pre>
+<p><span class="koboSpan" id="kobo.439.1">As we’ll see in </span><span class="No-Break"><em class="italic"><span class="koboSpan" id="kobo.440.1">Figure 12</span></em></span><em class="italic"><span class="koboSpan" id="kobo.441.1">.6</span></em><span class="koboSpan" id="kobo.442.1">, throughput stabilizes at around 40-50 requests per second – that’s what we configured in the </span><span class="No-Break"><strong class="source-inline"><span class="koboSpan" id="kobo.443.1">rate</span></strong></span><span class="No-Break"><span class="koboSpan" id="kobo.444.1"> parameter.</span></span></p>
+<p><span class="koboSpan" id="kobo.445.1">Then, we can check the 50</span><span class="superscript"><span class="koboSpan" id="kobo.446.1">th</span></span><span class="koboSpan" id="kobo.447.1"> percentile for latency with the </span><span class="No-Break"><span class="koboSpan" id="kobo.448.1">following query:</span></span></p>
+<pre class="console"><span class="koboSpan" id="kobo.449.1">
+histogram_quantile(0.50,
+  sum (rate(http_server_duration_milliseconds_bucket[1m]))
+  by (le, http_route, http_method))</span></pre>
+<p><span class="koboSpan" id="kobo.450.1">Later, in </span><span class="No-Break"><em class="italic"><span class="koboSpan" id="kobo.451.1">Figure 12</span></em></span><em class="italic"><span class="koboSpan" id="kobo.452.1">.7</span></em><span class="koboSpan" id="kobo.453.1">, we’ll see that responses are blazing fast – the 50</span><span class="superscript"><span class="koboSpan" id="kobo.454.1">th</span></span><span class="koboSpan" id="kobo.455.1"> percentile for latency is just </span><a id="_idIndexMarker664"/><span class="koboSpan" id="kobo.456.1">a </span><span class="No-Break"><span class="koboSpan" id="kobo.457.1">few milliseconds.</span></span></p>
+<p class="callout-heading"><span class="koboSpan" id="kobo.458.1">Spoiler</span></p>
+<p class="callout"><span class="koboSpan" id="kobo.459.1">If we checked the 95</span><span class="superscript"><span class="koboSpan" id="kobo.460.1">th</span></span><span class="koboSpan" id="kobo.461.1"> percentile for latency, we’d notice it is much bigger, reaching 200-300 milliseconds. </span><span class="koboSpan" id="kobo.461.2">MongoDB shows these spikes in latency because container resources are constrained for </span><span class="No-Break"><span class="koboSpan" id="kobo.462.1">demo purposes.</span></span></p>
+<p><span class="koboSpan" id="kobo.463.1">Let’s now check the cache hit rate. </span><span class="koboSpan" id="kobo.463.2">We can derive it from Redis server metrics or a client operation duration histogram. </span><span class="koboSpan" id="kobo.463.3">The following query uses the </span><span class="No-Break"><span class="koboSpan" id="kobo.464.1">latter approach:</span></span></p>
+<pre class="source-code"><span class="koboSpan" id="kobo.465.1">
+100 *
+sum by (net_peer_name) (
+  rate(db_operation_duration_milliseconds_count{cache_hit="true",
+          db_operation="GetString",
+          db_system="redis"}[1m]))
+/
+sum by (net_peer_name) (
+  rate(
+      db_operation_duration_milliseconds_count{db_
+        operation="GetString",
+      db_redis_status="ok",
+      db_system="redis"}[1m]))</span></pre>
+<p><span class="koboSpan" id="kobo.466.1">The query gets the rate of the </span><strong class="source-inline"><span class="koboSpan" id="kobo.467.1">GetString</span></strong><span class="koboSpan" id="kobo.468.1"> operation on Redis with the </span><strong class="source-inline"><span class="koboSpan" id="kobo.469.1">cache.hit</span></strong><span class="koboSpan" id="kobo.470.1"> attribute set to </span><strong class="source-inline"><span class="koboSpan" id="kobo.471.1">true</span></strong><span class="koboSpan" id="kobo.472.1"> and divides it by the overall </span><strong class="source-inline"><span class="koboSpan" id="kobo.473.1">GetString</span></strong><span class="koboSpan" id="kobo.474.1"> operation success rate. </span><span class="koboSpan" id="kobo.474.2">It also multiplies </span><a id="_idIndexMarker665"/><span class="koboSpan" id="kobo.475.1">the ratio by 100 to calculate the hit percentage, which is around 80%, as we can see in </span><span class="No-Break"><em class="italic"><span class="koboSpan" id="kobo.476.1">Figure 12</span></em></span><span class="No-Break"><em class="italic"><span class="koboSpan" id="kobo.477.1">.5</span></em></span><span class="No-Break"><span class="koboSpan" id="kobo.478.1">:</span></span></p>
+<div>
+<div class="IMG---Figure" id="_idContainer130">
+<span class="koboSpan" id="kobo.479.1"><img alt="Figure 12.5 – Redis hit rate for the GetString method" src="image/B19423_12_05.jpg"/></span>
+</div>
+</div>
+<p class="IMG---Caption" lang="en-US" xml:lang="en-US"><span class="koboSpan" id="kobo.480.1">Figure 12.5 – Redis hit rate for the GetString method</span></p>
+<p><span class="koboSpan" id="kobo.481.1">So, the cache is used and it handles 80% of read requests. </span><span class="koboSpan" id="kobo.481.2">Let’s see what happens if we stop it with the </span><strong class="source-inline"><span class="koboSpan" id="kobo.482.1">$ docker stop </span></strong><span class="No-Break"><strong class="source-inline"><span class="koboSpan" id="kobo.483.1">chapter12-redis-1</span></strong></span><span class="No-Break"><span class="koboSpan" id="kobo.484.1"> command.</span></span></p>
+<p class="callout-heading"><span class="koboSpan" id="kobo.485.1">Tip</span></p>
+<p class="callout"><span class="koboSpan" id="kobo.486.1">With this exercise, you may find it interesting to explore the effect of recording exceptions from Redis. </span><span class="koboSpan" id="kobo.486.2">Once the Redis container is stopped, every call to Redis will result in an exception being recorded. </span><span class="koboSpan" id="kobo.486.3">In the case of our tiny application, it alone increases the telemetry volume tenfold. </span><span class="koboSpan" id="kobo.486.4">Check it out yourself with the following </span><span class="No-Break"><span class="koboSpan" id="kobo.487.1">Prometheus query:</span></span></p>
+<pre class="console"><span class="koboSpan" id="kobo.488.1">
+sum by (container_image_name)
+  (rate(container_network_io_usage_rx_bytes_total[1m]))</span></pre>
+<p><span class="koboSpan" id="kobo.489.1">Immediately after the Redis container is stopped (at around 14:48), the application throughput starts to decrease to less than one record per second, as shown in </span><span class="No-Break"><em class="italic"><span class="koboSpan" id="kobo.490.1">Figure 12</span></em></span><span class="No-Break"><em class="italic"><span class="koboSpan" id="kobo.491.1">.6</span></em></span><span class="No-Break"><span class="koboSpan" id="kobo.492.1">:</span></span></p>
+<div>
+<div class="IMG---Figure" id="_idContainer131">
+<span class="koboSpan" id="kobo.493.1"><img alt="Figure 12.6 – Application throughput before and after the Redis container is stopped" src="image/B19423_12_06.jpg"/></span>
+</div>
+</div>
+<p class="IMG---Caption" lang="en-US" xml:lang="en-US"><span class="koboSpan" id="kobo.494.1">Figure 12.6 – Application throughput before and after the Redis container is stopped</span></p>
+<p><span class="koboSpan" id="kobo.495.1">HTTP latency (the 50</span><span class="superscript"><span class="koboSpan" id="kobo.496.1">th</span></span><span class="koboSpan" id="kobo.497.1"> percentile) increases</span><a id="_idIndexMarker666"/><span class="koboSpan" id="kobo.498.1"> from a few milliseconds to several seconds, as you can see in </span><span class="No-Break"><em class="italic"><span class="koboSpan" id="kobo.499.1">Figure 12</span></em></span><span class="No-Break"><em class="italic"><span class="koboSpan" id="kobo.500.1">.7</span></em></span><span class="No-Break"><span class="koboSpan" id="kobo.501.1">:</span></span></p>
+<div>
+<div class="IMG---Figure" id="_idContainer132">
+<span class="koboSpan" id="kobo.502.1"><img alt="Figure 12.7 – Application latency 50th percentile before and after Redis container is stopped" src="image/B19423_12_07.jpg"/></span>
+</div>
+</div>
+<p class="IMG---Caption" lang="en-US" xml:lang="en-US"><span class="koboSpan" id="kobo.503.1">Figure 12.7 – Application latency 50</span><span class="superscript"><span class="koboSpan" id="kobo.504.1">th</span></span><span class="koboSpan" id="kobo.505.1"> percentile before and after Redis container is stopped</span></p>
+<p><span class="koboSpan" id="kobo.506.1">The spikes in HTTP</span><a id="_idIndexMarker667"/><span class="koboSpan" id="kobo.507.1"> latency are consistent with the MongoDB latency increase shown in </span><span class="No-Break"><em class="italic"><span class="koboSpan" id="kobo.508.1">Figure 12</span></em></span><span class="No-Break"><em class="italic"><span class="koboSpan" id="kobo.509.1">.8</span></em></span><span class="No-Break"><span class="koboSpan" id="kobo.510.1">:</span></span></p>
+<div>
+<div class="IMG---Figure" id="_idContainer133">
+<span class="koboSpan" id="kobo.511.1"><img alt="Figure 12.8 – MongoDB latency (p50) in milliseconds" src="image/B19423_12_08.jpg"/></span>
+</div>
+</div>
+<p class="IMG---Caption" lang="en-US" xml:lang="en-US"><span class="koboSpan" id="kobo.512.1">Figure 12.8 – MongoDB latency (p50) in milliseconds</span></p>
+<p><span class="koboSpan" id="kobo.513.1">Finally, we should check what happened with MongoDB throughput: since Redis no longer handles 80% of read requests, the load on the database increases and, initially, it tries to catch up, as you can see in </span><span class="No-Break"><em class="italic"><span class="koboSpan" id="kobo.514.1">Figure 12</span></em></span><span class="No-Break"><em class="italic"><span class="koboSpan" id="kobo.515.1">.9</span></em></span><span class="No-Break"><span class="koboSpan" id="kobo.516.1">:</span></span></p>
+<div>
+<div class="IMG---Figure" id="_idContainer134">
+<span class="koboSpan" id="kobo.517.1"><img alt="Figure 12.9 – MongoDB throughput before and after the container is stopped" src="image/B19423_12_09.jpg"/></span>
+</div>
+</div>
+<p class="IMG---Caption" lang="en-US" xml:lang="en-US"><span class="koboSpan" id="kobo.518.1">Figure 12.9 – MongoDB throughput before and after the container is stopped</span></p>
+<p><span class="koboSpan" id="kobo.519.1">The resources on a MongoDB container are significantly constrained and it can’t handle such </span><span class="No-Break"><span class="koboSpan" id="kobo.520.1">a load.</span></span></p>
+<p><span class="koboSpan" id="kobo.521.1">If we check the traces, we’ll see the MongoDB call takes significantly longer and is the root cause of slow application responses and low throughput. </span><span class="koboSpan" id="kobo.521.2">An example of such a trace is shown in </span><span class="No-Break"><em class="italic"><span class="koboSpan" id="kobo.522.1">Figure 12</span></em></span><span class="No-Break"><em class="italic"><span class="koboSpan" id="kobo.523.1">.10</span></em></span><span class="No-Break"><span class="koboSpan" id="kobo.524.1">:</span></span></p>
+<div>
+<div class="IMG---Figure" id="_idContainer135">
+<span class="koboSpan" id="kobo.525.1"><img alt="Figure 12.10 – Trace showing ﻿a long MongoDB request when Redis is stopped" src="image/B19423_12_10.jpg"/></span>
+</div>
+</div>
+<p class="IMG---Caption" lang="en-US" xml:lang="en-US"><span class="koboSpan" id="kobo.526.1">Figure 12.10 – Trace showing a long MongoDB request when Redis is stopped</span></p>
+<p><span class="koboSpan" id="kobo.527.1">If you now start Redis with the </span><strong class="source-inline"><span class="koboSpan" id="kobo.528.1">$ docker start chapter12-redis-1</span></strong><span class="koboSpan" id="kobo.529.1"> command, the</span><a id="_idIndexMarker668"/><span class="koboSpan" id="kobo.530.1"> throughput and latency will be restored to the original values within a </span><span class="No-Break"><span class="koboSpan" id="kobo.531.1">few minutes.</span></span></p>
+<p><span class="koboSpan" id="kobo.532.1">We did this analysis knowing the root cause, but it also works as a general approach – when service-level indicators such as latency and throughput change drastically, we should check the state and health of service dependencies. </span><span class="koboSpan" id="kobo.532.2">The findings here are that we need to protect the database better, for example, by adding a few more (potentially smaller) Redis instances that would handle the load if one of them goes down. </span><span class="koboSpan" id="kobo.532.3">We may also consider rate-limiting calls to the database on the service side, so it stays responsive, even with </span><span class="No-Break"><span class="koboSpan" id="kobo.533.1">lower throughput.</span></span></p>
+<h1 id="_idParaDest-204"><a id="_idTextAnchor203"/><span class="koboSpan" id="kobo.534.1">Summary</span></h1>
+<p><span class="koboSpan" id="kobo.535.1">In this chapter, we explored database instrumentation. </span><span class="koboSpan" id="kobo.535.2">We started by looking into OpenTelemetry semantic conventions for databases and implemented tracing for MongoDB. </span><span class="koboSpan" id="kobo.535.3">Then, we added similar instrumentation for Redis and encompassing calls. </span><span class="koboSpan" id="kobo.535.4">We saw how to provide application-specific context on encompassing spans and record whether data was retrieved from the cache or database to improve performance analysis </span><span class="No-Break"><span class="koboSpan" id="kobo.536.1">across traces.</span></span></p>
+<p><span class="koboSpan" id="kobo.537.1">Then, we added metrics, including client duration histograms for MongoDB and Redis along with server-side metrics for Redis that help analyze and optimize cache usage, starting with the hit ratio, which we were able </span><span class="No-Break"><span class="koboSpan" id="kobo.538.1">to measure.</span></span></p>
+<p><span class="koboSpan" id="kobo.539.1">Finally, we simulated a Redis outage and saw how collecting telemetry makes it easy to detect and analyze what went wrong and how the outage progressed. </span><span class="koboSpan" id="kobo.539.2">We also found several issues in our application that make </span><span class="No-Break"><span class="koboSpan" id="kobo.540.1">it unreliable.</span></span></p>
+<p><span class="koboSpan" id="kobo.541.1">Now you’re ready to start instrumenting database calls in your application or enrich auto-collected telemetry with additional traces </span><span class="No-Break"><span class="koboSpan" id="kobo.542.1">and metrics.</span></span></p>
+<p><span class="koboSpan" id="kobo.543.1">This concludes our journey through instrumentation recipes. </span><span class="koboSpan" id="kobo.543.2">In the next chapter, we’ll talk about organizational aspects of adopting and evolving tracing </span><span class="No-Break"><span class="koboSpan" id="kobo.544.1">and observability.</span></span></p>
+<h1 id="_idParaDest-205"><a id="_idTextAnchor204"/><span class="koboSpan" id="kobo.545.1">Questions</span></h1>
+<ol>
+<li><span class="koboSpan" id="kobo.546.1">How would you approach instrumenting a database change feed (the event stream exposed by the database that notifies about changes to database records)? </span><span class="koboSpan" id="kobo.546.2">For example, an application can subscribe to a notification that the cloud provider will send when a blob is created, updated, or removed from cloud storage (which we can consider to be </span><span class="No-Break"><span class="koboSpan" id="kobo.547.1">a database).</span></span></li>
+<li><span class="koboSpan" id="kobo.548.1">Would it make sense to record calls to Redis as events/logs instead </span><span class="No-Break"><span class="koboSpan" id="kobo.549.1">of spans?</span></span></li>
+<li><span class="koboSpan" id="kobo.550.1">Try removing resource limitations on the MongoDB container and check what happens if we kill </span><span class="No-Break"><span class="koboSpan" id="kobo.551.1">Redis now.</span></span></li>
+</ol>
+</div>
+
+
+<div class="Content" id="_idContainer137">
+<h1 id="_idParaDest-206"><a id="_idTextAnchor205"/><span class="koboSpan" id="kobo.1.1">Part 4: Implementing Distributed Tracing in Your Organization</span></h1>
+</div>
+<div id="_idContainer138">
+<p><span class="koboSpan" id="kobo.2.1">This part walks through the sociotechnical aspects of observability adoption – making an initial push and improving it further, developing telemetry standards within your company, and instrumenting new parts of a system in the presence of </span><span class="No-Break"><span class="koboSpan" id="kobo.3.1">legacy services.</span></span></p>
+<p><span class="koboSpan" id="kobo.4.1">This part has the </span><span class="No-Break"><span class="koboSpan" id="kobo.5.1">following chapters:</span></span></p>
+<ul>
+<li><a href="B19423_13.xhtml#_idTextAnchor206"><em class="italic"><span class="koboSpan" id="kobo.6.1">Chapter 13</span></em></a><span class="koboSpan" id="kobo.7.1">, </span><em class="italic"><span class="koboSpan" id="kobo.8.1">Driving Change</span></em></li>
+<li><a href="B19423_14.xhtml#_idTextAnchor220"><em class="italic"><span class="koboSpan" id="kobo.9.1">Chapter 14</span></em></a><span class="koboSpan" id="kobo.10.1">, </span><em class="italic"><span class="koboSpan" id="kobo.11.1">Creating Your Own Conventions</span></em></li>
+<li><a href="B19423_15.xhtml#_idTextAnchor233"><em class="italic"><span class="koboSpan" id="kobo.12.1">Chapter 15</span></em></a><span class="koboSpan" id="kobo.13.1">, </span><em class="italic"><span class="koboSpan" id="kobo.14.1">Instrumenting Brownfield Applications</span></em></li>
+</ul>
+</div>
+<div>
+<div id="_idContainer139">
+</div>
+</div>
+<div>
+<div class="Basic-Graphics-Frame" id="_idContainer140">
+</div>
+</div>
+<div>
+<div id="_idContainer141">
+</div>
+</div>
+</body></html>

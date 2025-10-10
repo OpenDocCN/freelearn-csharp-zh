@@ -1,0 +1,299 @@
+<html><head></head><body>
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Error Handling over the Wire</h1>
+                </header>
+            
+            <article>
+                
+<p class="Normal1">This chapter will explore the many possible failure points of a distributed application, and how the impact of a failure can be felt by downstream consumers of your application. We'll examine how different errors are reported or detected depending on the severity, context, and stage of the life cycle of network traffic. We'll explore a variety of error-handling strategies as they are implemented in C#, and demonstrate how conventions and standards can be leveraged to ensure that your application behaves as expected for any potential downstream consumers. Finally, we'll look at how to generate meaningful errors for your application's consumers when their requests cannot be reasonably serviced.</p>
+<p>The following topics will be covered in this chapter:</p>
+<ul>
+<li>How different points of failure should generate different error messages, and how to recover from them</li>
+<li>Common error codes and messages returned by services that have correctly implemented their respective communication protocols</li>
+<li>Strategies for handling different kinds of errors depending on the needs your application must meet</li>
+<li>Using status codes, errors, logs, and messages to generate and report your own errors for downstream consumers</li>
+</ul>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Technical requirements</h1>
+                </header>
+            
+            <article>
+                
+<p>We'll be writing a substantial amount of sample code, which can be found on GitHub here: <a href="https://github.com/PacktPublishing/Hands-On-Network-Programming-with-CSharp-and-.NET-Core/tree/master/Chapter%207">https://github.com/PacktPublishing/Hands-On-Network-Programming-with-CSharp-and-.NET-Core/tree/master/Chapter 7</a><a href="https://github.com/PacktPublishing/Hands-On-Network-Programming-with-C-and-.NET-Core/tree/master/Chapter%207">.</a></p>
+<p><span>Check out the following video to see the code in action: <a href="http://bit.ly/2HT1l9z">http://bit.ly/2HT1l9z</a></span></p>
+<p>This chapter will introduce a resilient network client called <strong>Polly</strong> to demonstrate common error-recovery strategies. I'd recommend reading up on some of the features of that particular library here: <a href="https://github.com/App-vNext/Polly">https://github.com/App-vNext/Polly.</a></p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Multiple devices, multiple points of failure</h1>
+                </header>
+            
+            <article>
+                
+<p>There is an inexhaustible number of problems that can occur on even simple software when you introduce the unpredictability of network interactions. A single off-by-one error in an upstream service could mean a missing the closing curly-brace in a JSON string, rendering an entire payload impossible to parse. <strong>Internet service provider</strong> (<strong>ISP</strong>) service interruptions or weak wireless signals can result in timeouts and incomplete payload delivery. Meanwhile, the stability of the remote system you're requesting a resource from is entirely out of your control. With all these factors introducing the potential for errors, we can't simply hope to avoid errors or exceptions in our software. We must assume they will occur, and design around that eventuality.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">External dependencies</h1>
+                </header>
+            
+            <article>
+                
+<p>In our time as professional engineers, we can count on one hand the number of application we wrote that neither served as a network dependency for a downstream consumer, nor had a dependency on an upstream network resource. Every time your software must make a network hop to access a necessary resource, you're introducing the risk of failure.</p>
+<p>As a rule, any time you are reading data from an external dependency, you must implement proper exception handling. Always assume that something could go wrong. We didn't do this in the last chapter because we didn't want to introduce unnecessary complexity while I was still trying to fully elucidate the concepts and uses of data streams. However, in this chapter, we'll be looking exclusively at error-handling strategies. And the first strategy is to <em>always</em> assume accessing external dependencies will eventually fail.</p>
+<p class="mce-root"/>
+<p class="mce-root"/>
+<p>This is fairly straightforward when you are handling the response from another external dependency, but what if your own software is a dependency for another application? The next strategy for resilient application behavior is to always assume that your own software will eventually fail. This will encourage you to account for that fact and provide fault tolerance and useful error messaging for anyone who may be using your software at the moment of failure. With that in mind, let's start with our network access code from the last chapter and modify it for better resiliency.</p>
+<p>Looking back at our method, we had the following:</p>
+<pre>public async Task&lt;ResultObject&gt; AsyncMethodDemo() {<br/>  ResultObject result = new ResultObject();<br/>  WebRequest request = WebRequest.Create("http://test-domain.com");<br/>  request.Method = "POST";<br/>  Stream reqStream = request.GetRequestStream();<br/><br/>  using (StreamWriter sw = new StreamWriter(reqStream)) {<br/>    sw.Write("Our test data query");<br/>  }<br/>  var responseTask = request.GetResponseAsync();<br/><br/>  result.LocalResult = LongRunningSlowMethod();<br/><br/>  var webResponse = await responseTask;<br/><br/>  using (StreamReader sr = new StreamReader(webResponse.GetResponseStream())) {<br/>    result.RequestResult = await sr.ReadToEndAsync();<br/>  }<br/>            <br/>  return result;<br/>}</pre>
+<p>Within this method, we have one external dependency. We could encounter a failure when we attempt to access and process the response we receive from the server. Any number of issues could arise here for any number of reasons, so we'll want to wrap that code in a <kbd>try</kbd>/<kbd>catch</kbd> block, or apply an exception filter in our code (more on that shortly). We'll start with a simple <kbd>try</kbd>/<kbd>catch</kbd> block, looking at an incredibly useful built-in <kbd>Exception</kbd> class for our purposes, the <kbd>WebException</kbd> class. So let's catch that, and see what kind of utility we can get from it:</p>
+<pre>try {<br/>  var webResponse = await responseTask;<br/>                <br/>  using (StreamReader sr = new StreamReader(webResponse.GetResponseStream())) {<br/>    result.RequestResult = await sr.ReadToEndAsync();<br/>  }<br/>} catch (WebException ex) {<br/>  Console.WriteLine(ex.Status);<br/>  Console.WriteLine(ex.Message);<br/>}</pre>
+<p>Here, you'll note that we don't have to look for exceptions until we block our code and wait for the response to return. If we kick off an asychronous task and, while executing, that task throws an error, it doesn't reach our code until we <kbd>await</kbd> the result of that task. When we catch the error that we know we'll get (since the <a href="http://test-domain.com/">test-domain.com</a> resource doesn't actually exist), we catch it as <kbd>WebException</kbd>. This class is the base exception class you will receive from any network-specific exceptions your code encounters. What makes this especially useful, as opposed to the <kbd>catchall Exception</kbd> class, is the availability of the network error-specific <kbd>Status</kbd> property.</p>
+<p>In this sample, we're merely logging the status and the exception message to our console. If the code existed in an API that we wrote, however, and was exposed exposed to downstream entities over a network, we would be responsible for returning a meaningful status code of our own. Doing so ensures that if our specific application code is the primary point of failure in a process pipeline, we are providing as much information as possible to reliably respond to, and recover from, our exceptions.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Parsing the exception status for context</h1>
+                </header>
+            
+            <article>
+                
+<p>When there is an error status returned in <kbd>WebException</kbd>, the value of that property can tell us a lot about what failed and why. The <kbd>Status</kbd> property is an instance of the <kbd>WebExceptionStatus</kbd> enum, and the values returned can tell us a lot about the conditions that caused our external dependency to fail. It may have been a routing issue, or an inability to resolve a cache lookup or to maintain an active connection.</p>
+<p>The information you can discern simply from checking the value of the status code can tell you a lot about what specifically failed and what recovery strategy is most likely to yield positive results. For example, if your exception has a <kbd>Status</kbd> of <kbd>NameResolutionFailure</kbd>, you can safely assume that retrying the request won't be an effective strategy. If the DNS failed to identify the host based on the provided name at your first attempt, subsequent attempts with the same hostname are unlikely to prove fruitful. However, if you receive an error status of the <kbd>Timeout</kbd><span class="packt_screen"> </span>type, you could potentially increase your timeout threshold on your request client and submit a series of retries, up to a predetermined maximum timeout length.</p>
+<p>The documentation for the <kbd>WebException</kbd> status is freely available, and it's up to you to identify which possible exception statuses you can encounter. Furthermore, once you know where or what in the request chain failed, you can determine the best recovery strategy for your application code. The main takeaway here, though, is that you should check for and attempt to recover from the <kbd>WebException</kbd> occurrences at any point in your application in which a request is transmitted.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Status codes and error messages</h1>
+                </header>
+            
+            <article>
+                
+<p>Now that we know where we should be checking for potential exceptions (or providing them for our consumers), it's important to understand what those exceptions could ultimately look like. Identifying the full scope of possible exceptions and writing recovery solutions for each possibility will make our code nearly bulletproof against the unreliability of distributed resource acquisitions. While we've already seen that we can access hugely useful information just by inspecting the <kbd>WebException</kbd> exception that is thrown by any failed network requests we could make, there's still a lot to understand about the standards of Internet status code specifications and exceptional response handling.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Status messages and status codes</h1>
+                </header>
+            
+            <article>
+                
+<p>First, let's look at a reliable approach to handling different status responses in the case of an error from an upstream dependency. Let's use the same snippet of code from our earlier example, but respond more robustly to the variety of possible statuses we could receive. To keep our request code short, we'll delegate the exception handling code to a different method named <kbd>ProcessException(WebException ex)</kbd>. The two parameters of this method will be the exception that was generated, as well as the original request that triggered the exceptional state in our code. This will give the exception-processing method sufficient context about the original request to attempt to recover gracefully from the error. So, inside the <kbd>catch</kbd> block of our earlier example, we'll replace our two <kbd>Console.WriteLine()</kbd> statements accordingly:</p>
+<pre>} catch (WebException ex) {<br/>    ProcessException(ex);<br/>}</pre>
+<p class="mce-root"/>
+<p class="mce-root"/>
+<p>Then, from within our <kbd>ProcessException(WebException ex)</kbd> method, we'll switch on the possible value of the exception <kbd>Status</kbd> property, performing useful recovery logic based on the status or messages received:</p>
+<pre>public void ProcessException(WebException ex) {<br/>    switch(ex.Status) {<br/>      case WebExceptionStatus.ConnectFailure:<br/>      case WebExceptionStatus.ConnectionClosed:<br/>      case WebExceptionStatus.RequestCanceled:<br/>      case WebExceptionStatus.PipelineFailure:<br/>      case WebExceptionStatus.SendFailure:<br/>      case WebExceptionStatus.KeepAliveFailure:<br/>      case WebExceptionStatus.Timeout:<br/>        Console.WriteLine("We should retry connection attempts");<br/>        break;<br/>      case WebExceptionStatus.NameResolutionFailure:<br/>      case WebExceptionStatus.ProxyNameResolutionFailure:<br/>      case WebExceptionStatus.ServerProtocolViolation:<br/>      case WebExceptionStatus.ProtocolError:<br/>        Console.WriteLine("Prevent further attempts and notify consumers to check URL configurations");<br/>        break;<br/>      case WebExceptionStatus.SecureChannelFailure:<br/>      case WebExceptionStatus.TrustFailure:<br/>        Console.WriteLine("Authentication or security issue. Prompt for credentials and perhaps try again");<br/>        break;<br/>      default:<br/>        Console.WriteLine("We don't know how to handle this. We should post the error message and terminate our current workflow.");<br/>        break;     <br/>    }<br/>}</pre>
+<p>By using the descriptive and reliable status codes returned by <kbd>WebException</kbd>, we can group similar errors together, and respond to them with resolutions that will likely resolve the common issue for each of them. If there were issues with connectivity or timeouts, there may simply have been an issue with your ISP, or the remote host simply didn't have the resources loaded from the cache, and so took too long to process the request. In that case, simply trying again may well prove to be a consistently reliable solution. However, if the exception was due to an inability to resolve the target hostname, then subsequent requests will likely fail in the same way. They'd all be processed by the same DNS, so unless the request URI is updated to a valid host name, there's no benefit in retrying the request. Meanwhile, security issues can likely be resolved by refreshing authentication or authorization credentials.</p>
+<p>You'll note that the default simply recommends publishing the inner message returned with the <kbd>WebException</kbd> class. This is because, in cases where there is no common status code returned by the server, the class itself will have some default messaging about what has probably gone wrong. So even if we get back an instance of <kbd>WebExceptionStatus.UnknownError</kbd>, there will likely still be useful information returned as part of the error message.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Useful error messages</h1>
+                </header>
+            
+            <article>
+                
+<p>If we find ourselves in a scenario where we cannot gracefully recover from a failed attempt to request resources from an upstream dependency, and we cannot proceed with the service our application provides, it's time to send an error message of our own. It is our responsibility to provide as much information about the failure state as we can for the user to understand what went wrong while avoiding sending back any potentially compromising details that could open our application up to vulnerabilities.</p>
+<p>This is where status codes become your best friend. When you're handling HTTP requests against your application, you should be as specific as you possibly can with which status codes you return. It may seem extremely simple to return a <span class="packt_screen">500</span> status code every time something goes wrong, with your own software, since 5XX is the blanket code designation for a server error. If you want people to be happy to use your services, though, I would recommend you don't. The more specific you can be with your status codes, the less work any of your consumers have to put in to understanding and recovering from issues on their own side of the equation.</p>
+<p>Using the most specific status codes possible also gives us a risk-free way of communicating enough information about what went wrong, while not communicating anything that could put our software at risk. If you respond to a bad authentication request with a <span class="packt_screen">401</span> status code (the status code for "unauthorized"), users will know that they have to adjust their authentication mechanism. However, if you simply returned a blanket <span class="packt_screen">400</span> status code, along with a message indicating that the minimum character requirements for a password is eight, then you've just given potential malicious actors more information about your authentication scheme than they had before their failed attempt. And with malicious software, <em>any</em> information about the specifics of your system is dangerous.</p>
+<p>Understanding how much information is enough, versus too much, can be a delicate balancing act. Much of knowing what others will want to see from your software will come from experience. The more external services you see sending useless <span class="packt_screen">Something went wrong. Oops!</span> error messages, the more you'll have an idea of what you would have wanted to know, and how you can do better in your own code in the future. A good rule of thumb when you're starting out, though, is that status codes should be as specific as possible, and error messages should be as vague as you can get away with. In HTTP, error status codes are all isolated to the 4XX and 5XX values. These two groupings designate request servicing errors and server errors, respectively.</p>
+<p>A request-servicing error relates to anything about the structure, origin, or nature of the request that caused the failure to occur. So, anything from requesting a resource that doesn't actually exist at the requested location (<span class="packt_screen">404 - Not Found</span>), to requesting a resource with an HTTP verb that isn't supported by the listening server (<span class="packt_screen">405 - Method Not Allow</span>) to requesting access to resources for which the client isn't authorized (<span class="packt_screen">401 - Unauthorized</span>).</p>
+<p>Server errors, on the other hand, relate to issues that have occurred after a correct and well-formed address has been received. There are far fewer of these since most well-formed requests are considered well formed specifically because there is a server configured to process it. The reasons for a 5XX response range from failure of an upstream server to process some aspect of the client request (<span class="packt_screen">502 - Bad Gateway</span>/<span class="packt_screen">504 - Gateway Timeout</span>), to the target server simply being out of commission or unavailable at the time of the request (<span class="packt_screen">503 - Service Unavailable</span>).</p>
+<p>If you're sending correct error codes, it is incredibly unlikely that you will ever find yourself returning a 5XX error code explicitly from within your own code. If your software is written well, issues that cause it to throw an error will almost always be ultimately traceable to some aspect of an incoming request. When that happens, though, it is absolutely your responsibility to do your best to find out what, specifically, about the request caused the error, and report it back promptly.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Error-handling strategies</h1>
+                </header>
+            
+            <article>
+                
+<p>Now that we've seen the tools available to you when encountering error messages from network resources (and when sending error messages of your own), let's take a look at what to do with them.</p>
+<p>How should we best respond to a <kbd>RequestCancelled</kbd> exception status? Which failure states are likely to have a common root cause, and thus a common shared solution? How should our software respond to our own users when we can't recover from errors further upstream? In this section, we'll take a look at each of these questions, and leave with some concrete approaches that can be adapted and scaled to almost any circumstance.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Resilient requests with Polly</h1>
+                </header>
+            
+            <article>
+                
+<p><span>As we already saw in our previous code sample, it's not uncommon to respond to a number of similar error statuses with the same general recovery solution. This is a great practice for simplifying your code base, and can provide durable exception handling in a wide variety of common situations.</span></p>
+<p><span>This act of associating common network issues into groups that can be resolved with similar strategies is exactly the idea behind the Polly library for resilient HTTP clients. While we're not looking specifically at HTTP now, it is one of the most robust libraries out there for one of the most common network protocols, so I think it bears examination as we continue to look at error-recovery strategies.</span></p>
+<p>The first order of business is to include the package in our project either through an explicit inclusion in the NuGet package manager, or with the following command-line input:</p>
+<pre>dotnet add package Polly</pre>
+<p>Once it's installed, we can declare a <kbd>Policy</kbd> class for how we plan to handle various network exceptions using Polly's declarative handler and recovery methods. The <kbd>Policy</kbd> class is a robust, transient container for a given task. We define a delegate, and then we provide that delegate to a <kbd>Policy</kbd> for execution. The <kbd>Policy</kbd> class then uses the actively-defined error handlers and their recovery definitions to execute the task, and then listen for and respond to exceptional states accordingly.</p>
+<p>Exceptions that we want Polly to respond to are set with the generic <kbd>Handle&lt;T&gt;()</kbd> method, where <kbd>T</kbd> is some subclass of the <kbd>Exception</kbd> type. The <kbd>Handle&lt;T&gt;()</kbd> method also takes optional conditional parameters specifying the state of the <kbd>Exception</kbd> type we want to respond to with the corresponding recovery specification. This gives us the ability to define specific recovery strategies for different states. Let's look at this in action to see what I mean.</p>
+<p class="mce-root"/>
+<p class="mce-root"/>
+<p>First, we're going to define a method for requesting some remote resource. This will only be used for demonstration purposes, so we'll want it to occasionally fail and occasionally succeed. For that, we'll just generate a random number, and if the number is even, we'll throw an exception; otherwise, we'll return a valid response. Importantly, though, we'll want to log our failed attempts onscreen so we can see the retry in action:</p>
+<pre>public static HttpResponseMessage ExecuteRemoteLookup() {<br/>    if (new Random().Next() % 2 == 0) {<br/>        Console.WriteLine("Retrying connections...");<br/>        throw new WebException("Connection Failure", WebExceptionStatus.ConnectFailure);<br/>    }<br/>    return new HttpResponseMessage();<br/>}</pre>
+<p>This will be the delegate that we pass to our <kbd>Policy</kbd> object once we've defined our recovery strategy and want to try to execute it. Next, we'll define behaviors for a couple of the error states we defined in our naive error-handling code from earlier. For the sake of readability, we'll define some private class variables to hold the groups of the <kbd>WebExceptionStatus</kbd> values that we had logically lumped together:</p>
+<pre>private List&lt;WebExceptionStatus&gt; connectionFailure = new List&lt;WebExceptionStatus&gt;() {<br/> WebExceptionStatus.ConnectFailure,<br/> WebExceptionStatus.ConnectionClosed,<br/> WebExceptionStatus.RequestCanceled,<br/> WebExceptionStatus.PipelineFailure,<br/> WebExceptionStatus.SendFailure,<br/> WebExceptionStatus.KeepAliveFailure,<br/> WebExceptionStatus.Timeout<br/>};<br/><br/>private List&lt;WebExceptionStatus&gt; resourceAccessFailure = new List&lt;WebExceptionStatus&gt;() {<br/> WebExceptionStatus.NameResolutionFailure,<br/> WebExceptionStatus.ProxyNameResolutionFailure,<br/> WebExceptionStatus.ServerProtocolViolation<br/>};<br/><br/>private List&lt;WebExceptionStatus&gt; securityFailure = new List&lt;WebExceptionStatus&gt;() {<br/> WebExceptionStatus.SecureChannelFailure,<br/> WebExceptionStatus.TrustFailure<br/>};</pre>
+<p>With that, we can easily define a <kbd>Policy</kbd> object that responds to <kbd>WebException</kbd> with a status in one of our groupings, as follows:</p>
+<p> </p>
+<pre>public static void ExecuteRemoteLookupWithPolly() {<br/>    Policy connFailurePolicy = Policy<br/>        .Handle&lt;WebException&gt;(x =&gt; connectionFailure.Contains(x.Status))<br/>        .RetryForever();<br/><br/>    HttpResponseMessage resp = connFailurePolicy.Execute(() =&gt; ExecuteRemoteLookup());<br/>    if (resp.IsSuccessStatusCode) {<br/>        Console.WriteLine("Success!");<br/>    }<br/>}</pre>
+<p>Note that when we execute <kbd>Policy</kbd>, we specify that as long as we get <kbd>WebExceptionStatus</kbd> defined in our <kbd>connectionFailure</kbd> grouping, we want to retry the request. So, let's now call this from a driver program a few times and see what our console looks like after each run. The assumption is due to the sufficient randomness of the pseudo-random number generator, there should be at least a few runs that fail multiple times before returning a valid response. (Note that, for the purposes of this demo, all of the Polly code exists in a <kbd>static PollyDemo</kbd> class). Let's have a look at the following code:</p>
+<pre>using System.Threading;<br/><br/>namespace ErrorHandling {<br/>    public class Program {<br/>        static void Main(string[] args) {<br/>            PollyDemo.ExecuteRemoteLookupWithPolly();<br/>            Thread.Sleep(10000);<br/>        }<br/>    }<br/>}</pre>
+<p>If you have your IDE configured to break on errors, you'll get a pause in execution every time your code fails. Just running this code myself, though, I saw an instant success, and then five consecutive retries before my code successfully executed. The fact that I was able to define that in fewer than 10 lines of code is incredible, and speaks to the value of Polly in providing resiliency to an application.</p>
+<p>However, if we want to truly mirror the behavior we established in our naive error-handling code from earlier, we want to respond to a variety of exceptional states with specific recovery codes based on which state was reached. For that, Polly allows you to define multiple state handlers and then wrap them together in a <kbd>PolicyWrap</kbd> class, which does precisely. It will allow you to define the recovery policies for as many conditional states as you need, and then wrap them up in a single common policy to be respected when your <kbd>PolicyWrap</kbd> instance's <kbd>Execute(delegate)</kbd> method is called.</p>
+<p>To demonstrate this, we'll define a few additional exceptional states for our delegate, such that if the random number generated is divisible by <kbd>3</kbd>, we'll throw a name resolution error, and if the number is divisible by <kbd>4</kbd>, we'll throw a security error:</p>
+<pre>public static HttpResponseMessage ExecuteRemoteLookup() {<br/>    var num = new Random().Next();<br/>    if (num % 3 == 0) {<br/>        Console.WriteLine("Breaking the circuit");<br/>        throw new WebException("Name Resolution Failure", WebExceptionStatus.NameResolutionFailure);<br/>    } else if (num % 4 == 0) {<br/>        Console.WriteLine("Falling Back");<br/>        throw new WebException("Security Failure", WebExceptionStatus.TrustFailure);<br/>    } else if (num % 2 == 0) {<br/>        Console.WriteLine("Retrying connections...");<br/>        throw new WebException("Connection Failure", WebExceptionStatus.ConnectFailure);<br/>    }<br/>    return new HttpResponseMessage();<br/>}</pre>
+<p>Now that we have a random chance that at least one of our exceptional conditions is met, let's define the behavior for each circumstance. As you might have noticed from my console messages, we'll use a different strategy for each specific error case. Polly defines a small number of policies out of the box, and you can invoke each one in the case for which it is most useful. I won't go into all of them now, but I will take a moment to encourage you to read up on Polly's documentation (<a href="https://github.com/App-vNext/Polly">https://github.com/App-vNext/Polly</a>). It's longer than this whole chapter, but well written and immeasurably useful for anyone looking to provide more reliable stability to a production application. For now though, we'll just be looking at the <kbd>Circuit-breaker</kbd> policy and the <kbd>Fallback</kbd> policy. These two seem most useful for our use cases since they most closely match the strategy we identified in our naive approach.</p>
+<p>The <kbd>Fallback</kbd> policy is by far the simpler of the two. It simply allows you to designate an alternative response to return in the event of the specified exception being handled. In our example, since we'll be using <kbd>Fallback</kbd> for our security exceptions, we'll simply return a new instance of <kbd>HttpResponseMessage</kbd> with a <span class="packt_screen">401</span> status code set to notify our downstream consumers that there is an issue with authorization that needs to be resolved.</p>
+<p>The Circuit-breaker policy designates that multiple failed attempts to resolve a request should open the circuit to the requested resource, and stop subsequent requests before they start. This is useful in scenarios like the one we've defined for name resolution failures, where, <span>based on the error message</span> subsequent attempts are no more likely to be successful than the original request. Opening the circuit (and thus stopping the flow of requests over that circuit) gives the upstream system a chance to recover without being bombarded by a series of retry attempts. You can configure the circuit to open after a designated number of failed attempts or after a designated timeout, and you can set it to stay open for as long as you determine would probably be necessary to allow the upstream system to recover.</p>
+<p>Unlike the retry policy and its variants, though, the Circuit-breaker doesn't actually do anything in response to errors being thrown. In fact, it will always re-throw any caught errors; even if the circuit has already been broken. If you want to retry requests after the designated reset period for an open circuit, you are free to implement that behavior yourself, but by default, the Polly <kbd>spec</kbd> doesn't do so with its Circuit-breaker implementation. So in our example, we're going to break the circuit after only one failed attempt, and we'll still need to look for the appropriate error messages in <kbd>try</kbd>/<kbd>catch</kbd> from our calling code.</p>
+<p>With that in mind, let's update our previous example. The first thing we'll do is add a method to return the <span class="packt_screen">401</span> status code in <kbd>HttpResponseMessage</kbd> for our <kbd>Fallback</kbd> policy:</p>
+<pre>private static HttpResponseMessage GetAuthorizationErrorResponse() {<br/>    return new HttpResponseMessage(HttpStatusCode.Unauthorized);<br/>}</pre>
+<p>Then we'll set policies for each of our two alternative error states, and wrap them accordingly:</p>
+<pre>public static void ExecuteRemoteLookupWithPolly() {<br/>    Policy connFailurePolicy = Policy<br/>        .Handle&lt;WebException&gt;(x =&gt; connectionFailure.Contains(x.Status))<br/>        .RetryForever();<br/><br/>    Policy&lt;HttpResponseMessage&gt; authFailurePolicy = Policy&lt;HttpResponseMessage&gt;<br/>        .Handle&lt;WebException&gt;(x =&gt; securityFailure.Contains(x.Status))<br/>        .Fallback(() =&gt; GetAuthorizationErrorResponse());<br/><br/>    Policy nameResolutionPolicy = Policy<br/>        .Handle&lt;WebException&gt;(x =&gt; resourceAccessFailure.Contains(x.Status))<br/>        .CircuitBreaker(1, TimeSpan.FromMinutes(2));<br/><br/>    Policy intermediatePolicy = Policy<br/>        .Wrap(connFailurePolicy, nameResolutionPolicy);<br/><br/>    Policy&lt;HttpResponseMessage&gt; combinedPolicies = intermediatePolicy<br/>        .Wrap(authFailurePolicy);<br/><br/>    try {<br/>        HttpResponseMessage resp = combinedPolicies.Execute(() =&gt; ExecuteRemoteLookup());<br/>        if (resp.IsSuccessStatusCode) {<br/>            Console.WriteLine("Success!");<br/>        } else if (resp.StatusCode.Equals(HttpStatusCode.Unauthorized)) {<br/>            Console.WriteLine("We have fallen back!");<br/>        }<br/>    } catch (WebException ex) {<br/>        if (resourceAccessFailure.Contains(ex.Status)) {<br/>            Console.WriteLine("We should expect to see a broken circuit.");<br/>        }<br/>    }<br/>}</pre>
+<p>So, in our revised method, we define a policy for each possible scenario we want to respond to, including the specific state of the exception that should be handled and the recovery process we want to implement. Of note, though, are the two different calls to the <kbd>Policy.Wrap()</kbd> method. The reason for this is that using the <kbd>Fallback()</kbd> method on a strongly-typed instance of <kbd>Policy&lt;HttpResponseMessage&gt;</kbd> is the only way we can designate the type of the return object from the delegate method we passed into <kbd>Fallback()</kbd>. However, by strongly typing the policy, we can't <kbd>Wrap()</kbd> it with the other weakly-typed policies in a single call. The <kbd>Wrap()</kbd> method of strongly-typed policies can take at most one argument. So the workaround for this is to first wrap all of the weakly-typed policies we've defined, and then use that wrapped <kbd>Policy</kbd> instance as the input to the <kbd>Wrap()</kbd> call on our strongly-typed <kbd>Policy</kbd>. This is confusing, initially, I realize, but will become clearer as you work with Polly, read their excellent documentation, and most importantly, implement these error-handling strategies in any networked software you write.</p>
+<p>To make our driver program a little simpler to use for test purposes (instead of having to run the program by hand two dozen times to see all possible outcomes), we'll update that as well. Let's have a look at the following code:  </p>
+<pre>public static void Main(string[] args) {<br/>    for (var i = 0; i &lt; 24; i++) {<br/>        Console.WriteLine($"Polly Demo Attempt {i}");<br/>        Console.WriteLine("-------------");<br/>        PollyDemo.ExecuteRemoteLookupWithPolly();<br/>        Console.WriteLine("-------------");<br/>        Thread.Sleep(5000);<br/>    }<br/>}</pre>
+<p>Run that program once (maybe twice, since randomness is random, after all) and you should see the appropriate log statements for each of our possible scenarios. I'm counting on you to understand the nature of the flow of control through our program to understand why the results onscreen demonstrate the promised functionality of the <kbd>Policy</kbd> objects we defined.</p>
+<p>As we move forward and look at specific implementations of different network protocols, we'll be leaning heavily on Polly to define our recovery strategies. There's a lot of depth to the library, and you'll get out of it whatever you choose to put in to learning it. With this foundation, though, you'll be well equipped to move forward through the rest of this book.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Summary</h1>
+                </header>
+            
+            <article>
+                
+<p>In this chapter, we took a close look at how the .NET Core <kbd>WebException</kbd> class provides engineers with a stable, reliable, and informative interface for understanding network errors as they arise. We looked at where and when we should expect and account for network exceptions, and how we could inspect the <kbd>Status</kbd> property of those exceptions to determine their root cause. We also considered our responsibility in providing meaningful exception messaging, as well as the value of providing as specific a status code as possible for any consumers of our software. Finally, we looked at some common strategies, and an extremely useful library in the form of Polly, for consistently recovering from network exceptions to maximize our application's up time and increase our consumers' trust in our software. It will be important to keep these ideas of resilience and optimization in mind going forward.</p>
+<p>In our next chapter, we'll be stepping into the world of low-level data transmission and host-to-host communication.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Questions</h1>
+                </header>
+            
+            <article>
+                
+<ol>
+<li>What is one thing we should always assume about external dependencies?</li>
+<li>What are the two categories of error status codes in HTTP?</li>
+<li>Which property of the <kbd>WebException</kbd> class can we use to determine the nature of the exception we received?</li>
+<li>What does Polly's fallback policy provide for an exception state?</li>
+<li>How does a Circuit-breaker policy specification differ from a <kbd>retry</kbd> policy specification?</li>
+<li>Write a sample method that combines <kbd>fallback</kbd> and <kbd>retry</kbd> policies based on the <kbd>StatusCode</kbd> of the response from a sample request.</li>
+<li>In which circumstances would you not want to retry a web request after an initial failure?</li>
+</ol>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Further reading</h1>
+                </header>
+            
+            <article>
+                
+<p>For more information about specific error-handling strategies with various network software architectures, check out the book <em>Learning ASP.NET Core 2.0</em>, by <em>Jason De Oliveira</em> and <em>Michel Bruche</em><em>t</em>. This will provide more in-depth guidance on error handling in ASP.NET Core-based HTTP application scenarios. The book is available electronically or in print, here: <a href="https://www.packtpub.com/application-development/learning-aspnet-core-20">https://www.packtpub.com/application-development/learning-aspnet-core-20.</a></p>
+<p>Alternatively, I would once again recommend <em>C# 7 and .NET: Designing Modern Cross-platform Applications,</em> by<em> </em><em>Mark J. Price</em> and <em>Ovais Mehboob Ahmed Khan</em>. The content on exception handling is useful and well focused for many common use cases. Once again, the link to purchase as an e-book or printed copy is here: <a href="https://www.packtpub.com/application-development/learning-path-c-7-and-net-designing-modern-cross-platform-applications">https://www.packtpub.com/application-development/learning-path-c-7-and-net-designing-modern-cross-platform-applications.</a></p>
+
+
+            </article>
+
+            
+        </section>
+    </body></html>

@@ -1,0 +1,268 @@
+<html><head></head><body>
+		<div id="_idContainer201">
+			<h1 id="_idParaDest-274"><em class="italic"><a id="_idTextAnchor280"/>Chapter 16</em>: Asynchronous Programming</h1>
+			<p>In this chapter, you will learn about the <strong class="bold">Task-based Asynchronous Pattern</strong> (<strong class="bold">TAP</strong>). You will learn how to program tasks asynchronously and how to access web resources using <strong class="source-inline">async</strong>, <strong class="source-inline">await</strong>, and <strong class="source-inline">WhenAll</strong>. You will also learn about different return types and extract the required results. Plus, you will learn how to correctly cancel asynchronous operations and perform asynchronous file reading and writing.</p>
+			<p>In this chapter, we will be covering the following topics:</p>
+			<ul>
+				<li><strong class="bold">Understanding the TAP model</strong>: In this section, we provide a high-level overview of the TAP model.</li>
+				<li><strong class="bold">Using async, await, and Task</strong>: In this section, we will benchmark the performance of a method run synchronously (using <strong class="source-inline">Task.Run</strong>) and asynchronously.</li>
+				<li><strong class="bold">Benchmarking GetAwaiter.GetResult(), .Result, and .Wait for both Task and ValueTask</strong>: In this section, we benchmark the performance of an asynchronous operation using <strong class="source-inline">GetAwaiter.GetResult()</strong>, <strong class="source-inline">.Result</strong>, and <strong class="source-inline">.Wait</strong> for both <strong class="source-inline">Task</strong> and <strong class="source-inline">ValueTask</strong>.</li>
+				<li><strong class="bold">Canceling asynchronous operations</strong>: In this section, we write code that demonstrates asynchronous task cancellation.</li>
+				<li><strong class="bold">Writing files asynchronously</strong>: In this section, we write text to a file asynchronously.</li>
+				<li><strong class="bold">Reading files asynchronously</strong>: In this section, we read text from a file asynchronously.</li>
+			</ul>
+			<p>After completing this chapter, you will be skilled in the following areas:</p>
+			<ul>
+				<li>Understanding the TAP model</li>
+				<li>Processing web resources asynchronously</li>
+				<li>Writing files asynchronously</li>
+				<li>Reading files asynchronously</li>
+			</ul>
+			<h1 id="_idParaDest-275"><a id="_idTextAnchor281"/>Technical requirements</h1>
+			<p>You'll need Visual Studio to work on the code presented in this chapter.</p>
+			<p>All code from this chapter is placed on GitHub at <a href="https://github.com/PacktPublishing/High-Performance-Programming-in-CSharp-and-.NET/tree/master/CH16">https://github.com/PacktPublishing/High-Performance-Programming-in-CSharp-and-.NET/tree/master/CH16</a>.</p>
+			<h1 id="_idParaDest-276"><a id="_idTextAnchor282"/>Understanding the TAP model</h1>
+			<p>Before we begin, it is<a id="_idIndexMarker1496"/> worth noting that there are three different models for dealing with asynchronous programming. These are as follows:</p>
+			<ul>
+				<li>The <strong class="bold">Asynchronous Programming Model</strong> (<strong class="bold">APM</strong>)</li>
+				<li>The <strong class="bold">Event-Based Asynchronous Pattern</strong> (<strong class="bold">EAP</strong>) model</li>
+				<li>The <strong class="bold">Task Parallelism Library</strong> (<strong class="bold">TPL</strong>)</li>
+			</ul>
+			<p>APM uses <strong class="source-inline">BeginMethod</strong> to start the asynchronous process and <strong class="source-inline">EndMethod</strong> to complete the asynchronous process. EAP uses <strong class="source-inline">MethodAsync</strong> to start an asynchronous process, <strong class="source-inline">CancelAsync</strong> to handle the cancellation of an asynchronous operation, and a completed event handler to handle the completed asynchronous operation. Both these ways of performing asynchronous operations were replaced by TPL in C# 4.5.</p>
+			<p>TPL uses the <strong class="source-inline">async</strong> and <strong class="source-inline">await</strong> pattern. Asynchronous method names are suffixed with <strong class="source-inline">async</strong>. An asynchronous method usually returns an awaitable <strong class="source-inline">Task</strong> or <strong class="source-inline">Task&lt;Result&gt;</strong>. From .NET 4.5 onwards, you are advised to use TPL instead of using APM and EAP.</p>
+			<p>TAP's foundation types are the <strong class="source-inline">System.Thread.Tasks</strong> namespace, and the <strong class="source-inline">Task</strong> and <strong class="source-inline">Task&lt;Tresult&gt;</strong> classes via asynchronous operations. Microsoft advises that you should use TAP when starting new projects.</p>
+			<h2 id="_idParaDest-277"><a id="_idTextAnchor283"/>Naming, parameters, and return types</h2>
+			<p>An asynchronous method <a id="_idIndexMarker1497"/>using the TAP model prefixes the method signature with <strong class="source-inline">async Task</strong> for void methods, or <strong class="source-inline">async Task&lt;Tresult&gt;</strong>, <strong class="source-inline">async ValueTask</strong>, or <strong class="source-inline">async ValueTask&lt;Tresult&gt;</strong> for methods that return a value. The name of an asynchronous method that does not return a value should begin with a verb such as <strong class="source-inline">Begin</strong> or <strong class="source-inline">Process</strong>.</p>
+			<p>TAP method parameters should match <a id="_idIndexMarker1498"/>and be in the same order as the parameters of synchronous counterpart methods. You should avoid entirely using <strong class="source-inline">out</strong> and <strong class="source-inline">ref</strong> parameters that are exempt from this rule. If you need to return data, use <strong class="source-inline">Tresult</strong> returned by <strong class="source-inline">Task&lt;Tresult&gt;</strong>. Use data structures to accommodate multiple return<a id="_idIndexMarker1499"/> types. It is also worth considering adding cancellation tokens to TAP methods as parameters even if synchronous method counterparts don't have such tokens.</p>
+			<p>Combinator methods that work with multiple tasks where the intent is clear do not have to follow this naming pattern. <strong class="source-inline">WhenAll</strong> and <strong class="source-inline">WhenAny</strong> are examples of combinator methods.</p>
+			<h2 id="_idParaDest-278"><a id="_idTextAnchor284"/>Initiating asynchronous operations</h2>
+			<p>You may wish to perform <a id="_idIndexMarker1500"/>some synchronous tasks, such as validation and preparing the asynchronous operation for execution, at the start of an asynchronous method. If so, you are advised to keep these tasks to the minimum, and the time they take should be minimal. The reason is that such methods may be invoked from <strong class="bold">User Interface</strong> (<strong class="bold">UI</strong>) threads, and you don't want to cause your applications to hang or freeze momentarily.</p>
+			<p>Another reason for keeping synchronous operations to the minimum and for spending minimal time within asynchronous operations is that when you run concurrent asynchronous methods, long-running synchronous operations can and do decrease the benefits of concurrency.</p>
+			<p>Sometimes, it can take longer to prepare and launch an asynchronous operation than it can take to complete the same operation synchronously. In these situations, you can run the method synchronously and return a task.</p>
+			<h2 id="_idParaDest-279"><a id="_idTextAnchor285"/>Exceptions</h2>
+			<p>Usage errors, such as passing <strong class="source-inline">null</strong> arguments, are the only errors that should be raised in asynchronous methods. You can prevent asynchronous methods from raising usage errors by modifying the calling code to ensure that erroneous arguments are not passed into the asynchronous <a id="_idIndexMarker1501"/>methods. All other types of exceptions and errors should be assigned to the task being returned. Normally, one exception is returned by one task. But when there are multiple operations represented by a single task, multiple exceptions may be returned by a single task.</p>
+			<h2 id="_idParaDest-280"><a id="_idTextAnchor286"/>Optional cancellation</h2>
+			<p>Cancellation of asynchronous <a id="_idIndexMarker1502"/>method implementers and consumers is optional. An asynchronous method that can be canceled, exposes an overload method that accepts a <strong class="source-inline">CancellationToken</strong> that is named <strong class="source-inline">cancellationToken</strong> by convention.</p>
+			<p>Cancellation requests are monitored by the asynchronous operation. When a cancellation request is received, it may be honored. If cancellation results in unfinished work, a task in the <strong class="source-inline">Canceled</strong> state is returned with no available result and no exceptions.</p>
+			<p>The <strong class="source-inline">Canceled</strong> state is a completed task state, as are <strong class="source-inline">RanToCompletion</strong> and <strong class="source-inline">Faulted</strong>. When a task's state is either <strong class="source-inline">Canceled</strong>, <strong class="source-inline">RanToCompletion</strong>, or <strong class="source-inline">Faulted</strong>, the <strong class="source-inline">IsCompleted</strong> property returns <strong class="source-inline">true</strong>.</p>
+			<p>Continuations will continue to be scheduled and executed when a task is canceled unless the <strong class="source-inline">NotOnCancelled</strong> continuation option is specified. If this option is specified, then continuations will not be scheduled or executed when a task is canceled.</p>
+			<p>Asynchronous code waiting for canceled tasks via language features will continue to run but will receive an <strong class="source-inline">OperationCanceledException</strong> or one of its derivatives. And code that is blocked synchronously waiting on tasks through methods like <strong class="source-inline">Wait</strong> and <strong class="source-inline">WaitAll</strong> will continue to run with an exception.</p>
+			<p>TAP methods should return a <strong class="source-inline">Canceled</strong> task when a cancellation token has requested cancellation before the TAP method that accepts the token has been called. During the execution of an asynchronous operation, cancellation requests can be ignored. When returning a task, you will normally return the task with one of three states:</p>
+			<ul>
+				<li><strong class="source-inline">Canceled</strong>: The operation has ended as a result of a cancellation request.</li>
+				<li><strong class="source-inline">RanToCompletion</strong>: A cancellation was requested but the operation was completed and produced a result.</li>
+				<li><strong class="source-inline">Faulted</strong>: A cancellation was requested that resulted in the generation of an exception.</li>
+			</ul>
+			<p>If you are coding an asynchronous method and want to enable the operation to be canceled first and foremost, then there is no need to produce an overload method devoid of a <strong class="source-inline">CancellationToken</strong>. If you are coding an asynchronous method that cannot be canceled, then you do not have to provide an overload method that accepts a <strong class="source-inline">CancellationToken</strong>. These<a id="_idIndexMarker1503"/> guidelines help the caller to know whether or not the target method can be canceled. When a method that accepts a <strong class="source-inline">CancellationToken</strong> is called by a consumer that has no desire to cancel the method call, <strong class="source-inline">None</strong> can be passed in for the <strong class="source-inline">CancellationToken</strong> argument, as this is functionally equivalent to the default <strong class="source-inline">CancellationToken</strong>.</p>
+			<h2 id="_idParaDest-281"><a id="_idTextAnchor287"/>Optional Progress Reporting</h2>
+			<p>When asynchronous operations are <a id="_idIndexMarker1504"/>running as part of a UI procedure, it can be beneficial to provide progress updates. This helps the end user to know that the program is still working.</p>
+			<p>The <strong class="source-inline">IProgress&lt;T&gt;</strong> interface is used to handle progress and is passed into an asynchronous method as a parameter that is conventionally called <strong class="source-inline">progress</strong>. Passing this interface into an asynchronous method can help prevent race conditions that can occur when event handlers are incorrectly registered once the operation has started, which can lead to missed updates. Another reason for passing in an interface is that consuming code can support various progress implementations. Only provide an <strong class="source-inline">IProgress&lt;T&gt;</strong> interface when progress notifications are supported by the TAP implementation.</p>
+			<p>An example that fits well with progress updates is the <strong class="source-inline">FindFilesAsync</strong> method, which returns a list of files meeting a particular search pattern. In this scenario, you could provide the percentage of work completed along with the current set of partial results. The information would be provided by some data type that is specific to your API. Such data types are conventionally suffixed with <strong class="source-inline">ProgressInfo</strong>.</p>
+			<p>TAP methods that provide a progress parameter should allow no progress reporting by allowing the progress parameter to be <strong class="source-inline">null</strong>. Progress should be reported to the <strong class="source-inline">Progress&lt;T&gt;</strong> object that implements the <strong class="source-inline">IProgress&lt;T&gt;</strong> interface synchronously. This enables the asynchronous method to quickly provide progress. Consumers can then determine how and where they want to handle the information provided by the progress update.</p>
+			<p>The <strong class="source-inline">ProgressChanged</strong> event is <a id="_idIndexMarker1505"/>exposed by instances of the <strong class="source-inline">Progress&lt;T&gt;</strong> class. This event is raised every time a progress update is reported by the asynchronous operation. When a <strong class="source-inline">Progress&lt;T&gt;</strong> object is instantiated, the <strong class="source-inline">ProgressChanged</strong> event is raised on the captured <strong class="source-inline">SynchronizationContext</strong> object. A default context that targets the thread pool is used when there is no synchronization context available.</p>
+			<p>You can either register handlers for this event as you would any other event, and you can also provide the <strong class="source-inline">Progress&lt;T&gt;</strong> constructor with a single handler, for convenience. The single handler behaves the same as an event handler for the <strong class="source-inline">ProgressChanged</strong> event. During the execution of event handlers, delays to asynchronous operations are avoided by raising progress updates asynchronously.</p>
+			<p>Now that we have a high-level understanding of the task-based asynchronous pattern, in the next section, we will look at <strong class="source-inline">async</strong>, <strong class="source-inline">await</strong>, and <strong class="source-inline">Task</strong>.</p>
+			<h1 id="_idParaDest-282"><a id="_idTextAnchor288"/>async, await, and Task</h1>
+			<p>In this section, we will be looking at the performance differences between running methods<a id="_idIndexMarker1506"/> synchronously, using <strong class="source-inline">Task.Run</strong>, and asynchronously. An asynchronous method is identified by the <strong class="source-inline">async</strong> keyword.</p>
+			<p>The <strong class="source-inline">await</strong> keyword informs<a id="_idIndexMarker1507"/> the runtime to wait at the specified line until the current task has been completed. It can only be used with a method that is prefixed <a id="_idIndexMarker1508"/>with the <strong class="source-inline">async</strong> keyword.</p>
+			<p>The <strong class="bold">Task Parallel Library </strong>(<strong class="bold">TPL</strong>) can<a id="_idIndexMarker1509"/> be found in the <strong class="source-inline">System.Threading.Tasks</strong> namespace. A task encapsulates threading in order to maximize the use of multiple cores on computer hardware.</p>
+			<p>Let's write a simple project to benchmark three different ways of calling a method. We will call the method synchronously using <strong class="source-inline">Task.Run</strong>, and asynchronously using <strong class="source-inline">async/await</strong>. We will be using <strong class="source-inline">BenchmarkDotNet</strong> to see how each method call type performs. We aim to show the performance advantage of using asynchronous calls over synchronous<a id="_idIndexMarker1510"/> and <strong class="source-inline">Task.Run</strong> calls.</p>
+			<p>We perform the following <a id="_idIndexMarker1511"/>steps to write our little program:</p>
+			<ol>
+				<li>Start a new .NET 6.0 console application and call it <strong class="source-inline">CH16_AsynchronousProgramming</strong>.</li>
+				<li>Add the <strong class="source-inline">BenchmarkDotNet</strong> NuGet package.</li>
+				<li>Add a new class called <strong class="source-inline">Benchmarks</strong>, and in that class add the following method:<p class="source-code">public static void LengthyTask()</p><p class="source-code">{</p><p class="source-code">     int y = 0;</p><p class="source-code">     for (int x = 0; x &lt; 10; x++)</p><p class="source-code">          y++;</p><p class="source-code">}</p></li>
+			</ol>
+			<p>This method is our worker method. All it does is increment the <strong class="source-inline">y</strong> variable by one for ten iterations.</p>
+			<ol>
+				<li value="4">Add the <strong class="source-inline">SynchronousMethod</strong> to the class:<p class="source-code">[Benchmark]</p><p class="source-code">public void SychronousMethod()</p><p class="source-code">{</p><p class="source-code">      LengthyTask();</p><p class="source-code">}</p></li>
+			</ol>
+			<p>This method calls the <strong class="source-inline">LengthyTask</strong> method synchronously and is a benchmark.</p>
+			<ol>
+				<li value="5">Add the <strong class="source-inline">TaskMethod</strong> to the class:<p class="source-code">[Benchmark]</p><p class="source-code">public void TaskMethod()</p><p class="source-code">{</p><p class="source-code">     Task.Run(new Action(LengthyTask));</p><p class="source-code">}</p></li>
+			</ol>
+			<p>This method runs the <strong class="source-inline">LengthyTask</strong> method as a new <strong class="source-inline">Action</strong>, which is queued to run on the <strong class="source-inline">ThreadPool</strong>. A <strong class="source-inline">Task</strong> or <strong class="source-inline">Task&lt;Tresult&gt;</strong> handle is returned for<a id="_idIndexMarker1512"/> that method.</p>
+			<ol>
+				<li value="6">Add the <strong class="source-inline">AsynchronousTaskMethod</strong> to the class:<p class="source-code">[Benchmark]</p><p class="source-code">public void AsynchronousTaskMethod()</p><p class="source-code">{</p><p class="source-code">     var data = async () =&gt; await Task.Run(new   </p><p class="source-code">         Action(LengthyTask));</p><p class="source-code">}</p></li>
+			</ol>
+			<p>This method runs the <strong class="source-inline">LengthyTask</strong> method as an action using <strong class="source-inline">Task.Run</strong> asynchronously, and await the completion of the method before it continues.</p>
+			<ol>
+				<li value="7">Our <a id="_idIndexMarker1513"/>benchmark class is now complete. So, in the <strong class="source-inline">Program.cs</strong> file, replace the code with the following:<p class="source-code">using BenchmarkDotNet.Running;</p><p class="source-code">using CH16_AsynchronousProgramming;</p><p class="source-code">Console.WriteLine("CH16 - Asynchronous Programming");</p><p class="source-code">var summary = BenchmarkRunner.Run&lt;Benchmarks&gt;();</p><p class="source-code">Console.ReadLine();</p></li>
+			</ol>
+			<p>This code will run our benchmarks and produce a report for us.</p>
+			<ol>
+				<li value="8">Make sure that the <a id="_idIndexMarker1514"/>project is set to <strong class="source-inline">Release</strong> build.</li>
+				<li>Build the project.</li>
+				<li>Open a command window and execute the compiled executable file called <strong class="source-inline">CH16_AsynchronousProgramming.exe</strong> in the <strong class="source-inline">bin\Release\net6.0</strong> folder.</li>
+				<li>The benchmarks should start running, and once complete, you should see a report like the<a id="_idIndexMarker1515"/> one shown in <em class="italic">Figure 16.1</em>:</li>
+			</ol>
+			<div>
+				<div id="_idContainer197" class="IMG---Figure">
+					<img src="image/B16617_Figure_16.1.jpg" alt="Figure 16.1 – The BenchmarkDotNet report for our CH16_AsynchronusProgramming Project&#13;&#10;"/>
+				</div>
+			</div>
+			<p class="figure-caption">Figure 16.1 – The BenchmarkDotNet report for our CH16_AsynchronusProgramming Project</p>
+			<p>As you can see in <em class="italic">Figure 16.1</em>, running the <strong class="source-inline">LengthyTask</strong> method synchronously took <strong class="source-inline">7.3220 ns</strong> to complete. Using <strong class="source-inline">Task.Run</strong> took the longest time to run at <strong class="source-inline">112.4494 ns</strong>. And the<a id="_idIndexMarker1516"/> fastest way to run the code was asynchronously, which only took <strong class="source-inline">0.9982ns</strong> to complete.</p>
+			<p>We can clearly see from<a id="_idIndexMarker1517"/> those times that there is a clear performance benefit to running our code asynchronously, as it takes less overall time for our code to complete.</p>
+			<p>In the next section, we will compare the performance of <strong class="source-inline">await</strong> with <strong class="source-inline">GetAwaiter.GetResult()</strong>, <strong class="source-inline">.Result</strong>, and <strong class="source-inline">.Wait</strong>. We will cover both <strong class="source-inline">Task</strong> and <strong class="source-inline">ValueTask</strong>.</p>
+			<h1 id="_idParaDest-283"><a id="_idTextAnchor289"/>Benchmarking GetAwaiter.GetResult(), .Result, and .Wait for both Task and ValueTask</h1>
+			<p>In this section, we will be<a id="_idIndexMarker1518"/> writing some code to benchmark the <strong class="source-inline">GetAwaiter.GetResult()</strong>, <strong class="source-inline">.Result</strong>, and <strong class="source-inline">.Wait</strong> methods to <a id="_idIndexMarker1519"/>see which method is best for <a id="_idIndexMarker1520"/>obtaining the return value for both a <strong class="source-inline">Task</strong> and a <strong class="source-inline">ValueTask</strong>.</p>
+			<p>At <a href="https://github.com/dotnet/BenchmarkDotNet/issues/236">https://github.com/dotnet/BenchmarkDotNet/issues/236</a>, the <strong class="source-inline">BenchmarkDotNet</strong> maintainer called <em class="italic">adamsitnik</em> wrote in reply to <em class="italic">@i3arnon</em>:</p>
+			<p><em class="italic">"@i3arnon Thanks for the hint! I have measured</em> <strong class="source-inline">.Result</strong><em class="italic"> vs </em><strong class="source-inline">.Wait</strong><em class="italic"> vs</em> <strong class="source-inline">GetAwaiter.GetResult()</strong> <em class="italic">and it seems that for</em> <strong class="source-inline">Tasks</strong> <em class="italic">the </em><strong class="source-inline">GetAwaiter.GetResult()</strong> <em class="italic">is also the fastest way to go. On the other hand, for </em><strong class="source-inline">ValueTask</strong><em class="italic"> it was much more slower so I stayed with</em> <strong class="source-inline">.Result</strong><em class="italic"> for VT</em>."</p>
+			<p>And so, from the code that we will be writing, we should see that <strong class="source-inline">.Result</strong> should provide us with the best performance when working with a <strong class="source-inline">ValueTask</strong>. And <strong class="source-inline">GetAwaiter.GetResult()</strong> should give us the best performance when working with a <strong class="source-inline">Task</strong>.</p>
+			<p>We will now start writing our code. Please complete the following tasks in the <strong class="source-inline">CH16_AsynchronousProgramming</strong> project that we started in the previous section:</p>
+			<ol>
+				<li value="1">Open the <strong class="source-inline">CH16_AsynchronousProgramming</strong> project.</li>
+				<li>Open the <strong class="source-inline">Benchmarks</strong> class.</li>
+				<li>Add the following<a id="_idIndexMarker1521"/> method that returns an <strong class="source-inline">int</strong>:<p class="source-code">public static int LengthyTaskReturnsInt()</p><p class="source-code">{</p><p class="source-code">     int y = 0;</p><p class="source-code">     for (int x = 0; x &lt; 10; x++)</p><p class="source-code">         y++;</p><p class="source-code">      return y;</p><p class="source-code">}</p></li>
+			</ol>
+			<p>In this code, we<a id="_idIndexMarker1522"/> are incrementing the <strong class="source-inline">y</strong> variable and returning<a id="_idIndexMarker1523"/> the result.</p>
+			<ol>
+				<li value="4">Add the <strong class="source-inline">GetAwaiterGetResult</strong> method:<p class="source-code">[Benchmark]</p><p class="source-code">public void GetAwaiterGetResult()</p><p class="source-code">{</p><p class="source-code">     int value = Task.Run(() =&gt; </p><p class="source-code">         LengthyTaskReturnsInt()).GetAwaiter()</p><p class="source-code">           .GetResult();</p><p class="source-code">}</p></li>
+			</ol>
+			<p>This method benchmarks the time taken to return an <strong class="source-inline">int</strong> from a method using <strong class="source-inline">GetAwaiter().GetResult()</strong>.</p>
+			<ol>
+				<li value="5">Add the <strong class="source-inline">Result</strong> method:<p class="source-code">[Benchmark]</p><p class="source-code">public async Task Result()</p><p class="source-code">{</p><p class="source-code">     int value = await Task.Run(() =&gt; </p><p class="source-code">       LengthyTaskReturnsInt()).ConfigureAwait(false);</p><p class="source-code">}</p></li>
+			</ol>
+			<p>This method <a id="_idIndexMarker1524"/>benchmarks the time taken<a id="_idIndexMarker1525"/> to await the return of <strong class="source-inline">int</strong> from a method.</p>
+			<ol>
+				<li value="6">Add the <strong class="source-inline">Wait</strong> method:<p class="source-code">[Benchmark]</p><p class="source-code">public void Wait()</p><p class="source-code">{</p><p class="source-code">     Task.Run(() =&gt; LengthyTask()).Wait();</p><p class="source-code">}</p></li>
+			</ol>
+			<p>This method runs a lengthy <a id="_idIndexMarker1526"/>task and waits for it to finish before continuing.</p>
+			<ol>
+				<li value="7">Add the <strong class="source-inline">GetAwaiter</strong> method:<p class="source-code">[Benchmark]</p><p class="source-code">public void GetAwaiter()</p><p class="source-code">{</p><p class="source-code">         Task.Run(() =&gt; LengthyTask()).GetAwaiter();</p><p class="source-code">}</p></li>
+			</ol>
+			<p>This method gets an awaiter used to await the task completion.</p>
+			<ol>
+				<li value="8">Build the project and<a id="_idIndexMarker1527"/> run the executable via the command line. You should see a summary report<a id="_idIndexMarker1528"/> like the one shown in <em class="italic">Figure 16.2</em>:</li>
+			</ol>
+			<div>
+				<div id="_idContainer198" class="IMG---Figure">
+					<img src="image/B16617_Figure_16.2.jpg" alt="Figure 16.2 – The BenchmarkDotNet summary report for this section's methods&#13;&#10;"/>
+				</div>
+			</div>
+			<p class="figure-caption">Figure 16.2 – The BenchmarkDotNet summary report for this section's methods</p>
+			<p>As we can see from these results, when<a id="_idIndexMarker1529"/> returning a value from a <strong class="source-inline">Task</strong>, the <strong class="source-inline">GetAwaiterGetResult</strong> method operates much faster than the <strong class="source-inline">Result</strong> method. And when executing a long-running <strong class="source-inline">Task</strong>, the <strong class="source-inline">GetAwaiter</strong> method operates much more quickly than the <strong class="source-inline">Wait</strong> method.</p>
+			<p>In the next section, we will look at how we can speed up our code asynchronously when awaiting multiple tasks by using <strong class="source-inline">WhenAll</strong>.</p>
+			<h1 id="_idParaDest-284"><a id="_idTextAnchor290"/>Using async, await, and WhenAll</h1>
+			<p>In this section, we will write some<a id="_idIndexMarker1530"/> example code that demonstrates the use of <strong class="source-inline">async</strong>, <strong class="source-inline">await</strong>, and <strong class="source-inline">WhenAll</strong> and the effect on execution time. </p>
+			<p>If you have multiple tasks that are being <a id="_idIndexMarker1531"/>executed in a method and you <strong class="source-inline">await</strong> each task, your code will work asynchronously, and the execution time will be expensive. You can circumvent this time expense with improved performance by using <strong class="source-inline">WhenAll</strong> to <strong class="source-inline">await</strong> all completed tasks before continuing. In the code we will be writing, you will see how <strong class="source-inline">WhenAll</strong> reduces<a id="_idIndexMarker1532"/> the time taken to execute two asynchronous methods within a function when compared to awaiting each task in turn.</p>
+			<p>Let's work our way through the following tasks:</p>
+			<ol>
+				<li value="1">In the <strong class="source-inline">Benchmarks</strong> class still, add the following asynchronous method, which waits <strong class="source-inline">300</strong> milliseconds before returning an <strong class="source-inline">int</strong>:<p class="source-code">private async Task&lt;int&gt; TaskOne()</p><p class="source-code">{</p><p class="source-code">     await Task.Delay(300);</p><p class="source-code">     return 100;</p><p class="source-code">}</p></li>
+			</ol>
+			<p>The <strong class="source-inline">TaskOne</strong> method is the first of our methods that will be run by our benchmarks.</p>
+			<ol>
+				<li value="2">Add the second of our asynchronous methods:<p class="source-code">private async Task&lt;string&gt; TaskTwo()</p><p class="source-code">{</p><p class="source-code">     await Task.Delay(300);</p><p class="source-code">     return "TaskTwo";</p><p class="source-code">}</p></li>
+			</ol>
+			<p>The <strong class="source-inline">TaskTwo</strong> method waits for <strong class="source-inline">300</strong> milliseconds and then returns a <strong class="source-inline">string</strong>.</p>
+			<ol>
+				<li value="3">Firstly, we will benchmark running asynchronous tasks synchronously:<p class="source-code">[Benchmark]</p><p class="source-code">public async Task SynchronousAwait()</p><p class="source-code">{</p><p class="source-code">     int intValue = await TaskOne();</p><p class="source-code">     string stringValue = await TaskTwo(); </p><p class="source-code">} </p></li>
+			</ol>
+			<p>Here, we have two<a id="_idIndexMarker1533"/> tasks and we <strong class="source-inline">await</strong> them both to complete before <a id="_idIndexMarker1534"/>continuing.</p>
+			<ol>
+				<li value="4">Now, we'll add our <a id="_idIndexMarker1535"/>method that will utilize <strong class="source-inline">WhenAll</strong>:<p class="source-code">[Benchmark]</p><p class="source-code">public async Task AsynchynchronousWhenAll()</p><p class="source-code">{</p><p class="source-code">     var taskOne = TaskOne();</p><p class="source-code">     var taskTwo = TaskTwo();</p><p class="source-code">     await Task.WhenAll(taskOne, taskTwo);</p><p class="source-code">}</p></li>
+			</ol>
+			<p>In this method, we create our two tasks, then we pass them into the <strong class="source-inline">WhenAll</strong> method as parameters. We do not continue until all tasks are complete.</p>
+			<ol>
+				<li value="5">Build and run your executable via the command line. You should see something like <em class="italic">Figure 16.3</em>:</li>
+			</ol>
+			<div>
+				<div id="_idContainer199" class="IMG---Figure">
+					<img src="image/B16617_Figure_16.3.jpg" alt="Figure 16.3 – The results of synchronous and asynchronous execution of multiple asynchronous calls&#13;&#10;"/>
+				</div>
+			</div>
+			<p class="figure-caption">Figure 16.3 – The results of synchronous and asynchronous execution of multiple asynchronous calls</p>
+			<p>As you can see from<a id="_idIndexMarker1536"/> the results of our benchmarking, using <strong class="source-inline">WhenAll</strong> executes<a id="_idIndexMarker1537"/> multiple asynchronous tasks <a id="_idIndexMarker1538"/>much faster than when you await them in turn. In the next section, we will look at canceling asynchronous tasks.</p>
+			<h1 id="_idParaDest-285"><a id="_idTextAnchor291"/>Canceling asynchronous operations</h1>
+			<p>In this section, we will look at how we <a id="_idIndexMarker1539"/>can cancel long-running asynchronous operations. Sometimes a task will take longer than it should do. A good example of this is fetching data from a website when it goes down. Asynchronous operations can take a long time before they are reset by the server due to something like <strong class="source-inline">Error 404</strong>, <strong class="source-inline">Error 401</strong>, or <strong class="source-inline">Error 500</strong> for example. And so, it pays to have the ability to cancel an asynchronous operation after a set period to prevent wasting an end user's time.</p>
+			<p>The code we will write will return the text from a website URL. We will assign a very short timeout. This timeout will cancel the task that is responsible for returning the website text. Follow these steps:</p>
+			<ol>
+				<li value="1">Open the <strong class="source-inline">CH16_AsynchronousProgramming</strong> project, and add a new class called <strong class="source-inline">TaskCancellation</strong>.</li>
+				<li>Add the <strong class="source-inline">using System.Text;</strong> statement.</li>
+				<li>Add the following two member variables:<p class="source-code">private const string _website = </p><p class="source-code">    "https://docs.microsoft.com";</p><p class="source-code">private static readonly CancellationTokenSource </p><p class="source-code">    _cancellationTokenSource = new();</p></li>
+			</ol>
+			<p>The <strong class="source-inline">_website</strong> variable holds the URL of the website whose page text we will be returning. And the <strong class="source-inline">CancellationTokenSource</strong> will be used to signal to a <strong class="source-inline">CancellationToken</strong> that it should be cancelled.</p>
+			<ol>
+				<li value="4">Add the following<a id="_idIndexMarker1540"/> method:<p class="source-code">private static readonly HttpClient HttpClient = new()</p><p class="source-code">{</p><p class="source-code">     MaxResponseContentBufferSize = 1000000</p><p class="source-code">};</p></li>
+			</ol>
+			<p>Here, we declare a method that returns a <strong class="source-inline">HttpClient</strong> for our HTTP request. The <strong class="source-inline">MaxResponseContentBufferSize</strong> sets the number of bytes to buffer when reading the response content.</p>
+			<ol>
+				<li value="5">Now add the <strong class="source-inline">ReturnWebsiteTextAsync</strong> method:<p class="source-code">private static async Task&lt;string&gt; </p><p class="source-code">    ReturnWebsiteTextAsync()</p><p class="source-code">{</p><p class="source-code">     HttpResponseMessage response = await HttpClient</p><p class="source-code">             .GetAsync(</p><p class="source-code">             _website, </p><p class="source-code">             _cancellationTokenSource.Token)</p><p class="source-code">           .ConfigureAwait(false);</p><p class="source-code">     byte[] contentAsByteArray = await response</p><p class="source-code">         .Content</p><p class="source-code">         .ReadAsByteArrayAsync(</p><p class="source-code">             _cancellationTokenSource.Token)</p><p class="source-code">           .ConfigureAwait(false);</p><p class="source-code">     return Encoding.ASCII.GetString(</p><p class="source-code">         contentAsByteArray</p><p class="source-code">     );</p><p class="source-code">}</p></li>
+			</ol>
+			<p>In this method, we declare <strong class="source-inline">HttpResponseMessage</strong>, which awaits an asynchronous task that returns the contents of a web page. The response is then read and<a id="_idIndexMarker1541"/> converted into a byte array. This byte array is then transformed into an ASCII string and returned.</p>
+			<ol>
+				<li value="6">Now add the <strong class="source-inline">Start</strong> method:<p class="source-code">public static async Task Start()</p><p class="source-code">{</p><p class="source-code">     Console.WriteLine("Task started.");</p><p class="source-code">     try {</p><p class="source-code">         _cancellationTokenSource.CancelAfter(3000);</p><p class="source-code">           await ReturnWebsiteTextAsync()</p><p class="source-code">             .ConfigureAwait(false);</p><p class="source-code">     }</p><p class="source-code">     catch (OperationCanceledException) {</p><p class="source-code">       Console.WriteLine(</p><p class="source-code">       "\nThe task has timed out and been cancelled.</p><p class="source-code">         \n");</p><p class="source-code">     }</p><p class="source-code">     finally {</p><p class="source-code">         _cancellationTokenSource.Dispose();</p><p class="source-code">     }</p><p class="source-code">     Console.WriteLine("Task completed.");</p><p class="source-code">}</p></li>
+			</ol>
+			<p>In the <strong class="source-inline">Start</strong> method, we write<a id="_idIndexMarker1542"/> a console message that states the task has started. We then set the cancellation time of <strong class="source-inline">cancellationTokenSource</strong> to 30 seconds, which is 3000 milliseconds. Then we <strong class="source-inline">await</strong> the call to the <strong class="source-inline">ReturnWebsiteTextAsync</strong>. If the process times out after the set timeout period, an <strong class="source-inline">OperationCanceledException</strong> is raised, which outputs a message to the console. Finally, <strong class="source-inline">cancellationTokenSource</strong> is disposed of and a console message is an output stating that the task is finished.</p>
+			<ol>
+				<li value="7">Comment out the benchmark running code in the <strong class="source-inline">Program.cs</strong> file, and add the following line:<p class="source-code">TaskCancellation.Start().GetAwaiter();</p></li>
+				<li>Run the project and try it several times with different timeout periods to test the code completing successfully and returning text, and to test the operation timing out and raising an exception.</li>
+			</ol>
+			<p>Running this code through a couple of times with timeouts of <strong class="source-inline">3000</strong> and <strong class="source-inline">30000</strong> will present an operation timeout exception and display the web page text, respectively. As you can see if you run the code yourself, it is very easy to write asynchronous tasks that are canceled after a set period.</p>
+			<p>In the next section, we will be writing code that shows how to write files asynchronously.</p>
+			<h1 id="_idParaDest-286"><a id="_idTextAnchor292"/>Writing files asynchronously</h1>
+			<p>In this section, we will write<a id="_idIndexMarker1543"/> text to a file asynchronously. Scenarios where asynchronous file writing can be useful include writing large volumes of text and data to files that will not be read immediately.</p>
+			<p>Use the following steps to write our code:</p>
+			<ol>
+				<li value="1">On your <strong class="source-inline">C:\</strong> drive, add a folder called <strong class="source-inline">Temp</strong> if one does not already exist.</li>
+				<li>Open the <strong class="source-inline">CH16_AsynchronousProgramming</strong> project.</li>
+				<li>Add a class called <strong class="source-inline">FileReadWriteAsync</strong>.</li>
+				<li>Add the following method:<p class="source-code">public static async Task WriteTextAsync()</p><p class="source-code">{</p><p class="source-code">string filePath = @"C:\Temp\Greetings.txt";</p><p class="source-code">string text = "Hello, World!";</p><p class="source-code">byte[] encodedText = </p><p class="source-code">     Encoding.Unicode.GetBytes(text);</p><p class="source-code">using (FileStream fileStream = new FileStream(</p><p class="source-code">                    filePath,</p><p class="source-code">                    FileMode.Append, </p><p class="source-code">                    FileAccess.Write, </p><p class="source-code">                    FileShare.None,</p><p class="source-code">                    bufferSize: 4096, </p><p class="source-code">                    useAsync: true</p><p class="source-code">                )</p><p class="source-code">            )</p><p class="source-code">{</p><p class="source-code">         await fileStream.WriteAsync(</p><p class="source-code">             encodedText, 0, encodedText.Length); </p><p class="source-code">};</p><p class="source-code">}</p></li>
+			</ol>
+			<p>In the <strong class="source-inline">WriteTextAsync</strong> method, we declare a file path for a text file and a variable that contains the text to be written to the file. The text to be written gets converted into a byte array. A writable asynchronous file stream is then opened in append mode. Then we write the text to the file stream and close it.</p>
+			<p>In the next section, we continue<a id="_idIndexMarker1544"/> in this class as we add our asynchronous read method that shows how to read a file asynchronously.</p>
+			<h1 id="_idParaDest-287"><a id="_idTextAnchor293"/>Reading files asynchronously</h1>
+			<p>In this section, we will read<a id="_idIndexMarker1545"/> text from a file asynchronously. We will be building upon the code from the previous section that writes the text to a file asynchronously.</p>
+			<p>The following steps will add our asynchronous read method and update the <strong class="source-inline">Program.cs</strong> file to run our asynchronous code:</p>
+			<ol>
+				<li value="1">In the <strong class="source-inline">FileReadWriteAsync</strong> class, add the following method:<p class="source-code">public static async Task&lt;string&gt; ReadTextAsync()</p><p class="source-code">{</p><p class="source-code">     string filePath = @"C:\Temp\Greetings.txt";</p><p class="source-code">     using (FileStream fileStream = new FileStream(</p><p class="source-code">             filePath,</p><p class="source-code">               FileMode.Open, </p><p class="source-code">               FileAccess.Read, </p><p class="source-code">               FileShare.Read,</p><p class="source-code">               bufferSize: 4096, </p><p class="source-code">               useAsync: true</p><p class="source-code">         )</p><p class="source-code">     )</p><p class="source-code">     {</p><p class="source-code">         StringBuilder sb = new StringBuilder();</p><p class="source-code">         byte[] buffer = new byte[0x1000];</p><p class="source-code">         int numRead;</p><p class="source-code">         while (( numRead = await fileStream</p><p class="source-code">           .ReadAsync(buffer, 0, buffer.Length)) != 0</p><p class="source-code">         )</p><p class="source-code">         {</p><p class="source-code">             string text = Encoding.Unicode</p><p class="source-code">                 .GetString(buffer, 0, numRead);</p><p class="source-code">             sb.Append(text);</p><p class="source-code">         }</p><p class="source-code">         return sb.ToString();</p><p class="source-code">     }</p><p class="source-code">}</p></li>
+			</ol>
+			<p>Here, we define the path <a id="_idIndexMarker1546"/>of the file that we need to read. Then we open a file stream in read mode with read access. Next, we define <strong class="source-inline">StringBuilder</strong> and byte array that will act as our buffer to store read data. We then read the stream until the read has been completed. During each iteration of the read, we read the text from the file, encode it into Unicode, and then append it to <strong class="source-inline">StringBuilder</strong>. Then, once the loop has finished and exits, we return the string from the method.</p>
+			<ol>
+				<li value="2">Open the <strong class="source-inline">Program.cs</strong> class.</li>
+				<li>Comment out the following lines:<p class="source-code">//var summary = BenchmarkRunner.Run&lt;Benchmarks&gt;();</p><p class="source-code">// TaskCancellation.Start().GetAwaiter();</p></li>
+			</ol>
+			<p>We won't be needing these lines when we run our code.</p>
+			<ol>
+				<li value="4">Add the following lines of code:<p class="source-code">FileReadWriteAsync.WriteTextAsync().GetAwaiter();</p><p class="source-code">string data = FileReadWriteAsync.ReadTextAsync()</p><p class="source-code">    .GetAwaiter().GetResult();</p><p class="source-code">Console.WriteLine(data);</p></li>
+			</ol>
+			<p>In this code, we call our<a id="_idIndexMarker1547"/> methods that write text to a file asynchronously, read the text asynchronously into a variable, and then print the contents of the variable to the console.</p>
+			<ol>
+				<li value="5">Run the code, and you should see something like <em class="italic">Figure 16.3</em>:</li>
+			</ol>
+			<div>
+				<div id="_idContainer200" class="IMG---Figure">
+					<img src="image/B16617_Figure_16.4.jpg" alt="Figure 16.4 – The result of our asynchronous write and read code&#13;&#10;"/>
+				</div>
+			</div>
+			<p class="figure-caption">Figure 16.4 – The result of our asynchronous write and read code</p>
+			<p>As you can see from the screenshot, we have successfully written text asynchronously to a file, asynchronously read it from that file, and printed the contents to the console window.</p>
+			<p>In the next section, we will summarize what we have learned in this chapter.</p>
+			<h1 id="_idParaDest-288"><a id="_idTextAnchor294"/>Summary</h1>
+			<p>In this chapter, we began with a high-level overview of the task-based asynchronous pattern. Things we covered were naming, parameters, return types, initializing asynchronous operations, exceptions, and optionally providing ways to report progress updates and cancel operations. We saw that we can have asynchronous operations that allow cancellation, and those that don't allow cancellation. Plus, we learned that when a cancellation has been requested, the cancellation will either go ahead or be ignored. Completed tasks can have a completed state of <strong class="source-inline">Canceled</strong>, <strong class="source-inline">RanToCompletion</strong>, or <strong class="source-inline">Faulted</strong>.</p>
+			<p>We then benchmarked three different ways of calling a method synchronously, using <strong class="source-inline">Task.Run</strong>, and asynchronously. Using <strong class="source-inline">Task.Run</strong> took the longest time, followed by running the method synchronously, and running the method asynchronously was by far the quickest way to run the method.</p>
+			<p>Then we benchmarked <strong class="source-inline">GetAwaiter.GetResult()</strong>, <strong class="source-inline">Result</strong>, and <strong class="source-inline">Wait</strong> for both <strong class="source-inline">Task</strong> and <strong class="source-inline">TaskValue</strong>. We saw that when returning a value from a <strong class="source-inline">Task</strong>, the <strong class="source-inline">GetAwaiterGetResult</strong> method operates much faster than the <strong class="source-inline">Result</strong> method. And when executing a long-running <strong class="source-inline">Task</strong>, the <strong class="source-inline">GetAwaiter</strong> method operates much more quickly than the <strong class="source-inline">Wait</strong> method.</p>
+			<p>Next, we looked at cancelling asynchronous operations. We coded an example that obtains the text from a website and outputs the text to the console. If the operation fails to complete within a set period of time, then it is cancelled.</p>
+			<p>In the final two sections, we wrote some code to demonstrate the writing and reading of text and data asynchronously.</p>
+			<p>To complete this chapter, there are some questions for you to answer to see how well you have retained what you have read and some further reading on asynchronous programming.</p>
+			<p>Thank you for purchasing this book. I hope you have enjoyed reading it, and that you have learned plenty of ways to improve your own code. Happy coding!</p>
+			<h1 id="_idParaDest-289"><a id="_idTextAnchor295"/>Questions</h1>
+			<ol>
+				<li value="1">What does TAP stand for?</li>
+				<li>What parameter type identifies that an asynchronous operation can be canceled?</li>
+				<li>What parameter type is passed into an asynchronous task to provide progress updates?</li>
+				<li>Explain <strong class="source-inline">async</strong>, <strong class="source-inline">await</strong>, and <strong class="source-inline">Task</strong>.</li>
+				<li>How do you cancel an asynchronous operation?</li>
+				<li>How do you report on an asynchronous operation's progress?</li>
+			</ol>
+			<h1 id="_idParaDest-290"><a id="_idTextAnchor296"/>Further reading</h1>
+			<ul>
+				<li>Asynchronous programming; APM vs EAP: <a href="https://stackoverflow.com/questions/11276314/asynchronous-programming-apm-vs-eap">https://stackoverflow.com/questions/11276314/asynchronous-programming-apm-vs-eap</a></li>
+				<li>Asynchronous programming: <a href="https://docs.microsoft.com/en-us/dotnet/csharp/async">https://docs.microsoft.com/en-us/dotnet/csharp/async</a></li>
+				<li>Introduction to async programming in C#: <a href="https://auth0.com/blog/introduction-to-async-programming-in-csharp/">https://auth0.com/blog/introduction-to-async-programming-in-csharp/</a></li>
+				<li>The performance characteristics of async methods in C#: <a href="https://devblogs.microsoft.com/premier-developer/the-performance-characteristics-of-async-methods/">https://devblogs.microsoft.com/premier-developer/the-performance-characteristics-of-async-methods/</a></li>
+				<li>Exception Handling (Task Parallel Library): <a href="https://docs.microsoft.com/en-us/dotnet/standard/parallel-programming/exception-handling-task-parallel-library">https://docs.microsoft.com/en-us/dotnet/standard/parallel-programming/exception-handling-task-parallel-library</a></li>
+			</ul>
+		</div>
+	</body></html>

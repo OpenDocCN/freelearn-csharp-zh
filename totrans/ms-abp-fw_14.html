@@ -1,0 +1,234 @@
+<html><head></head><body>
+		<div id="_idContainer080">
+			<h1 id="_idParaDest-236"><em class="italic"><a id="_idTextAnchor340"/>Chapter 11</em>: DDD – The Application Layer</h1>
+			<p>The previous chapter explained the domain-layer building blocks with details. The domain layer is used to implement the core, application-independent domain logic of the solution. However, we also need some applications to interact with that domain logic, such as a web or mobile application. The application layer is responsible for implementing the business logic of such applications without depending on the <strong class="bold">user interface</strong> (<strong class="bold">UI</strong>) technology used in the presentation layer. We keep the domain layer isolated from the presentation technology by encapsulating it with the application services.</p>
+			<p>In this chapter, we will learn how to design and implement the application services and <strong class="bold">data transfer objects</strong> (<strong class="bold">DTOs</strong>) with ABP Framework. We will also understand the differences between domain-layer and application-layer responsibilities.</p>
+			<p>This chapter covers the following topics:</p>
+			<ul>
+				<li>Implementing application services</li>
+				<li>Designing DTOs</li>
+				<li>Understanding the responsibilities of the layers</li>
+			</ul>
+			<h1 id="_idParaDest-237"><a id="_idTextAnchor341"/>Technical requirements</h1>
+			<p>You can clone or download the source code of the <em class="italic">EventHub</em> project from GitHub: <a href="https://github.com/volosoft/eventhub">https://github.com/volosoft/eventhub</a>.</p>
+			<p>If you want to run the solution in your local development environment, you need an <strong class="bold">integrated development environment</strong> (<strong class="bold">IDE</strong>)/editor (such as Visual Studio) to build and run ASP.NET Core solutions. Also, if you want to create ABP solutions, you need to have the ABP <strong class="bold">command-line interface</strong> (<strong class="bold">CLI</strong>) installed, as explained in <a href="B17287_02_Epub_AM.xhtml#_idTextAnchor026"><em class="italic">Chapter 2</em></a>, <em class="italic">Getting Started with ABP Framework</em>.</p>
+			<h1 id="_idParaDest-238"><a id="_idTextAnchor342"/>Implementing application services</h1>
+			<p>An application service<a id="_idIndexMarker713"/> is a stateless class used by the presentation layer to perform use cases of the application. It orchestrates the domain objects to achieve the business operation. Application services get and return DTOs instead of entities.</p>
+			<p>An application service method is considered a work unit (meaning all database operations—all succeed or all fail as a group, as covered in <a href="B17287_06_Epub_AM.xhtml#_idTextAnchor177"><em class="italic">Chapter 6</em></a>, <em class="italic">Working with the Data Access Infrastructure</em>), which ABP Framework <a id="_idIndexMarker714"/>automatically does. A typical flow of an application service method includes the<a id="_idIndexMarker715"/> following steps:</p>
+			<ol>
+				<li>Get the necessary aggregates from the repositories using the input parameters and the current context.</li>
+				<li>Implement the use case by coordinating the aggregates, domain services, and other domain objects, and delegating the work to them.</li>
+				<li>Update the changed aggregates in the database using the repositories.</li>
+				<li>Optionally, return a resulting DTO to the client (typically, to the presentation layer).<p class="callout-heading">About Updating Changed Objects</p><p class="callout">In fact, <em class="italic">Step 3</em> is not necessary if you <a id="_idIndexMarker716"/>use <strong class="bold">Entity Framework Core</strong> (<strong class="bold">EF Core</strong>), since EF Core has a change-tracking system that can automatically determine changed objects and update them in the database at the end of the <strong class="bold">unit of work</strong> (<strong class="bold">UoW</strong>). So, if <a id="_idIndexMarker717"/>you have no problem relying on EF Core features, you can skip <em class="italic">Step 3</em>.</p></li>
+			</ol>
+			<p>Let’s see the <strong class="source-inline">AddSessionAsync</strong> application service method in the following example:</p>
+			<p class="source-code">public class EventAppService : ApplicationService,</p>
+			<p class="source-code">    IEventAppService</p>
+			<p class="source-code">{</p>
+			<p class="source-code">    ...</p>
+			<p class="source-code">    [Authorize]</p>
+			<p class="source-code">    public async Task AddSessionAsync(Guid id,</p>
+			<p class="source-code">                                      AddSessionDto input)</p>
+			<p class="source-code">    {</p>
+			<p class="source-code">        var @event = await _eventRepository.GetAsync(id);</p>
+			<p class="source-code">        @event.AddSession(</p>
+			<p class="source-code">            input.TrackId, GuidGenerator.Create(),</p>
+			<p class="source-code">            input.Title,</p>
+			<p class="source-code">            input.StartTime, input.EndTime,</p>
+			<p class="source-code">            input.Description, input.Language</p>
+			<p class="source-code">        );</p>
+			<p class="source-code">        await _eventRepository.UpdateAsync(@event);</p>
+			<p class="source-code">    }</p>
+			<p class="source-code">}</p>
+			<p>This method <a id="_idIndexMarker718"/>is a simple application service method. It is used to add a new session to an event. It first gets the related <strong class="source-inline">Event</strong> aggregate from the database. Then, it uses the <strong class="source-inline">AddSession</strong> method of the <strong class="source-inline">Event</strong> class to delegate the actual business operation to the domain layer. It finally updates the changed <strong class="source-inline">Event</strong> object in the database. We will see the <strong class="source-inline">AddSessionDto</strong> class in the <em class="italic">Designing DTOs</em> section of this chapter.</p>
+			<p>Let’s see a more complex example that creates a new event, as fol<a id="_idTextAnchor343"/>lows:</p>
+			<p class="source-code">[Authorize]</p>
+			<p class="source-code">public async Task&lt;EventDto&gt; CreateAsync(CreateEventDto </p>
+			<p class="source-code">                                        input)</p>
+			<p class="source-code">{</p>
+			<p class="source-code">    var organization = await _organizationRepository</p>
+			<p class="source-code">        .GetAsync(input.OrganizationId);</p>
+			<p class="source-code">    if (organization.OwnerUserId != CurrentUser.GetId())</p>
+			<p class="source-code">    {</p>
+			<p class="source-code">        throw new AbpAuthorizationException(</p>
+			<p class="source-code">        L[“EventHub:</p>
+			<p class="source-code">          NotAuthorizedToCreateEventInThisOrganization”,</p>
+			<p class="source-code">          organization.DisplayName]</p>
+			<p class="source-code">        );</p>
+			<p class="source-code">    }</p>
+			<p class="source-code">    var @event = await _eventManager.CreateAsync(</p>
+			<p class="source-code">        organization, input.Title,</p>
+			<p class="source-code">        input.StartTime, input.EndTime, input.Description);</p>
+			<p class="source-code">    await _eventManager.SetLocationAsync(@event,</p>
+			<p class="source-code">        input.IsOnline, input.OnlineLink, input.CountryId,</p>
+			<p class="source-code">        input.City);</p>
+			<p class="source-code">    await _eventManager.SetCapacityAsync(@event,</p>
+			<p class="source-code">                                         input.Capacity);</p>
+			<p class="source-code">    @event.Language = input.Language;</p>
+			<p class="source-code">    if (input.CoverImageContent != null &amp;&amp;</p>
+			<p class="source-code">        input.CoverImageContent.Length &gt; 0)</p>
+			<p class="source-code">    {</p>
+			<p class="source-code">        await SaveCoverImageAsync(</p>
+			<p class="source-code">            @event.Id, input.CoverImageContent);</p>
+			<p class="source-code">    }</p>
+			<p class="source-code">    await _eventRepository.InsertAsync(@event);</p>
+			<p class="source-code">    return ObjectMapper.Map&lt;Event, EventDto&gt;(@event);</p>
+			<p class="source-code">}</p>
+			<p>The <strong class="source-inline">CreateAsync</strong> method gets a <strong class="source-inline">CreateEventDto</strong> object from the UI layer that carries the new event data and is a good example of creating new entities. Let’s investigate how it was implemented.</p>
+			<p>It first gets the <strong class="source-inline">organization</strong> object<a id="_idIndexMarker719"/> from the database and compares its owner’s <strong class="bold">identifier</strong> (<strong class="bold">ID</strong>) with the current user’s ID. It throws an <strong class="source-inline">AbpAuthorizationException</strong> exception if the user doesn’t meet the condition. Authorization is an application-layer responsibility, and the authorization rules can be different in different applications. For example, in the admin application, an admin user can create events on behalf of any user without checking the organization’s ownership.</p>
+			<p>The <strong class="source-inline">CreateAsync</strong> method then uses the <strong class="source-inline">eventManager</strong> domain service to create a new <strong class="source-inline">Event</strong> object with the minimum required properties.</p>
+			<p>We’ve created an <strong class="source-inline">Event</strong> object, but our work hasn’t been completed yet. <strong class="source-inline">CreateEventDto</strong> has some optional properties that the user may set. We are again using the <strong class="source-inline">eventManager</strong> domain service to set the location of the event. We are then directly setting the <strong class="source-inline">Language</strong> property of <strong class="source-inline">Event</strong> because there is no business rule to set it; it has a public setter, and the value can even be <strong class="source-inline">null</strong>.</p>
+			<p>The <strong class="source-inline">CreateAsync</strong> method continues using the <strong class="source-inline">eventManager</strong> class to set the event capacity by checking the core domain rules. It also saves the event’s cover image if it was provided.</p>
+			<p>Until that point, the <strong class="source-inline">Event</strong> object hasn’t been saved to the database. All the operations are performed on an in-memory object. The domain service doesn’t save changes to the database since it is the application layer’s responsibility to do this. If the domain service methods saved their changes, we would end up with one insert and three update operations in the database. With the current implementation, the <strong class="source-inline">CreateAsync</strong> method uses the <strong class="source-inline">InsertAsync</strong> method of the repository and saves the object at the end of <a id="_idIndexMarker720"/>the method with a single database operation.</p>
+			<p>As you see in the example application service definitions, application service methods use DTO classes to get data from the upper layer (typically, the presentation layer) and return data to the upper layer. The next section introduces DTO design considerations and best practices.</p>
+			<h1 id="_idParaDest-239"><a id="_idTextAnchor344"/>Designing DTOs</h1>
+			<p>A DTO is a <a id="_idIndexMarker721"/>simple object used to transfer data between the presentation and the application layers. Let’s start by seeing the basic principles of designing DTO classes.</p>
+			<h2 id="_idParaDest-240"><a id="_idTextAnchor345"/>Designing DTO classes</h2>
+			<p>There are<a id="_idIndexMarker722"/> some fundamental principles to follow while defining DTO classes, as outlined here:</p>
+			<ul>
+				<li>DTOs should not contain any business logic; they are just for data transfer.</li>
+				<li>DTO objects should be serializable because most of the time, they are transferred over the wire. Typically, they have a parameterless constructor, and all of their properties have public getters and setters.</li>
+				<li>DTO classes should not inherit from the entities or use entity types as their properties.</li>
+			</ul>
+			<p>The following DTO class is used to store the data while adding a new session to an existing track of an event:</p>
+			<p class="source-code">public class AddSessionDto</p>
+			<p class="source-code">{</p>
+			<p class="source-code">    [Required]</p>
+			<p class="source-code">    [StringLength(SessionConsts.MaxTitleLength,</p>
+			<p class="source-code">        MinimumLength = SessionConsts.MinTitleLength)]</p>
+			<p class="source-code">    public string Title { get; set; }</p>
+			<p class="source-code">    [Required]</p>
+			<p class="source-code">    [StringLength(SessionConsts.MaxDescriptionLength,</p>
+			<p class="source-code">        MinimumLength = </p>
+			<p class="source-code">            SessionConsts.MinDescriptionLength)]</p>
+			<p class="source-code">    public string Description { get; set; }</p>
+			<p class="source-code">    public Guid TrackId { get; set; }</p>
+			<p class="source-code">    public DateTime StartTime { get; set; }</p>
+			<p class="source-code">    public DateTime EndTime { get; set; }</p>
+			<p class="source-code">    public string Language { get; set; }</p>
+			<p class="source-code">}</p>
+			<p>The <strong class="source-inline">AddSessionDto</strong> class has no method, so it has no business logic. All its properties<a id="_idIndexMarker723"/> have public getters and setters. The <strong class="source-inline">AddSessionDto</strong> class does not define any constructor, so it has an implicit public parameterless constructor.</p>
+			<p>The <strong class="source-inline">Title</strong> and <strong class="source-inline">Description</strong> properties of the <strong class="source-inline">AddSessionDto</strong> class have validation attributes, such as <strong class="source-inline">Required</strong> and <strong class="source-inline">StringLength</strong>. </p>
+			<p>The next section discusses validating input DTOs.</p>
+			<h2 id="_idParaDest-241"><a id="_idTextAnchor346"/>Validating input DTOs</h2>
+			<p>There are a few <a id="_idIndexMarker724"/>ways to validate a DTO object when<a id="_idIndexMarker725"/> it is used as a parameter to an application service method, as outlined here:</p>
+			<ul>
+				<li>We can use data annotation attributes, such as <strong class="source-inline">Required</strong>, <strong class="source-inline">StringLength</strong>, and <strong class="source-inline">Range</strong>.</li>
+				<li>We can implement an <strong class="source-inline">IValidatableObject</strong> interface for the DTO class and perform additional validation logic in the <strong class="source-inline">Validate</strong> method.</li>
+				<li>We can use third-party libraries to validate a DTO object. For example, ABP integrates to the <strong class="source-inline">FluentValidation</strong> library to separate the validation logic from the DTO class and perform advanced validation logic.</li>
+			</ul>
+			<p>Whichever<a id="_idIndexMarker726"/> approach you follow (you can use all together for a DTO class), ABP<a id="_idIndexMarker727"/> automatically checks these validation rules and throws a validation exception in case of an invalid value. So, your application service method is always executed with a valid DTO object. See the <em class="italic">Validating user inputs</em> section of <a href="B17287_07_Epub_AM.xhtml#_idTextAnchor213"><em class="italic">Chapter 7</em></a>, <em class="italic">Exploring Cross-Cutting Concerns,</em> for all the details of ABP’s validation infrastructure.</p>
+			<p>The validation logic on the DTO class (or in the <strong class="source-inline">FluentValidation</strong> validator class) should only be a formal validation. That means you can check if the given input is supplied and well formatted. However, it should not contain a domain validation. For example, do not try to check if the given start and end dates conflict with another session on the same track. Such validation logic should be implemented in the domain layer, typically in the entity or a domain service class.</p>
+			<p>Another common task with DTOs is mapping them to other objects.</p>
+			<h2 id="_idParaDest-242"><a id="_idTextAnchor347"/>Object-to-object mapping</h2>
+			<p>We use <a id="_idIndexMarker728"/>entities<a id="_idIndexMarker729"/> inside the domain and application layers and use DTOs to communicate with the upper layers. This approach leads us to create DTO classes similar to entity classes and convert entity objects to DTO objects. If the entity class has a few properties, then creating a corresponding DTO object can be manually done by copying properties one by one. However, entity classes grow over time, and writing and maintaining a manual mapping code becomes tedious and error-prone.</p>
+			<p>ABP Framework provides an <strong class="source-inline">IObjectMapper</strong> service that is used to convert similar objects to each other. See the following application service method:</p>
+			<p class="source-code">public async Task&lt;EventDto&gt; GetAsync(Guid id)</p>
+			<p class="source-code">{</p>
+			<p class="source-code">    Event eventEntity = </p>
+			<p class="source-code">        await _eventRepository.GetAsync(id);</p>
+			<p class="source-code">    return ObjectMapper.Map&lt;Event, EventDto&gt;(eventEntity);</p>
+			<p class="source-code">}</p>
+			<p>This <a id="_idIndexMarker730"/>method simply returns an <strong class="source-inline">EventDto</strong> object by converting it from the <strong class="source-inline">Event</strong> object using the <strong class="source-inline">IObjectMapper</strong> service. <strong class="source-inline">EventDto</strong> has a lot of properties, and manually creating it would result in a long code block. <strong class="source-inline">IObjectMapper</strong> is an abstraction and is implemented using the <strong class="source-inline">AutoMapper</strong> library when you create a new ABP solution. If you want to use the preceding code, you should first define the <strong class="source-inline">AutoMapper</strong> mapping configuration.</p>
+			<p class="callout-heading">Object-to-Object Mapping Documentation</p>
+			<p class="callout">The topic of object-to-object mapping is not included in this book. However, we did use it in <a href="B17287_03_Epub_AM.xhtml#_idTextAnchor044"><em class="italic">Chapter 3</em></a>, <em class="italic">Step-By-Step Application Development,</em> while creating an example application. Please refer to ABP’s documentation to fully understand the object-to-object mapping <a id="_idIndexMarker731"/>system: <a href="https://docs.abp.io/en/abp/latest/Object-To-Object-Mapping">https://docs.abp.io/en/abp/latest/Object-To-Object-Mapping</a>.</p>
+			<p>While using the object mapper is pretty simple, we should use it carefully. Object mapping libraries mostly rely on naming conventions. They automatically map same-named properties, while we can configure the mappings manually.</p>
+			<p>One possible problem may occur when you refactor entities but do not update the corresponding DTOs or the mapping code. The <strong class="source-inline">AutoMapper</strong> library has a concept named<a id="_idIndexMarker732"/> configuration validation. It validates the mapping configuration on the application startup and throws an exception if it detects a mapping configuration problem. I suggest enabling it for your application. See the <strong class="source-inline">AutoMapper</strong> documentation to<a id="_idIndexMarker733"/> learn about configuration validation: <a href="https://docs.automapper.org/en/stable/Configuration-validation.html">https://docs.automapper.org/en/stable/Configuration-validation.html</a>.</p>
+			<p>Object-to-object mapping is <a id="_idIndexMarker734"/>really useful when you map your entities to DTOs. However, do not map input DTOs to entities. There are some technical and design reasons behind this suggestion, as outlined here:</p>
+			<ul>
+				<li>Do you remember the <em class="italic">Implementing entity constructors</em> section of the previous chapter? Entity classes typically have primary constructors to get the required properties and create a valid entity. Auto-mapping operations generally need an empty constructor on the target class, so the mapping fails.</li>
+				<li>Some properties on the entities are designed with private setters. You should use entity methods to change these property values to apply some business rules. Directly copying their values from a DTO object may violate the business rules.</li>
+				<li>You should carefully validate and process the user input instead of blindly mapping to the entities.</li>
+			</ul>
+			<p>The <strong class="source-inline">CreateAsync</strong> method<a id="_idIndexMarker735"/> explained in the <em class="italic">Implementing application services</em> section was a good example of creating an entity using an input DTO. It doesn’t map the DTO to the entity but uses a domain service to create a valid entity and set optional properties.</p>
+			<p>In the next section, we will discuss some design practices for DTOs.</p>
+			<h2 id="_idParaDest-243"><a id="_idTextAnchor348"/>DTO design best practices</h2>
+			<p>Creating DTOs <a id="_idIndexMarker736"/>seems simple at first—they are simple, indeed. However, once the application grows, you will have many DTO classes, and it becomes important to understand how to organize these classes. In the next sections, I will provide a few suggestions about DTOs to make your code base more maintainable and bug-free.</p>
+			<h3>Do not define unused properties in input DTOs</h3>
+			<p>No one defines an unused property in an input DTO, right? Unfortunately, this isn’t true. I have seen a lot of code bases with this problem.</p>
+			<p>A property in a DTO class that is not used in the application service method is a perfect way to confuse the developers using that application service method and lead to building a buggy code base.</p>
+			<p>A probable reason for an unused property in a DTO class is that it was used before, but the application service method was changed and the developer has forgotten to remove it. We should care about that and always remove unused properties. If you care about backward compatibility because you are not the one building the client application, then declare an <strong class="source-inline">[Obsolete]</strong> attribute on that property, document the breaking change, and try to preserve the old behavior if the value is provided.</p>
+			<p>Having unused <a id="_idIndexMarker737"/>properties can be unavoidable if you violate the rule in the next section.</p>
+			<h3>Do not reuse input DTOs</h3>
+			<p>When you have too many application service methods, you may think that using some DTOs for multiple application service methods is a good idea to reduce the number of DTOs. However, if you do that, some properties will be used in some methods but not used in others.</p>
+			<p>It is a good practice to define a specialized input DTO for each application service method. Sometimes, it seems practical to reuse the same DTO class for two methods since they are almost the same. However, the application service methods will change over time, and the requirements will be different. Inheriting a DTO from another DTO is another way of reusing DTOs, but the problem is the same.</p>
+			<p>Code duplication is a better practice than coupling use cases in many scenarios. See the following example:</p>
+			<p class="source-code">public interface IEventAppService : IApplicationService</p>
+			<p class="source-code">{</p>
+			<p class="source-code">    Task&lt;EventDto&gt; GetAsync(Guid id);</p>
+			<p class="source-code">    Task CreateAsync(EventDto input);</p>
+			<p class="source-code">    Task UpdateEventTimeAsync(EventDto input);</p>
+			<p class="source-code">}</p>
+			<p>In this example, the <strong class="source-inline">GetAsync</strong> method returns an <strong class="source-inline">EventDto</strong> object that stores almost all of the event properties. The <strong class="source-inline">CreateAsync</strong> method reuses the same <strong class="source-inline">EventDto</strong> class. In general, reusing an output DTO as an input DTO is not good since some <strong class="source-inline">EventDto</strong> properties (such as <strong class="source-inline">Id</strong>, <strong class="source-inline">UrlCode</strong>, <strong class="source-inline">RegisteredUserCount</strong>, and <strong class="source-inline">CreationTime</strong>) are not expected to be sent by the client application on event creation but calculated on the server side. Finally, reusing the same <strong class="source-inline">EventDto</strong> class in the <strong class="source-inline">UpdateEventTimeAsync</strong> method is much worse since this method only uses the <strong class="source-inline">Id</strong>, <strong class="source-inline">StartTime</strong>, and <strong class="source-inline">EndTime</strong> properties. </p>
+			<p>A <a id="_idIndexMarker738"/>true DTO design is shown in the following example:</p>
+			<p class="source-code">public interface IEventAppService : IApplicationService</p>
+			<p class="source-code">{</p>
+			<p class="source-code">    Task&lt;EventDto&gt; GetAsync(Guid id);</p>
+			<p class="source-code">    Task CreateAsync(EventCreationDto input);</p>
+			<p class="source-code">    Task UpdateEventTimeAsync(EventTimeUpdateDto input);</p>
+			<p class="source-code">}</p>
+			<p>We’ve defined a separate DTO class for the <strong class="source-inline">CreateAsync</strong> and <strong class="source-inline">UpdateEventTimeAsync</strong> methods. In this way, any change in one DTO won’t affect the other methods.</p>
+			<p>The design suggestions in the last two sections were for input DTOs. The next section explains the case for output DTOs.</p>
+			<h3>About output DTOs</h3>
+			<p>In practice, output DTOs are different than input DTOs. The <em class="italic">unused property</em> problem (of input DTOs) does not exist for output DTOs. Let’s try to understand why an<a id="_idIndexMarker739"/> unused property is a problem for an input DTO. Imagine that we are calling a method and setting a property on the input DTO. We expect that it is being processed by the method and change the behavior. We get confused if the method doesn’t use the property, and we don’t see any behavior difference, whatever we set for that property. If a method parameter (or property of the parameter) is there, it should work just as expected.</p>
+			<p>However, for output DTOs, that’s not the case. An application service may return more properties than the client currently needs. Thus, I mean that the application service method fills all the properties of an output DTO; if a property does exist in the DTO, it should always be filled regardless of whether it is being used by the client or not.</p>
+			<p>This approach has an advantage—when the client later needs those properties, we don’t need to change the service class, making it easier to extend the UI. This is especially useful if the client is not your application or you want to open your <strong class="bold">application programming interface</strong> (<strong class="bold">API</strong>) to <a id="_idIndexMarker740"/>third-party clients whose needs can be different.</p>
+			<p>Since an output DTO may contain some properties that are not used by the client yet, we can reduce the number of output DTOs and reuse some<a id="_idIndexMarker741"/> DTO classes in multiple cases.</p>
+			<p>See the following example application service definition:</p>
+			<p class="source-code">public interface IEventAppService : IApplicationService</p>
+			<p class="source-code">{</p>
+			<p class="source-code">    Task&lt;EventDto&gt; CreateAsync(CreateEventDto input);</p>
+			<p class="source-code">    Task&lt;EventDto&gt; GetAsync(Guid id);</p>
+			<p class="source-code">    Task&lt;List&lt;EventDto&gt;&gt; GetListAsync(PagedResultRequestDto </p>
+			<p class="source-code">                                      input);</p>
+			<p class="source-code">    Task&lt;EventDto&gt; AddSessionAsync(Guid id, </p>
+			<p class="source-code">                                  AddSessionDto input);</p>
+			<p class="source-code">}</p>
+			<p>All the methods <a id="_idIndexMarker742"/>on this example use the same output DTO class to represent an event, <strong class="source-inline">EventDto</strong>, while they get different input DTO objects.</p>
+			<p class="callout-heading">Performance Considerations</p>
+			<p class="callout">Returning<a id="_idIndexMarker743"/> fine-tuned and minimal-output DTO objects can be needed for performance requirements, especially when returning large result sets. In such cases, you can define different DTO classes with the properties only needed for the related use cases.</p>
+			<p>We’ve covered the fundamental building blocks for implementing DDD with ABP Framework. The next section demonstrates some examples to understand the roles and responsibilities of the layers.</p>
+			<h1 id="_idParaDest-244"><a id="_idTextAnchor349"/>Understanding the responsibilities of the layers</h1>
+			<p>Separating your <a id="_idIndexMarker744"/>business logic into application and domain layers allows you to create multiple applications on the same domain, as explained in the <em class="italic">Dealing with multiple applications</em> section of <a href="B17287_09_Epub_AM.xhtml#_idTextAnchor300"><em class="italic">Chapter 9</em></a>, <em class="italic">Understanding Domain-Driven Design</em>. Large systems typically have multiple applications and isolating the core domain from application-specific logic is a key principle to not mix the logic of different applications. Creating a separate application layer for each application makes it possible to design our application service methods best suited to different application requirements.</p>
+			<p>To successfully separate the application and domain layers, we should have a good understanding of each layer’s responsibilities. In the last three chapters, I have already mentioned these responsibilities while explaining the DDD building blocks. In the next sections, I will summarize these responsibilities to understand them better.</p>
+			<h2 id="_idParaDest-245"><a id="_idTextAnchor350"/>Authorizing users</h2>
+			<p>Authorization is used to allow or prevent using a certain application functionality by a user (on a UI) or a client application (on a machine-to-machine communication). </p>
+			<p>ABP provides a <a id="_idIndexMarker745"/>declarative way of checking user permissions with the <strong class="source-inline">[Authorize]</strong> attribute and an imperative way with the <strong class="source-inline">IAuthorizationService</strong> service. You can use these features to restrict access to desired functionalities in your application.</p>
+			<p>Authorization is the responsibility of the application layer and the upper layers (such as the presentation layer) because it highly depends on the clients and the users of the application.</p>
+			<p>For example, in the <em class="italic">EventHub</em> project, a user in the public web application can edit only their own events. However, an admin user in the admin application can edit any event without the ownership checking if they have the required permission. On the other hand, a background service may change an event’s state without any authorization rule. These applications use the same domain layer, hence the same domain rules, but implement different authorization rules. So, it is good not to include the authorization logic in the domain layer to make it reusable in different cases.</p>
+			<h2 id="_idParaDest-246"><a id="_idTextAnchor351"/>Controlling the transaction</h2>
+			<p>The UoW system’s <a id="_idIndexMarker746"/>responsibility is to create a transaction scope for a use case (typically, a web request) and ensure that all the changes done in that use case are committed together. The UoW system was covered in the <em class="italic">Understanding the UoW system</em> section of <a href="B17287_06_Epub_AM.xhtml#_idTextAnchor177"><em class="italic">Chapter 6</em></a>, <em class="italic">Working with the Data Access Infrastructure</em>.</p>
+			<p>The scope of a use case is an application service method. An application service method may work with multiple domain services and aggregates and may make changes on the aggregates. The only way to ensure that all changes are committed together is to control the UoW system at the application service level, in the application layer. So, a UoW is an application-layer concept.</p>
+			<h2 id="_idParaDest-247"><a id="_idTextAnchor352"/>Validating the user input</h2>
+			<p>As stated<a id="_idIndexMarker747"/> in the <em class="italic">Validating user inputs</em> section of <a href="B17287_07_Epub_AM.xhtml#_idTextAnchor213"><em class="italic">Chapter 7</em></a>, <em class="italic">Exploring Cross-Cutting Concerns</em>, a typical application has three levels of validation, as follows:</p>
+			<ul>
+				<li><em class="italic">Client-side validation</em> is used <a id="_idIndexMarker748"/>to pre-validate the user input before sending data to the server. This type of validation is the responsibility of the presentation layer.</li>
+				<li><em class="italic">Server-side validation</em> is<a id="_idIndexMarker749"/> performed by the server to prevent incomplete, badly formatted, or malicious requests. We generally use data annotation attributes and other functionalities to validate DTO objects. Such validation is the responsibility of the application layer.</li>
+				<li><em class="italic">Business validation</em> is also <a id="_idIndexMarker750"/>performed in the server, implements your business rules, and keeps your business data consistent. Business validation is mostly done in the domain layer to force the same business rules in every application.</li>
+			</ul>
+			<p>ABP provides good infrastructure and gracefully integrates to ASP.NET Core services to easily perform formal validation logic. You can implement business validation rules and constraints in the aggregate constructors, methods, and domain services, as explained in <a href="B17287_10_Epub_AM.xhtml#_idTextAnchor316"><em class="italic">Chapter 10</em></a>, <em class="italic">DDD – The Domain Layer</em>.</p>
+			<h2 id="_idParaDest-248"><a id="_idTextAnchor353"/>Working with the current user</h2>
+			<p>ABP’s <strong class="source-inline">ICurrentUser</strong> service is used to get information about the current user. The current <a id="_idIndexMarker751"/>user logic requires a stateful session system that stores user information and makes it available in every web request.</p>
+			<p>For ASP.NET Core applications, ABP uses the current principle that is based on the authentication ticket. An authentication ticket is created when the user logs in to the application. It is saved in a cookie to read in subsequent requests. It can be stored in local storage<a id="_idIndexMarker752"/> for a <strong class="bold">single-page application</strong> (<strong class="bold">SPA</strong>) and sent to the server in the <strong class="bold">HyperText Transfer Protocol</strong> (<strong class="bold">HTTP</strong>) header<a id="_idIndexMarker753"/> for every request.</p>
+			<p>The session/current user is a concept that is typically implemented in the presentation layer. It is usable in the application layer since the application layer is designed to be used by the presentation layer, so it can assume that there is a <em class="italic">current user</em> in the current context. However, the domain layer should be designed as independent from any application, so it should not work with the current user. In some applications, such as a background service or an integration application, there may not be a user at all.</p>
+			<p>The following application service method, from the <em class="italic">EventHub</em> project, is used to join a given organization by the current user:</p>
+			<p class="source-code">[Authorize]</p>
+			<p class="source-code">public async Task JoinAsync(Guid organizationId)</p>
+			<p class="source-code">{</p>
+			<p class="source-code">    var organization = await _organizationRepository</p>
+			<p class="source-code">        .GetAsync(organizationId);</p>
+			<p class="source-code">    var user = await</p>
+			<p class="source-code">        _userRepository.GetAsync(CurrentUser.GetId());    </p>
+			<p class="source-code">    await _organizationMembershipManager.JoinAsync(</p>
+			<p class="source-code">        organization, user);</p>
+			<p class="source-code">}</p>
+			<p>First of all, this method is authorized. So, it is guaranteed that the method is called by a user that has already logged in to the application and <strong class="source-inline">CurrentUser.GetId()</strong> returns a valid user ID.</p>
+			<p>We are <a id="_idIndexMarker754"/>not accepting the user’s ID as a method parameter; otherwise, any authenticated user could make any user a member of any organization. But we want every user to be able to join the organization themselves.</p>
+			<p>We get the organization and user aggregates from the repositories and delegate the work to the domain service (<strong class="source-inline">organizationMembershipManager</strong>). The domain service, in this way, is independent of the current user concept and also more reusable: it can work with any user, not only with the current one.</p>
+			<h1 id="_idParaDest-249"><a id="_idTextAnchor354"/>Summary</h1>
+			<p>In this chapter, you’ve learned how to properly implement the application services and design the DTOs. I’ve covered DTO design in detail, such as validating input DTOs and mapping entities to DTOs, and provided suggestions based on best practices and my experience.</p>
+			<p>We’ve learned that mixing the responsibilities of the layers makes layering meaningless. We’ve investigated some fundamental responsibilities to understand at which layer we should implement these responsibilities.</p>
+			<p>As we’re at the end of this chapter, we’ve completed the third part of the book. The purpose of this part was to demonstrate how you can implement <strong class="bold">domain-driven design</strong> (<strong class="bold">DDD</strong>) building blocks with ABP Framework. I’ve provided rules, best practices, and suggestions to make your code base more maintainable when you follow them.</p>
+			<p>The next part of the book will explore the UI and API development with ABP Framework. In the next chapter, we will learn the architectural structure and the fundamental features of the ABP Framework MVC/Razor Pages UI.</p>
+		</div>
+	</body></html>

@@ -1,0 +1,314 @@
+<html><head></head><body>
+<div id="_idContainer020">
+<h1 class="chapter-number" id="_idParaDest-58"><a id="_idTextAnchor057"/><span class="koboSpan" id="kobo.1.1">4</span></h1>
+<h1 id="_idParaDest-59"><a id="_idTextAnchor058"/><span class="koboSpan" id="kobo.2.1">Asynchronous Communication between Microservices</span></h1>
+<p><span class="koboSpan" id="kobo.3.1">We have just reviewed synchronous communication between microservices and the pros and cons of that method. </span><span class="koboSpan" id="kobo.3.2">Now, we will take a look at its opposite counterpart, asynchronous communication.</span></p>
+<p><span class="koboSpan" id="kobo.4.1">Synchronous communication is needed at times and, based on the operation being carried out, can be unavoidable. </span><span class="koboSpan" id="kobo.4.2">It does introduce potentially long wait times as well as potential break points in certain operations. </span><span class="koboSpan" id="kobo.4.3">At this point, it is important to properly assess the operation and decide whether immediate feedback from an additional service is required to continue. </span><span class="koboSpan" id="kobo.4.4">Asynchronous communication means that we send data to the next service but do not wait for a response. </span><span class="koboSpan" id="kobo.4.5">The user will be under the impression that the operation was completed, but the actual work is being done in the background.</span></p>
+<p><span class="koboSpan" id="kobo.5.1">From that review, it is obvious that this method of communication cannot always be used but is necessary to implement certain flows and operations efficiently in our application.</span></p>
+<p><span class="koboSpan" id="kobo.6.1">After reading this chapter, we will be able to do the following:</span></p>
+<ul>
+<li><span class="koboSpan" id="kobo.7.1">Understand what asynchronous communication is and when we should use it</span></li>
+<li><span class="koboSpan" id="kobo.8.1">Implement Pub-Sub communication</span></li>
+<li><span class="koboSpan" id="kobo.9.1">Learn how to configure a message bus (</span><strong class="bold"><span class="koboSpan" id="kobo.10.1">RabbitMQ</span></strong><span class="koboSpan" id="kobo.11.1"> or </span><strong class="bold"><span class="koboSpan" id="kobo.12.1">Azure Service Bus</span></strong><span class="koboSpan" id="kobo.13.1">)</span></li>
+</ul>
+<h1 id="_idParaDest-60"><a id="_idTextAnchor059"/><span class="koboSpan" id="kobo.14.1">Technical requirements</span></h1>
+<p><span class="koboSpan" id="kobo.15.1">Code references used in this chapter can be found in the project repository, which is hosted on GitHub at this URL: </span><a href="https://github.com/PacktPublishing/Microservices-Design-Patterns-in-.NET/tree/master/Ch04"><span class="koboSpan" id="kobo.16.1">https://github.com/PacktPublishing/Microservices-Design-Patterns-in-.NET/tree/master/Ch04</span></a></p>
+<h1 id="_idParaDest-61"><a id="_idTextAnchor060"/><span class="koboSpan" id="kobo.17.1">Functioning with asynchronous communication</span></h1>
+<p><span class="koboSpan" id="kobo.18.1">Let us revisit</span><a id="_idIndexMarker143"/><span class="koboSpan" id="kobo.19.1"> some vital definitions and concepts before moving forward.</span></p>
+<p><span class="koboSpan" id="kobo.20.1">There are basically two messaging patterns that we will employ between microservices:</span></p>
+<ul>
+<li><strong class="bold"><span class="koboSpan" id="kobo.21.1">Synchronous communication</span></strong><span class="koboSpan" id="kobo.22.1">: We</span><a id="_idIndexMarker144"/><span class="koboSpan" id="kobo.23.1"> covered this pattern in the previous chapter, where one service calls another directly and waits for a response</span></li>
+<li><strong class="bold"><span class="koboSpan" id="kobo.24.1">Asynchronous communication</span></strong><span class="koboSpan" id="kobo.25.1">: In this </span><a id="_idIndexMarker145"/><span class="koboSpan" id="kobo.26.1">pattern, we use messages to communicate without waiting for a response</span></li>
+</ul>
+<p><span class="koboSpan" id="kobo.27.1">There are times when one microservice needs another to complete an operation, but at the moment, it doesn’t need to know the outcome of the task. </span><span class="koboSpan" id="kobo.27.2">Let us think of sending confirmation emails after an appointment has been successfully booked by our health care management system. </span><span class="koboSpan" id="kobo.27.3">Imagine the user waiting on the user interface to complete its loading operation and show the confirmation. </span><span class="koboSpan" id="kobo.27.4">In between them clicking </span><strong class="bold"><span class="koboSpan" id="kobo.28.1">Submit</span></strong><span class="koboSpan" id="kobo.29.1"> and seeing the confirmation, the booking service needs to complete the following operations:</span></p>
+<ol>
+<li><span class="koboSpan" id="kobo.30.1">Create an appointment record</span></li>
+<li><span class="koboSpan" id="kobo.31.1">Send an email to the doctor booked for the appointment</span></li>
+<li><span class="koboSpan" id="kobo.32.1">Send an email to the patient who booked the appointment</span></li>
+<li><span class="koboSpan" id="kobo.33.1">Create a calendar entry for the system</span></li>
+</ol>
+<p><span class="koboSpan" id="kobo.34.1">Despite our best efforts, the booking service attempting to complete these operations will take some time and might lead to a less than pleasing user experience. </span><span class="koboSpan" id="kobo.34.2">We could also argue that the responsibility of sending emails should not be native to the booking service. </span><span class="koboSpan" id="kobo.34.3">In the same way, calendar management should stand on its own. </span><span class="koboSpan" id="kobo.34.4">So, we could refactor the booking service’s tasks as follows:</span></p>
+<ol>
+<li value="1"><span class="koboSpan" id="kobo.35.1">Create an appointment record</span></li>
+<li><span class="koboSpan" id="kobo.36.1">Synchronously call the email service to send an email to the doctor booked for the appointment</span></li>
+<li><span class="koboSpan" id="kobo.37.1">Synchronously call the email service to send an email to the patient who booked the appointment</span></li>
+<li><span class="koboSpan" id="kobo.38.1">Synchronously call the calendar management service to create a calendar entry for the system</span></li>
+</ol>
+<p><span class="koboSpan" id="kobo.39.1">Now, we have refactored the booking service to do fewer operations and offload the intricacies of non-appointment booking operations to other services. </span><span class="koboSpan" id="kobo.39.2">This is a good refactor, but we have retained and potentially amplified the main flaw in this design. </span><span class="koboSpan" id="kobo.39.3">We are still going to wait on the completion of one potentially time-consuming operation before we move on to the next operation, which runs the same risk. </span><span class="koboSpan" id="kobo.39.4">At this point, we can consider how important waiting on a response to these actions really is, relative to us entering the booking record in our database, which is the most important operation relative to allowing the user to know the outcome of the booking process.</span></p>
+<p><span class="koboSpan" id="kobo.40.1">In this setting, we can make use of an asynchronous communication pattern to ensure that the major operation gets completed and other operations, such as sending an email and entering a calendar entry, can happen eventually, without compromising our user experience.</span></p>
+<p><span class="koboSpan" id="kobo.41.1">At a very</span><a id="_idIndexMarker146"/><span class="koboSpan" id="kobo.42.1"> basic level, we can still implement asynchronous communication using HTTP patterns. </span><span class="koboSpan" id="kobo.42.2">Let us discuss how effective this can be.</span></p>
+<h2 id="_idParaDest-62"><a id="_idTextAnchor061"/><span class="koboSpan" id="kobo.43.1">HTTP asynchronous communication</span></h2>
+<p><span class="koboSpan" id="kobo.44.1">In seeming </span><a id="_idIndexMarker147"/><span class="koboSpan" id="kobo.45.1">contrast to what we have explored so far, we can actually implement asynchronous communication via HTTP. </span><span class="koboSpan" id="kobo.45.2">If we assess how HTTP communication works, we form an assessment of success or failure based on the HTTP response we receive. </span><span class="koboSpan" id="kobo.45.3">Synchronously, we would expect the booking service to call the email service and then wait on an HTTP </span><strong class="source-inline"><span class="koboSpan" id="kobo.46.1">200 OK</span></strong><span class="koboSpan" id="kobo.47.1"> successful response code before it tries to move to the next command. </span><span class="koboSpan" id="kobo.47.2">Synchronously, we would actually try to send the email at the moment, and based on the success or failure of that operation, we would form our response.</span></p>
+<p><span class="koboSpan" id="kobo.48.1">Asynchronously, we would let the email service respond with an HTTP </span><strong class="source-inline"><span class="koboSpan" id="kobo.49.1">202 ACCEPTED</span></strong><span class="koboSpan" id="kobo.50.1"> response, which indicates that the service has accepted the task and will carry it out eventually. </span><span class="koboSpan" id="kobo.50.2">This way, the booking service can continue its operation based on that promise and spend less time on the operation. </span><span class="koboSpan" id="kobo.50.3">In the background, the email service will carry out the task when it gets around to it.</span></p>
+<p><span class="koboSpan" id="kobo.51.1">While this does alleviate some of the pressure that the booking service carries, there are other patterns, such as the Pub-Sub pattern, that can be implemented to make this process</span><a id="_idIndexMarker148"/><span class="koboSpan" id="kobo.52.1"> smoother. </span><span class="koboSpan" id="kobo.52.2">Let us review this pattern.</span></p>
+<h1 id="_idParaDest-63"><a id="_idTextAnchor062"/><span class="koboSpan" id="kobo.53.1">Understanding Pub-Sub communication</span></h1>
+<p><span class="koboSpan" id="kobo.54.1">The Pub-Sub </span><a id="_idIndexMarker149"/><span class="koboSpan" id="kobo.55.1">pattern has gained a fair amount of popularity and acclaim and is widely used in distributed systems. </span><em class="italic"><span class="koboSpan" id="kobo.56.1">Pub</span></em><span class="koboSpan" id="kobo.57.1"> is short for </span><em class="italic"><span class="koboSpan" id="kobo.58.1">Publisher</span></em><span class="koboSpan" id="kobo.59.1"> and </span><em class="italic"><span class="koboSpan" id="kobo.60.1">Sub</span></em><span class="koboSpan" id="kobo.61.1"> is short for </span><em class="italic"><span class="koboSpan" id="kobo.62.1">Subscriber</span></em><span class="koboSpan" id="kobo.63.1">. </span><span class="koboSpan" id="kobo.63.2">Essentially, this pattern revolves around publishing data, contextually called messages, to an intermediary messaging system, which can be described as resilient and reliable, and then having subscribing applications monitor this intermediary system. </span><span class="koboSpan" id="kobo.63.3">Once a message is detected, the subscribing application will conduct its processing as necessary.</span></p>
+<h2 id="_idParaDest-64"><a id="_idTextAnchor063"/><span class="koboSpan" id="kobo.64.1">Understanding message queues</span></h2>
+<p><span class="koboSpan" id="kobo.65.1">Before we </span><a id="_idIndexMarker150"/><span class="koboSpan" id="kobo.66.1">explore </span><a id="_idIndexMarker151"/><span class="koboSpan" id="kobo.67.1">the Pub-Sub method, we need to understand the basics of messaging systems and how they work. </span><span class="koboSpan" id="kobo.67.2">The first model we will look at is called a </span><em class="italic"><span class="koboSpan" id="kobo.68.1">message queue</span></em><span class="koboSpan" id="kobo.69.1">. </span><span class="koboSpan" id="kobo.69.2">A message queue is usually implemented as a bridge between two systems, a publisher and a consumer. </span><span class="koboSpan" id="kobo.69.3">When a publisher places messages in the queue, a consumer processes the information in the message as soon as it becomes available. </span><span class="koboSpan" id="kobo.69.4">Queues </span><a id="_idIndexMarker152"/><span class="koboSpan" id="kobo.70.1">enforce a </span><strong class="bold"><span class="koboSpan" id="kobo.71.1">first-in-first-out</span></strong><span class="koboSpan" id="kobo.72.1"> (</span><strong class="bold"><span class="koboSpan" id="kobo.73.1">FIFO</span></strong><span class="koboSpan" id="kobo.74.1">) delivery method, so the order of processing can always be guaranteed. </span><span class="koboSpan" id="kobo.74.2">This is usually implemented in a one-to-one communication scenario, so a specific queue is provisioned for each subscribing application. </span><span class="koboSpan" id="kobo.74.3">Payment systems tend to use this pattern heavily, where the actual sequence of submitted payments matters and they need to ensure the resilience of the instructions. </span><span class="koboSpan" id="kobo.74.4">If you think about it, payment systems generally have a very low failure rate. </span><span class="koboSpan" id="kobo.74.5">Most of the time when we submit a payment request, we can rest assured that it will be completed successfully at some point in the future.</span></p>
+<p><em class="italic"><span class="koboSpan" id="kobo.75.1">Figure 4.1</span></em><span class="koboSpan" id="kobo.76.1"> shows a publisher interacting with several message queues.</span></p>
+<div>
+<div class="IMG---Figure" id="_idContainer018">
+<span class="koboSpan" id="kobo.77.1"><img alt="Figure 4.1 – Each message queue ensures that each application gets the exact data it needs and nothing more" src="image/Figure_4.1_B19100.jpg"/></span>
+</div>
+</div>
+<p class="IMG---Caption" lang="en-US" xml:lang="en-US"><span class="koboSpan" id="kobo.78.1">Figure 4.1 – Each message queue ensures that each application gets the exact data it needs and nothing more</span></p>
+<p><span class="koboSpan" id="kobo.79.1">The unfortunate thing here is that one bad message can spell trouble for the other messages waiting in the queue, and so we have to consider this potential downside. </span><span class="koboSpan" id="kobo.79.2">We also have to consider that we have our first chink in the armor. </span><span class="koboSpan" id="kobo.79.3">Messages are also discarded after they are read, so special provisions need to be made for messages that were not processed successfully.</span></p>
+<p><span class="koboSpan" id="kobo.80.1">While message queues do have their uses and bring a certain level of reliability to our system design, in a distributed system, they can be a bit inefficient and introduce some cons that we </span><a id="_idIndexMarker153"/><span class="koboSpan" id="kobo.81.1">might not be prepared to live with. </span><span class="koboSpan" id="kobo.81.2">In that</span><a id="_idIndexMarker154"/><span class="koboSpan" id="kobo.82.1"> event, we turn our attention to a more distributed messaging setup such as a message bus. </span><span class="koboSpan" id="kobo.82.2">We will discuss this next.</span></p>
+<h2 id="_idParaDest-65"><a id="_idTextAnchor064"/><span class="koboSpan" id="kobo.83.1">Understanding message bus systems</span></h2>
+<p><span class="koboSpan" id="kobo.84.1">A </span><em class="italic"><span class="koboSpan" id="kobo.85.1">message bus</span></em><span class="koboSpan" id="kobo.86.1">, </span><em class="italic"><span class="koboSpan" id="kobo.87.1">event bus</span></em><span class="koboSpan" id="kobo.88.1">, or </span><em class="italic"><span class="koboSpan" id="kobo.89.1">service bus</span></em><span class="koboSpan" id="kobo.90.1"> provides</span><a id="_idIndexMarker155"/><span class="koboSpan" id="kobo.91.1"> interfaces, where one published message </span><a id="_idIndexMarker156"/><span class="koboSpan" id="kobo.92.1">can be processed by multiple or competing subscribers. </span><span class="koboSpan" id="kobo.92.2">This is advantageous in scenarios where we need to publish the same data to multiple applications or services. </span><span class="koboSpan" id="kobo.92.3">This way, we do not need to connect to multiple queues to send a message, but we can have one connection, complete one </span><em class="italic"><span class="koboSpan" id="kobo.93.1">send</span></em><span class="koboSpan" id="kobo.94.1"> action, and not worry about the rest.</span></p>
+<p><em class="italic"><span class="koboSpan" id="kobo.95.1">Figure 4.2</span></em><span class="koboSpan" id="kobo.96.1"> shows a publisher interacting with a message, which has several consumers.</span></p>
+<div>
+<div class="IMG---Figure" id="_idContainer019">
+<span class="koboSpan" id="kobo.97.1"><img alt="Figure 4.2 – This message bus has several consumers or subscribers listening for messages" src="image/Figure_4.2_B19100.jpg"/></span>
+</div>
+</div>
+<p class="IMG---Caption" lang="en-US" xml:lang="en-US"><span class="koboSpan" id="kobo.98.1">Figure 4.2 – This message bus has several consumers or subscribers listening for messages</span></p>
+<p><span class="koboSpan" id="kobo.99.1">Going back to our scenario where booking an appointment has several operational concerns, we can use a message bus to distribute data to the relevant services and allow them to complete their operations in their own time. </span><span class="koboSpan" id="kobo.99.2">Instead of making direct calls to the other APIs, our</span><a id="_idIndexMarker157"/><span class="koboSpan" id="kobo.100.1"> appointment booking API will</span><a id="_idIndexMarker158"/><span class="koboSpan" id="kobo.101.1"> create a message and place it on the message bus. </span><span class="koboSpan" id="kobo.101.2">The email and calendar services are subscribed to the message bus and process the message accordingly.</span></p>
+<p><span class="koboSpan" id="kobo.102.1">This pattern has several advantages where decoupling and application scalability are concerned. </span><span class="koboSpan" id="kobo.102.2">This aids in making the microservices even more independent from each other and reduces limitations associated with adding more services in the future. </span><span class="koboSpan" id="kobo.102.3">It also adds stability to the overall interactions of our services, since the message bus acts as a storage intermediary for the data needed to complete an operation. </span><span class="koboSpan" id="kobo.102.4">If a consuming service is unavailable, the message will be retained, and the pending messages will be processed once normalcy is restored. </span><span class="koboSpan" id="kobo.102.5">If all services are running and messages are backing up, then we can scale the number of instances of the services to reduce the message backlog more quickly.</span></p>
+<p><span class="koboSpan" id="kobo.103.1">There are several types of messages that you may encounter, but we will focus on two for this chapter. </span><span class="koboSpan" id="kobo.103.2">They are </span><strong class="bold"><span class="koboSpan" id="kobo.104.1">command</span></strong><span class="koboSpan" id="kobo.105.1"> and </span><strong class="bold"><span class="koboSpan" id="kobo.106.1">event</span></strong><span class="koboSpan" id="kobo.107.1"> messages. </span><span class="koboSpan" id="kobo.107.2">Command messages essentially </span><a id="_idIndexMarker159"/><span class="koboSpan" id="kobo.108.1">request </span><a id="_idIndexMarker160"/><span class="koboSpan" id="kobo.109.1">some action is performed. </span><span class="koboSpan" id="kobo.109.2">So, our message to the calendar services sends an instruction for a calendar entry to be created. </span><span class="koboSpan" id="kobo.109.3">Given the nature of these commands, we can take advantage of this asynchronous pattern and have the messages get picked up eventually. </span><span class="koboSpan" id="kobo.109.4">That way, even large numbers of messages will be processed.</span></p>
+<p><span class="koboSpan" id="kobo.110.1">Event messages simply announce that some action took place. </span><span class="koboSpan" id="kobo.110.2">Since these messages are generated after an action, they are worded in the past tense and can be sent to several microservices. </span><span class="koboSpan" id="kobo.110.3">In this case, the message to the email service can be seen as an event and our email service will relay that information accordingly. </span><span class="koboSpan" id="kobo.110.4">This type of message generally has just enough information to let the consuming services know what action was completed.</span></p>
+<p><span class="koboSpan" id="kobo.111.1">Command messages are generally aimed at microservices that need to post or modify data. </span><span class="koboSpan" id="kobo.111.2">Until a message is consumed and actioned, the expected data will not be available for some amount</span><a id="_idIndexMarker161"/><span class="koboSpan" id="kobo.112.1"> of time. </span><span class="koboSpan" id="kobo.112.2">This is one of the key</span><a id="_idIndexMarker162"/><span class="koboSpan" id="kobo.113.1"> downsides to the asynchronous messaging model, and it is termed </span><strong class="bold"><span class="koboSpan" id="kobo.114.1">eventual consistency</span></strong><span class="koboSpan" id="kobo.115.1">. </span><span class="koboSpan" id="kobo.115.2">We need to explore this in more detail and discover the best approaches to take.</span></p>
+<h2 id="_idParaDest-66"><a id="_idTextAnchor065"/><span class="koboSpan" id="kobo.116.1">Understanding eventual consistency</span></h2>
+<p><span class="koboSpan" id="kobo.117.1">One of the biggest</span><a id="_idIndexMarker163"/><span class="koboSpan" id="kobo.118.1"> challenges we face in </span><a id="_idIndexMarker164"/><span class="koboSpan" id="kobo.119.1">microservices design is data management and developing a strategy for keeping data in sync, which sometimes means that we need to have multiple copies of the same data in several microservice databases. </span><strong class="bold"><span class="koboSpan" id="kobo.120.1">Eventual consistency</span></strong><span class="koboSpan" id="kobo.121.1"> is a notion in distributed computing systems that accepts that data will be out of sync for a period of time. </span><span class="koboSpan" id="kobo.121.2">This type of constraint is only acceptable in distributed systems and fault-tolerant applications.</span></p>
+<p><span class="koboSpan" id="kobo.122.1">It is easy enough to manage one dataset in one database, as is the case with a monolithic application, since data will always be up to date for any other part of the application to be able to access. </span><span class="koboSpan" id="kobo.122.2">A single database approach to our application gives us the guarantee of ACID transactions, which we discussed earlier, but we still are met with the challenge of </span><strong class="bold"><span class="koboSpan" id="kobo.123.1">concurrency</span></strong><span class="koboSpan" id="kobo.124.1"> management. </span><span class="koboSpan" id="kobo.124.2">Concurrency refers to the fact that we might have </span><a id="_idIndexMarker165"/><span class="koboSpan" id="kobo.125.1">multiple versions of the same data available at different points. </span><span class="koboSpan" id="kobo.125.2">This challenge is easier to manage in a single database application but presents a unique challenge in a distributed system.</span></p>
+<p><span class="koboSpan" id="kobo.126.1">It is a reasonable assumption that when data changes in one microservice, data will change in another and lead to some inconsistency between the data stores for a period. </span><span class="koboSpan" id="kobo.126.2">The </span><strong class="bold"><span class="koboSpan" id="kobo.127.1">CAP theorem</span></strong><span class="koboSpan" id="kobo.128.1"> introduces </span><a id="_idIndexMarker166"/><span class="koboSpan" id="kobo.129.1">the notion that we cannot guarantee all three of the main attributes of a distributed system: </span><strong class="bold"><span class="koboSpan" id="kobo.130.1">consistency</span></strong><span class="koboSpan" id="kobo.131.1">, </span><strong class="bold"><span class="koboSpan" id="kobo.132.1">availability</span></strong><span class="koboSpan" id="kobo.133.1">, and </span><strong class="bold"><span class="koboSpan" id="kobo.134.1">partition tolerance</span></strong><span class="koboSpan" id="kobo.135.1">:</span></p>
+<ul>
+<li><strong class="bold"><span class="koboSpan" id="kobo.136.1">Consistency</span></strong><span class="koboSpan" id="kobo.137.1">: This means </span><a id="_idIndexMarker167"/><span class="koboSpan" id="kobo.138.1">that every read operation against a data store will yield the current and most up-to-date version of the data, or an error will be raised if the system cannot guarantee that it is the latest.</span></li>
+<li><strong class="bold"><span class="koboSpan" id="kobo.139.1">Availability</span></strong><span class="koboSpan" id="kobo.140.1">: This means</span><a id="_idIndexMarker168"/><span class="koboSpan" id="kobo.141.1"> that data will always be returned for a read operation, even if this is not the latest guaranteed version.</span></li>
+<li><strong class="bold"><span class="koboSpan" id="kobo.142.1">Partition tolerance</span></strong><span class="koboSpan" id="kobo.143.1">: This</span><a id="_idIndexMarker169"/><span class="koboSpan" id="kobo.144.1"> means that systems will operate even when there might be transient errors that would stop a system under normal circumstances. </span><span class="koboSpan" id="kobo.144.2">Imagine we have minor connectivity issues between our services and/or messaging systems. </span><span class="koboSpan" id="kobo.144.3">Data updates will be delayed, but this principle will suggest that we need to choose between </span><strong class="bold"><span class="koboSpan" id="kobo.145.1">availability</span></strong><span class="koboSpan" id="kobo.146.1"> and </span><strong class="bold"><span class="koboSpan" id="kobo.147.1">consistency</span></strong><span class="koboSpan" id="kobo.148.1">.</span></li>
+</ul>
+<p><span class="koboSpan" id="kobo.149.1">Choosing consistency or availability is a very important decision moving forward. </span><span class="koboSpan" id="kobo.149.2">Given that microservices </span><a id="_idIndexMarker170"/><span class="koboSpan" id="kobo.150.1">need to be generally always</span><a id="_idIndexMarker171"/><span class="koboSpan" id="kobo.151.1"> available, we must be careful with our decision and how strictly we impose our constraints around a system’s consistency policy – eventual or strong.</span></p>
+<p><span class="koboSpan" id="kobo.152.1">There are scenarios where strong consistency is not required, since all the work that was performed by an operation is completed or rolled back. </span><span class="koboSpan" id="kobo.152.2">These updates are either lost (if rolled back) or will propagate to the other microservices in their own time, without having any detrimental effects on the overall operations of the application. </span><span class="koboSpan" id="kobo.152.3">If this model is selected, we can gauge our user experience through sensitization and letting them know that updates are not always immediate across the different screens and modules.</span></p>
+<p><span class="koboSpan" id="kobo.153.1">Using the Pub-Sub model is the number one way to implement this kind of event-driven communication between services, where they all communicate via a messaging bus. </span><span class="koboSpan" id="kobo.153.2">With the completion of each operation, each microservice will publish an event message to the message bus, and other services will pick this up and process it eventually.</span></p>
+<p><span class="koboSpan" id="kobo.154.1">To implement eventual consistency, we usually use event-driven communication using a publish-subscribe model. </span><span class="koboSpan" id="kobo.154.2">When data is updated in one microservice, you can publish a message to a central messaging bus, and other microservices that have copies of the data can receive a notification by subscribing to the bus. </span><span class="koboSpan" id="kobo.154.3">Because the calls are asynchronous, the individual microservices can continue to serve requests using the copy of the data that they already have, and the system needs to tolerate that while it might not be consistent right away, meaning that the data may not all be in sync immediately, eventually it will be consistent across the microservices. </span><span class="koboSpan" id="kobo.154.4">Of course, implementing eventual consistency can be more complex than just firing and forgetting messages to a message bus. </span><span class="koboSpan" id="kobo.154.5">Later in this book, we’ll look at ways we can mitigate the risks.</span></p>
+<p><span class="koboSpan" id="kobo.155.1">Until now, we have explored the concepts of using event-driven or Pub-Sub patterns to facilitate asynchronous communication. </span><span class="koboSpan" id="kobo.155.2">All of these concepts have been based on the idea that we have</span><a id="_idIndexMarker172"/><span class="koboSpan" id="kobo.156.1"> a messaging system persisting </span><a id="_idIndexMarker173"/><span class="koboSpan" id="kobo.157.1">and distributing messages between services and operations. </span><span class="koboSpan" id="kobo.157.2">Now, we need to explore some of our options in the forms of RabbitMQ and Azure Service Bus.</span></p>
+<h1 id="_idParaDest-67"><a id="_idTextAnchor066"/><span class="koboSpan" id="kobo.158.1">Configuring a message bus (RabbitMQ or Azure Service Bus)</span></h1>
+<p><span class="koboSpan" id="kobo.159.1">After waxing </span><a id="_idIndexMarker174"/><span class="koboSpan" id="kobo.160.1">poetic about messaging buses and queues, we can finally discuss two excellent options </span><a id="_idIndexMarker175"/><span class="koboSpan" id="kobo.161.1">for</span><a id="_idIndexMarker176"/><span class="koboSpan" id="kobo.162.1"> facilitating message-based service communication. </span><span class="koboSpan" id="kobo.162.2">They are </span><strong class="bold"><span class="koboSpan" id="kobo.163.1">RabbitMQ</span></strong><span class="koboSpan" id="kobo.164.1"> and </span><strong class="bold"><span class="koboSpan" id="kobo.165.1">Azure Service Bus</span></strong><span class="koboSpan" id="kobo.166.1">.</span></p>
+<p><span class="koboSpan" id="kobo.167.1">These are by no means the only options, nor are they the best, but they are popular and can get the job done. </span><span class="koboSpan" id="kobo.167.2">Alternatives that you may encounter </span><a id="_idIndexMarker177"/><span class="koboSpan" id="kobo.168.1">include </span><strong class="bold"><span class="koboSpan" id="kobo.169.1">Apache Kafka</span></strong><span class="koboSpan" id="kobo.170.1">, which </span><a id="_idIndexMarker178"/><span class="koboSpan" id="kobo.171.1">is famed for its high performance and low latency, or </span><strong class="bold"><span class="koboSpan" id="kobo.172.1">Redis Cache</span></strong><span class="koboSpan" id="kobo.173.1">, which </span><a id="_idIndexMarker179"/><span class="koboSpan" id="kobo.174.1">can double as a simple key-value caching store but also as a message broker. </span><span class="koboSpan" id="kobo.174.2">Ultimately, the tool you use is relative to what you need </span><a id="_idIndexMarker180"/><span class="koboSpan" id="kobo.175.1">and what the tool offers your context.</span></p>
+<p><span class="koboSpan" id="kobo.176.1">Let us explore how we can integrate with RabbitMQ in a .NET Core application.</span></p>
+<h2 id="_idParaDest-68"><a id="_idTextAnchor067"/><span class="koboSpan" id="kobo.177.1">Implementing RabbitMQ in an ASP.NET Core web API</span></h2>
+<p><span class="koboSpan" id="kobo.178.1">RabbitMQ </span><a id="_idIndexMarker181"/><span class="koboSpan" id="kobo.179.1">is the most deployed</span><a id="_idIndexMarker182"/><span class="koboSpan" id="kobo.180.1"> and used open source message broker, at least at the time of writing. </span><span class="koboSpan" id="kobo.180.2">It supports multiple operating systems, has a ready-to-go container image, and is a reliable intermediary messaging system that is supported by several programming languages. </span><span class="koboSpan" id="kobo.180.3">It also provides a management UI that allows us to review messages and overall system performance as part of monitoring measures. </span><span class="koboSpan" id="kobo.180.4">If you plan to deploy a messaging system on-premises, then RabbitMQ is an excellent option.</span></p>
+<p><span class="koboSpan" id="kobo.181.1">RabbitMQ supports sending </span><a id="_idIndexMarker183"/><span class="koboSpan" id="kobo.182.1">messages in two main ways – </span><strong class="bold"><span class="koboSpan" id="kobo.183.1">queues</span></strong><span class="koboSpan" id="kobo.184.1"> and </span><strong class="bold"><span class="koboSpan" id="kobo.185.1">exchanges</span></strong><span class="koboSpan" id="kobo.186.1">. </span><span class="koboSpan" id="kobo.186.2">We </span><a id="_idIndexMarker184"/><span class="koboSpan" id="kobo.187.1">already have an appreciation for what queues are, and exchanges support the message bus paradigm.</span></p>
+<p><span class="koboSpan" id="kobo.188.1">Let us take a look at what it takes to configure RabbitMQ on a Windows computer and what supporting C# code is needed to publish and consume. </span><span class="koboSpan" id="kobo.188.2">Let us start by including the </span><strong class="source-inline"><span class="koboSpan" id="kobo.189.1">MassTransit.RabbitMQ</span></strong><span class="koboSpan" id="kobo.190.1"> RabbitMQ package via NuGet. </span><span class="koboSpan" id="kobo.190.2">In our </span><strong class="source-inline"><span class="koboSpan" id="kobo.191.1">Program.cs</span></strong><span class="koboSpan" id="kobo.192.1"> file, we need to ensure that we configure </span><strong class="source-inline"><span class="koboSpan" id="kobo.193.1">MassTransit</span></strong><span class="koboSpan" id="kobo.194.1"> to use RabbitMQ by adding the following lines:</span></p>
+<pre class="source-code"><span class="koboSpan" id="kobo.195.1">
+builder.Services.AddMassTransit(x =&gt;
+{
+    x.UsingRabbitMq();
+});</span></pre>
+<p><span class="koboSpan" id="kobo.196.1">This creates an injectable service that can be accessed in any other part of our code. </span><span class="koboSpan" id="kobo.196.2">We need to inject </span><strong class="source-inline"><span class="koboSpan" id="kobo.197.1">IPublishEndpoint</span></strong><span class="koboSpan" id="kobo.198.1"> into our code, and this will allow us to submit a message </span><a id="_idIndexMarker185"/><span class="koboSpan" id="kobo.199.1">to</span><a id="_idIndexMarker186"/><span class="koboSpan" id="kobo.200.1"> the RabbitMQ exchange:</span></p>
+<pre class="source-code"><span class="koboSpan" id="kobo.201.1">
+[ApiController]
+[Route("api/[controller]")]
+public class AppointmentsController : ControllerBase
+{
+    private readonly IPublishEndpoint _publishEndpoint;
+    private readonly IAppointmentRepository
+        _appointmentRepository;
+    public AppointmentsController (IAppointmentRepository
+        appointmentRepository, IPublishEndpoint
+            publishEndpoint)
+    {
+        _publishEndpoint = publishEndpoint;
+        _appointmentRepository = appointmentRepository;
+    }
+[HttpPost]
+public async Task&lt;IActionResult&gt; CreateAppointment
+    (AppointmentDto appointment)
+{
+       var appointment = new Appointment()
+       {
+         CustomerId = AppointmentDto.CustomerId,
+         DoctorId = AppointmentDto.DoctorId,
+         Date = AppointmentDto.Date
+       });
+       await _appointmentRepository.Create(appointment);
+      var appointmentMessage = new AppointmentMessage()
+       {
+        Id = appointment.Id
+         CustomerId = appointment.CustomerId,
+         DoctorId = appointment.DoctorId,
+         Date = appointment.Date
+       });
+       await _publishEndpoint.Publish(appointmentMessage);
+       return Ok();
+  }
+}</span></pre>
+<p><span class="koboSpan" id="kobo.202.1">After creating </span><a id="_idIndexMarker187"/><span class="koboSpan" id="kobo.203.1">an </span><a id="_idIndexMarker188"/><span class="koboSpan" id="kobo.204.1">appointment record, we can share the record’s details on the exchange. </span><span class="koboSpan" id="kobo.204.2">The different subscribers will pick up this message and process what they need. </span><span class="koboSpan" id="kobo.204.3">Consumers are generally created as windows or background worker services that are always on and running. </span><span class="koboSpan" id="kobo.204.4">The following example shows how a consumer’s code might look:</span></p>
+<pre class="source-code"><span class="koboSpan" id="kobo.205.1">
+public class AppointmentCreatedConsumer :
+    IConsumer&lt;AppointmentMessage&gt;
+{
+public async Task Consume(ConsumeContext&lt;Appointment
+    Message&gt; context)
+{
+   // Code to extract the message from the context and
+     complete processing – like forming email, etc…
+        var jsonMessage =
+            JsonConvert.SerializeObject(context.Message);
+        Console.WriteLine($"ApoointmentCreated message:
+            {jsonMessage}");
+      }
+}</span></pre>
+<p><span class="koboSpan" id="kobo.206.1">Our consumers will be able to receive any message of the </span><strong class="source-inline"><span class="koboSpan" id="kobo.207.1">AppointmentMessage</span></strong><span class="koboSpan" id="kobo.208.1"> type and use the information as they need to. </span><span class="koboSpan" id="kobo.208.2">Note that the data type for the message exchange is consistent between the producer and the consumer. </span><span class="koboSpan" id="kobo.208.3">So, it would be prudent of us to have a </span><strong class="source-inline"><span class="koboSpan" id="kobo.209.1">CommonModels</span></strong><span class="koboSpan" id="kobo.210.1"> project that sits in between and serves up these common data types.</span></p>
+<p><span class="koboSpan" id="kobo.211.1">If we implement this consumer in a console application, then we need to register a </span><strong class="bold"><span class="koboSpan" id="kobo.212.1">Bus Factory</span></strong><span class="koboSpan" id="kobo.213.1"> and subscribe </span><a id="_idIndexMarker189"/><span class="koboSpan" id="kobo.214.1">to the expected event endpoint. </span><span class="koboSpan" id="kobo.214.2">In this case, the endpoint that will be generated in RabbitMQ based on the type being published is </span><strong class="source-inline"><span class="koboSpan" id="kobo.215.1">appointment-created-event</span></strong><span class="koboSpan" id="kobo.216.1">. </span><span class="koboSpan" id="kobo.216.2">To create a console application that will listen until we terminate the instance, we need code that looks like this:</span></p>
+<pre class="source-code"><span class="koboSpan" id="kobo.217.1">
+var busControl = Bus.Factory.CreateUsingRabbitMq(cfg =&gt;
+{
+    cfg.ReceiveEndpoint("appointment-created-event", e =&gt;
+    {
+        e.Consumer&lt;AppointmentCreatedConsumer&gt;();
+    });
+});
+await busControl.StartAsync(new CancellationToken());
+try
+{
+    Console.WriteLine("Press enter to exit");
+    await Task.Run(() =&gt; Console.ReadLine());
+}
+finally
+{
+    await busControl.StopAsync();
+}</span></pre>
+<p><span class="koboSpan" id="kobo.218.1">Now that we</span><a id="_idIndexMarker190"/><span class="koboSpan" id="kobo.219.1"> have </span><a id="_idIndexMarker191"/><span class="koboSpan" id="kobo.220.1">seen in a nutshell what it takes to communicate with a RabbitMQ exchange, let us review what is needed to communicate with the cloud-based Azure Service Bus.</span></p>
+<h2 id="_idParaDest-69"><a id="_idTextAnchor068"/><span class="koboSpan" id="kobo.221.1">Implementing Azure Service Bus in an ASP.NET Core API</span></h2>
+<p><span class="koboSpan" id="kobo.222.1">Azure Service </span><a id="_idIndexMarker192"/><span class="koboSpan" id="kobo.223.1">Bus is an excellent </span><a id="_idIndexMarker193"/><span class="koboSpan" id="kobo.224.1">choice for cloud-based microservices. </span><span class="koboSpan" id="kobo.224.2">It is a fully managed enterprise message broker that supports queues as well as Pub-Sub topics. </span><span class="koboSpan" id="kobo.224.3">Given Microsoft Azure’s robust availability guarantees, this service supports load balancing, and we can be assured of secure and coordinated message transfers if we choose this option. </span><span class="koboSpan" id="kobo.224.4">Similar to RabbitMQ, Azure Service Bus has support for </span><strong class="bold"><span class="koboSpan" id="kobo.225.1">queues</span></strong><span class="koboSpan" id="kobo.226.1"> and </span><strong class="bold"><span class="koboSpan" id="kobo.227.1">topics</span></strong><span class="koboSpan" id="kobo.228.1">. </span><span class="koboSpan" id="kobo.228.2">Topics are the direct equivalent of </span><strong class="bold"><span class="koboSpan" id="kobo.229.1">exchanges</span></strong><span class="koboSpan" id="kobo.230.1">, where we can have multiple services subscribed and waiting on new messages. </span><span class="koboSpan" id="kobo.230.2">Let us reuse the concept we just explored with RabbitMQ and review the code needed to publish a message on a topic and see what consumers would look like. </span><span class="koboSpan" id="kobo.230.3">We are going to focus on the code in this section and assume that you have already created the following:</span></p>
+<ul>
+<li><span class="koboSpan" id="kobo.231.1">An Azure Service Bus resource</span></li>
+<li><span class="koboSpan" id="kobo.232.1">An Azure Service Bus topic</span></li>
+<li><span class="koboSpan" id="kobo.233.1">An Azure Service Bus subscription to the topic</span></li>
+</ul>
+<p><span class="koboSpan" id="kobo.234.1">These elements all need to exist, and we will retrieve a connection string to Azure Service Bus through the Azure portal. </span><span class="koboSpan" id="kobo.234.2">To get started with the code, add the </span><strong class="source-inline"><span class="koboSpan" id="kobo.235.1">Azure.Messaging.ServiceBus</span></strong><span class="koboSpan" id="kobo.236.1"> NuGet package to the producer and consumer projects.</span></p>
+<p><span class="koboSpan" id="kobo.237.1">In our publisher, we can create a service wrapper that can be injected into parts of the code that will publish messages. </span><span class="koboSpan" id="kobo.237.2">We will have something like this:</span></p>
+<pre class="source-code"><span class="koboSpan" id="kobo.238.1">
+public interface IMessagePublisher {
+    Task PublisherAsync&lt;T&gt; (T data);
+}
+public class MessagePublisher: IMessagePublisher {
+    public async Task PublishMessage&lt;T&gt; (T data, string
+       topicName) {
+         await using var client = new ServiceBusClient
+             (configuration["AzureServiceBusConnection"]);
+        ServiceBusSender sender = client.CreateSender
+            (topicName);
+        var jsonMessage =
+            JsonConvert.SerializeObject(data);
+        ServiceBusMessage finalMessage = new
+            ServiceBusMessage(Encoding.UTF8.GetBytes
+                (jsonMessage))
+        {
+            CorrelationId = Guid.NewGuid().ToString()
+        };
+        await sender.SendMessageAsync(finalMessage);
+        await client.DisposeAsync();
+}</span></pre>
+<p><span class="koboSpan" id="kobo.239.1">In this </span><a id="_idIndexMarker194"/><span class="koboSpan" id="kobo.240.1">code, we </span><a id="_idIndexMarker195"/><span class="koboSpan" id="kobo.241.1">declare an interface, </span><strong class="source-inline"><span class="koboSpan" id="kobo.242.1">IMessagePublisher.cs</span></strong><span class="koboSpan" id="kobo.243.1">, and implement it through </span><strong class="source-inline"><span class="koboSpan" id="kobo.244.1">MessagePublisher.cs</span></strong><span class="koboSpan" id="kobo.245.1">. </span><span class="koboSpan" id="kobo.245.2">When a message comes in, we create </span><strong class="source-inline"><span class="koboSpan" id="kobo.246.1">ServiceBusMessage</span></strong><span class="koboSpan" id="kobo.247.1"> and submit it to the specified topic.</span></p>
+<p><span class="koboSpan" id="kobo.248.1">We need to ensure that we register this service so that it can be injected into other parts of our code:</span></p>
+<pre class="source-code"><span class="koboSpan" id="kobo.249.1">
+services.AddScoped&lt;IMessagePublisher, MessagePublisher&gt;();</span></pre>
+<p><span class="koboSpan" id="kobo.250.1">Now, let us look at the same controller and how it would publish a message to Azure Service Bus </span><a id="_idIndexMarker196"/><span class="koboSpan" id="kobo.251.1">instead </span><a id="_idIndexMarker197"/><span class="koboSpan" id="kobo.252.1">of RabbitMQ:</span></p>
+<pre class="source-code"><span class="koboSpan" id="kobo.253.1">
+[ApiController]
+[Route("api/[controller]")]
+public class AppointmentsController : ControllerBase
+{
+    private readonly IMessageBus _messageBus;
+    private readonly IAppointmentRepository
+        _appointmentRepository;
+    public AppointmentsController (IAppointmentRepository
+        appointmentRepository, IMessageBus messageBus)
+    {
+      _appointmentRepository = appointmentRepository;
+      _messageBus = messageBus;
+    }
+[HttpPost]
+public async Task&lt;IActionResult&gt; CreateAppointment
+    (AppointmentDto appointment)
+{
+       var appointment = new Appointment()
+       {
+         CustomerId = AppointmentDto.CustomerId,
+         DoctorId = AppointmentDto.DoctorId,
+         Date = AppointmentDto.Date
+       });
+       await _appointmentRepository.Create(appointment);
+      var appointmentMessage = new AppointmentMessage()
+       {
+        Id = appointment.Id
+         CustomerId = appointment.CustomerId,
+         DoctorId = appointment.DoctorId,
+         Date = appointment.Date
+       });
+       await _messageBus.PublishMessage(appointmentMessage,
+           "appointments");
+       return Ok();
+  }
+}</span></pre>
+<p><span class="koboSpan" id="kobo.254.1">Now that we </span><a id="_idIndexMarker198"/><span class="koboSpan" id="kobo.255.1">know </span><a id="_idIndexMarker199"/><span class="koboSpan" id="kobo.256.1">how we can set up the publisher code, let us review what we need for a consumer. </span><span class="koboSpan" id="kobo.256.2">This code could be used by a background worker or Windows service to continuously monitor for new messages:</span></p>
+<pre class="source-code"><span class="koboSpan" id="kobo.257.1">
+public interface IAzureServiceBusConsumer
+    {
+        Task Start();
+        Task Stop();
+    }</span></pre>
+<p><span class="koboSpan" id="kobo.258.1">We start with defining an interface that outlines </span><strong class="source-inline"><span class="koboSpan" id="kobo.259.1">Start</span></strong><span class="koboSpan" id="kobo.260.1"> and </span><strong class="source-inline"><span class="koboSpan" id="kobo.261.1">Stop</span></strong><span class="koboSpan" id="kobo.262.1"> methods. </span><span class="koboSpan" id="kobo.262.2">This interface will be implemented by a consumer service class, which will connect to Azure Service Bus</span><a id="_idIndexMarker200"/><span class="koboSpan" id="kobo.263.1"> and</span><a id="_idIndexMarker201"/><span class="koboSpan" id="kobo.264.1"> begin executing code that listens to Service Bus for new messages and consumes them accordingly:</span></p>
+<pre class="source-code"><span class="koboSpan" id="kobo.265.1">
+    public class AzureServiceBusConsumer :
+        IAzureServiceBusConsumer
+    {
+        private readonly ServiceBusProcessor
+            appointmentProcessor;
+        private readonly string appointmentSubscription;
+        private readonly IConfiguration _configuration;
+        public AzureServiceBusConsumer(IConfiguration
+            configuration)
+        {
+           _configuration = configuration;
+            string appointmentSubscription =
+              _configuration.GetValue&lt;string&gt;
+                ("AppointmentProcessSubscription")
+            var client = new ServiceBusClient
+                (serviceBusConnectionString);
+            appointmentProcessor = client.CreateProcessor
+                ("appointments", appointmentSubscription);
+        }
+        public async Task Start()
+        {
+            appointmentProcessor.ProcessMessageAsync +=
+                ProcessAppointment;
+            appointmentProcessor.ProcessErrorAsync +=
+                ErrorHandler;
+            await appointmentProcessor
+                .StartProcessingAsync();
+        }
+        public async Task Stop()
+        {
+            await appointmentProcessor
+                .StopProcessingAsync();
+            await appointmentProcessor.DisposeAsync();
+        }
+        Task ErrorHandler(ProcessErrorEventArgs args)
+        {
+            Console.WriteLine(args.Exception.ToString());
+            return Task.CompletedTask;
+        }
+        private async Task ProcessAppointment
+            (ProcessMessageEventArgs args)
+        {
+            // Code to extract the message from the args,
+            parse to a concrete type, and complete 
+            processing – like
+forming email, etc…
+           await args.CompleteMessageAsync(args.Message);
+        }
+    }</span></pre>
+<p><span class="koboSpan" id="kobo.266.1">From these two examples of how we interact with message bus systems, we can see that they are conceptually very similar. </span><span class="koboSpan" id="kobo.266.2">Similar considerations and techniques would be employed for any of the other message bus systems supported by .NET Core libraries.</span></p>
+<p><span class="koboSpan" id="kobo.267.1">Surely, there are trade-offs when we implement this type of message-based communication. </span><span class="koboSpan" id="kobo.267.2">We now have an additional system and potential point of failure, so we must consider </span><a id="_idIndexMarker202"/><span class="koboSpan" id="kobo.268.1">the</span><a id="_idIndexMarker203"/><span class="koboSpan" id="kobo.269.1"> additional infrastructural requirements. </span><span class="koboSpan" id="kobo.269.2">We also see that the code required adds more complexity to our code base. </span><span class="koboSpan" id="kobo.269.3">Let us dive into some of the disadvantages of this approach.</span></p>
+<h1 id="_idParaDest-70"><a id="_idTextAnchor069"/><span class="koboSpan" id="kobo.270.1">Disadvantages of asynchronous communication between microservices</span></h1>
+<p><span class="koboSpan" id="kobo.271.1">As with any </span><a id="_idIndexMarker204"/><span class="koboSpan" id="kobo.272.1">system or programming method, there are always advantages and disadvantages that come with the territory. </span><span class="koboSpan" id="kobo.272.2">We have already explored why having an asynchronous messaging pattern is a good idea for operations that might be long-running. </span><span class="koboSpan" id="kobo.272.3">We need to ensure that the end user doesn’t spend too much time waiting on an entire operation to be completed. </span><span class="koboSpan" id="kobo.272.4">Messaging systems are an excellent way to shorten the perceived time it takes to complete an operation and allows services to operate as efficiently as possible on their own. </span><span class="koboSpan" id="kobo.272.5">They also aid in decoupling systems, allowing for greater scalability and introducing a certain level of stability to a system where data transfer and processing are concerned.</span></p>
+<p><span class="koboSpan" id="kobo.273.1">Now, disadvantages creep in when we analyze the real level of complexity that this pattern can introduce. </span><span class="koboSpan" id="kobo.273.2">Far more coordination needs to be considered when designing how our services interact with others, what data they need to share, and what events need to be posted when operations are completed. </span><span class="koboSpan" id="kobo.273.3">In the synchronous model, we will be more sure of tasks getting completed down the line, since we cannot move forward without a favorable response from the next service along the chain. </span><span class="koboSpan" id="kobo.273.4">In the asynchronous model using queues and buses, we have to rely on the consuming service(s) posting an event regarding the state of completion. </span><span class="koboSpan" id="kobo.273.5">We also have to ensure that there are no repeated calls and, in some cases, need to make a concerted effort to ensure that messages are processed in a specific order.</span></p>
+<p><span class="koboSpan" id="kobo.274.1">This brings us to another disadvantage in the form of data consistency. </span><span class="koboSpan" id="kobo.274.2">Remember that the initial response from the message bus suggests that the operation is successful, but this just means that data was successfully submitted to the bus. </span><span class="koboSpan" id="kobo.274.3">After this, our consuming services still need to follow through and complete their operations. </span><span class="koboSpan" id="kobo.274.4">If one or more of these services fails to process and potentially submits the data to a data store, then we'll end up with inconsistency in our data. </span><span class="koboSpan" id="kobo.274.5">This is something to be mindful of, as it can lead to</span><a id="_idIndexMarker205"/><span class="koboSpan" id="kobo.275.1"> detrimental side effects and user attrition.</span></p>
+<h1 id="_idParaDest-71"><a id="_idTextAnchor070"/><span class="koboSpan" id="kobo.276.1">Summary</span></h1>
+<p><span class="koboSpan" id="kobo.277.1">In this chapter, we explored a few things. </span><span class="koboSpan" id="kobo.277.2">We did a blow-by-blow comparison of how a process would be handled through synchronous API communication versus asynchronous communication. </span><span class="koboSpan" id="kobo.277.3">We then expanded our general knowledge of how messaging systems can be leveraged to support an asynchronous communication model for our services. </span><span class="koboSpan" id="kobo.277.4">In all of this, we discussed challenges that we can face with data consistency between operations and how we can gauge acceptable metrics for this unavoidable factor. </span><span class="koboSpan" id="kobo.277.5">In the latter parts, we reviewed two popular messaging systems and then discussed some of the outright disadvantages that we have to contend with in this paradigm.</span></p>
+<p><span class="koboSpan" id="kobo.278.1">In our next chapter, we will explore the </span><strong class="bold"><span class="koboSpan" id="kobo.279.1">Command-Query Responsibility Segregation</span></strong><span class="koboSpan" id="kobo.280.1"> (</span><strong class="bold"><span class="koboSpan" id="kobo.281.1">CQRS</span></strong><span class="koboSpan" id="kobo.282.1">) pattern and how it helps us to write cleaner code in our services.</span></p>
+</div>
+</body></html>

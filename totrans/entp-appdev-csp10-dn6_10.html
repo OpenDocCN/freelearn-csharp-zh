@@ -1,0 +1,469 @@
+<html><head></head><body>
+		<div id="_idContainer119">
+			<h1 id="_idParaDest-144"><em class="italic"><a id="_idTextAnchor714"/>Chapter 8</em>: All You Need to Know about Caching</h1>
+			<p>Caching is one of the key system design patterns that help in scaling any enterprise application along with improving response time. Any web application typically involves reading and writing data from and to a data store, which is usually a relational database such as SQL Server or a NoSQL database such as Cosmos DB. However, reading data from the database for every request is not efficient, especially when the data hasn't changed. This is because databases usually persist data to disk and it's a costly operation to load the data from disk and send it back to the browser client (or device in the case of mobile/desktop applications) or user. This is where caching comes into play. </p>
+			<p>Cache stores can be used as a primary source for retrieving data, falling back to the original data store only when the required data is not available in the cache, thus giving a faster response to the consuming application. When using caches this way, we also need to ensure that the cached data is expired/refreshed as and when the data in the original data store is updated.</p>
+			<p>In this chapter, we will learn about various techniques for caching data in .NET 6 applications as well as various caching components and the platforms available that can be integrated with a .NET 6 application. We will cover the following topics:</p>
+			<ul>
+				<li>Introduction to caching</li>
+				<li>Understanding the components of caching</li>
+				<li>Caching platforms</li>
+				<li>Designing a cache abstraction layer using distributed caching</li>
+			</ul>
+			<h1 id="_idParaDest-145"><a id="_idTextAnchor715"/><a id="_idTextAnchor716"/>Technical requirements</h1>
+			<p>A basic understanding of .NET Core, C#, Azure, and the .NET CLI is required. The code for the chapter can be found here: <a href="https://github.com/PacktPublishing/Enterprise-Application-Development-with-C-10-and-.NET-6-Second-Edition/tree/main/Chapter08">https://github.com/PacktPublishing/Enterprise-Application-Development-with-C-10-and-.NET-6-Second-Edition/tree/main/Chapter08</a>.</p>
+			<p>The instructions for the code examples can be found here: <a href="https://github.com/PacktPublishing/Enterprise-Application-Development-with-C-10-and-.NET-6-Second-Edition/tree/main/Enterprise%20Application">https://github.com/PacktPublishing/Enterprise-Application-Development-with-C-10-and-.NET-6-Second-Edition/tree/main/Enterprise%20Application</a>.</p>
+			<h1 id="_idParaDest-146"><a id="_idTextAnchor717"/><a id="_idTextAnchor718"/>Introduction to caching</h1>
+			<p>There are <a id="_idIndexMarker579"/>multiple ways to improve<a id="_idTextAnchor719"/> the performance of an application and caching is one of the key techniques used in enterprise applications. A <strong class="bold">cache</strong> is like<a id="_idIndexMarker580"/> a temporary data store, with a limited size and limited data, but has much faster data access compared to the original data source and usually holds only a subset of the data, the most frequently used data that does not change often.</p>
+			<p>A <strong class="bold">cache store</strong> could <a id="_idIndexMarker581"/>be as simple as the RAM of the computer that is used by the process during execution, or it could be something such as Redis, which uses both memory and disks to store data. The key thing here is that it is usually on hardware that has a lower access time compared to the original storage layer.</p>
+			<p>Caching can<a id="_idTextAnchor720"/> be implemented at every layer in the architecture so that data can be retrieved from the layer closest to the user. For example, in any web application, the moment a URL is typed in the browser and we press <em class="italic">Enter</em>, it goes through various web components that are involved in loading the web application, starting with the browser, proxies, and DNS, to the web server and database. Caching is something that can be applied at all these layers. </p>
+			<p>If data is cached in the browser, it can be loaded immediately. It can alternatively fall back to a higher layer if data is not available in the layer closest to the user, thus reducing the load on higher layers that are shared across multiple users, such as the application server and database tier. </p>
+			<p>The following figure depicts this discussion at a high level, where a request is flowing through various layers and is moved to a higher layer only when data is not available (represented by the dotted line) in the cache<a id="_idTextAnchor721"/>:</p>
+			<div>
+				<div id="_idContainer107" class="IMG---Figure">
+					<img src="image/Figure_8.1_B18507.jpg" alt="Figure 8.1 – Cache layers in a request flow&#13;&#10;"/>
+				</div>
+			</div>
+			<p class="figure-caption">Figure 8.1 – Cache layers in a request flow</p>
+			<p>Let's discuss <a id="_idIndexMarker582"/>some of these layers in application architecture where data can be cache<a id="_idTextAnchor722"/><a id="_idTextAnchor723"/>d.</p>
+			<h2 id="_idParaDest-147"><a id="_idTextAnchor724"/>Client caching</h2>
+			<p>Commonly <a id="_idIndexMarker583"/>requested<a id="_idIndexMarker584"/><a id="_idTextAnchor725"/> data can be cached on the client side to avoid unnecessary round trips to the server. For example, Microsoft's Outlook app downloads the most recent emails from the server and keeps a copy of them on the client side, and then periodically syncs for new emails. If there is a need to search for an email that isn't already downloaded, it goes back to the server.</p>
+			<p>Similarly, browsers can cache various resources and responses from a web application based on certain headers, and subsequent requests for the same resource load from the browser cache. For example, all JavaScript files, image files, and CSS are usually cached on the browser for a certain period. Also, a response from an API can be cached by sending appropriate response headers. Th<a id="_idTextAnchor726"/>is is also<a id="_idIndexMarker585"/> known as <strong class="bold">HTTP caching</strong> or <strong class="bold">response caching</strong>, wh<a id="_idTextAnchor727"/>ich<a id="_idIndexMarker586"/> is discussed in detail in a later se<a id="_idTextAnchor728"/><a id="_idTextAnchor729"/>ction.</p>
+			<h2 id="_idParaDest-148"><a id="_idTextAnchor730"/>Content Delivery Network (CDN)</h2>
+			<p>A <strong class="bold">Content Delivery Network</strong> (<strong class="bold">CDN</strong>) is a<a id="_idTextAnchor731"/><a id="_idIndexMarker587"/> set of servers<a id="_idIndexMarker588"/> that are globally distributed and are usually used to serve static content such as HTML, CSS, and video. Whenever an application requests a resource, if the CDN is enabled, the system will first look to load the resource from the CDN server that is physically closest to the user. However, if it is not available on the CDN server, the resource is retrieved from the server and is cached in the CDN to serve subsequent requests. Netflix is one such great example that heavily relies on its custom-built CDN to deliver content to users.</p>
+			<p>Microsoft also comes with Azure CDN, which is primarily used to serve static content. Also, Microsoft's CDN gives an option to integrate with Azure Storage, which we will be using in our e-commerce application to serve various product images. Similarly, AWS has Amazon Cloudfront <a id="_idIndexMarker589"/>and Google Cloud offers Cloud CDN as part of their respective e-storage <a id="_idIndexMarker590"/><a id="_idTextAnchor732"/><a id="_idTextAnchor733"/>offerings.</p>
+			<h2 id="_idParaDest-149"><a id="_idTextAnchor734"/>Web server caching</h2>
+			<p>Althou<a id="_idTextAnchor735"/>gh<a id="_idIndexMarker591"/> CDNs <a id="_idIndexMarker592"/>are great for static content, they come with additional costs and maintenance overhead in terms of refreshing data from application servers. To overcome these limitations, applications can use web servers or reverse proxies to serve static content. A lightweight NGINX server is one such example that can be used to serve static content.</p>
+			<p>We<a id="_idTextAnchor736"/>b servers can also cache dynamic content, such as an API response coming from the application server. Web servers such as NGINX or IIS, when configured as a reverse proxy, can be further used to cache dynamic content, thereby reducing the load on the application server by serving requests from its cache.</p>
+			<p class="callout-heading">Note</p>
+			<p class="callout">NGINX is an open source solution that is primarily known for its web server capabilities; ho<a id="_idTextAnchor737"/>wever, it can also be used as a reverse proxy, for load balancing, and more. For further reading, please refer to <a href="https://www.nginx.com/">https://www<span id="_idTextAnchor738"/><span id="_idTextAnchor739"/>.nginx.com/</a>.</p>
+			<h2 id="_idParaDest-150"><a id="_idTextAnchor740"/>Database caching</h2>
+			<p>Increasin<a id="_idTextAnchor741"/>gly, database<a id="_idIndexMarker593"/> servers <a id="_idIndexMarker594"/>cache certain components of a query; for example, SQL Server usually has cache execution plans and also has a data buffer to cache, and MongoDB keeps recently queried data in memory for faster retrieval. So, it is good to tweak these settings to improve the performance of the application.</p>
+			<p class="callout-heading">Note </p>
+			<p class="callout">Database caching doesn't guarantee that subsequent execution of the same query executes with zero CPU consumption; that is, it is not practically free. The same query in subsequent <a id="_idIndexMarker595"/>requests<a id="_idIndexMarker596"/> executes a<a id="_idTextAnchor742"/><a id="_idTextAnchor743"/>t a faster pace.</p>
+			<h2 id="_idParaDest-151"><a id="_idTextAnchor744"/>Application caching</h2>
+			<p>Applicati<a id="_idTextAnchor745"/>on<a id="_idIndexMarker597"/> caching<a id="_idIndexMarker598"/> can be achieved by caching data retrieved from the storage layer within the application server. This is mostly done in the following two ways:</p>
+			<ul>
+				<li>Stored in the memory of the application server, also known as in-memory caching</li>
+				<li>Stored in an external store, such as Redis or Memcached, that has a faster access time as compared to the underlying original data store</li>
+			</ul>
+			<p>Application caching usually involves integrating extra code within the application logic to cache data. So, whenever a request for data is made, the application first looks in the cache. But if it's not available in the cache, the application will fall back to the original data store, such as a database. Usually, the size of the application cache is limited compared to the original data store, so internally, application caching platforms <a id="_idTextAnchor746"/>will employ various<a id="_idIndexMarker599"/> algorithms such as <strong class="bold">Least Recently Used</strong> (<strong class="bold">LRU</strong>) or <strong class="bold">Least Frequently Used</strong> (<strong class="bold">LFU</strong>) to <a id="_idIndexMarker600"/>clean up the data stored in the cache. <a id="_idTextAnchor747"/>We will discuss more about caching platforms in the <em class="italic">Caching platforms</em> section.</p>
+			<p>Another importa<a id="_idTextAnchor748"/>nt point to consider for application caches is data invalidation, which is how frequently data needs to be expired or synced with the original data source. So, things such as cache expiry and various strategies to update the cache with the original data store (read-through, write-through) need to be considered. We will discuss more cache invalidation/refresh strategies in the <em class="italic">Cache acce<a id="_idTextAnchor749"/><a id="_idTextAnchor750"/>ss patterns</em> section.</p>
+			<h1 id="_idParaDest-152"><a id="_idTextAnchor751"/>Understanding the components of caching</h1>
+			<p>Bef<a id="_idTextAnchor752"/>ore we<a id="_idIndexMarker601"/> understand the various possible cache stores/platforms available in .NET 6 applications, we need to understand the various components of caching that are available in .NET 6 and how to use them in enterprise applications. Along the way, we will also cover various cache eviction strategies and techniques to <a id="_idIndexMarker602"/>keep the cache in sync with<a id="_idTextAnchor753"/><a id="_idTextAnchor754"/> original data stores.</p>
+			<h2 id="_idParaDest-153">Response cachin<a id="_idTextAnchor755"/>g</h2>
+			<p>Response caching<a id="_idIndexMarker603"/> is a<a id="_idIndexMarker604"/> caching technique supported by HTTP to cache the response to a request made using HTTP or HTTPS either on the client (for example, a browser) or an intermediate proxy server. From an implementation standpoint, this is controlled by setting the appropriate value for the <strong class="source-inline">Cache-Control</strong> header in both requests and responses. A typical <strong class="source-inline">Cache-Control</strong> header will look as follows:</p>
+			<pre class="source-code">Cache-Control:public,max-age=10</pre>
+			<p>In this case, if the header is present in the response, the server is telling the client/proxy (public) that the client can cache the response for 10 seconds (<strong class="source-inline">max-age=10</strong>). However, the client can still override it and cache it for a shorter duration; that is, if both the request and response set the cache headers, the cache duration would be the minimum of both.</p>
+			<p>Along with <strong class="source-inline">max-age</strong>, as per the HTTP specification (<a href="https://tools.ietf.org/html/rfc7234#section-5.2">https://tools.ietf.org/html/rfc7234#section-5.2</a>), <strong class="source-inline">Cache-Control</strong> can additionally hold the following values:</p>
+			<ul>
+				<li><strong class="bold">Public</strong>: The response can be cached anywhere – client/server/intermediate proxy server.</li>
+				<li><strong class="bold">Private</strong>: The response can be stored for a specific user but not in a shared cache server; for example, it can be stored in the client browser or application server.</li>
+				<li><strong class="bold">No-cache</strong>: The response cannot be cached.</li>
+			</ul>
+			<p>Other headers that play a role in response caching are the following:</p>
+			<ul>
+				<li><strong class="bold">Age</strong>: This is a response header indicating the duration for which an object is present in the cache (proxy/browser). The accepted value is an integer and represents the duration in seconds.</li>
+				<li><strong class="bold">Vary</strong>: This is the <a id="_idTextAnchor756"/>response header that, when received, tells the client the request header on which basis the responses are cached. The value of this header is one of the request headers and based on the value of that header, the client can decide whether to use a cached response or download data from the server. For example, if <strong class="source-inline">Vary</strong> is set to the <strong class="source-inline">user-agent</strong> value, responses are uniquely cached per <strong class="source-inline">user-agent</strong>.</li>
+			</ul>
+			<p>The followin<a id="_idIndexMarker605"/>g screenshot shows response headers related to<a id="_idIndexMarker606"/> the cache for a s<a id="_idTextAnchor757"/>ample request in Postman:</p>
+			<div>
+				<div id="_idContainer108" class="IMG---Figure">
+					<img src="image/Figure_8.2_B18507.jpg" alt="Figure 8.2 – Sample response with Cache-Control and Vary headers&#13;&#10;"/>
+				</div>
+			</div>
+			<p class="figure-caption">Figure 8.2 – Sample response with Cache-Control and Vary heade<a id="_idTextAnchor758"/>rs</p>
+			<p>The following sequence diagram shows a sample API built using ASP.NET Core 6 that has response cac<a id="_idTextAnchor759"/>hing middleware enabled:</p>
+			<div>
+				<div id="_idContainer109" class="IMG---Figure">
+					<img src="image/Figure_8.3_B18507.jpg" alt="Figure 8.3 – Response cache sequence diagram&#13;&#10;"/>
+				</div>
+			</div>
+			<p class="figure-caption">Figure 8.3 – Response cache sequence <a id="_idTextAnchor760"/>diagram</p>
+			<p>After creating a<a id="_idIndexMarker607"/> new ASP.NET Core 6 MVC/Web API<a id="_idIndexMarker608"/> application, or using an existing ASP.NET Core 6 MVC/Web API application, to configure response caching, the following code changes are required:</p>
+			<ol>
+				<li>Add <strong class="source-inline">builder.Services.AddResponseCaching()</strong> to <strong class="source-inline">Program.cs</strong> and add the required middleware using <strong class="source-inline">app.UseResponseCaching()</strong>. This middleware holds the required logic to cache data. Ensure this middleware is injected before <strong class="source-inline">app.UseEndpoints</strong>.</li>
+				<li>Handle the response to set cache headers either through custom middleware or using the <strong class="source-inline">ResponseCache</strong> attribute.<p class="callout-heading">Note</p><p class="callout"><strong class="source-inline">UseCors</strong> must be called before <strong class="source-inline">UseResponseCaching</strong> when using CORS middleware. For further information on this ordering, please refer to <a href="https://github.com/dotnet/AspNetCore.Docs/blob/master/aspnetcore/fundamentals/middleware/index.md">https://github.com/dotnet/AspNetCore.Docs/blob/master/aspnetcore/fundamentals/middleware/index.md</a>.</p></li>
+			</ol>
+			<p>The <strong class="source-inline">R<a id="_idTextAnchor761"/>esponseCache</strong> attribute can be used for the entire controller or specific methods in a controller, and it accepts the following key properties:</p>
+			<ul>
+				<li><strong class="source-inline">Duration</strong>: A numeric value that sets the <strong class="source-inline">max-age</strong> value in the response header</li>
+				<li><strong class="source-inline">ResponseCacheLocation</strong>: An enum that takes three values – <strong class="source-inline">Any</strong>, <strong class="source-inline">Client</strong>, and <strong class="source-inline">None</strong> – and further sets the <strong class="source-inline">Cache-Control</strong> header to <strong class="source-inline">public</strong>, <strong class="source-inline">private</strong>, or <strong class="source-inline">no-store</strong></li>
+				<li><strong class="source-inline">VaryByHeader</strong>: A string that controls cache behavior to cache based on a specific header</li>
+				<li><strong class="source-inline">VaryByQueryKeys</strong>: An array of strings that accepts key values on which basis data is cached</li>
+			</ul>
+			<p>A<a id="_idIndexMarker609"/> typical<a id="_idIndexMarker610"/> method with the <strong class="source-inline">ResponseCache</strong> attribute looks like this:</p>
+			<pre class="source-code">        [HttpGet]</pre>
+			<pre class="source-code">        [ResponseCache(Duration = 500, VaryByHeader = </pre>
+			<pre class="source-code">          "user-agent", Location = </pre>
+			<pre class="source-code">          ResponseCacheLocation.Any, VaryByQueryKeys = </pre>
+			<pre class="source-code">          new[] { "Id" })]</pre>
+			<pre class="source-code">        public async Task&lt;IActionResult&gt; </pre>
+			<pre class="source-code">          Get([FromQuery]int Id = 0)</pre>
+			<p>This method would be cached for <strong class="source-inline">500</strong> seconds based on a unique <strong class="source-inline">user-agent</strong> header and <strong class="source-inline">Id</strong> value. If any of these values change, a response is served from the server, otherwise, it's served from the cache middleware.</p>
+			<p>As you can see here, we need to prefix the <strong class="source-inline">ResponseCache</strong> attribute to every controller/method. So, if the application has many controllers/methods, this could be a ma<a id="_idTextAnchor762"/>intenance overhead since, in order to make any changes to the way data is cached (such as changing the <strong class="source-inline">Duration</strong> value), we need to apply the change at the controller/method level, and that's where cache profiles come into play. </p>
+			<p>So, instead of setting properties individually, we can group them and give them a name in <strong class="source-inline">Program.cs</strong>, and that name can be used in the <strong class="source-inline">ResponseCache</strong> attribute. So, for the<a id="_idIndexMarker611"/> preceding properties, we can create a cache<a id="_idIndexMarker612"/> profile by adding the code shown here in <strong class="source-inline">Program.cs</strong>:</p>
+			<pre class="source-code">            builder.Services.AddControllers(options =&gt;</pre>
+			<pre class="source-code">            {</pre>
+			<pre class="source-code">                options.CacheProfiles.Add("Default", </pre>
+			<pre class="source-code">                  new CacheProfile {</pre>
+			<pre class="source-code">                    Duration = 500,</pre>
+			<pre class="source-code">                    VaryByHeader = "user-agent",</pre>
+			<pre class="source-code">                    Location = ResponseCacheLocation.Any,</pre>
+			<pre class="source-code">                    VaryByQueryKeys = new[] { "Id" } });</pre>
+			<pre class="source-code">            });</pre>
+			<p>And on the controller, call this cache profile using <strong class="source-inline">CacheProfileName</strong>:</p>
+			<pre class="source-code">[ResponseCache(CacheProfileName = "Default")]</pre>
+			<p>For an MVC application, <strong class="source-inline">CacheProfile</strong> can be configured in <strong class="source-inline">servi<a id="_idTextAnchor763"/><a id="_idTextAnchor764"/>ces.AddControllersWithViews()</strong>.</p>
+			<h2 id="_idParaDest-154"><a id="_idTextAnchor765"/>Distributed caching</h2>
+			<p>As we kno<a id="_idTextAnchor766"/>w, in<a id="_idIndexMarker613"/> a distributed system, the data store is split across multiple servers. Similarly, distributed caching is an extension of traditional caching in which cached data is stored in more than one server in a network. Before we get into distributed caching, here's a quick recap of the <strong class="bold">CAP theorem</strong>:</p>
+			<ul>
+				<li><strong class="bold">C</strong> stands for <a id="_idTextAnchor767"/>consistency, meaning the data is consistent across all the nodes and each node has the same copy of the data.</li>
+				<li><strong class="bold">A</strong> stan<a id="_idTextAnchor768"/>ds for availability, meaning the system is available, and the failure of one node doesn't cause the system to go down.</li>
+				<li><strong class="bold">P</strong> stands <a id="_idTextAnchor769"/>for partition-tolerant, meaning the system doesn't go down even if the communication between nodes goes d<a id="_idTextAnchor770"/>own.</li>
+			</ul>
+			<p>As per the CAP theorem, any distributed system can only achieve two of the preceding principles, and as<a id="_idIndexMarker614"/> distributed systems must be partition-tolerant (P), we can only achieve either consistency (C) of data or high availability (A) of data.</p>
+			<p>So, distributed caching is a cache strategy in which data is stored in multiple servers/nodes/shards outside the application server. Since data is distributed across multiple servers, if one server goes down, another server can be used as a backup to retrieve data. </p>
+			<p>For example, if our system wanted to cache countries, states, and cities, and if there are three caching servers in a distributed caching system, hypothetically there is a possibility that one of the cache servers will cache countries, another one will cache states, and one will cache cities (of course, in a real-time application, data is split in a much more complex way). </p>
+			<p>Also, each server will additionally act as a backup for one or more entities. So, on a high level, one type of distribut<a id="_idTextAnchor771"/>ed cache system looks as shown:</p>
+			<div>
+				<div id="_idContainer110" class="IMG---Figure">
+					<img src="image/Figure_8.4_B18507.jpg" alt="Figure 8.4 – Distributed caching high-level representation&#13;&#10;"/>
+				</div>
+			</div>
+			<p class="figure-caption">Figure 8.4 – Distributed caching high-level representation</p>
+			<p>As you<a id="_idIndexMarker615"/> can<a id="_idIndexMarker616"/> see, while reading data, it is read from the primary server, and if the primary server is not available, the caching system will fall back to the secondary server. Similarly, for writes, write operations are not complete until data<a id="_idTextAnchor772"/> is written to the primary as well as the secondary server. Until this operation is completed, read operations can be blocked, hence compromising the availability of the system. Another strategy for writes could be background synchronization, which will result in the eventual consistency of data, hence compromising the consistency of data until synchronization is completed. Going back to the CAP theorem, most distributed caching systems fall under the category of CP or AP.</p>
+			<p>The following are a few of the distributed caching providers that are integrated with .NET 6 applications:</p>
+			<ul>
+				<li>Redis Cache</li>
+				<li>Memcached</li>
+				<li>Couchbase</li>
+				<li>SQL Server</li>
+				<li>NCache</li>
+			</ul>
+			<p>This can be further extended to any cluster orchestration platform, for example, <strong class="bold">Terracotta</strong>, which<a id="_idIndexMarker617"/> takes care of managing various nodes and can distribute data <a id="_idTextAnchor773"/>to all nodes.</p>
+			<p>Although distributed caching has a lot of benefits, one possible disadvantage of distributed caching as opposed to single-server caching or in-process caching could be the introduced latency due to the possible extra hop and serialization/deserialization. So, if applications rely heavily on cached data, the design can consider a combination of in-memory cache and distributed cache. However, most scenarios are covered by integrating <a id="_idIndexMarker618"/>a well-implemented distributed <a id="_idIndexMarker619"/>caching system such as Redis, which <a id="_idTextAnchor774"/><a id="_idTextAnchor775"/>we will cover later in this chapter.</p>
+			<h2 id="_idParaDest-155"><a id="_idTextAnchor776"/>Cache access patterns</h2>
+			<p>Once<a id="_idIndexMarker620"/> <a id="_idTextAnchor777"/>object <a id="_idIndexMarker621"/>data is cached, there needs to be a design in place that takes care of refreshing the cache. Multiple cache access patterns can be implemented to handle this. A few key patterns are as follows:</p>
+			<ul>
+				<li>Cache-aside pattern</li>
+				<li>Read-through/write-through</li>
+				<li>Refresh-ahead</li>
+				<li>Write-behind</li>
+			</ul>
+			<p>Let's discuss each in detail.</p>
+			<h3>Cache-aside pattern</h3>
+			<p>As the <a id="_idIndexMarker622"/>name <a id="_idIndexMarker623"/>suggests, in the cache-aside pattern, the cache store is kept alongside the data store. In this pattern, the application code checks for data availability in the <a id="_idTextAnchor778"/>cache store. If it's not available in the cache store, the data is retrieved from the<a id="_idTextAnchor779"/> underlying data store and is updated in the cache. Subsequent requests would again query the data in the cache and if the data is available in the cache, it will be served from the cache. The cache-aside pattern relies on the concept of lazy loading, discussed in <a href="B18507_04_Epub.xhtml#_idTextAnchor205"><em class="italic">Chapter 4</em></a>, <em class="italic">Threading and Asynchronous Operations</em>, and populates as and when data is accessed for the first time; a subsequent request for the same entity would be loaded from cache.</p>
+			<p>The expiry of data in the cache store should be handled while updating the data in the original data store, and then subsequent reads will add the updated data to the cach<a id="_idTextAnchor780"/>e again.</p>
+			<p>The following are the<a id="_idIndexMarker624"/> advantages of this pattern:</p>
+			<ul>
+				<li>Simplified implementation compared to the read-through/write-through patterns covered in the next section. As the cache isn't the primary data source in the application, we do not need additional classes to synchronize the cache store with the data store.</li>
+				<li>As it relies on the lazy loading principle, the cache is populated only when any data is accessed at least once.<a id="_idTextAnchor781"/></li>
+			</ul>
+			<p>However, there are a few<a id="_idIndexMarker625"/> cons associated with this pattern:</p>
+			<ul>
+				<li>It leads to the possibility of a greater number of cache misses. Cache misses should always be minimal as they introduce latency in the application due to the additional hop.</li>
+				<li>If cache expiry is missed during data updates, it can lead to stale data in the cache. This can occur if data is updated by a background/external process that doesn't have information on the cach<a id="_idTextAnchor782"/>ing system.</li>
+			</ul>
+			<p>One way to mitigate issues with expiration is <a id="_idIndexMarker626"/>to set the <strong class="bold">Time to Live</strong> (<strong class="bold">TTL</strong>) for each entity so that objects are automatically expired after a certain period. However, the TTL duration needs to be carefully evaluated after monitoring the data refresh rate. Another common practice in the case of the cache-aside pattern is to prepopulate the cache store during the startup of the application as this helps in reducing the number of cache misses. Most enterprise applications<a id="_idTextAnchor783"/> usually implement a caching layer using the cache-aside pattern<a id="_idIndexMarker627"/> and prepopulate it with master data <a id="_idIndexMarker628"/>rather than transactional data.</p>
+			<h3>Read-through/wri<a id="_idTextAnchor784"/>te-through</h3>
+			<p>In read-through/write-through, the<a id="_idIndexMarker629"/> application<a id="_idIndexMarker630"/> directly reads/writes data from the cache store; that is, the application uses it as a primary store and the cache layer is responsible for loading the data in the cache and also for writing any updates from the cache store back to the original store.</p>
+			<p>When the application wants to read an entity, it will directly request it from the cache store. If that entity is available in the cache, a response is returned. However, if it isn't present in the cache, the caching layer requests it from the original data store, which is updated in the cache for future use, and then the response is returned from the cache layer.</p>
+			<p>When updating an entity, the following steps occur:</p>
+			<ol>
+				<li value="1">It is first updated in the cache.</li>
+				<li>The cache layer writes it back to the original d<a id="_idTextAnchor785"/>ata store.</li>
+			</ol>
+			<p>The major <a id="_idIndexMarker631"/>advantages of this kind of system are as follows:</p>
+			<ul>
+				<li>Significant load reduction on the original data store, which is usually a database, as in most enterprise applications, all the calls would be served from the cache apart from calls from the cache layer to the data store.</li>
+				<li>Simplified application code as it only interacts with one store, unlike the cache-aside pattern, which interacts with the cache store as well as a data store from within the application code.</li>
+			</ul>
+			<p>A few disadvantages<a id="_idIndexMarker632"/> of this pattern are as follows:</p>
+			<ul>
+				<li>An additional mechanism is required to synchronize data between the cache and data store.</li>
+				<li>Cache updating becomes a bit tricky as it involves additional complexity to refresh the <a id="_idIndexMarker633"/>cache stor<a id="_idTextAnchor786"/>e.</li>
+			</ul>
+			<h3>Refresh-ahead</h3>
+			<p>The refresh-ahead<a id="_idIndexMarker634"/> strategy allows you to load <a id="_idIndexMarker635"/>data into the cache store asynchronously; that is, in this design, the application still talks directly to the cache store. However, the cache layer periodically refreshes the data before the data in the cache expires. The refresh happens asynchronously for the entries that were accessed most recently and are refreshed from the original store asynchronously before their expiration. This way, there won't be any latency in the application if any item cache is expire<a id="_idTextAnchor787"/>d.</p>
+			<h3>Write-behind</h3>
+			<p>In the <a id="_idIndexMarker636"/>write-behind<a id="_idIndexMarker637"/> strategy, data is updated into the cache store first and asynchronously updated back to the data store, as opposed to the write-through strategy in which data is immediately updated to the data store. One of the key advantages of this strategy is reduced latency. However, as data is updated asynchronously (writing to the data store and cache store are two different transactions) to the data store, there should be a rollback mechanism implemented in case there is ever a failure.</p>
+			<p>Typically, this is much more complex to implement as opposed to write-through due to the additional handling needed to avoid any data loss during asynchronous updates, but it's still a good pattern to integrate if there is a requirement to have the cache store as the primary source.</p>
+			<p>All the patterns discussed up to now can be visuali<a id="_idTextAnchor788"/>zed at a high level as shown in the following figure:</p>
+			<div>
+				<div id="_idContainer111" class="IMG---Figure">
+					<img src="image/Figure_8.5_B18507.jpg" alt="Figure 8.5 – Cache patterns&#13;&#10;"/>
+				</div>
+			</div>
+			<p class="figure-caption">Figure 8.5 – Cache patterns</p>
+			<p>Up to now, we have seen various caching patterns and strategies. In the next section, we will discuss <a id="_idIndexMarker638"/>various cache pro<a id="_idTextAnchor789"/><a id="_idTextAnchor790"/>viders and their <a id="_idIndexMarker639"/>integration with .NET 6 <a id="_idTextAnchor791"/>applications.</p>
+			<h1 id="_idParaDest-156"><a id="_idTextAnchor792"/>Caching platforms</h1>
+			<p>.NET 6 supports <a id="_idIndexMarker640"/>multiple caching platforms. A few of the commonly used cache platforms ar<a id="_idTextAnchor793"/>e as follows:</p>
+			<ul>
+				<li><strong class="bold">In-memory cache</strong>: In this, the cache data is stored inside the process memory. For example, if the application is hosted on IIS, the in-memory cache will consume<a id="_idTextAnchor794"/> memory from <strong class="source-inline">w3wp.exe</strong>.</li>
+				<li><strong class="bold">Distributed cache</strong>: Data is stored across multiple servers. The data stores that can be integrated wit<a id="_idTextAnchor795"/><a id="_idTextAnchor796"/>h .NET 6 applications are SQL Server, Redis, and NCache.</li>
+			</ul>
+			<h2 id="_idParaDest-157">In-me<a id="_idTextAnchor797"/>mory cache</h2>
+			<p>To configure<a id="_idIndexMarker641"/> memory <a id="_idIndexMarker642"/>caching, after creating a new ASP.NET Core 6 MVC/Web API application, or for an existing ASP.NET Core 6 MVC/Web API application, the following code changes are required:</p>
+			<ol>
+				<li value="1">Add <strong class="source-inline">builder.Services.AddMemoryCache()</strong> to <strong class="source-inline">Program.cs</strong>. The <strong class="source-inline">MemoryCache</strong> class is a built-in implementation of <strong class="source-inline">IMemoryCache</strong> in .NET 6 and would be available in any C# class via <strong class="source-inline">IMemoryCache</strong>. It is instantiated using constructor injection. Object creation happens using <strong class="bold">Dependency Injection</strong> (<strong class="bold">DI</strong>), as covered in <a href="B18507_05_Epub.xhtml#_idTextAnchor445"><em class="italic">Chapter 5</em></a>, <em class="italic">Dependency Injection in .NET 6</em>. So, to cache any entity to the memory cache, create a property of <strong class="source-inline">IMemoryCache</strong> and create an instance of <strong class="source-inline">MemoryCache</strong> using constructor injection. </li>
+				<li><strong class="source-inline">MemoryCache</strong> exposes many methods, but a few important ones are <strong class="source-inline">Get</strong> (to get the value of a key), <strong class="source-inline">Set</strong> (to insert a key and its value), and <strong class="source-inline">Re<a id="_idTextAnchor798"/>move</strong> (to remove a key (cache expiration)).</li>
+				<li>While creating a cache object (using <strong class="source-inline">Set</strong> or other methods), the memory cache can be configured for various parameters using <strong class="source-inline">MemoryCacheEntryOptions</strong>. The following properties are supported:</li>
+			</ol>
+			<p>a. <strong class="source-inline">SetAbsoluteExpiration</strong>: The<a id="_idIndexMarker643"/> absolute <strong class="bold">Time To Live </strong>(<strong class="bold">TTL</strong>) for a cache entry can be set in <strong class="source-inline">TimeSpan</strong> or the exact date and time (<strong class="source-inline">DateTime</strong>) until<a id="_idIndexMarker644"/> which <a id="_idIndexMarker645"/>the cache is valid.</p>
+			<p>b. <strong class="source-inline">SetSlidingExpiration</strong>: The inactive time for the cache after which the cache entry is removed from the cache. For example, a sliding expiration value of 5 seconds will wait for the cache entry to be inactive for 5 seconds. Sliding expiration should always be less than absolute expiration as the cache would expire after the absolute expiration duration has been reached irrespective of the sliding expiration duration.</p>
+			<p>c. <strong class="source-inline">SetPriority</strong>: As<a id="_idIndexMarker646"/> cache size is limited while performing <a id="_idIndexMarker647"/>cache eviction (<strong class="bold">Least Recently Used</strong> (<strong class="bold">LRU)</strong>, <strong class="bold">Least Frequently Used (LFU</strong>)), the priority of the cache entry is also considered. <strong class="source-inline">SetPriority</strong> can be used to set the priority for a cache entry through a <strong class="source-inline">CacheItemPriority</strong> enum. Its default value is <strong class="source-inline">CacheItemPriority.Normal</strong>.</p>
+			<p>A simple Web API controller with memory cache integration as per the preceding steps will look like this:</p>
+			<pre class="source-code">    public class WeatherForecastController : ControllerBase</pre>
+			<pre class="source-code">    {</pre>
+			<pre class="source-code">        private IMemoryCache cache;</pre>
+			<pre class="source-code">        public WeatherForecastController(IMemoryCache </pre>
+			<pre class="source-code">          cache)</pre>
+			<pre class="source-code">        {</pre>
+			<pre class="source-code">            this.cache = cache;</pre>
+			<pre class="source-code">        }</pre>
+			<pre class="source-code">        [HttpGet]</pre>
+			<pre class="source-code">        public IActionResult Get()</pre>
+			<pre class="source-code">        {            </pre>
+			<pre class="source-code">            DateTime? cacheEntry;            </pre>
+			<pre class="source-code">            if (!cache.TryGetValue("Weather", </pre>
+			<pre class="source-code">              out cacheEntry))</pre>
+			<pre class="source-code">            {</pre>
+			<pre class="source-code">                cacheEntry = DateTime.Now;</pre>
+			<pre class="source-code">                var cacheEntryOptions = new </pre>
+			<pre class="source-code">                  MemoryCacheEntryOptions()</pre>
+			<pre class="source-code">                    .SetSlidingExpiration(</pre>
+			<pre class="source-code">                     TimeSpan.FromSeconds(50))</pre>
+			<pre class="source-code">                    .SetAbsoluteExpiration(</pre>
+			<pre class="source-code">                     TimeSpan.FromSeconds(100))</pre>
+			<pre class="source-code">                    .SetPriority(</pre>
+			<pre class="source-code">                     CacheItemPriority.NeverRemove);</pre>
+			<pre class="source-code">                cache.Set("Weather", cacheEntry, </pre>
+			<pre class="source-code">                  cacheEntryOptions);</pre>
+			<pre class="source-code">            }</pre>
+			<pre class="source-code">            cache.TryGetValue("Weather", out cacheEntry);</pre>
+			<pre class="source-code">            var rng = new Random();</pre>
+			<pre class="source-code">            return Ok(from temp in Enumerable.Range(1, 5)</pre>
+			<pre class="source-code">                   select new</pre>
+			<pre class="source-code">                   {</pre>
+			<pre class="source-code">                       Date = cacheEntry,</pre>
+			<pre class="source-code">                       TemperatureC = rng.Next(-20, 55),</pre>
+			<pre class="source-code">                       Summary = "Rainy day"</pre>
+			<pre class="source-code">                   });</pre>
+			<pre class="source-code">        }</pre>
+			<pre class="source-code">    }</pre>
+			<p>As you can see, this code is self-expl<a id="_idTextAnchor799"/>anatory and has an API using an in-memory cache.</p>
+			<p>One additional method that is available in <strong class="source-inline">MemoryCache</strong> is the integration of a callback method that is available through <strong class="source-inline">RegisterPostEvictionCallback</strong>. This is an extension method in <strong class="source-inline">MemoryCacheEntryOptions</strong> that accepts a <strong class="source-inline">PostEvictionDelegate</strong> delegate and a callback is triggered during cache entry expiration. The signature of <strong class="source-inline">PostEvictionDelegate</strong> is as follows:</p>
+			<pre class="source-code">public delegate void PostEvictionDelegate(object key, object value, EvictionReason reason, object state);</pre>
+			<p>So, that <a id="_idIndexMarker648"/>means<a id="_idIndexMarker649"/> the callback that we pass to <strong class="source-inline">RegisterPostEvictionCallback</strong> should follow the same signature, and as you can see, all the input parameters are self-explanatory. So, let's add a callback method and update <strong class="source-inline">cacheEntryOptions</strong> as follows:</p>
+			<pre class="source-code">private void EvictionCallback(object key, object value, EvictionReason reason, object state)</pre>
+			<pre class="source-code">{</pre>
+			<pre class="source-code">      Debug.WriteLine(reason);        </pre>
+			<pre class="source-code">}</pre>
+			<pre class="source-code">cacheEntryOptions.RegisterPostEvictionCallback(EvictionCallback);</pre>
+			<p>The code map<a id="_idTextAnchor800"/> of the weather controller is shown in the following s<a id="_idTextAnchor801"/>creenshot:</p>
+			<div>
+				<div id="_idContainer112" class="IMG---Figure">
+					<img src="image/Figure_8.6_B18507.jpg" alt="Figure 8.6 – Weather controller code map&#13;&#10;"/>
+				</div>
+			</div>
+			<p class="figure-caption">Figure 8.6 – Weather controller code map</p>
+			<p>Once we run this code, we can see that any subsequent calls to the controller after the absolute<a id="_idIndexMarker650"/> expiration of 50 seconds will trigger a callback and log<a id="_idIndexMarker651"/> the reason as <strong class="source-inline">Expiration</strong>. Once this is deployed to <strong class="source-inline">AppService</strong>, the callback is automatically triggere<a id="_idTextAnchor802"/><a id="_idTextAnchor803"/>d. Only for debugging pur<a id="_idTextAnchor804"/>poses would we need to make another call.</p>
+			<h2 id="_idParaDest-158"><a id="_idTextAnchor805"/>Distributed cache</h2>
+			<p>Having <a id="_idIndexMarker652"/>di<a id="_idTextAnchor806"/>scussed <a id="_idIndexMarker653"/>in-memory cache, let's move on to the other cache platforms that can be configured for distributed caching. Distributed caching, just like distributed storage systems, distributes the cache data to multiple servers to primarily support scaling. In this section, we <a id="_idIndexMarker654"/>will look at the different types of distributed <a id="_idIndexMarker655"/>cache, starting with SQL.</p>
+			<h3>SQL</h3>
+			<p>Distributed <a id="_idIndexMarker656"/>caching<a id="_idIndexMarker657"/> can be implemen<a id="_idTextAnchor807"/>ted with various stores, one of them being SQL Server. The first step to using SQL Server for distributed caching is to create the required SQL table that will sto<a id="_idTextAnchor808"/>re cache entries. The entire setup for SQL as a distributed caching store involves the following steps:</p>
+			<ol>
+				<li value="1">Open a command line in the administrator prompt and run the following command to install the <strong class="source-inline">dotnet-sql-cache</strong> package globally:<a id="_idTextAnchor809"/><p class="source-code"><strong class="bold">dotnet tool install ––global dotnet-sql-cache</strong></p></li>
+			</ol>
+			<p>This is how it appears:</p>
+			<div>
+				<div id="_idContainer113" class="IMG---Figure">
+					<img src="image/Figure_8.7_B18507.jpg" alt="Figure 8.7 – Installing the sql-cache package using the .NET CLI&#13;&#10;"/>
+				</div>
+			</div>
+			<p class="figure-caption">Figure 8.7 – Installing the sql-cache package using the .NET CLI</p>
+			<ol>
+				<li value="2">Create the required database (on-premises or using Azure SQL) and run the following command to create the table that stores cache data:<p class="source-code"><strong class="bold">dotnet sql-cache create "Data Source=.;Initial Catalog=DistributedCache;Integrated Security=true;" dbo cache</strong></p></li>
+			</ol>
+			<p>In this command, we are passing the connection string of the database (update it accordingly when running it locally) as one parameter and the other is the name o<a id="_idTextAnchor810"/>f the table (<strong class="source-inline">cache</strong> is the name of the table in the preceding snippet).</p>
+			<div>
+				<div id="_idContainer114" class="IMG---Figure">
+					<img src="image/Figure_8.8_B18507.jpg" alt="Figure 8.8 – Creating a SQL table for distributed caching&#13;&#10;"/>
+				</div>
+			</div>
+			<p class="figure-caption">Figure 8.8 – Creating a SQL table for distributed caching</p>
+			<ol>
+				<li value="3">Once the command has run successfully, if we open the SQL server in SSMS, we will see a table as shown in the following s<a id="_idTextAnchor811"/>creenshot that has the columns and indexes<a id="_idIndexMarker658"/> required <a id="_idIndexMarker659"/>for optimization:</li>
+			</ol>
+			<div>
+				<div id="_idContainer115" class="IMG---Figure">
+					<img src="image/Figure_8.9_B18507.jpg" alt="Figure 8.9 – Cache table in SQL distributed caching from SSMS&#13;&#10;"/>
+				</div>
+			</div>
+			<p class="figure-caption">Figure 8.9 – Cache<a id="_idTextAnchor812"/> table in SQL distributed caching from SSMS</p>
+			<ol>
+				<li value="4">Create a Web API application and install NuGet <strong class="source-inline">Microsoft.Extensions.Cach<a id="_idTextAnchor813"/>ing.SqlServer</strong> (either through the <strong class="bold">Package Manager Console</strong> (<strong class="bold">PMC</strong>) or using the .NET CLI).</li>
+				<li>In <strong class="source-inline">Program.cs</strong>, add the following code:<p class="source-code">builder.Services.AddDistributedSqlServerCache(options =&gt;</p><p class="source-code">{</p><p class="source-code">    options.ConnectionString = "Data Source=.;Initial </p><p class="source-code">      Catalog=DistributedCache;Integrated </p><p class="source-code">      Security=true;";</p><p class="source-code">    options.SchemaName = "dbo";</p><p class="source-code">    options.TableName = "Cache";</p><p class="source-code">});</p></li>
+				<li>To insert data into the cache, we need to make use of <strong class="source-inline">IDistributedCache</strong>, and the object will be created via constructor injection. So, clean up all the code in <strong class="source-inline">WeatherForecastController</strong> (the default controller created during the creation of the ASP.NET Core 6 Web API project) and add the following code (a Web API <a id="_idIndexMarker660"/>controller <a id="_idIndexMarker661"/>that has a <strong class="source-inline">Get</strong> method):<p class="source-code">    public class WeatherForecastController : ControllerBase</p><p class="source-code">    {</p><p class="source-code">        private readonly IDistributedCache </p><p class="source-code">          distributedCache;</p><p class="source-code">        public WeatherForecastController(</p><p class="source-code">          IDistributedCache distributedCache)</p><p class="source-code">        {</p><p class="source-code">            this.distributedCache = distributedCache;</p><p class="source-code">        }</p><p class="source-code">    }</p></li>
+				<li>Add the following <strong class="source-inline">Get</strong> method, w<a id="_idTextAnchor814"/>hich uses <strong class="source-inline">distributedCache</strong> and saves data to the cache store (SQL in this case):<p class="source-code">[HttpGet]</p><p class="source-code">public IActionResult Get()</p><p class="source-code">        {</p><p class="source-code">            DateTime? cacheEntry;</p><p class="source-code">            if (distributedCache.Get("Weather") == </p><p class="source-code">              null)</p><p class="source-code">            {</p><p class="source-code">                cacheEntry = DateTime.Now;</p><p class="source-code">                var cacheEntryOptions = new </p><p class="source-code">                  DistributedCacheEntryOptions()</p><p class="source-code">                    .SetSlidingExpiration(TimeSpan</p><p class="source-code">                    .FromSeconds(50))</p><p class="source-code">                    .SetAbsoluteExpiration(TimeSpan</p><p class="source-code">                    .FromSeconds(100));</p><p class="source-code">                distributedCache.SetString("Weather", </p><p class="source-code">                  cacheEntry.ToString(), </p><p class="source-code">                  cacheEntryOptions);</p><p class="source-code">            }</p><p class="source-code">            var cachedDate = </p><p class="source-code">              distributedCache.GetString("Weather");</p><p class="source-code">            var rng = new Random();</p><p class="source-code">            return Ok(from temp in Enumerable.Range(1, </p><p class="source-code">              5)</p><p class="source-code">                      select new</p><p class="source-code">                      {</p><p class="source-code">                          Date = cachedDate,</p><p class="source-code">                          TemperatureC = rng.Next(-20, </p><p class="source-code">                            55),</p><p class="source-code">                          Summary<a id="_idTextAnchor815"/> = "Rainy day"</p><p class="source-code">                      });</p><p class="source-code">        }</p></li>
+				<li>Run the application and we can see that the cache entry is g<a id="_idTextAnchor816"/>etting stored in the SQL database, as shown in the following screenshot:</li>
+			</ol>
+			<div>
+				<div id="_idContainer116" class="IMG---Figure">
+					<img src="image/Figure_8.10_B18507.jpg" alt=""/>
+				</div>
+			</div>
+			<p class="figure-caption">Figure 8.10 – Cache table in SQL distributed caching</p>
+			<p>As you can see, the code is very much like the <strong class="source-inline">MemoryCache</strong> code, except that we use <strong class="source-inline">IDistributedCache</strong> here to read/write data to cache and <strong class="source-inline">DistributedCacheEntryOptions</strong> for setting<a id="_idTextAnchor817"/> additional properties during cache entry creation.</p>
+			<p>A few <a id="_idIndexMarker662"/>recommendations <a id="_idIndexMarker663"/>for using SQL Server as a distributed caching store are as follows:</p>
+			<ul>
+				<li>SQL Server can be picked if the existing application does not support stores such as Redis. For example, an on-premises application that only integrates with SQL Server can easily extend SQL Server for caching purposes.</li>
+				<li>The cache database should be different from the application database as using the same databases can cause bottlenecks and defeats the purpose of using a cache.</li>
+				<li>The built-in implementation of <strong class="source-inline">IDistributedCache</strong> for SQL Server is <strong class="source-inline">SqlServerCache</strong> and does not support serializing a different schema for the caching table. Any customization has to be manually overridden by implementing <strong class="source-inline">IDistributedCache</strong> in a custom class.</li>
+			</ul>
+			<p>Up until now, we have seen in-memory caching and distributed caching using SQL Server. In the next section, we will see how to use Redis (one of the recommended stores and a widely used store for caching) f<a id="_idTextAnchor818"/>or distributed caching in .NET 6 applications.</p>
+			<h3>Redis</h3>
+			<p>Redis is an<a id="_idIndexMarker664"/> in-memory<a id="_idIndexMarker665"/> data store that is used for various purposes, such as databases, cache stores, and even as a message broker. The core data structure that Redis supports is key-value pairs where the value could be something as simple as a string, to a custom complex data type (nested classes). Redis works with an in-memory dataset and can also persist data to disk on a per-need basis. Redis also internally supports replication and automatic partitioning with Redis Cluster. With all these features available out of t<a id="_idTextAnchor819"/>he box, it's an ideal store for distributed caching.</p>
+			<p>Azure provides a managed instance for Redis servers<a id="_idTextAnchor820"/> known as <strong class="bold">Azure Cache for Redis</strong>, and just <a id="_idIndexMarker666"/>like any other PaaS service, it is managed by Microsoft. This allows application developers to integrate it as is and leave the infrastructure overhead of maintaining, scaling, and upgrading th<a id="_idTextAnchor821"/>e Redis server to Microsoft. Azure Cache for Redis can be used for distributed caching and can be easily integrated into .NET 6 applications using the following steps:</p>
+			<ol>
+				<li value="1">First, create an instance of Azure Cache for Redis as outlined at <a href="https://docs.microsoft.com/en-in/azure/azure-cache-for-redis/quickstart-create-redis">https://docs.microsoft.com/en-in/azure/azure-cache-for-redis/quickstart-create-redis</a>. Navigate to <strong class="bold">Access keys</strong> and copy the <a id="_idTextAnchor822"/>value under <strong class="bold">Primary connection string</strong>, as shown in the following screenshot:</li>
+			</ol>
+			<div>
+				<div id="_idContainer117" class="IMG---Figure">
+					<img src="image/Figure_8.11_B18507.jpg" alt="Figure 8.11 – Cache key from Azure Cache for Redis&#13;&#10;"/>
+				</div>
+			</div>
+			<p class="figure-caption">Figure 8.11 – Cache key from Azure Cache for Redis</p>
+			<ol>
+				<li value="2">Create an ASP.NET Core 6 Web API application and install the NuGet <strong class="source-inline">Microsoft.Extensions.Caching.StackExchangeRedis</strong> package.</li>
+				<li>In <strong class="source-inline">Program.cs</strong>, add the following code:<p class="source-code">            builder.Services.AddStackExchangeRedisCache(</p><p class="source-code">                options =&gt;</p><p class="source-code">                {</p><p class="source-code">                    options.Configuration = </p><p class="source-code">                      "&lt;Connection string copied in </p><p class="source-code">                        step 1&gt;";</p><p class="source-code">                });</p></li>
+				<li>Update<a id="_idIndexMarker667"/> the <a id="_idIndexMarker668"/>default <strong class="source-inline">WeatherForecastControll<a id="_idTextAnchor823"/>er</strong> controller with the same code as shown in the previou<a id="_idTextAnchor824"/>s <em class="italic">SQL</em> section.</li>
+				<li>Run the application and we can see that data gets stored in the cache for 10 seconds. Any calls within 50 seconds to this API will retrieve data from the cache.</li>
+				<li>Azure Cache for Redis also comes with a console that allows us to query the Redis server using Redis CLI commands. The console can be found in the Azure portal by navigating to the overview left menu of the Redis instance. Querying it fo<a id="_idTextAnchor825"/>r the <strong class="source-inline">Weather</strong> key will give us the results shown in the<a id="_idTextAnchor826"/> following screenshot:</li>
+			</ol>
+			<div>
+				<div id="_idContainer118" class="IMG---Figure">
+					<img src="image/Figure_8.12_B18507.jpg" alt="Figure 8.12 – Redis console&#13;&#10;"/>
+				</div>
+			</div>
+			<p class="figure-caption">Figure 8.12 – Redis console</p>
+			<p>If we go with the Premium tier of Azure Cache for Redis, it also <a id="_idTextAnchor827"/>supports multiple <a id="_idIndexMarker669"/>shards<a id="_idIndexMarker670"/> to support higher volumes of data and geo-replication for high availability.</p>
+			<ol>
+				<li value="7">Additionally, to add/remove keys from the cache store, there are the <strong class="source-inline">GetAsync</strong> and <strong class="source-inline">SetAsync</strong> methods, which can be used to store more complex types or any type other than string. However, these methods return/accept <strong class="source-inline">Task&lt;byte[]&gt;</strong>, so the application needs to handle serialization/deserialization, which can be seen in the reusable caching library.</li>
+			</ol>
+			<p>Redis is th<a id="_idTextAnchor828"/>e most preferred cache store for enterprise applications, and in our e-commerce application, we<a id="_idTextAnchor829"/> will use Azure Cache for Redis as our cache store. Some additional information about Azure Cache for Redis can be found at <a href="https://docs.microsoft.com/en-in/azure/azure-cache-for-redis/">https://docs.microsoft.com/<span id="_idTextAnchor830"/>en-in/azure/azure-cache-for-redis/</a>.</p>
+			<h3>Other providers</h3>
+			<p>As you can<a id="_idIndexMarker671"/> see, distributed caching in .NET 6 applications is driven by <strong class="source-inline">IDistributedCache</strong>, and whichever store's implementation is injected in the <strong class="source-inline">Program</strong> class cache store is configured accordingly. Additionally, there are two more providers that .NET 6 has a built-in implementation for:</p>
+			<ul>
+				<li><strong class="bold">NCache</strong>: This is a<a id="_idIndexMarker672"/> thir<a id="_idTextAnchor831"/>d-party cache store that is developed in .NET/.NET Core and has an implementation of <strong class="source-inline">IDistributedCache</strong>. NCache can be integrated like Redis or SQL. However, the NCache server needs to be configured locally for development and can be configured in IaaS using virtual machines or PaaS using app services.</li>
+				<li><strong class="bold">Distributed memory cache</strong> (<strong class="source-inline">AddDistributedMemoryCache</strong>): This is another<a id="_idIndexMarker673"/> buil<a id="_idTextAnchor832"/>t-in implementation of <strong class="source-inline">IDistributedCache</strong> and can be used similarly. It can be used for unit testing. Since it's not a distributed cache and uses process memory, it is not recommended for multiple application server scenarios. The only difference between <strong class="source-inline">AddMemoryCache(IMemoryCache)</strong> and <strong class="source-inline">AddDistributedMemoryCache(IDistributedCache)</strong> is that the latter one requires serialization to store complex data. So, if there is a type that cannot be serialized and needs to be cached, go with <strong class="source-inline">IMemoryCache</strong>, otherwise go with <strong class="source-inline">IDistributedCache</strong>.</li>
+			</ul>
+			<p>In enterprise applications, <strong class="source-inline">IDistributedCache</strong> can address all the caching layer implementation, and a combination of in-memory cache for a development/testing environment and Redis for a production environment would be ideal. If your application is hosted on a single server, you can go with an in-memory cache but that's very rare for production applications, hence it is most recommended to go with distributed caching.</p>
+			<p>So, based on all the principles and patterns that we've discussed, we will design a cache abstraction laye<a id="_idTextAnchor833"/><a id="_idTextAnchor834"/>r to be used in an e-commerce application, which is discussed in the next s<a id="_idTextAnchor835"/>ection.</p>
+			<h1 id="_idParaDest-159"><a id="_idTextAnchor836"/>Designing a cache abstraction layer using distributed caching</h1>
+			<p>In enterprise<a id="_idIndexMarker674"/> applications, it's<a id="_idIndexMarker675"/> always good to have a wrapper class on top of an underlying cache implementation as it abs<a id="_idTextAnchor837"/>tracts the core logic of caching and can also be used as one single class that holds application-wide default cache entry options.</p>
+			<p>We will be implementing a cache wrapper class with an underlying store as Azure Cache for Redis using the <strong class="source-inline">IDistributedCache</strong> implementation. It's a .NET Standard 2.1 class library; the source code for this library is available in the <strong class="source-inline">Packt.Ecommerce.Caching</strong> project. Any class that wants to cache data should inject <strong class="source-inline">IDistributedCacheService</strong> using constructor injection and can call the following various methods:</p>
+			<ul>
+				<li><strong class="source-inline">AddOrUpdateCacheAsync&lt;T&gt;</strong>: Adds or updates cache entries of type <strong class="source-inline">T</strong> asynchronously</li>
+				<li><strong class="source-inline">AddOrUpdateCacheStringAsync</strong>: Adds or updates cache entries of the string type asynchronously</li>
+				<li><strong class="source-inline">GetCacheAsync&lt;T&gt;</strong>: Gets cache entries of type <strong class="source-inline">T</strong> asynchronously</li>
+				<li><strong class="source-inline">GetCacheStringAsync</strong>: Gets cache entries of the string type asynchronously</li>
+				<li><strong class="source-inline">RefreshCacheAsync</strong>: Refreshes cache entries asynchronously</li>
+				<li><strong class="source-inline">RemoveCacheAsync</strong>: Removes cache entries asynchronously</li>
+			</ul>
+			<p><strong class="source-inline">DistributedCacheService</strong> is the wrapper class that inherits <strong class="source-inline">IDistributedCacheService</strong> and implements all the preceding methods. Additionally, <strong class="source-inline">IDistributedCache</strong> and <strong class="source-inline">DistributedCacheEntryOptions</strong> are configured in this class to use distributed caching.</p>
+			<p>For serialization and deserialization, we will use <strong class="source-inline">System.Text.Json</strong>, a custom <strong class="source-inline">IEntitySerializer</strong> interface, and the <strong class="source-inline">EntitySerializer</strong> class is created with the following methods:</p>
+			<ul>
+				<li><strong class="source-inline">SerializeEntityAsync&lt;T&gt;</strong>: Serializes the specified object to a byte array asynchronously</li>
+				<li><strong class="source-inline">DeserializeEntityAsync&lt;T&gt;</strong>: <a id="_idTextAnchor838"/>Deserializes the specified stream asynchronously</li>
+			</ul>
+			<p>The <strong class="source-inline">IEntitySerializer</strong> implemen<a id="_idTextAnchor839"/>tation is injected into the <strong class="source-inline">DistributedCacheService</strong> class using constructor injection and is used for serialization and deserialization.</p>
+			<p class="callout-heading">Note</p>
+			<p class="callout">Please refer to the <em class="italic">Serialization performance comparison</em> article, which talks about benchmarking various serializers. You can find it at <a href="https://maxondev.com/serialization-performance-comparison-c-net-formats-frameworks-xmldatacontractserializer-xmlserializer-binaryformatter-json-newtonsoft-servicestack-text/">https://maxondev.com/serialization-performance-comparison-c-net-formats-frameworks-xmldatacontractserializer-xmlserializer-binaryformatter-json-newtonsoft-servicestack-text/</a>.</p>
+			<p>The<a id="_idIndexMarker676"/> implementation of <strong class="source-inline">DistributedCacheService</strong> and <strong class="source-inline">EntitySerializer</strong> follows all the asynchronous <a id="_idIndexMarker677"/>principles discussed in <a href="B18507_04_Epub.xhtml#_idTextAnchor205"><em class="italic">Chapter 4</em></a>, <em class="italic">Threading and Asynchronous Operations</em>, and the configuration as explained in <a href="B18507_06_Epub.xhtml#_idTextAnchor473"><em class="italic">Chapter 6</em></a><em class="italic">, Configuration in .NET  6</em>.</p>
+			<p>Finally, in an API/MVC application, perform these steps:</p>
+			<ol>
+				<li value="1">Install the NuGet <strong class="source-inline">Microsoft.Extensions.Caching.StackExchangeRedis</strong> package.</li>
+				<li>Configure caching by adding the following code snippet to <strong class="source-inline">Program.cs</strong>:<p class="source-code">if (this.Configuration.GetValue&lt;bool&gt;("AppSettings:UseRedis"))</p><p class="source-code">{</p><p class="source-code">    builder.Services.AddStackExchangeRedisCache(</p><p class="source-code">      options =&gt;</p><p class="source-code">    {</p><p class="source-code">        options.Configuration = this.Configuration</p><p class="source-code">          .GetConnectionString("Red<a id="_idTextAnchor840"/>is");</p><p class="source-code">    });</p><p class="source-code">}</p><p class="source-code">else</p><p class="source-code">{</p><p class="source-code">    services.AddDistributedMemoryCache();</p><p class="source-code">}</p></li>
+				<li>From <a id="_idIndexMarker678"/>a <a id="_idIndexMarker679"/>configuration standpoint, two properties are added to <strong class="source-inline">appsettings.json</strong>, as shown here:<p class="source-code">  "ConnectionStrings": {</p><p class="source-code">    //removed other values for brevity</p><p class="source-code">    "Redis": "" //Azure Cache for Redis connection </p><p class="source-code">                //string.</p><p class="source-code">  },</p><p class="source-code">  "AppSettings": {</p><p class="source-code">    //removed other values for brevity</p><p class="source-code">    "UseRedis": false //Flag to fallback to in memory </p><p class="source-code">    //distributed cac<a id="_idTextAnchor841"/>hing, usually false for local </p><p class="source-code">    //development.</p><p class="source-code">  },</p></li>
+			</ol>
+			<p>Any class that wants to cache data needs to add a reference to the <strong class="source-inline">Packt.Ecommerce.Caching</strong> project and inject <strong class="source-inline">IDistributedCacheService</strong>, and can call the aforementioned methods to read/update/insert<a id="_idIndexMarker680"/> data in the cache<a id="_idIndexMarker681"/> store. The following is a code snippet of a method using the cache service:</p>
+			<pre class="source-code">   public class Country</pre>
+			<pre class="source-code">    {</pre>
+			<pre class="source-code">      public int Id { get; set; }</pre>
+			<pre class="source-code">      public string Name { get; set; }</pre>
+			<pre class="source-code">    }</pre>
+			<pre class="source-code">        public async Task&lt;Country&gt; GetCountryAsync()</pre>
+			<pre class="source-code">        {</pre>
+			<pre class="source-code">            var country = await </pre>
+			<pre class="source-code">            this.cacheService.GetAsync&lt;Country&gt;("Country"); // cacheservice is of Type IDistributedCacheService and is </pre>
+			<pre class="source-code">// injected using constructor injection.</pre>
+			<pre class="source-code">            if (country == null)</pre>
+			<pre class="source-code">            {</pre>
+			<pre class="source-code">                country = await </pre>
+			<pre class="source-code">                  this.countryRepository.GetCountryAsync(); // Retrieving data from database using Repository pattern.</pre>
+			<pre class="source-code">                if (country != null)</pre>
+			<pre class="source-code">                {</pre>
+			<pre class="source-code">                    await this.cacheService</pre>
+			<pre class="source-code">                     .AddOrUpdateAsync&lt;Country&gt;("Country", </pre>
+			<pre class="source-code">                     country, TimeSpan.FromMinutes(5));</pre>
+			<pre class="source-code">                }</pre>
+			<pre class="source-code">            }</pre>
+			<pre class="source-code">            return country;</pre>
+			<pre class="source-code">        }</pre>
+			<p>Here, we are using the cache-aside pattern and checking for the <strong class="source-inline">Country</strong> key in the cache store first. If found, return it from the function, otherwise retrieve it from the database and insert it into the cache, and then return from the function. We will heavily use the cache service in <a href="B18507_10_Epub.xhtml#_idTextAnchor1040"><em class="italic">Chapter 10</em></a>, <em class="italic">Creating an ASP.NET Core 6 Web API</em>. </p>
+			<p>As you can see, we h<a id="_idTextAnchor842"/>ave used a few of the patterns that we discussed in earlier sections. There are also a few additional considerations discussed in the next section, w<a id="_idTextAnchor843"/><a id="_idTextAnchor844"/>hich need to be kept<a id="_idIndexMarker682"/> in <a id="_idIndexMarker683"/>mind while designing <a id="_idTextAnchor845"/>the cache layer in an enterprise application.</p>
+			<h2 id="_idParaDest-160"><a id="_idTextAnchor846"/>Caching considerations</h2>
+			<p>Having a cache layer <a id="_idIndexMarker684"/>is critical for improving performance and scalability in enterprise applications. Hence, the following are a few factors that need to be considered while developing the caching layer:</p>
+			<ul>
+				<li>If we are building a new application, then Azure Cache for Redis can be the starting point using the <strong class="source-inline">IDistributedCache</strong> implementation as it can easily be plumbed into the application with a few lines of code. However, this comes at a cost that needs to be evaluated.</li>
+				<li>For an existing project, the current infrastructure plays a critical role and SQL can be the default choice if SQL Server is already being used as a data store. However, it's good to benchmark the performance of SQL against Redis, and a decision can be taken accordingly.</li>
+				<li>Having a wrapper class on the underlying cache store is a good approach as it decouples the application from the cache store and makes the code more flexible and easily maintained in case of future changes in the cache store.</li>
+				<li>The methods of <strong class="source-inline">IMemoryCache</strong> and <strong class="source-inline">IDistributedCache</strong> are not thread-safe. For example, say a thread queries a key from the cache and finds it isn't there in the cache, and falls back to the original data store. While data is retrieved from the original store if another thread queries the same key, it won't wait for the first thread to finish reading from the database. The second thread will also end up falling back to the database. So, thread safety needs to be handled explicitly, possibly in the wrapper class.</li>
+				<li>Response caching should be implemented along with application caching for even more optimization.</li>
+				<li><strong class="bold">Entity Tag</strong> (<strong class="bold">ETag</strong>) response<a id="_idIndexMarker685"/> headers can be further used to i<a id="_idTextAnchor847"/>mprove the reusability of cached data. ETag is <strong class="bold">Global Unique Identifier</strong> (<strong class="bold">GUID</strong>)-generate<a id="_idTextAnchor848"/>d<a id="_idIndexMarker686"/> while caching data on the server and is sent as a response header. This value is sent back to the server as part of the <strong class="source-inline">If-None-Match</strong> request header and if there is a match, the server returns <strong class="source-inline">304</strong> (no change) and the client can reuse the cached version of the data. For ETag, there is no built-in implementation on the ser<a id="_idTextAnchor849"/>ver side, so a filter or middleware can be used to implement server-side logic.</li>
+				<li>Although we used JSON serialization in our implementation, there are other formats, such as BSON or protocol buffers, that should be evaluated for serialization and deserialization.</li>
+			</ul>
+			<p>Just like any other component in application development for caching, there is no one-size-fits-all <a id="_idIndexMarker687"/>solution. So, the p<a id="_idTextAnchor850"/><a id="_idTextAnchor851"/>receding points should be evaluated and an appropriate caching solution implemented accordingly.</p>
+			<h1 id="_idParaDest-161"><a id="_idTextAnchor852"/>Summary</h1>
+			<p>In this chapter, we learned about various caching techniques, patterns, and their benefits in improving application performance. Furthermore, we learned about HTTP caching, how response caching can be integrated into an API response, and further various available caching providers and their integration with .NET 6 applications. We also learned how to implement distributed caching using <strong class="source-inline">IDistributedCache</strong> and built a cache abstraction layer that will be used in subsequent chapters for caching requirements. Some of the key information and skills that we learned about along the way were why and when caching is needed and how to implement caching in .NET 6 applications.</p>
+			<p>In the next chapter, we will loo<a id="_idTextAnchor853"/><a id="_idTextAnchor854"/>k at various data stores and providers in .NET 6 and their integration with .NET 6 applications.</p>
+			<h1 id="_idParaDest-162"><a id="_idTextAnchor855"/>Questions</h1>
+			<ol>
+				<li value="1">Which of the following values for the <strong class="source-inline">Cache-Control</strong> header allows the response to be stored in any server (client/server/proxy)?</li>
+			</ol>
+			<p>a. <strong class="source-inline">Private</strong></p>
+			<p>b. <strong class="source-inline">Public</strong></p>
+			<p>c. <strong class="source-inline">No-cache</strong></p>
+			<p><strong class="bold">Answer: b</strong></p>
+			<ol>
+				<li value="2">In a multiple-application server scenario, which of the following caching platforms should we choose?</li>
+			</ol>
+			<p>a. Distributed caching</p>
+			<p>b. In-memory caching</p>
+			<p><strong class="bold">Answer: a</strong></p>
+			<ol>
+				<li value="3">True or false: In the cache-aside pattern, data is first updated in the cache store and then in the underlying data store.</li>
+			</ol>
+			<p>a. True</p>
+			<p>b. False</p>
+			<p><strong class="bold">Answer: b</strong></p>
+			<ol>
+				<li value="4">Which of the following caches is best suited to store static files and image files and supports<a id="_idTextAnchor856"/><a id="_idTextAnchor857"/> geo-replication?</li>
+			</ol>
+			<p>a. Web server caching</p>
+			<p>b. Application caching</p>
+			<p>c. Content Delivery Network (CDN)</p>
+			<p><strong class="bold">Answer: c</strong></p>
+			<h1 id="_idParaDest-163"><a id="_idTextAnchor858"/>Further reading</h1>
+			<p>You can read more about caching here:</p>
+			<ul>
+				<li><a href="https://github.com/Alachisoft/NCache">https://github.com/Alachisoft/NCache</a></li>
+				<li><a href="https://redis.io/">https://redis.io/</a></li>
+				<li><a href="https://aws.amazon.com/redis/">https://aws.amazon.com/redis/</a></li>
+				<li><a href="https://docs.microsoft.com/en-us/azure/azure-cache-for-redis/cache-configure#redis-console">https://docs.microsoft.com/en-us/azure/azure-cache-for-redis/cache-configure#redis-console</a></li>
+				<li>Features (terracotta.org)</li>
+			</ul>
+		</div>
+	</body></html>

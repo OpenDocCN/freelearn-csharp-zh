@@ -1,0 +1,443 @@
+<html><head></head><body>
+<div id="sbo-rt-content"><div id="_idContainer119">
+<h1 class="chapter-number" id="_idParaDest-235"><a id="_idTextAnchor245"/>10</h1>
+<h1 id="_idParaDest-236"><a id="_idTextAnchor246"/>Building an App with Repositories and Document DB</h1>
+<p>In <a href="B18370_08_RN.xhtml#_idTextAnchor209"><em class="italic">Chapter 8</em></a>, <em class="italic">Designing an Appointment Booking App</em>, we laid the technical specifications and the design decisions for building an appointment booking system for a barber salon called Heads Up Barbers. This chapter is a continuation of <a href="B18370_08_RN.xhtml#_idTextAnchor209"><em class="italic">Chapter 8</em></a>, so I strongly advise you to be familiar with it first.</p>
+<p>This chapter will implement the requirements in TDD style and will use the repository pattern with <strong class="bold">Azure Cosmos DB</strong>. The implementation will be applicable to other <strong class="bold">document databases</strong> aka <strong class="bold">NoSQL</strong> such as <strong class="bold">MongoDB</strong>, <strong class="bold">Amazon DynamoDB</strong>, <strong class="bold">GCP Firestore</strong>, and others.</p>
+<p>If you are a fan of document DBs or you are using one at work, then this chapter is for you, while if you are using a relational database, then you might want to skip this chapter and go back to the previous chapter, <a href="B18370_09.xhtml#_idTextAnchor226"><em class="italic">Chapter 9</em></a>. Both chapters, <a href="B18370_09.xhtml#_idTextAnchor226"><em class="italic">Chapter 9</em></a> and <a href="B18370_10.xhtml#_idTextAnchor245"><em class="italic">Chapter 10</em></a> have the same outcome, but they use different backend DB categories.</p>
+<p>The chapter assumes you are familiar with a document DB service and the idea behind document DBs, not necessarily Cosmos DB, as from a TDD perspective, the implementation between different DB products is almost identical.</p>
+<p>In this chapter, we will cover the following:</p>
+<ul>
+<li>Planning the code and the project structure</li>
+<li>Implementing the web APIs with TDD</li>
+<li>Answering frequently asked questions</li>
+</ul>
+<p>By the end of the chapter, you will have experienced the implementation of an end-to-end app using TDD with mocks and document DB backend. Also, you will witness the analysis process that precedes writing unit tests.</p>
+<h2 id="_idParaDest-237"><a id="_idTextAnchor247"/>Technical requirements</h2>
+<p>The code for this chapter can be found at the following GitHub repository: </p>
+<p><a href="https://github.com/PacktPublishing/Pragmatic-Test-Driven-Development-in-C-Sharp-and-.NET/tree/main/ch10">https://github.com/PacktPublishing/Pragmatic-Test-Driven-Development-in-C-Sharp-and-.NET/tree/main/ch10</a></p>
+<p>To run the project, you will need to have an instance of Cosmos DB installed. This can be one of the following:</p>
+<ul>
+<li>Azure Cosmos DB on the cloud under an Azure account</li>
+<li><strong class="bold">Azure Cosmos DB Emulator</strong>, which can be installed locally on Windows, Linux, and macOS and can run from Docker</li>
+</ul>
+<p>The implementation doesn’t use any advanced Cosmos feature, so feel free to use any Cosmos flavor. I have tested the application with Azure Cosmos DB Emulator on Windows locally. You can find more about it here:</p>
+<p><a href="https://docs.microsoft.com/en-us/azure/cosmos-db/local-emulator%0D">https://docs.microsoft.com/en-us/azure/cosmos-db/local-emulator</a></p>
+<p>After installing the local emulator, you need to grab the connection string, which you can do by browsing to <strong class="source-inline">https://localhost:8081/_explorer/index.xhtml</strong> and copying the connection string from the <strong class="bold">Primary Connection String</strong> field:</p>
+<div>
+<div class="IMG---Figure" id="_idContainer112">
+<img alt="Figure 10.1 – Finding Cosmos DB connection string " height="575" src="image/Figure_10.1_B18370.jpg" width="617"/>
+</div>
+</div>
+<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Figure 10.1 – Finding Cosmos DB connection string</p>
+<p>To run the project, you have to set the connection string to your specific DB instance in <strong class="source-inline">Uqs.AppointmentBooking.WebApi/AppSettings.json</strong>, as follows:</p>
+<pre class="source-code">"ConnectionStrings": {
+  "AppointmentBooking": "<strong class="bold">[The primary connection string]</strong>"
+},</pre>
+<p>The connection string is pointing to <strong class="source-inline">LocalMachine</strong> and will connect to a database called <strong class="source-inline">AppointmentBooking</strong>.</p>
+<p class="callout-heading">Note</p>
+<p class="callout">I am not concerned in this chapter regarding setting multiple environments, but you may want to create multiple <strong class="source-inline">AppSettings</strong> for different environments and change the connection string accordingly. </p>
+<p>The previous DB configuration steps are optional. You can implement the requirements for this chapter without using a DB, but you won’t be able to run the project and interact with it in the browser.</p>
+<h1 id="_idParaDest-238"><a id="_idTextAnchor248"/>Planning your code and project structure</h1>
+<p>In <a href="B18370_08_RN.xhtml#_idTextAnchor209"><em class="italic">Chapter 8</em></a>, <em class="italic">Designing an Appointment Booking App</em>, we planned our domain and analyzed what we needed to do. The project architecture will follow the classical three-tier applications of the client application (the website), business logic (the web APIs), and database (Cosmos DB). Let’s translate this into VS solutions and projects.</p>
+<p>In this section, we will create the solution and create the projects, and wire up the components.</p>
+<h2 id="_idParaDest-239"><a id="_idTextAnchor249"/>Analyzing projects’ structure</h2>
+<p>Get a group of senior developers to agree <a id="_idIndexMarker737"/>on one project structure, and you will end up <a id="_idIndexMarker738"/>with multiple structures! In this section, we will discuss a way of organizing your project structure that I have developed over the years.</p>
+<p>Given that we are first going to build a website for the user and later a mobile app (not covered in this book), it makes sense to isolate the business logic to a web API project that can be shared by both the website and the mobile app. So, we will build a website project based on Blazor WebAssembly called <strong class="source-inline">Uqs.AppointmentBooking.Website</strong>.</p>
+<p>The domain logic will be exposed as APIs, so we will create an ASP.NET API project for this one called <strong class="source-inline">Uqs.AppointmentBooking.WebApi</strong>. </p>
+<p>The previous two projects needed to exchange<a id="_idIndexMarker739"/> data in an agreed structure called <strong class="bold">data transportation objects</strong> (<strong class="bold">DTOs</strong>), commonly known as <em class="italic">contracts</em>. So, we will <a id="_idIndexMarker740"/>create a .NET library project called <strong class="source-inline">Uqs.AppointmentBooking.Contracts</strong>. This project will be referenced by both the website and the web API projects.</p>
+<p>The web API project translates web requests into something we can understand in C#. In technical terms, this will manage <a id="_idIndexMarker741"/>our communication layer of HTTP with RESTful style APIs. So, the WebApi project <a id="_idIndexMarker742"/>will not contain business logic. The business logic will be in our domain project. We will create a domain project called <strong class="source-inline">Uqs.AppointmentBooking.Domain</strong>.</p>
+<p>Your business logic will live in two places – the UI and the domain layer. The UI business logic will manage UI functionalities such as toggling dropdowns, blocking calendar days, responding to drag and drop, and disabling/enabling buttons, among others. This logic will live in the website project. </p>
+<p class="callout-heading">Important Note</p>
+<p class="callout">UI frameworks such as Blazor and Angular act as standalone applications. These frameworks facilitate, by design, using a design <a id="_idIndexMarker743"/>pattern called <strong class="bold">Model View View-Model</strong> (<strong class="bold">MVVM</strong>), which makes dependency injection and, therefore, unit testing easy. However, unit testing the UI-specific elements (razor files in Blazor) requires a <a id="_idIndexMarker744"/>more specialized framework such as <strong class="bold">bUnit</strong>.</p>
+<p>The language used in writing the code depends on the UI framework in use, such as Angular, React, and Blazor. In our implementation, we will have little code in the UI layer, so we will not be doing any UI unit tests.</p>
+<p>The sophisticated business logic will live in the domain layer, and we will be writing it following the concepts of TDD. So, we shall create a project that will hold our domain unit tests and call it <strong class="source-inline">Uqs.AppointmentBooking.Domain.Tests.Unit</strong>.</p>
+<p>To put these projects into perspective and map them to our three-tier architecture, we can have the following diagram:</p>
+<div>
+<div class="IMG---Figure" id="_idContainer113">
+<img alt="Figure 10.2 – The relationship between the projects and the application design " height="574" src="image/Figure_10.2_B18370.jpg" width="1209"/>
+</div>
+</div>
+<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Figure 10.2 – The relationship between the projects and the application design</p>
+<p>The previous diagram shows<a id="_idIndexMarker745"/> the functionality that each project provides<a id="_idIndexMarker746"/> to form the three-tier application. Let’s start by creating the VS solution structure.</p>
+<h2 id="_idParaDest-240"><a id="_idTextAnchor250"/>Creating projects and configuring dependencies</h2>
+<p>This is the boring inevitable part, creating<a id="_idIndexMarker747"/> the solution and the projects and then<a id="_idIndexMarker748"/> linking them together. In the following section, we will take the command line approach rather than the UI.</p>
+<p class="callout-heading">Note</p>
+<p class="callout">I have added a text file, <strong class="source-inline">create-projects.bat</strong>, to the project source control that contains all the command lines, so you don’t have to write them manually. You can copy and paste this file to your desired directory, then, from your command line, execute the file.</p>
+<p>The following is the list of commands that will create your VS solution and its projects:</p>
+<ol>
+<li>From your OS console, navigate to the directory where you want to create your new solution and execute the following to create the solution file:<p class="source-code"><strong class="bold">md UqsAppointmentBooking</strong></p><p class="source-code"><strong class="bold">cd UqsAppointmentBooking</strong></p><p class="source-code"><strong class="bold">dotnet new sln</strong></p></li>
+<li>Execute this to create the projects and notice that we are using a different template for each project:<p class="source-code"><strong class="bold">dotnet new blazorwasm -n </strong></p><p class="source-code">  <strong class="bold">Uqs.AppointmentBooking.Website</strong></p><p class="source-code"><strong class="bold">dotnet new webapi -n Uqs.AppointmentBooking.WebApi</strong></p><p class="source-code"><strong class="bold">dotnet new classlib -n Uqs.AppointmentBooking.Contract</strong></p><p class="source-code"><strong class="bold">dotnet new classlib -n Uqs.AppointmentBooking.Domain</strong></p><p class="source-code"><strong class="bold">dotnet new xunit -n</strong></p><p class="source-code">  <strong class="bold">Uqs.AppointmentBooking.Domain.Tests.Unit</strong></p></li>
+<li>Add the projects to<a id="_idIndexMarker749"/> the solution:<p class="source-code"><strong class="bold">dotnet sln add Uqs.AppointmentBooking.Website</strong></p><p class="source-code"><strong class="bold">dotnet sln add Uqs.AppointmentBooking.WebApi</strong></p><p class="source-code"><strong class="bold">dotnet sln add Uqs.AppointmentBooking.Contract</strong></p><p class="source-code"><strong class="bold">dotnet sln add Uqs.AppointmentBooking.Domain</strong></p><p class="source-code"><strong class="bold">dotnet sln add Uqs.AppointmentBooking.Domain</strong></p><p class="source-code"><strong class="bold">  .Tests.Unit</strong></p></li>
+<li>Now let’s set up<a id="_idIndexMarker750"/> dependencies between projects:<p class="source-code"><strong class="bold">dotnet add Uqs.AppointmentBooking.Website reference</strong></p><p class="source-code">  <strong class="bold">Uqs.AppointmentBooking.Contract</strong></p><p class="source-code"><strong class="bold">dotnet add Uqs.AppointmentBooking.WebApi reference</strong></p><p class="source-code">  <strong class="bold">Uqs.AppointmentBooking.Contract</strong></p><p class="source-code"><strong class="bold">dotnet add Uqs.AppointmentBooking.Domain reference</strong></p><p class="source-code">  <strong class="bold">Uqs.AppointmentBooking.Contract</strong></p><p class="source-code"><strong class="bold">dotnet add Uqs.AppointmentBooking.WebApi reference</strong></p><p class="source-code">  <strong class="bold">Uqs.AppointmentBooking.Domain</strong></p><p class="source-code"><strong class="bold">dotnet add Uqs.AppointmentBooking.Domain.Tests.Unit </strong></p><p class="source-code">  <strong class="bold">reference Uqs.AppointmentBooking.Domain</strong></p></li>
+</ol>
+<p>And the last bit is adding the required NuGet packages to the project. The domain project will communicate with Cosmos DB using the Cosmos SDK from the <strong class="source-inline">Microsoft.Azure.Cosmos</strong> package. Add this library to the <strong class="source-inline">Domain</strong> project as such:</p>
+<p class="source-code"><strong class="bold">dotnet add Uqs.AppointmentBooking.Domain package </strong></p>
+<p class="source-code">  <strong class="bold">Microsoft.Azure.Cosmos</strong></p>
+<ol>
+<li value="5">The unit testing project will require <strong class="source-inline">NSubstitute</strong> for mocking, so let’s add its NuGet:<p class="source-code"><strong class="bold">dotnet add Uqs.AppointmentBooking.Domain.Tests.Unit </strong></p><p class="source-code">  <strong class="bold">package NSubstitute</strong></p></li>
+</ol>
+<p>For visual inspection, you can <a id="_idIndexMarker751"/>open the solution file with VS, and it should look as<a id="_idIndexMarker752"/> such:</p>
+<div>
+<div class="IMG---Figure" id="_idContainer114">
+<img alt="Figure 10.3 – A view of VS Solution Explorer " height="579" src="image/Figure_10.3_B18370.jpg" width="952"/>
+</div>
+</div>
+<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Figure 10.3 – A view of VS Solution Explorer</p>
+<p>At this stage, your solution structure should look similar. </p>
+<p>Now that the project structure is in place, we will modify the code.</p>
+<h2 id="_idParaDest-241"><a id="_idTextAnchor251"/>Setting up the domain project</h2>
+<p>From the domain analysis in <a href="B18370_08_RN.xhtml#_idTextAnchor209"><em class="italic">Chapter 8</em></a>, <em class="italic">Designing an Appointment Booking App</em>, we have <a id="_idIndexMarker753"/>created a list of the domain objects. I will not go through them again; I will just create and add them to the <strong class="source-inline">Domain</strong> project under <strong class="source-inline">DomainObjects</strong>:</p>
+<div>
+<div class="IMG---Figure" id="_idContainer115">
+<img alt="Figure 10.4 – Added domain objects " height="430" src="image/Figure_10.4_B18370.jpg" width="718"/>
+</div>
+</div>
+<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Figure 10.4 – Added domain objects</p>
+<p>These are just data structures with no business logic. Here is the source code of one of them, the <strong class="source-inline">Customer</strong> domain object:</p>
+<pre class="source-code">namespace Uqs.AppointmentBooking.Domain.DomainObjects;
+public class Customer : IEntity
+{
+    public string? Id { get; set; }
+    public string? FirstName { get; set; }
+    public string? LastName { get; set; }
+}</pre>
+<p>You can view the rest<a id="_idIndexMarker754"/> of the files in the chapter’s GitHub repository online. This is the interface of the previous class:</p>
+<pre class="source-code">public interface IEntity
+{
+    public string? Id { get; set; }
+}</pre>
+<p><strong class="source-inline">IEntity</strong> is an interface that ensures every domain object that is going to be persisted to a document container has an <strong class="source-inline">Id</strong>.</p>
+<p class="callout-heading">Note</p>
+<p class="callout"><strong class="source-inline">Id</strong> is a string as this is what a document DB is expecting and usually, but not necessarily, the string is a <strong class="source-inline">GUID</strong>.</p>
+<p>What is the relationship between our document containers and our domain objects?</p>
+<h3>Designing your containers</h3>
+<p>I am assuming that you are familiar<a id="_idIndexMarker755"/> with the basics of document DBs, so I won’t be going into much detail. Let me start first by defining what a <strong class="bold">container</strong> is so that we have the same understanding across the chapter. A container is a storage unit that stores a similar document type. A container in a document DB shares similar characteristics to a table of a relational DB. </p>
+<p>There are many schools and opinions regarding designing containers and the factors to take into consideration, but our focus in this book is TDD, so we shall keep this short and to the point. Obviously, designing in DDD, while it has some guidelines, is still a subjective process. It feels that our aggregate routes, <strong class="source-inline">Service</strong>, <strong class="source-inline">Employee</strong>, <strong class="source-inline">Customer</strong>, and <strong class="source-inline">Appointment</strong>, are direct contenders for becoming containers, so we will set them to be.</p>
+<p>Next, we need a way for our <a id="_idIndexMarker756"/>domain services to interact with the database. This is done through the repository pattern.</p>
+<h2 id="_idParaDest-242"><a id="_idTextAnchor252"/>Exploring the repository pattern</h2>
+<p>Our containers are now <a id="_idIndexMarker757"/>defined. We just need the mechanism of interacting with these containers. DDD employs the repository pattern for this purpose. Let’s shed some light on the role of the pattern and where it sits in our application.</p>
+<h3>Understanding the repository pattern</h3>
+<p>The repository layer is code that<a id="_idIndexMarker758"/> knows how to interact with a database, it doesn’t matter what type of database is underlying (it doesn’t matter whether this is Cosmos, SQL Server, a text file, or others), document, relational, or others. The layer is meant to isolate the domain layer from understanding the specifics of the database. Instead, the domain services will only be concerned about what data to persist rather than how they will be persisted.</p>
+<p>The next diagram shows the repository as the bottom layer in the domain layer:</p>
+<div>
+<div class="IMG---Figure" id="_idContainer116">
+<img alt="Figure 10.5 – The repositories within DDD " height="502" src="image/Figure_10.5_B18370.jpg" width="1207"/>
+</div>
+</div>
+<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Figure 10.5 – The repositories within DDD</p>
+<p>You can see from the diagram that any domain object to be persisted in the database passes through the repositories layer.</p>
+<p>The common practice of creating a repository is creating a repository per container. So, for our application, we will have four repositories:</p>
+<ul>
+<li><strong class="source-inline">ServiceRepository</strong></li>
+<li><strong class="source-inline">CustomerRepository</strong></li>
+<li><strong class="source-inline">AppointmentRepository</strong></li>
+<li><strong class="source-inline">EmployeeRepository</strong></li>
+</ul>
+<p>Given that we will have to unit test our<a id="_idIndexMarker759"/> implementation, our repositories need to be unit test-ready.</p>
+<h4>Repositories and unit testing</h4>
+<p>We suddenly started speaking about <a id="_idIndexMarker760"/>repositories in a chapter about TDD. The reason is that when you think of unit testing, the first thing that comes to mind is dependencies and how to isolate the database.</p>
+<p>Repositories are the answer to this question, as they should provide the abstraction necessary to convert the database into an injectable dependency. You will see this clearly later on in this chapter.</p>
+<p class="callout-heading">Note</p>
+<p class="callout">If you have worked with a relational database using an <strong class="bold">object-relational mapper</strong> (<strong class="bold">ORM</strong>) such as <strong class="bold">Entity Framework</strong> or <strong class="bold">NHibernate</strong>, then you have probably not used the repository pattern directly as the ORM frameworks eliminate the need to use it.</p>
+<p>You will see that our repositories will have interfaces that will allow them to be injection-ready. Enough of the theory and let me show you some code.</p>
+<h3>Implementing the repository pattern</h3>
+<p>Now that you have <a id="_idIndexMarker761"/>an idea about what repositories are, let’s start with an example. One of the repositories needed is <strong class="source-inline">ServiceRepository</strong>, which will interact with the Service repository:</p>
+<div>
+<div class="IMG---Figure" id="_idContainer117">
+<img alt="Figure 10.6 – The Service repository " height="469" src="image/Figure_10.6_B18370.jpg" width="844"/>
+</div>
+</div>
+<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Figure 10.6 – The Service repository</p>
+<p>The <strong class="source-inline">ServiceRepository</strong> class contains methods for adding a service, deleting it and searching for a specific service, and more. Let’s pick a random method from the <strong class="source-inline">GetActiveService</strong> repository class:</p>
+<pre class="source-code">public async Task&lt;Service?&gt; GetActiveService(string id)
+{
+  var queryDefinition = new QueryDefinition(
+  "SELECT * FROM c WHERE c.id = @id AND c.isActive = true")
+            .WithParameter("@id", id);
+  return (await GetItemsAsync(queryDefinition))
+   .SingleOrDefault();
+}</pre>
+<p>The method above uses <a id="_idIndexMarker762"/>Cosmos DB-specific code to access the database and returns a service by its ID.</p>
+<p>Note that the repository is implementing the <strong class="source-inline">IServiceRepository</strong> interface, which will become handy later during unit testing.</p>
+<p>There is plenty of repetition in how a repository interacts with a container. It stores a document, it reads a document, it deletes a document, it searches for a document, and so forth. So, we can create a small framework to embed these behaviors and reduce the repeated code.</p>
+<h3>Utilizing a repository pattern framework</h3>
+<p>Every time I’ve seen a<a id="_idIndexMarker763"/> project accessing a document DB, I notice that the developers create a small repository framework in advance to simplify the code. Here is an excerpt from a framework that I created to access Cosmos DB, the <strong class="source-inline">CosmosRepository&lt;T&gt;</strong> class, which is inherited by all repositories:</p>
+<pre class="source-code">using Microsoft.Azure.Cosmos;
+using Microsoft.Extensions.Options;
+using System.Net;
+namespace Uqs.AppointmentBooking.Domain.Repository;
+public abstract class CosmosRepository&lt;T&gt; : 
+    ICosmosRepository&lt;T&gt; where T : IEntity
+{
+    protected CosmosClient CosmosClient { get; }
+    protected Database Database { get; }
+    protected Container Container { get; }
+    public CosmosRepository(string containerId,
+    CosmosClient cosmosClient,
+    IOptions&lt;ApplicationSettings&gt; settings)
+    {
+        CosmosClient = cosmosClient;
+        Database = cosmosClient.GetDatabase(
+            settings.Value.DatabaseId);
+        Container = Database.GetContainer(containerId);
+    }
+    public Task AddItemAsync(T item)
+    {
+        return Container.CreateItemAsync(item, 
+            new PartitionKey(item.Id));
+    }
+…</pre>
+<p>The code above provides the repository with the basic methods required to interact with the database, such as <strong class="source-inline">AddItemAsync</strong>.</p>
+<p>Going into details about<a id="_idIndexMarker764"/> the specifics of Cosmos DB is beyond the scope of the book, but the code is easy to read and you can find the complete implementation in the <strong class="source-inline">Uqs.AppointmentBooking.Domain/Repository</strong> directory in the source code.</p>
+<p>Now that we have created the repositories, for development purposes, we might need some test data to fill the pages with some meaningful data. We shall do this next.</p>
+<h3>Adding seed data</h3>
+<p>Newly created DBs have<a id="_idIndexMarker765"/> empty containers, and the <strong class="source-inline">seed</strong> class is meant to pre-populate the tables with sample data.</p>
+<p>I will not list the code here as it is outside the scope of the chapter, but you can look at the code in the <strong class="source-inline">Domain</strong> project in <strong class="source-inline">Database/SeedData.cs</strong>.</p>
+<p>We’ve just finished the setup for the <strong class="source-inline">WebApi</strong> project that is going to be consumed by the website, so let’s create the website next.</p>
+<h2 id="_idParaDest-243"><a id="_idTextAnchor253"/>Setting up the website project</h2>
+<p>Phase I of this<a id="_idIndexMarker766"/> implementation includes creating a website to access the APIs to provide a UI for the user, which we did previously in this chapter by command line. However, website implementation is outside the scope of this chapter and the book, in general, as it is not related to TDD, so I will not be going through the code.</p>
+<p>Although, we are interested in one aspect – what does <strong class="source-inline">Website</strong> require from <strong class="source-inline">WebApis</strong>? We will need to understand this in order to build the required functionality in <strong class="source-inline">WebApis</strong> the TDD way.</p>
+<p>We will answer this question bit by bit in the next section of this chapter.</p>
+<p>In this section, we did the setup and configuration aspect of the project, and we have not done anything that is affected by TDD. You may have noticed that I referred you to the companion source code on multiple occasions, as I wanted to keep the focus on the next section while still providing you with the source code.</p>
+<h1 id="_idParaDest-244"><a id="_idTextAnchor254"/>Implementing the WebApis with TDD</h1>
+<p>To build the WebApi project, we are<a id="_idIndexMarker767"/> going to look at each requirement from <a href="B18370_08_RN.xhtml#_idTextAnchor209"><em class="italic">Chapter 8</em></a>, <em class="italic">Designing an Appointment Booking App</em>, and provide the implementation that satisfies it using the TDD style.</p>
+<p>The requirements <a id="_idIndexMarker768"/>are all stated in terms of <strong class="source-inline">Website</strong> and its functionality, and they do not dictate how to build our APIs. <strong class="source-inline">Website</strong> will have to call <strong class="source-inline">WebApis</strong> for any business logic as it has no access to the DB and does UI-related business logic only.</p>
+<p>In this section, we will go through working in TDD mode, taking into consideration our persistence provider, the repositories.</p>
+<h2 id="_idParaDest-245"><a id="_idTextAnchor255"/>Implementing the first story</h2>
+<p>The first story in our<a id="_idIndexMarker769"/> requirement is very easy. The website is going to display all the available services that we have. Since the website will request this data from <strong class="source-inline">WebApi</strong> through a RESTful API call, the domain layer will have a service that will return this list. Let’s dig further if the website is to display this:</p>
+<div>
+<div class="IMG---Figure" id="_idContainer118">
+<img alt="Figure 10.7 – A UI of the requirements of Story 1 " height="623" src="image/Figure_10.7_B18370.jpg" width="607"/>
+</div>
+</div>
+<p class="IMG---Caption" lang="en-US" xml:lang="en-US">Figure 10.7 – A UI of the requirements of Story 1</p>
+<p>It will need to issue a RESTful call to the WebApi, which can look as follows:</p>
+<p class="source-code">GET https://webapidomain/services</p>
+<p>This UI will require a few data properties that should be returned by this API. So, the fetched JSON can look like an array of this:</p>
+<pre class="source-code">{    
+    "ServiceId": "e4c9d508-89d7-49cd-86c2-835cde94472a",
+    "Name": "Men - Clipper &amp; Scissor Cut",
+    "Duration": 30,
+    "Price": 23.0
+}</pre>
+<p>You can see where each part is used on the page, but maybe <strong class="source-inline">ServiceId</strong> is not very clear. It will be used to construct the URL of the <em class="italic">Select</em> hyperlink. So, we can now design the contract type that will render this JSON, which could look like this:</p>
+<pre class="source-code">namespace Uqs.AppointmentBooking.Contract;
+public record Service(string ServiceId, string Name, 
+    int Duration, float Price);</pre>
+<p>This <strong class="source-inline">record</strong> contract will <a id="_idIndexMarker770"/>render the previous JSON code, and the full returned array contract could look like this:</p>
+<pre class="source-code">namespace Uqs.AppointmentBooking.Contract;
+  public record AvailableServices(Service[] Services);</pre>
+<p>You can find these contract types and all the other contracts in the <strong class="source-inline">Contract</strong> project.</p>
+<h3>Adding the first unit test via TDD</h3>
+<p>Thinking along the lines of DDD, we will have a<a id="_idIndexMarker771"/> domain service called <strong class="source-inline">ServicesService</strong>, which will handle retrieving all the available services. So, let’s have the structure of this service. We will create it in the <strong class="source-inline">Domain</strong> project under <strong class="source-inline">Services</strong>. Here is the code:</p>
+<pre class="source-code">public class ServicesService
+{
+}</pre>
+<p>There is nothing special here. I have just helped VS understand when I type <strong class="source-inline">ServicesService</strong>, it will guide me to this class.</p>
+<p class="callout-heading">Note</p>
+<p class="callout">I have added the previous <strong class="source-inline">ServicesService</strong> class manually. Some TDD practitioners like to code-generate this file while they are writing their unit test rather than writing it first. Any method is fine as long as you are more productive. I chose to create the file first because sometimes VS creates this file in a different directory from where I intend to.</p>
+<p>I will create my unit tests class, which is called <strong class="source-inline">ServicesServiceTests</strong>, with the following code:</p>
+<pre class="source-code">public class ServicesServiceTests
+{
+    private readonly IServiceRepository _serviceRepository
+        = Substitute.For&lt;IServiceRepository&gt;();
+    private ServicesService? _sut;
+}</pre>
+<p>I have added <strong class="source-inline">IServiceRepository</strong> immediately because I know that I am going to be dealing with the database in my unit tests and this interface is going to be my mocked dependency.</p>
+<p>Now, I need to think of what I <a id="_idIndexMarker772"/>need from my service and build a unit test accordingly. The straightforward way to start is to pick the easiest scenario. If we have no barber service, then no service is returned:</p>
+<pre class="source-code">[Fact]
+public async Task
+  GetActiveServices_NoServiceInTheSystem_NoServices()
+{
+    // Arrange
+    _sut = new ServicesService(_serviceRepository);
+    // Act
+    var actual = await _sut.GetActiveServices();
+    // Assert
+    Assert.True(!actual.Any());
+}</pre>
+<p>I have decided in the test that there will be a method named <strong class="source-inline">GetActiveServices</strong>, and when this method is called, it will return a collection of active services. At this stage, the code doesn’t compile; as such, a method doesn’t exist. We have got our TDDs fail! </p>
+<p>Now, we can instruct VS to generate this method, and then we can write the implementation:</p>
+<pre class="source-code">public class ServicesService
+{
+    private readonly IServiceRepository _serviceRepository;
+    public ServicesService(
+        IServiceRepository serviceRepository)
+    {
+        _serviceRepository = serviceRepository;
+    }
+    public async Task&lt;IEnumerable&lt;Service&gt;&gt; 
+        GetActiveServices() =&gt; 
+        await _serviceRepository.GetActiveServices();
+}</pre>
+<p>This is getting, through the repository, all the available services, and since the repository is not mocked to return any service, an empty collection will return.</p>
+<p>If you run the test again, it will pass. This is our TDD test pass. There is no need for the refactor stage, as this is a <a id="_idIndexMarker773"/>simple implementation. Congratulations, you have finished your first test!</p>
+<p class="callout-heading">Note</p>
+<p class="callout">This test is simple, and it seems like a waste of time. However, this test is a valid test case, and it also helps us create our domain class and inject the right dependencies. Starting with a simple test helps to progress in steady steps.</p>
+<h3>Adding the second unit test via TDD</h3>
+<p>The second feature that we need to <a id="_idIndexMarker774"/>add is the ability to get active services. So, let’s start with this unit test:</p>
+<pre class="source-code">[Fact]
+public async Task 
+  GetActiveServices_TwoActiveServices_TwoServices()
+{
+    // Arrange
+    _serviceRepository.GetActiveServices()
+        .Returns(new Service[] {
+            new Service{IsActive = true},
+            new Service{IsActive = true},
+        });
+    _sut = new ServicesService(_serviceRepository);
+    var expected = 2;
+    // Act
+    var actual = await _sut.GetActiveServices();
+    // Assert
+    Assert.Equal(expected, actual.Count());
+}</pre>
+<p>What is interesting here is the way we are mocking the <strong class="source-inline">GetActiveServices </strong>repository method. The method is mocked to return an array of <strong class="source-inline">Service</strong> when the service calls it. This is how we have substituted the database for the relevant repository.</p>
+<p>If you run this, it should pass from the first time without failure, so it is not going to fail then pass. It just happened to be this way. In this scenario, I would debug my code to see why the unit test passed without me implementing the code, and it is obvious the implementation code for the first unit test made was enough to cover the second scenario. </p>
+<p>This was an easy requirement. In <a id="_idIndexMarker775"/>fact, all the stories are straightforward except story number 5. We will not list the other stories here because they are similar, but you can find them in the companion source code. Instead, we will focus on story number 5 as its complexity matches a real-life production code and would reveal the main benefit of TDD.</p>
+<h2 id="_idParaDest-246"><a id="_idTextAnchor256"/>Implementing the fifth story (time management)</h2>
+<p>This story is about a time <a id="_idIndexMarker776"/>management system. It tries to manage the barbers’ time fairly, taking rest time into consideration. If you take a moment to think about this story, it is a complex one with many edge cases.</p>
+<p>This story reveals the power of TDD as it will help you find a starting point and adds little incremental steps to build the requirement. When you finish, you will notice that you have automatically documented the story in the unit tests. </p>
+<p>In the next sections, we will find a way to start with the easier-to-implement scenarios and climb up to more sophisticated test scenarios.</p>
+<h3>Checking for records</h3>
+<p>One gentle way to start our <a id="_idIndexMarker777"/>implementation that will make us think of the signature of the method is by checking the parameters.</p>
+<p>Logically, to determine an employee’s availability, we need to know who this employee is by using <strong class="source-inline">employeeId</strong> and the length of the time required. The length can be acquired from the service by <strong class="source-inline">serviceId</strong>. A logical name for the method can be <strong class="source-inline">GetAvailableSlotsForEmployee</strong>. Our first unit test is this:</p>
+<pre class="source-code">[Fact]
+public async Task 
+  GetAvailableSlotsForEmployee_ServiceIdNoFound_
+    ArgumentException()
+{
+    // Arrange
+    // Act
+    var exception = await 
+        Assert.ThrowsAsync&lt;ArgumentException&gt;(() =&gt;
+        _sut.GetAvailableSlotsForEmployee("AServiceId"));
+    // Assert
+    Assert.IsType&lt;ArgumentException&gt;(exception);
+}</pre>
+<p>It doesn’t compile; it is a fail. Now <a id="_idIndexMarker778"/>create the method in <strong class="source-inline">SlotsService</strong>:</p>
+<pre class="source-code">public async Task&lt;Slots&gt; GetAvailableSlotsForEmployee(
+    string serviceId)
+{
+    var service = await 
+        _serviceRepository.GetItemAsync(serviceId);
+    if (service is null)
+    {
+        throw new ArgumentException("Record not found", 
+        nameof(serviceId));
+    }
+    return null;
+}</pre>
+<p>Now that you have the implementation in place, run the tests again, and they will pass. You can do the same for <strong class="source-inline">employeeId</strong> and follow what we did for <strong class="source-inline">serviceId</strong>.</p>
+<h3>Starting with the simplest scenario</h3>
+<p>Let’s add the simplest possible <a id="_idIndexMarker779"/>business logic to start with. Let’s assume that the system has one employee called Tom. Tom has no shifts available in the system. Also, the system has one service only:</p>
+<pre class="source-code">[Fact]
+public async Task GetAvailableSlotsForEmployee_
+  NoShiftsForTomAndNoAppointmentsInSystem_NoSlots()
+{
+    // Arrange
+    var appointmentFrom = new DateTime(
+      2022, 10, 3, 7, 0, 0);
+    _nowService.Now.Returns(appointmentFrom);
+    var tom = new Employee { Id = "Tom", Name = 
+      "Thomas Fringe", Shifts = Array.Empty&lt;Shift&gt;() };
+    var mensCut30Min = new Service { Id = "MensCut30Min",
+      AppointmentTimeSpanInMin = 30 };
+    _serviceRepository.GetItemAsync(Arg.Any&lt;string&gt;())
+        .Returns(Task.FromResult((Service?)mensCut30Min));
+    _employeeRepository.GetItemAsync(Arg.Any&lt;string&gt;())
+        .Returns(Task.FromResult((Employee?)tom));
+    // Act
+    var slots = await    
+      _sut.GetAvailableSlotsForEmployee(mensCut30Min.Id, 
+      tom.Id);
+    // Assert
+    var times = slots.DaysSlots.SelectMany(x =&gt; x.Times);
+    Assert.Empty(times);
+}</pre>
+<p>You can see how the repositories are being populated via mocking. This is how we set up our database and do the <a id="_idIndexMarker780"/>dependency injection. We were able to do this as <strong class="source-inline">SlotsService</strong> is accessing the database through the repositories and if the repositories are mocked, then we have replaced our database.</p>
+<p class="callout-heading">Note</p>
+<p class="callout">Replacing the database with mocked repositories is a hot interview question that goes like <em class="italic">how do you clean the database after each unit test?</em>. This is a trick question, as you don’t interact with the database during the unit test and you mock your repositories instead. The question comes in multiple variations.</p>
+<p>This will fail, as we have <strong class="source-inline">null</strong> returned by the method, whatever the input is. We need to continue adding bits of code to the solution. We can start with the following code:</p>
+<pre class="source-code">…
+if (!employee.Shifts.Any())
+{
+    return new Slots(Array.Empty&lt;DaySlots&gt;());
+}
+return null;</pre>
+<p>The previous code is exactly what is required<a id="_idIndexMarker781"/> to pass the test. The test is green now.</p>
+<h3>Elevating the scenarios’ complexity</h3>
+<p>The rest of the unit tests follow the <a id="_idIndexMarker782"/>same way of elevating test scenario complexity slightly. Here are other scenarios you might want to add:</p>
+<pre class="source-code">[Theory]
+[InlineData(5, 0)]
+[InlineData(25, 0)]
+[InlineData(30, 1, "2022-10-03 09:00:00")]
+[InlineData(35, 2, "2022-10-03 09:00:00", 
+  "2022-10-03 09:05:00")]
+public async Task GetAvailableSlotsForEmployee_
+  OneShiftAndNoExistingAppointments_VaryingSlots(  
+    int serviceDuration, int totalSlots, 
+      params string[] expectedTimes)
+{
+…</pre>
+<p>The previous test is, in fact, multiple tests (because we are using <strong class="source-inline">Theory</strong>) with each <strong class="source-inline">InlineData</strong> elevating complexity. As usual, do the red then green to let it pass before adding another suite of tests:</p>
+<pre class="source-code">public async Task GetAvailableSlotsForEmployee_
+  OneShiftWithVaryingAppointments_VaryingSlots(
+    string appointmentStartStr, string appointmentEndStr, 
+      int totalSlots, params string[] expectedTimes)
+{
+…</pre>
+<p>This is also a test with multiple <strong class="source-inline">InlineData</strong>. Obviously, we cannot fit all the code here, so please have a look in <strong class="source-inline">SlotsServiceTests.cs</strong> for the complete unit tests.</p>
+<p>As you start adding more test cases, whether by using <strong class="source-inline">Theory</strong> with <strong class="source-inline">InlineData</strong> or using <strong class="source-inline">Fact</strong>, you will notice that the code complexity in the implementation is going up. This is all right! Do you feel the readability is suffering? Then it is time to refactor. </p>
+<p>Now you have the advantage of unit tests protecting the code from being broken. Refactoring when the<a id="_idIndexMarker783"/> method is doing what you want it to do is part of the <em class="italic">Red-Green-Refactor</em> mantra. In fact, if you look at <strong class="source-inline">SlotsService.cs</strong>, I did refactor to improve readability by creating multiple private methods.</p>
+<p>This story is complex, I will give you that. I could have picked an easier example, and everybody would be happy, but real-life code has ups and downs and varies in complexity, so I wanted to include one sophisticated scenario following the pragmatism theme of the book.</p>
+<p>After this section, you might have some questions. I hope I am able to answer some of them below.</p>
+<h1 id="_idParaDest-247"><a id="_idTextAnchor257"/>Answering frequently asked questions</h1>
+<p>Now that we have written the unit tests and the associated implementation, let me explain the process.</p>
+<h2 id="_idParaDest-248"><a id="_idTextAnchor258"/>Are these unit tests enough?</h2>
+<p>The answer to this question depends on your target coverage and your confidence that all cases are covered. Sometimes, adding more unit tests increases the future maintenance overhead, so with experience, you would strike the right balance.</p>
+<h2 id="_idParaDest-249"><a id="_idTextAnchor259"/>Why didn’t we unit test the controllers?</h2>
+<p>The controllers should not contain business logic. We pushed all the logic to the services, then tested the services. What is left in the controllers is minimal code concerned with mapping different types to each other. Have a look at the controllers in <strong class="source-inline">Uqs.AppointmentBooking.WebApi/Controllers</strong> to see what I mean.</p>
+<p>Unit tests excel in testing business logic or areas where there are conditions and branching. The controllers in the coding style that we chose do not have that.</p>
+<p>The controllers should be tested but through a different type of test.</p>
+<h2 id="_idParaDest-250"><a id="_idTextAnchor260"/>Why didn’t we unit test the repositories implementation?</h2>
+<p>The repositories contain specific code for Cosmos DB with minimal to no business logic. The code there is interacting with the SDK directly and testing it doesn’t prove anything, as you will be making assumptions (through test doubles) about the behavior of the framework.</p>
+<p>Sometimes a repository contains a bit of business logic, such as <strong class="source-inline">ServiceRepository</strong> picking the active services only, rather than all services. It is still hard to test this logic as it is embedded in SQL-like syntax, which is hard to unit test.</p>
+<p>On the contrary, testing your repositories expands your unit tests footprint in a negative way, which makes your code more brittle.</p>
+<p>Some developers still unit test their repositories for code coverage purposes, but the mistake here is that code coverage is the combination of all types of tests and not just unit tests. Your repositories should be covered by a different type of test such as Sintegration testing.</p>
+<h2 id="_idParaDest-251"><a id="_idTextAnchor261"/>Did we test the system enough?</h2>
+<p>No, we didn’t! We did the unit tests part. We have not tested the controllers or the boot of the system (the content of <strong class="source-inline">Program.cs</strong>) and other small bits of the code.</p>
+<p>We did not test them via unit tests, as they are not business logic. However, they need testing, but unit tests are not the best testing type to check for the quality of these areas. You can cover these by other types of testing such as integration, Sintegration, and system tests, as per our discussion in <a href="B18370_04.xhtml#_idTextAnchor097"><em class="italic">Chapter 4</em></a>, <em class="italic">Real Unit Testing with Test Doubles</em>.</p>
+<h2 id="_idParaDest-252"><a id="_idTextAnchor262"/>We omitted testing some areas, how can we achieve high coverage?</h2>
+<p>Some areas of the code are not unit tested, such as <strong class="source-inline">Program.cs</strong> and the controllers. If you are aiming for high code coverage, such as 90%, you might not achieve it via unit testing alone, as there is a good amount of code that went here.</p>
+<p>Achieving coverage by unit tests alone is unfair, or the developers would start cheating by adding meaningless tests to boost coverage. These tests do more harm than good as they will create a maintenance overhead.</p>
+<p>Coverage calculation should include other types of tests, rather than relying on units alone. If this is the case, 90% is a realistic target and can lead to a high-quality product.</p>
+<p>Sometimes it is hard to configure a coverage meter tool to measure the sum of multiple test types, so in this case, it makes sense to lower your coding coverage target to maybe 80% or so. Because not all tests run locally, a local test coverage tool (such as <em class="italic">Fine Code Coverage</em>, which was discussed earlier, in <a href="B18370_06.xhtml#_idTextAnchor140"><em class="italic">Chapter 6</em></a>, <em class="italic">The FIRSTHAND Guidelines of TDD</em>), can only calculate the coverage for the locally executed tests.</p>
+<p>So the short answer is your coverage should be made to include all your testing types, which takes some effort. Or you can reduce your coverage to unit test only and go for lower coverage.</p>
+<h1 id="_idParaDest-253"><a id="_idTextAnchor263"/>Summary</h1>
+<p>We have seen implementing realistic stories by setting up the system with repositories and Cosmos DB, then building it a bit at a time by incrementally adding unit tests and increasing the complexity with every additional unit test.</p>
+<p>We had to select multiple important scenarios to encourage you to examine the full source code. Otherwise, the pages will be filled with code.</p>
+<p>If you have read and understood the code, then I assure you that this is the peak of the complexity, as other chapters should be easier to read and follow. So congratulations, you have made it through the hard part of this book! I trust you can now go ahead and start your TDD-based project with a document DB.</p>
+<p>This chapter ended with the implementation of a realistic project based on TDD. Hopefully, by understanding this part of the book, you are equipped to write your TDD-based project with a relational DB or a document DB.</p>
+<p>The next part of the book goes about introducing unit tests to your project and organization, dealing with existing legacy code, and building a continuous integration system. I call that the fun part, where you take your TDD knowledge and expand it.</p>
+</div>
+</div>
+
+
+<div id="sbo-rt-content"><div class="Content" id="_idContainer120">
+<h1 id="_idParaDest-254"><a id="_idTextAnchor264"/>Part 3: Applying TDD to Your Projects</h1>
+<p>Now that we know how to build an application with TDD, we want to take the next step. In this part, we will cover how to combine unit testing with continuous integration, how to deal with legacy projects, and how to implement TDD in your organization. The following chapters are included in this part:</p>
+<ul>
+<li><a href="B18370_11.xhtml#_idTextAnchor265"><em class="italic">Chapter 11</em></a>, <em class="italic">Implementing Continuous Integration with GitHub Actions</em></li>
+<li><a href="B18370_12.xhtml#_idTextAnchor279"><em class="italic">Chapter 12</em></a>, <em class="italic">Dealing with Brownfield Projects</em></li>
+<li><a href="B18370_13_RN.xhtml#_idTextAnchor297"><em class="italic">Chapter 13</em></a>, <em class="italic">The Intricacies of Rolling Out TDD</em></li>
+</ul>
+</div>
+<div>
+<div id="_idContainer121">
+</div>
+</div>
+</div>
+</body></html>

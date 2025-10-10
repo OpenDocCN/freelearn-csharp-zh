@@ -1,0 +1,369 @@
+<html><head></head><body>
+		<div id="_idContainer029">
+			<h1 id="_idParaDest-41"><em class="italic"><a id="_idTextAnchor040"/>Chapter 2</em>: Implementing C# Interoperability</h1>
+			<p>This chapter is an optional chapter for those who would like to or need to use C# to interoperate with Excel, Python, C++, and <strong class="bold">Visual Basic 6</strong> (<strong class="bold">VB6</strong>).</p>
+			<p>Python has become a very popular programming language in recent months and is now a very big player in data science and machine learning. Since big data employs various technologies that are required to work with each other under various business scenarios, in this chapter, you will learn how to execute Python scripts and code from C#. You can also use IronPython.NET on the .NET platform, but since this book is for C# programmers, we will not be considering IronPython.NET in this chapter.</p>
+			<p>There are times when it is necessary to access libraries written in C++ – especially when performance is an issue, and you need that extra performance in advanced games. </p>
+			<p>In this chapter, you will learn about Microsoft .NET interoperability. It is advantageous to move your complete code base to a single code base that uses a familiar language that your whole development team is comfortable with using. But sometimes, to do this in one move is often not practical or cost-effective, or even safe. And that is where interoperability comes in.</p>
+			<p>In this chapter, you will learn how to interact with managed and unmanaged code. You will be looking at using unsafe code, unmanaged code with <strong class="bold">Platform Invoke</strong> (<strong class="bold">P/Invoke</strong>), COM interoperability, and disposing of unsafe code.</p>
+			<p class="callout-heading">Note</p>
+			<p class="callout">Using unmanaged code in C# does not always improve performance. Sometimes, it degrades it. But the logic of including this chapter within this book on high performance is to provide the knowledge and tools you will need to gradually replace your unmanaged code base with a managed code base. By doing so, all your developers only work with a single language and its supporting languages (in this case, C#). Your software can use the high-performing and highly scalable features of Azure or any other .NET cloud provider to build world-class cloud-based systems. The other advantage of doing this is that it makes code management and maintenance much easier.</p>
+			<p>In this chapter, we will be covering the following topics:</p>
+			<ul>
+				<li><strong class="bold">Using unsafe code</strong>: C# does a good job of shielding programmers from having to deal with pointers. But sometimes, it is necessary to use pointers to improve performance. Due to this, in this section, we will be looking at what unsafe code is and how to implement them.</li>
+				<li><strong class="bold">Exposing static entry points using Platform Invoke</strong>: P/Invoke allows you to access code in unmanaged libraries from your managed C# code. In this section, we will learn how to access code that hasn't been built using .NET.</li>
+				<li><strong class="bold">Performing COM interoperability</strong>: In this section, we will learn how to make COM components and libraries visible for C# projects to use. We will also look at how to make our components and libraries visible to COM components to use.</li>
+				<li><strong class="bold">Safely disposing of unsafe code</strong>: C# does a very good job of performing garbage collection to free up resources when code is finished with, but when you're dealing with unmanaged code, you are responsible for cleaning up unmanaged resources. So, in this section, you will be shown how to do this.</li>
+			</ul>
+			<p>After completing this chapter, you will be able to do the following:</p>
+			<ul>
+				<li>Understand the use of unsafe code in C#</li>
+				<li>Call native code from managed code</li>
+				<li>Use COM libraries and components in managed and unmanaged code</li>
+				<li>Release unsafe resources when they're no longer needed</li>
+			</ul>
+			<h1 id="_idParaDest-42"><a id="_idTextAnchor041"/>Technical requirements</h1>
+			<p>In this chapter, some of the code includes interoperability between C# managed assemblies and COM-based ActiveX UserControls, DLLs, and executables. </p>
+			<p>To write the code and build the projects in this chapter, you will need the following:</p>
+			<ul>
+				<li>Visual Studio 2022</li>
+				<li>The latest x86 preview of .NET 6</li>
+				<li>The latest x64 preview of .NET 6</li>
+				<li>Optional: Visual C++</li>
+				<li>Optional: Visual Studio Tools for Microsoft Office</li>
+				<li>Optional: Visual Basic 6</li>
+			</ul>
+			<p>The code files for this chapter can be found in this book's GitHub repository: <a href="https://github.com/PacktPublishing/High-Performance-Programming-in-CSharp-and-.NET/tree/master/CH02">https://github.com/PacktPublishing/High-Performance-Programming-in-CSharp-and-.NET/tree/master/CH02</a>.</p>
+			<p class="callout-heading">Note</p>
+			<p class="callout">Although Visual Basic 6 is obsolete and no longer supported by Microsoft, it is still heavily used in production code within various businesses and sectors, such as automotive software providers and the education sector. Interoping with VB6 and .NET enables phased migrations from VB6 to .NET. By modernizing applications built with old technology, you can make them highly scalable across time zones using various cloud providers, such as Azure.</p>
+			<p>We will start this chapter by looking at unsafe code.</p>
+			<h1 id="_idParaDest-43"><a id="_idTextAnchor042"/>Using Platform Invocation (P/Invoke)</h1>
+			<p>P/Invoke is <a id="_idIndexMarker092"/>a <strong class="bold">Common Language Infrastructure</strong> (<strong class="bold">CLI</strong>) feature <a id="_idIndexMarker093"/>that enables native code to be called by managed applications. Native code is not managed by the <strong class="bold">Common Language Runtime </strong>(<strong class="bold">CLR</strong>), so, the<a id="_idIndexMarker094"/> code's safety is firmly placed in the hands of the programmer. </p>
+			<p>In managed code, the garbage collector automatically cleans up objects in memory and is responsible for assigning generations to objects. We will cover the garbage collector in more detail in <a href="B16617_04_Final_SB_Epub.xhtml#_idTextAnchor072"><em class="italic">Chapter 4</em></a>, <em class="italic">Memory Management</em>. A new object always starts life as generation zero when it is less than 80,000 bytes in size and will be placed on the small object heap. Objects equal to or greater than 80,000 bytes in size are placed on the large object heap. Objects that survive generation zero get promoted by the garbage collector to generation one. Finally, objects that survive generation one get promoted to generation two. </p>
+			<p class="callout-heading">Note</p>
+			<p class="callout">Instantiated objects equal to or greater than 80,000 bytes may start as generation zero but be promoted, so they would not be seen as generation zero.</p>
+			<p>When an <a id="_idIndexMarker095"/>object is promoted from one generation to another by the garbage collector, its memory address changes. This breaks any pointers that refer to that address. To prevent the address from being modified by the garbage collector, the pointer code must be declared using the <strong class="source-inline">fixed</strong> keyword.</p>
+			<p>Now, let's look at using the <strong class="source-inline">unsafe</strong> and <strong class="source-inline">fixed</strong> keywords.</p>
+			<h2 id="_idParaDest-44"><a id="_idTextAnchor043"/>Using unsafe and fixed code</h2>
+			<p>To remind the programmer of their responsibility for ensuring code safety, unmanaged code is wrapped in a code block marked as unsafe using the <strong class="source-inline">unsafe</strong> keyword. Unsafe code makes use of pointers to refer to locations in memory. </p>
+			<p><strong class="bold">Unsafe code</strong> provides<a id="_idIndexMarker096"/> programmers with<a id="_idIndexMarker097"/> access to pointer types in C#, which can be necessary when they're working with the underlying operating system, system drivers, or working on time-critical code that needs to be executed in the smallest amount of time.</p>
+			<p>Even though we say the code that deals with pointers is unsafe code, it is safe to work with. Such code is marked with the <strong class="source-inline">unsafe</strong> keyword. Despite being called unsafe, such code is safe to use in managed code – it is just not verified by the CLR. Therefore, it is possible to introduce security risks and/or pointer errors. You can have an unsafe <strong class="source-inline">pointer_type</strong>, <strong class="source-inline">value_type</strong>, or <strong class="source-inline">reference_type</strong>.</p>
+			<p class="callout-heading">Note</p>
+			<p class="callout">The topic of unsafe code is deep, so if you wish to learn more, please view the language specification that discusses unsafe code at https://docs.microsoft.com/dotnet/csharp/language-reference/language-specification/unsafe-code. </p>
+			<p>In this section, we <a id="_idIndexMarker098"/>will write a console application that puts the various unsafe code mechanisms to work. You can view the project's source code at <a href="https://github.com/PacktPublishing/C-9-and-.NET-5-High-Performance/tree/master/CH02/CH02_UnsafeCode">https://github.com/PacktPublishing/C-9-and-.NET-5-High-Performance/tree/master/CH02/CH02_UnsafeCode</a>.</p>
+			<p>Consider<a id="_idIndexMarker099"/> the following computer program:</p>
+			<pre class="source-code">namespace CH02_UnsafeCode</pre>
+			<pre class="source-code">{</pre>
+			<pre class="source-code">    using System;</pre>
+			<pre class="source-code">    class Program</pre>
+			<pre class="source-code">    {</pre>
+			<pre class="source-code">        static void Main(string[] args)</pre>
+			<pre class="source-code">        {</pre>
+			<pre class="source-code">            int[] array = new int[5] { 5, 4, 3, 2, 1 };</pre>
+			<pre class="source-code">            Console.WriteLine(array[4]);</pre>
+			<pre class="source-code">            unsafe</pre>
+			<pre class="source-code">            {</pre>
+			<pre class="source-code">                int* pointer = stackalloc int[5];</pre>
+			<pre class="source-code">                int* cpointer = pointer;</pre>
+			<pre class="source-code">                cpointer += 50;</pre>
+			<pre class="source-code">                Console.WriteLine(*cpointer);</pre>
+			<pre class="source-code">            }</pre>
+			<pre class="source-code">        }</pre>
+			<pre class="source-code">    }</pre>
+			<pre class="source-code">}</pre>
+			<p>In the preceding code, you can see that we allocate memory space for an array of five <strong class="source-inline">int</strong> values<a id="_idIndexMarker100"/> using the <strong class="source-inline">new</strong> keyword. We can do the same thing using unsafe code. But instead of using the <strong class="source-inline">new</strong> keyword, we can use <strong class="source-inline">stackalloc</strong> and wrap the code in a code block marked as <strong class="source-inline">unsafe</strong>.</p>
+			<p>When dealing <a id="_idIndexMarker101"/>with unsafe code such as array pointers, it is necessary to use<a id="_idIndexMarker102"/> the <strong class="source-inline">fixed</strong> keyword. To <a id="_idIndexMarker103"/>understand why the <strong class="source-inline">fixed</strong> keyword is important, you need to understand garbage collection.</p>
+			<p>When <a id="_idIndexMarker104"/>objects are created, they are generation-zero objects. The garbage collector will remove any unreferenced generation one objects. If the space for allocating generation zero objects becomes full, the garbage collector moves the generation zero objects to generation one. Then, new objects can be added to generation zero. If the generation one and generation two objects become full, and all the objects are in use, then the garbage collector moves the generation one objects to generation two. This, in turn, moves the generation zero objects to generation one.</p>
+			<p>New objects are then added to generation zero. At this point, if the generation two, generation one, and generation zero storage spaces are full, which means that no new objects can be added, then you end up with an out-of-memory exception. The following diagram shows this:</p>
+			<div>
+				<div id="_idContainer021" class="IMG---Figure">
+					<img src="image/Figure_2.1_B16617.jpg" alt="Figure 2.1 – Garbage collection management of object generations&#13;&#10;"/>
+				</div>
+			</div>
+			<p class="figure-caption">Figure 2.1 – Garbage collection management of object generations</p>
+			<p>Since the<a id="_idIndexMarker105"/> garbage collector is moving the items from one generation to another, the memory locations change. However, the pointers to those objects in your code do not change. Therefore, when retrieving the information <a id="_idIndexMarker106"/>from the pointer address, the data will be incorrect.</p>
+			<p>To prevent <a id="_idIndexMarker107"/>this from happening, we can use the <strong class="source-inline">fixed</strong> keyword. The <strong class="source-inline">fixed</strong> keyword tells the garbage collector to leave the address space that <strong class="source-inline">arrayPointer</strong> is pointing to alone. This means that we can ensure that the pointer will be pointing to the correct address space and data. The following code shows the <strong class="source-inline">unsafe</strong> and <strong class="source-inline">fixed</strong> keywords <a id="_idIndexMarker108"/>being used to deal with an array:</p>
+			<pre class="source-code">unsafe </pre>
+			<pre class="source-code">{</pre>
+			<pre class="source-code">     fixed (int* arrayPointer = array)</pre>
+			<pre class="source-code">     {</pre>
+			<pre class="source-code">     // Code omitted.</pre>
+			<pre class="source-code">}</pre>
+			<pre class="source-code">}</pre>
+			<p>In the preceding code, because we are using unsafe code, we used an <strong class="source-inline">unsafe</strong> code block. Since we don't want the array to be affected by the garbage collector, we kept the object at its current generation by using the <strong class="source-inline">fixed</strong> code block.</p>
+			<p>One caveat you<a id="_idIndexMarker109"/> need to be aware of when using unsafe code is the effect of accessing an array that's out of bounds. When you access <a id="_idIndexMarker110"/>an array that's out of bounds in managed code, you are presented with <strong class="source-inline">IndexOutOfBoundsException</strong>. You do not have that luxury with <a id="_idIndexMarker111"/>unmanaged code. You are responsible for ensuring that the correct indexes are accessed. If you happen to access an index that is outside the bounds of the array, then you will <a id="_idIndexMarker112"/>not have <strong class="source-inline">IndexOutOfBoundsException</strong> thrown. Instead, you will have whatever is at that memory address returned to you. In that case, you may or may not end up with some type of exception being thrown. The following code demonstrates this:</p>
+			<pre class="source-code"><strong class="bold">int</strong>* pointerToArray = <strong class="bold">stackalloc int</strong>[100];</pre>
+			<pre class="source-code">Console.WriteLine(pointerToArray[99]);</pre>
+			<pre class="source-code">Console.WriteLine(pointerToArray[100]);</pre>
+			<p>Here, the array is added to the stack. The value of the array at position <strong class="source-inline">99</strong> is correct, but the array position of <strong class="source-inline">100</strong> is out of bounds, so an incorrect value is returned. This means that <strong class="source-inline">IndexOutOfBoundsException</strong> is thrown. That is why you must be careful with unmanaged code when dealing with indexes.</p>
+			<p class="callout-heading">Note</p>
+			<p class="callout">The reason for the <strong class="source-inline">unsafe</strong> keyword is to alert the programmer to their responsibility for code safety. When dealing with pointers, runtime exceptions aren't raised. Instead, whatever is at that memory location is returned. That's why you must take extra care when programming unsafe code. You must also use the <strong class="source-inline">fixed</strong> keyword when you can't afford for the garbage collector to switch the generations of your objects and move them.</p>
+			<p>In C#, you can only use structs and primitives with unsafe and fixed code. Classes and strings that access the heap are not allowed. This means that nothing that will be garbage collected can be referenced using unsafe code. So, when using C# pointers, you can use value <a id="_idIndexMarker113"/>types, but <a id="_idIndexMarker114"/>you cannot use reference types.</p>
+			<p>For example, the<a id="_idIndexMarker115"/> following code will not compile:</p>
+			<pre class="source-code">unsafe</pre>
+			<pre class="source-code">{</pre>
+			<pre class="source-code">      fixed (TestObject* testObject = new TestObject()) { }</pre>
+			<pre class="source-code">      fixed (string* text = "Hello, World!") { }</pre>
+			<pre class="source-code">}</pre>
+			<p>The <strong class="source-inline">testObject</strong> variable<a id="_idIndexMarker116"/> is a reference type pointer, so the compiler throws an exception if you build the code. This code returns the following exception:</p>
+			<ul>
+				<li><strong class="source-inline">CS0208</strong>: Cannot take the address of, get the size of, or declare a pointer to a managed type (<strong class="source-inline">'TestObject'</strong>)</li>
+			</ul>
+			<p>The <strong class="source-inline">text</strong> variable is a string pointer, and the compiler throws an exception if you build the code. This code returns the following exception: </p>
+			<ul>
+				<li><strong class="source-inline">CS0208</strong>: Cannot take the address of, get the size of, or declare a pointer to a managed type (<strong class="source-inline">'string'</strong>)<p class="callout-heading">Note</p><p class="callout">Using fixed objects can result in memory fragmentation. So, avoid using the <strong class="source-inline">fixed</strong> keyword until you need to, and only use it for as long as you need it.</p></li>
+			</ul>
+			<p>Now, let's look at exposing static entry points using P/Invoke.</p>
+			<h2 id="_idParaDest-45"><a id="_idTextAnchor044"/>Exposing static entry points using P/Invoke</h2>
+			<p>P/Invoke allows<a id="_idIndexMarker117"/> you to make static entry points available to other applications. If you have ever used WinAPI, then you<a id="_idIndexMarker118"/> have accessed code in DLLs via their public static entry points. These access points would have been made available using P/Invoke.</p>
+			<p>To use P/Invoke, you will need to import the <strong class="source-inline">System.Runtime.InteropServices</strong> namespace. Then, you must make the static entry call using <strong class="source-inline">DllImportAttribute</strong>:</p>
+			<p class="callout-heading">Note</p>
+			<p class="callout">To identify the static entry points of a file, you can use the <strong class="source-inline">dumpbin.exe</strong> file that's located in the <strong class="source-inline">C:\Program Files (x86)\Microsoft Visual Studio\2019\Preview\VC\Tools\MSVC\14.28.29115\bin\Hostx64\x64</strong> folder. This version of 14.28.29.115 was correct at the time of writing. When you come to execute the following code, this version will have changed. Use the latest version that you have installed on your computer.</p>
+			<p>Now, let's learn how to use <strong class="source-inline">dumpbin</strong> to see what methods and properties the <strong class="source-inline">User32.dll</strong> system library exports using the command line:</p>
+			<ol>
+				<li>Open the command line or developer command prompt. Then, enter the following command (note that there might be a different version on your computer – use the latest version number you have):<p class="source-code">" C:\Program Files (x86)\Microsoft Visual </p><p class="source-code">    Studio\2019\Preview\VC\Tools\MSVC\14.28.29304</p><p class="source-code">      \bin\Hostx64\x64\dumpbin.exe /exports User32.dll</p></li>
+			</ol>
+			<p>You should see something like the following:</p>
+			<div>
+				<div id="_idContainer022" class="IMG---Figure">
+					<img src="image/Figure_2.2_B16617.jpg" alt="Figure 2.2 – Command line showing the outcome from executing dumpbin on User32.dll&#13;&#10;"/>
+				</div>
+			</div>
+			<p class="figure-caption">Figure 2.2 – Command line showing the outcome from executing dumpbin on User32.dll</p>
+			<ol>
+				<li value="2">Let's <a id="_idIndexMarker119"/>write a <a id="_idIndexMarker120"/>C++ library and call it from C# using P/Invoke. First, we must create a new empty C++ project, as shown in the following screenshot:</li>
+			</ol>
+			<p class="figure-caption"> </p>
+			<div>
+				<div id="_idContainer023" class="IMG---Figure">
+					<img src="image/Figure_2.3_B16617.jpg" alt="Figure 2.3 – Creating a new empty C++ project&#13;&#10;"/>
+				</div>
+			</div>
+			<p class="figure-caption">Figure 2.3 – Creating a new empty C++ project</p>
+			<ol>
+				<li value="3">Delete<a id="_idIndexMarker121"/> the <strong class="source-inline">Header Files</strong>, <strong class="source-inline">Resource File</strong>, and <strong class="source-inline">Source Files</strong> folders. Add a new class called <strong class="source-inline">Product</strong>. Delete the header file that has the <strong class="source-inline">.h</strong> file extension.</li>
+				<li>Modify <a id="_idIndexMarker122"/>the <strong class="source-inline">Product.cpp</strong> file so that it contains the following code:<p class="source-code">#include &lt;string&gt;</p><p class="source-code">#include &lt;iostream&gt;</p><p class="source-code">#include &lt;comdef.h&gt;</p><p class="source-code">struct Product {</p><p class="source-code">int Id;</p><p class="source-code">      BSTR Name;</p><p class="source-code">      void BuyProduct() {</p><p class="source-code">            std::wcout &lt;&lt; "Product.BuyProduct(" &lt;&lt; </p><p class="source-code">              Name &lt;&lt; ");\n";</p><p class="source-code">            std::cout &lt;&lt; "Id: " &lt;&lt; Id;</p><p class="source-code">            std::cout &lt;&lt; "\n";</p><p class="source-code">      }</p><p class="source-code">};</p><p class="source-code">extern "C" __declspec(dllexport)  Product </p><p class="source-code">    CreateProduct() {</p><p class="source-code">      Product product = Product();</p><p class="source-code">      product.Id = 1;</p><p class="source-code">      product.Name = SysAllocString(L"New Product");</p><p class="source-code">      return product;</p><p class="source-code">}</p><p class="source-code">extern "C" __declspec(dllexport) void </p><p class="source-code">    BuyProduct(Product product) {</p><p class="source-code">      product.BuyProduct();</p><p class="source-code">}</p></li>
+				<li>Now, we <a id="_idIndexMarker123"/>must import <a id="_idIndexMarker124"/>three libraries: <strong class="source-inline">string</strong>, <strong class="source-inline">iostream</strong>, and <strong class="source-inline">comdef.h</strong>. Then, we must declare a struct with <strong class="source-inline">Id</strong> and <strong class="source-inline">Name</strong> values. In C++, strings are typically defined using <strong class="source-inline">std::string</strong>, but when it comes to.NET, we declare strings as the BSTR type for OLE/automation by convention. The BSTR APIs use the <strong class="source-inline">CoTask*</strong> memory allocator, which is the implied interop contract for native on Windows. On non-Windows systems, .NET 5 uses <strong class="source-inline">malloc</strong>/<strong class="source-inline">free</strong>. We also have a void method called <strong class="source-inline">BuyProduct()</strong> that prints the <strong class="source-inline">Id</strong> and <strong class="source-inline">Name</strong> values as well as a newline, to the console's output window.</li>
+				<li>The next thing we must do is export two methods called <strong class="source-inline">CreateProduct()</strong> and <strong class="source-inline">BuyProduct(Product product)</strong>. Now, <strong class="source-inline">CreateProduct()</strong> creates a new <strong class="source-inline">Product</strong> and returns it to the caller, while <strong class="source-inline">BuyProduct(Product product)</strong> calls the <strong class="source-inline">BuyProduct()</strong> method on the passed-in <strong class="source-inline">Product</strong> struct.</li>
+				<li>Add a new <a id="_idIndexMarker125"/>class <a id="_idIndexMarker126"/>called <strong class="source-inline">Greeting</strong>. Delete the <strong class="source-inline">Greeting.h</strong> file. Update the <strong class="source-inline">Greeting.cpp</strong> file so that it contains the following source code:<p class="source-code">#include &lt;iostream&gt;</p><p class="source-code">#include &lt;comdef.h&gt;</p><p class="source-code">extern "C" __declspec(dllexport) void SendGreeting();</p><p class="source-code">extern "C" __declspec(dllexport) int Add(int, int);</p><p class="source-code">extern "C" __declspec(dllexport) bool </p><p class="source-code">    IsLengthGreaterThan5(const char*);</p><p class="source-code">extern "C" __declspec(dllexport) BSTR GetName();</p><p class="source-code">void SendGreeting() {</p><p class="source-code">      std::cout &lt;&lt; "Dear C#, C++ says hello!\n";</p><p class="source-code">}</p><p class="source-code">int Add(int x, int y) {</p><p class="source-code">      return x + y;</p><p class="source-code">}</p><p class="source-code">bool IsLengthGreaterThan5(const char* value) {</p><p class="source-code">      return strlen(value) &gt; 5;</p><p class="source-code">}</p><p class="source-code">BSTR GetName() {</p><p class="source-code">      return SysAllocString(L"Packt Publishing");</p><p class="source-code">}</p></li>
+			</ol>
+			<p>Here, we have included <strong class="source-inline">iostream</strong> and <strong class="source-inline">comdef.h</strong>. We have four methods called <strong class="source-inline">SendGreeting()</strong>, <strong class="source-inline">Add(int x, int y)</strong>, <strong class="source-inline">IsLengthGreaterThan5(const char* value)</strong>, and <strong class="source-inline">GetName()</strong>. We expose these methods to external callers.</p>
+			<p><strong class="source-inline">SendGreeting()</strong> takes<a id="_idIndexMarker127"/> no <a id="_idIndexMarker128"/>parameters and outputs a string to the standard output window. <strong class="source-inline">Add(int x, int y)</strong> adds to integers passed in by the caller and returns the result. <strong class="source-inline">IsLengthGreaterThan5(const char* value)</strong> checks if the length of the string that's been passed in by the caller is greater than <strong class="source-inline">5</strong>. If it is, then <strong class="source-inline">true</strong> is returned. Otherwise, <strong class="source-inline">false</strong> is returned. <strong class="source-inline">GetName()</strong> returns a string. The return type for a string must be <strong class="source-inline">BSTR</strong>. To return a string in a method, you must call <strong class="source-inline">SysAllocString(L"the string you want returning")</strong>. This correctly initializes the string to a wide-character array and initializes the count.</p>
+			<p>That is all there is to our C++ library. Now, we just need to configure it. But before we do that, we will write our C# client, which will consume the C++ library. The reason for doing this is that once we have the build folder for our C# client, we will get our C++ library to output the DLL to the C# build folder. Follow these steps:</p>
+			<ol>
+				<li value="1">Add a new .NET Core 3.1 console application project to your solution, and then set it as the startup project. Add a class called <strong class="source-inline">Product</strong>. Update the contents of the <strong class="source-inline">Product.cs</strong> file, as follows:<p class="source-code">using System.Runtime.InteropServices;</p><p class="source-code">[StructLayout(LayoutKind.Sequential)]</p><p class="source-code">public struct Product</p><p class="source-code">{</p><p class="source-code">      public int Id;</p><p class="source-code">[MarshalAs(UnmanagedType.BStr)]</p><p class="source-code">public string Name;</p><p class="source-code">}</p></li>
+			</ol>
+			<p>Here, we have created a mirror of the C++ struct in our C# client and included the <strong class="source-inline">System.Runtime.InteropServices</strong> library. Our C# struct has the same two fields as our C++ struct and they are in the same order. The struct itself is annotated with <strong class="source-inline">[StructLayout(LayoutKind.Sequential)]</strong>, which <a id="_idIndexMarker129"/>states<a id="_idIndexMarker130"/> that the field order must be processed sequentially. This ensures a match between the fields in the C++ library and the fields in the C# library. Additionally, the <strong class="source-inline">Name</strong> property is a string, so it needs to be annotated with the <strong class="source-inline">[MarshalAs(UnmanagedType.Bstr)]</strong> annotation. This tells the compiler that the C# string is to be treated as a C++ BSTR.</p>
+			<ol>
+				<li value="2">Modify the <strong class="source-inline">Program.cs</strong> file, as follows:<p class="source-code">namespace CH02_Pinvoke {</p><p class="source-code">    using System;</p><p class="source-code">    using System.Runtime.InteropServices;</p><p class="source-code">    class Program {</p><p class="source-code">        static void Main(string[] _) {</p><p class="source-code">        }</p><p class="source-code">    }</p><p class="source-code">}</p></li>
+			</ol>
+			<p>Here, we imported the <strong class="source-inline">System</strong> and <strong class="source-inline">System.Runtime.InteropServices</strong> libraries, and then modified the <strong class="source-inline">Main(string[] args)</strong> method by replacing the <strong class="source-inline">args</strong> parameter's name with the default operator.</p>
+			<ol>
+				<li value="3">Set the build configuration to x64.</li>
+				<li>Append the following line to the <strong class="source-inline">PropertyGroup</strong> section of your C++ project file:<p class="source-code">&lt;AppendTargetFrameworkToPath&gt;false&lt;/AppendTargetFrame</p><p class="source-code">    workToPath&gt;</p></li>
+				<li>Build<a id="_idIndexMarker131"/> the project. This <a id="_idIndexMarker132"/>will produce our output folder where we will place our compiled C++ library.</li>
+				<li>Right-click on the C++ project and select <strong class="bold">Properties</strong>. You should see the <strong class="bold">CH02_NativeLibrary Property Pages</strong> dialog box:</li>
+			</ol>
+			<div>
+				<div id="_idContainer024" class="IMG---Figure">
+					<img src="image/Figure_2.4_B16617.jpg" alt="Figure 2.4 – CH02_NativeLibrary Property Pages&#13;&#10;"/>
+				</div>
+			</div>
+			<p class="figure-caption">Figure 2.4 – CH02_NativeLibrary Property Pages</p>
+			<ol>
+				<li value="7">Change <strong class="bold">Output Directory</strong> to your C# project's output directory. Then, change <strong class="bold">Configuration Type</strong> to <strong class="bold">Dynamic Library (.dll)</strong>. Build the C++ library.</li>
+				<li>Back in <a id="_idIndexMarker133"/>your C# project, add the COM library by browsing for it in your C# build folder.</li>
+				<li>Add the <a id="_idIndexMarker134"/>following DLL imports to the <strong class="source-inline">Program</strong> class, above the <strong class="source-inline">Main</strong> method:<p class="source-code">[DllImport("CH02_NativeLibrary.dll",</p><p class="source-code">      CallingConvention = CallingConvention.StdCall</p><p class="source-code">)]</p><p class="source-code">[DllImport("CH02_NativeLibrary.dll", EntryPoint = </p><p class="source-code">    "Add",CallingConvention = Calling</p><p class="source-code">        Convention.StdCall</p><p class="source-code">)]</p><p class="source-code">public static extern int AddIntegers(int x, int y);</p><p class="source-code">[DllImport("CH02_NativeLibrary.dll",</p><p class="source-code">      CallingConvention = CallingConvention.StdCall</p><p class="source-code">)]</p><p class="source-code">public static extern bool IsLengthGreaterThan5(string </p><p class="source-code">    value);</p><p class="source-code">[DllImport("CH02_NativeLibrary.dll",</p><p class="source-code">      CallingConvention = CallingConvention.StdCall</p><p class="source-code">)]</p><p class="source-code">[return: MarshalAs(UnmanagedType.BStr)]</p><p class="source-code">public static extern string GetName();</p><p class="source-code">[DllImport("CH02_NativeLibrary.dll",</p><p class="source-code">      CallingConvention = CallingConvention.StdCall</p><p class="source-code">)]</p><p class="source-code">public static extern void BuyProduct(Product product);</p><p class="source-code">[DllImport("CH02_NativeLibrary.dll")]</p><p class="source-code">public static extern Product CreateProduct();</p></li>
+				<li>These <strong class="source-inline">DllImport</strong> statements make our <strong class="source-inline">CH02_NativeLibrary.dll</strong> methods<a id="_idIndexMarker135"/> available <a id="_idIndexMarker136"/>to C#. Update the <strong class="source-inline">Main</strong> method, as follows:<p class="source-code">static void Main(string[] _)</p><p class="source-code">{</p><p class="source-code">SendGreeting();</p><p class="source-code">    Console.WriteLine($"1 + 2 = {AddIntegers(1, 2)}");</p><p class="source-code">     var answer = IsLengthGreaterThan5("C# is </p><p class="source-code">       awesome!") ? "Yes." : "No.";</p><p class="source-code">     Console.WriteLine($"Is \"C# is awesome!\" &gt; than </p><p class="source-code">       5? {answer}");</p><p class="source-code">     Console.WriteLine($"Publisher Name: {GetName()}");</p><p class="source-code">     var product = CreateProduct();</p><p class="source-code">     Console.WriteLine($"Product: {product.Name}");</p><p class="source-code">     BuyProduct(product);</p><p class="source-code">     Console.ReadKey();</p><p class="source-code">}</p></li>
+			</ol>
+			<p>Our <strong class="source-inline">Main</strong> method calls the methods that were imported from our <strong class="source-inline">CH02_NativeLibrary.dll</strong> binary. We pass values in and receive values and structures back. </p>
+			<p>Now that you know what unsafe and fixed code is, let's learn how to interact with Python code in C#.</p>
+			<h1 id="_idParaDest-46"><a id="_idTextAnchor045"/>Interacting with Python code</h1>
+			<p>Python is <a id="_idIndexMarker137"/>one of the world's top programming languages <a id="_idIndexMarker138"/>and is a favorite of data scientists and programmers working in the field of artificial intelligence and machine learning. Automation of day-to-day mundane infrastructure tasks has been carried out by infrastructure professionals using the Python programming language.</p>
+			<p>Python code has been designed in such a way that programmers can code tasks quicker than they can in C#. So, the programming writing experience in Python can be quicker than in C#. Some programmers state that Python can be more readable than C#, although I find C# easier to read and understand when compared to Python. This means that readability is rather subjective, but more programmers create programs in Python than they do in C#.</p>
+			<p>C# beats Python when it comes to compiled code performance. Python can be quicker to write but requires a lot of testing and its garbage collector and interpreter can affect the performance of Python applications. C# uses JIT, AOT, and Ngen, which are also available to VB.NET, C#, F#, and other .NET languages, to perform various types of compilation. The result is that C# produces native code on the target machine, thus providing much faster-executing code than Python. And with the advent of further performance improvements being added to .NET 5 and C# 9.0 by Microsoft, C# will be even faster than it was in its previous versions.</p>
+			<p>With so much good work being accomplished in the Python arena, it is good for C# programmers to be able to capitalize on Python by using Python code from C#. At the same time, some companies are striving to have all their code in a single code base, so they want to move away from languages such as Java and Python and become fully C#-oriented. Another advantage of moving the existing Python code over to C# is that the same tasks will be much faster in C# than they are in Python. The first step in being able to move away from Python to C# is to be able to use the existing Python code within the C# programming language.</p>
+			<p>In this section, you will learn<a id="_idIndexMarker139"/> how to execute Python code inside C#. You will also learn how to call and execute an external Python script. Follow these steps:</p>
+			<ol>
+				<li value="1">First, make sure you add the Python payload from within Visual Studio Installer and add Python to your <strong class="source-inline">PATH</strong> environment variable.</li>
+				<li>Start a new .NET Core 3.1 console application. Then, add the <strong class="source-inline">IronPython</strong> NuGet package. This will only work with Python 2.x code. If you require Python 3.x support, then use Python.NET, which is <a id="_idIndexMarker140"/>available at http//pythonnet.github.io. You will need the following <strong class="source-inline">using</strong> statements:<p class="source-code">using System;</p><p class="source-code">using IronPython.Hosting;</p></li>
+			</ol>
+			<p>We need <strong class="source-inline">System</strong> because we will be outputting text to the console window. The <strong class="source-inline">IronPython.Hosting</strong> library is needed to host and execute Python code in C#.</p>
+			<ol>
+				<li value="3">Add a <a id="_idIndexMarker141"/>file called <strong class="source-inline">welcome.py</strong> to the project, set it to <strong class="source-inline">Copy</strong> always, and add the following code:<p class="source-code">print("Welcome to the world of Python integration with </p><p class="source-code">    C#!")</p></li>
+				<li>This Python code will print out the text to our console window. Add the following code to the <strong class="source-inline">Main</strong> method:<p class="source-code">Console.WriteLine("Enter a string to be printed from </p><p class="source-code">    Python: ");</p><p class="source-code">var input = Console.ReadLine();</p><p class="source-code">     var python = Python.CreateEngine();</p><p class="source-code">     try</p><p class="source-code">{</p><p class="source-code">python.Execute("print('From Python: " + input + "')");</p><p class="source-code">python.ExecuteFile("welcome.py");</p><p class="source-code">}</p><p class="source-code">catch (Exception ex)</p><p class="source-code">{</p><p class="source-code">Console.WriteLine(ex.Message);</p><p class="source-code">}</p><p class="source-code">finally</p><p class="source-code">{</p><p class="source-code">Console.ReadKey();</p><p class="source-code">}</p></li>
+			</ol>
+			<p>Here, we are prompting the user to input some text. Then, we read the line of text the user enters. A variable is created that can be used to execute Python code. A <strong class="source-inline">try</strong>/<strong class="source-inline">catch</strong>/<strong class="source-inline">finally</strong> block is then used to execute the Python code. First, we execute pure Python code<a id="_idIndexMarker142"/> directly from within C#. Then, we execute the code that was executed in our Python script. Any exceptions are caught with the exception message that was written to the console window. Finally, we wait for the user to press any key before we exit.</p>
+			<p>And that is all there is to executing Python code directly within C# and via external Python scripts. Now, let's learn the COM interface.</p>
+			<h1 id="_idParaDest-47"><a id="_idTextAnchor046"/>Performing Component Object Model (COM) interoperability</h1>
+			<p>The <strong class="bold">Component Object Model</strong> (<strong class="bold">COM</strong>) is an<a id="_idIndexMarker143"/> interface standard that was introduced by Microsoft in 1993. It enables components written in the same or different languages to communicate with each other, and<a id="_idIndexMarker144"/> COM components can pass data between each other. Communication is accomplished through <strong class="bold">Inter-Process Communication</strong> (<strong class="bold">IPC</strong>) and <a id="_idIndexMarker145"/>dynamic object creation. COM is not a programming language; it provides a software architecture that consists of binary and network standards.</p>
+			<p>Many business employees use spreadsheets because they are an easy way to combine and manipulate data for various reasons. Spreadsheets are also the perfect tools for statistical analysis. Many companies expand the power of spreadsheets by building useful add-ons using C# and other languages. But spreadsheets are also useful for ingesting data into databases for day-to-day operations and reporting purposes. In this section, you will learn how to create and manipulate spreadsheets in C#, as well as write C# plugins for Excel.</p>
+			<p class="callout-heading">Note</p>
+			<p class="callout"><strong class="bold">Visual Studio Tools for Office</strong> (<strong class="bold">VSTO</strong>) is <a id="_idIndexMarker146"/>only available in .NET 4.8 and below. It will not work in C# 9 and .NET 5.0. Due to this, we will perform C# interoperability using .NET 4.8. Microsoft has moved away from VSTO and the COM model to focus on the cross-platform extensibility of Excel using JavaScript. Since this book is on C#, we will focus on VSTO in .NET 4.8. To find out more about Microsoft Office extensibility using the JavaScript API, please read the following documentation: <a href="https://docs.microsoft.com/office/dev/add-ins/develop/understanding-the-javascript-api-for-office">https://docs.microsoft.com/office/dev/add-ins/develop/understanding-the-javascript-api-for-office</a>.</p>
+			<p>In this section, we <a id="_idIndexMarker147"/>will provide two demonstrations. The first demonstration will read data from an existing spreadsheet. It is useful to know how to do this as there is often a business need for programmers to work with spreadsheet data. After that, we will add an Excel VSTO add-in for Excel. It can be very useful to provide add-ins to end users that make their work more expedient and enjoyable.</p>
+			<h2 id="_idParaDest-48"><a id="_idTextAnchor047"/>Reading data from an Excel spreadsheet</h2>
+			<p>In this section, we are <a id="_idIndexMarker148"/>going to write a <a id="_idIndexMarker149"/>small program to read an Excel file, count the number of lines, and then update the Excel spreadsheet with the used line count from within C#. Follow these steps:</p>
+			<ol>
+				<li value="1">Add a folder called <strong class="source-inline">C:\Temp</strong>. Then, create a new spreadsheet in it called <strong class="source-inline">LineCount.xlsx</strong>. Add 10 rows of text in the first column. Save and close the spreadsheet.</li>
+				<li>Add a <a id="_idIndexMarker150"/>new .NET 4.8 console application. Add the following reference using the NuGet package manager to install the latest versions:<p class="source-code">Microsoft.Office.Interop.Excel</p><p class="source-code">Microsoft.VisualStudio.Tools.Applications.Runtime</p></li>
+				<li>Add<a id="_idIndexMarker151"/> the following namespaces to the <strong class="source-inline">Program</strong> class:<p class="source-code">using System;</p><p class="source-code">using Microsoft.Office.Interop.Excel;</p></li>
+				<li>With that, we can interact with Excel from C#. Now, modify the <strong class="source-inline">Main</strong> method, as follows:<p class="source-code">var excel = new Application();</p><p class="source-code">var workbook = excel.Workbooks.Open</p><p class="source-code">     ("C:\\Temp\\LineCount.xlsx");</p><p class="source-code">var worksheet = excel.ActiveSheet as Worksheet;</p><p class="source-code">Range userRange = worksheet.UsedRange;</p><p class="source-code">int countRecords = userRange.Rows.Count;</p><p class="source-code">int add = countRecords + 1;</p><p class="source-code">worksheet.Cells[add, 1] = $"Total Rows: {countRecords}";</p><p class="source-code">workbook.Close(true, Type.Missing, Type.Missing);</p><p class="source-code">excel.Quit();</p></li>
+			</ol>
+			<p>The preceding code creates a new Excel application. The workbook we created and modified earlier on is opened. At this point, we can obtain the actively used range on the active sheet and the count of how many rows there are. The count is then saved on a new row, after which we can close the workbook and quit Excel. </p>
+			<ol>
+				<li value="5">Run the <a id="_idIndexMarker152"/>code as many <a id="_idIndexMarker153"/>times as you like and then open the spreadsheet. You should see something similar to the following:</li>
+			</ol>
+			<div>
+				<div id="_idContainer025" class="IMG---Figure">
+					<img src="image/Figure_2.5_B16617.jpg" alt="Figure 2.5 – Excel showing rows added by C#&#13;&#10;"/>
+				</div>
+			</div>
+			<p class="figure-caption">Figure 2.5 – Excel showing rows added by C#</p>
+			<p>As you can see, working with Excel files is straightforward.</p>
+			<p class="callout-heading">Tip</p>
+			<p class="callout">The most performant way to populate an Excel spreadsheet from a database result set is to use <strong class="source-inline">Worksheet.Range.CopyFromRecordset(Object, Object, Object)</strong>. See the official Microsoft documentation at <a href="https://docs.microsoft.com/dotnet/api/microsoft.office.interop.excel.range.copyfromrecordset?view=excel-pia">https://docs.microsoft.com/dotnet/api/microsoft.office.interop.excel.range.copyfromrecordset?view=excel-pia</a>.</p>
+			<p>Now, let's create an Excel add-in.</p>
+			<h2 id="_idParaDest-49"><a id="_idTextAnchor048"/>Creating an Excel add-in</h2>
+			<p>What <a id="_idIndexMarker154"/>does creating an Excel add-in have to <a id="_idIndexMarker155"/>do with.NET high performance? Well, VSTO performance can be improved by implementing the following strategies:</p>
+			<ul>
+				<li>Load VSTO add-ins on demand.</li>
+				<li>Publish Office solutions by using Windows Installer.</li>
+				<li>Bypass Ribbon reflection.</li>
+				<li>Perform expensive operations in a separate thread.</li>
+			</ul>
+			<p>In this section, we are going to write an Excel add-in that will appear on the <strong class="bold">Add-ins</strong> tab within Excel. When the button is clicked, it will read the text in the currently selected cell and display the contents in a message box. Follow these steps:</p>
+			<ol>
+				<li value="1">Create a new Excel VSTO add-in project. This will target .NET 4.8. You cannot use VSTO with .NET 5.0.</li>
+				<li>Add a new Ribbon (Visual Designer) and call it <strong class="source-inline">CsRibbonExtension</strong>. </li>
+				<li>Rename <strong class="source-inline">group1</strong> to <strong class="source-inline">CsGroup</strong> and change the label to <strong class="source-inline">C# Group</strong>. </li>
+				<li>Add a button to <strong class="source-inline">CsGroup</strong>. </li>
+				<li>Change the button's name to <strong class="source-inline">GetCellValueButton</strong> and change its label to <strong class="source-inline">Get Cell Value</strong>. </li>
+				<li>Double-click the button to generate the click event. Update the click event like so:<p class="source-code">private void GetCellValueButton_Click(object sender, </p><p class="source-code">    RibbonControlEventArgs e)</p><p class="source-code">{</p><p class="source-code">CultureInfo originalLanguage = Thread.CurrentThread</p><p class="source-code">    .CurrentCulture;</p><p class="source-code">       Thread.CurrentThread.CurrentCulture = new </p><p class="source-code">          CultureInfo("en-US");</p><p class="source-code">       var activeCell = Globals.ThisAddIn.Application</p><p class="source-code">          .ActiveCell;</p><p class="source-code">       if (activeCell.Value2 != null)</p><p class="source-code">             MessageBox.Show(activeCell.Value2</p><p class="source-code">                .ToString());</p><p class="source-code">            Thread.CurrentThread.CurrentCulture = </p><p class="source-code">                originalLanguage;</p><p class="source-code">}</p></li>
+				<li>In our<a id="_idIndexMarker156"/> click event, we save the current<a id="_idIndexMarker157"/> language and then change it to American English. Then, we obtain the active cell. The <strong class="source-inline">Value2</strong> property is a dynamic type. We check if the value for the active cell is null. If the cell is not null, then we display the active cell's value in a message box. Finally, we return the language to its original language.</li>
+				<li>Build the project. </li>
+				<li>Then, press F5 to deploy the solution. </li>
+				<li>Open Excel and start a blank workbook. </li>
+				<li>On the ribbon, if the <strong class="bold">Add-ins</strong> tab is not visible, click on <strong class="bold">Customize Quick Access Toolbar</strong> and then <strong class="bold">More Commands…</strong> to bring up the <strong class="bold">Excel Options</strong> dialog, as shown in the following screenshot:</li>
+			</ol>
+			<div>
+				<div id="_idContainer026" class="IMG---Figure">
+					<img src="image/Figure_2.6_B16617.jpg" alt="Figure 2.6 – The Excel Options dialog&#13;&#10;"/>
+				</div>
+			</div>
+			<p class="figure-caption">Figure 2.6 – The Excel Options dialog</p>
+			<ol>
+				<li value="12">Make<a id="_idIndexMarker158"/> sure that the <strong class="bold">Add-ins</strong> option is <a id="_idIndexMarker159"/>ticked, as shown in the preceding screenshot. </li>
+				<li>Click on <strong class="bold">OK</strong> to close the dialog. Type anything you like in a cell and then click on the <strong class="bold">Add-ins</strong> tab. You should see something similar to the following:</li>
+			</ol>
+			<div>
+				<div id="_idContainer027" class="IMG---Figure">
+					<img src="image/Image87430.jpg" alt="Figure 2.7 – Excel showing the Add-ins tab&#13;&#10;"/>
+				</div>
+			</div>
+			<p class="figure-caption">Figure 2.7 – Excel showing the Add-ins tab</p>
+			<ol>
+				<li value="14">Make <a id="_idIndexMarker160"/>sure that your text cell is selected. Then, click on the <strong class="bold">Get Cell Value</strong> ribbon item. You should see a message similar<a id="_idIndexMarker161"/> to the following:</li>
+			</ol>
+			<div>
+				<div id="_idContainer028" class="IMG---Figure">
+					<img src="image/Image87438.jpg" alt="Figure 2.8 – Excel message displaying the text in the active cell&#13;&#10;"/>
+				</div>
+			</div>
+			<p class="figure-caption">Figure 2.8 – Excel message displaying the text in the active cell</p>
+			<h3>Loading our VSTO add-in on demand</h3>
+			<p>Now, let's <a id="_idIndexMarker162"/>add a performance improvement to our Excel add-in by only loading it when the customer demands it instead of at startup. Follow these steps:</p>
+			<ol>
+				<li value="1">Right-click on the Excel add-in project and select <strong class="bold">Properties</strong>.</li>
+				<li>Then, select the <strong class="bold">Publish</strong> page.</li>
+				<li>On the <strong class="bold">Publish</strong> page, click on the <strong class="bold">Options</strong> button.</li>
+				<li>On the <strong class="bold">Publish Options</strong> dialog, select <strong class="bold">Office Settings</strong>.</li>
+				<li>Select<a id="_idIndexMarker163"/> the <strong class="bold">Load on Demand</strong> option and click on the <strong class="bold">OK</strong> button.</li>
+			</ol>
+			<h3>Bypassing Ribbon reflection</h3>
+			<p>You can <a id="_idIndexMarker164"/>bypass Ribbon reflection by overriding <strong class="source-inline">Microsoft.Office.Core.IRibbonExtensibility.CreateRibbonExtensibleObject()</strong>. Instead of letting VSTO reflect what Ribbon object to load, you must use a conditional statement to explicitly load the correct Ribbon.</p>
+			<h3>Executing expensive operations in a separate thread of execution</h3>
+			<p>Any<a id="_idIndexMarker165"/> time-consuming tasks such as database operations and transferring objects over a network should be carried out in separate threads.</p>
+			<p class="callout-heading">Note</p>
+			<p class="callout">You must execute calls to the Office object model in the main thread.</p>
+			<h3>Further performance improvements</h3>
+			<p>For further <a id="_idIndexMarker166"/>guidance on performance improvements that you can make to VSTO add-ins, check out the official Microsoft documentation: <a href="https://docs.microsoft.com/en-us/visualstudio/vsto/improving-the-performance-of-a-vsto-add-in?view=vs-2019">https://docs.microsoft.com/en-us/visualstudio/vsto/improving-the-performance-of-a-vsto-add-in?view=vs-2019</a>.</p>
+			<p>So far, we have looked at various methods of interacting with other programs and programming languages. Now, let's learn how to safely dispose of unmanaged code.</p>
+			<h1 id="_idParaDest-50"><a id="_idTextAnchor049"/>Safely disposing of unmanaged code</h1>
+			<p>When working with <a id="_idIndexMarker167"/>unmanaged resources, you must explicitly dispose of them yourself to free up resources. If you do not, then you may end up with exceptions being raised or, worse, your application completely crashing. You must make sure that your applications don't continue running and supplying wrong data when exceptions are encountered. Should exceptions be encountered where the data would become invalid if the application were to continue, then it is better to exit the program. You must also make sure that if your application encounters a catastrophic exception that it is unable to recover from, either a message is displayed or some kind of logging takes place before it shuts down.</p>
+			<p>In C#, there are two ways to dispose of unmanaged resources: using the disposable pattern and using finalizers. We will discuss both methods in this section via code examples.</p>
+			<h3>Understanding C# finalization</h3>
+			<p>A <strong class="bold">finalizer</strong> is a<a id="_idIndexMarker168"/> destructor in C# and is used to <a id="_idIndexMarker169"/>perform any necessary final cleanup that needs to be performed manually. You can use finalizers in classes, but you cannot use them in structs. A class can have<a id="_idIndexMarker170"/> one finalizer, but a class cannot inherit or overload finalizers. You cannot call finalizers as they are invoked automatically when the class is destroyed. Also, modifiers do not accept modifiers or have any parameters.</p>
+			<p class="callout-heading">Note</p>
+			<p class="callout">You have no control over when a finalizer runs. If the GC was to run too infrequently, then you could experience <strong class="source-inline">OutOfMemory</strong> exceptions. Instead of relying on finalizers, you should implement the Dispose design pattern best practice, which will call the finalizer as a last resort. Consider finalizer code running as a bug when you're disposing of managed and unmanaged objects.</p>
+			<p>There are two syntactic<a id="_idIndexMarker171"/> ways to write finalizers in C#. The first is the classic method, as shown here:</p>
+			<pre class="source-code">public class Third : Second </pre>
+			<pre class="source-code">{</pre>
+			<pre class="source-code">      ~Third() // Destructor/Finalizer</pre>
+			<pre class="source-code">{</pre>
+			<pre class="source-code">      // Clean-up code goes here … </pre>
+			<pre class="source-code">}</pre>
+			<pre class="source-code">}</pre>
+			<p>The <a id="_idIndexMarker172"/>second <a id="_idIndexMarker173"/>way to write a finalizer is as follows:</p>
+			<pre class="source-code">public class Third : Second </pre>
+			<pre class="source-code">{</pre>
+			<pre class="source-code">      ~Third() =&gt; Console.WriteLine("Clean-up goes </pre>
+			<pre class="source-code">          here …");</pre>
+			<pre class="source-code">}</pre>
+			<p>As a <a id="_idIndexMarker174"/>programmer, you must know that, despite using finalizers to clean up code, you have no control over whether or when the garbage collector will call them. </p>
+			<p class="callout-heading">Note</p>
+			<p class="callout">As a rule of thumb, most of your code is managed code. This means that there should never be a need for you to touch finalizers. Only use them if you need to when cleaning up unmanaged objects.</p>
+			<h3>Using the disposable pattern to release managed and unmanaged resources</h3>
+			<p>When you're dealing<a id="_idIndexMarker175"/> with managed and <a id="_idIndexMarker176"/>unmanaged objects, it is necessary to implement the disposable design pattern. The disposable pattern<a id="_idIndexMarker177"/> implements the <strong class="bold">IDisposable</strong> interface and makes use of finalizers. This is an aspect of the disposable pattern, not a requirement. You can write an abstract base class that implements the disposable design pattern, and then inherit from that class and override the <strong class="source-inline">Dispose(bool disposing)</strong> method, as shown in the source code for the <strong class="source-inline">CH02_ObjectCleanup</strong> project on GitHub. This is what we will do in this demonstration. Follow these steps:</p>
+			<ol>
+				<li value="1">Start a new .NET console application. Then, add a class called <strong class="source-inline">DisposableBase</strong>, as follows:<p class="source-code">public abstract class DisposableBase : IDisposable</p><p class="source-code">{</p><p class="source-code">protected bool _disposed = false;</p><p class="source-code">}</p></li>
+				<li>Here, we <a id="_idIndexMarker178"/>declared the class abstract and implemented the <strong class="source-inline">IDisposable</strong> interface. Our <strong class="source-inline">_disposed</strong> Boolean value will be accessed by subclasses, so we need to declare that it is protected. Add the <strong class="source-inline">Dispose()</strong> method, as follows:<p class="source-code">public void Dispose()</p><p class="source-code">{</p><p class="source-code">     Dispose(true);</p><p class="source-code">     GC.SuppressFinalize(this);</p><p class="source-code">}</p></li>
+				<li>This <a id="_idIndexMarker179"/>method calls the <strong class="source-inline">Dispose(bool disposing)</strong> method, which cleans up both managed and unmanaged resources. Then, it stops the finalizer from being executed. Let's add the finalizer:<p class="source-code">~DisposableBase()</p><p class="source-code">{</p><p class="source-code">Dispose(false);</p><p class="source-code">}</p></li>
+				<li>Should our finalizer run – and it is not guaranteed to run – it will call the <strong class="source-inline">Dispose(bool disposing)</strong> method when the programmer fails to call the <strong class="source-inline">Dispose()</strong> method. Now, let's add the final part of our <strong class="source-inline">DisposableBase</strong> class – that is, the <strong class="source-inline">Disposable(bool disposing)</strong> method:<p class="source-code">protected virtual void Dispose(bool disposing)</p><p class="source-code">{</p><p class="source-code">if (_disposed)</p><p class="source-code">           return;</p><p class="source-code">if (disposing)</p><p class="source-code">{</p><p class="source-code">           // Free up any managed objects here.</p><p class="source-code">}</p><p class="source-code">// Free up any unmanaged objects here.</p><p class="source-code">// Set large fields to null.</p><p class="source-code">_disposed = true;</p><p class="source-code">}</p></li>
+				<li>If our <a id="_idIndexMarker180"/>class has already<a id="_idIndexMarker181"/> been disposed of, then we can exit the method. If the class has not been disposed of, then we must free up managed resources. Once the managed resources have been cleaned up, we can clean up the unmanaged objects and set large fields to null. Finally, we must set the <strong class="source-inline">_disposed</strong> Boolean to <strong class="source-inline">true</strong>.</li>
+			</ol>
+			<p>When a class inherits our abstract class, its finalizer will call <strong class="source-inline">Dispose(false)</strong>. The subclass will override the <strong class="source-inline">Dispose(bool disposing)</strong> method.</p>
+			<p>To create an object and destroy it, you can use the following code:</p>
+			<pre class="source-code">var objectThree = new ObjectThree();</pre>
+			<pre class="source-code">objectThree.Dispose();</pre>
+			<p>Here, the <strong class="source-inline">ObjectThree</strong> class is instantiated and then disposed of by calling the <strong class="source-inline">Dispose()</strong> method.</p>
+			<p>That brings us to the end of this chapter on C# interoperability. Let's summarize what we have learned.</p>
+			<h1 id="_idParaDest-51"><a id="_idTextAnchor050"/>Summary</h1>
+			<p>In this chapter, we started by looking into P/Invoke regarding C# interoperability using pointer code. We looked at unsafe and fixed code. Unsafe code is code that is not managed by the .NET platform, while mixed code is objects fixed in memory that are not promoted by the garbage collector because they are accessed using pointers.</p>
+			<p>Then, we learned how to call methods in a C++ DLL, including passing parameters and returning structs. </p>
+			<p>Next, we learned how to interact with Python code. We learned how to install Python and then add the IronPython NuGet package. This allows us to execute Python 2.x code directly in a C# class and execute Python code that resides in a Python script. The ironPython 2.7.10 library only supports Python 2.x versions.</p>
+			<p>Then, we learned how to perform COM interoperability by reading data from an Excel spreadsheet. We also built an Excel add-in that was able to read the data of the active cell and display a message box.</p>
+			<p>Finally, we learned how to safely dispose of managed and unmanaged objects. We built a reusable abstract class called <strong class="source-inline">DisposableBase</strong>. At this point, you know to call <strong class="source-inline">Disposable(false)</strong> in subclass finalizers if <strong class="source-inline">Dispose()</strong> is not called, as well as how to override <strong class="source-inline">Disposable(bool disposing)</strong> in your base classes.</p>
+			<p>Now, it is time for you to answer some questions to reinforce your learning before moving on to the <em class="italic">Further reading</em> section. In the next chapter, we will learn about primitives and object types.</p>
+			<h1 id="_idParaDest-52"><a id="_idTextAnchor051"/>Questions</h1>
+			<p>Answer the following questions to test your knowledge of this chapter:</p>
+			<ol>
+				<li value="1">What is P/Invoke short for?</li>
+				<li>Explain what P/Invoke is.</li>
+				<li>What is the <strong class="source-inline">unsafe</strong> keyword used for?</li>
+				<li>Explain object generations.</li>
+				<li>What is the <strong class="source-inline">fixed</strong> keyword used for?</li>
+				<li>What is the C++ type for a string?</li>
+				<li>What NuGet package do you have to import to work with Python code?</li>
+				<li>What pattern do you use to safely dispose of managed and unmanaged objects?</li>
+				<li>How do you dispose of large fields?</li>
+			</ol>
+			<h2 id="_idParaDest-53"><a id="_idTextAnchor052"/>Further reading</h2>
+			<p>To learn more about the topics that were covered in this chapter, take a look at the following resources:</p>
+			<ul>
+				<li><em class="italic">Unsafe code language specification</em>: <a href="https://docs.microsoft.com/en-us/dotnet/csharp/language-reference/language-specification/unsafe-code">https://docs.microsoft.com/en-us/dotnet/csharp/language-reference/language-specification/unsafe-code</a>.</li>
+				<li><em class="italic">C# tutorial for beginners: What is Unsafe Code?</em> <a href="https://www.youtube.com/watch?v=oIqEBMw_Syk">https://www.youtube.com/watch?v=oIqEBMw_Syk</a>.</li>
+				<li><em class="italic">Interoperating with unmanaged code</em>: <a href="https://docs.microsoft.com/en-us/dotnet/framework/interop/">https://docs.microsoft.com/en-us/dotnet/framework/interop/</a>.</li>
+				<li><em class="italic">Interop Marshaling</em>: <a href="https://docs.microsoft.com/en-us/dotnet/framework/interop/interop-marshaling">https://docs.microsoft.com/en-us/dotnet/framework/interop/interop-marshaling</a>.</li>
+				<li><em class="italic">Marshalling Data with Platform Invoke</em>: <a href="https://docs.microsoft.com/en-us/dotnet/framework/interop/marshaling-data-with-platform-invoke">https://docs.microsoft.com/en-us/dotnet/framework/interop/marshaling-data-with-platform-invoke</a>.</li>
+				<li><em class="italic">P/Invoke Tips</em>: <a href="http://benbowen.blog/post/pinvoke_tips/">http://benbowen.blog/post/pinvoke_tips/</a>.</li>
+				<li><em class="italic">Debugging Finalizers</em>: <a href="https://docs.microsoft.com/en-us/archive/msdn-magazine/2007/november/net-matters-debugging-finalizers">https://docs.microsoft.com/en-us/archive/msdn-magazine/2007/november/net-matters-debugging-finalizers</a>.</li>
+				<li><em class="italic">Destructors in C#</em>: <a href="https://www.geeksforgeeks.org/destructors-in-c-sharp/">https://www.geeksforgeeks.org/destructors-in-c-sharp/</a>.</li>
+				<li>.NET Memory Performance Analysis: <a href="https://github.com/Maoni0/mem-doc/blob/master/doc/.NETMemoryPerformanceAnalysis.md#The-effect-of-a-generational-GC">https://github.com/Maoni0/mem-doc/blob/master/doc/.NETMemoryPerformanceAnalysis.md#The-effect-of-a-generational-GC</a>.</li>
+				<li><em class="italic">Improving the performance of a VSTO add-in</em>: <a href="https://docs.microsoft.com/en-us/visualstudio/vsto/improving-the-performance-of-a-vsto-add-in?view=vs-2019">https://docs.microsoft.com/en-us/visualstudio/vsto/improving-the-performance-of-a-vsto-add-in?view=vs-2019</a>.</li>
+				<li><em class="italic">When everything you know is wrong, part one</em>: <a href="https://ericlippert.com/2015/05/18/when-everything-you-know-is-wrong-part-one/">https://ericlippert.com/2015/05/18/when-everything-you-know-is-wrong-part-one/</a>.</li>
+				<li><em class="italic">.NET Memory Performance Analysis</em>: <a href="https://github.com/Maoni0/mem-doc/blob/master/doc/.NETMemoryPerformanceAnalysis.md.">https://github.com/Maoni0/mem-doc/blob/master/doc/.NETMemoryPerformanceAnalysis.md.</a></li>
+				<li><em class="italic">OLE/Automation BSTR (String Manipulation Functions)</em>: <a href="https://docs.microsoft.com/previous-versions/windows/desktop/automat/string-manipulation-functions">https://docs.microsoft.com/previous-versions/windows/desktop/automat/string-manipulation-functions</a></li>
+				<li><em class="italic">How to pass arrays of objects from C# to C++</em>: <a href="https://alekdavis.blogspot.com/2012/07/how-to-pass-arrays-of-objects-from-c-to.html">https://alekdavis.blogspot.com/2012/07/how-to-pass-arrays-of-objects-from-c-to.html</a>.</li>
+			</ul>
+		</div>
+	</body></html>

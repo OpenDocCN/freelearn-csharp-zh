@@ -1,0 +1,409 @@
+<html><head></head><body>
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Packets and Streams</h1>
+                </header>
+            
+            <article>
+                
+<p class="Normal1">This chapter will build upon the discussion in <a href="84e54d31-1726-477b-b753-4408a3ee6286.xhtml">Chapter 3</a>, <em>Communication Protocols, </em>of network architecture to trace the flow of data across a network, and break down the software you will write in C# to handle the data at each step in the process. We will explain the encapsulation of data into minimal packets for network transmission, and how that encapsulation helps to ensure that packets are delivered to the correct destination and are decoded properly. We will explain the concept of a data stream as a serialized sequence of discrete packets, and demonstrate the various ways that serialization can be executed in C#. Finally, we will demonstrate a variety of abstractions exposed by the <kbd>System.IO</kbd> namespace for handling streams.</p>
+<p>The following topics will be covered in this chapter:</p>
+<ul>
+<li>Understanding how data moves through a network, and how the various layers of network-stack metadata are unwrapped at each step in the transmission process to ensure proper delivery</li>
+<li>A deep dive into the structure of a packet delivered over a network</li>
+<li>Understanding the concept of a data stream as a collection of discrete packets, and how to leverage it to abstract away the process of receiving and parsing packets using C#'s many <kbd>Stream</kbd> classes</li>
+</ul>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Technical requirements</h1>
+                </header>
+            
+            <article>
+                
+<p>For this chapter, we'll be looking closely at network communication. To that end, I'll be using the <em>Wireshark</em> packet sniffing tool to demonstrate some of the concepts we discuss. If you want to follow along and explore the network traffic on your own machine, Wireshark is a free download, available at <a href="https://www.wireshark.org/">https://www.wireshark.org/</a>.</p>
+<p><span>Whether you plan to use it to follow along with this chapter or not, I absolutely recommend familiarizing yourself with it as a tool. If you are at all serious about doing any meaningful network programming with C#, low-level traffic inspection will be a major key to your success and the earlier you learn the tool, the better off you'll be.</span></p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Leveraging networks – transmitting packets for use by remote resources</h1>
+                </header>
+            
+            <article>
+                
+<p class="mce-root">To understand specifically what a packet is, we should first understand the constraints of a network that necessitates packets in the first place. To do that, we'll need to understand the limitations of bandwidth, latency, and signal strength. Each of these constraints plays a key role in determining the maximum size of an atomic unit of data that can be transmitted over a given network. These limitations demand that pieces of data transmitted over the network include a number of attributes to ensure any measure of reliability. Data packets sent between nodes in a network must be small, and contain sufficient context to be properly routed. With that in mind, let's look at the ways a network's physical limitations can inform and drive the software solutions written for them.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Bandwidth</h1>
+                </header>
+            
+            <article>
+                
+<p>Anyone with an internet connection is probably fairly familiar with the concept of <strong>bandwidth</strong>. The monthly rates for an internet service are typically (at least in the US) tiered by the maximum bandwidth provided. In professional programming vernacular, the term bandwidth is often used, somewhat loosely, to refer to the amount of time or mental capacity a team or team member can dedicate to new tasks. Each of us should have a somewhat intuitive understanding of the concept. Put simply, it's the maximum rate of data transmission over a given network connection.</p>
+<p>While that definition might seem basic, or even trivial, the way that bandwidth drives the standards for packet size and structure may be less obvious. So, let's consider more thoroughly what bandwidth describes and how it impacts data transmission. There are two things to consider when we're discussing bandwidth: the speed of throughput and the channel's maximum capacity.</p>
+<p>The easiest way to conceptualize these concepts is through the analogy of a highway. Imagine that you're the operator of a tollbooth on this hypothetical highway. However, for this analogy, let's say that, instead of collecting a toll, you're responsible for counting the total number of cars that move past your booth over a given period of time. <span>The cars on your highway represent individual bits of data. Every time a car crosses your toll booth, you tally it.</span> <span>The total number of cars that cross your booth in any given time represents the</span> bandwidth <span>of your highway over that time period.</span> <span>With this analogy in place, let's see how the throughput and channel capacity can impact that bandwidth.</span></p>
+<p>In this characterization, the speed of throughput is analogous to the speed limit of your highway. It's the physical maximum velocity that a signal can travel over a connection. There are a number of factors that can impact or change this speed, but in most cases, the physics of electrical or optical signals traveling over their respective media render the impact of those changes negligible. Speed will ultimately boil down to the physical limits of the transmission medium itself. So, for example, fiber-optic cables will have a much higher throughput speed than copper wire. Fiber-optic cables transmit data at speeds approaching the speed of light, but copper wire introduces resistance to electrical current, slowing and weakening any data signal traveling over it. So, in the context of our highway analogy, fiber-optic cable networks have a much higher speed limit than copper cables. Sitting in your tollbooth over a single shift, more cars will pass by on a highway with a higher speed limit. Given this fact, it can be trivially simple to increase the bandwidth of a network by taking the basic step to upgrade your transmission media.</p>
+<p>While the speed of throughput is a strong determinant of bandwidth, we should also take a moment to consider the maximum <strong>capacity</strong> of a given channel. S<span>pecifically, t</span>his refers to how many physical wires can actively carry an individual bit at any given moment along a channel. In our highway analogy, the channel capacity will describe the number of <strong>lanes</strong> on our highway that a car could travel. So, imagine that instead of a single-file line of cars moving down a single lane of our highway, it's been expanded to four lanes in one direction. So now, at any given moment, we could have four cars, or four bits of data, moving through our tollbooth at any given moment.</p>
+<p>Obviously, it's the responsibility of system programmers writing firmware for network interface devices to write support for properly handling multiple simultaneous channels. However, as I'm sure you can imagine, variable channel capacity can demand very specific optimizations for the network entities responsible for breaking your data into atomic packets.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Latency</h1>
+                </header>
+            
+            <article>
+                
+<p>Bandwidth limitations are only one consideration for the efficiency of a network. The next most common limitation for which engineers must design, and that most users are at least intuitively familiar, is <strong>latency<em>.</em></strong> Put simply, latency is the time between the initial moment a signal is sent, and the first moment a response to that signal can be initiated. It's the delay of a network.</p>
+<p>There are two ways to think about latency. Simply put, you can measure it as one-way, or round-trip. Obviously, <strong>one-way latency</strong> describes the delay from the moment a signal is sent from one device, to the time it is received by the target device. Alternately, <strong>round-trip latency</strong> describes the delay between the moment a signal is sent from a device, and the moment a response from the target is received by that same device.</p>
+<p>One thing to note, however, is that round-trip latency actually excludes the amount of time the recipient spends processing the initial signal before sending a response. For example, if I send a request from my software to an external API to provide some calculations on a piece of input data, I should reasonably expect that software to take some non-trivial amount of time to process my request. So, imagine first that the request spends 0.005 seconds in transit. Then, once received, the request is processed by the API in 0.1 seconds. Finally, the response itself spends another 0.01 seconds in transit back to my software. The total amount of time between my software sending the request and getting a response is <em>0.005 + 0.1 + 0.01 = 0.115</em> seconds. However, since 0.1 seconds was spent processing, we will ignore this when measuring round-trip latency, so the round-trip latency will be measured as <em>0.115 - 0.1 = 0.015</em> seconds total.</p>
+<p>It's not uncommon for a software platform to provide a service that simply <strong>echoes</strong> the request it was sent without any processing applied in response. This is typically called a <strong>ping</strong> <strong>service</strong>, and is used to provide a useful measurement of the current round-trip latency for network requests between two devices. For this reason, latency is commonly called <strong>ping</strong>. There are a number of factors that confound the reliability of a ping request in any given scenario, so the response times for such requests are not generally considered accurate. However, the measurements any ping service provides are typically considered to be approximate for a given network round-trip, and can be used to help isolate other latency issues with a given request pipeline.</p>
+<p>As I'm sure you can imagine, a constraint as generically defined as a <strong>network delay</strong> can have any number of contributing factors to its impact on network performance. This delay could come from just about any point in the network transaction, or on any piece of software or hardware in between the originating and target devices. On a given packet-switched network, there may be dozens of intermediary routers and gateways receiving and forwarding your package for any single request. Each of these devices could introduce some delay that will be nearly impossible to isolate when performance monitoring or testing. And, if a given gateway is processing hundreds of simultaneous requests, you could experience delays just by virtue of being queued up behind a number of requests that you had nothing to do with and of which you might have no direct knowledge.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Mechanical latency</h1>
+                </header>
+            
+            <article>
+                
+<p>The different contributing factors to latency are sometimes categorized slightly differently. Mechanical latency, for instance, describes the delay introduced into a network by the time it takes for the physical components to actually generate or receive a signal. So, for instance, if your 64-bit computer has a clock speed of 4.0 GHz, this sets a physical, mechanical limit on the total amount of information that can be processed in a given second. Now, to be fair, it would be a lot of information to be processed by such a system. Assuming the CPU is processing a single byte per clock cycle, it's 4 billion 64-bit instructions per second being processed; that's a ton. But that clock speed constitutes a mechanical limit that introduces some measurable latency to any transaction. On such a system, a 64-bit instruction cannot move onto the network transmission device any faster than at least 0.000000128 seconds, assuming a bit is processed and delivered to the transmission stream at every interval of the clock cycle.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Operating system latency</h1>
+                </header>
+            
+            <article>
+                
+<p>The preceding example describes a somewhat unrealistic system, in that 64 bytes of data can be sent directly to the transmission media uninterrupted. Realistically, an <strong>operating system</strong> (<strong>OS</strong>) will be handling requests from the application and system software to send over that hypothetical packet, and it will be doing so while simultaneously processing thousands of other requests from hundreds of other pieces of software running on the host machine. Almost all modern OSes have a system for interlacing operations from multiple requests so that no one process is unreasonably delayed by the execution of another. So really, we will never expect to achieve latency as low as the minimum mechanical latency defined by our clock speed. Instead, what might realistically happen is that the first byte of our packet will be queued up for transport, and then the OS will switch to servicing another operation on its procedure queue, some time will be spent executing that operation, and then it might come back and ready the second byte of our packet for transport. So, if your software is trying to send a packet on an OS that is trying to execute a piece of long-running or blocking software, you may experience substantial latency that is entirely out of your control. The latency introduced by how your software's requests are prioritized and processed by the OS is, hopefully very obviously, called <strong>OS latency.</strong></p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Operational latency</h1>
+                </header>
+            
+            <article>
+                
+<p>While I did state earlier that latency typically describes only the time that a packet spends in transit, it is often useful for you, as a network engineer, to consider the impact of latency on your end user experience. While we would all like to, no engineer can get away with ignoring a negative user experience by claiming that the causes are out of your control. So even though your software may be performing optimally, and deployed to a lightning-fast fiber-optic network, if it is dependent on an upstream resource provider that is slow to process requests, your end user will ultimately feel that pain, no matter how perfect your own code is. For this reason, it's often useful to keep track of the actual, overall window of time necessary to process a given network request, including the processing time on the remote host. This measurement is the most meaningful when considering the impact of network operations on your user's experience, and is what's called <strong>operational latency.</strong> So, while most of the contributing factors to the operational latency of a task are, typically, out of your control, it is often important to be aware of its impact and, wherever possible, try to optimize it down to a minimum.</p>
+<p>Ultimately, what each of these individual metrics should tell you is that there are dozens of points throughout a network request at which latency can be introduced. Each of them has varying degrees of impact, and they are often under varying degrees of your control, but to the extent that you can, you should always seek to minimize the number of points in your application at which external latency can be introduced. Designing for optimal network latency is always easier than trying to build it in after the fact. Doing so isn't always easy or obvious though, and optimizing for minimal latency can look different from either side of a request.</p>
+<p>To illustrate, imagine we are writing an application that is responsible for collecting one or more transaction IDs, looking up the monetary value of those transactions, and then returning a sum of them. Being a forward-thinking developer, you've separated this transaction aggregation service from the database of transactions to keep the business logic of your service decoupled from your data-storage implementation. To facilitate data access, you've exposed the transaction table through a simple REST API that exposes an endpoint for individual transaction lookups by way of a single key in the URL, such as <kbd>transaction-db/transaction/{id}</kbd>. This makes the most sense to you since each transaction has a unique key, and allowing individual-transaction lookup allows us to minimize the amount of information returned by your database service. Less content passed over the network means less latency, and so, from the data-producer perspective, we have designed well.</p>
+<p>Your aggregation service, though, is another story. That service will need multiple transaction records to generate a meaningful output. With only a single endpoint returning a single record at a time, the aggregation service will send multiple, simultaneous requests to the transaction service. Each one of those requests will contribute their own mechanical, OS, and operational latencies. While modern OSes allow for multithreaded processing of multiple network requests simultaneously, there is an upper limit to the number of available threads in a given process. As the number of transactions increases, requests will start to become queued, preventing simultaneous processing and increasing the operational latency experienced by the user.</p>
+<p>In this case, optimizing for both cases is a simple matter of adding an additional REST endpoint, and accepting <kbd>POST</kbd> HTTP requests with multiple transaction IDs in the request body. Most of us reading this will have likely already known this, but the example is useful as an illustration of how <strong>optimal performance</strong> can look very different on either side of the same coin. Often, we won't be responsible for both the service application and the database API, and in those cases, we will have to do the best we can to improve performance from only one side.</p>
+<p>No matter what side of a request you're on, though, the impact of network latency on application performance demands your consideration for minimizing the size of atomic data packets that must be sent over the network. Breaking down large requests into smaller, bite-sized pieces provides more opportunities for every device in the communication chain to step in, perform other operations, and then proceed with processing your packets. If our single-network request will block other network operations for the duration of an entire 5 MB file transfer, it might be given lower priority in the queue of network transactions that your OS is maintaining. However, if our OS only needs to slot in a small, 64-byte packet for transmission, it can likely find many more opportunities to send that request more frequently, reducing your OS latency overall.</p>
+<p>If our application must send 5 MB of data, then doing so in 64-byte packets gives your application's hosting context much more flexibility in determining the best way to service that requirement.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Signal strength</h1>
+                </header>
+            
+            <article>
+                
+<p>The last major constraint of network communication that we'll look at is variable <strong>signal strength.</strong> Over any non-trivial network, the strength of a given signal can be impacted by anything from the distance between wireless transmitters and receivers, to just plain distance between two gateways connected by a wire. This isn't much of a concern on modern fiber optic networks, since those rely on the transmission of visible light through glass or plastic fiber, and are thus not subject to many of the confounding factors that interfere with older physical network standards. However, reliable signal strength can be a major concern for wireless networks, or wired networks that use electric signals over copper wiring.</p>
+<p>If you're at all familiar with the impact of resistance on signal strength (for those of you who remember your college physics or computer hardware classes), you'll know that the longer the wire over which you want to send a signal, the weaker the signal will be at the receiving end. If you're defining a bit as being a 1 whenever the voltage on a wire is above a given threshold, and the resistance of your wire reduces the voltage of a signal over time, there's a non-zero chance that some bits of your packet will be rendered indeterminable by your target due to the interference of your signal. A weak signal strength means a lower reliability of transmission.</p>
+<p>And mere resistance isn't the only thing that can weaken your signal strength. Most electrical signals are subject to interference from any other nearby electrical signals, or simply the electromagnetic fields that permeate the earth naturally. Of course, over time, electrical engineers have devised innumerable ways to mitigate those effects; everything from wire insulation to reduce the impact of electromagnetic interference, to signal relays to reduce the impact of resistance by amplifying a signal along its route. However, as your software is deployed to wider and wider networks, the extent to which you can rely on a modern and well-designed network infrastructure diminishes significantly. Data loss is inevitable, and that can introduce a number of problems for those responsible for ensuring the reliable delivery of your requests.</p>
+<p>So, how does this intermittent data loss impact the design of network transmission formats? It enforces a few necessary attributes of our packets that we'll explore in greater depth later, but we'll mention them here quickly. Firstly, it demands the transmission of the smallest packets that can reasonably be composed. This is for the simple reason that, if there is an issue of data corruption, it invalidates the whole payload of a packet. In a sequence of zeroes and ones, uncertainty about the value of a single bit can make a world of difference in the actual meaning of the payload. Since the payloads are only segments of the overall request or response object, we can't rely on having sufficient context within a given packet itself to make the correct assertion about the value of an indeterminate bit. So, if one bit goes bad and is deemed indeterminable, the entire payload is invalidated, and must be thrown out. By reducing the packet size to the smallest reasonable size achievable, we minimize the impact of invalid bits on the whole of our request payload. It's much more palatable to re-request a single 64-byte packet due to an indeterminable bit than it is to restart an entire 5 Mb transmission.</p>
+<p class="mce-root">Astute readers may have already identified the second attribute of packets that are driven by unreliable signal strength. While variable signal strength and external interference could simply render a single bit indeterminable, it could also very well flip the bit entirely. So, while the recipient might be able to determine its received value with certainty, it ultimately determines the <strong>incorrect value</strong>. This is a much more subtle problem since, as I mentioned before, packets will likely contain insufficient information to determine the appropriate value for a specific bit in its payload. This means packets will have to have some mechanism for, at the very least, <strong>error detection</strong> baked into the standard headers. So long as the consuming device can detect an error, it can know, at the very least, to discard the contents of the erroneous packet and request re-transmission.</p>
+<p class="mce-root">It's worth noting that the benefits of decomposing a request into smaller and smaller packets reach limits beyond which it ceases to be beneficial for network performance. Subject this line of thinking to reduction ad absurdum and you'll quickly find yourself with a full-fledged packet for every single bit in your payload, error-detection and all. With our imagined request payload of 5 Mb, that's 40,000,000 packets being sent simultaneously. Obviously, this is an absurd number of packets for such a small request. Instead, network engineers have found a reliable range of sizes for packets being sent according to a given protocol as falling somewhere between a few hundred bytes and a few kilobytes.</p>
+<p>Now that we know why network communication is done with small, isolated packets, we should take a look at what those are.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">The anatomy of a packet</h1>
+                </header>
+            
+            <article>
+                
+<p>While I've touched on some features already in this chapter, here we'll take a closer look at the attributes that a network packet must exhibit in order to actually be useful as a piece of information. We'll look at how the standard for network packets is defined and the minimum amount of features that all network packets will contain in some form or other. Then we'll take a brief look at how different transmission protocols implement their own standards for packets, and how some of the required attributes are expanded on to provide more reliable data transmission, or higher performance. This will ultimately lay the foundation for later in this book where we look at network security, diagnostics, and optimization.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">What is a packet?</h1>
+                </header>
+            
+            <article>
+                
+<p>So, to start off with, we should engage in a bit of nit-picking. The term I've been using throughout this chapter-packet-is not, strictly speaking, the most accurate term for what I've been describing. Until now, I've been using the word packet to describe the most atomic unit of data transmission over a network. However, for the sake of accuracy, I should note that the term packet refers specifically to the most atomic piece of data transmitted by the network layer of the <span><strong>Open Systems Interconnection</strong> (</span><strong>OSI</strong>) network stack. In the transport layer, where we'll be most concerned with it (since that is the lowest layer in the stack we'll directly interact with through C#), the atomic unit of data transmission is actually called a <strong>datagram. </strong>However, I'll note that it is much more common to refer to data units of the transmission layer as packets than datagrams and so will continue with this colloquial use of the term throughout the chapter and throughout the rest of the book. I did, however, want to take the opportunity to point out the distinction between the two terms in case you encountered either being used elsewhere in different contexts. With that in mind, what exactly is a datagram, or packet?</p>
+<p>We already know quite a bit about what a packet must be in order to be useful, so let's formalize it into a definition. A <strong>packet</strong> is an atomic unit of data, encapsulated with sufficient context for reliable transmission over an arbitrary network implementation.</p>
+<p class="mce-root">So basically, it's a <strong>payload</strong> (unit of data) with a <strong>header</strong> (sufficient context). This shouldn't be surprising by this point, but let's look at how this translates to an actual array of bytes passed from our transport layer to the network layer. To do so, we'll use Wireshark to examine the actual data packets being sent to and from my own Ethernet port, and look at how each part of that definition translates to actual datagrams.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Setting up Wireshark</h1>
+                </header>
+            
+            <article>
+                
+<p>As a tool for network engineers, Wireshark is immeasurably useful, and I strongly encourage you to familiarize yourself with its features and start to think about how you could leverage it in your own development tasks. For now, though, we'll be using its most basic packet sniffing functionality to examine every packet that comes through our open internet connection. So, once Wireshark is installed, simply open it up and select your Ethernet connection as your target for packet sniffing, as seen in the following screenshot:</p>
+<p class="CDPAlignCenter CDPAlign"><img class="alignnone size-full wp-image-899 image-border" src="assets/4c8c54d3-bcfe-4640-99af-0691cd9fbaee.png" style="width:76.50em;height:32.08em;"/></p>
+<p>When you open it on your own machine, take a second to watch the graph growing out to the right of the traffic source. This actually provides a quick view of the relative activity on the given source over time. Once your primary internet source is selected, start capturing by clicking the capture button on the top-left of the toolbar, or simply double-clicking the desired source. Allow the tool to capture traffic for a few minutes just to get a good range of sample data and then start exploring on your own. If you've never used a tool such as Wireshark or Fiddler before, you'll likely be surprised by how much chatter is actually happening, even with no input from you directly.</p>
+<p>With the tool installed and running, let's take a look at some of the features of a packet specified by our definition and see how it translates to real-world implementations.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Atomic data</h1>
+                </header>
+            
+            <article>
+                
+<p>If you have any experience with database design, you might already have a pretty clear idea of what constitutes <strong>atomic data</strong>. Typically, it means the smallest components into which a record can be broken down without losing their meaning. In the context of network communication, though, we're not really concerned with the payload of a packet losing its meaning. It would recompiled into the original data structure by the recipient of the payload, and so it's fine if the small chunk of data that moves over the network is meaningless on its own. Instead, when we talk about atomic data in the context of network transactions, we're really talking about the minimum size that we can truncate our data into, beyond which we will stop seeing the desired benefits of shrinking our data into smaller and smaller chunks. Those chunks may well splice double-precision decimal values in two, sending one half over in one packet and the other half in an entirely separate packet. So, in that case, neither packet has enough information to make sense of the data in its original form. It wouldn't be considered atomic in the same way that a <kbd>FIRST_NAME</kbd> field will be the most atomic way to store the first name of a user record in a database. But if that decomposition results in the most efficient distribution of packets for transmission over the current network, with minimum latency and maximum bandwidth utilization, then it is the most atomic way to represent it in a network packet.</p>
+<p>For an example of this, just look at any arbitrary packet you recorded in your Wireshark capture. Looking at a packet in my data stream, we've got this arbitrary <span><strong>Transmission Control Protocol</strong> (</span><strong>TCP</strong>) packet (or datagram), as follows:</p>
+<p class="CDPAlignCenter CDPAlign"><img class="alignnone size-full wp-image-900 image-border" src="assets/59829791-f402-407e-adb1-76c43942fe39.png" style="width:95.50em;height:54.67em;"/></p>
+<p>As you can see in the selected text of the raw data view on the bottom of my Wireshark panel, the payload of that particular packet was 117 bytes of nonsensical garbage. That might not seem very useful to you or me, but once that specific TCP request is reassembled with the rest of the packets in that request, the resulting data should make sense to the consuming software (in this case, the instance of Google Chrome running on my computer). So, this is what is meant by an <strong>atomic unit of data</strong>. Fortunately, that's not something that we'll have to concern ourselves with, since that's handled directly by the hardware implementation of the transport layer. So, even though we can implement software that directly leverages a transport layer protocol of our choice, the actual act of decomposing and recomposing packets or datagrams will always be out of our hands when we're working on the .NET Core platform.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Encapsulated with sufficient context</h1>
+                </header>
+            
+            <article>
+                
+<p>This aspect of our definition is actually the real meat of it, and is the real reason we're messing about with Wireshark in the first place. What exactly does it mean to encapsulate a packet with sufficient context? Let's start with the context that a datagram must have. This refers to the information that any device in between the source and destination hosts will need to route the packet accordingly, as well as any information necessary for the destination host to properly read and process the packet once received. For obvious reasons, this information is contained at the very front of a packet (which is to say, it composes the first bits that will be read by a receiving device), and is what constitutes the header of a packet. The <strong>context</strong> is the information necessary to either forward or process a packet correctly.</p>
+<p>So what, then, constitutes <strong>sufficient context</strong>? Well, that actually depends on the specific protocol under which the packet was constructed. Different protocols have different requirements and expectations, and thus, different requirements to be serviced properly. What constitutes sufficient context for one might be grossly insufficient for another.</p>
+<p class="mce-root">The two most commonly used transport layer protocols are TCP and <span><strong>User Datagram Protocol</strong> (</span><strong>UDP</strong>), and each of them have different service contracts for the application software that leverages them. This means that both of them have very distinct header specifications. TCP seeks to provide sequential, reliable, error-checked transmission service for packets traveling between hosts. Meanwhile, UDP, as a connection-less protocol (we'll discuss specifically what that means later in this book), doesn't explicitly aim to provide the reliability of transmission or a guarantee of the ordering of data. Instead, it seeks to provide light weight communication with a minimal protocol definition to enforce. As such, the sufficient context for UDP is actually substantially less than for that of a TCP packet.</p>
+<p>A UDP packet header consists of a mere 8 bytes of data, broken up into 4 individual fields that each are 2 bytes in length; those fields are as follows:</p>
+<ul>
+<li><strong>Source port:</strong> The specific port of the socket connection on the source machine generating the request.</li>
+<li><strong>Destination port:</strong> The port of the connection on the destination machine.</li>
+<li><strong>Length:</strong> The exact length of the packet, including the payload that immediately follows the 8-byte header.</li>
+<li><strong>Checksum:</strong> A simple value used to verify the data integrity of the payload.</li>
+</ul>
+<p>Using Wireshark, we can see this in action. With a simple UDP packet, the full contents are captured by those few relevant fields, as seen in the <span class="packt_screen">Packet Details</span> view in the middle of my Wireshark window:</p>
+<p class="CDPAlignCenter CDPAlign"><img class="alignnone size-full wp-image-901 image-border" src="assets/d0e6a7b0-dc93-4878-b3c7-a0915489d239.png" style="width:95.42em;height:58.50em;"/></p>
+<p>However, since TCP provides reliable delivery, guaranteed ordering, and leverages a handshake-protocol that UDP forgoes, the specification of a TCP packet header is much longer. Where sufficient context for UDP could be encapsulated in a mere 8 bytes, sufficient context for TCP demands a header of up to 20 bytes. This is including a number of flag-bits indicating the state of the individual packets in the context of the larger session, and a sequence number to provide the protocol-specified ordering of packets. A brief examination of the <span class="packt_screen">Packet Details</span> view of a simple TCP packet within Wireshark should illuminate the disparity in the expected context provided by a TCP packet header, as follows:</p>
+<p class="CDPAlignCenter CDPAlign"><img class="alignnone size-full wp-image-902 image-border" src="assets/102c266e-88aa-4c56-84c5-c755df460150.png" style="width:95.50em;height:76.50em;"/></p>
+<p>As you can see here, even though the actual length of the TCP packet in bytes is shorter than the UDP packet that we looked at previously, the header provides substantially more information than was necessary for a valid UDP connection. There was obviously overlap (of the source and destination ports, and a checksum), but there was a wider gap between the two headers than there was common ground.</p>
+<p>So, hopefully, it's now clear why what constitutes sufficient context is driven by the protocol under which a packet was constructed. The specifics of what is sufficient can change, but for every protocol, there will always be a minimum amount of context that is sufficient to be forwarded or processed.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Error detection and correction</h1>
+                </header>
+            
+            <article>
+                
+<p>Before we move on, I do want to take a brief moment to talk about the distinction between error detection and error correction<em>.</em> You might have wondered why I left out any stipulation regarding error correction or error detection from my definition of a packet. This is because there is no guarantee that, for every protocol defined for the transport layer of the OSI stack, packets will always contain sufficient information to detect or correct errors incurred in transit.</p>
+<p>I will say, however, that it is extremely common to have at least some kind of error detection in a given protocol specification. TCP, and even the unreliable UDP transport protocol, provide a checksum for simple error detection, as seen in the following two packets on Wireshark:</p>
+<p class="CDPAlignCenter CDPAlign"><img class="alignnone size-full wp-image-903 image-border" src="assets/8319b2d7-0835-4836-85ed-f878f0aaf4d9.png" style="width:102.08em;height:30.08em;"/></p>
+<p>What those protocols don't provide, however, is any mechanism for error correction<em>,</em> which is actually much more difficult to implement, and for anything other than trivial correction capabilities, will require the packet size to balloon upwards. For example, while a checksum can tell you whether the payload has altered in transit somehow, it cannot tell you specifically where, or to what extent, the payload may have been altered. To do so would require enough additional data to reconstruct the packet from scratch. Since packet transmission is generally reliable over time (which is to say, even if one transmission failed, retrying the transmission is likely to succeed), and generally exceptionally fast at the transport layer, it's always a much better idea to simply detect an error, discard the erroneous packet, and request retransmission.</p>
+<p>With this in place, we have a solid idea of everything that a packet defined under a given protocol must have, and of how we can examine or use individual pieces of network data. But our software won't be using tiny little pieces of individual data. Our software will be expecting JSON objects, XML payloads, or serialized byte-streams of C# objects. So, how does software that consumes network traffic make heads or tails of those random flows of bite-sized packets? By using them as streams<em>.</em></p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Streams and serialization – understanding sequential data transmission</h1>
+                </header>
+            
+            <article>
+                
+<p>So with our fat, chunky JSON requests being broken up into tiny, sub-kilobyte packets, and sent over as an array of seemingly random, disjointed pieces of data, how can we possibly expect our recipients to process this data? Well, in C#, that's where the concept of a data stream comes in. Within the context of our application code, we can reliably assume that the transport layer will recompose our packets into a sequence of bits for us to consume as soon as it becomes available to us. So once we get that sequence of bits back, how do we consume it? As an IO stream!</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">The Stream class</h1>
+                </header>
+            
+            <article>
+                
+<p>If you've done any reading or writing of files on your local file system in C# on older .NET Framework versions, you'll already be familiar with this concept. In .NET Core, we can import the <kbd>System.IO</kbd> namespace to our application to start working directly with the data returned by a TCP/IP socket by simply opening up a new <kbd>StreamReader</kbd> object, initialized with a <kbd>NetworkStream</kbd> instance connected to the target socket. So, what is a stream and how should you use it?</p>
+<p>Streams are a powerful concept in processing serialized data. They provide one-way access to a sequential data source and allow you to handle the processing of that data explicitly. Executing the <kbd>Read()</kbd> or <kbd>ReadAsAsync()</kbd> methods, or other associated methods, will trigger this one-way traversal; starting at the beginning and reading, on demand, byte by byte through the entire sequence, until a Terminal character has been reached. The .NET implementation of this concept is extremely flexible, such that, regardless of the specific instance of the <kbd>Stream</kbd> abstract class you're using, the <kbd>StreamReader</kbd> class will be equipped to accept the data, traverse it accordingly, and allow you to build out a non-serialized instance of a C# data structure as needed.</p>
+<p>We'll examine streams more thoroughly in later chapters, but for now, I wanted to highlight how, in the context of network communication, streams are composed of the sequence of packets received by a specific port or socket, and returned to your application through a normalized implementation of the <kbd>Stream</kbd> class.</p>
+<p>This is just one example of the power suite of abstractions provided by .NET Core. So, even though you now have the understanding necessary to explicitly handle individual packets returned from your transport layer to rebuild the response of a network request from scratch, you thankfully never have to do that. The Core framework handles that headache for you. And with this added perspective of what's happening under the hood, I hope you feel better equipped to address potential performance issues or subtle network bugs in your network-dependent applications going forward.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Summary</h1>
+                </header>
+            
+            <article>
+                
+<p>Looking back, this chapter covered the lowest-level details of network communication. First, we learned about the three most common constraints of a physical network infrastructure that demand the decomposition of a network request into packets. We looked at how different aspects of the hosting context of our application can contribute some measure of latency to our requests, how bandwidth can change the way requests move from one node to another, and how signal strength can compromise the integrity of a packet.</p>
+<p>Next, we explored how those factors necessitate small, contextually-complete, atomic packets as our transport format for network requests. We unpacked how some common protocols provide that complete context with each packet through standardized formats. This gave us a clearer idea of how a larger network request is decomposed and sent over our network pipes.</p>
+<p>Finally, we looked at how a set of packets, delivered at inconsistent intervals, can be consumed as a sequential stream. With all of this, the lowest level of our foundation is set, and we have the complete context of network infrastructure and communication standards necessary to fully explore how C# provides that functionality in our .NET Core applications. And that's exactly what we'll be looking at in the next chapter, as we finally generate a network request in a user-facing application, and fully unpack every step of that process as implemented by the .NET Core hosting platform.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Questions</h1>
+                </header>
+            
+            <article>
+                
+<ol>
+<li>What are the three constraints of a network that necessitates the decomposition of a network request into packets?</li>
+<li>List each of the types of latency discussed in this chapter.</li>
+<li>Why does unreliable signal strength warrant smaller packet sizes?</li>
+<li>What is the definition of a datagram?</li>
+<li>What are the two components of a datagram?</li>
+<li>What is sufficient context in terms of a datagram or packet?</li>
+<li>Which feature of .NET Core facilitates the processing of unreliable data streams?</li>
+</ol>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Further reading</h1>
+                </header>
+            
+            <article>
+                
+<p>For a better understanding of how packets and data streams operate over a distributed system, check out <em>Packet Analysis with Wireshark</em>, <em>Anish Nath</em>, <em>Packt Publishing</em>, here: <a href="https://www.packtpub.com/networking-and-servers/packet-analysis-wireshark">https://www.packtpub.com/networking-and-servers/packet-analysis-wireshark</a>.</p>
+<p>For a closer look at data streams in practice, consider <em>Stream Analytics with Microsoft Azure, Anindita Basak</em>, <em>Krishna Venkataraman</em>, <em>Ryan Murphy</em>, <em>and Manpreet Singh</em>, <em>Packt Publishing</em>, here: <a href="https://www.packtpub.com/big-data-and-business-intelligence/stream-analytics-microsoft-azure">https://www.packtpub.com/big-data-and-business-intelligence/stream-analytics-microsoft-azure</a>.</p>
+
+
+            </article>
+
+            
+        </section>
+    </body></html>

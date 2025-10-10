@@ -1,0 +1,471 @@
+<html><head></head><body>
+        <section>
+
+                            <header>
+                    <h1 class="header-title">DNS and Resource Location</h1>
+                </header>
+            
+            <article>
+                
+<p>The last chapter was spent dissecting networks to such a degree that most readers will likely never think about them again. In this chapter, we'll take those concepts and look at their real-world implementations. We'll start with a look at how the problem of resource allocation is solved at the scale of the internet. Distributing resources is useless without being able to access them from across your network, and this chapter will introduce you to the systems and standards that make doing so possible. As we investigate these topics, we'll finally get our hands dirty with some code. Throughout this chapter, we'll look at software examples to get you familiar with leveraging the tools available with the .NET Core framework.</p>
+<p>The following topics will be covered in this chapter:</p>
+<ul>
+<li>How data and services are exposed and made available on everything from your home Wi-Fi network to the internet</li>
+<li>The specific standards used to identify resources at different levels of your network, from URLs and domain names, to devices names and local directory access</li>
+<li>Using the DNS class in .NET Core to access external resources and resolve requests for data within your network</li>
+</ul>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Technical requirements</h1>
+                </header>
+            
+            <article>
+                
+<p>To follow this chapter, you'll need to have either Visual Studio Code, or Visual Studio Community Edition. Both are free downloads available at the Visual Studio website, at <a href="https://visualstudio.microsoft.com/">https://visualstudio.microsoft.com/</a>. </p>
+<p><span>Check out the following video to see the code in action: <a href="http://bit.ly/2HVSHad">http://bit.ly/2HVSHad</a></span></p>
+<p>We'll also be using the .NET Core <strong>command-line interface</strong> (<strong>CLI</strong>). This will give us access to a series of programs we can call directly from the command prompt. To follow along, you'll need to make sure you have the .NET Core SDK installed locally, which can be downloaded from <a href="https://www.microsoft.com/net/download">https://www.microsoft.com/net/download</a><span>.</span></p>
+<p>The source code is available at <a href="https://github.com/PacktPublishing/Hands-On-Network-Programming-with-C-and-.NET-Core">https://github.com/PacktPublishing/Hands-On-Network-Programming-with-C-and-.NET-Core</a><span>.</span></p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Needles in a haystack – data on the internet</h1>
+                </header>
+            
+            <article>
+                
+<p>The first step to using the resources exposed on a network is finding them. While this problem is easily solved on a LAN with only four computers, you can imagine how daunting a challenge it becomes when your context grows to the several billion devices actively connected to the internet. To ensure reliable delivery of requests broadcast on a network, each device on that network must be uniquely addressed, and any software that wants to communicate with a device must know the address of the target device. With this in mind, let's look at how the problem has been solved at scale and consider how we can apply that solution to our more locally-relevant use cases with .NET Core.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">The first network addresses</h1>
+                </header>
+            
+            <article>
+                
+<p>As I mentioned, every device on a network must be uniquely identifiable so that, at any given time, requests intended for a specific device can be delivered. Likewise, unique addressing means that any responses can be reliably returned to the originating device, no matter how many network nodes lie between the two. If someone has written a service that solves a problem you have, it's only useful to you if you can actually use that service. This means either knowing the address of the device hosting that service, or, at the very least, knowing who to ask for the address.</p>
+<p>Thankfully, this is a problem that was solved long before even the earliest incarnations of the modern internet. I am, of course, referring to telecommunication networks, and their well-established system for addressing and address look-ups. With early telecom networks, engineers needed to solve problems for a large set of devices that needed to be uniquely addressed. Whatever system they came up with, though, would need to exhibit the following characteristics in order to remain viable in the long term:</p>
+<ul>
+<li>Usability: The system would be used by anyone who wanted to communicate over the telecom network, and so the system could not have been prohibitively complex.</li>
+</ul>
+<ul>
+<li>Scalability: The ultimate goal was to connect every home in the nation with a single, unified network. The solution for adding nodes to that network would need to grow with the population and the geographic region that it would ultimately support.</li>
+<li>Performance: If a telephone call took as long as the postal service to deliver messages back and forth, no one would use it. And, while that was never going to be the case, there would certainly be a limit to what customers would tolerate in terms of speed and reliability.</li>
+</ul>
+<p>Thankfully, what they came up with was a sustainable solution that has scaled and functioned for decades.</p>
+<p>The system that telecom engineers devised was that of phone numbers. By assigning 10-digit addresses to each phone on a telecom network, engineers guaranteed a network capable of uniquely addressing up to 9,999,999,999 devices. Add two digit country codes to that, and you've got a network that can theoretically support up to a trillion devices, or over 100 unique addresses for each human on the planet, with approximately another <span>240</span> billion to spare.</p>
+<p>You might have noticed that I specified that the phone numbering system only theoretically supports up to a trillion devices. However, there are certain limitations of the addressing system of telecoms that make reaching the theoretical maximum difficult. As most of you will be well aware, the first three digits of a US telephone number are known as the <strong>area code</strong>. Those digits were originally determined by the specific geographic location in which the phone was located. This helped route numbers quickly, but means that the total number of possible devices supportable by telecom networks is limited by the distribution of those devices across geographic regions. Within an area code, there is only a theoretical maximum of 9,999,999 possible devices; barely more than the total population of New York.</p>
+<p>I'm over-simplifying the solution here, but what this trade-off provided for telecom engineers was a simple mechanism for narrowing down the possible field of physical phones to which an address would resolve as quickly as was reasonably possible. Calls could be routed to a substantially restricted region by examining only the first three numbers. This provided an obvious performance benefit by applying semantic meaning to a syntactic standard. The telephone numbering system simply <span>specifies</span> that a physical phone is addressed by a 10-digit address. That is a syntax requirement. However, the geographic information conveyed by the first three digits of that address is a semantic standard. There is an underlying meaning baked into those first three numbers that conveys how the entire address should be handled.</p>
+<p>The scalability of this numeric addressing system helps network devices direct traffic accurately. For a human user, though, an arbitrary series of seven to ten numbers can be difficult to remember, and are error-prone to use. Those who grew up in the time before smartphones and built-in contacts lists may remember the need to have a Rolodex, or contact book, to keep frequently needed, but difficult to remember, phone numbers organized and on-hand at all times. However, it was often the case that you'd need to call someone whose number you didn't have conveniently stored. This is where the phone book comes in. It served as a simple way of mapping easily-remembered unique identifiers for a person (specifically, a full name and street address) to their corresponding network-friendly address (their phone number).</p>
+<p>All of these features, taken together, provided telecoms with the hallmarks of a successful network implementation: usability (through the simplicity of phone books), scalability (with the extensive range of valid addresses), and performance (with improved routing speeds achieved by embedding semantic meaning into the syntactic standards of the address). By now, though, you've likely correctly guessed that we won't be programming for telephone networks in C#. So, let's see how the design decisions made by telecom engineers translate to modern computer networks.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">DNS – the modern phone book</h1>
+                </header>
+            
+            <article>
+                
+<p>As I have alluded to, engineers designing modern computer networks faced the same problem <span>as telecom engineers:</span> <span>defining a standardized syntax with which they could create unique addresses for each device on their network. Thankfully, though, there were already giants on whose shoulders those computer network engineers could stand (to paraphrase Sir Isaac Newton).</span></p>
+<p>The phone numbering system demonstrated that a simple system of fixed-length numeric addresses could be quickly parsed and routed. Moreover, strictly numerical addresses can be represented in binary. This meant no additional standards needed to be applied for consistently representing non-numeric characters. However, this was a trade-off in usability. The software written to use those addresses would still need to be written by humans. As is often the case, the easier (and more performant) solution for computers to use was the more difficult solution for humans. This meant that computer network engineers would need to devise a phone book of their own. Thankfully, they rose to the occasion.</p>
+<p>O<span>n all modern computational networks, the fixed-length numerical address by which you can reliably locate an external device is the</span> <strong>Internet Protocol (IP)</strong> address<span>. Meanwhile, the system from which you can reliably</span> ask <span>for the address of a given device is the</span> <strong>Domain Name System (DNS).</strong> This, the DNS, is the computer network's phone book. It's essentially an elaborate, distributed mapping of human-readable domain names to their underlying IP addresses.</p>
+<p>Every device on the internet (or any local networks) will have their own IP address. However, the specifics of how that IP address is determined, and the strengths and limitations of the syntax for those addresses, will be discussed later in this book. For now, what we're concerned with is specifically how those addresses are resolved by their more meaningful, human-readable domain names. In this next section, we'll explore fully how that happens every time you look up a resource by its URL.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">URLs, domain names, and device addresses</h1>
+                </header>
+            
+            <article>
+                
+<p>With a solid understanding of the primary concerns that must be addressed for resource location on networks, let's look at how they've been addressed in more detail. First, let's consider how the much less error-prone URL naming convention allows easier access to remote resources. Then we'll look at how the DNS provides a bridge between the usability of URLs or domain names, and the speed and reliability of IP addressing.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">URLs – user-friendly addressing</h1>
+                </header>
+            
+            <article>
+                
+<p>I've been taking a very basic approach to explaining the nature of locating resources so far. I'm certainly aware, though, that most of you probably have at least some idea of how that happens in, at the very least, a high-level context. Hell, you likely used a web browser to find this book in the first place, and had a pretty solid idea that the long string of seemingly random words and letters strung together in your browsers address bar was, in fact, a URL. However, I have certainly met my fair share of developers who were surprised to learn exactly how URLs are constructed and used. So, much as we've done so far, we're going to start with a very basic explanation of what exactly URLs are, and how we can use them to find what we need.</p>
+<p><strong>Uniform Resource Locator</strong> (<strong>URL</strong>) is a universally agreed-upon standard for (unsurprisingly) locating resources on the web. It does so by specifying the mechanism by which to retrieve the resource, as well as the specific route over which to retrieve it. It does so by specifying the order of, and delimiters between, specific components that collectively define the specific physical location of any resource. The specification will initially seem complicated, but will become more intuitive as we elaborate on the components and the responsibilities they hold.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">URL components</h1>
+                </header>
+            
+            <article>
+                
+<p>Every URL begins with the scheme by which a resource should be located. This specifies the transport mechanism, or location type, that should be used to find what you're looking for. There is a finite list of universally valid schemes that you can specify, including http, ftp, and even file for locally hosted resources. The scheme is always followed by a colon (<kbd>:</kbd>) delimiter. After the scheme specification, a URL could contain an optional authority specification, which itself contains a small handful of sub-components.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">The authority component</h1>
+                </header>
+            
+            <article>
+                
+<p>The authority has a designated prefix: the special delimiter of two consecutive forward slash (<kbd>//</kbd>) characters, whose presence indicates that characters that follow should be parsed according to the specification for a URL authority. This prefix is optionally followed by access credentials, or user information, which transmits an optional user ID and/or password to the destination host. These values, if included, will always be separated from one another with a colon (<kbd>:</kbd>) as a delimiter, and will be separated from the rest of the authority component with an at sign (<kbd>@</kbd>) delimiter.</p>
+<p>Whether access credentials are included as part of the authority or not, it will always include a host domain. This always follows either the double forward slash (<kbd>//</kbd>) prefix, or, in the event of access credentials, the (<kbd>@</kbd>) delimiter. The host domain specifies the physical address of the hardware hosting the resource being located. It can be specified as either a registered domain name, or the underlying IP address for the hardware.</p>
+<p>Finally, an authority might specify a listening port on the host. This is delimited from the host domain name or IP address by the colon (<kbd>:</kbd>) character, and indicates the only ports on the hardware to which requests for the specified resource should be sent.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">The path component</h1>
+                </header>
+            
+            <article>
+                
+<p>The path component specifies a series of path segments over which requests must travel to arrive at the searched for resource. Each segment of the path is individually delimited with a forward slash (<kbd>/</kbd>) character. It's technically valid to have an empty segment as part of your path, resulting in two consecutive forward slash characters (<kbd>//</kbd>).</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">The query component</h1>
+                </header>
+            
+            <article>
+                
+<p>After the final segment of the path, the URL may contain an optional query component, indicated by the presence of the question mark character (<kbd>?</kbd>) delimiter. The query component allows users to specify additional parameters for more specific results from the requested resource. Each different query comes in the form of a parameter, the equals sign (<kbd>=</kbd>) delimiter, and the requested value of the query parameter. Finally, each parameter is delimited by either a semi-colon (<kbd><span><span>;</span></span></kbd><span><span>)</span></span> or ampersand (<kbd>&amp;</kbd>) delimiter between any two query parameters and their values.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">The fragment component</h1>
+                </header>
+            
+            <article>
+                
+<p>The final piece of a URL, at least ordinarily, is the fragment component. It's an optional piece of the URL string, and its presence is indicated by the reserved pound, or hash (<kbd>#</kbd>) prefix. The fragment component is often used to identify a sub-component of the eventually-returned resource, and is typically used by web browsers to navigate to a specific fragment of the HTML document that was searched for.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Putting it all together</h1>
+                </header>
+            
+            <article>
+                
+<p>Having clearly enumerated all the relevant components of a URL, we can simplify things with a basic syntax specification. Every URL ultimately breaks down to the following structure, where optional components are designated with square brackets <kbd>[]</kbd>:</p>
+<pre>scheme:[//authority/]path[?query][#fragment]</pre>
+<p>So here, we see plainly that the only required components of a URL are the scheme and subsequent colon delimiter, and a path. Everything else is optional, and you'll note that each optional component has its presence in the URL indicated by its unique prefix character. And we can, of course, expand on the following components.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Authority specification</h1>
+                </header>
+            
+            <article>
+                
+<p>The authority, as we already specified, can be broken down as follows:</p>
+<pre>//[access_credentials<span>][@]host_domain[:port]</span></pre>
+<p>So, if an authority component is present, it will always be prefixed with a (<kbd>//</kbd>) delimiter, and will always contain the host domain. Meanwhile, the access credentials component is also broken down as follows:</p>
+<pre>[user_id][:][password]</pre>
+<p>Here, only one component is required. However, if either component is present, then the (<kbd>@</kbd>) character separating access credentials from the host domain becomes a requirement. And, if both the <kbd>user_id</kbd> and the <kbd>password</kbd> functions are present, then the colon (<kbd>:</kbd>) delimiter between the two components will be required.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Query specification</h1>
+                </header>
+            
+            <article>
+                
+<p>Finally, the last component that has a well-defined specification for how it can be composed is the query component. It can be broken down as follows:</p>
+<pre>?[parameter=value][(;|&amp;)parameter=value]...</pre>
+<p>The sequence of additional delimiters and key-value pairs can extend all the way to the maximum allowable length of a valid URL.</p>
+<p>By following these syntax specifications, you can decompose any URL you are presented with into its component parts, and meaningfully leverage it to access the resource it identifies.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">The URL as a sub-type of the URI</h1>
+                </header>
+            
+            <article>
+                
+<p>We've spent the bulk of this section discussing URLs specifically. What you may not have realized, however, is that a URL is actually a single, specific kind of something known as a <strong>Uniform Resource Identifier</strong> (<strong>URI</strong>), which is a string of characters adhering to a well-defined syntax that universally and uniquely identifies a resource on a network.</p>
+<p>The distinction between a URL and a URI is subtle, and almost entirely conceptual. The simplest way to characterize that distinction is to note that, by using a URL, we are guaranteed to be able to identify and locate a requested resource. The only thing we are guaranteed, given a simple URI, is an ability to identify it that is to distinguish the resource from any other arbitrary resource.</p>
+<p>In practice, however, the terms URL and URI are frequently used interchangeably. This is because, since URL is a specific kind of URI, it's always valid to characterize a URL as a URI. Meanwhile, it is often sufficient to characterize a URI as a URL since knowing the specific identity of a resource within the context of a network is usually enough to then locate that resource.</p>
+<p>If you're wondering why I brought up a subject of such apparent triviality, it's for clarity's sake. Over the course of this book, I'll consistently talk about resources as being identified by their URL. However, the class exposed by .NET Core for constructing, decomposing, and leveraging these addresses is named for the more generic URI specification. In fact, let's take a quick look at that class now.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">The System.Net.UriBuilder class</h1>
+                </header>
+            
+            <article>
+                
+<p>If you've made it all the way through this elaborate definition of the URL specification, you might be wondering how on earth you can leverage this in your code to access a resource, when you already know specifically where to look for it. Enter, dear readers, the <kbd>UriBuilder</kbd> class!</p>
+<p>Living in the <kbd>System.Net</kbd> namespace, the <kbd>UriBuilder</kbd> class is a factory class for generating instances of the <kbd>Uri</kbd> class. It provides users with several overloaded constructors to allow the specification of more of the components of a valid URL progressively. It also provides accessors to properties representing each of those components individually. Finally, it provides a function to produce the well-formed instance of the <kbd>Uri</kbd> class from the component parts.</p>
+<p>Let's start with a very simple example. We'll use <kbd>UriBuilder</kbd> to compose an instance of <kbd>Uri</kbd> with only the <kbd>Scheme</kbd> and <kbd>Host</kbd> components as follows:</p>
+<pre>public Uri GetSimpleUri() {<br/>   var builder = new UriBuilder();<br/>    builder.Scheme = "http";<br/>    builder.Host = "packt.com";<br/>    return builder.Uri;<br/>}</pre>
+<p>With this method, we can see how the <kbd>UriBuilder</kbd> class composes a well-formed and syntactically correct <kbd>Uri</kbd> out of the component parts we specify, as demonstrated in the following code snippet:</p>
+<pre>using System;<br/>using System.Net;<br/>using System.Threading;<br/><br/>namespace UriTests {<br/>    public class TestUriProgram {<br/>        public static Uri GetSimpleUri() {<br/>            //...<br/>        }<br/><br/>        public static void Main(string[[ args) {<br/>            var simpleUri = GetSimpleUri();<br/>    <br/>            Console.Warn(simpleUri.ToString());<br/><br/>            Thread.Sleep(10000);<br/>        }<br/>    }<br/>}</pre>
+<p>By running this program, you should see the <kbd>http://packt.com</kbd> output while your console is open for ten seconds, before it closes and the application terminates.</p>
+<p>Here, we didn't need to specify that the <kbd>http</kbd> component of the URL should be followed by a colon character. We didn't say anything about the host we specified being prefixed with the <kbd>//</kbd> prefix characters. The <kbd>UriBuilder</kbd> class did that for us. This factory class gives us a clean way to incrementally construct a more specific desired location, without us, as the developers, having to keep the nitty-gritty details of delimiters, prefixes, and suffixes in our heads all the time.</p>
+<p>In this example, we leveraged the fact that the <kbd>UriBuilder</kbd> class provides public <kbd>get</kbd> access to all of the properties that it has to encapsulate each component of a <kbd>Uri</kbd>. However, you can also apply many of those properties through a series of overloaded constructors, if you know their values at the time of construction.</p>
+<p>The <kbd>UriBuilder</kbd> class has seven overloaded constructors. We've seen the default constructor, taking no parameters, but <span>now let's look at a program that leverages each of the constructors and see what they provide. Given that we know the transport scheme and domain name we intend to look up, we can simplify our initial method for a simple <kbd>Uri</kbd> as follows:</span></p>
+<pre>public static Uri GetSimpleUri_Constructor() {<br/>    var builder = new UriBuilder("http", "packt.com");<br/>    return builder.Uri;<br/>}</pre>
+<p>With that change, the output from our <kbd>TestUriProgram</kbd> will print the exact same string we saw before, but the code to produce that output is one-third of the size. Whenever possible, I recommend using the constructor overloads to instantiate the <kbd>UriBuilder</kbd> class. Doing so shrinks our code height and makes our intentions explicit when instantiating the class. Always be more explicit in your code when possible.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Hosts – domain names and IPs</h1>
+                </header>
+            
+            <article>
+                
+<p>In my description of the host component of a URL, I specified that the host domain could be either a domain name, or an IP address. As I mentioned before, an IP address is the underlying numeric address used by routing hardware and software to navigate to a resource on a network. It's the unique ID, specific to a piece of hardware at a specific location. A domain name, however, is the human-readable string of words and alpha-numeric characters used to make addressing easier and more consistent. It is more consistent, easily remembered, and less prone to error than a raw IP address. What's interesting, however, is that domain names and their IP addresses are actually functionally interchangeable. In any context in which you can use one, you can always safely substitute the other.</p>
+<p>Given that IP addresses can be resolved directly by the network transport layer, and don't need to be resolved before they can be serviced by any node in the routing process, we'll ignore them for now. We'll explore the syntax, limitations, and advantages gained by using the IP address of a device later on in this book. For now, though, we're more concerned with how we can find the IP address in the first place. That's why, for this chapter at least, we're only concerning ourselves with domain names and how they're resolved by the DNS.</p>
+<p>I'd bet that among everyone reading this book, there isn't a single person who knows a single other person who hasn't typed <a href="http://google.com">google.com</a> or <a href="https://en.wikipedia.org/wiki/Main_Page">en.wikipedia.org</a> into their browser's address bar. Our use of domain names is ubiquitous, and yet most of us have no idea how, exactly, they are created or used. Even for me, it wasn't until I was explicitly tasked with writing software for resolving those domain names on an internal network that I finally took the time to understand what made that system work. At that time, I learned how the web of DNS servers facilitated network usage by human users. While I only mentioned it previously, it's time to consider just what the DNS is <span>more deeply</span>, and how we can use it.</p>
+<p>The DNS is a distributed, decentralized network of authoritative servers that hosts a directory of all sub-domain servers, as well as any domain names that can be resolved by that authoritative server. <span>Any domain name that has been registered with a certified</span> domain name registrar<strong>,</strong> and <span>which meets the syntax standards of a domain name (and which hasn't already been registered), is considered valid. Valid domain names are added to the distributed registry hosted by authoritative servers.</span> Between your computer and any other network node you hope to interact with using a valid, registered domain name, your request will have to interact with one or more of these name servers.</p>
+<p>Each server will inspect the domain name given, and look up the domain in its own directory of names and IP address mappings. Naturally, the server will first determine if the given name can be resolved by that server, or at least by one of its subordinate servers. If so, the authoritative server simply replaces the domain name in the request with the IP address to which it maps, and forwards the request along accordingly. If the current server cannot resolve the domain name, however, it will forward it along up the hierarchy of name servers to a more general, parent domain. This process continues up to the root name server, or until the name is resolved.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">The DNS in C#</h1>
+                </header>
+            
+            <article>
+                
+<p>It is occasionally necessary to identify the underlying IP address for a domain name from within the context of our software. For that, .NET Core provides the static <kbd>Dns</kbd> class as part of the <kbd>System.Net</kbd> namespace. With the <kbd>Dns</kbd> class, we can access directory information as returned by the nearest downstream name server capable of resolving the given name. We can request an instance of the <kbd>IPHostEntry</kbd> class, containing all of the relevant directory information of a DNS entry, or simply an array of IP addresses registered to resolve requests against the domain name.</p>
+<p>To see this in action, simply invoke any of the methods exposed by the static <kbd>Dns</kbd> class in a sample program as follows:</p>
+<pre>using System;<br/>using System.Net;<br/>using System.Threading;<br/><br/>namespace DnsTest {<br/>    public class DnsTestProgram {<br/>        static void Main(string[] args) {<br/>            var domainEntry = Dns.GetHostEntry("google.com");<br/>            Console.WriteLine(domainEntry.HostName);<br/>            foreach(var ip in domainEntry.AddressList) {<br/>                Console.WriteLine(ip);<br/>            }<br/>            Thread.Sleep(10000);<br/>        }<br/>    }<br/>}</pre>
+<p>With this program, we should see the following output:</p>
+<pre>google.com<br/>172.217.10.14</pre>
+<p class="mce-root">Of course, the IP address that is resolved when you look for a host entry that resolves the <kbd>google.com</kbd> domain name will likely be different. Google's servers are widely distributed, and the specific server slice (and its associated IP address) that is nearest your network location will be what resolves a lookup of that domain name.</p>
+<p>If you want to validate that the IP address returned is in fact what is registered for that domain name, you can actually intercept the host entry lookup locally by modifying your computer's hosts file. On a Windows OS, that file will live at the <kbd>C:\Windows\System32\drivers\etc\hosts</kbd> directory, and will have no file extension. On macOS and *nix systems, it simply lives at <kbd>\etc\hosts</kbd>.</p>
+<p>This file serves as the first stop on any outbound requests for a network resource addressed by a host name. It is, technically, your computer's internal name server, and you can use it to direct traffic any way you'd like. To demonstrate this, add an entry to your hosts file as follows:</p>
+<pre>127.0.0.1    fun.with.dns.com</pre>
+<p>Now, opening your command prompt, navigate to an empty folder, and spin up a new .NET Core Web API project with the following CLI command:</p>
+<pre><strong>dotnet new webapi</strong></pre>
+<p>Your console should print information about .NET Core, telemetry, ASP.NET Core, and finally, finish execution with the following line:</p>
+<pre>Restore succeeded.</pre>
+<p>Assuming that this worked, you can immediately run the application by executing the following command from within the same directory that you created the project:</p>
+<pre><strong>dotnet run</strong></pre>
+<p>After this, you should see that your application is running and listening, as seen in the following screenshot:</p>
+<p class="CDPAlignCenter CDPAlign"><img class="alignnone size-full wp-image-895 image-border" src="assets/07246658-3674-4d45-96bf-e0e89da8e0af.png" style="width:66.58em;height:22.08em;"/></p>
+<p>Pay attention to the specific port your application is listening on.</p>
+<p>If we look inside the blank Web API application, we can see that .NET Core stood up a single controller, named <kbd>ValuesController</kbd>, and that it exposes a number of REST endpoints. The only things that we're concerned with for now is the route specified for the API, and the endpoint listening for HTTP GET requests, listed as follows:</p>
+<pre>[Route("api/{controller}")]<br/><br/>...<br/><br/>[HttpGet("{id}")]<br/>public ActionResult&lt;string&gt; Get(int id) {<br/>    return "value";<br/>}</pre>
+<p>This tells us that we should expect to see the <kbd>"value"</kbd> result if we navigate to the <kbd>/api/values/{id}</kbd> path on the listening port of our local machine.</p>
+<p>Sure enough, if you open your browser of choice and type the application's URL into your address bar, appending the path specified in the controller, you should see the <span class="packt_screen">value</span> string displayed in your browser, as shown in the following screenshot:</p>
+<p class="CDPAlignCenter CDPAlign"><img class="alignnone size-full wp-image-896 image-border" src="assets/a1aebff3-3c6a-4132-b7d4-76aed2098e0d.png" style="width:45.75em;height:10.92em;"/></p>
+<p>What's interesting, though, is that localhost is itself an alias for the <kbd>127.0.0.1</kbd> <span>IP address.</span> By convention, that address always resolves to the current local machine. Since we modified our hosts file, however, we should be able to replace <kbd>localhost</kbd> in our URL with the <kbd>fun.with.dns.com</kbd> as <span>new domain name.</span> Make the change in your browser, and you'll see the same response!</p>
+<p>Now that we've seen how to set up our own domain name entries locally, we can use our hosts file to explore the <kbd>Dns</kbd> class in more detail, and validate the responses.</p>
+<p>First, add an additional entry to the hosts file with a new IP address, but the same fake domain name as before. Your new hosts file should read as follows:</p>
+<pre>127.0.0.1    fun.with.dns.com<br/>1.0.0.127    fun.with.dns.com</pre>
+<p>Here, it doesn't actually matter what the addresses are, since we won't be looking for resources at those locations. What matters is that there are two. With those entries in place, you can see more concretely how the <kbd>Dns</kbd> class in .NET exposes a host entry from the nearest domain name server that can resolve it. We can modify our program from before as follows:</p>
+<pre>using System;<br/>using System.Net;<br/><br/>namespace DnsTest {<br/>    public class DnsTestProgram {<br/>        static void Main(string[] args) {<br/> var domainEntry = Dns.GetHostEntry("fun.with.dns.com");<br/> Console.WriteLine(domainEntry.HostName);<br/> foreach(var ip in domainEntry.AddressList) {<br/> Console.WriteLine(ip);<br/> }<br/><br/> var domainEntryByAddress = Dns.GetHostEntry("127.0.0.1");<br/> Console.WriteLine(domainEntryByAddress.HostName);<br/> foreach(var ip in domainEntryByAddress.AddressList) {<br/> Console.WriteLine(ip);<br/> }<br/> Thread.Sleep(10000);<br/> }<br/>    }<br/>}</pre>
+<p>We can now see the following output:</p>
+<pre>fun.with.dns.com<br/>1.0.0.127<br/>127.0.0.1<br/>fun.with.dns.com<br/>1.0.0.127<br/>127.0.0.1</pre>
+<p>This demonstrates how we can access host information for a given domain name or IP address using the <kbd>Dns</kbd> class. Note that the instance of the <kbd>HostEntry</kbd> class returned by the methods of the <kbd>Dns</kbd> class always contain all of the IP addresses for which there is a record in the naming server. Even when we looked up the <kbd>HostEntry</kbd> class by a specific IP address, the <kbd>Dns</kbd> class still resolved and returned every other IP address registered for the domain name that matched the IP address of the original lookup. This provides the flexibility of being able to access and leverage alternative hardware resources for a given request in the event that one of the registered addresses is unresponsive. The extent to which you'll leverage this class in your work may vary, but I hope you see now that it can be a useful tool to keep in your belt.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Summary</h1>
+                </header>
+            
+            <article>
+                
+<p>In this chapter, we examined the primary characteristics network engineers identified as necessary to make networks viable. We considered the trade-off of usability for routing hardware versus readability for humans when defining a standard syntax for network addressing. With that consideration in mind, we looked at how the work of the telecom engineers of previous generations contributed hugely to the solutions that were ultimately standardized on all modern networks today.</p>
+<p>Within that context, we looked at how IP addresses are used by network hardware to locate resources, and how the DNS facilitates the more memorable, human-readable addressing schemes of URLs and URIs. We learned how those domain names are explicitly mapped to their underlying IP addresses by implementing a domain name server of our own, using the hosts file of our operating system. Using the sandbox of our self-contained DNS server, we explored the C# classes provided by the System.Net namespace to facilitate building syntactically correct URLs, and leveraging the DNS to lookup the underlying IP addresses of a given URL, or resolve requests to do the same.</p>
+<p>With this foundation in place, we'll use the next chapter to explore the communication protocols that allow for data transmission from one host to another. We'll look at how a standardized model facilitates communication between entities, and take a close look at some of the most common protocols used in that communication.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Questions</h1>
+                </header>
+            
+            <article>
+                
+<ol>
+<li>What are the three characteristics network engineers seek to achieve for long-term viability of a network addressing standard?</li>
+<li>How did telecom engineers sacrifice the maximum possible scale of telecom networks to achieve higher routing performance?</li>
+<li>What are the phone number and phone book of the modern internet?</li>
+<li>How does a URL locate resources on the web?</li>
+<li>What are the valid components of a URL? Which of them are optional?</li>
+<li>What is a fully qualified domain name?</li>
+<li>How is a device given a domain name?</li>
+</ol>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Further reading</h1>
+                </header>
+            
+            <article>
+                
+<p><span>For more information on URLs, domains, and resource location on networks, consider <em>Managing Mission-Critical Domains and DNS</em> by <em>Mark E. Jeftovic</em>. It provides a deeper and more considered analysis of working with the DNS, and strategies for leveraging that system to your advantage when constructing networks of your own.</span></p>
+
+
+            </article>
+
+            
+        </section>
+    </body></html>

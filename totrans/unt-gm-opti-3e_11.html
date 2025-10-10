@@ -1,0 +1,1209 @@
+<html><head></head><body>
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Masterful Memory Management</h1>
+                </header>
+            
+            <article>
+                
+<p> Memory efficiency is an important element of performance optimization. It's possible for games of limited scope, such as hobby projects and prototypes, to get away with ignoring memory management. These games will tend to waste a lot of resources and potentially leak memory, but this won't be a problem if we limit its exposure to friends and coworkers. However, anything we want to release professionally needs to take this subject seriously. Unnecessary memory allocations lead to poor user experience due to excessive garbage collection (costing precious CPU time) and m<span>emory leaks, which will lead to crashes. None of these situations are acceptable in modern game releases.</span></p>
+<p>Using memory efficiently with Unity requires a solid understanding of the underlying Unity engine, the Mono <span>platform</span>, and the C# language. Also, if we're making use of the new IL2CPP scripting backend, then it would be wise to become familiar with its inner workings. This can be a bit of an intimidating place for some developers since many pick Unity3D for their game development solution primarily to avoid the kind of low-level work that comes from engine development and memory management. We'd prefer to focus on higher-level concerns related to gameplay implementation, level design, and art asset management, but, unfortunately, modern computer systems are complex tools, and ignoring low-level concerns for too long could potentially lead to disaster.</p>
+<p><span>Understanding what is happening with memory allocations and C# language features, how they interact with the Mono platform, and how Mono interacts with the underlying Unity engine are absolutely paramount to making high-quality, efficient script code. So, in this chapter, you will learn about all of the nuts and bolts of the underlying Unity engine: the Mono platform, the C# language, <strong>Intermediate Language to C++</strong> (<strong>IL2CPP</strong>), and the .NET Framework.</span></p>
+<p><span>Fortunately, it is not necessary to become absolute masters of the C# language to use it effectively. This chapter will boil these</span> complex subjects down to a more digestible form and is split into the following subjects:</p>
+<ul>
+<li>Overview of the Mono platform:
+<ul>
+<li>Native and managed memory domains</li>
+<li>Garbage collection</li>
+<li>Memory fragmentation</li>
+</ul>
+</li>
+<li>Building a project using IL2CPP</li>
+<li>How to profile memory issues</li>
+<li>Implement various memory-related performance enhancements:
+<ul>
+<li>Minimizing garbage collection</li>
+<li>Using value types and reference types properly</li>
+<li>Using strings responsibly</li>
+<li>A multitude of potential enhancements related to the Unity engine</li>
+<li>Object and Prefab pooling</li>
+</ul>
+</li>
+</ul>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">The Mono platform</h1>
+                </header>
+            
+            <article>
+                
+<p>Mono is a magical sauce mixed into the Unity recipe, which gives it a lot of its cross-platform capability. Mono is an open source project that built its own platform of libraries based on the API, specifications, and tools from Microsoft's .NET Framework. Essentially, it is an open source recreation of the .NET library, was accomplished with little-to-no access to the original source code, and is fully compatible with the original library from Microsoft.</p>
+<p>The goal of the Mono project is to provide cross-platform development through a framework that allows code written in a common programming language to run against many different hardware platforms, including Linux, macOS, Windows, ARM, PowerPC, and more. Mono even supports many different programming languages. Any language that can be compiled into .NET's <strong>Common Intermediate Language</strong> (<strong>CIL</strong>) is sufficient to integrate with the Mono platform. This includes C# itself, but also several other languages, such as F#, Java, Visual Basic .NET, pythonnet, and IronPython.</p>
+<p>A common misconception about the Unity engine is that it is built on top of the Mono platform. This is untrue, as its Mono-based layer does not handle many important game tasks such as audio, rendering, physics, and keeping track of time. Unity Technologies built a native C++ backend for the sake of speed and allowed its users control of this game engine through Mono as a scripting interface. As such, Mono is merely an ingredient of the underlying Unity engine. This is equivalent to many other game engines, which run C++ under the hood, handling important tasks such as rendering, animation, and resource management, while providing a higher-level scripting language for gameplay logic to be implemented. As such, the Mono platform was chosen by Unity Technologies to provide this feature.</p>
+<div class="packt_infobox">Native code <span>is a common vernacular for code that is written specifically for the given platform. For instance, writing code to create a window object or interface with networking subsystems in Windows would be completely different to code performing the tasks for a macOS, Unix, PlayStation 4, Xbox One, and so on.</span></div>
+<p>Scripting languages typically abstract away complex memory management through automatic garbage collection and provide various safety features, which simplify the act of programming at the expense of runtime overhead. Some scripting languages can also be interpreted at runtime, meaning that they don't need to be compiled before execution. The raw instructions are converted dynamically into machine code and executed the moment they are read during runtime; of course, this often makes the code relatively slow. The last feature, and probably the most important one, is that they allow simpler syntax of programming commands. This usually improves development workflow immensely, as team members without much experience using languages such as C++ can still contribute to the code base. This enables them to implement things such as gameplay logic in a simpler format at the expense of a certain amount of control and runtime execution speed.</p>
+<p>Note that such languages are often called <strong>managed languages</strong>, which feature <strong>managed code</strong>. Technically, this was a term coined by Microsoft to refer to any source code that must run inside their <strong>Common Language Runtime</strong> (<strong>CLR</strong>) environment, as opposed to code that is compiled and run natively through the target OS.</p>
+<p>However, because of the prevalence and common features that exist between the CLR and other languages that feature their own similarly designed runtime environments (such as Java), the term <strong>managed</strong> has since been hijacked. It tends to be used to refer to any language or code that depends on its own runtime environment, and that may or may not include automatic garbage collection. For the rest of this chapter, we will adopt this definition and use the term <strong>managed</strong> to refer to code that both depends on a separate runtime environment to execute and is being monitored by automatic garbage collection.</p>
+<p>The runtime performance cost of managed languages is always greater than the equivalent native code, but it is becoming less significant every year. This is partly due to gradual optimizations in tools and runtime environments, and partly due to the computing power of the average device gradually becoming greater although the main point of controversy with using managed languages still remains their automatic memory management. Managing memory manually can be a complex task that can take many years of difficult debugging to be proficient at, but many developers feel that managed languages solve this problem in ways that are too unpredictable, risking too much product quality. Such developers might claim that managed code will never reach the same level of performance as native code, and hence it is foolhardy to build high-performance applications with them.</p>
+<p>This is true to an extent, as managed languages invariably inflict runtime overheads, and we lose partial control over runtime memory allocations. This would be a deal-breaker for high-performance server architecture; however, for game development, it becomes a balancing act since not all resource usage will necessarily result in a bottleneck, and the best games aren't necessarily the ones that use every single byte to their fullest potential. For example, imagine a user interface that refreshes in 30 ms via native code versus 60 µs in managed code due to an extra 100% overhead (an extreme example). The managed code version is still fast enough that the user will never be able to notice the difference, so is there really any harm in using managed code for such a task?</p>
+<p>In reality, at least for game development, working with managed languages often just means that developers have a unique set of concerns to worry about compared to native code developers. As such, the choice to use a managed language for game development is partly a matter of preference and partly a compromise of control versus development speed.</p>
+<p>Let's revisit a topic we touched upon in earlier chapters but didn't quite flesh out: the concept of memory domains in the Unity engine.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Memory domains</h1>
+                </header>
+            
+            <article>
+                
+<p>Memory space within the Unity engine can be essentially split into three different memory domains. Each domain stores different types of data and takes care of a very different set of tasks. Let's take a look at each of them:</p>
+<ul>
+<li><span>The first memory domain—the managed domain—should be very familiar. This domain is where the Mono platform does its work, where any <kbd>MonoBehaviour</kbd> scripts and custom C# classes we write will be instantiated at runtime, and so we will interact with this domain very explicitly through any C# code we write. It is called the m</span>anaged domain <span>because this memory space is automatically managed by a <strong>Garbage Collector</strong> (<strong>GC</strong>).</span></li>
+<li>The second domain—<span>the native domain—</span>is more subtle since we only interact with it indirectly. <span>Unity has an underlying native code foundation, which is written in C++ and compiled into our application differently, depending on which platform is being targeted. This domain takes care of allocating internal memory space for things such as asset data (for example, textures, audio files, and meshes) and memory space for various subsystems such as the Rendering Pipeline, physics system, and user input system. Finally, it includes partial n</span>ative representations <span>of important gameplay objects such as</span> GameObjects <span>and components so that they can interact with these internal systems. This is where a lot of built-i</span>n Unity <span>classes keep their data, such as the <kbd>transform</kbd> and <kbd>Rigidbody</kbd> components.</span></li>
+<li>The third and final memory domains are those of external libraries, such as DirectX and OpenGL libraries, as well as any custom libraries and plugins we include in our project. Referencing these libraries from our C# code will cause a similar memory context switch and subsequent cost.</li>
+</ul>
+<p><span>The managed domain also includes</span> <span>wrappers for the very same object representations that are stored within the native domain. As a result, when we interact with components such as <kbd>transform</kbd>, most instructions will ask Unity to dive into its native code, generate the result there, and then copy it back to the managed domain for us.</span> <span>This is where the n</span>ative-managed bridge <span>between the managed domain and native domains derives from, which was briefly mentioned in previous chapters. When both domains have their own representations for the same entity, crossing the bridge between them requires a memory context switch that can potentially inflict some fairly significant performance hits on our game. Obviously, c</span><span>rossing back and forth across this bridge should be minimized as much as possible due to the overhead involved. We covered several techniques for this in</span> <a href="">Chapter 2</a><span>,</span> <em>Scripting Strategies</em><span><em>.</em></span></p>
+<p>Memory in most modern OS splits runtime memory space into two categories.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">The stack</h1>
+                </header>
+            
+            <article>
+                
+<p>The stack is a special reserved space in memory, dedicated to small, short-lived data values, which are automatically deallocated the moment they go out of scope, hence why it is called the stack. It literally operates as a stack data structure, pushing and popping data from the top. Allocation to the stack complies with the following properties:</p>
+<ul>
+<li>The stack contains any local variables we declare and handles the loading and unloading of functions as they're called. These function calls to expand and contract through what is known as the call stack. When the call stack is done with the current function, it jumps back to the previous point on the call stack and continues from where it left off.</li>
+<li>The start of the previous memory allocation is always known, and there's no reason to perform any clean-up operations since any new allocations can simply overwrite the old data. Hence, the stack is relatively quick and efficient.</li>
+<li>The total stack size is usually very small, usually on the order of MB. It's possible to cause a stack overflow by allocating more space than the stack can support. This can occur during exceptionally large call stacks (for example, an infinite loop) or having a large number of local variables, but in most cases, causing a stack overflow is rarely a concern despite its relatively small size.</li>
+</ul>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">The heap</h1>
+                </header>
+            
+            <article>
+                
+<p>The heap represents all remaining memory space, and it is used for the overwhelming majority of memory allocation.</p>
+<ul>
+<li>Since we want most of the memory allocated to persist longer than the current function call, we couldn't allocate it on the stack since it would just get overwritten when the current function ends. So, instead, whenever a data type is too big to fit in the stack or must persist outside the function it was declared in, it is allocated on the heap.</li>
+<li>There's nothing physically different between the stack and the heap; they're both just memory spaces containing bytes of data that exist in RAM, which have been requested and set aside for us by the OS. The only difference is in when, where, and how they are used.</li>
+</ul>
+<p>In native code, such as code written in languages such as C++, these memory allocations are handled manually in that we are responsible for ensuring that all pieces of memory we allocate are properly and explicitly deallocated when they are no longer needed. If this is not done properly, then we could easily and accidentally introduce memory leaks since we are likely to keep allocating more and more memory space from RAM that is never cleaned up until there is no more space to allocate and the application crashes.</p>
+<p>Meanwhile, in managed languages, this process is automated through the GC. During the initialization of our Unity app, the Mono platform will request a given chunk of memory from the OS and use it to generate a heap memory space that our C# code can use (often known as the <strong>managed heap</strong>). This heap space starts off fairly small, less than 1 MB, but will grow as new blocks of memory are needed by our script code. This space can also shrink by releasing it back to the OS if Unity determines that it's no longer needed.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Garbage collection</h1>
+                </header>
+            
+            <article>
+                
+<p>The GC has an important job, which is to ensure that we don't use more managed heap memory than we need, and that memory that is no longer needed will be automatically deallocated. For instance, if we create <kbd>GameObject</kbd> and then later destroy it, the GC will flag the memory space used by <kbd>GameObject</kbd> for eventual deallocation later. This is not an immediate process, as the GC only deallocates memory when necessary.</p>
+<p>When a new memory request is made, and there is enough empty space in the managed heap to satisfy the request, the GC simply allocates the new space and hands it over to the caller. However, if the managed heap does not have room for it, then the GC will need to scan all of the existing memory allocations for anything that is no longer being used and cleans them up first. It will only expand the current heap space as the last resort.</p>
+<p>The GC in the version of Mono that Unity uses is a type of tracing GC, which uses a <strong>Mark-and-Sweep</strong> strategy. This algorithm works in two phases: each allocated object is tracked with an additional bit. This flags whether the object has been marked or not. These flags start set to <kbd>false</kbd> to indicate that it has not yet been marked.</p>
+<p>When the collection process begins, it marks all objects that are still reachable to the program by setting their flags to <kbd>true</kbd>. Either the reachable object is a direct reference, such as static or local variables on the stack, or it is an indirect reference through the fields (member variables) of other directly or indirectly accessible objects. In essence, it is gathering a set of objects that are still referenceable to our application. Everything that is not still referenceable would be effectively invisible to our application and can be deallocated by the GC.</p>
+<p>The second phase involves iterating through this catalog of references (which the GC will have kept track of throughout the lifetime of the application) and determining whether or not it should be deallocated based on its <strong>marked</strong> status. If the object is marked, then it is still being referenced by something else, and so the GC leaves it alone. However, if it is not marked, then it is a candidate for deallocation. During this phase, all marked objects are skipped over, but not before setting their flag back to <kbd>false</kbd> for the first phase of the next garbage collection scan.</p>
+<div class="packt_infobox"><span>In essence, the GC maintains a list of all objects in memory, while our application maintains a separate list containing only a portion of them. Whenever our application is done with an object, it simpl</span>y forgets it <span>exists, removing it from its list. Hence, the list of objects that can be safely deallocated would be the difference between the GC's list and our application's list.</span></div>
+<p>Once the second phase ends, all unmarked objects are deallocated to free space, and then the initial request to create the object is revisited. If the GC has freed up enough space for the object, then it is allocated within that newly-freed space and returned to the caller. However, if it is not, then we hit the last-resort situation and must expand the managed heap by requesting it from the OS, at which point the object space can finally be allocated and returned to the caller.</p>
+<p>In an ideal world, where we only keep allocating and deallocating objects, but only a finite number of them exist at once, the heap would maintain a roughly constant size because there's always enough space to fit the new objects we need. However, all objects in an application are rarely deallocated in the same order they were allocated, and even more rarely do they all have the same size in memory. This leads to memory fragmentation.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Memory fragmentation</h1>
+                </header>
+            
+            <article>
+                
+<p>Fragmentation occurs when objects of different sizes are allocated and deallocated in alternating orders and if lots of small objects are deallocated, following by lots of large objects being allocated.</p>
+<p>This is best explained through an example. The following shows four steps we take in allocating and deallocating memory in a typical heap memory space:</p>
+<p class="CDPAlignCenter CDPAlign"><img src="assets/573bbf10-163c-4ab8-a83e-aa2705b2387c.png" style="width:42.83em;height:22.67em;"/></p>
+<p>The memory allocation takes place as follows:</p>
+<ol>
+<li>We start with an empty heap space</li>
+<li>We then allocate four objects on the heap, <strong>A</strong>, <strong>B</strong>, <strong>C</strong>, and <strong>D</strong>, each 64-bytes in size</li>
+<li>At a later time, we deallocate two of the objects, <strong>A</strong> and <strong>C</strong>, freeing up 128-bytes</li>
+<li>We then try to allocate a new object that is 128-bytes in size</li>
+</ol>
+<p>Deallocating objects <strong>A</strong> and <strong>C</strong> technically frees 128 bytes worth of space, but since the objects were not contiguous (adjoining neighbors) in memory, we cannot allocate an object larger than both individual spaces there. <span>New memory allocations must always be contiguous in memory; t</span>herefore, the new object must be allocated in the next available contiguous 128-byte space available in the managed heap. We now have two empty 64-byte holes in our memory space, which will never be reused unless we allocate objects sized 64 bytes or smaller.</p>
+<p>Over long periods of time, our heap memory can become riddled with more, smaller empty spaces such as these as objects of different sizes are deallocated, and then the system later tries to allocate new objects within the smallest available space that it can fit within, leaving some small remainder that becomes harder to fill. In the absence of background techniques that automatically clean up this fragmentation, this effect would occur in literally any memory space—RAM, heap space, and even hard drives—which are just larger, slower, and more permanent memory storage areas (this is why it's a good idea to defragment our hard drives from time to time).</p>
+<p>Memory fragmentation causes two problems:</p>
+<ul>
+<li>Firstly, it effectively reduces the total usable memory space for new objects over long periods of time, depending on the frequency of allocations and deallocations. This is likely to result in the GC having to expand the heap to make room for new allocations.</li>
+<li>Secondly, it makes new allocations take longer to resolve due to the extra time it takes to find a new memory space large enough to fit the object.</li>
+</ul>
+<p>This becomes important when new memory allocations are made in a heap since the location of available space becomes just as important as how much free space is available. There is no way to split an object across partial memory locations, so the GC must either continue searching until it finds a large enough space or the entire heap size must be increased to fit the new object, costing even more time after it just spent a bunch of time doing an exhaustive search.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Garbage collection at runtime</h1>
+                </header>
+            
+            <article>
+                
+<p>So, in a worst-case scenario, when a new memory allocation is being requested by our game, the CPU would have to spend cycles completing the following tasks before the allocation is finally completed:</p>
+<ol>
+<li>Verify that there is enough contiguous space for the new object.</li>
+<li>If there is not enough space, iterate through all known direct and indirect references, marking everything they connect to as reachable</li>
+<li>Iterate through all of these references again, flagging unmarked objects for deallocation</li>
+<li>Iterate through all flagged objects to check whether deallocating some of them would create enough contiguous space for the new object</li>
+<li>If not, request a new memory block from the OS to expand the heap</li>
+<li>Allocate the new object at the front of the newly allocated block and return it to the caller</li>
+</ol>
+<p>This can be a lot of work for the CPU to handle, particularly if this new memory allocation is an important object such as a particle effect, a new character entering the scene, or a cutscene transition. Users are extremely likely to note moments where the GC is freezing gameplay to handle this extreme case. To make matters worse, the garbage collection workload scales poorly as the allocated heap space grows since sweeping through a few MBs of space will be significantly faster than scanning several GBs of space.</p>
+<p>All of this makes it absolutely critical to control our heap space intelligently. The lazier our memory usage tactics are, the worse the GC will behave in an almost exponential fashion, as we are more and more likely to hit this worst-case scenario. So, it's a little ironic that, despite the efforts of managed languages to make the memory management problem easier, managed language developers still find themselves being just as, if not more, concerned with memory consumption than developers of native applications. The main difference is in the types of problems they're trying to solve.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Threaded garbage collection</h1>
+                </header>
+            
+            <article>
+                
+<p>The GC runs on two separate threads: the main thread and what is called the <strong>finalizer thread</strong>. When the GC is invoked, it will run on the main thread and flag heap memory blocks for future deallocation. This does not happen immediately. The finalizer thread, controlled by Mono, can have a delay of several seconds before the memory is finally freed and available for reallocation:</p>
+<p class="CDPAlignCenter CDPAlign"><img src="assets/94a86feb-5908-4874-ba02-0fb1c4c8da8b.png" style="width:37.17em;height:11.17em;"/></p>
+<p>We can observe this behavior in the <span class="packt_screen">Total Allocated</span> block (the green line, with apologies to that 5% of the population with deuteranopia/deuteranomaly) of the <span class="packt_screen">Memory Area</span> within the <span class="packt_screen">Profiler</span> window. It can take several seconds for the total allocated value to drop after a garbage collection has occurred. Owing to this delay, we should not rely on memory being available the moment it has been deallocated, and as such, we should never waste time trying to eke out every last byte of memory that we believe should be available. We must ensure that there is always some kind of buffer zone available for future allocations.</p>
+<p>Blocks that have been freed by the GC may sometimes be given back to the OS after some time, which would reduce the reserved space consumed by the heap and allow the memory to be allocated for something else, such as another application. However, this is very unpredictable and depends on the platform being targeted, so we shouldn't rely on it. The only safe assumption to make is that as soon as the memory has been allocated to Mono, it's then reserved and is no longer available to either the native domain or any other application running on the same system.</p>
+<p>In the next section, we will look at another essential element of the development process: code compilation. During code compilation, the C# code will be transformed into real instructions executed by the CPU. Surprisingly, there are multiple ways of performing this conversion; let's see how to choose among them.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Code compilation</h1>
+                </header>
+            
+            <article>
+                
+<p>When we make changes to our C# code, it is automatically compiled when we switch back from our favorite IDE (which is typically either MonoDevelop or the much more feature-rich Visual Studio) to the Unity Editor. However, the C# code is not converted directly into machine code, as we would expect static compilers to do if we are using languages such as C++.</p>
+<p>Instead, the code is converted into an intermediate stage called <strong>Common Intermediate Language</strong> (<strong>CIL</strong>), which is an abstraction above the native code. This is how .NET can support multiple languages—each uses a different compiler, but they're all converted into CIL, so the output is effectively the same regardless of the language that we pick. CIL is similar to Java bytecode, upon which it is based, and the CIL code is entirely useless on its own, as CPUs have no idea how to run the instructions defined in this language.</p>
+<p>At runtime, this intermediate code is run through the Mono <strong>Virtual Machine</strong> (<strong>VM</strong>), which is an infrastructure element that allows the same code to run against multiple platforms without the need to change the code itself. This is an implement<span>ation of the .NET</span> CLR. If we're running on iOS, we run on the iOS-based VM infrastructure, and if we're running on Linux, then we simply use a different one that is better suited for Linux. This is how Unity allows us to write code once, and it works <span>magically</span> on multiple platforms.</p>
+<p>Within the CLR, the intermediate CIL code will actually be compiled into the native code on demand. This immediate native compilation can be accomplished either by an <strong>Ahead-Of-Time</strong> (<strong>AOT</strong>) or <strong>Just-In-Time</strong> (<strong>JIT</strong>) compiler. Which one is used will depend on the platform that is being targeted. These compilers allow code segments to be compiled into native code, allowing the platform's architecture to complete the written instructions without having to write them ourselves. The main difference between the two compiler types is when the code is compiled.</p>
+<p>AOT compilation is the typical behavior for code compilation and happens early (AOT) either during the build process or in some cases during app initialization. In either case, the code has been precompiled, and no further runtime costs are inflicted due to dynamic compilation since there are always machine code instructions available whenever the CPU needs them.</p>
+<p>JIT compilation happens dynamically at runtime in a separate thread and begins just before execution (JIT for execution). Often, this dynamic compilation causes the first invocation of a piece of code to run a little (or a lot) more slowly because the code must finish compiling before it can be executed. However, from that point forward, whenever the same code block is executed, there is no need for recompilation, and the instructions run through the previously compiled native code.</p>
+<p><span>A common adage in software development is that 90% of the work is being done by only 10 percent of the code. This generally means that JIT compilation turns out to be a net positive on performance than if we simply tried to interpret the CIL code directly. However, because the JIT compiler must compile code quickly, it is not able to make use of many optimization techniques that static AOT compilers can exploit.</span></p>
+<div class="packt_infobox">Not all platforms support JIT compilation, but some scripting functionalities are not available when using AOT. Unity provides a complete list of these restrictions at <a href="https://docs.unity3d.com/Manual/ScriptingRestrictions.html">https://docs.unity3d.com/Manual/ScriptingRestrictions.html</a>.</div>
+<p>A few years ago, Unity Technologies was faced with a choice to either continue to support the Mono platform, which Unity was finding more and more difficult to keep up with, or implement their own scripting backend. They chose the latter option, and multiple platforms now support IL2CPP.</p>
+<div class="packt_infobox">The Unity Technologies' initial post about IL2CPP, the reasoning behind the decision, and its long-term benefits can be found at <a href="https://blogs.unity3d.com/2014/05/20/the-future-of-scripting-in-unity/">https://blogs.unity3d.com/2014/05/20/the-future-of-scripting-in-unity/</a>.</div>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">IL2CPP</h1>
+                </header>
+            
+            <article>
+                
+<p>IL2CPP is a scripting backend designed to convert Mono's CIL output directly into the native C++ code. This leads to improved performance since the application will now be running native code. This ultimately gives Unity Technologies more control of runtime behavior since <span>IL2CPP provides its own AOT compiler and VM,</span> allowing custom improvements to subsystems such as the GC and compilation process. IL2CPP does not intend to replace the Mono platform completely, but it is an additional tool we can enable, which improves part of the functionality that Mono provides.</p>
+<p>Note that IL2CPP is automatically enabled for iOS and WebGL projects. For other platforms that support it, <span class="packt_screen">IL2CPP</span> can be enabled under <span class="packt_screen">Edit</span> | <span class="packt_screen">Project Settings</span> | <span class="packt_screen">Player</span> | <span class="packt_screen">Other Settings</span> | <span class="packt_screen">Configure</span> | <span class="packt_screen">Scripting Backend</span>:</p>
+<p class="CDPAlignCenter CDPAlign"><img src="assets/69ce6f1d-e1db-431b-9048-4cc06c0226c4.png"/></p>
+<div class="packt_infobox">A list of platforms currently supporting IL2CPP can be found at <a href="https://docs.unity3d.com/Manual/IL2CPP.html">https://docs.unity3d.com/Manual/IL2CPP.html</a>.</div>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Profiling memory</h1>
+                </header>
+            
+            <article>
+                
+<p><span>There are two issues we are concerned about when it comes to memory management: how much we're consuming and how often we're allocating new blocks. Let's cover each of these topics separately.</span></p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Profiling memory consumption</h1>
+                </header>
+            
+            <article>
+                
+<p>We do not have direct control over what is going on in the native domain since we don't have the Unity engine source code and hence can't add any code that will interact with it directly. We can, however, control it indirectly using various script-level functions that serve as interaction points between managed and native code. There are technically a variety of memory allocators available, which are used internally for things such as GameObjects, graphics objects, and the Profiler, but these are hidden behind the native-managed bridge.</p>
+<p>However, we can observe how much memory has been allocated and reserved in this memory domain via the <span class="packt_screen">Memory Area</span> of the <span class="packt_screen">Profiler</span> window. Native memory allocations show up under the values labeled <span class="packt_screen">Unity</span>, and we can even get more information using <span class="packt_screen"><span class="packt_screen">Detailed</span></span> mode and sampling the current frame:</p>
+<div class="CDPAlignCenter CDPAlign"><img src="assets/30b8e292-906d-40d6-a003-a90237837821.png"/></div>
+<p>Under the <span class="packt_screen">Scene Memory</span> section of breakdown view, we can observe that <kbd>MonoBehaviour</kbd> objects always consume a constant amount of memory, regardless of their member data. This is the memory consumed by the native representation of the object.</p>
+<div class="packt_tip">Note that memory consumption in <span class="packt_screen">Edit</span> mode is always wildly different from that of a standalone version due to various debugging and editor hook data being applied. This adds a further incentive to avoid using <span class="packt_screen">Edit</span> mode for benchmarking and instrumentation purposes.</div>
+<p>We can also use the <kbd>Profiler.GetRuntimeMemorySize()</kbd> method to get the native memory allocation size of a particular object.</p>
+<p>Managed object representations are intrinsically linked to their native representations. The best way to minimize our native memory allocations is to simply optimize our managed memory usage.</p>
+<p>We can verify how much memory has been allocated and reserved for the managed heap using the <span class="packt_screen">Memory Area</span> of the <span class="packt_screen">Profiler</span> window, under the values labeled <span class="packt_screen">Mono</span>, as follows:</p>
+<div class="CDPAlignCenter CDPAlign"><img src="assets/c2540c86-793d-47ab-9656-a3ea1a558ff2.png"/></div>
+<p>We can also determine the current used and reserved heap space at runtime using the <kbd>Profiler.GetMonoUsedSize()</kbd> and <kbd>Profiler.GetMonoHeapSize()</kbd> methods, respectively.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Profiling memory efficiency</h1>
+                </header>
+            
+            <article>
+                
+<p>The best metric we can use to measure the health of our memory management is simply watching the behavior of the GC. The more work it's doing, the more waste we're generating and the worse our application's performance is likely to become.</p>
+<p>We can use both the <span class="packt_screen">CPU Usage Area</span> (the <span class="packt_screen">GarbageCollector</span> checkbox) and <span class="packt_screen">Memory Area</span> (the <span class="packt_screen">GC Allocated</span> checkbox) of the <span class="packt_screen">Profiler</span> window to observe the amount of work the GC is doing and the time it is taking to do it. This can be relatively straightforward for some situations, where we only allocated a temporary small block of memory or we just destroyed a <kbd>GameObject</kbd> instance.</p>
+<p>However, root-cause analysis for memory efficiency problems can be challenging and time-consuming. When we observe a spike in the GC's behavior, it could be a symptom of allocating too much memory in a previous frame and merely allocating a little more in the current frame, requiring the GC to scan a lot of fragmented memory, determine whether there is enough space, and decide whether to allocate a new block. The memory it cleaned up could have been allocated a long time ago, and we may only be able to observe these effects when our application runs over long periods of time and could even happen when our scene is sitting relatively idle, giving no obvious cause for the GC to trigger suddenly. Even worse, the Profiler can only tell us what happened in the last few seconds or so, and it won't be immediately obvious what data was being cleaned up.</p>
+<p>We must be vigilant and test our application rigorously, observing its memory behavior while simulating a typical play session if we want to be certain we are not generating memory leaks or creating a situation where the GC has too much work to complete in a single frame.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Memory management performance enhancements</h1>
+                </header>
+            
+            <article>
+                
+<p>In most game engines, we would have the luxury of being able to port inefficient managed code into faster native code if we were hitting performance issues. This is not an option unless we invest serious cash in obtaining the Unity source code, which is offered as a license separate from the Free/Personal/Pro licensing system, and on a per case, per-title basis. We could also purchase a license of Unity Pro with the hope of using native plugins, but doing so rarely leads to a performance benefit since we must still cross the native-managed bridge to invoke function calls inside of it. Native plugins are normally used to interface with systems and libraries that are not built specifically for C#. This forces the overwhelming majority of us into a position of needing to make our C# script-level code as performant as possible ourselves.</p>
+<p><span>With this in mind, we should now have enough understanding of Unity engine internals and memory spaces to detect and analyze memory performance issues and understand and implement enhancements for them. So, let's cover some performance enhancements we can apply.</span></p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Garbage collection tactics</h1>
+                </header>
+            
+            <article>
+                
+<p>One strategy to minimize garbage collection problems is concealment by manually invoking the GC at opportune moments when we're certain the player would not notice. Garbage collection can be manually invoked by calling <kbd>System.GC.Collect()</kbd>.</p>
+<p>Good opportunities to invoke a collection may occur while loading between levels, when the gameplay is paused, shortly after a menu interface has been opened, during cutscene transitions, or any break in gameplay when the player would not witness, or care about, a sudden performance drop. We could even use the <kbd>Profiler.GetMonoUsedSize()</kbd> and <kbd>Profiler.GetMonoHeapSize()</kbd> methods at runtime to determine whether a garbage collection needs to be invoked soon.</p>
+<p>We can also cause the deallocation of a handful of specific objects. If the object in question is one of the Unity object wrappers, such as a <kbd>GameObject</kbd> or <kbd>MonoBehaviour</kbd> component, then the finalizer will first invoke the <kbd>Dispose()</kbd> method within the native domain. At this point, the memory consumed by both the native and managed domains will then be freed. In some rare instances, if the Mono wrapper implements the <kbd>IDisposable</kbd> interface class (that is, it has a <kbd>Dispose()</kbd> method available from script code), then we can actually control this behavior and force the memory to be freed instantly.</p>
+<p>There are a number of different object types in the Unity engine (most of which are introduced in Unity 5 or later), which implement the <kbd>IDisposable</kbd> interface class, as follows: <span><kbd>NetworkConnection</kbd>, <kbd>WWW</kbd>,</span> <span><kbd>UnityWebRequest</kbd>,</span> <span><kbd>UploadHandler</kbd>,</span> <span><kbd>DownloadHandler</kbd>,</span> <span><kbd>VertexHelper</kbd>,</span> <span><kbd>CullingGroup</kbd>,</span> <span><kbd>PhotoCapture</kbd>,</span> <span><kbd>VideoCapture</kbd>,</span> <span><kbd>PhraseRecognizer</kbd>,</span> <span><kbd>GestureRecognizer</kbd>,</span> <kbd>DictationRecognizer</kbd><span>,</span> <span><kbd>SurfaceObserver</kbd>, and more.</span></p>
+<p>These are all utility classes for pulling in potentially large datasets where we might want to ensure immediate destruction of the data it has acquired since they normally involve allocating several buffers and memory blocks in the native domain to accomplish their tasks. If we kept all of this memory for a long time, it would be a colossal waste of precious space. So, by calling their <kbd>Dispose()</kbd> method from script code, we can ensure that the memory buffers are freed promptly and precisely when they need to be.</p>
+<p>All other asset objects offer some kind of unloading method to clean up any unused asset data, such as <kbd>Resources.UnloadUnusedAssets()</kbd>. Actual asset data is stored within the native domain, so the GC technically isn't involved here, but the idea is basically the same. It will iterate through all assets of a particular type, check whether they're no longer being referenced, and, if so, deallocate them. However, again, this is an asynchronous process, and we cannot guarantee exactly when the deallocation will occur. This method is automatically called internally after a scene is loaded, but this still doesn't guarantee instant deallocation. The preferred approach is to use <kbd>Resources.UnloadAsset()</kbd> instead, which will unload one specific asset at a time. This method is generally faster since time will not be spent iterating through an entire collection of asset data to figure out what is unused.</p>
+<p>However, the best strategy for garbage collection will always be avoidance; if we allocate as little heap memory and control its usage as much as possible, then we won't have to worry about the GC inflicting frequent, expensive performance costs. We will cover many tactics for this throughout the remainder of this chapter.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Manual JIT compilation</h1>
+                </header>
+            
+            <article>
+                
+<p>If JIT compilation is causing a runtime performance loss, be aware that it is actually possible to force JIT compilation of a method at any time via reflection. Reflection is a useful feature of the C# language that allows our code base to explore itself introspectively for type information, methods, values, and metadata. Using reflection is often a very costly process. It should be avoided at runtime or, at the very least, only used during initialization or other loading times. Not doing so can easily cause significant CPU spikes and gameplay freezing.</p>
+<p>We can manually force JIT compilation of a method using reflection to obtain a function pointer to it:</p>
+<pre>var method = typeof(MyComponent).GetMethod("MethodName");<br/>if (method != null) {<br/>  method.MethodHandle.GetFunctionPointer();<br/>  Debug.Log("JIT compilation complete!");<br/>}</pre>
+<p>The preceding code only works on <kbd>public</kbd> methods. Obtaining <kbd>private</kbd> or <kbd>protected</kbd> methods can be accomplished through the use of <kbd>BindingFlags</kbd>:</p>
+<pre>using System.Reflection;<br/>// ...<br/>var method = typeof(MyComponent).GetMethod("MethodName",  <br/>BindingFlags.NonPublic | BindingFlags.Instance);</pre>
+<p>This kind of code should only be run for very targeted methods where we are certain that JIT compilation is causing CPU spikes. This can be verified by restarting the application and profiling a method's first invocation versus all subsequent invocations. The difference will tell us the JIT compilation overhead.</p>
+<div class="packt_infobox">Note that the official method for forcing JIT compilation in the .NET library is <kbd>RuntimeHelpers.PrepareMethod()</kbd>, but this is not properly implemented in the current default version of Mono that comes with Unity (Mono version 2.6.5). Since Unity 2018.1, the .NET 4.x runtime is no longer considered experimental; however, it is not supported on all platforms, and it is still not the suggested one. The aforementioned workaround is not pretty, but it is still the best and most consistent way to proceed.</div>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Value types and reference types</h1>
+                </header>
+            
+            <article>
+                
+<p>Not all memory allocations we make within Mono will go through the heap. The .NET Framework (and, by extension, the C# language, which merely implements the .NET specification) has the concept of value types and reference types, and only the latter needs to be marked by the GC while it is performing its Mark-and-Sweep algorithm. Reference types are expected to (or need to) last a long time in memory due to their complexity, their size, or how they're used. Large datasets and any kind of object instantiated from a <kbd>class</kbd> instance is a reference type. This also includes arrays (regardless of whether it is an array of Value types or reference types), delegates, all classes, such as <kbd>MonoBehaviour</kbd>, <kbd>GameObject</kbd>, and any custom classes we define.</p>
+<p>Reference types are always allocated on the heap, whereas value types can be allocated <span>either</span> on the stack or the heap. Primitive data types such as <kbd>bool</kbd>, <kbd>int</kbd>, and <kbd>float</kbd> are examples of value types. These values are typically allocated on the stack, but as soon as a value type is contained within a reference type, such as <kbd>class</kbd> or an array, then it is implied that it is either too large for the stack or will need to survive longer than the current scope and must be allocated on the heap, bundled with the reference type it is contained within.</p>
+<p>All of this can be best explained through examples. The following code will create an integer as a value type that exists on the stack only temporarily:</p>
+<pre>public class TestComponent {<br/>  void TestFunction() {<br/>    int data = 5; // allocated on the stack<br/>    DoSomething(data);<br/>  } // integer is deallocated from the stack here<br/>}</pre>
+<p>As soon as the <kbd>TestFunction()</kbd> method ends, the integer is deallocated from the stack. This is essentially a free operation since, as mentioned previously, it doesn't bother doing any cleanup; it just moves the stack pointer back to the previous memory location in the call stack (back to whichever function called <kbd>TestFunction()</kbd> on the <kbd>TestComponent</kbd> object). Any future stack allocations simply overwrite the old data. More importantly, no heap allocation took place to create the data, so the GC does not need to track its existence.</p>
+<p>However, if we created an integer as a member variable of the <kbd>MonoBehaviour</kbd> class definition, then it is now contained within a reference type (<kbd>class</kbd>) and must be allocated on the heap along with its container:</p>
+<pre>public class TestComponent : MonoBehaviour {<br/>  private int _data = 5;<br/>  void TestFunction() {<br/>    DoSomething(_data);<br/>  }<br/>}</pre>
+<p>The <kbd>_data</kbd> <span>integer</span> is now an additional piece of data that consumes space in the heap alongside the <kbd>TestComponent</kbd> object it is contained within. If <kbd>TestComponent</kbd> is destroyed, then the integer is deallocated along with it, but not before then.</p>
+<p>Similarly, if we put the integer into a normal C# class, then the rules for reference types still apply and the object is allocated on the heap:</p>
+<pre>public class TestData {<br/>  public int data = 5;<br/>}<br/><br/>public class TestComponent {<br/>  void TestFunction() {<br/>    TestData dataObj = new TestData(); // allocated on the heap<br/>    DoSomething(dataObj.data);<br/>  } // dataObj is not immediately deallocated here, but it will <br/>    // become a candidate during the next GC sweep<br/>}</pre>
+<p>So, there is a big difference between creating a temporary value type within a <kbd>class</kbd> method versus storing long-term value type as a member field of <kbd>class</kbd>. In the former case, we're storing it in the stack, but in the latter case, we're storing it within a reference type, which means it can be referenced elsewhere. For example, imagine that <kbd>DoSomething()</kbd> has stored the reference to <kbd>dataObj</kbd> within a member variable:</p>
+<pre>public class TestComponent {<br/>  private TestData _testDataObj;<br/><br/>  void TestFunction() {<br/>    TestData dataObj = new TestData(); // allocated on the heap<br/>    DoSomething(dataObj.data);<br/>  }<br/><br/>  void DoSomething (TestData dataObj) {<br/>    _testDataObj = dataObj; // a new reference created! The referenced <br/>    // object will now be marked during Mark-and-Sweep<br/>  }<br/>}</pre>
+<p>In this case, we would not be able to deallocate the object pointed to <kbd>dataObj</kbd> as soon as the <kbd>TestFunction()</kbd> method ends because the total number of things referencing the object would go from <kbd>2</kbd> to <kbd>1</kbd>. This is not <kbd>0</kbd>, and hence the GC would still mark it during Mark-and-Sweep. We would need to set the value of <kbd>_testDataObj</kbd> to <kbd>null</kbd> or make it reference something else before the object is no longer reachable.</p>
+<p>Note that a value type must have a value and can never be <kbd>null</kbd>. If a stack-allocated value type is assigned to a reference type, then the data is simply copied. This is true even for arrays of value types:</p>
+<pre>public class TestClass {<br/>  private int[] _intArray = new int[1000]; // Reference type <br/>                                           // full of Value types<br/>  void StoreANumber(int num) {<br/>    _intArray[0] = num; // store a Value within the array<br/>  }<br/>}</pre>
+<p>When the initial array is created (during object initialization), <kbd>1000</kbd> integers will be allocated on the heap set to a value of <kbd>0</kbd>. When the <kbd>StoreANumber()</kbd> method is called, the value of <kbd>num</kbd> is merely copied into the zeroth element of the array rather than storing a reference to it.</p>
+<p>The subtle change in the referencing capability is what ultimately decides whether something is a reference type or a value type, and we should try to use value types whenever we have the opportunity so that they generate stack allocations instead of heap allocations. Any situation where we're just sending around a piece of data that doesn't need to live longer than the current scope is a good opportunity to use a value type instead of a reference type. Ostensibly, it does not matter if we pass the data into another method of the same class or a method of another class—it still remains a value type that will exist on the stack until the method that created it goes out of the scope.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Pass by value and by reference</h1>
+                </header>
+            
+            <article>
+                
+<p>Technically, something is duplicated every time a data value is passed as an argument from one method to another, and this is true whether it is a value type or a reference type. When we're passing the object's data, this is known as <strong>passing by value</strong>. When we're simply copying a reference to something else, it is called <strong>passing by reference</strong>.</p>
+<p>An important difference between value types and reference types is that a reference type is merely a pointer to another location in memory that consumes only 4 or 8-bytes in memory (32 bit or 64 bit, depending on the architecture), regardless of what it is actually pointing to. When a reference type is passed as an argument, it is only the value of this pointer that gets copied into the function. Even if the reference type points to a humongous array of data, this operation will be very quick since the data being copied is very small.</p>
+<p>Meanwhile, a value type contains the full and complete bits of data stored within a concrete object. Hence, all of the data of a value type will be copied whenever they are passed between methods or stored in other value types. In some cases, it can mean that passing a large value type as arguments around too much can be more costly than just using a reference type and letting the GC take care of it. For most value types, this is not a problem since they are comparable in size to a pointer, but this becomes important when we begin to talk about the <kbd>struct</kbd> type in the next section.</p>
+<p>Data can also be passed around by reference using the <kbd>ref</kbd> keyword, but this is very different from the concept of value and reference types, and it is very important to keep them distinct in our mind when we try to understand what is going on under the hood. We can pass a value type by value or by reference, and we can pass a reference type by value or by reference. This means that there are four distinct data passing situations that can occur, depending on which type is being passed and whether the <kbd>ref</kbd> keyword is being used or not.</p>
+<p>When data is passed by reference (even if it is a value type), then making any changes to the data will change the original. For example, the following code would print the value as <kbd>10</kbd>:</p>
+<pre>void Start() {<br/>  int myInt = 5;<br/>  DoSomething(ref myInt);<br/>  Debug.Log(String.Format("Value = {0}", myInt));<br/>}<br/><br/>void DoSomething(ref int val) {<br/>  val = 10;<br/>}</pre>
+<p>Removing the <kbd>ref</kbd> keyword from both places would make it print the value <kbd>5</kbd> instead (and removing it from only one of them would lead to a compiler error since the <kbd>ref</kbd> keyword needs to be present in both locations or neither). This understanding will come in handy when we start to think about some of the more interesting data types we have access to, namely, structs, arrays, and strings.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Structs are value types</h1>
+                </header>
+            
+            <article>
+                
+<p>The <kbd>struct</kbd> type is an interesting special case in C#. A <span><kbd>struct</kbd> object can contain <kbd>private</kbd>, <kbd>protected</kbd>, and <kbd>public</kbd> fields; have methods; and be instantiated at runtime, just like a <kbd>class</kbd> type. However, there is a fundamental difference between the two: a <kbd>struct</kbd> type is a value type, and a <kbd>class</kbd> type is a reference type. Consequently, this leads to some important differences between the two, namely, that a <kbd>struct</kbd> type cannot support inheritance, their properties cannot be given custom default values (member data always defaults to values such as <kbd>0</kbd> or <kbd>null</kbd> since it is a value type), and their default constructors cannot be overridden. This greatly restricts their usage compared to classes, so simply replacing all classes with structs (under the assumption that it will just allocate everything on the stack) is not as easy as it sounds.</span></p>
+<p>However, if we're using a class in a situation whose only purpose is to send a blob of data to somewhere else in our application, and it does not need to last beyond the current scope, then we might be able to use a <kbd>struct</kbd> type instead, since a <kbd>class</kbd> type would result in a heap allocation for no particularly good reason:</p>
+<pre>public class DamageResult {<br/>  public Character attacker;<br/>  public Character defender;<br/>  public int totalDamageDealt;<br/>  public DamageType damageType;<br/>  public int damageBlocked;<br/>  // etc.<br/>}<br/><br/>public void DealDamage(Character _target) {<br/>  DamageResult result = CombatSystem.Instance.CalculateDamage(this, _target);<br/>  CreateFloatingDamageText(result);<br/>}</pre>
+<p>In this example, we're using a <kbd>class</kbd> type to pass a bunch of data from one subsystem (the combat system) to another (the UI system). The only purpose of this data is to be calculated and read by various subsystems, so this is a good candidate to convert into a <kbd>struct</kbd> type.</p>
+<p>Merely changing the <kbd>DamageResult</kbd> definition from a <kbd>class</kbd> type to a <kbd>struct</kbd> type could save us quite a few unnecessary garbage collections since it would be allocated on the stack as a value type instead of the heap as a reference type:</p>
+<pre>public <strong>struct</strong> DamageResult {<br/>  // ...<br/>}</pre>
+<p>This is not a catch-all solution. Since structs are value types, the entire blob of data will be duplicated and provided to the next method in the call stack, regardless of how large or small it is. So, if a <kbd>struct</kbd> object is passed by a value between five different methods in a long chain, then five different stack copies will occur at the same time. Recall that stack deallocations are effectively free, but stack allocations (which involve copying of data) is not. This data copying is pretty much negligible for small values, such as a handful of integers or floating-point values, but passing around ridiculously large datasets through structs over and over again is obviously not a trivial task and should be avoided.</p>
+<p>We can work around this problem by passing the <kbd>struct</kbd> object by reference using the <kbd>ref</kbd> keyword to minimize the amount of data being copied each time (just a single pointer). However, this can be dangerous since passing by reference allows any subsequent methods to make changes to the <kbd>struct</kbd> object, in which case it would be prudent to make its data values <kbd>readonly</kbd>. This means that the values can only be initialized in the constructor, and never again, even by its own member functions, which prevents accidental changes as it's passed through the chain.</p>
+<p>All of the preceding is also true when structs are contained within reference types, as follows:</p>
+<pre>public struct DataStruct {<br/>  public int val;<br/>}<br/><br/>public class StructHolder {<br/>  public DataStruct _memberStruct;<br/>  public void StoreStruct(DataStruct ds) {<br/>      _memberStruct = ds;<br/>  }<br/>}</pre>
+<p>To the untrained eye, the preceding code appears to be attempting to store a stack-allocated struct (<kbd>ds</kbd>) within a reference type (<kbd>StructHolder</kbd>). Does this mean that a <kbd>StructHolder</kbd> object on the heap can now reference an object on the stack? If so, what will happen when the <kbd>StoreStruct()</kbd> method goes out of scope and the <kbd>struct</kbd> object is (effectively) erased? It turns out that these are the wrong questions.</p>
+<p>What's actually happening is that while a <kbd>DataStruct</kbd> object (<kbd>_memberStruct</kbd>) has been allocated on the heap within the <kbd>StructHolder</kbd> object, it is still a value type and does not magically transform into a reference type when it is a member variable of a reference type. So, all of the usual rules for value types apply. The <kbd>_memberStruct</kbd> variable cannot have a value of <kbd>null</kbd>, and all of its fields will be initialized to <kbd>0</kbd> or <kbd>null</kbd> values. When <kbd>StoreStruct()</kbd> is called, the data from <kbd>ds</kbd> will be copied into <kbd>_memberStruct</kbd> in its entirety. There are no references to stack objects taking place, and there is no concern about lost data.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Arrays are reference types</h1>
+                </header>
+            
+            <article>
+                
+<p>The purpose of arrays is to contain large datasets, which makes them difficult to be treated as a value type since there's probably not enough room on the stack to support them. Therefore, they are treated as a reference type so that the entire dataset can be passed around via a single reference (if it were a value type, we would need to duplicate the entire array every time it is passed around). This is true irrespective of whether the array contains value types or reference types.</p>
+<p>This means that the following code will result in a heap allocation:</p>
+<pre>TestStruct[] dataObj = new TestStruct[1000];<br/><br/>for(int i = 0; i &lt; 1000; ++i) {<br/>  dataObj[i].data = i;<br/>  DoSomething(dataObj[i]);<br/>}</pre>
+<p>However, the following, functionally equivalent, code would not result in any heap allocations since the <kbd>struct</kbd> objects being used are value types, and hence, it would be created on the stack:</p>
+<pre>for(int i = 0; i &lt; 1000; ++i) {<br/>  TestStruct dataObj = new TestStruct();<br/>  dataObj.data = i;<br/>  DoSomething(dataObj);<br/>}</pre>
+<p>The subtle difference in the second example is that only one <kbd>TestStruct</kbd> exists on the stack at a time, whereas the first example needs to allocate <kbd>1000</kbd> of them via an array. Obviously, these methods are kind of ridiculous as they're written, but they illustrate an important point to consider. The compiler isn't smart enough to automatically find these situations for us and make the appropriate changes. Opportunities to optimize our memory usage through value type replacements will be entirely down to our ability to detect them and understand why conversions from reference types to value types will result in stack allocations, rather than heap allocations.</p>
+<p>Note that when we allocate an array of reference types, we're creating an array of references, which can provide each reference other locations on the heap. However, when we allocate an array of value types, we're creating a packed list of value types on the heap. Each of these value types will be initialized with a value of <kbd>0</kbd> (or equivalent) since they cannot be <kbd>null</kbd>, while each reference within an array of reference types will always initialize to <kbd>null</kbd> since no references have been assigned yet.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Strings are immutable reference types</h1>
+                </header>
+            
+            <article>
+                
+<p>We briefly touched upon the subject of strings in <a href="">Chapter 2</a>, <em>Scripting Strategies</em>, but now it's time to go into more detail about why proper string usage is extremely important.</p>
+<p>Strings are essentially arrays of characters, and so they are considered reference types and follow all of the same rules as other reference types; <span>they will be allocated on the heap, and</span> a pointer is all that is copied from one method to the next. Since a string is effectively an array, this implies that the characters it contains must be contiguous in memory. However, we often find ourselves expanding, contracting, or combining strings to create other strings. This can lead us to make some faulty assumptions about how strings work. We might assume that because strings are such common, ubiquitous objects, performing operations on them is fast and cheap. Unfortunately, this is incorrect. <span>Strings are not made to be fast. They are only made to be convenient.</span></p>
+<p>The string <span>object class is immutable, which means they cannot be changed after they've been allocated. Therefore, w</span>hen we change a string, we are actually allocating a whole new string on the heap to replace it, where the contents of the original will be copied and modified as needed into a whole new character array, and the original string object reference now points to a completely new string object. In which case, the old string object might no longer be referenced anywhere, will not be marked during <em>Mark-and-Sweep</em>, and will eventually be purged by the GC. As a result, lazy string programming can result in a lot of unnecessary heap allocations and garbage collection.</p>
+<p>A good example to illustrate how strings are different than normal reference types is the following code:</p>
+<pre>void TestFunction() {<br/>  string testString = "Hello";<br/>  DoSomething(testString);<br/>  Debug.Log(testString);<br/>}<br/><br/>void DoSomething(string localString) {<br/>  localString = "World!";<br/>}</pre>
+<p><span>If we were under the mistaken assumption that strings worked just like other reference types, then we might be forgiven for assuming that the log output of the following to be <kbd>World!</kbd>. It appears as though <kbd>testString</kbd>, a reference type, is being passed into <kbd>DoSomething()</kbd>, which would change what <kbd>testString</kbd> is referencing to, in which case, the <kbd>Log</kbd> statement will print out the new value of the string.</span></p>
+<p>However, this is not the case, and it will simply print out <kbd>Hello</kbd>. What is actually happening is that the <kbd>localString</kbd> variable, within the scope of <kbd>DoSomething()</kbd>, starts off referencing the same place in memory as <kbd>testString</kbd> due to the reference being passed by value. This gives us two references pointing to the same location in memory as we would expect if we were dealing with any other reference type. So far, so good.</p>
+<p>However, as soon as we change the value of <kbd>localString</kbd>, we run into a little bit of a conflict. Strings are immutable, and we cannot change them, so, therefore, we must allocate a new string containing the <kbd>World!</kbd> <span>value</span> <span>and assign its reference to the value of</span> <kbd>localString</kbd><span>; now, the number of references to the</span> <kbd>Hello</kbd> <span>string returns back to one. The value of</span> <kbd>testString</kbd><span>, therefore, has not been changed, and that is still the value that will be printed by</span> <kbd>Debug.Log()</kbd><span>. All we've succeeded in doing by calling</span> <kbd>DoSomething()</kbd> <span>is creating a new string on the heap that gets garbage-collected and doesn't change anything. This is the textbook definition of wasteful.</span></p>
+<p>If we change the method definition of <kbd>DoSomething()</kbd> to pass the string by reference via the <kbd>ref</kbd> keyword, the output would indeed change to <kbd>World!</kbd>. Of course, this is also what we would expect to happen with a value type, which leads a lot of developers to incorrectly assume that strings are value types. However, this is an example of the fourth and final data-passing case, where a reference type is being passed by reference, which allows us to change what the original reference is referencing.</p>
+<p class="mce-root">So, let's recap:</p>
+<ul>
+<li class="mce-root">If we pass a value type by value, we can only change the value of a copy of its data</li>
+<li class="mce-root">If we pass a value type by reference, we can change the value of the original data passed in</li>
+<li class="mce-root">If we pass a reference type by value, we can make changes to the object referenced by the original reference variable</li>
+<li class="mce-root">If we pass a reference type by reference, we can change to which object the original reference is pointing to</li>
+</ul>
+<p>If we find functions that seem to generate a lot of GC allocations the moment they are called, then we might be causing undue heap allocations due to a misunderstanding of the preceding rules.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">String concatenation</h1>
+                </header>
+            
+            <article>
+                
+<p>Concatenation is the act of appending strings to one another to form a larger string. As you've learned, any such cases are likely to result in excess heap allocations. The biggest offender in a string-based memory waste is concatenating strings using the <kbd>+</kbd> operator and <kbd>+=</kbd> operators, because of the allocation chaining effect they cause.</p>
+<p>For example, the following code tries to combine a group of string objects together to print some information about a combat result:</p>
+<pre>void CreateFloatingDamageText(DamageResult result) {<br/>  string outputText = result.attacker.GetCharacterName() + " <br/>             dealt " + result.totalDamageDealt.ToString() + " " + <br/>             result.damageType.ToString() + " damage to " + <br/>             result.defender.GetCharacterName() + " (" + <br/>             result.damageBlocked.ToString() + " blocked)";<br/>  // ...<br/>}</pre>
+<p>An example output of this function might be a string that reads as follows:</p>
+<pre>Dwarf dealt 15 Slashing damage to Orc (3 blocked)</pre>
+<p>This function features a handful of string literals (hardcoded strings that are allocated during application initialization) such as <kbd>" dealt "</kbd>, <kbd>" damage to "</kbd>, and <kbd>" blocked)"</kbd>, which are simple constructs for the compiler to pre-allocate for us. However, because we are using other local variables within this combined string, it cannot be compiled away at build time, and, therefore, the complete string is regenerated dynamically at runtime each time the function is called.</p>
+<p>A new heap allocation will be generated each time a <kbd>+</kbd> or <kbd>+=</kbd> operator is executed. Only a single pair of strings will be merged at a time, and it allocates a new string object each time. Then, the result of one merger will be fed into the next and merged with the next string and so on until the final string object has been built.</p>
+<p>So, the previous example will result in nine different strings being allocated all in one statement. All of the following strings would be allocated to satisfy this instruction, and all would eventually need to be garbage collected (note that the operators are resolved from right to left):</p>
+<pre>"3 blocked)"<br/>" (3 blocked)"<br/>"Orc (3 blocked)"<br/>" damage to Orc (3 blocked)"<br/>"Slashing damage to Orc (3 blocked)"<br/>" Slashing damage to Orc (3 blocked)"<br/>"15 Slashing damage to Orc (3 blocked)"<br/>" dealt 15 Slashing damage to Orc (3 blocked)"<br/>"Dwarf dealt 15 Slashing damage to Orc (3 blocked)"</pre>
+<p>That's 262 characters being used, instead of 49. In addition, because a character is a 2-byte data type (for Unicode strings), that's 524 bytes of data being allocated when we only need 98 bytes. The chances are that if this code exists in the code base once, it exists all over the place; so, for an application that's doing a lot of lazy string concatenation like this, that is a ton of memory being wasted on generating unnecessary strings.</p>
+<div class="packt_infobox">Note that big, constant string literals can be safely combined using the <kbd>+</kbd> and <kbd>+=</kbd> operators. The compiler knows that you will eventually need the full string and pre-generates the string automatically. This helps us to make a huge block of text more readable within the code base, but only if they will result in a constant string.</div>
+<p>Better approaches for generating strings are to use either the <kbd>StringBuilder</kbd> class or one of several string class methods for string formatting.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">StringBuilder</h1>
+                </header>
+            
+            <article>
+                
+<p><span>Conventional wisdom says that if we roughly know the final size of the resultant string, then we can allocate an appropriate buffer AOT and save ourselves undue allocations. This is the purpose of t</span>he <kbd>StringBuilder</kbd> class. It is effectively a mutable (changeable) string-based object that works like a dynamic array. It allocates a block of space, which we can copy future string objects into, and allocates additional space whenever the current size is exceeded. Of course, expanding the buffer should be avoided as much as possible by predicting the maximum size we will need and allocating a sufficiently sized buffer AOT.</p>
+<p>When we use <kbd>StringBuilder</kbd>, we can retrieve the resultant string object by calling the <kbd>ToString()</kbd> method. This still results in one additional memory allocation for the completed string, but, at the very least, we only allocated one large string as opposed to dozens of smaller strings, had we used the <kbd>+</kbd> or <kbd>+=</kbd> operators.</p>
+<p>For the previous example, we might allocate a <kbd>StringBuilder</kbd> buffer of <kbd>100</kbd> characters to make room for long character names and damage values:</p>
+<pre>using System.Text;<br/>// ...<br/>StringBuilder sb = new StringBuilder(100);<br/>sb.Append(result.attacker.GetCharacterName());<br/>sb.Append(" dealt " );<br/>sb.Append(result.totalDamageDealt.ToString());<br/>// etc.<br/>string result = sb.ToString();</pre>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">String formatting</h1>
+                </header>
+            
+            <article>
+                
+<p>If we don't know the final size of the resultant string, then using a <kbd>StringBuilder</kbd> class is unlikely to generate a buffer that fits the result size exactly. We will either end up with a buffer that's too large (wasted space) or, worse, a buffer that's too small, which must keep expanding as we generate the complete string. In this scenario, it might be best to use one of the various string class formatting methods.</p>
+<p>There are three string class methods available for generating strings: <kbd>string.Format()</kbd>, <kbd>string.Join()</kbd>, and <kbd>string.Concat()</kbd>. Each operates slightly differently, but the overall output is the same. A new string object is allocated, containing the contents of the string objects we pass into them, and it is all done in a single action, which reduces excess string allocations.</p>
+<div class="mce-root packt_infobox"><span>Unfortunately, regardless of the approach we use, if we're converting other objects into additional</span> string o<span>bjects (</span><span>such as the calls to generate the strings for <kbd>"Orc"</kbd>, <kbd>"Dwarf"</kbd>, or <kbd>"Slashing"</kbd> in the preceding example), then this will allocate an additional</span> string o<span>bject on the h</span><span>eap. There is nothing we can do about this allocation, except perhaps cache the result so that we don't need to recalculate it each time it's needed.</span></div>
+<p>It can be surprisingly hard to say which one of these string generation approaches would be more beneficial in a given situation, as there are a lot of silly little nuances involved that tend to explode into religious debate (just do a Google search for <kbd>C# string concatenation performance</kbd><em>,</em> and you'll see what I mean), so the simplest approach is to implement one or the other using the conventional wisdom described previously. Whenever we run into bad performance with one of the string-manipulation methods, we should also try the other to check whether it results in performance improvement. The best way to be certain is to profile them both for comparison and then pick the best options.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Boxing</h1>
+                </header>
+            
+            <article>
+                
+<p>Everything in C# is an object (caveats apply), meaning that they derive from the <kbd>System.Object</kbd> class. Even primitive data types such as <kbd>int</kbd>, <kbd>float</kbd>, and <kbd>bool</kbd> are implicitly derived from <kbd>System.Object</kbd>, which is itself a reference type. This is a special case, which allows them access to helper methods such as <kbd>ToString()</kbd> so that they can customize their string representation, but without actually turning them into reference types. Whenever one of these value types is implicitly treated in such a way that it must act as an object, the CLR automatically creates a temporary object to store, or <em>box</em>, the value inside so that it can be treated as a typical reference type object. As we should expect, this results in a heap allocation to create the containing vessel.</p>
+<div class="packt_infobox">Note that boxing is not the same thing as using value types as member variables of reference types. Boxing only takes place when value types are treated as reference types via conversion or casting.</div>
+<p><span><span>Check out these</span></span> examples:</p>
+<ul>
+<li>The following code will cause the <kbd>i</kbd> integer variable to be boxed inside the <kbd>obj</kbd> object:</li>
+</ul>
+<pre style="padding-left: 60px">int i = 128;<br/>object obj = i;</pre>
+<ul>
+<li>The following code will use the <kbd>obj</kbd> object representation to replace the value stored within the integer, and unbox it back into an integer, storing it in <kbd>i</kbd>. The final value of <kbd>i</kbd> would be <kbd>256</kbd>:</li>
+</ul>
+<pre style="padding-left: 60px">int i = 128;<br/>object obj = i;<br/>obj = 256;<br/>i = (int)obj; // i = 256</pre>
+<p style="padding-left: 60px">The preceding types can be changed dynamically.</p>
+<ul>
+<li>The following is perfectly legal C# code, where we override the type of <kbd>obj</kbd>, converting it into <kbd>float</kbd>:</li>
+</ul>
+<pre style="padding-left: 60px">int i = 128;<br/>object obj = i;<br/>obj = 512f;<br/>float f = (float)obj; // f = 512f</pre>
+<ul>
+<li>The following is also legal—conversion into <kbd>bool</kbd>:</li>
+</ul>
+<pre style="padding-left: 60px">int i = 128;<br/>object obj = i;<br/>obj = false;<br/>bool b = (bool)obj; // b = false</pre>
+<ul>
+<li>Note that attempting to unbox <kbd>obj</kbd> into a type that isn't the most recently assigned type would result in <kbd>InvalidCastException</kbd>:</li>
+</ul>
+<pre style="padding-left: 60px">int i = 128;<br/>object obj = i;<br/>obj = 512f;<br/>i = (int)obj; // InvalidCastException thrown here since most recent conversion was to a float</pre>
+<p>All of this can be a little tricky to wrap our head around until we remember that, at the end of the day, everything is just bits in memory and that we are free to interpret them any way we like. After all, data types such as <kbd>int</kbd>, <kbd>float</kbd>, and so on are just an abstraction over binary lists of <kbd>0</kbd> and <kbd>1</kbd>. What's important is knowing that we can treat our primitive types as objects by boxing them, converting their types, and then unboxing them into a different type at a later time, but each time we do this results in a heap memory allocation.</p>
+<div class="packt_infobox">Note that it's possible to convert a boxed object's type using one of the many <kbd>System.Convert.To…()</kbd> methods.</div>
+<p>Boxing can be either implicit, as shown in the preceding examples, or explicit, by typecasting to <kbd>System.Object</kbd>. Unboxing must always be explicit by typecasting back to its original type. Whenever we pass a value type into a method that uses <kbd>System.Object</kbd> as arguments, boxing will be applied implicitly.</p>
+<p>Methods such as <kbd>String.Format()</kbd>, which take <kbd>System.Object</kbd> as arguments, are one such example. We typically use them by passing in value types, such as <kbd>int</kbd>, <kbd>float</kbd>, and <kbd>bool</kbd>, to generate a string with. Boxing is automatically taking place in these situations, causing additional heap allocations that we should be aware of. <kbd>Collections.Generic.ArrayList</kbd> is another such example since <kbd>ArrayList</kbd> always contains converts its inputs into <kbd>System.Object</kbd> references, regardless of what types are stored within.</p>
+<p>Any time we use a function definition that takes <kbd>System.Object</kbd> as arguments, and we're passing in value types, we should be aware that we're implicitly causing heap allocations due to boxing.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">The importance of data layout</h1>
+                </header>
+            
+            <article>
+                
+<p>The importance of how our data is organized in memory can be surprisingly easy to forget about but can result in a fairly big performance boost if it is handled properly. Cache misses should be avoided whenever possible, which means that in most cases, arrays of data that are contiguous in memory should be iterated over sequentially as opposed to any other iteration style.</p>
+<p>This means that data layout is also important for garbage collection since it is done in an iterative fashion, and if we can find ways to have the GC skip over problematic areas, then we can potentially save a lot of iteration time.</p>
+<p>In essence, we want to keep large groups of reference types separated from large groups of value types. If there is even one reference type within a value type, such as <kbd>struct</kbd>, then the GC considers the entire object, and all of its data members, indirectly referenceable objects. When it comes time to Mark-and-Sweep, it must verify all fields of the object before moving on. However, if we separate the various types into different arrays, then we can make the GC skip the majority of the data.</p>
+<p>For instance, if we have an array of <kbd>struct</kbd> objects that looks like the following code, then the GC will need to iterate over every member of every <kbd>struct</kbd>, which could be fairly time-consuming:</p>
+<pre>public struct MyStruct {<br/>    int myInt;<br/>    float myFloat;<br/>    bool myBool;<br/>    string myString;<br/>}<br/><br/>MyStruct[] arrayOfStructs = new MyStruct[1000];</pre>
+<p>However, if we reorganize all pieces of this data into multiple arrays of each time, then the GC will ignore all of the primitive data types and only check the string objects. The following code will result in much a faster garbage collection sweep:</p>
+<pre>int[] myInts = new int[1000];<br/>float[] myFloats = new float[1000];<br/>bool[] myBools = new bool[1000];<br/>string[] myStrings = new string[1000];</pre>
+<p>The reason this works is that we're giving the GC fewer indirect references to check. When the data is split into separate arrays (reference types), it finds three arrays of value types, marks the arrays, and then immediately moves on because there's no reason to mark the contents of an array of value types. It must still iterate through all of the string objects within <kbd>myStrings</kbd> since each is a reference type and it needs to verify that there are no indirect references within it. Technically, the string objects cannot contain indirect references, but the GC works at a level where it only knows whether the object is a reference type or value type and, therefore, can't tell the difference between a string and class. However, we have still spared the GC from needing to iterate over an extra 3,000 pieces of data (the 3,000 values in <kbd>myInts</kbd>, <kbd>myFloats</kbd>, and <kbd>myBools</kbd>).</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Arrays from the Unity API</h1>
+                </header>
+            
+            <article>
+                
+<p>Several instructions within the Unity API result in heap memory allocations, which we should be aware of. This essentially includes everything that returns an array of data. For example, the following methods allocate memory on the heap:</p>
+<pre>GetComponents&lt;T&gt;(); // (T[])<br/>Mesh.vertices; // (Vector3[])<br/>Camera.allCameras; // (Camera[])</pre>
+<p>Each and every time we call a Unity API method that returns an array will cause a whole new version of that data to be allocated. Such methods should be avoided whenever possible or at the very least called once and cached so that we don't cause memory allocations more often than necessary.</p>
+<p>There are other Unity API calls where we provide an array of elements to a method, and it writes the necessary data into the array for us. <span>One such example is</span> providing a <kbd>Particle[]</kbd> array to <kbd>ParticleSystem</kbd> to get its <kbd>Particle</kbd> data. <span>The benefit of these types of API calls is that we can avoid reallocating large arrays, whereas the downside is that the array needs to be large enough to fit all of the objects.</span> If the number of objects we need to acquire keeps increasing, then we may find ourselves reallocating larger arrays. In the case of <kbd>ParticleSystem</kbd>, we need to be certain we create an array large enough to contain the maximum number of <kbd>Particle</kbd> objects it generates at any given time.</p>
+<div class="packt_tip">Unity Technologies have hinted in the past that they may eventually change some of the API calls that return arrays into the form that requires an array to be provided. The API of the latter form can be confusing for new programmers at first glance; however, unlike the first form, it allows responsible programmers to use memory much more efficiently.</div>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Using InstanceIDs for dictionary keys</h1>
+                </header>
+            
+            <article>
+                
+<p>As mentioned in <a href="">Chapter 2</a>, <em>Scripting Strategies</em>, dictionaries are used to map associations between two different objects, which are very quick at telling us whether a mapping exists, and if so, what that mapping is. It's common practice to map <kbd>MonoBehaviour</kbd> or <kbd>ScriptableObject</kbd> reference as the key of a dictionary, but this causes some problems. When the dictionary element is accessed, it will need to call into several derived methods of <kbd>UnityEngine.Object</kbd>, which both of these object types derive from. This makes element comparison and mapping acquisition relatively slow.</p>
+<p>This can be improved by making use of <kbd>Object.GetInstanceID()</kbd>, which returns an integer representing a unique identification value for that object that never changes and is never reused between two objects during the entire lifecycle of the application. If we cache this value in the object somehow and use it as the key in our dictionary, then the element comparison will be around two to three times faster than if we used the object reference directly.</p>
+<p>However, there are caveats to this approach. If the instance ID value is not cached (we keep calling <kbd>Object.GetInstanceID()</kbd> each time we need to index into our dictionary) and we are compiling with Mono (and not IL2CPP), then element acquisition could end up being slow. This is because it will call some thread-unsafe code to acquire the instance ID, in which case, the Mono compiler cannot optimize the loop, and, therefore causes some additional overhead by comparison to caching the instance ID value. If we are compiling with IL2CPP, which doesn't have this problem, then the benefits are still not as great (only around 50% faster) than if we had simply cached the value beforehand. Therefore, we should aim to cache the integer value in some way so that we avoid having to call <kbd>Object.GetInstanceID()</kbd> too often.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">foreach loops</h1>
+                </header>
+            
+            <article>
+                
+<p>The <kbd>foreach</kbd> loop keyword is a bit of a controversial issue in Unity development circles. It turns out that a lot of <kbd>foreach</kbd> loops implemented in Unity C# code will incur unnecessary heap memory allocations during these calls, as they allocate an <kbd>Enumerator</kbd> object as a class on the heap, instead of a <kbd>struct</kbd> on the stack. It all depends on the given collection's implementation of the <kbd>GetEnumerator()</kbd> method.</p>
+<div class="packt_tip">Note that it is safe to use <kbd>foreach</kbd> loops on typical arrays. The Mono compiler secretly converts <kbd>foreach</kbd> over arrays into simple for loops.</div>
+<p><span>Since Unity 2018.1, Unity uses an upgraded Mono runtime (</span><span>4.0.30319) and some compiler fixes many of the previous issues with <kbd>foreach</kbd>. As a consequence, <kbd>foreach</kbd> is no more a big issue in the general case. Yet, <kbd>foreach</kbd> still has a bad reputation among developers. The fact that sometimes they can actually be problematic makes everything more complicated. As usual, there is only one way to be sure: use the Profiler and check whether <kbd>foreach</kbd> is actually creating problems in your specific situation.</span></p>
+<p>In any case, even in the worst scenario—that is, your <kbd>foreach</kbd> loop is actually doing heap allocations—the cost is fairly negligible, as the heap allocation cost does not scale with the number of iterations. Only one <kbd>Enumerator</kbd> object is allocated and reused over and over again, which only costs a handful of bytes of memory overall. So, unless our <kbd>foreach</kbd> loops are being invoked for every update (which is typically dangerous in, and of, itself), the costs will be mostly negligible on small projects. The time taken to convert everything into a <kbd>for</kbd> loop may not be worth it.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Coroutines</h1>
+                </header>
+            
+            <article>
+                
+<p>As mentioned before, starting a coroutine costs a small amount of memory, to begin with, but note that no further costs are incurred when the method calls <kbd>yield</kbd>. If memory consumption and garbage collection are significant concerns, we should try to avoid having too many short-lived coroutines and avoid calling <kbd>StartCoroutine()</kbd> too much during runtime.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Closures</h1>
+                </header>
+            
+            <article>
+                
+<p>Closures are useful, but dangerous tools. Anonymous methods and lambda expressions are not always closures, but they can be. It all depends on whether the method uses data outside of its own scope and parameter list or not.</p>
+<p>For example, the following anonymous function would not be a closure, since it is self-contained and functionally equivalent to any other locally defined function:</p>
+<pre>System.Func&lt;int,int&gt; anon = (x) =&gt; { return x; };<br/><br/>int result = anon(5); // result = 5</pre>
+<p>However, if the anonymous function pulled in data from outside itself, it becomes a closure, as it closes the environment around the required data. The following would result in a closure:</p>
+<pre>int i = 1024;<br/>System.Func&lt;int,int&gt; anon = (x) =&gt; { return x + i; };<br/>int result = anon(5);</pre>
+<p>In order to complete this transaction, the compiler must define a new custom class that can reference the environment where the <kbd>i</kbd> <span>data value</span> <span>would be accessible. At runtime, it creates the corresponding object on the heap and provides it to the anonymous function. Note that this includes value types (as per the preceding example), which were originally on the stack, possibly defeating the purpose of them being allocated on the stack in the first place. So, we should expect each invocation of the second method to result in heap allocations and inevitable garbage collection.</span></p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">The .NET library functions</h1>
+                </header>
+            
+            <article>
+                
+<p>The .NET library offers a huge amount of common functionalities that help to solve numerous problems that programmers may come across during day-to-day implementation. Most of these classes and functions are optimized for general use cases, which may not be optimal for a specific situation. It may be possible to replace a particular .NET library class with a custom implementation that is more suited to our specific use case.</p>
+<p>There are also two big features in the .NET library that often become big performance hogs whenever they're used. This tends to be because they are only included as a quick-and-dirty solution to a given problem without much effort put into optimization. These features are <strong>LINQ</strong> and <strong>r</strong><strong>egular expressions</strong>.</p>
+<p>LINQ provides a way to treat arrays of data as miniature databases and perform queries against them using a SQL-like syntax. The simplicity of its coding style and complexity of the underlying system (through its usage of closures) implies that it has a fairly large overhead cost. LINQ is a handy tool, but is not really intended for high-performance, real-time applications, such as games, and does not even function on platforms that do not support JIT compilation, such as iOS.</p>
+<p>Meanwhile, regular expressions through the <kbd>Regex</kbd> class allow us to perform complex string parsing to find substrings that match a particular format, replace pieces of a string, or construct strings from various inputs. Regular expressions are very useful tools but tends to be overused in places where they are largely unnecessary or in so-called clever ways to implement a feature such as text localization, when straightforward string replacement would be far more efficient.</p>
+<p>Specific optimizations for both of these features go far beyond the scope of this book, as they could fill an entire book by themselves. We should either try to minimize their usage as much as possible, replace their usage with something less costly, bring in a LINQ or regex expert to solve the problem for us or do some Googling on the subject to optimize how we're using them.</p>
+<div class="packt_tip">One of the best ways to find the correct answer online is to simply post the wrong answer. People will either help us out of kindness or will take such a great offense from our implementation that they will consider it their civic duty to correct us. Just be sure to do some kind of research on the subject first. Even the busiest of people are generally happy to help if they can see that we've put in our fair share of effort beforehand.</div>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Temporary work buffers</h1>
+                </header>
+            
+            <article>
+                
+<p>If we get into the habit of using large, temporary work buffers for one task or another, then it just makes sense that we should look for opportunities to reuse them, instead of reallocating them over and over again, as this lowers the overhead involved in allocation and garbage collection (often called <strong>memory pressure</strong>). It might be worthwhile to extract such functionality from case-specific classes into a generic <em>G</em><em>od</em> class that contains a big work area for multiple classes to reuse.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Object pooling</h1>
+                </header>
+            
+            <article>
+                
+<p>Speaking of temporary work buffers, object pooling is an excellent way of both minimizing and establishing control over our memory usage by avoiding deallocation and reallocation. The idea is to formulate our own system for object creation, which hides away whether the object we're getting has been freshly allocated or has been recycled from an earlier allocation. The typical terms to describe this process are to spawn and despawn the object rather than creating and deleting them in memory. When an object is despawned, we're simply hiding it, making it lay dormant until we need it again, at which point it is respawned from one of the previously despawned objects and used in place of an object we might have otherwise newly allocated.</p>
+<p>Let's cover a quick implementation of an object pooling system:</p>
+<ol>
+<li>First, we define a common interface for the object we want to use in the object pool. An important feature of this system is to allow the pooled object to decide how to recycle itself when the time comes. The following interface class called <kbd>IPoolableObject</kbd> will satisfy this requirement nicely:</li>
+</ol>
+<pre style="padding-left: 60px">public interface IPoolableObject{<br/>  void New();<br/>  void Respawn();<br/>}</pre>
+<p> </p>
+<p style="padding-left: 60px">This interface class defines two methods: <kbd>New()</kbd> and <kbd>Respawn()</kbd>. These should be called when the object is first created and when it has been respawned, respectively.</p>
+<ol start="2">
+<li>Now, we need to implement a class that manages the poolable objects. The following <kbd>ObjectPool</kbd> class definition is a fairly simple implementation of the object pooling concept:</li>
+</ol>
+<pre style="padding-left: 60px">using System.Collections.Generic;<br/><br/>public class ObjectPool&lt;T&gt; where T : IPoolableObject, new() {<br/>  private Stack&lt;T&gt; _pool;<br/>  private int _currentIndex = 0;<br/><br/>  public ObjectPool(int initialCapacity) {<br/>    _pool = new Stack&lt;T&gt;(initialCapacity);<br/>    for(int i = 0; i &lt; initialCapacity; ++i) {<br/>      Spawn (); // instantiate a pool of N objects<br/>    }<br/>    Reset ();<br/>  }<br/><br/>  public int Count {<br/>    get { return _pool.Count; }<br/>  }<br/><br/>  public void Reset() {<br/>    _currentIndex = 0;<br/>  }<br/><br/>  public T Spawn() {<br/>    if (_currentIndex &lt; Count) {<br/>      T obj = _pool.Peek ();<br/>      _currentIndex++;<br/>      IPoolableObject po = obj as IPoolableObject;<br/>      po.Respawn();<br/>      return obj;<br/>    } else {<br/>      T obj = new T();<br/>      _pool.Push(obj);<br/>      _currentIndex++;<br/>      IPoolableObject po = obj as IPoolableObject;<br/>      po.New();<br/>      return obj;<br/>    }<br/>  }<br/>}</pre>
+<p style="padding-left: 60px"><span>This class</span> <span>allows <kbd>ObjectPool</kbd> to be used with any object type so long as it fits the following two criteria: it must implement the</span> <kbd>IPoolableObject</kbd> <span>interface class, and the derived class must allow for a parameter-less constructor (specified by the</span> <kbd>new()</kbd> <span>keyword in the class declaration).</span></p>
+<ol start="3">
+<li>Finally, we need to implement the <kbd>IPoolableObject</kbd> interface for any object we want to pool. An example poolable object would look like so: it must implement two <kbd>public</kbd> methods, <kbd>New()</kbd> and <kbd>Respawn()</kbd>, which are invoked by the <kbd>ObjectPool</kbd> class at the appropriate times:</li>
+</ol>
+<pre style="padding-left: 60px">public class EnemyObject : IPoolableObject {<br/>  public void New() {<br/>    // very first initialization here<br/>  }<br/>  public void Respawn() {<br/>    // reset data which allows the object to be recycled here<br/>  }<br/>}</pre>
+<p>Now, just consider this usage example: we want to have a continuous wave of monsters. Obviously, we do not want to create new enemies continuously, instead, we want to recycle the enemies killed by the player. To do that, first we create a pool of 100 <kbd>EnemyObject</kbd> objects (we assume we never need to show more than 100 enemies on screen at the same time):</p>
+<pre>private ObjectPool&lt;EnemyObject&gt; _objectPool = new ObjectPool&lt;EnemyObject&gt;(100);</pre>
+<p>The first 100 calls to <kbd>Spawn()</kbd> on <kbd>ObjectPool</kbd> will cause the enemy to be respawned, providing the caller with a unique instance of the object each time. If there are no more enemies to provide (we have called <kbd>Spawn()</kbd> more than 100 times), then we will allocate a new <kbd>EnemyObject</kbd> instance and push it onto the stack. Finally, if <kbd>Reset()</kbd> is called on <kbd>ObjectPool</kbd>, it will begin again from the start, recycling enemies and providing them to the caller.</p>
+<p>Note that we are using the <kbd>Peek()</kbd> method on the <kbd>Stack</kbd> object so that we don't remove the old instance from the stack. We want <kbd>ObjectPool</kbd> to maintain references to all of the enemies we create.</p>
+<p>Also, note that this pooling solution will not work for classes we haven't defined and cannot derive from <kbd>IPoolableObject</kbd>, such as <kbd>Vector3</kbd> and <kbd>Quaternion</kbd>. This is normally dictated by the <kbd>sealed</kbd> keyword in the class definition. In these cases, we would need to define a containing class:</p>
+<pre>public class PoolableVector3 : IPoolableObject {<br/>  public Vector3 vector = new Vector3();<br/>  public void New() {<br/>    Reset();<br/>  }<br/>  public void Respawn() {<br/>    Reset();<br/>  }<br/>  public void Reset() {<br/>    vector.x = vector.y = vector.z = 0f;<br/>  }<br/>}</pre>
+<p>We could extend this system in a number of ways, such as defining a <kbd>Despawn()</kbd> method to handle destruction of the object, making use of the <kbd>IDisposable</kbd> interface class and <kbd>using</kbd> blocks when we wish to automatically spawn and despawn objects within a small scope, and/or allowing objects instantiated outside the pool to be added to it.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Prefab pooling</h1>
+                </header>
+            
+            <article>
+                
+<p>The previous pooling solution is useful for typical C# objects, but it won't work for specialized Unity objects, such as <kbd>GameObject</kbd> and <kbd>MonoBehaviour</kbd>. These objects tend to consume a large chunk of our runtime memory, can cost us a great deal of CPU usage when they're created and destroyed, and tend to risk a large amount of garbage collection at runtime. For instance, during the lifecycle of a small RPG game, we might spawn a thousand Orc creatures, but at any given moment, we may only need a maximum of 10 of them. It would be nice if we could perform similar pooling as before but, for Unity Prefabs, to save on a lot of unnecessary overhead creating and destroying 990 Orcs we don't need.</p>
+<p>Our goal is to push the overwhelming majority of object instantiation to scene initialization rather than letting them get created at runtime. This can provide some big runtime CPU savings and avoids a lot of spikes caused by object creation/destruction and garbage collection at the expense of scene loading times and runtime memory consumption. As a result, there are quite a few pooling solutions available on the Asset Store to handle this task, with varying degrees of simplicity, quality, and feature sets.</p>
+<div class="packt_tip">It is often recommended that pooling should be implemented in any game that intends to be deployed on mobile devices, due to the greater overhead costs involved in the allocation and deallocation of memory compared to desktop applications.</div>
+<p>However, creating a pooling solution is an interesting topic, and building one from scratch is a great way of getting to grips with a lot of important internal Unity engine behavior. Also, knowing how such a system is built makes it easier to extend if we wish it to meet the needs of our particular game, rather than to rely on a prebuilt solution.</p>
+<p>The general idea of Prefab pooling is to create a system that contains lists of active and inactive GameObjects that were all instantiated from the same Prefab reference. The following diagram shows how the system might look after several spawns, despawns, and respawns of various objects derived from four different <span>P</span>refabs (<strong>Orc</strong>, <strong>Troll</strong>, <strong>Ogre</strong>, and <strong>Dragon</strong>):</p>
+<p class="CDPAlignCenter CDPAlign"><img src="assets/1a9a8f86-8bc4-4750-8b4a-50ed0ec65a19.png" style="width:48.17em;height:23.58em;"/></p>
+<div class="packt_tip packt_infobox"><span>Note that the</span> <strong>Heap Memory</strong> <span>area in the previous screenshot represents the objects as they exist in memory, while the</span> <strong>Pooling System</strong> <span>area represents the <strong>Pooling System's</strong> references to those objects.</span></div>
+<p>In this example, several instances of each <span>P</span>refab were instantiated (<strong>11 Orcs</strong>, <strong>8 Trolls</strong>, <strong>5 Ogres</strong>, and <strong>1 Dragon</strong>). Currently, only 11 of these objects are active, while the other 14 have <span>been</span> previously despawned and are inactive. Note that the despawned objects still exist in memory, although they are not visible and cannot interact with the game world until they have been respawned. Naturally, this costs us a constant amount of heap memory at runtime to maintain the inactive objects, but when a new object is instantiated, we can reuse one of the existing inactive objects rather than allocating more memory to satisfy the request. This saves significant runtime CPU costs during object creation and destruction and avoids garbage collection.</p>
+<p>The following diagram shows the chain of events that needs to occur when <strong>New Orc is spawned</strong>:</p>
+<p class="CDPAlignCenter CDPAlign"><img src="assets/66c18f0a-1750-47bb-ba14-a631fe3f9bc8.png"/></p>
+<p>The first object in the <strong>Inactive</strong> Orc pool (<strong>Orc7</strong>) is reactivated and moved into the <strong>Active</strong> pool. We now have six active Orcs and five inactive Orcs.</p>
+<p>The following diagram shows the order of events when an <strong>Ogre</strong> object is despawned:</p>
+<p class="CDPAlignCenter CDPAlign"><img src="assets/6f60b2b9-e1fb-40a0-8743-cf891a46b8a5.png" style="width:43.25em;height:21.17em;"/></p>
+<p>This time, the object is deactivated and moved from the <strong>Active</strong> pool into the <strong>Inactive</strong> pool, leaving us with one active <strong>Ogre</strong> and four inactive Ogres.</p>
+<p class="mce-root">Finally, the following diagram shows what happens when a new object is spawned, but there are no inactive objects to satisfy the request:</p>
+<p class="CDPAlignCenter CDPAlign"><img src="assets/ac207546-6fe8-475f-8dcd-fecbec9b3985.png" style="width:43.17em;height:21.75em;"/></p>
+<p>In this scenario, more memory must be allocated to instantiate the new <strong>Dragon</strong> object since there are no <strong>Dragon</strong> objects in its <strong>Inactive</strong> pool to reuse. Therefore, to avoid runtime memory allocations for our GameObjects, it is critical that we know beforehand how many we will need and that there is sufficient memory space available to contain them all at once. This will vary depending on the type of object in question and requires occasional testing and sanity checking to ensure that we have a sensible number of each <span>P</span>refab instantiated at runtime.</p>
+<p>With all of this in mind, let's create a pooling system for <span>P</span>refabs.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Poolable components</h1>
+                </header>
+            
+            <article>
+                
+<p>Let's first define an interface class for a component that can be used in the pooling system:</p>
+<pre>public interface IPoolableComponent {<br/>  void Spawned();<br/>  void Despawned();<br/>}</pre>
+<p>The approach for <kbd>IPoolableComponent</kbd> will be very different from the approach taken for <kbd>IPoolableObject</kbd>. The objects being created this time are GameObjects, which are a lot trickier to work with than standard objects because of how much of their runtime behavior is already handled through the Unity engine and how little low-level access we have to it.</p>
+<p>GameObjects do not give us access to an equivalent <kbd>New()</kbd> method that we can invoke any time the object is created, and we cannot derive from the <kbd>GameObject</kbd> class to implement one. GameObjects are created either by placing them in a scene or by instantiating them at runtime through <kbd>GameObject.Instantiate()</kbd>, and the only inputs we can apply are an initial position and rotation. Of course, their components have an <kbd>Awake()</kbd> callback that we can define, which is invoked the first time the component is brought to life, but this is merely a compositional object—it's not the actual parent object we're spawning and despawning.</p>
+<p>So, because we have control over <span>only</span> a <kbd>GameObject</kbd> class's components, it is assumed that the <kbd>IPoolableComponent</kbd> interface class is implemented by at least one of the components that is attached to the <kbd>GameObject</kbd> class we wish to pool.</p>
+<p>The <kbd>Spawned()</kbd> method should be invoked on every implementing component each time the pooled <kbd>GameObject</kbd> class is respawned, while the <kbd>Despawned()</kbd> method gets invoked whenever it is despawned. This gives us entry points to control the data variables and behavior during the creation and destruction of the parent <kbd>GameObject</kbd> class.</p>
+<p>The act of despawning <kbd>GameObject</kbd> is trivial: turn its <kbd>active</kbd> flag to <kbd>false</kbd> through <kbd>SetActive()</kbd>. This disables <kbd>Collider</kbd> and <kbd>Rigidbody</kbd> for physics calculations, removes it from the list of renderable objects, and essentially takes care of disabling all interactions with all built-in Unity engine subsystems in a single stroke. The only exception is any coroutines that are currently invoking on the object since, as you learned in <a href="https://cdp.packtpub.com/unity_2017_game_optimization__second_edition/wp-admin/post.php?post=123&amp;action=edit#post_44">Chapter 2</a><span>,</span> <em>Scripting Strategies</em>, coroutines are invoked independently of any <kbd>Update()</kbd> and <kbd>GameObject</kbd> activity. We will, therefore, need to call <kbd>StopCoroutine()</kbd> or <kbd>StopAllCoroutines()</kbd> during the despawning of such objects.</p>
+<p>Also, components typically hook into our own custom gameplay subsystems as well, so the <kbd>Despawn()</kbd> method allows our components to take care of any custom cleanup before shutting down. For example, we would probably want to use <kbd>Despawn()</kbd> to deregister the component from the messaging system we defined in <a href="https://cdp.packtpub.com/unity_2017_game_optimization__second_edition/wp-admin/post.php?post=123&amp;action=edit#post_44">Chapter 2</a><span>,</span> <em>Scripting Strategies</em>.</p>
+<p>Unfortunately, successfully respawning the <kbd>GameObject</kbd> is a lot more complicated. When we respawn an object, there will be many settings that were left behind when the object was previously active, and these must be reset to avoid conflicting behaviors. A common problem with this is the Rigidbody's <kbd>linearVelocity</kbd> and <kbd>angularVelocity</kbd> properties. If these values are not explicitly reset before the object is reactivated, then the newly respawned object will continue moving with the same velocity the old version had when it was despawned.</p>
+<p>This problem becomes further complicated by the fact that built-in components are <kbd>sealed</kbd>, which means that they cannot be derived from. So, to avoid these issues, we can create a custom component that resets the attached <kbd>Rigidbody</kbd> instance whenever the object is despawned:</p>
+<pre>public class ResetPooledRigidbodyComponent : MonoBehaviour, IPoolableComponent {<br/>  [SerializeField] Rigidbody _body;<br/>  public void Spawned() {  }<br/>  public void Despawned() {<br/>    if (_body == null) {<br/>      _body = GetComponent&lt;Rigidbody&gt;();<br/>      if (_body == null) {<br/>        // no Rigidbody!<br/>        return;<br/>      }<br/>    }<br/>    _body.velocity = Vector3.zero;<br/>    _body.angularVelocity = Vector3.zero;<br/>  }<br/>}</pre>
+<p>Note that the best place to perform the cleanup task is during despawning, because we cannot be certain in what order the <kbd>GameObject</kbd> class's <kbd>IPoolableComponent</kbd> interface classes will have their <kbd>Spawned()</kbd> methods invoked. It is unlikely that another <kbd>IPoolableComponent</kbd> will change the object's velocity during despawning, but it is possible that a different <kbd>IPoolableComponent</kbd> attached to the same object might want to set the Rigidbody's initial velocity to some important value during its own <kbd>Spawned()</kbd> method. Ergo, performing the velocity reset during the <kbd>ResetPooledRigidbodyComponent</kbd> class's <kbd>Spawned()</kbd> method could potentially conflict with other components and cause some very confusing bugs.</p>
+<div class="packt_tip">In fact, creating poolable components that are not self-contained and tend to tinker with other components like this is one of the biggest dangers of implementing a pooling system. We should minimize such design and routinely verify them when we're trying to debug strange issues in our game.</div>
+<p>For the sake of illustration, here is the definition of a simple poolable component making use of the <kbd>MessagingSystem</kbd> class we defined in <a href="">Chapter 2</a><span>,</span> <em>Scripting Strategies</em>. This component automatically handles some basic tasks every time the object is spawned and despawned:</p>
+<pre>public class PoolableTestMessageListener : MonoBehaviour, IPoolableComponent {<br/>  public void Spawned() {<br/>    MessagingSystem.Instance.AttachListener(typeof(MyCustomMessage), <br/>                                            this.HandleMyCustomMessage);<br/>  }<br/><br/>  bool HandleMyCustomMessage(BaseMessage msg) {<br/>    MyCustomMessage castMsg = msg as MyCustomMessage;<br/>    Debug.Log (string.Format("Got the message! {0}, {1}", <br/>                             castMsg._intValue, <br/>                             castMsg._floatValue));<br/>    return true;<br/>  }<br/><br/>  public void Despawned() {<br/>    if (MessagingSystem.IsAlive) {<br/>      MessagingSystem.Instance.DetachListener(typeof(MyCustomMessage), <br/>                                              this.HandleMyCustomMessage);<br/>    }<br/>  }<br/>}</pre>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">The Prefab pooling system</h1>
+                </header>
+            
+            <article>
+                
+<p>Hopefully, we now have an understanding of what we need from our pooling system, so all that's left is to implement it. The requirements are as follows:</p>
+<ul>
+<li>It must accept requests to spawn a <kbd>GameObject</kbd> instance from a <span>P</span>refab, an initial position, and an initial rotation:
+<ul>
+<li>If a despawned version already exists, it should respawn the first available one</li>
+<li>If it does not exist, then it should instantiate a new <kbd>GameObject</kbd> instance from the <span>P</span>refab</li>
+<li>In either case, the <kbd>Spawned()</kbd> method should be invoked on all <kbd>IPoolableComponent</kbd> interface classes attached to <kbd>GameObject</kbd></li>
+</ul>
+</li>
+<li>It must accept requests to despawn a specific <kbd>GameObject</kbd> instance:
+<ul>
+<li>If the object is managed by the pooling system, it should deactivate it and call the <kbd>Despawned()</kbd> method on all <kbd>IPoolableComponent</kbd> interface classes attached to <kbd>GameObject</kbd></li>
+<li>If the object is not managed by the pooling system, it should send an error</li>
+</ul>
+</li>
+</ul>
+<p>The requirements are fairly straightforward, but the implementation requires some investigation if we wish to make the solution performance-friendly. Firstly, a typical singleton would be a good choice for the main entry point since we want this system to be globally accessible from anywhere:</p>
+<pre>public static class PrefabPoolingSystem {}</pre>
+<p>The main task for object spawning involves accepting a <span>P</span>refab reference and figuring whether we have any despawned GameObjects that were originally instantiated from the same reference. To do this, we will essentially want our pooling system to keep track of two different lists for any given Prefab reference: a list of active (spawned) GameObjects and a list of inactive (despawned) objects that were instantiated from it. This information would be best abstracted into a separate class, which we will name <kbd>PrefabPool</kbd>.</p>
+<p>To maximize the performance of this system (and hence make the largest gains possible, relative to just allocating and deallocating objects from memory all of the time), we will want to use some fast data structures in order to acquire the corresponding <kbd>PrefabPool</kbd> objects whenever a spawn or despawn request comes in.</p>
+<p>Since spawning involves being given a <span>P</span>refab, we will want a data structure that can quickly map <span>P</span>refabs to the <kbd>PrefabPool</kbd> that manages them. Also, since despawning involves being given <kbd>GameObject</kbd>, we will want another data structure that can quickly map spawned GameObjects to the <kbd>PrefabPool</kbd> instance that originally spawned them. A pair of dictionaries would be a good choice for both of these needs.</p>
+<p>Let's define these dictionaries in our <kbd>PrefabPoolingSystem</kbd> class:</p>
+<pre>public static class PrefabPoolingSystem {<br/>  static Dictionary&lt;GameObject,PrefabPool&gt; _prefabToPoolMap = new Dictionary&lt;GameObject,PrefabPool&gt;();<br/>  static Dictionary&lt;GameObject,PrefabPool&gt; _goToPoolMap = new Dictionary&lt;GameObject,PrefabPool&gt;();<br/>}</pre>
+<p>Next, we'll define what happens when we <kbd>Spawn</kbd> an object:</p>
+<pre>public static GameObject Spawn(GameObject prefab, Vector3 position, Quaternion rotation) {<br/>  if (!_prefabToPoolMap.ContainsKey (prefab)) {<br/>    _prefabToPoolMap.Add (prefab, new PrefabPool());<br/>  }<br/>  PrefabPool pool = _prefabToPoolMap[prefab];<br/>  GameObject go = pool.Spawn(prefab, position, rotation);<br/>  _goToPoolMap.Add (go, pool);<br/>  return go;<br/>}</pre>
+<p>The <kbd>Spawn()</kbd> method will be given a <kbd>prefab</kbd> reference, an initial <kbd>position</kbd>, and an initial <kbd>rotation</kbd>. We need to figure out which <kbd>PrefabPool</kbd> the <kbd>prefab</kbd> reference belongs to (if any), ask it to spawn a new <kbd>GameObject</kbd> instance using the data provided, and then return the spawned object to the requestor. We will first check our <span>P</span>refab-to-pool map to check whether a pool already exists for this <span>P</span>refab. If not, we immediately create one. In either case, we then ask <kbd>PrefabPool</kbd> to spawn us a new object. <kbd>PrefabPool</kbd> will either end up respawning an object that was despawned earlier or instantiate a new one (if there aren't any inactive instances left).</p>
+<p>This class doesn't particularly care how <kbd>PrefabPool</kbd> creates the object. It just wants the instance generated by the <kbd>PrefabPool</kbd> class so that it can be entered into the GameObject-to-pool map and returned to the requestor.</p>
+<p>For convenience, we can also define an overload that places the object at the world's center. This is useful for GameObjects that aren't visible and just need to exist in the scene:</p>
+<pre>public static GameObject Spawn(GameObject prefab) {<br/>  return Spawn (prefab, Vector3.zero, Quaternion.identity);<br/>}</pre>
+<div class="packt_infobox">Note that no actual spawning and despawning are taking place, yet. This task will eventually be implemented within the <kbd>PrefabPool</kbd> class.</div>
+<p>Despawning involves being given <kbd>GameObject</kbd> and then figuring out which <kbd>PrefabPool</kbd> is managing it. This could be achieved by iterating through our <kbd>PrefabPool</kbd> objects and checking whether they contain the given <kbd>GameObject</kbd> instance. However, if we end up generating a lot of <span>P</span>refab pools, then this iterative process can take a while. We will always end up with as many <kbd>PrefabPool</kbd> objects as we have <span>P</span>refabs (at least, so long as we manage all of them through the pooling system). Most projects tend to have dozens, hundreds, if not thousands, of different <span>P</span>refabs.</p>
+<p>So, the GameObject-to-pool map is maintained to ensure that we always have rapid access to <kbd>PrefabPool</kbd> that originally spawned the object. It can also be used to quickly check whether the given <kbd>GameObject</kbd> instance is even managed by the pooling system to begin with. Here is the method definition for the despawning method, which takes care of these tasks:</p>
+<pre>public static bool Despawn(GameObject obj) {<br/>  if (!_goToPoolMap.ContainsKey(obj)) {<br/>    Debug.LogError (string.Format ("Object {0} not managed by pool system!", obj.name));<br/>    return false;<br/>  }<br/><br/>  PrefabPool pool = _goToPoolMap[obj];<br/>  if (pool.Despawn (obj)) {<br/>    _goToPoolMap.Remove (obj);<br/>    return true;<br/>  }<br/>  return false;<br/>}</pre>
+<div class="packt_infobox">Note that the <kbd>Despawn()</kbd> method of both <kbd>PrefabPoolingSystem</kbd> and <kbd>PrefabPool</kbd> returns a Boolean that can be used to check whether the object was successfully despawned.</div>
+<p>As a result, thanks to the two maps we're maintaining, we can quickly access the <kbd>PrefabPool</kbd> instance that manages the given reference, and this solution will scale for any number of <span>P</span>refabs that the system manages.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Prefab pools</h1>
+                </header>
+            
+            <article>
+                
+<p>Now that we have a system that can handle multiple <span>P</span>refab pools automatically, the only thing left is to define the behavior of the pools. As mentioned previously, we will want the <kbd>PrefabPool</kbd> class to maintain two data structures: one for active (spawned) objects that have been instantiated from the given <span>P</span>refab and another for inactive (despawned) objects.</p>
+<p>Technically, the <kbd>PrefabPoolingSystem</kbd> class already maintains a map of which <span>P</span>refab is governed by which <kbd>PrefabPool</kbd>, so we can actually save a little memory by making the <kbd>PrefabPool</kbd> class dependent upon the <kbd>PrefabPoolingSystem</kbd> class to give it the reference to the <span>P</span>refab it is managing. Consequently, the two data structures would be the only member variables <kbd>PrefabPool</kbd> needs to keep track of.</p>
+<p>However, for each spawned <kbd>GameObject</kbd>, it must also maintain a list of all of its <kbd>IPoolableComponent</kbd> references to invoke the <kbd>Spawned()</kbd> and <kbd>Despawned()</kbd> methods on them. Acquiring these references can be a costly operation to perform at runtime, so it would be best to cache the data in a simple struct:</p>
+<pre>public struct PoolablePrefabData {<br/>  public GameObject go;<br/>  public IPoolableComponent[] poolableComponents;<br/>}</pre>
+<p>This <kbd>struct</kbd> will contain a reference to <kbd>GameObject</kbd> and the precached list of all of its <kbd>IPoolableComponent</kbd> components.</p>
+<p>Now, we can define the member data of our <kbd>PrefabPool</kbd> class:</p>
+<pre>public class PrefabPool {<br/>  Dictionary&lt;GameObject,PoolablePrefabData&gt; _activeList = new Dictionary&lt;GameObject,PoolablePrefabData&gt;();<br/>  Queue&lt;PoolablePrefabData&gt; _inactiveList = new Queue&lt;PoolablePrefabData&gt;();<br/>}</pre>
+<p>The data structure for the active list should be a dictionary to do a quick lookup for the corresponding <kbd>PoolablePrefabData</kbd> component from any given <kbd>GameObject</kbd> reference. This will be useful during object despawning.</p>
+<p>Meanwhile, the inactive data structure is defined as <kbd>Queue</kbd>, but it will work equally well as <kbd>List</kbd>, <kbd>Stack</kbd>, or really any data structure that needs to regularly expand or contract, where we only need to pop items from one end of the group, since it does not matter which object it is. It only matters that we retrieve one of them. <kbd>Queue</kbd> is useful in this case because we can both retrieve and remove the object from the data structure in a single call to <kbd>Dequeue()</kbd>.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Object spawning</h1>
+                </header>
+            
+            <article>
+                
+<p>Let's define what it means to spawn <kbd>GameObject</kbd> in the context of our pooling system: at some point, <kbd>PrefabPool</kbd> will get a request to spawn <kbd>GameObject</kbd> from a given <span>P</span>refab, at a particular position and rotation. The first thing we should check is whether or not we have any inactive instances of the Prefab. If so, then we can dequeue the next available one from <kbd>Queue</kbd> and respawn it. If not, then we need to instantiate a new <kbd>GameObject</kbd> from the <span>P</span>refab using <kbd>GameObject.Instantiate()</kbd>. At this moment, we should also create a <kbd>PoolablePrefabData</kbd> object to store the <kbd>GameObject</kbd> reference and acquire the list of all <kbd>MonoBehaviours</kbd> that implement <kbd>IPoolableComponent</kbd> that are attached to it.</p>
+<p>Either way, we can now activate <kbd>GameObject</kbd>, set its position and rotation, and call the <kbd>Spawned()</kbd> method on all of its <kbd>IPoolableComponent</kbd> references. Once the object has been respawned, we can add it to the list of active objects and return it to the requestor.</p>
+<p>The following is the definition of the <kbd>Spawn()</kbd> method that defines this behavior:</p>
+<pre>public GameObject Spawn(GameObject prefab, Vector3 position, Quaternion rotation) {    <br/>  PoolablePrefabData data;<br/><br/>  if (_inactiveList.Count &gt; 0) {<br/>    data = _inactiveList.Dequeue();<br/>  } else {<br/>    // instantiate a new object<br/>    GameObject newGO = GameObject.Instantiate(prefab, position, rotation) as GameObject;<br/>    data = new PoolablePrefabData();<br/>    data.go = newGO;<br/>    data.poolableComponents = newGO.GetComponents&lt;IPoolableComponent&gt;();<br/>  }<br/><br/>  data.go.SetActive (true);<br/>  data.go.transform.position = position;<br/>  data.go.transform.rotation = rotation;<br/><br/>  for(int i = 0; i &lt; data.poolableComponents.Length; ++i) {<br/>    data.poolableComponents[i].Spawned ();<br/>  }<br/>  _activeList.Add (data.go, data);<br/><br/>  return data.go;<br/>}</pre>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Instance prespawning</h1>
+                </header>
+            
+            <article>
+                
+<p>Since we are using <kbd>GameObject.Instantiate()</kbd> whenever the <kbd>PrefabPool</kbd> has run out of despawned instances, this system does not completely rid us of runtime object instantiation, hence heap memory allocation. It's important to prespawn the expected number of instances that we will need during the lifetime of the current scene so that we minimize or remove the need to instantiate more during runtime.</p>
+<p>Note that we shouldn't prespawn too many objects. It would be wasteful to prespawn 100 explosion particle effects if the most we will ever expect to see in the scene at any given time is three or four. Conversely, spawning too few instances will cause excessive runtime memory allocations, and the goal of this system is to push the majority of allocation to the start of a scene's lifetime. We need to be careful about how many instances we maintain in memory so that we don't waste more memory space than necessary.</p>
+<p>Let's define a method in our <kbd>PrefabPoolingSystem</kbd> class that we can use to quickly prespawn a given number of objects from a <span>P</span>refab. This essentially involves spawning <kbd>N</kbd> objects and then immediately despawning them all:</p>
+<pre>public static void Prespawn(GameObject prefab, int numToSpawn) {<br/>  List&lt;GameObject&gt; spawnedObjects = new List&lt;GameObject&gt;();<br/><br/>  for(int i = 0; i &lt; numToSpawn; i++) {<br/>    spawnedObjects.Add (Spawn (prefab));<br/>  }<br/><br/>  for(int i = 0; i &lt; numToSpawn; i++) {<br/>    Despawn(spawnedObjects[i]);<br/>  }<br/><br/>  spawnedObjects.Clear ();<br/>}</pre>
+<p>We would use this method during scene initialization to prespawn a collection of objects to use in the level. Take, for example, the following code:</p>
+<pre>public class OrcPreSpawner : MonoBehaviour<br/>  [SerializeField] GameObject _orcPrefab;<br/>  [SerializeField] int _numToSpawn = 20;<br/><br/>  void Start() {<br/>    PrefabPoolingSystem.Prespawn(_orcPrefab, _numToSpawn);<br/>  }<br/>}</pre>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Object despawning</h1>
+                </header>
+            
+            <article>
+                
+<p>Finally, there is the act of despawning the objects. As mentioned previously, this primarily involves deactivating the object, but we also need to take care of various bookkeeping tasks and invoking <kbd>Despawned()</kbd> on all of its <kbd>IPoolableComponent</kbd> references.</p>
+<p>Here is the method definition for <kbd>PrefabPool.Despawn()</kbd>:</p>
+<pre class="mce-root">public bool Despawn(GameObject objToDespawn) {<br/>  if (!_activeList.ContainsKey(objToDespawn)) {<br/>    Debug.LogError ("This Object is not managed by this object pool!");<br/>    return false;<br/>  }<br/><br/>  PoolablePrefabData data = _activeList[objToDespawn];<br/><br/>  for(int i = 0; i &lt; data.poolableComponents.Length; ++i) {<br/>    data.poolableComponents[i].Despawned ();<br/>  }<br/><br/>  data.go.SetActive (false);<br/>  _activeList.Remove (objToDespawn);<br/>  _inactiveList.Enqueue(data);<br/>  return true;<br/>}</pre>
+<p>First, we verify that the object is being managed by the pool and then we grab the corresponding <kbd>PoolablePrefabData</kbd> instance to access the list of <kbd>IPoolableComponent</kbd> references. Once <kbd>Despawned()</kbd> is invoked on all of them, we deactivate the object, remove it from the active list, and push it into the inactive queue so that it can be respawned later.</p>
+<p class="mce-root"/>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Prefab pool testing</h1>
+                </header>
+            
+            <article>
+                
+<p>The following class definition allows us to perform a simple hands-on test with the <kbd>PrefabPoolingSystem</kbd> class; it will support three <span>P</span>refabs and prespawn five instances of each during application initialization. We can press the <em>1</em>, <em>2</em>, <em>3</em>, or <em>4</em> keys to spawn an instance of each type and then press <em>Q</em>, <em>W</em>, <em>E</em>, and <em>R</em> to despawn a random instance of each type, respectively:</p>
+<pre>public class PrefabPoolingTestInput : MonoBehaviour {<br/>  [SerializeField] GameObject _orcPrefab;<br/>  [SerializeField] GameObject _trollPrefab;<br/>  [SerializeField] GameObject _ogrePrefab;<br/>  [SerializeField] GameObject _dragonPrefab;<br/><br/>  List&lt;GameObject&gt; _orcs = new List&lt;GameObject&gt;();<br/>  List&lt;GameObject&gt; _trolls = new List&lt;GameObject&gt;();<br/>  List&lt;GameObject&gt; _ogres = new List&lt;GameObject&gt;();<br/>  List&lt;GameObject&gt; _dragons = new List&lt;GameObject&gt;();<br/><br/>   void Start() {<br/>     PrefabPoolingSystem.Prespawn(_orcPrefab, 11);<br/>     PrefabPoolingSystem.Prespawn(_trollPrefab, 8);<br/>     PrefabPoolingSystem.Prespawn(_ogrePrefab, 5);<br/>     PrefabPoolingSystem.Prespawn(_dragonPrefab, 1);<br/>   }<br/><br/>  void Update () {<br/>    if (Input.GetKeyDown(KeyCode.Alpha1)) {SpawnObject(_orcPrefab, _orcs);}<br/>    if (Input.GetKeyDown(KeyCode.Alpha2)) {SpawnObject(_trollPrefab, _trolls);}<br/>    if (Input.GetKeyDown(KeyCode.Alpha3)) {SpawnObject(_ogrePrefab, _ogres);}<br/>    if (Input.GetKeyDown(KeyCode.Alpha4)) {SpawnObject(_dragonPrefab, _dragons);}<br/>    if (Input.GetKeyDown(KeyCode.Q)) { DespawnRandomObject(_orcs); }<br/>    if (Input.GetKeyDown(KeyCode.W)) { DespawnRandomObject(_trolls); }<br/>    if (Input.GetKeyDown(KeyCode.E)) { DespawnRandomObject(_ogres); }<br/>    if (Input.GetKeyDown(KeyCode.R)) { DespawnRandomObject(_dragons); }<br/>  }<br/><br/>  void SpawnObject(GameObject prefab, List&lt;GameObject&gt; list) {<br/>    GameObject obj = PrefabPoolingSystem.Spawn (prefab, <br/>                                                5.0f * Random.insideUnitSphere, <br/>                                                Quaternion.identity);<br/>    list.Add (obj);<br/>  }<br/><br/>  void DespawnRandomObject(List&lt;GameObject&gt; list) {<br/>    if (list.Count == 0) {<br/>       // Nothing to despawn<br/>       return;<br/>    }<br/><br/>    int i = Random.Range (0, list.Count);<br/>    PrefabPoolingSystem.Despawn(list[i]);<br/>    list.RemoveAt(i);<br/>  }<br/>}</pre>
+<p>Once we spawn more than five instances of any of the <span>P</span>refabs, it will need to instantiate a new one in memory, costing us some memory allocation. However, if we observe the <span class="packt_screen">Memory Area</span> in the <span class="packt_screen">Profiler</span> window, while we only spawn and despawn instances that already exist, then we will notice that absolutely no new allocations take place.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Prefab pooling and scene loading</h1>
+                </header>
+            
+            <article>
+                
+<p>There is one important caveat to this system that has not yet been mentioned: the <kbd>PrefabPoolingSystem</kbd> class will outlast the scene's lifetime since it is a static class. This means that when a new scene is loaded, the pooling system's dictionaries will attempt to maintain references to any pooled instances from the previous scene, but Unity forcibly destroys these objects regardless of the fact that we are still keeping references to them (unless they were set to <kbd>DontDestroyOnLoad()</kbd>), and so the dictionaries will be full of <kbd>null</kbd> references. This would cause some serious problems for the next scene.</p>
+<p>We should, therefore, create a method in <kbd>PrefabPoolingSystem</kbd> that resets the pooling system in preparation for this likely event. The following method should be called before a new scene is loaded so that it is ready for any early calls to <kbd>Prespawn()</kbd> in the next scene:</p>
+<pre>public static void Reset() {<br/>  _prefabToPoolMap.Clear ();<br/>  _goToPoolMap.Clear ();<br/>}</pre>
+<p>Note that if we also invoke a garbage collection during scene transitions, there's no need to explicitly destroy the <kbd>PrefabPool</kbd> objects these dictionaries were referencing. Since these were the only references to the <kbd>PrefabPool</kbd> objects, they will be deallocated during the next garbage collection. If we aren't invoking garbage collection between scenes, then the <kbd>PrefabPool</kbd> and <kbd>PooledPrefabData</kbd> objects will remain in memory until that time.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Prefab pooling summary</h1>
+                </header>
+            
+            <article>
+                
+<p>This pooling system provides a decent solution to the problem of runtime memory allocations for GameObjects and <span>P</span>refabs, but, as a quick reminder, we need to be aware of the following caveats:</p>
+<ul>
+<li>We need to be careful about properly resetting important data in respawned objects (such as <kbd>Rigidbody</kbd> velocity)</li>
+<li>We must ensure that we don't prespawn too few, or too many, instances of a <span>P</span>refab</li>
+<li>We should be careful of the order of execution of <kbd>Spawned()</kbd> and <kbd>Despawned()</kbd> methods on <kbd>IPoolableComponent</kbd> and not assume that they will be called in a particular order</li>
+<li>We must call <kbd>Reset()</kbd> on <kbd>PrefabPoolingSystem</kbd> when loading a new scene to clear any <kbd>null</kbd> references to objects, which may no longer exist</li>
+</ul>
+<p>There are several other features that we could implement. These will be left as academic exercises if we wish to extend this system in the future:</p>
+<ul>
+<li>Any <kbd>IPoolableComponent</kbd> added to the <kbd>GameObject</kbd> after initialization will not have their <kbd>Spawned()</kbd> or <kbd>Despawned()</kbd> methods invoked since we only collect this list when <kbd>GameObject</kbd> is first instantiated. We could fix this by changing <kbd>PrefabPool</kbd> to keep acquiring <kbd>IPoolableComponent</kbd> references every time <kbd>Spawned()</kbd> and <kbd>Despawned()</kbd> are invoked at the cost of additional overhead during spawning/despawning.</li>
+<li>Any <kbd>IPoolableComponent</kbd> attached to children of the Prefab's root will also not be counted. This could be fixed by changing <kbd>PrefabPool</kbd> to use <kbd>GetComponentsInChildren&lt;T&gt;</kbd> at the cost of additional overhead if we're using <span>P</span>refabs with deep hierarchies.</li>
+<li>Prefab instances that already exist in the scene will not be managed by the pooling system. We could create a component that needs to be attached to such objects and that notifies the <kbd>PrefabPoolingSystem</kbd> class of its existence in its <kbd>Awake()</kbd> callback, which passes the reference along to the corresponding <kbd>PrefabPool</kbd>.</li>
+<li>We could implement a way for <kbd>IPoolableComponent</kbd> to set a priority during acquisition and directly control the order of execution for their <kbd>Spawned()</kbd> and <kbd>Despawned()</kbd> methods.</li>
+</ul>
+<ul>
+<li>We could add counters that keep track of how long objects have been sitting in the Inactive list relative to total scene lifetime and print out the data during shutdown. This could tell us whether or not we're prespawning too many instances of a given <span>P</span>refab.</li>
+<li>This system will not interact kindly with <span>P</span>refab instances that set themselves to <kbd>DontDestroyOnLoad()</kbd>. It might be wise to add a Boolean to every <kbd>Spawn()</kbd> call to say whether the object should persist or not and keep them in a separate data structure that is not cleared out during <kbd>Reset()</kbd>.</li>
+<li>We could change <kbd>Spawn()</kbd> to accept an argument that allows the requestor to pass custom data to the <kbd>Spawned()</kbd> function of <kbd>IPoolableObject</kbd> for initialization purposes. This could use a system similar to how custom message objects were derived from the <kbd>Message</kbd> class for our messaging system in <a href="https://cdp.packtpub.com/unity_2017_game_optimization__second_edition/wp-admin/post.php?post=123&amp;action=edit#post_44">Chapter 2</a><span>,</span> <em>Scripting Strategies</em>.</li>
+</ul>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">IL2CPP optimizations</h1>
+                </header>
+            
+            <article>
+                
+<p>Unity Technologies have released a few blog posts on interesting ways to improve the performance of IL2CPP in some circumstances, but they can be difficult to manage. If you're using IL2CPP and need to eke out the last little bit of performance from our application that we can, then check out the blog series at the following links:</p>
+<ul>
+<li><a href="https://blogs.unity3d.com/2016/07/26/il2cpp-optimizations-devirtualization/">https://blogs.unity3d.com/2016/07/26/il2cpp-optimizations-devirtualization/</a></li>
+<li><a href="https://blogs.unity3d.com/2016/08/04/il2cpp-optimizations-faster-virtual-method-calls/">https://blogs.unity3d.com/2016/08/04/il2cpp-optimizations-faster-virtual-method-calls/</a></li>
+<li><a href="https://blogs.unity3d.com/2016/08/11/il2cpp-optimizations-avoid-boxing/">https://blogs.unity3d.com/2016/08/11/il2cpp-optimizations-avoid-boxing/</a></li>
+</ul>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">WebGL optimizations</h1>
+                </header>
+            
+            <article>
+                
+<p>Unity Technologies have also released several blog posts covering WebGL applications, which includes some crucial information about memory management that all WebGL developers should know. These can be found at the following links:</p>
+<ul>
+<li><a href="https://blogs.unity3d.com/2016/09/20/understanding-memory-in-unity-webgl/">https://blogs.unity3d.com/2016/09/20/understanding-memory-in-unity-webgl/</a></li>
+<li><a href="https://blogs.unity3d.com/2016/12/05/unity-webgl-memory-the-unity-heap/">https://blogs.unity3d.com/2016/12/05/unity-webgl-memory-the-unity-heap/</a></li>
+</ul>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Summary</h1>
+                </header>
+            
+            <article>
+                
+<p>We've covered a humongous amount of theory and language concepts in this chapter, which have hopefully shed some light on how the internals of the Unity engine and C# language work. These tools try their best to spare us from the burden of complex memory management, but there is still a whole host of concerns we need to keep in mind as we develop our game. Between the compilation processes, multiple memory domains, the complexities of value types versus reference types, passing by value versus passing by reference, boxing, object pooling, and various quirks within the Unity API, you have a lot of things to worry about. However, with enough practice, you will learn to overcome them without needing to keep referring to giant tomes such as this!</p>
+<p>With this chapter, we have covered all of the possible optimization areas in classic Unity. However, with the 2019.1 release, Unity officially introduced the <strong>Data-Oriented Technology Stack</strong> (<strong>DOTS</strong>), a set of new fundamental APIs to access a completely new optimization level, especially in modern massively multi-threading systems. Follow me to the next chapter, where we will explore this new frontier.</p>
+
+
+            </article>
+
+            
+        </section>
+    </body></html>

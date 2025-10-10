@@ -1,0 +1,406 @@
+<html><head></head><body>
+        <section>
+
+                            <header>
+                    <h1 class="header-title">The Benefits of Batching</h1>
+                </header>
+            
+            <article>
+                
+<p>In 3D graphics and games, batching is a very general term used to describe the process of grouping a large number of wayward pieces of data together and processing them as a single, large block of data. This situation is ideal for CPUs, and particularly GPUs, which can handle the simultaneous processing of multiple tasks with their multiple cores. Having a single core switching back and forth between different locations in memory takes time, so the less this needs to be done, the better.</p>
+<p>In some cases, the act of batching refers to large sets of meshes, vertices, edges, UV coordinates, and other different data types that are used to represent a 3D object; however, the term could just as easily refer to the act of batching audio files, sprites, texture files, and other large datasets.</p>
+<p>So, just to clear up any confusion, when the topic of batching is mentioned in Unity, it is usually referring to the two primary mechanisms it offers for batching mesh data: <strong>dynamic batching</strong> and <strong>static batching</strong>. These methods are essentially two different forms of geometry merging, where we combine the mesh data of multiple objects together and render them all in a single instruction, as opposed to preparing and drawing each one separately.</p>
+<p>The process of batching together multiple meshes into a single mesh is possible because there is no reason why a mesh object must fill a contiguous volume of 3D space. The Rendering Pipeline is perfectly happy with accepting a collection of vertices that are not attached together with edges, and so we can take multiple separate meshes that might have resulted in multiple render instructions and combine them together into a single mesh, thereby rendering it using a single instruction.</p>
+<p>There has been a lot of confusion over the years surrounding the conditions under which the dynamic batching and static batching systems activate and where we might even see an improvement in performance. After all, in some cases, batching can actually degrade performance if it is not used wisely. A proper understanding of these systems will give us the knowledge we need to improve the graphics performance of our application in significant ways.</p>
+<p>This chapter intends to dispel much of the misinformation floating around about these systems. We will see, via explanation, exploration, and examples, just how these two batching methods operate. This will enable us to make informed decisions, using most of them to improve our application's performance.</p>
+<p>We will cover the following topics in this chapter:</p>
+<ul>
+<li>A brief introduction to the Rendering Pipeline and the concept of draw calls</li>
+<li>How Unity's materials and shaders work together to render our objects</li>
+<li>Using the Frame Debugger to visualize rendering behavior</li>
+<li>How dynamic batching works, and how to optimize it</li>
+<li>How static batching works, and how to optimize it</li>
+</ul>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Draw calls</h1>
+                </header>
+            
+            <article>
+                
+<p>Before we discuss dynamic batching and static batching, let's first learn about the problems that they are both trying to solve within the Rendering Pipeline. We will try to keep our analysis fairly light on the technicalities as we will explore this topic in greater detail in <a href="">Chapter 6</a>, <em>Dynamic Graphics</em>.</p>
+<p>The primary goal of these batching methods is to reduce the number of draw calls required to render all objects in the current view. At its most basic form, a draw call is a request sent from the CPU to the GPU asking it to draw an object.</p>
+<div class="packt_infobox"><strong>Draw call </strong>is the common industry vernacular for this process, although they are sometimes referred to as <span class="packt_screen">SetPass Calls</span> in Unity since some low-level methods are named as such. Think of this as configuring options before initiating the current rendering pass. We will refer to them as draw calls throughout the remainder of this book.</div>
+<p>Before a draw call can be requested, the system needs to perform several operations. The complete list is too long for this book, and depends on the specific features enabled on Unity; however, we can categorize them into two significant steps:</p>
+<ol>
+<li class="mce-root">Upload assets and meshes to the GPU</li>
+<li class="mce-root">Set up the rendering of the meshes using the uploaded assets.</li>
+</ol>
+<p class="mce-root">In the first step, mesh and texture data must be pushed from the CPU memory (RAM) into GPU memory (VRAM), which typically takes place during the initialization of the scene, but only for textures and meshes that the scene file knows about. If we dynamically instantiate objects at runtime using texture and mesh data that hasn't appeared in the scene yet, then they must be loaded at the time we instantiate them. The scene cannot know ahead of time which Prefabs we're planning to instantiate at runtime, as many of them are hidden behind conditional statements and much of our application's behavior depends upon user input.</p>
+<p class="mce-root">In the second step, the CPU must prepare the GPU by configuring the options and rendering features that are needed to process the object that is the target of the draw call.</p>
+<p class="mce-root">To handle all these interactions between the CPU and GPU, we use the underlying graphics API, which could be DirectX, OpenGL, OpenGLES, Metal, WebGL, or Vulkan, depending on the platform we're targeting and the specific graphical settings we are using. These API calls go through a library—called a <strong>driver</strong>—which maintains a long series of complex and interrelated settings, state variables, and datasets that can be configured and executed from our application. The available features change enormously based on the graphics card we're using and the version of the graphics API we're targeting. More advanced graphics cards support more advanced features, which would need to be supported by newer versions of the API, so updated drivers would be needed to enable them. The sheer number of settings, features, and compatibility levels between one version and another that have been created over the years (particularly for older APIs such as DirectX and OpenGL) is nothing short of mind boggling. Thankfully, at a certain level of abstraction, all of these APIs tend to operate similarly, which means that Unity can support many different graphics APIs through a common interface.</p>
+<p class="mce-root">To refer to this utterly massive array of settings that must be configured to prepare the Rendering Pipeline just before rendering an object, we often use a single term: <span class="packt_screen">Render State</span>. Until these <span class="packt_screen">Render State</span> options <span><span>remain the same</span></span>, the GPU maintains the last <span class="packt_screen">Render State</span> settings for all incoming objects and renders them accordingly.</p>
+<p>Changing any of the <span class="packt_screen">Render State</span> settings can be a time-consuming process. For example, if we set the <span class="packt_screen">Render State</span> to use a blue texture file, and then we try to render one gigantic mesh, it would be rendered very rapidly, with the whole mesh appearing blue. At this point, we could render nine more completely different meshes, and they would all be rendered blue since we haven't changed <span>which texture the GPU should use </span><span>in <span class="packt_screen">Render State</span></span><span>. If, however, we wanted to render 10 meshes using 10 different textures, then this would take longer because we would need to prepare <span class="packt_screen">Render State</span> with the new texture for each mesh just before sending the draw call instruction.</span></p>
+<p class="mce-root">The texture used to render the current object is effectively a global variable in the graphics API, and changing a global variable within a parallel system is much easier said than done. In a massively parallel system such as a GPU, we must effectively wait until all of the current jobs have reached the same synchronization point (in other words, the fastest cores need to stop and wait for the slowest ones to catch up, wasting processing time could be used on other tasks) before we can make <span class="packt_screen">Render State</span> change, at which point we will need to spin up all of the parallel jobs again. This continuous waiting can waste a lot of time, and therefore the less we need to ask <span class="packt_screen">Render State</span> to change, the faster the graphics API will be able to process our requests.</p>
+<p class="mce-root">Things that can trigger <span class="packt_screen">Render State</span> synchronization include—but are not limited to—an immediate push of a new texture to the GPU and changing a shader, lighting information, shadows, transparency, and pretty much any graphical setting we can think of.</p>
+<p class="mce-root">Once we configure <span class="packt_screen">Render State</span>, the CPU must decide what mesh to draw, what textures and shader it should use, and where to draw the object based on its position, rotation, and scale (all represented within a 4 x 4 matrix known as a <strong>transform</strong>, which is where the <kbd>Transform</kbd> component gets its name from), and then send an instruction to the GPU to draw it. To keep the communication between the CPU and GPU very dynamic, Unity pushes new instructions into a queue known as the <strong>command buffer</strong>. This queue contains instructions that the CPU has created, from which the GPU pulls a new command each time it finishes the preceding one.</p>
+<p class="mce-root">The trick to how batching improves the performance of this process is that a new draw call does not necessarily mean that we need to configure a new <span class="packt_screen">Render State</span>. If two objects share the exact same <span class="packt_screen">Render State</span> information, then the GPU can immediately begin rendering the new object since the same <span class="packt_screen">Render State</span> is maintained after the last object is finished. This eliminates the time wasted because of <span class="packt_screen">Render State</span> synchronization. It also reduces the number of instructions that need to be pushed into the command buffer, reducing the workload on both the CPU and GPU.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Materials and shaders</h1>
+                </header>
+            
+            <article>
+                
+<p><span class="packt_screen">Render State</span><span> in Unity</span> is essentially exposed to us via <strong>materials</strong>. Materials are containers around shaders,<span> short programs that define how the GPU should render incoming vertex and texture data. A shader on its own does not have the necessary knowledge of the state to accomplish anything of value. A shader requires input such as diffuse textures, normal maps, and lighting information, and effectively dictates what <span class="packt_screen">Render State</span> variables need to be set in order to render the incoming data.</span></p>
+<div class="packt_tip">Shaders are named this way because, <span>many years ago, </span><span>their original implementation was to only handle the lighting and</span> shading <span>of an object (applying shadows where originally there were none). Their purpose has grown enormously since then, and now they have the much more generic purpose of being a programmable access point to many different kinds of parallel tasks, but the old name still remains.</span></div>
+<p>Every shader needs a material, and every material must have a shader. Even newly imported meshes introduced into the scene without an assigned material are automatically assigned a default (hidden) material, which gives them a basic diffuse shader and a white coloration, so there is no way of getting around this relationship.</p>
+<div class="packt_tip">Note that a single material can only support a single shader. The use of multiple shaders on the same mesh requires separate materials to be assigned to different parts of the same mesh.</div>
+<p>Therefore, if we want to minimize how often <span class="packt_screen">Render State</span> changes, then we can do so by reducing the number of materials we use during a scene. This would result in two performance improvements simultaneously: the CPU will spend <span>less time</span> generating and transmitting instructions to the GPU during each frame and the GPU won't need to stop and resynchronize state changes as often.</p>
+<p>Let's begin with a simple scene in order to visualize the behavior of materials and batching. However, before we start, we should disable a few rendering options, as they will contribute some extra draw calls, which might be distracting:</p>
+<ol>
+<li>Navigate to <span class="packt_screen">Edit</span> | <span class="packt_screen">Project Settings</span> | <span class="packt_screen">Quality</span> and set <span class="packt_screen">Shadows</span> to <span class="packt_screen">Disable Shadow</span><span class="packt_screen">s</span> (or select the default <span class="packt_screen">Fastest</span> quality level)</li>
+<li>Navigate to <span class="packt_screen">Edit</span> | <span class="packt_screen">Project Settings</span> | <span class="packt_screen">Player</span><span>, open the</span> <span class="packt_screen">Other Settings</span> <span>tab, and disable</span> <span class="packt_screen">Static Batching</span><span> and</span> <span class="packt_screen">Dynamic Batching</span>, <span>if they are enabled</span></li>
+</ol>
+<p>Next, we'll create a scene that contains a single directional light with four cubes and four spheres, where each object has its own unique material, position, rotation, and scale, as shown in the following screenshot:</p>
+<p class="CDPAlignCenter CDPAlign"><img src="assets/f0ffd2af-7cea-4679-a9d6-df66521986c2.png" style="width:41.50em;height:33.25em;"/></p>
+<p>In the preceding screenshot, <span>we can see 9 total batches </span><span>in the</span> <span class="packt_screen">Batching</span> <span>value in the</span> <span class="packt_screen">Game</span> <span>window's</span> <span class="packt_screen">Stats</span> <span>popup. This value closely represents the number of draw calls used to render the scene. The current view will consume one of these batches that renders the</span> background <span>of the scene, which could be set to</span> <span class="packt_screen">Skybox</span><span> or </span><span class="packt_screen">Solid Color</span><span>. This is determined by the camera object's</span> <span class="packt_screen">Clear Flags</span> <span>settings.</span></p>
+<p>The remaining eight batches are used to draw our eight objects. In each case, the draw call involves preparing the Rendering Pipeline using the material's properties and asking the GPU to render the given mesh at its current transform. We have ensured that each material is unique by giving them each a unique texture file to render. So, each mesh requires a different <span class="packt_screen">Render State</span>, and, therefore, each of our eight meshes requires a unique draw call.</p>
+<p>As previously mentioned, we can theoretically minimize the number of draw calls by reducing how often we cause the system to change <span class="packt_screen">Render State</span> information; so, part of the goal is to reduce the number of materials we use. However, if we configure all objects to use the same material, we still won't see any benefit, and the number of batches will remain at nine:</p>
+<p class="CDPAlignCenter CDPAlign"><img src="assets/b18b9038-34e9-460b-959c-fee468759166.png"/></p>
+<p>This is because we're not actually reducing the number of <span class="packt_screen">Render State</span> changes, nor are we efficiently grouping mesh information. Unfortunately, the Rendering Pipeline is not smart enough to realize we're overwriting the exact same <span class="packt_screen">Render State</span> values and then asking it to render the same meshes over and over again.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">The Frame Debugger</h1>
+                </header>
+            
+            <article>
+                
+<p>Before we dive into how batching can save us draw calls, let's explore a useful tool that can help us to determine how batching is affecting our scene—the Frame Debugger.</p>
+<p class="mce-root">We can open <span class="packt_screen">Frame Debugger</span> by selecting <span class="packt_screen">Window</span> | <span class="packt_screen">Analysis</span> |<span> </span><span class="packt_screen">Frame Debugger</span> from the main window or clicking on the <span class="packt_screen">Frame Debugger</span> button in <span class="packt_screen">Breakdown View Options</span> in the rendering area of the Profiler. Either approach will open the <span class="packt_screen">Frame Debug</span> window.</p>
+<p>Clicking on the <span class="packt_screen">Enable</span> button in the <span class="packt_screen">Frame Debug</span> window will allow us to observe how our scene is being constructed, one draw call at a time. The following screenshot shows the user interface of the Frame Debugger, with a list of GPU instructions in the left-hand panel and more detailed information in the right-hand panel:</p>
+<p class="CDPAlignCenter CDPAlign"><img src="assets/e500043a-5d55-4adb-a9ff-f1dc9fc8cb74.png" style="width:44.58em;height:32.33em;"/></p>
+<p>There is a lot of information in this window that can provide us with useful information if we want to debug the behavior of a single draw call, but the most useful area to look at is the <span class="packt_screen">Drawing</span> section in the left-hand panel, which lists all of the draw calls in our scene.</p>
+<p>Each item in this section represents a unique draw call and what was rendered by it. An amazingly useful feature of this tool is the ability to click on any one of these items and immediately observe only the draw calls needed to render the scene up to that point in the <span class="packt_screen">Game</span> window. This lets us see visually the differences between two sequential draw calls. This can make it easy to spot exactly which object(s) were rendered by a given draw call. This can help determine whether or not a set of objects were batched together by looking at how many of them appear during that draw call.</p>
+<div class="packt_tip">A weird bug with the Frame Debugger (which still exists in early builds of Unity 2019) is that if we are observing a scene that is making use of a skybox and click on various items under the <span class="packt_screen">Drawing</span> section, then only the final scene presentation can be observed in the <span class="packt_screen">Game</span> window. We would need to temporarily disable the skybox via the camera's <span class="packt_screen">Clear Flags</span> setting to look at how the draw call progression appears in the <span class="packt_screen">Game</span> <span>window </span>by setting it to <span class="packt_screen">Solid Color</span> instead.</div>
+<p>As we can see in the preceding Frame Debugger screenshot, one draw call is being consumed to clear the screen (the item labeled <span class="packt_screen">Clear</span>), and then our eight meshes are being rendered in eight separate draw calls (the item labeled <kbd>RenderForward.RenderLoopJob</kbd>).</p>
+<div class="packt_tip">Note that the number next to each item in the left-hand panel actually represents a graphics API call, of which a draw call is but one type of API call. These can be seen in the <kbd>Camera.Render</kbd>, <kbd>Camera.ImageEffects</kbd>, and <kbd>RenderTexture.ResolveAA</kbd> items. Any API call can be just as costly as a draw call, but the overwhelming majority of API calls we will make in a complex scene will be in the form of draw calls, so it is often best to focus on minimizing draw calls before worrying about the API communication overhead of things such as post processing effects.</div>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Dynamic batching</h1>
+                </header>
+            
+            <article>
+                
+<p>Dynamic batching has the following three important qualities:</p>
+<ul>
+<li>Batches are generated at runtime (batches are dynamically generated)</li>
+<li>The objects that are contained within a batch can vary from one frame to the next, depending on what meshes are currently visible to the <span class="packt_screen">Main Camera</span> view (batch contents are dynamic)</li>
+<li>Even objects that can move around the scene can be batched (it works on dynamic objects)</li>
+</ul>
+<p>These attributes lead us to the name <span class="packt_screen">Dynamic Batching</span>.</p>
+<p>If we return to the <span class="packt_screen">Player Settings</span> page and enable <span class="packt_screen">Dynamic Batching</span>, we should see that the number of batches drops from nine down to six. <span class="packt_screen">Dynamic Batching</span> automatically recognizes that our objects share material and mesh information and, therefore, combines some of them into a larger batch for processing. We should also see a different list of items in the Frame Debugger, demonstrating that meshes are now being dynamically batched:</p>
+<p class="CDPAlignCenter CDPAlign"><img src="assets/3de2be33-03df-4f2b-b6a4-03578a390e2d.png" style="width:46.50em;height:25.58em;"/></p>
+<p>As we can see from the Frame Debugger, our four boxes have been combined into a single draw call named <span class="packt_screen">Dynamic Batch</span>, but our four spheres are still being rendered with four separate draw calls. This is because the four spheres do not fit the requirements of dynamic batching, despite the fact that they<span> all</span> use the same material. There are many more requirements we must fulfill.</p>
+<p>You can find the list of the requirements needed to successfully dynamically batch a mesh in the Unity documentation at this address: <a href="http://docs.unity3d.com/Manual/DrawCallBatching.html">http://docs.unity3d.com/Manual/DrawCallBatching.html</a>.</p>
+<p>The following list covers the requirements to enable dynamic batching for a given mesh:</p>
+<ul>
+<li>All mesh instances must use the same material reference.</li>
+<li>Only <kbd>ParticleSystem</kbd> and <kbd>MeshRenderer</kbd> components are dynamically batched. The <kbd>SkinnedMeshRenderer</kbd> components (for animated characters) and all other renderable component types cannot be batched.</li>
+</ul>
+<ul>
+<li>There is a limit of 300 vertices per mesh; however, the total number of vertex attributes used by the shader must be no greater than 900. This means that for complex shaders, the maximum number of vertices per mesh may be less than 300 (see the <em>Vertex attributes</em> section for more details).</li>
+<li><span>The objects must not contain mirroring on the transform (that is, a <kbd>GameObject</kbd> A with a positive scale and a <kbd>GameObject</kbd> B with a negative scale cannot be batched together).</span></li>
+<li>Mesh instances should refer to the same lightmap file.</li>
+<li>The material's shader should not depend on multiple passes.</li>
+<li>Mesh instances must not receive real-time shadows.</li>
+<li>There is an upper limit on the total number of mesh indices in the entire batch, which varies for the graphics API and platform used, which is around 32,000–64,000 indices (check out the documentation/previously mentioned blog post for specifics).</li>
+</ul>
+<p>It is important to note the term <strong>material reference<em>s</em></strong> because, if we happen to use two different materials with identical settings, the Rendering Pipeline is not smart enough to realize that, and they will be treated as different materials and, therefore, will be disqualified from dynamic batching. Most of the rest of these requirements have already been explained; however, a couple of these requirements are not completely intuitive or clear from their description, which merits some additional explanation.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Vertex attributes</h1>
+                </header>
+            
+            <article>
+                
+<p>A vertex attribute is simply a piece of information contained within a mesh file on a per-vertex basis, and each is normally represented as a group of multiple floating-point values. This includes, but is not limited to, a vertex's position (relative to the root of the mesh), a normal vector (a vector pointing away from the object's surface, most often used in lighting calculations), one or more sets of texture UV coordinates (used to define how one or more textures wrap around the mesh), and possibly even color information per vertex (normally used in custom lighting or for a flat shaded, low poly style object). Only meshes with fewer than 900 total vertex attributes used by the shader can be included in dynamic batching.</p>
+<div class="packt_infobox">Note that looking into a mesh's raw data file may contain less vertex attribute information than what Unity loads into memory because of how the engine converts mesh data from one of several raw data formats into an internal format, so don't assume that the number of attributes our 3D modeling tool tells us the mesh uses will be the final count. The best way to verify the attribute count is to drill down into the mesh object in the <span class="packt_screen">Project</span> window until you find the <kbd>MeshFilter</kbd> component and look at the <span class="packt_screen">verts</span> value that appears in the <span class="packt_screen">Preview</span> subsection of the <span class="packt_screen">Inspector</span> window.</div>
+<p>Using more attribute data per vertex within the accompanying shader will consume more from our 900-attribute budget, and<span> </span><span>therefore reduce the number of vertices the mesh is allowed to have before it can no longer be used in dynamic batching. For example, a simple diffuse shader might only use three attributes per vertex: position, normal, and a single set of UV coordinates. Dynamic watching would, therefore, be able to support meshes using this shader, which has a combined total of 300 vertices; however, a more complex shader, requiring 5 attributes per vertex, would only be able to support dynamic batching with meshes using no more than 180 vertices. Also, note that even if we are using less than 3 vertex attributes per vertex in our shader, dynamic batching still only supports meshes with a maximum of 300 vertices, so only relatively simple objects are candidates for dynamic batching.</span></p>
+<p>These restrictions are why our scene saves<span> only</span> 3 draw calls with dynamic batching enabled, despite having all objects share the same material reference. The cube mesh that is autogenerated by Unity contains a mere 8 vertices, each with position, normal, and UV data, for 24 attributes in total. This is far less than the 300-vertex limit and 900-vertex attribute limit. However, an autogenerated sphere mesh contains 515 vertices, and therefore has 1,545 total vertex attributes. These meshes clearly exceed both the 300-vertex and 900-vertex attribute limits and, therefore, cannot be dynamically batched.</p>
+<p class="CDPAlignCenter CDPAlign"><img src="assets/20f98009-4a01-491a-8e46-d5b47322ab86.png"/></p>
+<p>If we click on one of the draw call items in the Frame Debugger, a section labeled <span class="packt_screen">Why this draw call can't be batched with the previous one</span> will appear. Most of the time, the explanation text beneath tells us which requirement we failed <span>(or at least the first one it detected) </span><span>and which ones can be useful for debugging batching behavior.</span></p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Mesh scaling</h1>
+                </header>
+            
+            <article>
+                
+<p>The documentation clearly <span>states</span><span> </span><span>that using negative scaling has a strange effect on dynamic batching. Negative scaling is often a quick way to mirror a mesh in our scene, which can save us from having to create and import a completely different mesh for something that's only flipped on one axis. This trick is commonly used for pairs of doors, or just to make a scene look more varied. However, if we only negatively scale the mesh on one or three axes, then it will be placed into a different dynamic batch than meshes that are negatively scaled on zero or two axes. It does not matter which of the three values (</span><kbd>x</kbd><span>,</span> <kbd>y</kbd><span>, or</span> <kbd>z</kbd><span>) are negative, only whether the total number of negative values is odd or even.</span></p>
+<p>Another strange property of how batch-splitting works behind the scene is that the rendering order of the objects can determine what gets batched together. If the previous object would have appeared in a different batch group than the current one, then it cannot be batched. Again, this is best explained by an example. Consider that we have five objects again: <em>V</em> scaled at <kbd>(1, 1, 1)</kbd>, <em>W</em> scaled at <kbd>(-1, 1, 1)</kbd>, <em>X</em> scaled at <kbd>(-1, -1, 1)</kbd>, <em>Y</em> scaled at <kbd>(-1, -1, -1)</kbd>, and finally <em>Z</em> scaled similarly to <em>V</em> at <kbd>(1, 1, 1)</kbd>. Objects <em>V</em> and <em>Z</em> share a common uniform scale, so we might expect them to be batched together. However, if all of these objects were rendered to the scene in the preceding order, then object <em>V</em> will be rendered and Unity will test to check whether objects <em>W</em> and <em>V</em> could share a batch. They cannot because of object <em>W</em>'s odd negative scaling, so no batching will take place. Unity will then compare object <em>X</em> with object <em>W</em> to check whether they can be batched, which they cannot because <em>W</em> has an odd negative scaling and <em>X</em> has an even negative scaling. The next comparisons between objects <em>W-Y</em> and <em>Y-Z</em> fail for the same reason. The end result is that all five objects will be rendered with five separate draw calls, and there was no opportunity to combine objects <em>V</em> and <em>Z</em>. Note that this weird effect comes into play only when negative scaling is used.</p>
+<p>Presumably, this is all a by-product of the algorithm used to detect valid batchable groups, since mirroring a mesh in two dimensions is mathematically equivalent to rotating the mesh by 180 degrees around the mirroring axis, while there is no rotational equivalent to mirroring a mesh on one or three axes. Therefore, the behavior we observe is perhaps just the dynamic batching system automatically transforming the object for us, although this isn't completely clear. Regardless, hopefully this prepares us for many of the weird situations we might run into when it comes to generating dynamic batches.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Dynamic batching summary</h1>
+                </header>
+            
+            <article>
+                
+<p>Dynamic batching is a very useful tool when we want to render very large groups of simple meshes. The design of the system makes it ideal to use when we're making use of large numbers of simple meshes, which are nearly identical in appearance. Some possible use cases to apply dynamic batching could be as follows:</p>
+<ul>
+<li>We want to render a large forest filled with rocks, trees, and bushes</li>
+<li>We want to render a building, factory, or space station with many simple, common elements (computers, corridor pieces, pipes, and so on)</li>
+<li>We want to build a game featuring many dynamic, non-animated objects with simple geometry and particle effects (a game such as <em>Geometry Wars</em> springs to mind)</li>
+</ul>
+<p>If the only requirement preventing two objects from being dynamically batched together is the fact that they use different texture files, be aware that it only takes a bit of development time and effort to combine textures and regenerate mesh UVs so that they can be dynamically batched together (commonly known as <strong>atlasing</strong>). This may cost us in texture quality or the overall size of a texture file (which can have drawbacks that we will understand once we dive into the topic of GPU memory bandwidth in <a href="">Chapter 6</a>, <em>Dynamic Graphics</em>), but it is worth considering.</p>
+<p>Perhaps the only situation where dynamic batching may hinder performance is if we were to set up a scene with hundreds of simple objects, where only a few objects are put into each batch. In these cases, the overhead cost of detecting and generating so many small batches might cost more time than we'd save by just making a separate draw call for each mesh. Even so, this is unlikely.</p>
+<p>If anything, we're far more likely to inflict performance losses on our application by simply assuming that dynamic batching is taking place when we've actually forgotten one of the essential requirements. We can accidentally break the vertex limit by pushing a new version of a mesh, and in the process of Unity converting a raw object (with the <kbd>.obj</kbd> extension) file into its own internal format, it will generate more vertex attributes than we expected. We could also exceed it by tweaking some shader code or adding additional passes without realizing that this would disqualify it from dynamic batching. We might even set up the object to enable shadows or light probes, which breaks another requirement.</p>
+<p>There will be no warning sign when these accidents occur, save for the number of draw calls increasing after changes are made and causing graphic performance to degrade further and further. Maintaining a healthy amount of dynamic batching in our scenes requires constant vigilance in checking our draw call count and looking at Frame Debugger data to make sure that we didn't accidentally disqualify objects from dynamic batching during our latest changes. However, as always, we only need to worry about our draw call performance if we've already proven that it's causing a performance bottleneck.</p>
+<p>Ultimately, every situation is unique, so it is worth experimenting with our mesh data, materials, and shaders to determine what can and cannot be dynamically batched, as well as performing tests on our scene from time to time to ensure that the number of draw calls we're using remains reasonable.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Static batching</h1>
+                </header>
+            
+            <article>
+                
+<p>Unity offers a second batching mechanism known as <strong>static batching</strong>. This batching feature is similar to dynamic batching in a couple of ways, in that the objects that are to be batched are determined at runtime based on what's visible to the camera, and the contents of these batches will vary from frame to frame. However, there is one very important difference: it only works on objects that are marked <span class="packt_screen">Static</span>, hence the name static batching.</p>
+<p>The static batching system has its own set of requirements:</p>
+<ul>
+<li>As the name implies, the meshes must be flagged as <span class="packt_screen">Static</span> (specifically, <span class="packt_screen">Batching Static</span>)</li>
+<li>Additional memory must be set aside for each mesh that is being statically batched</li>
+<li>There is an upper limit on the number of vertices that can be combined in a static batch that varies per graphics API and platform, which is around 32,000–64,000 vertices (check out the documentation/previously mentioned blog post for specifics)</li>
+<li>The mesh instances can come from any source mesh, but they must share the same material reference</li>
+</ul>
+<p>Let's cover some of these requirements in more detail.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">The Static flag</h1>
+                </header>
+            
+            <article>
+                
+<p>Static batching can only be applied to objects with the <span class="packt_screen">Static</span> flag enabled, or, more specifically, the <span class="packt_screen">Batching Static</span> subflag (these subflags are known as <span class="packt_screen">StaticEditorFlags</span>). Clicking on the small down arrow next to the <span class="packt_screen">Static</span> option for a <kbd>GameObject</kbd> will reveal a drop-down list of <span class="packt_screen">StaticEditorFlags</span>, which can alter the object's behavior for various <span class="packt_screen">Static</span> processes.</p>
+<p>An obvious side effect of this is that the object's transform cannot be changed, and, hence, any object wishing to make use of static batching cannot be moved, rotated, or scaled in any way.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Memory requirements</h1>
+                </header>
+            
+            <article>
+                
+<p>The additional memory requirement for static batching will vary, depending on the amount of replication occurring within the batched meshes. Static batching works by copying the data for all flagged and visible meshes into a single, large mesh data buffer, and passing it into the Rendering Pipeline through a single draw call while ignoring the original mesh. If all of the meshes being statically batched are unique, then this would cost us no additional memory usage compared to rendering the objects normally, as the same amount of memory space is required to store the meshes.</p>
+<p>However, since the data is effectively copied, these statically batched duplicates cost us additional memory equal to the number of meshes, multiplied by the size of the original mesh. Ordinarily, rendering one, ten, or a million clones of the same object costs us the same amount of memory, because they're all referencing the same mesh data. The only difference between objects, in this case, is the transform of each object; however, because static batching needs to copy the data into a large buffer, this referencing is lost, since each duplicate of the original mesh is copied into the buffer with a unique set of data with a hardcoded transform baked into the vertex positions.</p>
+<p>Therefore, using static batching to render 1,000 identical tree objects will cost us 1,000 times more memory than rendering the same trees without static batching. This causes some significant memory consumption and performance issues if static batching is not used wisely.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Material references</h1>
+                </header>
+            
+            <article>
+                
+<p>We are already aware that sharing material references is a means of reducing <span class="packt_screen">Render State</span> changes, so this requirement is fairly obvious. In addition, sometimes, we statically batch meshes that require multiple materials. In this case, all meshes using a different material will be grouped together in their own static batch for each unique material being used.</p>
+<p>The downside to this requirement is that, at best, static batching can only render all of the static meshes using a number of draw calls equal to the number of materials they need.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Static batching caveats</h1>
+                </header>
+            
+            <article>
+                
+<p>Because of how it approaches the batching solution (by combining meshes into a single greater mesh), the static batching system has a few caveats that we need to be aware of. These concerns range from minor inconveniences to major drawbacks, depending on the Scene:</p>
+<ul>
+<li>Draw call savings are not immediately visible from the <span class="packt_screen">Stats</span> window until runtime</li>
+<li>Objects marked <span class="packt_screen">Batching Static</span> introduced in the Scene at runtime will not be automatically included in static batching</li>
+</ul>
+<p>Let's explore these problems in a little more detail.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Edit Mode debugging of static batching</h1>
+                </header>
+            
+            <article>
+                
+<p>Trying to determine the overall effect that static batching will have on our Scene can be a little tricky since nothing is being statically batched while in <span class="packt_screen">Edit Mode</span>. All of the magic happens during runtime, which can make it difficult to determine what benefits static batching would provide without manual testing. We should use the Frame Debugger to verify that our static batches are being properly generated and that they contain the expected objects.</p>
+<p>This can be especially problematic if we leave implementing this feature until late in the project life cycle, where we can spend a lot of time launching, tweaking, and relaunching our Scene to ensure that we're getting the draw call savings we're expecting. Consequently, it is best to start working on static batching optimization early in the process of building a new Scene.</p>
+<p>It goes without saying that static batch creation work is not completely trivial, and it may also massively inflate Scene initialization time if there are many batches to create and/or many large objects to batch.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Instantiating static meshes at runtime</h1>
+                </header>
+            
+            <article>
+                
+<p>Any new objects we add into the Scene at runtime will not be automatically combined into any existing batch by the static batching system, even if they were<span> marked as </span><span class="packt_screen">Batching Static</span>. To do so would cause an enormous runtime overhead between recalculating the mesh and synchronizing with the Rendering Pipeline, so Unity does not even attempt to do it automatically.</p>
+<p>For the most part, we should try to keep any meshes we want to be statically batched present in the original Scene file; however, if dynamic instantiation is necessary, or we are making use of additional Scene loading, then we can control static batch eligibility with the <kbd>StaticBatchUtility.Combine()</kbd> method. This utility method has two overloads: either we provide a root <kbd>GameObject</kbd>, in which case all child <kbd>GameObject</kbd> instances with meshes will be turned into new static batch groups, or we provide a list of <kbd>GameObject</kbd> instances and a root <kbd>GameObject</kbd>, and it will automatically attach them as children to the root and generate new static batch groups in the same manner.</p>
+<p>We should profile our usage of this function, as it can be quite an expensive operation if there are many vertices to combine. It will also not combine the given meshes with any preexisting statically batched groups, even if they share the same material. This means that we will not be able to save draw calls by instantiating or additively loading <span class="packt_screen">Static</span> meshes that use the same material as other statically batched groups already present in the Scene (it can only combine with meshes it was grouped with in the <kbd>Combine()</kbd> call).</p>
+<div class="packt_tip">Note that if any of the GameObjects we batch with the <kbd>StaticBatchUtility.Combine()</kbd> method are not marked as <span class="packt_screen">Static</span> before batching, the GameObjects will remain non-static, but the mesh itself will be <span class="packt_screen">Static</span>. This means that we could accidentally move the <kbd>GameObject</kbd> instance, its <kbd>Collider</kbd> component, and any other important objects, but the mesh will remain in the same location. Be careful about accidentally mixing <span class="packt_screen">Static</span> and non-static states in statically batched objects.</div>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Static batching summary</h1>
+                </header>
+            
+            <article>
+                
+<p>Static batching is a powerful, but dangerous, tool. If we don't use it wisely, we can very easily inflict enormous performance losses because of memory consumption (potentially leading to application crashes) and rendering costs on our application. It also takes a good amount of manual tweaking and configuration to ensure that batches are being properly generated and that we aren't accidentally introducing any unintended side effects of using various <span class="packt_screen">Static</span> flags. However, it does have a significant advantage in that it can be used on meshes of different shapes and enormous sizes, which dynamic batching cannot provide.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Summary</h1>
+                </header>
+            
+            <article>
+                
+<p>It is clear that the dynamic batching and static batching systems are not a silver bullet. We cannot blindly apply them to any given Scene and expect improvements. If our application and Scene happen to fit a particular set of parameters, then these methods are very effective at reducing CPU load and rendering bottlenecks. However, if they do not, then some additional work is required to prepare our Scene to meet batching feature requirements. Ultimately, only a good understanding of these batching systems and how they function can help us determine where and when this feature can be applied, and, hopefully, this chapter has given us all of the information we need to make informed decisions.</p>
+<p>You will learn more about the Rendering Pipeline and performance improvement techniques in <a href="">Chapter 6</a>, <em>Dynamic Graphics</em>. But now, let's move onto a different topic and look into some of the more subtle performance improvements that we can achieve through managing our art assets in intelligent ways.</p>
+
+
+            </article>
+
+            
+        </section>
+    </body></html>

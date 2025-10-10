@@ -1,0 +1,285 @@
+<html><head></head><body><div class="chapter" title="Chapter&#xA0;2.&#xA0;Memory Management"><div class="titlepage"><div><div><h1 class="title"><a id="ch02"/>Chapter 2. Memory Management</h1></div></div></div><p>This chapter investigates how memory is managed on iOS and Android with Xamarin runtime. Whilst drawing parallels to the .NET platform, it will provide examples of <a class="indexterm" id="id51"/>memory management problems and issues that can cause leaks, and also look at useful patterns that can help developers save valuable resources. This chapter is divided into the following sections:</p><div class="itemizedlist"><ul class="itemizedlist"><li class="listitem" style="list-style-type: disc">Application Component lifecycle</li><li class="listitem" style="list-style-type: disc">Garbage collection</li><li class="listitem" style="list-style-type: disc">Platform-specific concepts</li><li class="listitem" style="list-style-type: disc">Troubleshooting and diagnosis</li><li class="listitem" style="list-style-type: disc">Patterns and best practices</li></ul></div><div class="section" title="Application Component lifecycle"><div class="titlepage"><div><div><h1 class="title"><a id="ch02lvl1sec15"/>Application Component lifecycle</h1></div></div></div><p>Each <a class="indexterm" id="id52"/>platform in the Xamarin ecosystem has certain processes and states that the applications go through during their execution lifetime. Developers can implement certain methods and subscribe to lifecycle events such as application start, suspension, termination, and backgrounding to handle much needed application state and release resources which are no longer required.</p><div class="section" title="Activity lifecycle (Android)"><div class="titlepage"><div><div><h2 class="title"><a id="ch02lvl2sec25"/>Activity lifecycle (Android)</h2></div></div></div><p>In<a class="indexterm" id="id53"/> Android applications, <a class="indexterm" id="id54"/>contrary to the conventional application development model, any activity can be the access point to the application (as long as it is designated as such). Any activity in the application can be initialized at start-up or can be resumed directly when the application is resuming or restarting from a crash.</p><p>In order to manage the lifecycle of the activities, there are distinct states and events which help developers organize memory resources and program features.</p><div class="section" title="Active/Running"><div class="titlepage"><div><div><h3 class="title"><a id="ch02lvl3sec01"/>Active/Running</h3></div></div></div><p>An activity is<a class="indexterm" id="id55"/> said to be in the active state when an application is the application in focus and the activity is in the foreground. At this state, unless extraordinary measures are required by the operating system (for example, in case of system out of memory or  application becoming unresponsive), the developer does not need to worry about the memory and resources, as the application has the highest priority.</p><p>In a creation cycle, <code class="literal">OnCreate</code> is the first method that is called by the application. This is the initialization step where the views are created, the variables are introduced, and static data resources are loaded.</p><p><code class="literal">OnStart</code> or <code class="literal">OnRestart</code> (if the activity is restarting after it was backgrounded) is the second event method in a creation cycle. This method(s) can be overridden if specific data reload procedures need to be implemented. This is the last method called before the activity becomes visible.</p><p>The <code class="literal">OnResume</code> method is called after a successful launch of the activity. This method is the indication that the application is ready for user interaction. It can be used to (re)subscribe to external events, display alerts/user messages, and communicate with device peripherals.</p></div><div class="section" title="Paused"><div class="titlepage"><div><div><h3 class="title"><a id="ch02lvl3sec02"/>Paused</h3></div></div></div><p>An activity is <a class="indexterm" id="id56"/>paused when either the device goes to sleep having this activity in the foreground, or the activity is partially hidden by another dialog or activity. In this state, the activity is still "alive" but cannot interact with the user.</p><p>The <code class="literal">OnPause</code> event method is called right before the activity goes into the Paused state. This event method is the ideal place to unsubscribe from any external event providers, commit any unsaved changes and clean up any objects consuming memory resources since the user interaction is not possible in the Paused state. The activity will call only the <code class="literal">OnResume</code> method when once again the activity has the highest priority, it will not go through the full creation cycle.</p></div><div class="section" title="Backgrounded"><div class="titlepage"><div><div><h3 class="title"><a id="ch02lvl3sec03"/>Backgrounded</h3></div></div></div><p>An activity goes into the Backgrounded state<a class="indexterm" id="id57"/> when the user presses the home button or uses the app switcher. In this state, it is not guaranteed that the activity will stay alive until the user "restarts" the application.</p><p>The <code class="literal">OnStop</code> method is called when the application is backgrounded or stopped. The difference between the Backgrounded and Stopped states is that the activity is in the Stopped state when it is being prepared for destruction and it will be followed by the <code class="literal">OnDestroy</code> method since the application is dismissed and will not be used by the user anymore. If the user resumes <a class="indexterm" id="id58"/>the application, the activity will call the <code class="literal">OnRestart</code> method and a full creation process will follow.</p></div><div class="section" title="Stopped"><div class="titlepage"><div><div><h3 class="title"><a id="ch02lvl3sec04"/>Stopped</h3></div></div></div><p>The Stopped state<a class="indexterm" id="id59"/> represents the end of the lifecycle for the activity. The activity enters this state when the user presses the back button signifying that the application is not needed anymore. However, it is also possible that the activity is taken into this state because the system is starved of memory resources and it needs to take down activities that are on the lower priority states like paused or backgrounded.</p><p>The <code class="literal">OnDestroy</code> method follows the Stopped state and it is the last lifecycle event method that is called. It is the last chance for the application to stop long running processes that might cause leaks or clean up other persistent resources. It is advisable to implement most of the resource clean up in <code class="literal">OnPause</code> and <code class="literal">OnStop</code> methods, since <code class="literal">OnDestroy</code> can be called unexpectedly by the system contrary to the user initiated <code class="literal">OnPause</code> and <code class="literal">OnStop</code> methods.</p></div><div class="section" title="Restarted"><div class="titlepage"><div><div><h3 class="title"><a id="ch02lvl3sec05"/>Restarted</h3></div></div></div><p>An activity is <a class="indexterm" id="id60"/>said to be "restarted" when it comes back to user interaction after it was backgrounded. Restarted activities can reload any saved state information and create an uninterrupted user experience. After going through the initialization steps, the application goes into the Running state again.</p></div></div><div class="section" title="Application lifecycle (iOS)"><div class="titlepage"><div><div><h2 class="title"><a id="ch02lvl2sec26"/>Application lifecycle (iOS)</h2></div></div></div><p>On iOS, the<a class="indexterm" id="id61"/> application lifecycle<a class="indexterm" id="id62"/> is handled through UI application delegates. Once the delegate methods are implemented and registered, the methods will be invoked by the execution context.</p><div class="informalexample"><pre class="programlisting">public class Application
+{
+    static void Main(string[] args)
+    {
+        UIApplication.Main(args, null, "AppDelegate");
+    }
+}
+
+[Register("AppDelegate")]
+public partial class AppDelegate : UIApplicationDelegate
+{
+    //Implement required methods
+}</pre></div><p>Application events <a class="indexterm" id="id63"/>on iOS are a little more complicated than the top-down execution of events on Android. Developers can insert their methods into transitive states using the state-related methods implemented in the <code class="literal">AppDelegate</code>.</p><div class="mediaobject"><img alt="Application lifecycle (iOS)" src="graphics/B04693_02_01.jpg"/><div class="caption"><p>Figure 1: iOS Application State Transitions</p></div></div><p>The most <a class="indexterm" id="id64"/>important state-related methods<a class="indexterm" id="id65"/> are the following:</p><div class="itemizedlist"><ul class="itemizedlist"><li class="listitem" style="list-style-type: disc"><code class="literal">WillFinishLaunching</code> is the <a class="indexterm" id="id66"/>first chance of the application to execute code at launch time. It indicates the application has started to launch but the state has not yet been restored.</li><li class="listitem" style="list-style-type: disc"><code class="literal">FinishedLaunching</code> is called <a class="indexterm" id="id67"/>once the state restoration occurs after the <code class="literal">WillFinishLaunching</code> is completed.</li><li class="listitem" style="list-style-type: disc"><code class="literal">OnActivated</code> and <a class="indexterm" id="id68"/><code class="literal">OnResignActivation</code> are similar to <code class="literal">OnPause</code> and <code class="literal">OnResume</code> event <a class="indexterm" id="id69"/>methods on the Android platform.</li><li class="listitem" style="list-style-type: disc"><code class="literal">DidEnterBackground</code> is <a class="indexterm" id="id70"/>called when the application enters the Backgrounded state. It is similar to the <code class="literal">OnStop</code> method on Android but there is a time constriction on this method; the method should execute in less than 5 seconds, and the method exits without notification after the allocated time. If more time is needed to execute certain methods in this delegate, applications can start a background task to complete the execution.</li><li class="listitem" style="list-style-type: disc"><code class="literal">WillEnterForeground</code> and <a class="indexterm" id="id71"/><code class="literal">WillTerminate</code> can follow the <code class="literal">DidEnterBackground</code> execution. If <a class="indexterm" id="id72"/>the former method is called, the application is about to be brought back to foreground and active state, otherwise, the application is prepared to be terminated because the system needs more memory, or the user is closing a backgrounded application.</li></ul></div></div></div></div>
+<div class="section" title="Garbage collection"><div class="titlepage"><div><div><h1 class="title"><a id="ch02lvl1sec16"/>Garbage collection</h1></div></div></div><p><span class="strong"><strong>Garbage collection</strong></span> (<span class="strong"><strong>GC</strong></span>) is<a class="indexterm" id="id73"/> one of the most effective automated memory management techniques on modern application development platforms. In simple terms, with automated garbage collection, memory resources are allocated for objects used by the application and reclaimed for resources no longer needed by the application.</p><div class="note" style="" title="Note"><div class="inner"><h3 class="title"><a id="note08"/>Note</h3><p>In spite of the fact that garbage collection, as an automated process, takes over the burden of managing memory allocations, it can have a significant impact on performance. This performance handicap is one of the main reasons why there is no garbage collection mechanism on the iOS platform.</p></div></div><p>In theory, GC is responsible for reclaiming memory resources occupied by runtime elements that cannot be reached by the current executing application. However, this mechanism cannot always identify these unreachable resources correctly and/or have unexpected results while purging the identified memory pointers.</p><p>Memory leaks occur when an application fails to identify and/or free the resources occupied by unreachable code elements, which can lead to memory exhaustion problems.</p><p>Dangling pointers happen when a memory region is freed while references still exist in the execution context. These references are then removed and memory can be re-allocated for another use.</p><p>Double<a class="indexterm" id="id74"/> free bugs occur when a memory region is already reclaimed and the application or garbage collector tries to free this region once more.</p><div class="section" title="GC on Xamarin projects"><div class="titlepage"><div><div><h2 class="title"><a id="ch02lvl2sec27"/>GC on Xamarin projects</h2></div></div></div><p>Managed code, as <a class="indexterm" id="id75"/>defined by the Common Language Runtime in the .NET framework, is application code where the memory resources are managed by the native garbage collector. GC, on initialization, allocates a segment of the memory to store and manage memory resources, which is called the "managed heap". The garbage collection in CLR happens on three different generations where objects with different lifespans live in the heap. Promotion between the generation and survival of objects depend on which generation they are placed in and how they survived prior GC cycles.</p><div class="section" title="SGen garbage collector"><div class="titlepage"><div><div><h3 class="title"><a id="ch02lvl3sec06"/>SGen garbage collector</h3></div></div></div><p>SGen garbage collector<a class="indexterm" id="id76"/> is the generational garbage collector used in most Xamarin projects (both Xamarin.iOS and Xamarin.Android). SGen performs more frequent garbage collections over smaller sets of objects which makes it more efficient over the conservative Boehm GC.</p><p>SGen utilizes <a class="indexterm" id="id77"/>three heaps, namely The Nursery, Major Heap, and Large Object Space, to allocate memory segments for objects according to their memory requirements, and objects are promoted between the heaps when they survive through GC cycles. In this setup, The Nursery, similar to Generation 0 in CLR on .NET, is where most objects are created and destroyed and most of the GC cycles occur to release memory resources. Objects surviving the minor GC cycles can be promoted to the major heap. The major heap only has major GC passes in case the heap itself is running out of memory. The last heap is only for larger objects that have higher memory requirements, and does not accept promotion from other heaps.</p><div class="note" style="" title="Note"><div class="inner"><h3 class="title"><a id="note09"/>Note</h3><p>It is important to remember that during a garbage collection cycle all the threads registered with the runtime, including the main run loop thread are paused. One exception to this execution pause is the separate process that continues to run the iOS animations.</p></div></div></div><div class="section" title="Boehm garbage collector (iOS only)"><div class="titlepage"><div><div><h3 class="title"><a id="ch02lvl3sec07"/>Boehm garbage collector (iOS only)</h3></div></div></div><p>Boehm GC (aka Boehm-Demers-Weiser garbage collector) is an open-source garbage collector <a class="indexterm" id="id78"/>implementation that was initially created for C/C++ language implementations. As<a class="indexterm" id="id79"/> a conservative garbage collector, it still has procedures for leak detection, supports "finalized" semantics, and has limited support for generational implementations which makes it an attractive candidate for implementations and ports on various platforms.</p><p>An implementation of Boehm GC is only available for Xamarin.iOS applications using the Classic API, in which it is the default garbage collector.</p></div></div></div>
+<div class="section" title="Platform-specific concepts"><div class="titlepage"><div><div><h1 class="title"><a id="ch02lvl1sec17"/>Platform-specific concepts</h1></div></div></div><p>In order to <a class="indexterm" id="id80"/>understand the memory management techniques and pitfalls, one must understand some platform-related concepts. Even though Xamarin provides an almost platform agnostic development experience, iOS and Android platforms deal with memory allocations and references slightly differently from .NET CLR and each other.</p><div class="section" title="Object reference types"><div class="titlepage"><div><div><h2 class="title"><a id="ch02lvl2sec28"/>Object reference types</h2></div></div></div><p>Referred objects <a class="indexterm" id="id81"/>can be classified according to application needs. This classification helps the garbage collector decide whether the memory allocation can be released for the referred objects.</p><p>A strong reference protects the object from being "garbage collected". A referred object is said to be strongly referenced/reachable when the class instance is directly used by the current execution context.</p><p>Weak references can be used for class instances when the need for the reference does not interfere with garbage collection. When the referred object is weakly reachable, the dependent section of code has to check whether the object is still alive before using the referenced object. Weak references have two types in CLR according to the dispose and finalization processes implemented by the declaring types: long and short weak references. Long weak references are types that can live on to be recreated and can be finalized by a destructor rather than being disposed or garbage collected.</p><p>Soft and phantom references are specific to Android runtime. Soft references, in simple terms, are a little more persistent than the weak references, and would only be cleared up by the garbage collector under memory pressure even though the object is no longer strongly reachable. Phantom references are the weakest reference in Android runtime. They are only used to implement specialized object finalization methods and have to be associated with a reference queue for processing.</p></div><div class="section" title="Automatic Reference Counting (ARC)"><div class="titlepage"><div><div><h2 class="title"><a id="ch02lvl2sec29"/>Automatic Reference Counting (ARC)</h2></div></div></div><p>Automatic Reference Counting is <a class="indexterm" id="id82"/>a compiler feature that was introduced in iOS 5. It is referred to as a compiler feature since it cannot be classified as a garbage collection implementation. It is a static analysis implementation where the compiler analyses the code execution tree and inserts retain and release messages according to the object persistence requirements.</p><p>With ARC, traditional memory management calls are not allowed to be inserted in the application to allocate memory and release memory addresses.</p></div></div>
+<div class="section" title="Troubleshooting and diagnosis"><div class="titlepage"><div><div><h1 class="title"><a id="ch02lvl1sec18"/>Troubleshooting and diagnosis</h1></div></div></div><p>Profiling is the term <a class="indexterm" id="id83"/>used to describe the dynamic system analysis while the target application is running. Profilers generally collect data about metrics such as CPU utilization, framerate values, and most importantly data about memory allocations. Especially with Xamarin projects, since we are dealing with multiple platforms, profiling becomes an important part of testing and diagnostics.</p><p>There are numerous tools that one can use to profile memory usage on Xamarin projects, Xamarin Profiler being the only one that can be used both for Xamarin.iOS and Xamarin.Android applications.</p><div class="section" title="Xamarin Profiler"><div class="titlepage"><div><div><h2 class="title"><a id="ch02lvl2sec30"/>Xamarin Profiler</h2></div></div></div><p>Xamarin Profiler is<a class="indexterm" id="id84"/> the newest addition to the Xamarin Suite. This <a class="indexterm" id="id85"/>profiler has the advantage over other platform-specific applications since it can be run either on OS X or Windows targeting Xamarin.Android or Xamarin.iOS applications.</p><div class="mediaobject"><img alt="Xamarin Profiler" src="graphics/B04693_02_02.jpg"/><div class="caption"><p>Figure 2: Xamarin Profiler</p></div></div><p>It was <a class="indexterm" id="id86"/>designed <a class="indexterm" id="id87"/>to give developers almost real time (depending on the sampling rate) information about the memory heaps for Xamarin applications. It can also save memory allocation snapshots which can later on be accessed and analyzed.</p><p>It can be started directly from Visual Studio or Xamarin Studio and can be used with both emulator and real device build/run configurations.</p><p>Currently there are two instruments you can select in the initial popup window.</p><div class="section" title="Allocations instrument"><div class="titlepage"><div><div><h3 class="title"><a id="ch02lvl3sec08"/>Allocations instrument</h3></div></div></div><p>The first instrument is the <a class="indexterm" id="id88"/>Allocations template which provides detailed information on the memory segments and allocations. In this view, developers can see a generalized list of allocations grouped by the class name under the <span class="strong"><strong>Summary</strong></span> tab. The <span class="strong"><strong>Call Tree</strong></span> tab gives a list of threads in the application and how they relate to the memory objects. Allocation list provides live data about the object allocations, and the <span class="strong"><strong>Snapshots</strong></span> tab gives information about the memory snapshots stored.</p></div><div class="section" title="Time Profiler"><div class="titlepage"><div><div><h3 class="title"><a id="ch02lvl3sec09"/>Time Profiler</h3></div></div></div><p>Time Profiler is<a class="indexterm" id="id89"/> the second instrument that can be used in Xamarin Profiler. It provides valuable information on how much time the application spent executing a certain method. Developers can see a whole stack trace on each method.</p></div></div><div class="section" title="Device Monitor (Android only)"><div class="titlepage"><div><div><h2 class="title"><a id="ch02lvl2sec31"/>Device Monitor (Android only)</h2></div></div></div><p>Android Device Monitor <a class="indexterm" id="id90"/>is hitherto<a class="indexterm" id="id91"/> the main diagnostic tool for Android development. And for Xamarin developers, when Android SDK is installed, device monitor can be accessed directly from a tool box item on Visual Studio and under the tools menu on Xamarin Studio.</p><p>On the main page of the device monitor there is a tree-view displaying each device or simulator that can be attached to with the device monitor.</p><div class="note" style="" title="Note"><div class="inner"><h3 class="title"><a id="note10"/>Note</h3><p>Only a single debugger can be attached to any device at a time, therefore other debuggers have to be detached before using the device monitor.</p></div></div><p>Once the device is selected, developers can get allocation information and the heap state using the graphical interface. It is also possible to trigger garbage collection cycles using the device monitor.</p><div class="mediaobject"><img alt="Device Monitor (Android only)" src="graphics/B04693_02_03.jpg"/><div class="caption"><p>Figure 3: Android Device Monitor attached to Visual Studio Emulator</p></div></div></div><div class="section" title="Instruments (iOS only)"><div class="titlepage"><div><div><h2 class="title"><a id="ch02lvl2sec32"/>Instruments (iOS only)</h2></div></div></div><p>Instruments <a class="indexterm" id="id92"/>is a <a class="indexterm" id="id93"/>valuable application that is installed together with the Xcode toolset. In this application developers are provided with a big set of diagnostic tools varying from energy consumption, graphic resources, to memory allocations.</p><p>The allocations instrument has a very similar interface to Xamarin Profiler, and gives almost real-time data about memory objects.</p><div class="mediaobject"><img alt="Instruments (iOS only)" src="graphics/B04693_02_04.jpg"/><div class="caption"><p>Figure 4: Instruments Profiling Xamarin Application</p></div></div><p>The Xcode Instruments <a class="indexterm" id="id94"/>tool can be used both together with an<a class="indexterm" id="id95"/> actual device or the iOS simulator. It can be started directly from Xamarin Studio. Once the application is started on the iOS simulator or on the actual device, it becomes available in the target selection window.</p><div class="mediaobject"><img alt="Instruments (iOS only)" src="graphics/B04693_02_05.jpg"/><div class="caption"><p>Figure 5: Instruments with iOS Simulator set as target</p></div></div><div class="note" style="" title="Note"><div class="inner"><h3 class="title"><a id="note11"/>Note</h3><p>If you are developing Xamarin.iOS applications on Microsoft Windows with an OS X build machine, you will not be able to access the Instruments directly from the development station. Once the application is either on the test device or the simulator, you can start the instruments on the build machine and choose the correct target to analyze.</p></div></div></div><div class="section" title="Monotouch Profiler (iOS only)"><div class="titlepage"><div><div><h2 class="title"><a id="ch02lvl2sec33"/>Monotouch Profiler (iOS only)</h2></div></div></div><p>Monotouch Profiler <a class="indexterm" id="id96"/>was the Xamarin tool <a class="indexterm" id="id97"/>used to diagnose memory issues with Xamarin.iOS applications before it was superseded by Xamarin Profiler. It can still be accessed using the <span class="strong"><strong>Run with Mono HeapShot</strong></span> menu item under the <span class="strong"><strong>Project</strong></span> menu in Xamarin Studio. While providing useful information about memory allocations and the heap, it currently does not go further than being a lightweight application to take memory snapshots.</p></div></div>
+<div class="section" title="Patterns and best practices"><div class="titlepage"><div><div><h1 class="title"><a id="ch02lvl1sec19"/>Patterns and best practices</h1></div></div></div><p>While dealing with managed runtime and garbage collection, there are certain patterns and anti-patterns developers must be careful with. If not handled properly, both managed and native objects can produce noncollectable traces, which in turn can cause memory leaks and unnecessary resource consumption.</p><div class="section" title="Disposable objects"><div class="titlepage"><div><div><h2 class="title"><a id="ch02lvl2sec34"/>Disposable objects</h2></div></div></div><p>The<a class="indexterm" id="id98"/> resources <a class="indexterm" id="id99"/>managed by the garbage collector are generally limited to memory allocations. Other resources like network sockets, database handles, UI elements, and file/device descriptors need to have additional definitions or mechanisms.</p><p>In managed <a class="indexterm" id="id100"/>runtime, these object resources can be cleaned up in two different ways. The first, less efficient, unpredictable way is to implement a destructor/finalizer. With a finalizer implementation, once the garbage collector decides the object is no longer strongly reachable, the resources such as network sockets can be disposed. However, finalizable objects have to wait for the following GC cycle to be cleaned up and cannot be finalized with developers' initiatives.</p><p>Another way to clean-up application resources is to implement the <code class="literal">IDisposable</code> interface in the class that has the references to the resources. This interface requires only a single <code class="literal">Dispose</code> method implementation to get rid of managed resources. The garbage collector also offers a method (<code class="literal">GC.SuppressFinalize</code>) to avoid finalization since the object is going to be disposed using the <code class="literal">IDisposable</code> interface.</p><div class="informalexample"><pre class="programlisting">public class DisposableFinalizableClass : IDisposable
+{
+
+    private ManagedResource m_Resource; // reference to a resource
+
+    public DisposableFinalizableClass()
+    {
+        m_Resource = new ManagedResource(); // allocates the resource
+    }
+
+    /// &lt;summary&gt;
+    /// Destructor for the DisposableFinalizableClass
+    /// &lt;remarks&gt;
+    /// Note that we are not overriding the object.Finalize method
+    /// but providing a destructor for the Finalize method to call
+    /// &lt;/remarks&gt;
+    /// &lt;/summary&gt;
+    ~DisposableFinalizableClass()
+    {
+        Dispose(false);
+    }
+
+    /// &lt;summary&gt;
+    /// Implementing the Dispose method
+    /// &lt;/summary&gt;
+    public void Dispose()
+    {
+        Dispose(true);
+
+        // Letting the GC know that there is no more need for
+        // Finalization, the resources are already cleaned-up
+        GC.SuppressFinalize(this);
+    }
+
+    protected virtual void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            if (m_Resource != null) m_Resource.Dispose();
+        }
+        else
+        {
+            // Called from Finalize
+            // Clean-up any unmanaged resources
+        }
+    }
+}</pre></div><p>The fact<a class="indexterm" id="id101"/> that disposable objects can be used together with <code class="literal">using</code> blocks, gives a deterministic way for developers to release associated resources as soon as the object is no longer needed.</p></div><div class="section" title="The lapsed listener problem"><div class="titlepage"><div><div><h2 class="title"><a id="ch02lvl2sec35"/>The lapsed listener problem</h2></div></div></div><p>One <a class="indexterm" id="id102"/>of the most common patterns used with UI elements or legacy API implementations is the observer pattern. As you might know, there are two stakeholders in this pattern, the observer and provider. The observer subscribes to the event provided by the provider to receive updates.</p><p>The lapsed listener problem occurs when the observer pattern is implemented incorrectly or better yet incompletely. In this pattern, after the subscription, the provider keeps a strong reference to the observer. If this subscription is not removed before the subscriber goes out of context, the application will leak the subscriber object since it cannot be garbage collected (for example, an Android activity, or a view model).</p><p>In order to demonstrate this problem, we will use a singleton implementation of Fibonacci sequence with asynchronous methods as the event provider.</p><div class="informalexample"><pre class="programlisting">public event EventHandler&lt;int&gt; CalculationCompleted;
+
+public event EventHandler&lt;List&lt;int&gt;&gt; RangeCalculationCompleted;
+
+/// &lt;summary&gt;
+/// Calculates n-th number in Fibonacci sequence
+/// &lt;/summary&gt;
+/// &lt;param name="ordinal"&gt;Ordinal of the number to calculate&lt;/param&gt;
+public void GetFibonacciNumberAsync(int ordinal)
+{
+    var task = Task.Run(() =&gt;
+    {
+        var result = GetFibonacciNumberInternal(ordinal);
+        if (CalculationCompleted != null) CalculationCompleted(this, result);
+    });
+
+    // Avoiding Deadlocks on the UI thread
+    task.ConfigureAwait(false);
+}
+
+/// &lt;summary&gt;
+/// Calculates a range of numbers in Fibonnaci sequence
+/// &lt;/summary&gt;
+/// &lt;param name="firstOrdinal"&gt;Ordinal of the first number&lt;/param&gt;
+/// &lt;param name="lastOrdinal"&gt;Ordinal of the last number&lt;/param&gt;
+public void GetFibonacciRangeAsync(int firstOrdinal, int lastOrdinal)
+{
+    var task = Task.Run(() =&gt;
+    {
+        var result = GetFibonacciRangeInternal(firstOrdinal, lastOrdinal);
+        if (RangeCalculationCompleted != null) RangeCalculationCompleted(this, result);
+    });
+
+    task.ConfigureAwait(false);
+}
+
+public static FibonacciSource Instance
+{
+    get 
+    { 
+        return m_Instance ?? (m_Instance = new FibonacciSource()); 
+    }
+}</pre></div><p>We will <a class="indexterm" id="id103"/>implement two separate view models using MvvmCross and use associated views to invoke the asynchronous methods, then navigate back to the main view using the <code class="literal">Close</code> method on the view models. In the constructor of each view model, we will be subscribing to the respective event on the <code class="literal">FibonacciSource</code>.</p><div class="mediaobject"><img alt="The lapsed listener problem" src="graphics/B04693_02_06.jpg"/><div class="caption"><p>Figure 6: Fibonacci Calculator App</p></div></div><p>In order to investigate any memory leaks, we navigate back and forth between the main and the calculation views. After a couple of iterations on both of the views (that is, single and range), we have the results shown below on the Xamarin Profiler (just using the "Allocations" template.)</p><div class="mediaobject"><img alt="The lapsed listener problem" src="graphics/B04693_02_07.jpg"/><div class="caption"><p>Figure 7: Xamarin Profiler Results</p></div></div><p>You will notice<a class="indexterm" id="id104"/> that none of the instances of <code class="literal">SingleCalculationViewModel</code> are alive after garbage collection (you can trigger a GC run with <code class="literal">GC.Collect()</code>), however <code class="literal">RangeCalculationViewModel</code> instances are persistent. The reason for this is the missing unsubscribe call in the close command of the <code class="literal">RangeCalculationViewModel</code>.</p><div class="informalexample"><pre class="programlisting">private MvxCommand m_CloseCommand;
+
+public ICommand CloseCommand
+{
+    get
+    {
+        m_CloseCommand = m_CloseCommand ?? new MvxCommand(DoClose);
+        return m_CloseCommand;
+    }
+}
+
+private void DoClose()
+{
+    // FibonacciSource.Instance.RangeCalculationCompleted -= OnCalculationCompleted;
+    Close(this);
+}</pre></div><p>We could<a class="indexterm" id="id105"/> have also used the <code class="literal">OnPause</code> event on this Android application or any other relevant event on other platforms to get rid of the subscription before the subscriber or the view component that holds the subscriber goes out of context.</p><p>In this scenario, another solution would be to use a <code class="literal">TaskCompletionSource</code> to convert the observable pattern to an awaitable one. Wrapping up the observable Fibonacci source would give you a better control over the subscription and the resulting asynchronous task would be better suited for mobile development and MVVM pattern.</p><div class="informalexample"><pre class="programlisting">private Task&lt;List&lt;int&gt;&gt; CalculateFibonacciRangeAsync(int firstOrdinal, int secondOrdinal)
+{
+    TaskCompletionSource&lt;List&lt;int&gt;&gt; taskCompletionSource = new TaskCompletionSource&lt;List&lt;int&gt;&gt;();
+
+    EventHandler&lt;List&lt;int&gt;&gt; calcCompletedEventHandler = null;
+
+    calcCompletedEventHandler =
+        (sender, e) =&gt;
+        {
+            FibonacciSource.Instance.RangeCalculationCompleted -= calcCompletedEventHandler;
+            taskCompletionSource.SetResult(e);
+        };
+
+    FibonacciSource.Instance.RangeCalculationCompleted += calcCompletedEventHandler;
+
+    FibonacciSource.Instance.GetFibonacciRangeAsync(firstOrdinal, secondOrdinal);
+
+    return taskCompletionSource.Task;
+}</pre></div><p>Finally, this async task would be called with a <code class="literal">ContinueWith</code> statement to set the result in the view model.</p><div class="informalexample"><pre class="programlisting">private void DoCalculate()
+{
+    if (!string.IsNullOrWhiteSpace(Input1) &amp;&amp; !string.IsNullOrWhiteSpace(Input2))
+    {
+        int numberOrdinal1, numberOrdinal2;
+
+        if (int.TryParse(Input1, out numberOrdinal1) &amp;&amp; int.TryParse(Input2, out numberOrdinal2))
+        {
+            InfoText = "Calculating";
+
+            var fibonacciTask = CalculateFibonacciRangeAsync(numberOrdinal1, numberOrdinal2)
+                .ContinueWith(task =&gt;
+                {
+                    Result = string.Join(",", task.Result);
+                    InfoText = "";
+                });
+
+            fibonacciTask.ConfigureAwait(false);
+
+            return;
+        }
+    }
+
+    InfoText = "Invalid Input";
+}</pre></div></div><div class="section" title="Weak references"><div class="titlepage"><div><div><h2 class="title"><a id="ch02lvl2sec36"/>Weak references</h2></div></div></div><p>Weak references <a class="indexterm" id="id106"/>can be of great assistance while dealing with loosely coupled application layers. In these type of scenarios, where objects need to be managed outside the class domain, weak referencing can be used to remove these instances from the GC protection based on the notion of reachability because of the strong references they have to other layers of the application.</p><p>Let us assume in the previous example that the Fibonacci sequence items are handled as reference values with a class called <code class="literal">FibonacciItem</code>. This class carries the value calculated and the time it was calculated.</p><div class="informalexample"><pre class="programlisting">public class FibonacciItem
+{
+    public int Value { get; private set; }
+
+    private readonly DateTime m_Calculated;
+
+    public FibonacciItem(int value, DateTime calculatedTime)
+    {
+        Value = value;
+
+        m_Calculated = calculatedTime;
+    }
+}</pre></div><p>To decrease<a class="indexterm" id="id107"/> the processing time, we can now implement a caching mechanism which would force the source to recalculate the value according to the ordinal if it does not already exist in the cache or just does not sound right is disposed of in favor of memory resources. For this purpose we can use the <code class="literal">WeakReference</code> to cache Fibonacci items.</p><div class="informalexample"><pre class="programlisting">public class FibonacciCache
+{
+    // Dictionary to contain the cache. 
+    private static Dictionary&lt;int, WeakReference&gt; _cache;
+
+    public FibonacciCache()
+    {
+        _cache = new Dictionary&lt;int, WeakReference&gt;();
+    }
+
+    /// &lt;summary&gt;
+    /// Accessor to FibonacciItem references
+    /// &lt;/summary&gt;
+    /// &lt;param name="ordinal"&gt;&lt;/param&gt;
+    /// &lt;returns&gt;FibonacciItem if it is still alive&lt;/returns&gt;
+    public FibonacciItem this[int ordinal]
+    {
+        get
+        {
+            if (!_cache.ContainsKey(ordinal)) return null;
+
+            if (_cache[ordinal].IsAlive)
+            {
+                // Object was obtained with the weak reference.
+                FibonacciItem cachedItem = _cache[ordinal].Target as FibonacciItem;
+                return cachedItem;
+            }
+            else
+            {
+                // Object reference is already disposed of   
+                return null;
+            }
+        }
+        set
+        {
+            _cache[ordinal] = new WeakReference(value);
+        }
+    }
+} </pre></div></div><div class="section" title="Cross-domain objects"><div class="titlepage"><div><div><h2 class="title"><a id="ch02lvl2sec37"/>Cross-domain objects</h2></div></div></div><p>In Xamarin applications, one<a class="indexterm" id="id108"/> of the most common memory issues, cross-heap references, occur when there is a cross-over between the native runtime and mono runtime. This issue stems from the fact that mono runtime is almost handled as a separate domain and managed in a heap only with GC handles to the native domain.</p><p>In an Android scenario, where Java objects are referenced by managed C# objects or vice versa, the communication between the two runtimes becomes expensive. For instance, if we were implementing the Fibonacci calculator without using the ViewModel pattern, we would want to create a data adaptor to load the range calculation results into a list view.</p><div class="informalexample"><pre class="programlisting">private void OnFibonacciCalculationCompleted(object sender, List&lt;FibonacciItem&gt; result)
+{
+    RunOnUiThread(() =&gt;
+    {
+        var listView = FindViewById&lt;ListView&gt;(Resource.Id.lstResult);
+
+        listView.Adapter = new ArrayAdapter&lt;string&gt;(this, Resource.Layout.ListViewItem, 
+            result.Select(val =&gt; val.Value.ToString()).ToArray());
+
+    });
+}</pre></div><p>This implementation has a higher cost of being garbage collected. It also has performance penalties considering the language crossing, not to mention the fact that objects from each world are effectively mirrored increasing the memory allocation costs.</p><p>The solution here would be to do as much work as possible in the managed world and let the runtime take care of the rest. So instead of using the native <code class="literal">ArrayAdapter</code>, we could implement a base adapter that would feed the <code class="literal">FibonacciItem</code> instances to the <code class="literal">ListView</code>.</p><div class="informalexample"><pre class="programlisting">public class FibonacciResultsAdapter : BaseAdapter&lt;FibonacciItem&gt;
+{
+    List&lt;FibonacciItem&gt; m_ResultItems;
+
+    Activity m_Context;
+
+    public FibonacciResultsAdapter(Activity context, List&lt;FibonacciItem&gt; items)
+    {
+        m_Context = context;
+        m_ResultItems = items;
+    }
+
+    public override long GetItemId(int position) { return position; }
+
+
+    public override FibonacciItem this[int position]
+    {
+        get { return m_ResultItems[position]; }
+    }
+
+    public override int Count
+    {
+        get { return m_ResultItems.Count; }
+    }
+
+    public override View GetView(int position, View convertView, ViewGroup parent)
+    {
+        View view = convertView;
+
+        if (view == null)
+            view = m_Context.LayoutInflater.Inflate(Resource.Layout.ListViewItem, null);
+
+        view.FindViewById&lt;TextView&gt;(Android.Resource.Id.txtOutput).Text = m_ResultItems[position].Value.ToString();
+
+        return view;
+    }
+}</pre></div><p>By implementing <a class="indexterm" id="id109"/>the adapter we removed the usage of Java type <code class="literal">ArrayAdapter</code>, <code class="literal">ArrayList</code> and the Java references to the <code class="literal">FibonacciItem</code> instances.</p><p>The same applies to scenarios where native objects are being inherited in the managed domain. These, so-called, "special objects" are handled differently by the garbage collector. They have to be rescanned<a class="indexterm" id="id110"/> for all the references they carry with each garbage collection cycle.</p></div><div class="section" title="Cyclic references (cycles)"><div class="titlepage"><div><div><h2 class="title"><a id="ch02lvl2sec38"/>Cyclic references (cycles)</h2></div></div></div><p>Cyclic references <a class="indexterm" id="id111"/>occur, in general terms, when the underlying platform uses some type of reference counting as memory management strategy and the memory is cleaned up according to the number of references to that specific object instance.</p><p>Reference counting was abandoned by Microsoft with the release of .NET and the introduction of the generational tracing garbage collection. SGen in mono runtime on Android devices also uses some form of a mark and sweep algorithm. In both runtimes, the references are traced from so called "application roots". These objects are the ones that are "presumed" to be alive at the time of a garbage collection cycle.</p><p>The roots can be:</p><div class="itemizedlist"><ul class="itemizedlist"><li class="listitem" style="list-style-type: disc">References to global objects</li><li class="listitem" style="list-style-type: disc">References to static objects</li><li class="listitem" style="list-style-type: disc">References to static fields</li><li class="listitem" style="list-style-type: disc">References on the stack to local objects</li><li class="listitem" style="list-style-type: disc">References to objects waiting to be finalized</li><li class="listitem" style="list-style-type: disc">References in CPU registers to objects on the managed heap</li></ul></div><p>However, as mentioned before, on iOS, garbage collection was abandoned in favor of performance and yet ARC (automatic reference counting) fails to deal with what is called a retain cycle. Retain cycle occurs when the lower elements (aka children) in the creation hierarchy require references to the parent items. In this scenario, when the child or the parent sends a <code class="literal">release</code>, the <code class="literal">dealloc</code> methods never get to run since there is an extra reference keeping each of the items alive.</p><div class="mediaobject"><img alt="Cyclic references (cycles)" src="graphics/B04693_02_08.jpg"/><div class="caption"><p>Figure 8: Retain Cycle</p></div></div><p>This native<a class="indexterm" id="id112"/> iOS problem becomes a problem in Xamarin applications when managed objects derive from native objects (that is, any object deriving from <code class="literal">NSObect</code>) such as UI controls. When managed classes are inheriting from native objects, in order to keep them from getting garbage collected, Xamarin.iOS creates a GCHandle. These GCHandles, together with the managed references between the objects, create the described (indirect) retain cycle.</p><p>If we were dealing with a parent <code class="literal">UIView</code> that holds an array of children and the child view objects that were retaining a reference to the parent object:</p><div class="informalexample"><pre class="programlisting">public class RetainingParentClass : UIView
+{
+    public RetainingParentClass()
+    {
+
+    }
+}
+
+public class RetainingChildClass : UIView
+{
+    private RetainingParentClass m_Parent;
+
+    public RetainingChildClass(RetainingParentClass parent)
+    {
+        m_Parent = parent;
+    }
+}</pre></div><p>The following piece of code would create a retain cycle and would cause memory leaks in the application:</p><div class="informalexample"><pre class="programlisting">var parent = new RetainingParentClass();
+
+parent.Add(new RetainingChildClass(parent));</pre></div><p>If we were to<a class="indexterm" id="id113"/> execute this code in the constructor of a view, every time the application navigates to this view, we would be creating a new parent object, never to be garbage collected.</p><div class="mediaobject"><img alt="Cyclic references (cycles)" src="graphics/B04693_02_09.jpg"/><div class="caption"><p>Figure 9: Instruments view for retained objects</p></div></div><p>In this case, the easiest fix would be to use a <code class="literal">WeakReference</code> while we are creating a reference to the parent object from the child one. Using the weak reference avoids the retain cycle situations and does not interfere with the garbage collection.</p><div class="informalexample"><pre class="programlisting">public class RetainingChildClass : UIView
+{
+    private WeakReference&lt;RetainingParentClass&gt; m_Parent;
+
+    public RetainingChildClass(RetainingParentClass parent)
+    {
+        m_Parent = new WeakReference&lt;RetainingParentClass&gt;(parent);
+    }
+}</pre></div><p>Another option would be to implement <code class="literal">IDisposable</code> interface to remove the strong link between the objects by setting the references to null before GC.</p></div></div>
+<div class="section" title="Summary"><div class="titlepage"><div><div><h1 class="title"><a id="ch02lvl1sec20"/>Summary</h1></div></div></div><p>In order to manage application resources, one must have a deeper understanding of the application lifecycle. Application lifecycle events, outlined in this chapter, are the main access points to underlying platform runtime on both iOS and Android. If used properly, the event delegates and event methods on both platforms can help developers save valuable resources and avoid memory problems.</p><p>Other concepts discussed were garbage collection, object references, and automatic reference counting. These concepts make up the foundation of memory management on target Xamarin platforms.</p><p>We also had a closer look at the diagnostic and profiling tools for target platforms and how they can be used effectively. While iOS and Android platforms each have a native app to analyze memory allocations, Xamarin Profiler provides a unified solution for both platforms.</p><p>Finally, useful patterns were outlined for different memory related issues and pitfalls. To analyze these patterns, Xamarin Profiler and Instruments were used for Android and iOS applications respectively.</p><p>In the next chapter, we will be looking at asynchronous implementation techniques and investigate various patterns of multi-threading and background execution.</p></div></body></html>

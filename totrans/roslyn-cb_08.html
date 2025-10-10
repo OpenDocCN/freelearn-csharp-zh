@@ -1,0 +1,614 @@
+<html><head></head><body>
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Contribute Simple Functionality to Roslyn C# Compiler Open Source Code</h1>
+                </header>
+            
+            <article>
+                
+<p>In this chapter, we will cover the following recipes:</p>
+<ul>
+<li>Setting up Roslyn enlistment</li>
+<li>Implementing a new syntax error in the C# compiler code base</li>
+<li>Implementing a new semantic error in the C# compiler code base</li>
+<li>Writing unit tests for a new error in C# compiler code base</li>
+<li>Using Roslyn Syntax Visualizer to view Roslyn syntax tokens and nodes for a source file</li>
+<li>Sending a Roslyn Pull request to contribute to next version of C# compiler and VS IDE</li>
+</ul>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Introduction</h1>
+                </header>
+            
+            <article>
+                
+<p class="mce-root CDPAlignLeft CDPAlign">This chapter enables developers to add new functionality to the Roslyn C# compiler.<br/>
+Let's briefly walk through the different parts of the Roslyn source tree. You can take a quick look at the topmost source folder of the Roslyn repo in the VS2017 branch: <a href="https://github.com/dotnet/roslyn/tree/Visual-Studio-2017/src">https://github.com/dotnet/roslyn/tree/Visual-Studio-2017/src<br/></a></p>
+<div class="mce-root CDPAlignCenter CDPAlign"><img class="image-border" height="536" src="assets/d251ab68-d073-46e3-b62c-658b8681a930.png" width="800"/><a href="https://github.com/dotnet/roslyn/tree/Visual-Studio-2017/src"><br/></a></div>
+<p class="mce-root">The most important source folders and corresponding components are:</p>
+<ul>
+<li><kbd>Compilers</kbd>: This implements the Roslyn C# and VB compilers and the core Microsoft Code Analysis layer, which exposes the rich-language agnostic API to perform syntactic and semantic analysis of source code. <span>Core concepts of this layer are</span> SyntaxTree (source file), SemanticModel (semantics of a source file), Symbol (declaration in source), and Compilation (collection of source files and options).</li>
+<li><kbd>Workspaces</kbd><strong>:</strong> This implements the Workspaces layer and the corresponding APIs to do workspace-level code analysis and refactoring of projects and solutions. This layer is completely agnostic to the host operating on the workspace, such as Visual Studio or command-line tools. <span>Core concepts of this layer are</span> Document (syntax tree with an associated semantic model), Project (collection of documents and assembly references comprising a compilation and properties for configuring a compilation), Solution (collection of projects), and Workspace-level Options.</li>
+<li><kbd>Features</kbd><strong>:</strong> <span>Extensible IDE features built on top of the Workspaces layer, such as Code fixes, refactorings, intellisense, completion, find references, navigate to definition, edit and continue (EnC), diagnostics, and so on, lie in this layer. This layer is not coupled to Visual Studio and can be hosted within different hosts or command-line tools.</span></li>
+<li><kbd>VisualStudio</kbd><strong>:</strong> Visual Studio-specific components built on top of the Features and Workspaces layers provide an end-to-end C# and VB IDE experience. <span>Core concepts of this layer are the <em>Visual Studio</em></span> <span><em>Workspace</em>,</span> Project system (component that bridges the gap between static program representation to a live IDE representation by populating the workspace and lighting up the above noted IDE features), and Language services (core language semantic services exposed to the project system).</li>
+<li><kbd>ExpressionEvaluator</kbd><strong>:</strong> C# and VB expression evaluators to parse and evaluate simple expressions and compute the runtime results.</li>
+<li><kbd>Samples</kbd><strong>:</strong> Samples and walkthroughs to demonstrate Roslyn API usage. You can read more details at <a href="https://github.com/dotnet/roslyn/wiki/Samples-and-Walkthroughs">https://github.com/dotnet/roslyn/wiki/Samples-and-Walkthroughs</a>.</li>
+</ul>
+<div class="packt_infobox">You can read a more detailed Roslyn overview at <a href="https://github.com/dotnet/roslyn/wiki/Roslyn%20Overview">https://github.com/dotnet/roslyn/wiki/Roslyn%20Overview</a>.</div>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Setting up Roslyn enlistment</h1>
+                </header>
+            
+            <article>
+                
+<p>In this section, we will walk you through the steps to install the required tools, enlist in Roslyn, build the Roslyn compiler sources and deploy, debug, and run tests for the locally-built compiler toolset.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Getting Started</h1>
+                </header>
+            
+            <article>
+                
+<p><span>You will need to have Visual Studio 2017 installed on your machine to execute the recipes in this chapter. You can install a free community version of Visual Studio 2017 from <a href="https://www.visualstudio.com/thank-you-downloading-visual-studio/?sku=Community&amp;rel=15">https://www.visualstudio.com/thank-you-downloading-visual-studio/?sku=Community&amp;rel=15</a>. Ensure that</span> C#, VB, MSBuild, and Visual Studio Extensibility <span>are included in the selected workloads. More specifically, add the</span> .NET desktop development workload and Visual Studio Extensibility tools workloads to your VS install.<a href="https://www.visualstudio.com/thank-you-downloading-visual-studio/?sku=Community&amp;rel=15"><br/></a></p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">How to do it...</h1>
+                </header>
+            
+            <article>
+                
+<ol>
+<li>Install GitHub for desktop by following the steps at <a href="https://desktop.github.com/">https://desktop.github.com/</a> and sign in to GitHub using your GitHub profile. If you do not have a profile, you can create one at <a href="https://github.com/join">https://github.com/join</a>.</li>
+<li>Execute the following commands from the <em>Git Shell</em> to enlist and restore Roslyn compiler sources with VS2017 tag:
+<ul>
+<li>git clone https://github.com/dotnet/roslyn c:\Roslyn</li>
+<li>cd c:\Roslyn</li>
+<li>git checkout tags/Visual-Studio-2017</li>
+<li>Restore.cmd</li>
+</ul>
+</li>
+<li>Build the Roslyn compiler subtree from a VS2017 admin developer command prompt: <kbd>msbuild /m /v:m Compilers.sln</kbd>. You can also build the entire Roslyn source tree using either <kbd>Build.cmd</kbd> or <kbd>msbuild /m /v:m Roslyn.sln</kbd>. This step builds the sources and deploys the locally-built compiler toolset (or entire Roslyn IDE + compiler toolset) into the <strong>RoslynDev</strong> hive.</li>
+</ol>
+<div class="packt_infobox">NOTE: If you get build errors due to strong name signing failures, execute the following command from an admin developer command prompt to disable strong name verification: <kbd>sn -Vr *</kbd> , and then execute the build.</div>
+<ol start="4">
+<li>Open <kbd>Roslyn.sln</kbd> in VS2017 and set <kbd>Compilers\CompilerExtension.csproj</kbd> as the startup project.</li>
+<li>Click on <em>Ctrl</em> + <em>F5</em> to deploy the locally built compiler toolset into a separate Visual Studio hive and start a new Visual Studio instance from this hive (RoslynDev).</li>
+<li>In the new instance of Visual Studio, create a new C# class library project.</li>
+</ol>
+<ol start="7">
+<li>Change the <span class="packt_screen">msbuild</span> output verbosity from <em>Minimal</em> to <em>Normal</em> by opening <span class="packt_screen">Tools</span> | <span class="packt_screen">Options</span> | <span class="packt_screen">Projects and Solutions</span> | <span class="packt_screen">Build and Run</span> | <span class="packt_screen">MSBuild project build output verbosity</span>.</li>
+<li>Build the C# class library project and open the Output Window to confirm that locally built <q>csc.exe</q> was used to build the library and it was executed from the Visual Studio RoslynDev hive: <kbd>C:\USERS\&lt;%USER_NAME%&gt;\APPDATA\LOCAL\MICROSOFT\VISUALSTUDIO\15.0_XXXXXXXXROSLYNDEV\EXTENSIONS\MICROSOFT\ROSLYN COMPILERS\42.42.42.42424\csc.exe</kbd></li>
+<li>Right-click on <kbd>Compilers\CSharpCompilerSemanticTest.csproj</kbd> and open project <span class="packt_screen">Properties <span><span>|</span></span></span> <span class="packt_screen">Debug</span> page. Execute the C# compiler semantic unit tests by executing the xunit console exe specified in the <span class="packt_screen">Start external program</span> textbox with arguments from the <span class="packt_screen">Command line arguments</span> textbox: <kbd>C:\Users\&lt;%USER_NAME%&gt;\.nuget\packages\xunit.runner.console\&lt;%VERSION%&gt;\tools\xunit.console.x86.exe "&lt;%REPO_ROOT%&gt;\Binaries\Debug\UnitTests\CSharpCompilerSemanticTest\\Roslyn.Compilers.CSharp.Semantic.UnitTests.dll" -html "<span>&lt;%REPO_ROOT%&gt;</span>\Binaries\Debug\UnitTests\CSharpCompilerSemanticTest\\xUnitResults\Roslyn.Compilers.CSharp.Semantic.UnitTests.html" -noshadow</kbd></li>
+</ol>
+<div class="packt_infobox">You can get more detailed instructions on enlisting, building, and testing Roslyn sources at <a href="https://github.com/dotnet/roslyn/blob/dev16/docs/contributing/Building,%20Debugging,%20and%20Testing%20on%20Windows.md">https://github.com/dotnet/roslyn/blob/dev16/docs/contributing/Building,%20Debugging,%20and%20Testing%20on%20Windows.md</a>.</div>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Implementing a new syntax error in the C# compiler code base</h1>
+                </header>
+            
+            <article>
+                
+<p>This section will enable Roslyn contributors to make changes to the C# parser to add a new syntax error. The C# parser reports a diagnostic <em>CS0106</em> (t<em><span>he modifier 'modifier' is not valid for this</span></em> item) (<a href="https://msdn.microsoft.com/en-us/library/3dd3ha66.aspx">https://msdn.microsoft.com/en-us/library/3dd3ha66.aspx</a>) when an incorrect modifier is used in symbol declarations such as fields, methods, locals, and so on. For example, the following erroneous code generates three <em>CS0106</em> instances:</p>
+<pre>
+class Class<br/>{<br/>  // Error CS0106: The modifier 'async' is not valid for this item<br/>  <strong>async</strong> int field;<br/>  <br/>  // Error CS0106: The modifier 'readonly' is not valid for this item               <br/>  readonly static void M()         <br/>  {<br/>    // Error CS0106: The modifier 'readonly' is not valid for this item<br/>    readonly int local = 0;        <br/>    System.Console.WriteLine(local);<br/>  }<br/>}
+</pre>
+<p>However, if you declare a parameter with an incorrect modifier, say <kbd>readonly int param</kbd>, it doesn't generate <em>CS0106</em>, instead it generates a large number of unhelpful syntax errors and squiggles related to missing tokens, invalid identifiers, and so on. Consider the following example:</p>
+<pre>
+class Class<br/>{<br/>  static void M(readonly int param)<br/>  {<br/>  }<br/>}
+</pre>
+<div class="mce-root CDPAlignLeft CDPAlign">This generates the following set of errors and squiggles:</div>
+<div class="mce-root CDPAlignCenter CDPAlign"><img class="image-border" height="322" src="assets/734e2d61-fb46-43a1-b916-acd118645928.png" width="877"/></div>
+<p class="mce-root">In this section, we will modify the C# parser to implement a better error recovery mechanism for such invalid parameter modifiers and report a single <em>CS0106</em> syntax error, which is more helpful to the end user.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Getting Started</h1>
+                </header>
+            
+            <article>
+                
+<p>You need to ensure that you have installed <em>Git</em> tools, VS2017, with .NET development and VS Extensiblity workloads and have enlisted and built Roslyn sources with the VS2017 tag. For reference, see the recipe Setting up Roslyn enlistment, at the start of this chapter.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">How to do it...</h1>
+                </header>
+            
+            <article>
+                
+<ol>
+<li>Open <kbd>Roslyn.sln</kbd> at the root of the Roslyn repo in VS2017.</li>
+<li>Open source file <kbd>&lt;%ROOT%&gt;\src\Compilers\CSharp\Portable\Parser\LanguageParser.cs</kbd>.</li>
+<li>Navigate to private method <kbd>IsPossibleParameter</kbd> (line 4060) and add the highlighted <kbd>||</kbd> clause to the default case return statement:</li>
+</ol>
+<pre style="padding-left: 90px">
+default:<br/>  return IsPredefinedType(this.CurrentToken.Kind)<strong> || GetModifier(this.CurrentToken) != SyntaxModifier.None</strong>;
+</pre>
+<ol start="4">
+<li>Navigate to private method <kbd>ParseParameterModifiers</kbd> (line 4234), and replace the existing <kbd>while (IsParameterModifier(this.CurrentToken.Kind, allowThisKeyword))</kbd> with a <kbd>while (true)</kbd> loop, add the following if statement at the start of the while loop:</li>
+</ol>
+<pre style="padding-left: 90px">
+while (true)<br/>{<br/>  if (!IsParameterModifier(this.CurrentToken.Kind, allowThisKeyword))<br/>  {<br/>    if (GetModifier(this.CurrentToken) != SyntaxModifier.None)<br/>    {<br/>      // Misplaced modifier<br/>      var misplacedModifier = this.EatToken();<br/>      misplacedModifier = this.AddError(misplacedModifier, ErrorCode.ERR_BadMemberFlag, misplacedModifier.Text);<br/>      modifiers.Add(misplacedModifier);<br/>      continue;<br/>    }<br/><br/>    break;<br/>  }<br/>  ...
+</pre>
+<ol start="5">
+<li>Build the solution.</li>
+<li>Set <kbd>VisualStudio\VisualStudioSetup.Next.csproj</kbd> as the startup project and click on <em>Ctrl</em> + <em>F5</em> to start a new VS instance with the locally built compiler and IDE toolset.</li>
+<li>Create a new C# class library project, say <kbd>ClassLibrary</kbd>, and add the following code:</li>
+</ol>
+<pre style="padding-left: 90px">
+class Class<br/>{<br/>  static void M(readonly int param)<br/>  {<br/>  }<br/>}
+</pre>
+<ol start="8">
+<li>Verify that there is a single <em>CS0106</em> diagnostic in the error list for the invalid <kbd>readonly</kbd> modifier and also that the editor has a single squiggle.</li>
+</ol>
+<div class="mce-root CDPAlignCenter CDPAlign"><img class="image-border" height="251" src="assets/8f4b6f12-be09-473a-af01-11f9f09e747d.png" width="905"/></div>
+<ol start="9">
+<li>Build the project and verify that the build output has a single <em>CS0106</em> diagnostic.</li>
+</ol>
+<div class="packt_infobox">You can view all the parser changes made in this recipe at <a href="https://github.com/mavasani/roslyn/commit/02b7be551b46fa9a8e054c3317bc2ae7957b563c">https://github.com/mavasani/roslyn/commit/02b7be551b46fa9a8e054c3317bc2ae7957b563c.</a></div>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">How it works...</h1>
+                </header>
+            
+            <article>
+                
+<p>Parsing, syntax analysis, or syntactic analysis is the process of analyzing a string of symbols, either in natural language or in computer languages, conforming to the rules of a formal grammar.</p>
+<p>The C# language parser is the first phase of the compiler tool chain that parses the source files according to the C# language specification to produce syntax trees. The primary entry point for parsing each source file is <kbd>SyntaxFactory.ParseCompilationUnit</kbd> (<a href="http://source.roslyn.io/#q=SyntaxFactory.ParseCompilationUnit">http://source.roslyn.io/#q=SyntaxFactory.ParseCompilationUnit</a>), which transforms the given source text into a <kbd>CompilationUnitSyntax</kbd> with syntax nodes, tokens, and trivia.</p>
+<div class="packt_tip">Use <a href="http://source.roslyn.io/">http://source.roslyn.io/</a> for a rich semantic search and navigation of Roslyn source code. Note that the version of source code indexed at this website corresponds to the latest sources in the <em>master</em> branch of the Roslyn repo and may differ from the sources for the <em>Visual-Studio-2017</em> tag.</div>
+<p><kbd>LanguageParser.ParseCompilationUnitCore</kbd> (<a href="http://source.roslyn.io/#q=LanguageParser.ParseCompilationUnitCore">http://source.roslyn.io/#q=LanguageParser.ParseCompilationUnitCore</a>) is the core method of the LanguageParser that parses the outermost namespace declaration, if any, and then parses type and member declarations within the namespace body. It uses the <strong>Lexer</strong> (<a href="http://source.roslyn.io/#q=Lexer.cs">http://source.roslyn.io/#q=Lexer.cs</a>) to read the next token and uses a very sophisticated error recovery mechanism to provide meaningful syntax errors for erroneous code with misplaced or invalid tokens.<br/>
+In this recipe, we identified a case of invalid modifiers on parameters, where the C# compiler doesn't perform optimal error recovery and changed the parser code to look for invalid modifiers on parameters and parse them with the <em>CS0601</em> diagnostic.<br/>
+The following highlighted change in step 3 to the default case return statement in <kbd>IsPossibleParameter</kbd> ensures that we don't completely skip over the parameter list when we encounter a member-level modifier such as readonly, public, private, and so on, in the modifier list of a parameter declaration. Instead, we associate the modifier with the parameter.</p>
+<pre>
+default:<br/> return IsPredefinedType(this.CurrentToken.Kind)<strong> || GetModifier(this.CurrentToken) != SyntaxModifier.None</strong>;
+</pre>
+<p>The <kbd>If</kbd> statement added in the while loop of the <kbd>ParseParameterModifiers</kbd> method in step 4 ensures that we parse both valid and invalid modifiers into the parameter modifier list (as opposed to just the valid modifiers in the original code) and generate appropriate <em>CS0106</em> syntax errors on the invalid modifiers.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Implementing a new semantic error in the C# compiler code base</h1>
+                </header>
+            
+            <article>
+                
+<p><span>This section will enable the Roslyn contributor to make changes to the C# binder/semantic analysis phase to add a new semantic diagnostic. Additionally, we will also show how to extend an existing semantic diagnostic reported during the local rewriting (lowering) phase to cover more cases.<br/>
+Usage of implicitly typed declarations with the</span> <kbd>var</kbd> <span>keyword is a very subjective matter. The C# compiler only reports non-subjective semantic errors on implicitly typed declarations where the type cannot be inferred or is invalid. However, there are certain cases where the type of the initializer is valid and can be inferred, but not at all apparent due to conversions in the initializer expression. For example, consider the expressions <kbd>var x = 1 + 1.0, var y = "string" + 1</kbd>. The initializers for <em>x</em> and <em>y</em> contain implicit conversions on the left/right sides of the binary expression, which may also involve user defined implicit operator conversions, hence, the inferred type of the variables is not apparent. We will extend the C# binder to report a new warning <strong>CS0823</strong> for such cases: <kbd>Warning CS0823: Use an explicit type for declaration as the initializer type '{0}' is not apparent due to conversions</kbd>.<br/>
+Additionally, in this recipe we will extend <em>CS1717</em> (</span>Assignment made to same variable; did you mean to assign something else?<span>) (<a href="https://docs.microsoft.com/en-us/dotnet/csharp/misc/cs1717">https://docs.microsoft.com/en-us/dotnet/csharp/misc/cs1717</a>) to be reported on self-assigning</span> property <span>access. Currently, it only covers self-assigning field, local, parameter, and event access.<br/>
+With both the preceding changes, we will see the</span> following new warnings for the code here:</p>
+<pre>
+class Class<br/>{<br/>  int X { get; set; }<br/><br/>  void M(int x)<br/>  {<br/>    // Warning CS1717 Assignment made to same variable; did you mean to <br/>    //assign something else?<br/>    X = X;     <br/>    <br/>    // Warning CS0823 Use an explicit type for declaration as the <br/>    //initializer type 'string' is not apparent due to conversions<br/>    var y = x + "" ; <br/>  }<br/>}
+</pre>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Getting Started</h1>
+                </header>
+            
+            <article>
+                
+<p><span>You need to ensure that you have installed</span> <em>Git</em> <span>tools,</span> VS2017 with .NET development, and VS Extensiblity workloads, and have enlisted and built Roslyn sources with the VS2017 tag. For reference, see the recipe <em>Setting up Roslyn enlistment</em> at the start of this chapter.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">How to do it...</h1>
+                </header>
+            
+            <article>
+                
+<ol>
+<li>Open <kbd>Roslyn.sln</kbd> at the root of the Roslyn repo in VS2017.</li>
+<li>Open source file <kbd>&lt;%ROOT%&gt;\src\Compilers\CSharp\Portable\Errors\ErrorCode.cs</kbd> and add the following new Warning ID at line 566: <kbd>WRN_ImplicitlyTypedVariableNotRecommended = 823,</kbd></li>
+<li><span>Open the resx file</span> <kbd><q>&lt;%ROOT%&gt;\src\Compilers\CSharp\Portable\CSharpResources.resx</q></kbd> <span>and add the following new resource strings for warning messages:</span></li>
+</ol>
+<pre style="padding-left: 90px">
+&lt;data name="WRN_ImplicitlyTypedVariableNotRecommended" xml:space="preserve"&gt;<br/>  &lt;value&gt;<br/>    Use an explicit type for declaration as the initializer type '{0}' is not apparent due to conversions<br/>  &lt;/value&gt;<br/>&lt;/data&gt;<br/><br/>&lt;data name="WRN_ImplicitlyTypedVariableNotRecommended_Title" xml:space="preserve"&gt;<br/>  &lt;value&gt;<br/>    Use an explicit type for declaration as the initializer type is not apparent due to conversions<br/>  &lt;/value&gt;<br/>&lt;/data&gt;
+</pre>
+<ol start="4">
+<li>Open source file <kbd>&lt;%ROOT%&gt;\src\Compilers\CSharp\Portable\Errors\ErrorFacts.cs</kbd> and add a new switch case in the method <kbd>GetWarningLevel</kbd> at line 320: <kbd>ErrorCode.WRN_ImplicitlyTypedVariableNotRecommended:</kbd></li>
+</ol>
+<ol start="5">
+<li>Open source file <kbd>&lt;%ROOT%&gt;\src\Compilers\CSharp\Portable\Binder\Binder_Statements.cs</kbd> and add the following if statement in method <kbd>BindInferredVariableInitializer</kbd> at line 702:</li>
+</ol>
+<pre style="padding-left: 90px">
+if (expression.Kind == BoundKind.BinaryOperator)<br/>{<br/>  var binaryOperation = (BoundBinaryOperator)expression;<br/>  if (!binaryOperation.Left.GetConversion().IsIdentity || !binaryOperation.Right.GetConversion().IsIdentity)<br/>  {<br/>    // Use an explicit type for declaration as the initializer type '{0}' is <br/>    //not apparent due to conversions.<br/>    Error(diagnostics, ErrorCode.WRN_ImplicitlyTypedVariableNotRecommended, errorSyntax, expression.Display);<br/>  }<br/>}
+</pre>
+<ol start="6">
+<li>Open source file <kbd>&lt;%ROOT%&gt;\src\Compilers\CSharp\Portable\Lowering\DiagnosticsPass_Warnings.cs</kbd> and add the following switch section in method <kbd>IsSameLocalOrField</kbd> at line 204:</li>
+</ol>
+<pre style="padding-left: 90px">
+case BoundKind.PropertyAccess:<br/>  var prop1 = expr1 as BoundPropertyAccess;<br/>  var prop2 = expr2 as BoundPropertyAccess;<br/>  return prop1.PropertySymbol == prop2.PropertySymbol &amp;&amp;<br/>  (prop1.PropertySymbol.IsStatic || IsSameLocalOrField(prop1.ReceiverOpt, prop2.ReceiverOpt));
+</pre>
+<ol start="7">
+<li>Build the solution.</li>
+<li>Set <kbd>VisualStudio\VisualStudioSetup.Next.csproj</kbd> as the startup project and click on <em>Ctrl</em> + <em>F5</em> to start a new VS instance with the locally built compiler and IDE toolset.</li>
+<li>Create a new C# class library project, say <kbd>ClassLibrary</kbd>, and add the following code:</li>
+</ol>
+<pre style="padding-left: 90px">
+class Class<br/>{<br/>  int X { get; set; }<br/><br/>  void M(int x)<br/>  {<br/>    X = X;<br/>    var y = x + "" ;<br/>  }<br/>}
+</pre>
+<ol start="10">
+<li>Verify the new warnings <em>CS0823</em> and <em>CS1717</em> show up in the error list and squiggles appear in the editor:</li>
+</ol>
+<div class="mce-root CDPAlignCenter CDPAlign"><img class="image-border" height="302" src="assets/35dfbc71-878b-48b1-aae6-38ac3ec9356e.png" width="882"/></div>
+<ol start="11">
+<li>Build the project and verify that the build output also has the new diagnostics.</li>
+</ol>
+<div class="packt_infobox">You can view all the source changes made in this recipe for <em>CS0823</em> at <a href="https://github.com/mavasani/roslyn/commit/a155824a41150414966c6f03493b0bb05a45a59e">https://github.com/mavasani/roslyn/commit/a155824a41150414966c6f03493b0bb05a45a59e</a> and for <em>CS1717</em> at <a href="https://github.com/mavasani/roslyn/commit/9f33d6809202d9b2b7ef5e0fa79df0b56ea46110">https://github.com/mavasani/roslyn/commit/9f33d6809202d9b2b7ef5e0fa79df0b56ea46110</a></div>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">How it works...</h1>
+                </header>
+            
+            <article>
+                
+<p>Semantic analysis, also context sensitive analysis, is a process in compiler construction, usually after parsing, to gather necessary semantic information from the source code.</p>
+<p><span>C# binder is the second phase of the compiler tool chain that operates on syntax trees, nodes, tokens, and trivia that comes out from the parser and analyzes the semantics of the code according to the C# language specification. This phase produces</span> <strong>BoundTrees</strong> <span>and reports semantic diagnostics. A bound tree is essentially an abstract syntax tree with rich semantic information associated with each node in the tree. All the semantic information provided by the</span> <strong>SemanticModel</strong> <span>APIs at the CodeAnalysis layer is from the bound nodes associated with the syntax. The primary entry points for binding statements and expressions are <a href="http://source.roslyn.io/#q=Binder.BindStatement">Binder.BindStatement</a> and <a href="http://source.roslyn.io/#q=Binder.BindExpression">Binder.BindExpression</a>, respectively.</span></p>
+<div class="packt_tip">Use <a href="http://source.roslyn.io/">http://source.roslyn.io/</a> for rich semantic search and navigation of Roslyn source code. Note that the version of source code indexed at this website corresponds to the latest sources in the <em>master</em> branch of the Roslyn repo, and may differ from the sources for the <em>Visual-Studio-2017</em> tag.</div>
+<p><span>In this recipe, we showed you how to make the following changes in the binder to add a new diagnostic</span> <em>CS0823</em><span>:</span></p>
+<ol>
+<li>Add a new error code to the <kbd>ErrorCode</kbd> enum.</li>
+<li>Add new resource strings for the compiler diagnostic message.</li>
+<li>Add a new semantic diagnostic to the method to bind the implicit variable initializer when the initializer is a binary expression involving non-apparent implicit conversions.</li>
+</ol>
+<p>C# local rewriter or lowering is the third phase of the compiler tool chain that simplifies the bound trees into very simple bound nodes. Additionally, it also performs flow analysis and reports flow analysis diagnostics (such as unreachable code). Then output of the local rewriter is fed to the code generator that generates MSIL for the simplified bound tree.<br/>
+In this recipe, we extended the existing local rewriting diagnostic pass to report <em>CS1717</em> for self-assigning property access expressions.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Writing unit tests for a new error in the C# compiler code base</h1>
+                </header>
+            
+            <article>
+                
+<p><span>This section will enable you to add unit tests to the C# compiler. This has the following set of unit test projects in Roslyn.sln:</span></p>
+<ul>
+<li><kbd>CSharpCompilerSyntaxTest</kbd>: Unit tests for parsing and syntax errors</li>
+<li><kbd>CSharpCompilerSemanticTest</kbd>: Unit tests for semantic errors and semantic model APIs</li>
+<li><kbd>CSharpCompilerSymbolTest</kbd>: Unit tests for symbols defined in the compiler layer</li>
+<li><kbd>CSharpCommandLineTest</kbd>: Unit tests for the compiler's command-line options</li>
+<li><kbd>CSharpCompilerEmitTest</kbd>: Unit tests for the code generation phase that verify the generated MSIL</li>
+</ul>
+<p><span>In this section, we will add unit tests to</span> <kbd>CSharpCompilerSemanticTest</kbd> <span>for a newly added semantic error</span><span>.</span></p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Getting Started</h1>
+                </header>
+            
+            <article>
+                
+<p><span>You need to ensure that you have executed the previous recipe in this chapter, <em>Implementing a new semantic error in the C# compiler code base,</em> to add a new semantic diagnostic to the C# compiler: <kbd>Warning CS0823: Use an explicit type for declaration as the initializer type '{0}' is not apparent due to conversions</kbd>.</span></p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">How to do it...</h1>
+                </header>
+            
+            <article>
+                
+<ol>
+<li>Open <kbd>Roslyn.sln</kbd> at the root of the Roslyn repo in VS2017.</li>
+<li>Open source file <kbd>&lt;%ROOT%&gt;\src\Compilers\CSharp\Test\Semantic\Semantics\ImplicitlyTypedLocalsTests.cs</kbd>.</li>
+<li>Add the following new unit test to the source file:</li>
+</ol>
+<pre style="padding-left: 90px">
+[Fact]<br/>public void VarInferredTypeNotApparent()<br/>{<br/>  var source = @"<br/>  class Class<br/>  {<br/>    void M(int x, string y)<br/>    {<br/>      var z = x + y;<br/>    }<br/>  }";<br/><br/>  CreateCompilationWithMscorlib(source).VerifyDiagnostics();<br/>}
+</pre>
+<ol start="4">
+<li>Build the test project and execute the unit test on a command-line console using the command line copied from the project's <kbd>Debug</kbd> property page, appending <kbd>-method</kbd> switch for the newly added unit test:</li>
+</ol>
+<pre style="padding-left: 90px">
+<strong><em>&lt;%USERS_FOLDER%&gt;</em>\.nuget\packages\xunit.runner.console\2.2.0-beta4-build3444\tools\xunit.console.x86.exe "<em>&lt;%ROOT%&gt;</em>\Binaries\Debug\UnitTests\CSharpCompilerSemanticTest\Roslyn.Compilers.CSharp.Semantic.UnitTests.dll" -html "C:\roslyn\Binaries\Debug\UnitTests\CSharpCompilerSemanticTest\xUnitResults\Roslyn.Compilers.CSharp.Semantic.UnitTests.html" -noshadow -method Microsoft.CodeAnalysis.CSharp.UnitTests.ImplicitlyTypedLocalTests.VarInferredTypeNotApparent</strong>
+</pre>
+<ol start="5">
+<li>Verify the unit test fails with the missing <em>CS0823</em> diagnostic:</li>
+</ol>
+<pre style="padding-left: 90px">
+Expected:<br/>Actual:<br/><strong>  // (6,7): warning CS0823: Use an explicit type for declaration as the initializer type 'string' is not apparent due to conversions</strong><br/><strong>  // var z = x + y;</strong><br/><strong>  Diagnostic(ErrorCode.WRN_ImplicitlyTypedVariableNotRecommended, "z = x + y").WithArguments("string").WithLocation(6, 7)</strong><br/><br/>Diff:<br/> ++&gt; Diagnostic(ErrorCode.WRN_ImplicitlyTypedVariableNotRecommended, "z = x + y").WithArguments("string").WithLocation(6, 7)
+</pre>
+<ol start="6">
+<li>Add the missing diagnostic as an argument to the <kbd>VerifyDiagnostics</kbd> invocation in our unit test:</li>
+</ol>
+<div class="CDPAlignCenter CDPAlign"><img class="image-border" height="330" src="assets/bee7e297-96e7-4734-bb36-8237213514ec.png" width="967"/></div>
+<ol start="7">
+<li>Re-execute the unit test by repeating step 4 and verify that the test passes now.</li>
+</ol>
+<div class="packt_tip">If you get a <kbd>DirectoryNotFoundException</kbd>, ensure that the test results directory exists on the machine: <kbd>&lt;%ROOT%&gt;\Binaries\Debug\UnitTests\CSharpCompilerSemanticTest\xUnitResults</kbd>.</div>
+<ol start="8">
+<li>Add another unit test to verify that the diagnostic does not fire for a case where the initializer binary expression has no implicit conversions:</li>
+</ol>
+<pre style="padding-left: 90px">
+[Fact]<br/>public void VarInferredTypeApparent_NoDiagnostic()<br/>{<br/>  var source = @"<br/>  class Class<br/>  {<br/>    void M(int x, string y)<br/>    {<br/>      var z = (string)(x + y);<br/>    }<br/>  }";<br/><br/>  CreateCompilationWithMscorlib(source).VerifyDiagnostics();<br/>}
+</pre>
+<ol start="9">
+<li>Execute the new unit test and verify that it passes.</li>
+</ol>
+<div class="packt_tip">You can also execute the unit tests inside Visual Studio using the <span class="packt_screen">Test Explorer</span> window, but the test discovery for <kbd>Roslyn.sln</kbd> is quite slow due to thousands of unit tests across the solution. Hence, you might have to wait for a few minutes before you can execute the first unit test.</div>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Using Roslyn Syntax Visualizer to view Roslyn syntax tokens and nodes for a source file</h1>
+                </header>
+            
+            <article>
+                
+<p class="mce-root"><span>The</span> <span class="packt_screen">Syntax Visualizer</span> <span>is a Visual Studio extension that facilitates the inspection and exploration of Roslyn syntax trees and can be used as a debugging aid when you develop your own applications atop the .NET Compiler Platform (Roslyn) APIs.</span></p>
+<p>In this section, we will show you how to install and use the Roslyn <span class="packt_screen">Syntax Visualizer</span> to view the syntax tree, nodes, and properties of C# and Visual Basic source code in Visual Studio. You can also view the semantics associated with the syntax nodes, such as symbol information, type information, and compile time constant value of expressions.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Getting Started</h1>
+                </header>
+            
+            <article>
+                
+<p><span>You need to install the</span> <kbd>.NET Compiler Platform SDK</kbd> <span>to install the Roslyn</span> <span class="packt_screen">Syntax Visualizer</span><span>. For guidance on installing the SDK, refer to the recipe, <em>Creating, debugging, and executing an analyzer project in Visual Studio</em></span>, <span>in <a href="9928750a-c427-42e6-b8a2-cf67eb5465af.xhtml">Chapter 1</a>, <em>Writing Diagnostic Analyzers.</em></span></p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">How to do it...</h1>
+                </header>
+            
+            <article>
+                
+<ol>
+<li>Open Visual Studio and start the Roslyn <span class="packt_screen">Syntax Visualizer</span> with the command <span class="packt_screen">View</span> | <span class="packt_screen">Other Windows</span> | <span class="packt_screen">Syntax Visualizer</span> and dock it to the left side of the Visual Studio window.</li>
+<li>Create a new C# class library project, say <kbd>ClassLibrary</kbd><em>,</em> and add the following method to <kbd>Class1.cs</kbd>:</li>
+</ol>
+<pre style="padding-left: 90px">
+public void Method()<br/>{<br/>  Console.WriteLine("Hello world!");<br/>}
+</pre>
+<ol start="3">
+<li>Select the code for the invocation <kbd>Console.WriteLine("Hello world!")</kbd> and view the <span class="packt_screen">Syntax Visualizer</span> hierarchical tree view: <kbd>CompilationUnit</kbd> containing a <kbd>NamespaceDeclaration</kbd>, which contains a <kbd>ClassDeclaration</kbd>, which contains a <kbd>MethodDeclaration</kbd> with a <kbd>Block</kbd> whose first statement is an <kbd>ExpressionStatement</kbd> with an <kbd>InvocationExpression</kbd>:</li>
+</ol>
+<div class="CDPAlignCenter CDPAlign"><img class="image-border" src="assets/19dcd0d3-2887-4c1d-8792-dc9e435c813a.png"/></div>
+<ol start="4">
+<li>Right-click on the <span class="packt_screen">InvocationExpression</span> node in <span class="packt_screen">SyntaxTree</span> pane of the <span class="packt_screen">Syntax Visualizer</span> and click on <span class="packt_screen">View Symbol (if any)</span> command.</li>
+</ol>
+<div class="mce-root CDPAlignCenter CDPAlign"><img class="image-border" height="130" src="assets/ddc2f5ea-28bd-4a91-8c5c-80ee77cd397c.png" width="235"/></div>
+<ol start="5">
+<li>You can view the <kbd>Properties</kbd> of the PE metadata symbol <kbd>System.Console.WriteLine</kbd> that is bound to the invocation.</li>
+</ol>
+<div class="mce-root CDPAlignCenter CDPAlign"><img class="image-border" height="437" src="assets/9468dced-3cca-420f-b500-6e576a9057d2.png" width="285"/></div>
+<ol start="6">
+<li>Add a new VB class library project to the solution, say <kbd>ClassLibrary1</kbd>, and add the following method to the existing class:</li>
+</ol>
+<pre style="padding-left: 90px">
+Public Sub Method()<br/>  Console.Write("Hello World!")<br/>End Sub
+</pre>
+<ol start="7">
+<li>Select the invocation expression <kbd>Console.Write("Hello World!")</kbd> in the editor and you can view the Syntax tree, nodes, and properties of the VB code in the <span class="packt_screen">Syntax Visualizer</span>:</li>
+</ol>
+<div class="CDPAlignCenter CDPAlign"><img class="image-border" src="assets/7ace532c-cde2-49ae-abdc-3a11eba9f7d8.png"/></div>
+<div class="packt_infobox">You can read a more detailed overview of the <span class="packt_screen">Syntax Visualizer</span> tool at <a href="https://github.com/dotnet/roslyn/wiki/Syntax%20Visualizer">https://github.com/dotnet/roslyn/wiki/Syntax%20Visualizer</a>.</div>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Sending a Roslyn pull request to contribute to next version of C# compiler and VS IDE</h1>
+                </header>
+            
+            <article>
+                
+<p>In this section, we will walk you through the steps to follow to send a pull request to contribute to the next version of the Roslyn compilers and Visual Studio IDE.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Getting Started</h1>
+                </header>
+            
+            <article>
+                
+<p><span>You need to ensure that you have installed</span> Git <span>tools,</span> VS2017 <span>with .NET development and VS Extensiblity workloads and have enlisted and built</span> Roslyn sources. For reference, see the recipe, <em>Setting up Roslyn enlistment</em>, at the start of this chapter.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">How to do it...</h1>
+                </header>
+            
+            <article>
+                
+<ol>
+<li>It is recommended that you create a Roslyn issue at <a href="https://github.com/dotnet/roslyn/issues">https://github.com/dotnet/roslyn/issues</a> for your planned work and also discuss it with Roslyn team members prior to coding to avoid any unnecessary or redundant work.</li>
+<li>Make the source changes that you would like to contribute to the Roslyn code base in your local enlistment. For example, execute the recipe, <em>Implementing a new semantic error in the C# compiler code base,</em> covered earlier in this chapter.</li>
+<li>Add sufficient unit tests for your code changes. For example, execute the recipe, <em>Writing unit tests for a new error in C# compiler code base,</em> covered earlier in this chapter.</li>
+<li>Execute <kbd>Test.cmd</kbd> at the root of the repo to build and run all the tests to confirm that there are no regressions with your changes. <span>For reference, see the recipe,</span> <em>Setting up Roslyn enlistment</em> <span>at the start of this chapter.</span></li>
+<li>Create a new git branch, add and commit your changes, and push them to the origin. For git help, search at <a href="https://help.github.com/">https://help.github.com/</a>.</li>
+<li>Sign the .NET <strong>Contributor License Agreement</strong> (<strong>CLA</strong>) at <a href="http://cla2.dotnetfoundation.org/">http://cla2.dotnetfoundation.org/</a> before sending the pull request.</li>
+<li>Follow the steps at <a href="https://help.github.com/articles/creating-a-pull-request/">https://help.github.com/articles/creating-a-pull-request/</a> to start a new pull request with your branch.</li>
+</ol>
+<ol start="8">
+<li>Fill out the pull request template in the description tab of the pull request. You can edit this information even after creating a pull request.</li>
+<li>After creating a pull request, add a new comment tagging the compiler and/or the IDE team to review the changes:<br/>
+<ul>
+<li>Compiler team: <kbd>@dotnet/roslyn-compiler</kbd></li>
+<li>IDE team: <kbd>@dotnet/roslyn-ide</kbd></li>
+</ul>
+</li>
+<li>Make the requested code changes from the reviewers and ensure there are no merge conflicts in your branch.</li>
+<li>After you get at least two approvals and all the tests pass on the pull request, you can request your changes to be merged in by the team members.</li>
+</ol>
+<div class="packt_infobox">You can read the <span class="packt_screen">Contributing Code</span> guidelines for the Roslyn repo at <a href="https://github.com/dotnet/roslyn/wiki/Contributing-Code">https://github.com/dotnet/roslyn/wiki/Contributing-Code</a> for further details.</div>
+
+
+            </article>
+
+            
+        </section>
+    </body></html>

@@ -1,0 +1,766 @@
+<html><head></head><body>
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Event Sourcing</h1>
+                </header>
+            
+            <article>
+                
+<p>You should already understand what domain events are, why they are important, and how to find and code them. Now, we will look into other uses for events. Hopefully, after reading this chapter, it will be clear why we need to use events to update the aggregate state. Before, we only used events inside our aggregates, and it might look a bit like overkill to raise those events and do the state transition separately, in the <kbd>When</kbd> method.</p>
+<p>This time, you will learn how events can be used to persist the state of an object, instead of using traditional persistence mechanisms, such as SQL or a document database. That is not an easy thing to grasp, but the reward is satisfying. Using events to represent the system behavior and derive its state for any given moment in time has many advantages. Of course, silver bullets do not exist, and before deciding whether Event Sourcing is for you, it is essential that you understand the possible drawbacks.</p>
+<p>We will continue developing our aggregates with more event handlers. Also, we will cover the concept of event streams and how streams relate to aggregates. We will use an event store to persist our aggregates in streams and load them back.</p>
+<p>The following topics will be covered in this chapter:</p>
+<ul>
+<li>What is Event Sourcing?</li>
+<li>Why do we use Event Sourcing?</li>
+<li>The challenges and drawbacks of Event Sourcing</li>
+<li>Why Event Sourcing became popular in the DDD community</li>
+<li>Using the Event Store</li>
+</ul>
+<p class="mce-root"/>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Technical requirements</h1>
+                </header>
+            
+            <article>
+                
+<p>In this chapter, we will be using the Event Store (<a href="https://eventstore.org/">https://eventstore.org</a>), which is an open source database.</p>
+<p>The easiest way to run Event Store is to use Docker. We've used <kbd>docker-compose</kbd> in previous chapters, so it will be the same experience with the Event Store.</p>
+<p>The code for this chapter contains a <kbd>docker-compose.yml</kbd> file that allows you to use Event Store by executing this command:</p>
+<pre class="language-bash"><strong>docker-compose up</strong></pre>
+<p>Docker will pull the latest image from Docker Hub and start a named container. Two ports are mapped by this command from the container to your machine: <kbd>2113</kbd> and <kbd>1113</kbd>. Port <kbd>2113</kbd> is used to access Event Store via HTTP, and <kbd>1113</kbd> is used for TCP connections.</p>
+<p>After the container starts, you can check its status by opening <kbd>http://localhost:2113</kbd> in your browser. You will get the following login prompt:</p>
+<p class="CDPAlignCenter CDPAlign"><img src="assets/b56a97c7-9a79-44c4-a71f-6661792c7413.png" style="width:23.67em;height:22.67em;"/></p>
+<p class="mce-root"/>
+<p>There, you need to enter the default credentials: <kbd>admin</kbd> as the username and <kbd>changeit</kbd> as the password. Then, click on the <span class="packt_screen">Sign In</span> button, and the following screen should appear:</p>
+<p class="CDPAlignCenter CDPAlign"><img src="assets/125ecde9-c70f-4a12-929e-56405d528a8b.png"/></p>
+<p>The product version and menu items might differ, depending on the latest version of Event Store.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Why Event Sourcing</h1>
+                </header>
+            
+            <article>
+                
+<p>In this section, we will not only discuss why one might want to use Event Sourcing—we will also look into the definition of this pattern and some history behind it. Like Greg Young often puts it, "<em>Event Sourcing is not new"</em>, and we will get into some history that should help you to understand the concept better.</p>
+<p>After that, we will get into the <em>why</em> part. Armed with some knowledge about its history, it won't be very hard to understand why this way of storing data is becoming more popular.</p>
+<p>By the end of this section, we will make it clear why one might not want to use Event Sourcing in their system, and what challenges are awaiting those who start using it for the first time.</p>
+<p class="mce-root"/>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Issues with state persistence</h1>
+                </header>
+            
+            <article>
+                
+<p>In the previous chapters, we used the term <em>domain event</em> many times. During the design phase, we used orange sticky notes to visualize domain events on the whiteboard. Later, during the implementation, we created classes for domain events. These classes translate things that happened in the system into something that the machine can read.</p>
+<p>Each action in the domain model, represented as a method in aggregate, makes changes in the system state. We also made our aggregate to use events to describe these changes. When such a change is made, we then use the pattern-matching code to amend the aggregate state before it gets persisted to a database.</p>
+<p>Now, let's suppose that we are not saving the aggregate state to the database, as we did in <a href="4eea9289-d77e-4568-a9c0-c5e1265e3b4e.xhtml" target="_blank">Chapter 8</a>, <em>CQRS - The Read Side</em>. Instead, we will collect all new events that are generated when an action is executed. For example, in our code for the <kbd>ClassifiedAd</kbd> aggregate, we have an <kbd>UpdatePrice</kbd> method:</p>
+<pre class="language-csharp"><span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">UpdatePrice</span><span class="token punctuation">(</span><span class="token class-name">Price</span> price<span class="token punctuation">)</span> <span class="token operator">=</span><span class="token operator">&gt;</span>  
+    <span class="token function">Apply</span><span class="token punctuation">(</span><span class="token keyword">new</span> <span class="token class-name">Events<span class="token punctuation">.</span>ClassifiedAdPriceUpdated</span>  
+    <span class="token punctuation">{</span>  
+        Id <span class="token operator">=</span> Id<span class="token punctuation">,</span>  
+        Price <span class="token operator">=</span> price<span class="token punctuation">.</span>Amount<span class="token punctuation">,</span>  
+        CurrencyCode <span class="token operator">=</span> price<span class="token punctuation">.</span>Currency<span class="token punctuation">.</span>CurrencyCode  
+    <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span></pre>
+<p>This method already creates a new event when we call it from our application service. We also have the <kbd>When</kbd> method for projecting events to the aggregate state, so when we call the <kbd>Apply</kbd> method, such as in the preceding code snippet, the aggregate state changes accordingly:</p>
+<pre class="language-csharp"><span class="token keyword">protected</span> <span class="token keyword">override</span> <span class="token keyword">void</span> <span class="token function">When</span><span class="token punctuation">(</span><span class="token keyword">object</span> @<span class="token keyword">event</span><span class="token punctuation">)</span>  
+<span class="token punctuation">{</span>  
+    <span class="token keyword">switch</span> <span class="token punctuation">(</span>@<span class="token keyword">event</span><span class="token punctuation">)</span>  
+    <span class="token punctuation">{</span>  
+        <span class="token comment">// only a part of the When method is shown  </span>
+        <span class="token keyword">case</span> <span class="token class-name">Events<span class="token punctuation">.</span>ClassifiedAdPriceUpdated</span> e<span class="token punctuation">:</span>  
+            Price <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">Price</span><span class="token punctuation">(</span>e<span class="token punctuation">.</span>Price<span class="token punctuation">,</span> e<span class="token punctuation">.</span>CurrencyCode<span class="token punctuation">)</span><span class="token punctuation">;</span>  
+            <span class="token keyword">break</span><span class="token punctuation">;</span>  
+    <span class="token punctuation">}</span>  
+<span class="token punctuation">}</span></pre>
+<p>So, if we look at how the aggregate state is changing over time, when we apply different events to it on a timeline, it will look like this:</p>
+<p class="CDPAlignCenter CDPAlign"><img src="assets/55dff57b-3a4d-48d0-a949-b2629dc839aa.png" style="width:60.92em;height:30.17em;"/></p>
+<p>In the previous chapters, we were saving the aggregate state to the database by committing it to the repository for that aggregate type. Each time we needed to perform an operation of the aggregate, we would fetch its state back from the database by calling the <kbd>Get(int id)</kbd> method of the repository.</p>
+<p>Each time we commit a new state, the previous state gets overwritten, so at any given moment, our database contains a snapshot of the system state, although there could have been many changes that made our system come to that state. We can visualize it using the timeline:</p>
+<p class="CDPAlignCenter CDPAlign"><img src="assets/6ef06f95-c9e9-4ad4-8ef3-037b3ba3208c.png" style="width:51.67em;height:43.17em;"/></p>
+<p>This is how executing any action on an aggregate will look:</p>
+<p class="CDPAlignCenter CDPAlign"><img src="assets/43b9aed0-a542-4a68-b6d4-5fe7b1171769.png" style="width:33.92em;height:29.08em;"/></p>
+<p>It works very well if we are only interested in the current state of things. We know the current sale price for a given classified ad. However, when the product owner says that we need to show a graph of the selling price history, we cannot do that. Another typical use case would be to only show those ads that had their price updated during the last couple of days. We can do this by adding the date of the last price update to our aggregate (just for the purpose of showing this new search result) but it will only work for new updates. It would mean that we cannot show the feature to our users before we collect enough data, since our persistence model is unable to provide us with any historical data.</p>
+<p>As developers, we often encounter situations where we get some elements of a system in an unexpected or invalid state. Usually, we use log files to figure out what happened. When this approach fails, we start to interrogate the usual suspect—our users, who definitely did something wrong, something that they shouldn't have been even able to do. Of course, the users deny everything and say that they did nothing wrong, or did nothing at all; it happened <strong>all by itself</strong>.</p>
+<p>Anyone who has found themselves in such a situation remembers the level of despair that is usually associated with an inability to find a cause. We end up dealing with the consequences, fixing the system state according to our best knowledge of how it should be corrected. Sometimes these issues exist for months, or even years, without developers being able to determine the cause of the problem. It is because they don't know the sequence of events that happened in the system, which led to this invalid state.</p>
+<p>The importance of keeping a history of the events that led to a particular state is well described by Mathias Verraes in his blog post from 2014, <em>Domain-Driven Design is Linguistic</em> (<a href="http://verraes.net/2014/01/domain-driven-design-is-linguistic/">http://verraes.net/2014/01/domain-driven-design-is-linguistic/</a>).</p>
+<p>As you would read there, having half a million Euros is the final system state. However, the preceding sequence of events might lead us to different conclusions about some other aspects of the system state that we did not consider before. If we want to add the emotional state or the level of happiness of our subjects to the system state, we won't be able to get this information if we haven't stored the history of events.</p>
+<p>The issue of collecting the history of changes, for both reporting and debugging, can often be solved by introducing an artificial log of changes. Then, it would seem that all changes are being captured for future analysis. At the same time, there will be no direct relationship between event processing and records in the audit log. It could potentially lead to situations wherein some changes won't be recorded.</p>
+<p>Another issue with only keeping the latest state is that to get any information about the system, we can only rely on those tables or documents that we use to persist our aggregates. Of course, if we have a CQRS system with two databases, we will be fetching the information from the read-side. But for those cases when we need to have a new screen in the system that contains data from different existing read models, the only thing we can do is make a complex query with joins to get the data we need. With time, it might diminish the advantages of using CQRS, because what we used to have optimized for reading is not tuned anymore, considering a bunch of new queries spanning across what looked like a perfectly clean model a while ago.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">What is Event Sourcing?</h1>
+                </header>
+            
+            <article>
+                
+<p>We often need to see what behavior has triggered the state transition, and that is why we started using domain events. However, without having those events stored somewhere, to be used as the source of truth for the system state, we can never be sure that the behavior that we have recorded is precisely the one that brought our system to the state where it is now.</p>
+<p>The principle of Event Sourcing is encoded in its name. It is quite simple. We already have an event generation in place in our code. So, instead of persisting the state of our aggregate, we save all new events to the database. When we fetch the aggregate from the database, instead of reading its state as one record in a table or document, we read all events that were saved before and call the <kbd>When</kbd> method for each of those events. By doing that, we get the aggregate state reconstructed from history.</p>
+<p>Then, when we need to execute a command, we call a method of the aggregate, it generates new events, and we add those events to the list of events that are already in the database for that aggregate. It means that we never change or remove anything in the database; we only append new events.</p>
+<p>We can visualize the execution of a single operation like this:</p>
+<p class="CDPAlignCenter CDPAlign"><img src="assets/81f33f9e-34ab-4d61-bc4d-cf244cb07047.png" style="width:44.25em;height:36.92em;"/></p>
+<p>Notice that although reading the aggregate might look more complicated since we are doing two activities (reading and executing <kbd>When</kbd>), in the code, it seems the same. We need to put the code to do the whole <kbd>Get</kbd> into the persistence implementation, and it will allow us to keep the persistence implementation unchanged, at least for the reading part.</p>
+<p>This approach addresses the issues of having historical data for different purposes—as an audit log, as a ledger, as a source for reports that need to get data from the past, and as a path that could help to find a trail that led the system to come into an invalid state.</p>
+<p>One of the significant advantages of Event Sourcing is that it removes impedance mismatch. We were discussing this issue in <a href="1c04605e-ffe3-49fb-94c6-2bb6e4fe269d.xhtml" target="_blank">Chapter 7</a>, <em>Consistency Boundary</em>, when we talked about persisting aggregates to relational and document databases. Since using Event Sourcing we stop persisting object as-is entirely, the impedance mismatch just becomes irrelevant. Remember how complex the mapping between objects and databases could be? Being able to remove this burden from the software development process is a precious feature of using events to persist objects.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Event Sourcing around us</h1>
+                </header>
+            
+            <article>
+                
+<p>Although it might look like Event Sourcing is a new technique, it is not.</p>
+<p>Back in 2007, Greg Young started the process of shaping Event Sourcing into the form that we have now. But, as Greg mentioned several times, we can trace similar techniques back to ancient Mesopotamia. The origins of writing are related to accounting, and cuneiform writing, the first known writing, was initially developed for accounting purposes. We know that from around 3500 BC, scribes recorded commercial transactions on clay tablets. Those tablets were then dried, making permanent, unchangeable records.</p>
+<p>Accounting has changed a lot since Mesopotamian and Sumerian times. Nevertheless, modern principles of accounting are similar to Event Sourcing. Each operation in double-entry accounting is recorded at least twice—once on a debit account and once on a credit account. These two records form one operation. The sum of amounts within an operation must be zero. There is no concept of state for an account in the chart of accounts. The running balance is a sum of the starting balance and the amounts from any record on that account. So, to get the current balance, we need to read all the records for that account.</p>
+<p>The same technique is used in many areas of finance. An example that we are all familiar with is banking. Bank accounts follow the same rule as accounts in bookkeeping. There is no <em>account balance</em> that is stored in a large SQL table that is called <kbd>Accounts</kbd>, in a field called <kbd>Balance</kbd>. It won't be possible for a bank to prove that the balance is correct in case of any disputes. The balance is therefore calculated by summing the amounts of all the transactions for that account. Of course, for a very intensively-used account, such sums would take too long to figure out. In this case, the bank makes an account snapshot once in a while. Most of us are familiar with the concept of the fiscal year. On one day, by the end of the fiscal year, all balances get fixed and all accounting is started anew, only transferring balances from the previous year.</p>
+<p>In any case, there are two common principles of Event Sourcing that are observed in real-world applications, such as accounting and banking:</p>
+<ul>
+<li>Events are recorded for each operation, so an object state can be reconstructed by reading all those events</li>
+<li>Events cannot be changed or removed, because such an operation would undermine the whole concept of the audit log and make it invalid</li>
+</ul>
+<p>For the purpose of corrections, accountants make new transactions that compensate for previously-entered operations that appeared to be incorrect. The same happens in banks. If you get an amount placed on your account by mistake, the bank will never <strong>remove</strong> the transaction, although it is wrong. You will see another transaction on your account, taking the same sum of money away from you. We can also see it happening when we get partial refunds. Instead of changing the sum of a transaction that is being partially refunded, we get a new transaction for the amount of the partial refund.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Event Sourced aggregates</h1>
+                </header>
+            
+            <article>
+                
+<p>Now, it is time to take a better look at how we can persist aggregates by saving the history of changes. In this section, we will discuss what event streams are and how we can use streams to persist aggregates to an event store and retrieve them. Of course, this implies that we will cover the topic of event stores, as well.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Event streams</h1>
+                </header>
+            
+            <article>
+                
+<p>So far, on all of the diagrams, we have seen events for <span>only </span>one aggregate. Of course, such a system is useless, and we need to find a way to store events for different aggregates, in order to make the system functional. The main requirement here would be that we need to be able to retrieve events for a single aggregate, preferably in one read. Of course, if there are thousands of events, we will need to split the read into multiple batches, but this is not in our scope right now. To achieve this ability to read events for <span>only </span>one aggregate, we need to write events with some metadata that indicates the aggregate identity. The second requirement is that events need to be read in the same strict order as they were written; and when we write changes as events to the database, these events need to be written in the exact order as we send them to the database.</p>
+<p>Events that are coming to the system in a particular order form an event stream. For the purpose of Event Sourcing, the most comfortable solution would be to have a database that allows us to have one stream per aggregate. In this case, we will write to a known stream and read from it. The stream name will be a combination of the aggregate type and the aggregate identity; for example, for our <kbd>ClassifiedAd</kbd> aggregate with an ID of <kbd>e99460470a7b4133827d06f32dd4714e</kbd>, the stream name would be <kbd>ClassifiedAd-e99460470a7b4133827d06f32dd4714e</kbd>. An aggregate stream contains all events that happened during the aggregate life cycle. When we decide that we don't need the aggregate in the system, we can either remove the whole stream or write a final event, such as <kbd>ClassifiedAdRemoved</kbd>.</p>
+<p>A critical feature of a database that we can use to persist events is to have a single stream with all events that have ever come to the system, in addition to individual streams. It won't be ideal, but we can deduce aggregate streams by controlling the stream ID metadata property, in case our database doesn't support separate streams natively. However, having a single stream that contains all events is absolutely necessary. Throughout the course of this book, we will reference this master stream as the <kbd>$all</kbd> stream, because this is what it is called in the Event Store, the database that we will use in our examples.</p>
+<p>It is crucial to understand that we are referring to the same events when dealing with the <kbd>$all</kbd> stream and aggregate streams. You can see it in a way that all events are always present in the <kbd>$all</kbd> stream but in addition, there is an index that is put on top of these events. This index tells the system which individual stream an event belongs to.</p>
+<p>The following diagram represents the <kbd>$all</kbd> stream with some events that are also indexed per aggregate stream:</p>
+<p class="CDPAlignCenter CDPAlign"><img src="assets/1f044552-bfa3-4849-8969-33e13ed65e55.png" style="width:56.00em;height:21.67em;"/></p>
+<div class="packt_figref CDPAlignCenter CDPAlign">Aggregate streams and the $all stream</div>
+<p>So far, we have been able to formulate the requirements for a database that we can use to persist our aggregate as streams of events. Now, we will look at concrete examples of such databases.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Event stores</h1>
+                </header>
+            
+            <article>
+                
+<p>In the preceding section, we discussed that in order to consider a database to be used as an event store, we need to ensure that this database can store events and metadata and put indexes on the metadata. We cannot put any indexes on events, because there is no single denominator for event objects; they are all different. Metadata, however, is structured in a known way. For example, the stream name must be present in the metadata for all events.</p>
+<p>Such a definition could lead us to a conclusion that any database that supports querying events by stream ID can be used as an event store. This is true. Here, you can find examples of how different databases can be used as event stores:</p>
+<table style="border-collapse: collapse" border="1">
+<thead>
+<tr>
+<th>
+<p>Database</p>
+</th>
+<th>
+<p>How to store events</p>
+</th>
+<th>
+<p>How to read a single stream</p>
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<p>RDBMS (SQL Server, PostgreSQL, and so on)</p>
+</td>
+<td>
+<p>Use a single table; add one column for the stream name and one column for the event payload. One row is one event.</p>
+</td>
+<td>
+<p>Select all rows where the stream name is what we want.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>Document database (MongoDB, Azure Cosmos DB, RavenDB)</p>
+</td>
+<td>
+<p>Use a document collection. Each document should have a metadata object and a field to store the payload. One document is one event.</p>
+</td>
+<td>
+<p>Query all documents where the stream name (part of the metadata) is what we need.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>Partitioned tables (Azure Table Storage, AWS DynamoDB)</p>
+</td>
+<td>
+<p>Use a single table; add one field for the stream name (or ID) to be used as the partition key and another field as the row key (Azure) or sort key (DynamoDB). The third field will contain the event payload. One record is one event.</p>
+</td>
+<td>
+<p>Query all records where the partition key is the name of the stream we are reading.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>Specialized database (Event Store)</p>
+</td>
+<td>
+<p>Native support for streams.</p>
+</td>
+<td>
+<p>Read all events from a single stream.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<p> </p>
+<p>Notice that for some relational databases, there are tools and libraries that can help to store events for Event Sourced systems. For example, the Marten framework (<a href="http://jasperfx.github.io/marten/">http://jasperfx.github.io/marten/</a>) uses the native PostgreSQL feature to store unstructured data in JSONB-type columns and has an event store implementation based on that database. The SQL Stream Store (<a href="https://github.com/SQLStreamStore/SQLStreamStore">https://github.com/SQLStreamStore/SQLStreamStore</a>) can also help you to use a variety of relational databases, including Microsoft SQL Server and PostgreSQL, as event stores. Both of these open source tools are actively being used in production systems around the world and have active communities behind them.</p>
+<p>So far, we've been concentrating on persisting a single aggregate as an event stream and reading all events for a single aggregate from the database. However, this is not the only characteristic that we need to be looking at for an event store that we would be comfortable using. If you haven't noticed yet, we haven't touched the query part, when we need to read data for some aggregates, based on some criteria. Our primary requirement for an event store does not include the ability to query anything except events by the stream name. Definitely, a query such as <kbd>ClassifiedAdsPendingReview</kbd> wouldn't be possible, just because we would need to read all events (potentially millions) for all classified ads and then query in the memory. This is not a feasible approach for production, although it might be quite useful for prototyping. To solve this issue, we need to get back to CQRS, and this time, we need to use domain events to build our read models. In the case of an Event Sourced system, we will have to use a conventional database, SQL or NoSQL, which can be queried, to handle the query side of CQRS, and this query side can only be built from events. Thus, we need to have a reliable way to get real-time (or near real-time) updates about all new events from  the event store to our read model builders. If we use traditional relational databases to store events, we almost inevitably turn to frequent polling. Some NoSQL databases, such as Azure Cosmos DB, RavenDB, and AWS DynamoDB, let us subscribe to the change stream and get information about all database operations. We will be using the term <em>subscription</em> when talking about this feature.</p>
+<p>For all of the examples in this book, we will be using the Event Store (<a href="https://eventstore.org">https://eventstore.org</a>,) because it has years of experience building Event Sourced systems put into it by its creator, the <em>father</em> of CQRS and longtime advocate of Event Sourcing, Greg Young, the company behind this product and the open source developers community that keeps helping to make Event Store better. In addition, this product is free, and you only need to pay to get production-grade support. The Event Store has native support for store events, and it has transactional writes; we can subscribe to event streams to get all new (and existing) events from there, and so on.</p>
+<p>Before going further, please ensure that you have completed the steps described in the <em>Technical requirements</em> section.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Event-oriented persistence</h1>
+                </header>
+            
+            <article>
+                
+<p>Now, we are going to write some code that will allow us to use events to persist our aggregates.</p>
+<p>In <a href="6f50ee65-024a-4c46-89c8-343183b05b8f.xhtml" target="_blank"/><a href="6f50ee65-024a-4c46-89c8-343183b05b8f.xhtml" target="_blank"/><a href="6f50ee65-024a-4c46-89c8-343183b05b8f.xhtml" target="_blank"/><a href="6f50ee65-024a-4c46-89c8-343183b05b8f.xhtml" target="_blank"/><a href="6f50ee65-024a-4c46-89c8-343183b05b8f.xhtml" target="_blank">Chapter 9</a>, <em>CQRS - The Read Side</em>, we used repositories to store aggregates, but now, we will do something else. Appending events to a stream for the <kbd>ClassifiedAd</kbd> aggregate is no different from doing the same thing for the <kbd>UserProfile</kbd> aggregate. The specifics of repositories therefore disappear, and everything about persisting aggregates and retrieving them is done in exactly the same way. Consequently, we can use one interface, <kbd>IAggregateStore</kbd>, that will handle the persistence for any type of aggregate.</p>
+<p>Now, let's start to implement some lower-level code to write events to Event Store streams and read them back. It will include serialization, paging, type handling, and optimistic concurrency.</p>
+<div class="packt_infobox">Throughout this chapter, we will be using the term <strong>event store</strong> when talking about a place where we can write events to streams and read them back. When we use the term Event Store, we will be referring to the product that you should have been able to execute by following the <em>Technical requirements</em> section.</div>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Writing to Event Store</h1>
+                </header>
+            
+            <article>
+                
+<p>Before any read, there must be a write, so that is where we will start. Let's look at the Event Store API to write events to streams. The method that we would most likely use is this one:</p>
+<pre class="language-csharp">Task<span class="token operator">&lt;</span>WriteResult<span class="token operator">&gt;</span> <span class="token function">AppendToStreamAsync</span><span class="token punctuation">(</span><span class="token keyword">string</span> stream<span class="token punctuation">,</span> <span class="token keyword">long</span> expectedVersion<span class="token punctuation">,</span> IEnumerable<span class="token operator">&lt;</span>EventData<span class="token operator">&gt;</span> events<span class="token punctuation">)</span></pre>
+<p>All of the parameters here are quite clear: a stream name and a list of events to be saved to the stream. Besides, we need to supply the aggregate version to handle optimistic concurrency. It will prevent overriding changes that someone else could have made in parallel by processing another command for the same aggregate. Event Store supports stream versioning out of the box, and we just need to supply the expected version when trying to save new events to the stream.</p>
+<p>We will start to write the code by adding the following interface to the <kbd>Marketplace.Framework</kbd> project:</p>
+<pre class="language-csharp"><span class="token keyword">using</span> System<span class="token punctuation">.</span>Threading<span class="token punctuation">.</span>Tasks<span class="token punctuation">;</span>
+
+<span class="token keyword">namespace</span> Marketplace<span class="token punctuation">.</span>Framework
+<span class="token punctuation">{</span>
+    <span class="token keyword">public</span> <span class="token keyword">interface</span> <span class="token class-name">IAggregateStore</span>
+    <span class="token punctuation">{</span>
+        Task<span class="token operator">&lt;</span><span class="token keyword">bool</span><span class="token operator">&gt;</span> <span class="token generic-method"><span class="token function">Exists</span><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">,</span> <span class="token class-name">TId</span><span class="token punctuation">&gt;</span></span><span class="token punctuation">(</span><span class="token class-name">TId</span> aggregateId<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        
+        Task <span class="token generic-method"><span class="token function">Save</span><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">,</span> <span class="token class-name">TId</span><span class="token punctuation">&gt;</span></span><span class="token punctuation">(</span><span class="token class-name">T</span> aggregate<span class="token punctuation">)</span> <span class="token keyword">where</span> T <span class="token punctuation">:</span> AggregateRoot<span class="token operator">&lt;</span>TId<span class="token operator">&gt;</span><span class="token punctuation">;</span>
+        
+        Task<span class="token operator">&lt;</span>T<span class="token operator">&gt;</span> <span class="token generic-method"><span class="token function">Load</span><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">,</span> <span class="token class-name">TId</span><span class="token punctuation">&gt;</span></span><span class="token punctuation">(</span><span class="token class-name">TId</span> aggregateId<span class="token punctuation">)</span> <br/>            <span class="token keyword">where</span> T <span class="token punctuation">:</span> AggregateRoot<span class="token operator">&lt;</span>TId<span class="token operator">&gt;</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></pre>
+<p>You can compare it to the repository interfaces we used in <a href="4eea9289-d77e-4568-a9c0-c5e1265e3b4e.xhtml" target="_blank">Chapter 8</a>, <em>Aggregate Persistence</em>, and you'll see that the new interface is some kind of a generic repository. Although we discussed why using generic repositories is usually not a good idea, in our case, it is perfectly acceptable, since all persistence aspects<span><span> are</span></span> handled in the same way for all aggregates.</p>
+<p>The serialization code would require some external dependencies to be installed. In the preceding snippet, we used the <kbd>JsonConvert</kbd> class for serializing events to JSON. Therefore, we need to add the <kbd>Newtonsoft.Json</kbd> package to our <kbd>Marketplace.Framework</kbd> project. To get the Event Store API, we also need the <kbd>EventStore.ClientAPI.NetCore</kbd> package. We can either use the <span class="packt_screen">Manage NuGet Packages</span> context menu on the project or run the following two commands in the Terminal window:</p>
+<pre><strong>dotnet add Marketplace.Framework package Newtonsoft.Json</strong><br/><strong>dotnet add Marketplace.Framework package EventStore.ClientAPI.NetCore</strong></pre>
+<p>Now, we can start implementing this interface in a new class, <kbd>EsAggregateStore</kbd>, that we will add to the <kbd>Infrastructure</kbd> folder of the <kbd>Marketplace</kbd> project.</p>
+<p>First, the stream name. At the beginning of this chapter, we already went through the concept of event streams, and since writing into one stream is a transaction, a stream becomes our transaction boundary, along with the aggregate boundary too. We will use the aggregate-per-stream strategy, and therefore, we can safely make the stream name derive from our aggregate name. But, what are the names of our aggregates? Well, we can start with the CRL type, such as <kbd>Marketplace.Domain.ClassifiedAd</kbd>. Then, we need to make those names unique. To do this, the obvious solution would be to add an aggregate ID. I want to cover two cases to create the stream ID: when we have an aggregate that needs to be persisted, and when we just have an ID of an aggregate that we want to load. To do that, I will add two methods to the <kbd>EsAggregateStore</kbd> class:</p>
+<pre class="language-csharp"><span class="token keyword">private</span> <span class="token keyword">static</span> <span class="token keyword">string</span> <span class="token generic-method"><span class="token function">GetStreamName</span><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">,</span> <span class="token class-name">TId</span><span class="token punctuation">&gt;</span></span><span class="token punctuation">(</span><span class="token class-name">TId</span> aggregateId<span class="token punctuation">)</span>
+    <span class="token operator">=</span><span class="token operator">&gt;</span> $<span class="token string">"{typeof(T).Name}-{aggregateId.ToString()}"</span><span class="token punctuation">;</span>
+
+<span class="token keyword">private</span> <span class="token keyword">static</span> <span class="token keyword">string</span> <span class="token generic-method"><span class="token function">GetStreamName</span><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">,</span> <span class="token class-name">TId</span><span class="token punctuation">&gt;</span></span><span class="token punctuation">(</span><span class="token class-name">T</span> aggregate<span class="token punctuation">)</span>
+    <span class="token keyword">where</span> T <span class="token punctuation">:</span> AggregateRoot<span class="token operator">&lt;</span>TId<span class="token operator">&gt;</span>
+    <span class="token operator">=</span><span class="token operator">&gt;</span> $<span class="token string">"{typeof(T).Name}-{aggregate.Id.ToString()}"</span><span class="token punctuation">;</span></pre>
+<p>Looking further at the list of parameters for <kbd>AppendToStreamAsync</kbd>, the method doesn't accept <kbd>IEnumerable&lt;object&gt;</kbd>, but instead expects a collection of objects that have the <kbd>EventData</kbd> type. This class has the following public members:</p>
+<pre class="language-csharp"><span class="token keyword">public</span> <span class="token keyword">sealed</span> <span class="token keyword">class</span> <span class="token class-name">EventData</span>
+<span class="token punctuation">{</span>
+    <span class="token keyword">public</span> <span class="token keyword">readonly</span> <span class="token class-name">Guid</span> EventId<span class="token punctuation">;</span>
+    <span class="token keyword">public</span> <span class="token keyword">readonly</span> <span class="token keyword">string</span> Type<span class="token punctuation">;</span>
+    <span class="token keyword">public</span> <span class="token keyword">readonly</span> <span class="token keyword">bool</span> IsJson<span class="token punctuation">;</span>
+    <span class="token keyword">public</span> <span class="token keyword">readonly</span> <span class="token keyword">byte</span><span class="token punctuation">[</span><span class="token punctuation">]</span> Data<span class="token punctuation">;</span>
+    <span class="token keyword">public</span> <span class="token keyword">readonly</span> <span class="token keyword">byte</span><span class="token punctuation">[</span><span class="token punctuation">]</span> Metadata<span class="token punctuation">;</span>
+<span class="token punctuation">}</span></pre>
+<p>For us, it is important to understand that we need to save the event type as a string, so that we can deserialize the event back to an object of the event CLR type. We also have to convert the event object to a byte array when we save events, and convert a byte array to an object when we read events. So, for <kbd>Type</kbd>, we can again use the CLR type name of the event object. For the payload (<kbd>Data</kbd>), we can use whatever serialization is useful.</p>
+<p>Nevertheless, Event Store has a nice UI that can show us the content of events, but it only does that if an event is serialized as JSON. This is exactly what the <kbd>IsJson</kbd> Boolean property is for. For the majority of applications, <span>which</span> doesn't require optimizing the performance by using more compact representations and a faster serialization process, such as protobuf, it is enough to use JSON, and that's what we are going to do.</p>
+<p>Since we need to convert our objects to byte arrays and still use JSON, we can create a method that will help us in doing that:</p>
+<pre class="language-csharp"><span class="token keyword">private</span> <span class="token keyword">static</span> <span class="token keyword">byte</span><span class="token punctuation">[</span><span class="token punctuation">]</span> <span class="token function">Serialize</span><span class="token punctuation">(</span><span class="token keyword">object</span> data<span class="token punctuation">)</span>
+    <span class="token operator">=</span><span class="token operator">&gt;</span> Encoding<span class="token punctuation">.</span>UTF8<span class="token punctuation">.</span><span class="token function">GetBytes</span><span class="token punctuation">(</span>JsonConvert<span class="token punctuation">.</span><span class="token function">SerializeObject</span><span class="token punctuation">(</span>data<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span></pre>
+<p>Then, we need to think of how to get a list of new events from an aggregate and build a collection of <kbd>EventData</kbd> objects to represent those events.</p>
+<p>From the very early versions of our application, we have the <kbd>GetChanges</kbd> method. First, we had it in the <kbd>Entity</kbd> base class, which we later renamed <kbd>AggregateRoot</kbd>. We can finally start using this method to get all new events that are generated as part of command execution. Here is the code that will get all changes from an aggregate and build a collection of <kbd>EventData</kbd> objects, just like we need for calling the <kbd>AppendToStreamAsync</kbd> method:</p>
+<pre class="language-csharp"><span class="token keyword">var</span> changes <span class="token operator">=</span> aggregate<span class="token punctuation">.</span><span class="token function">GetChanges</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+    <span class="token punctuation">.</span><span class="token function">Select</span><span class="token punctuation">(</span>@<span class="token keyword">event</span> <span class="token operator">=</span><span class="token operator">&gt;</span> <span class="token keyword">new</span> <span class="token class-name">EventData</span><span class="token punctuation">(</span>
+        eventId<span class="token punctuation">:</span> Guid<span class="token punctuation">.</span><span class="token function">NewGuid</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        type<span class="token punctuation">:</span> @<span class="token keyword">event</span><span class="token punctuation">.</span><span class="token function">GetType</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span>Name<span class="token punctuation">,</span>
+        isJson<span class="token punctuation">:</span> <span class="token keyword">true</span><span class="token punctuation">,</span>
+        data<span class="token punctuation">:</span> <span class="token function">Serialize</span><span class="token punctuation">(</span>@<span class="token keyword">event</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        metadata<span class="token punctuation">:</span> <span class="token keyword">null</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span></pre>
+<p>In the preceding snippet, we specify the <span>short </span>event type name to be used as the event type in Event Store. It will be something like <kbd>ClassifiedAdRenamed</kbd>. But, when we start loading events back, we need to deserialize JSON strings back to concrete event types. The <kbd>Newtonsoft.Json</kbd> library won't understand the short-type; it needs to know the <strong>fully-qualified class name</strong> (<strong>FQCN</strong>). If the events are defined in a different assembly, we also need to include the assembly information. If we use FQCN as an event type for Event Store, we will get quite an ugly picture in the Event Store UI, since it will be polluted with all that technical information about namespaces and assembly names. I don't like that, and therefore, I will still use the short-type name. However, we need a way to be able to tell the deserializer about the concrete event type. The best place to store any kind of technical information about the event is metadata, and that's what I am going to do. First, I will add a private nested class that we'll use for the event metadata:</p>
+<pre class="language-csharp"><span class="token keyword">private</span> <span class="token keyword">class</span> <span class="token class-name">EventMetadata</span>
+<span class="token punctuation">{</span>
+    <span class="token keyword">public</span> <span class="token keyword">string</span> ClrType <span class="token punctuation">{</span> <span class="token keyword">get</span><span class="token punctuation">;</span> <span class="token keyword">set</span><span class="token punctuation">;</span> <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></pre>
+<p>Now, I can modify the preceding code snippet to keep the FQCN with the event, as metadata:</p>
+<pre class="language-csharp"><span class="token keyword">var</span> changes <span class="token operator">=</span> aggregate<span class="token punctuation">.</span><span class="token function">GetChanges</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+    <span class="token punctuation">.</span><span class="token function">Select</span><span class="token punctuation">(</span>@<span class="token keyword">event</span> <span class="token operator">=</span><span class="token operator">&gt;</span> 
+        <span class="token keyword">new</span> <span class="token class-name">EventData</span><span class="token punctuation">(</span>
+            eventId<span class="token punctuation">:</span> Guid<span class="token punctuation">.</span><span class="token function">NewGuid</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            type<span class="token punctuation">:</span> @<span class="token keyword">event</span><span class="token punctuation">.</span><span class="token function">GetType</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span>Name<span class="token punctuation">,</span>
+            isJson<span class="token punctuation">:</span> <span class="token keyword">true</span><span class="token punctuation">,</span>
+            data<span class="token punctuation">:</span> <span class="token function">Serialize</span><span class="token punctuation">(</span>@<span class="token keyword">event</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            metadata<span class="token punctuation">:</span> <span class="token function">Serialize</span><span class="token punctuation">(</span><span class="token keyword">new</span> <span class="token class-name">EventMetadata</span>
+                <span class="token punctuation">{</span>ClrType <span class="token operator">=</span> @<span class="token keyword">event</span><span class="token punctuation">.</span><span class="token function">GetType</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span>AssemblyQualifiedName<span class="token punctuation">}</span><span class="token punctuation">)</span>
+        <span class="token punctuation">)</span><span class="token punctuation">)</span>
+    <span class="token punctuation">.</span><span class="token function">ToArray</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span></pre>
+<div class="packt_infobox">Using the event CLR type name as the event name and the FQCN in the event metadata is a temporary solution. For production systems, I would recommend using the concept of a <em>type mapper</em>, which translates CLR types to strings and back. This method gives you some freedom to change namespaces if needed, without breaking the ability to deserialize events that were persisted in the past. I will not go into detail on using the type mapper, but you will find the working code in the repository for <a href="https://www.packtpub.com/sites/default/files/downloads/Splitting_the_System.pdf">Chapter 13</a>, <em>Splitting the System</em>.</div>
+<p class="mce-root"/>
+<p>Let's put this code into our new <kbd>EsAggregateStore</kbd> class:</p>
+<pre class="language-csharp"><span class="token keyword">using</span> System<span class="token punctuation">;</span>
+<span class="token keyword">using</span> System<span class="token punctuation">.</span>Linq<span class="token punctuation">;</span>
+<span class="token keyword">using</span> System<span class="token punctuation">.</span>Text<span class="token punctuation">;</span>
+<span class="token keyword">using</span> System<span class="token punctuation">.</span>Threading<span class="token punctuation">.</span>Tasks<span class="token punctuation">;</span>
+<span class="token keyword">using</span> EventStore<span class="token punctuation">.</span>ClientAPI<span class="token punctuation">;</span>
+<span class="token keyword">using</span> Newtonsoft<span class="token punctuation">.</span>Json<span class="token punctuation">;</span>
+
+<span class="token keyword">namespace</span> Marketplace<span class="token punctuation">.</span>Infrastructure
+<span class="token punctuation">{</span>
+    <span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">EsAggregateStore</span> <span class="token punctuation">:</span> <span class="token class-name">IAggregateStore</span>
+    <span class="token punctuation">{</span>
+        <span class="token keyword">private</span> <span class="token keyword">readonly</span> <span class="token class-name">IEventStoreConnection</span> _connection<span class="token punctuation">;</span>
+
+        <span class="token keyword">public</span> <span class="token function">EsAggregateStore</span><span class="token punctuation">(</span><span class="token class-name">IEventStoreConnection</span> connection<span class="token punctuation">)</span>
+        <span class="token punctuation">{</span>
+            _connection <span class="token operator">=</span> connection<span class="token punctuation">;</span>
+        <span class="token punctuation">}</span>
+
+        <span class="token keyword">public</span> <span class="token keyword">async</span> Task <span class="token generic-method"><span class="token function">Save</span><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">,</span> <span class="token class-name">TId</span><span class="token punctuation">&gt;</span></span><span class="token punctuation">(</span><span class="token class-name">T</span> aggregate<span class="token punctuation">)</span> <br/>            <span class="token keyword">where</span> T <span class="token punctuation">:</span>  Aggregate<span class="token operator">&lt;</span>TId<span class="token operator">&gt;</span>
+        <span class="token punctuation">{</span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span>aggregate <span class="token operator">==</span> <span class="token keyword">null</span><span class="token punctuation">)</span>
+                <span class="token keyword">throw</span> <span class="token keyword">new</span> <span class="token class-name">ArgumentNullException</span><span class="token punctuation">(</span><span class="token function">nameof</span><span class="token punctuation">(</span>aggregate<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+            <span class="token keyword">var</span> changes <span class="token operator">=</span> aggregate<span class="token punctuation">.</span><span class="token function">GetChanges</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+                <span class="token punctuation">.</span><span class="token function">Select</span><span class="token punctuation">(</span>@<span class="token keyword">event</span> <span class="token operator">=</span><span class="token operator">&gt;</span>
+                    <span class="token keyword">new</span> <span class="token class-name">EventData</span><span class="token punctuation">(</span>
+                        eventId<span class="token punctuation">:</span> Guid<span class="token punctuation">.</span><span class="token function">NewGuid</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                        type<span class="token punctuation">:</span> @<span class="token keyword">event</span><span class="token punctuation">.</span><span class="token function">GetType</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span>Name<span class="token punctuation">,</span>
+                        isJson<span class="token punctuation">:</span> <span class="token keyword">true</span><span class="token punctuation">,</span>
+                        data<span class="token punctuation">:</span> <span class="token function">Serialize</span><span class="token punctuation">(</span>@<span class="token keyword">event</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                        metadata<span class="token punctuation">:</span> <span class="token function">Serialize</span><span class="token punctuation">(</span><span class="token keyword">new</span> <span class="token class-name">EventMetadata</span>
+                            <span class="token punctuation">{</span>ClrType <span class="token operator">=</span> <br/>                             @<span class="token keyword">event</span><span class="token punctuation">.</span><span class="token function">GetType</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span>AssemblyQualifiedName<span class="token punctuation">}</span><span class="token punctuation">)</span>
+                    <span class="token punctuation">)</span><span class="token punctuation">)</span>
+                <span class="token punctuation">.</span><span class="token function">ToArray</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+            <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span>changes<span class="token punctuation">.</span><span class="token function">Any</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token keyword">return</span><span class="token punctuation">;</span>
+
+            <span class="token keyword">var</span> streamName <span class="token operator">=</span> <span class="token generic-method"><span class="token function">GetStreamName</span><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">,</span> <span class="token class-name">TId</span><span class="token punctuation">&gt;</span></span><span class="token punctuation">(</span>aggregate<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+            <span class="token keyword">await</span> _connection<span class="token punctuation">.</span><span class="token function">AppendToStreamAsync</span><span class="token punctuation">(</span>
+                streamName<span class="token punctuation">,</span>
+                aggregate<span class="token punctuation">.</span>Version<span class="token punctuation">,</span>
+                changes<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+            aggregate<span class="token punctuation">.</span><span class="token function">ClearChanges</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">}</span>
+
+        <span class="token keyword">private</span> <span class="token keyword">static</span> <span class="token keyword">byte</span><span class="token punctuation">[</span><span class="token punctuation">]</span> <span class="token function">Serialize</span><span class="token punctuation">(</span><span class="token keyword">object</span> data<span class="token punctuation">)</span>
+            <span class="token operator">=</span><span class="token operator">&gt;</span> Encoding<span class="token punctuation">.</span>UTF8<span class="token punctuation">.</span><span class="token function">GetBytes</span><span class="token punctuation">(<br/>                </span>JsonConvert<span class="token punctuation">.</span><span class="token function">SerializeObject</span><span class="token punctuation">(</span>data<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token keyword">private</span> <span class="token keyword">static</span> <span class="token keyword">string</span> <span class="token generic-method"><span class="token function">GetStreamName</span><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">,</span> <span class="token class-name">TId</span><span class="token punctuation">&gt;</span></span><span class="token punctuation">(</span><span class="token class-name">TId</span> aggregateId<span class="token punctuation">)</span>
+            <span class="token operator">=</span><span class="token operator">&gt;</span> $<span class="token string">"{typeof(T).Name}-{aggregateId.ToString()}"</span><span class="token punctuation">;</span>
+
+        <span class="token keyword">private</span> <span class="token keyword">static</span> <span class="token keyword">string</span> <span class="token generic-method"><span class="token function">GetStreamName</span><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">,</span> <span class="token class-name">TId</span><span class="token punctuation">&gt;</span></span><span class="token punctuation">(</span><span class="token class-name">T</span> aggregate<span class="token punctuation">)</span> 
+            <span class="token keyword">where</span> T <span class="token punctuation">:</span> Aggregate<span class="token operator">&lt;</span>TId<span class="token operator">&gt;</span>
+            <span class="token operator">=</span><span class="token operator">&gt;</span> $<span class="token string">"{typeof(T).Name}-{aggregate.Id.ToString()}"</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></pre>
+<p>The only thing that we have not touched upon previously is <kbd>IEventStoreConnection</kbd>. All reads and writes between our application and Event Store need to be executed on the open TCP connection to the Event Store cluster, which can also be a single-node cluster that we can create by running the Docker image. Our application will establish the connection when it starts, and we need to close the connection when the application stops. We will add this infrastructure code to our executable project.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Reading from Event Store</h1>
+                </header>
+            
+            <article>
+                
+<p>In our application service, the only command that doesn't require reading an aggregate before handling is the <kbd>CreateClassifiedAd</kbd> command. For all other actions, we need to read our aggregate first, and that's what we do by calling <kbd>_store.Load&lt;ClassifiedAd&gt;(id.ToString())</kbd>. While saving an aggregate to the store by collecting all changes and saving them to an event stream seems quite obvious, reading the aggregate back from the event stream is a little less trivial. Let's describe the steps to retrieve an aggregate from the event store:</p>
+<ol>
+<li>Find out the stream name for an aggregate</li>
+<li>Read all of the events from the aggregate stream</li>
+<li>Loop through all of the events, and call the <kbd>When</kbd> handler for each of them</li>
+</ol>
+<p>After we have done all these steps, we will recover all the history of a given aggregate and use the aggregate event handling rules to reapply all historical events to an empty aggregate object. By doing this, we will be bringing our aggregate to its latest state.</p>
+<p>In the code, we will do all these steps in the <kbd>Load</kbd> method of the <kbd>EsAggregateStore</kbd> class:</p>
+<pre class="language-csharp"><span class="token keyword">public</span> <span class="token keyword">async</span> Task<span class="token operator">&lt;</span>T<span class="token operator">&gt;</span> <span class="token generic-method"><span class="token function">Load</span><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">,</span> <span class="token class-name">TId</span><span class="token punctuation">&gt;</span></span><span class="token punctuation">(</span><span class="token class-name">TId</span> aggregateId<span class="token punctuation">)</span>
+    <span class="token keyword">where</span> T <span class="token punctuation">:</span> AggregateRoot<span class="token operator">&lt;</span>TId<span class="token operator">&gt;</span>
+<span class="token punctuation">{</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>aggregateId <span class="token operator">==</span> <span class="token keyword">null</span><span class="token punctuation">)</span>
+        <span class="token keyword">throw</span> <span class="token keyword">new</span> <span class="token class-name">ArgumentNullException</span><span class="token punctuation">(</span><span class="token function">nameof</span><span class="token punctuation">(</span>aggregateId<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token keyword">var</span> stream <span class="token operator">=</span> <span class="token generic-method"><span class="token function">GetStreamName</span><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">,</span> <span class="token class-name">TId</span><span class="token punctuation">&gt;</span></span><span class="token punctuation">(</span>aggregateId<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">var</span> aggregate <span class="token operator">=</span> <span class="token punctuation">(</span>T<span class="token punctuation">)</span> Activator<span class="token punctuation">.</span><span class="token function">CreateInstance</span><span class="token punctuation">(</span><span class="token keyword">typeof</span><span class="token punctuation">(</span>T<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token keyword">true</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token keyword">var</span> page <span class="token operator">=</span> <span class="token keyword">await</span> _connection<span class="token punctuation">.</span><span class="token function">ReadStreamEventsForwardAsync</span><span class="token punctuation">(</span>
+        stream<span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">1024</span><span class="token punctuation">,</span> <span class="token keyword">false</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    aggregate<span class="token punctuation">.</span><span class="token function">Load</span><span class="token punctuation">(</span>page<span class="token punctuation">.</span>Events<span class="token punctuation">.</span><span class="token function">Select</span><span class="token punctuation">(</span>resolvedEvent <span class="token operator">=</span><span class="token operator">&gt;</span>
+    <span class="token punctuation">{</span>
+        <span class="token keyword">var</span> meta <span class="token operator">=</span> JsonConvert<span class="token punctuation">.</span><span class="token generic-method"><span class="token function">DeserializeObject</span><span class="token punctuation">&lt;</span><span class="token class-name">EventMetadata</span><span class="token punctuation">&gt;</span></span><span class="token punctuation">(</span>
+            Encoding<span class="token punctuation">.</span>UTF8<span class="token punctuation">.</span><span class="token function">GetString</span><span class="token punctuation">(</span>resolvedEvent<span class="token punctuation">.</span>Event<span class="token punctuation">.</span>Metadata<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">var</span> dataType <span class="token operator">=</span> Type<span class="token punctuation">.</span><span class="token function">GetType</span><span class="token punctuation">(</span>meta<span class="token punctuation">.</span>ClrType<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">var</span> jsonData <span class="token operator">= <br/>            </span>Encoding<span class="token punctuation">.</span>UTF8<span class="token punctuation">.</span><span class="token function">GetString</span><span class="token punctuation">(</span>resolvedEvent<span class="token punctuation">.</span>Event<span class="token punctuation">.</span>Data<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">var</span> data <span class="token operator">=</span> JsonConvert<span class="token punctuation">.</span><span class="token function">DeserializeObject</span><span class="token punctuation">(</span>jsonData<span class="token punctuation">,</span> dataType<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">return</span> data<span class="token punctuation">;</span>
+    <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">ToArray</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token keyword">return</span> aggregate<span class="token punctuation">;</span>
+<span class="token punctuation">}</span></pre>
+<p>Let's go through the <kbd>Load</kbd> method. In steps, it does the following:</p>
+<ol>
+<li>Ensures that the aggregate ID parameter is not null</li>
+<li>Gets the stream name for a given aggregate type</li>
+<li>Creates a new instance of the aggregate type by using reflections</li>
+<li>Reads events from the stream as a collection of <kbd>ResolvedEvent</kbd> objects</li>
+<li>Deserializes those raw events to a collection of domain events</li>
+<li>Calls the <kbd>Load</kbd> method of the empty aggregate instance to recover the aggregate state</li>
+</ol>
+<p>There are a couple of things that need additional explanations.</p>
+<p>First, we could have used the <kbd>new</kbd> constraint on the <kbd>T</kbd> generic type parameter, so we can instantiate an empty aggregate using a parameterless constructor. However, that would break encapsulation and force us to expose a public parameterless constructor, and we don't want that. Using reflections allows us to invoke the protected constructor that we already have in all our aggregate root types. You need to remember that this solution might cause performance issues if your system is dealing with loads of commands, and in such a case, an alternative solution is required. Exposing a public parameterless constructor could be an acceptable trade-off.</p>
+<p>Secondly, we use a magic number, <kbd>1024</kbd>, to read what is called a <strong>stream slice</strong>, which is nothing more than a page. Your event streams can get bigger, and the Event Store doesn't allow us to read more than 4,096 events at once. For large streams, we would need to implement paging, but for this example, it is not necessary, since the life cycle of our aggregates don't assume having long streams.</p>
+<p>The last thing is the missing <kbd>Load</kbd> method for the <kbd>AggregateRoot</kbd> abstract class. We didn't need this method, because we were not using Event Sourcing before. The <kbd>Load</kbd> method will complete the last step in the aggregate recovery sequence, looping through all events and calling the matching <kbd>When</kbd> for each of them. Let's see how we can implement this method in the <kbd>AggregateRoot</kbd> class:</p>
+<pre class="language-csharp"><span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">Load</span><span class="token punctuation">(</span>IEnumerable<span class="token operator">&lt;</span><span class="token keyword">object</span><span class="token operator">&gt;</span> history<span class="token punctuation">)</span>
+<span class="token punctuation">{</span>
+    <span class="token keyword">foreach</span> <span class="token punctuation">(</span><span class="token keyword">var</span> e <span class="token keyword">in</span> history<span class="token punctuation">)</span>
+    <span class="token punctuation">{</span>
+        <span class="token function">When</span><span class="token punctuation">(</span>e<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        Version<span class="token operator">++</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></pre>
+<p>As you can see, it is a very simple piece of code, and essentially, it represents what Event Sourcing is. We get a collection of events that we previously stored and then rebuild the state of our domain object from those events. The <kbd>When</kbd> method knows how to change the aggregate state for each event in the collection, so when we call it for each event from the history, we get our aggregate back to the last known state.</p>
+<p>Notice that we also increase the <kbd>Version</kbd> property of the aggregate for each applied event, so we know what version our aggregate should have when we commit changes to the store. We discussed the aggregate version when talking about the optimistic concurrency. Unlike using state persistence, where we needed to have a property in our database for the aggregate version, we don't really store the version when we use events, because one event always increases the aggregate version by one, so we can just count events to get the current version.</p>
+<p>One last thing that I need to use to finalize the implementation of the <kbd>IAggregateStore</kbd> interface is the <kbd>Exists</kbd> method. There is no simple way to ask Event Store whether a stream exists, but we can easily overcome this by trying to read a single event from a given stream:</p>
+<pre class="language-csharp"><span class="token keyword">public</span> <span class="token keyword">async</span> Task<span class="token operator">&lt;</span><span class="token keyword">bool</span><span class="token operator">&gt;</span> <span class="token generic-method"><span class="token function">Exists</span><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">,</span> <span class="token class-name">TId</span><span class="token punctuation">&gt;</span></span><span class="token punctuation">(</span><span class="token class-name">TId</span> aggregateId<span class="token punctuation">)</span>
+<span class="token punctuation">{</span>
+    <span class="token keyword">var</span> stream <span class="token operator">=</span> <span class="token generic-method"><span class="token function">GetStreamName</span><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">,</span> <span class="token class-name">TId</span><span class="token punctuation">&gt;</span></span><span class="token punctuation">(</span>aggregateId<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">var</span> result <span class="token operator">=</span> <span class="token keyword">await</span> _connection<span class="token punctuation">.</span><span class="token function">ReadEventAsync</span><span class="token punctuation">(</span>stream<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">,</span> <span class="token keyword">false</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">return</span> result<span class="token punctuation">.</span>Status <span class="token operator">!=</span> EventReadStatus<span class="token punctuation">.</span>NoStream<span class="token punctuation">;</span>
+<span class="token punctuation">}</span></pre>
+<p>By now, we should have a working implementation of the aggregate persistence that uses events.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">The wiring infrastructure</h1>
+                </header>
+            
+            <article>
+                
+<p>To finish the work and make our application make use of all these changes, we need to write some initialization code for the Event Store connection, and also do the wiring for our application service so that it uses <kbd>EsAggregateStore</kbd>.</p>
+<p>First, we need to configure our application by using the .NET Core configuration extensions. We will start by adding a simple <kbd>appsettings.json</kbd> configuration file. The content for this file, for now, will just be a connection string for Event Store that runs locally:</p>
+<pre class="language-json"><span class="token punctuation">{</span>
+  <span class="token property">"eventStore"</span><span class="token operator">:</span> <span class="token punctuation">{</span>
+    <span class="token property">"connectionString"</span><span class="token operator">:</span> <span class="token string">"ConnectTo=tcp://admin:changeit@localhost:1113; <br/>     DefaultUserCredentials=admin:changeit;"</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></pre>
+<p>Then, we need to read this configuration so that we will have access to these values. To do that, we will change the <kbd>BuildConfiguration</kbd> method of our <kbd>Program</kbd> class:</p>
+<pre class="language-csharp"><span class="token keyword">private</span> <span class="token keyword">static</span> <span class="token class-name">IConfiguration</span> <span class="token function">BuildConfiguration</span><span class="token punctuation">(</span><span class="token keyword">string</span><span class="token punctuation">[</span><span class="token punctuation">]</span> args<span class="token punctuation">)</span>
+    <span class="token operator">=</span><span class="token operator">&gt;</span> <span class="token keyword">new</span> <span class="token class-name">ConfigurationBuilder</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+        <span class="token punctuation">.</span><span class="token function">SetBasePath</span><span class="token punctuation">(</span>CurrentDirectory<span class="token punctuation">)</span>
+        <span class="token punctuation">.</span><span class="token function">AddJsonFile</span><span class="token punctuation">(</span><span class="token string">"appsettings.json"</span><span class="token punctuation">,</span> <span class="token keyword">false</span><span class="token punctuation">,</span> <span class="token keyword">false</span><span class="token punctuation">)</span>
+        <span class="token punctuation">.</span><span class="token function">Build</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span></pre>
+<p class="mce-root"/>
+<p>For the <kbd>settings</kbd> file to be copied to the application output directory, we need to change its properties in the <kbd>Marketplace.csproj</kbd> file, to ensure that the project file has lines like these:</p>
+<pre>&lt;ItemGroup&gt;<br/>  &lt;Content Update="appsettings.json" <br/>    CopyToOutputDirectory="Always" <br/>    CopyToPublishDirectory="Always" /&gt;<br/>&lt;/ItemGroup&gt;</pre>
+<p>The connection to Event Store needs to open when our application starts and close when we shut down the application. To enable this, we will implement the <kbd>Microsoft.Extensions.Hosting.IHostedService</kbd> interface with a new class called <kbd>HostedService</kbd>. To do that, we will add a new file, called <kbd>HostedService.cs</kbd>, to our executable project:</p>
+<pre class="language-csharp"><span class="token keyword">using</span> System<span class="token punctuation">.</span>Threading<span class="token punctuation">;</span>
+<span class="token keyword">using</span> System<span class="token punctuation">.</span>Threading<span class="token punctuation">.</span>Tasks<span class="token punctuation">;</span>
+<span class="token keyword">using</span> EventStore<span class="token punctuation">.</span>ClientAPI<span class="token punctuation">;</span>
+<span class="token keyword">using</span> Microsoft<span class="token punctuation">.</span>Extensions<span class="token punctuation">.</span>Hosting<span class="token punctuation">;</span>
+
+<span class="token keyword">namespace</span> Marketplace
+<span class="token punctuation">{</span>
+    <span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">HostedService</span> <span class="token punctuation">:</span> <span class="token class-name">IHostedService</span>
+    <span class="token punctuation">{</span>
+        <span class="token keyword">private</span> <span class="token keyword">readonly</span> <span class="token class-name">IEventStoreConnection</span> _esConnection<span class="token punctuation">;</span>
+
+        <span class="token keyword">public</span> <span class="token function">HostedService</span><span class="token punctuation">(</span><span class="token class-name">IEventStoreConnection</span> esConnection<span class="token punctuation">)</span>
+        <span class="token punctuation">{</span>
+            _esConnection <span class="token operator">=</span> esConnection<span class="token punctuation">;</span>
+        <span class="token punctuation">}</span>
+
+        <span class="token keyword">public</span> <span class="token class-name">Task</span> <span class="token function">StartAsync</span><span class="token punctuation">(</span><span class="token class-name">CancellationToken</span> cancellationToken<span class="token punctuation">)</span>
+            <span class="token operator">=</span><span class="token operator">&gt;</span> _esConnection<span class="token punctuation">.</span><span class="token function">ConnectAsync</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token keyword">public</span> <span class="token class-name">Task</span> <span class="token function">StopAsync</span><span class="token punctuation">(</span><span class="token class-name">CancellationToken</span> cancellationToken<span class="token punctuation">)</span>
+        <span class="token punctuation">{</span>
+            _esConnection<span class="token punctuation">.</span><span class="token function">Close</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token keyword">return</span> Task<span class="token punctuation">.</span>CompletedTask<span class="token punctuation">;</span>
+        <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></pre>
+<p>The final wiring takes place in the <kbd>Startup.cs</kbd> file, where we need to change the <kbd>ConfigureServices</kbd> method so it includes the Event Store connection and the <kbd>EsAggregateStore</kbd> registrations. Also, we need to register our <kbd>HostingService</kbd>, so that the web host knows that it needs to run something on startup and shutdown. The new version of the <kbd>Startup.ConfigureServices</kbd> method looks like this:</p>
+<pre class="language-csharp"><span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">ConfigureServices</span><span class="token punctuation">(</span><span class="token class-name">IServiceCollection</span> services<span class="token punctuation">)</span>
+<span class="token punctuation">{</span>
+    <span class="token keyword">var</span> esConnection <span class="token operator">=</span> EventStoreConnection<span class="token punctuation">.</span><span class="token function">Create</span><span class="token punctuation">(</span>
+        Configuration<span class="token punctuation">[</span><span class="token string">"eventStore:connectionString"</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+        ConnectionSettings<span class="token punctuation">.</span><span class="token function">Create</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">KeepReconnecting</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        Environment<span class="token punctuation">.</span>ApplicationName<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token keyword">var</span> store <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">EsAggregateStore</span><span class="token punctuation">(</span>esConnection<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">var</span> purgomalumClient <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">PurgomalumClient</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    services<span class="token punctuation">.</span><span class="token function">AddSingleton</span><span class="token punctuation">(</span>esConnection<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    services<span class="token punctuation">.</span><span class="token generic-method"><span class="token function">AddSingleton</span><span class="token punctuation">&lt;</span><span class="token class-name">IAggregateStore</span><span class="token punctuation">&gt;</span></span><span class="token punctuation">(</span>store<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    services<span class="token punctuation">.</span><span class="token function">AddSingleton</span><span class="token punctuation">(</span><span class="token keyword">new</span> <span class="token class-name">ClassifiedAdsApplicationService</span><span class="token punctuation">(</span>
+        store<span class="token punctuation">,</span> <span class="token keyword">new</span> <span class="token class-name">FixedCurrencyLookup</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    services<span class="token punctuation">.</span><span class="token function">AddSingleton</span><span class="token punctuation">(</span><span class="token keyword">new</span> <span class="token class-name">UserProfileApplicationService</span><span class="token punctuation">(</span>
+        store<span class="token punctuation">,</span> t <span class="token operator">=</span><span class="token operator">&gt;</span> purgomalumClient<span class="token punctuation">.</span><span class="token function">CheckForProfanity</span><span class="token punctuation">(</span>t<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    services<span class="token punctuation">.</span><span class="token generic-method"><span class="token function">AddSingleton</span><span class="token punctuation">&lt;</span><span class="token class-name">IHostedService</span><span class="token punctuation">,</span> <span class="token class-name">HostedService</span><span class="token punctuation">&gt;</span></span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    services<span class="token punctuation">.</span><span class="token function">AddMvc</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    services<span class="token punctuation">.</span><span class="token function">AddSwaggerGen</span><span class="token punctuation">(</span>c <span class="token operator">=</span><span class="token operator">&gt;</span>
+    <span class="token punctuation">{</span>
+        c<span class="token punctuation">.</span><span class="token function">SwaggerDoc</span><span class="token punctuation">(</span><span class="token string">"v1"</span><span class="token punctuation">,</span>
+            <span class="token keyword">new</span> <span class="token class-name">Info</span>
+            <span class="token punctuation">{</span>
+                Title <span class="token operator">=</span> <span class="token string">"ClassifiedAds"</span><span class="token punctuation">,</span>
+                Version <span class="token operator">=</span> <span class="token string">"v1"</span>
+            <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span></pre>
+<p>Here, we created a new connection instance and registered it in the service collection as a singleton. It will then be injected into the <kbd>HostedService</kbd> constructor, and we will open it when the application starts. We will also change the registration for <kbd>IAggregateStore</kbd>, so that it takes our new <kbd>EsAggregateStore</kbd> class. Then, we will register <kbd>HostedService</kbd>.</p>
+<p>We will also use <kbd>store</kbd> as a parameter for our application services. This parameter replaces the repositories we used before, so we need to change both application services, as well.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">The aggregate store in application services</h1>
+                </header>
+            
+            <article>
+                
+<p>The changes required for application services are quite small. To make the work even more comfortable, I created a small extension for the <kbd>IApplicationService</kbd> interface that allows us to handle commands with one line of code. We already did it before, by using a private method <kbd>HandleUpdate</kbd> in each application service. Now, since we use the <kbd>IAggregateStore</kbd> interface instead of repositories, we can abstract that method, so that it has no dependencies on the specific infrastructure. Therefore, we can place it in the <kbd>Marketplace.Framework</kbd> project. Here is the code:</p>
+<pre class="language-csharp"><span class="token keyword">using</span> System<span class="token punctuation">;</span>
+<span class="token keyword">using</span> System<span class="token punctuation">.</span>Threading<span class="token punctuation">.</span>Tasks<span class="token punctuation">;</span>
+
+<span class="token keyword">namespace</span> Marketplace<span class="token punctuation">.</span>Framework
+<span class="token punctuation">{</span>
+    <span class="token keyword">public</span> <span class="token keyword">static</span> <span class="token keyword">class</span> <span class="token class-name">ApplicationServiceExtensions</span>
+    <span class="token punctuation">{</span>
+        <span class="token keyword">public</span> <span class="token keyword">static</span> <span class="token keyword">async</span> Task <span class="token generic-method"><span class="token function">HandleUpdate</span><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">,</span> <span class="token class-name">TId</span><span class="token punctuation">&gt;</span></span><span class="token punctuation">(<br/>            </span><span class="token keyword">this</span> <span class="token class-name">IApplicationService</span> service<span class="token punctuation">,</span>
+            <span class="token class-name">IAggregateStore</span> store<span class="token punctuation">,</span> <span class="token class-name">TId</span> aggregateId<span class="token punctuation">,</span> <br/>            Action<span class="token operator">&lt;</span>T<span class="token operator">&gt;</span> operation<span class="token punctuation">)</span>
+            <span class="token keyword">where</span> T <span class="token punctuation">:</span> AggregateRoot<span class="token operator">&lt;</span>TId<span class="token operator">&gt;</span>
+        <span class="token punctuation">{</span>
+            <span class="token keyword">var</span> aggregate <span class="token operator">=</span> <span class="token keyword">await</span> store<span class="token punctuation">.</span><span class="token generic-method"><span class="token function">Load</span><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">,</span> <span class="token class-name">TId</span><span class="token punctuation">&gt;</span></span><span class="token punctuation">(</span>aggregateId<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span>aggregate <span class="token operator">==</span> <span class="token keyword">null</span><span class="token punctuation">)</span>
+                <span class="token keyword">throw</span> <span class="token keyword">new</span> <span class="token class-name">InvalidOperationException</span><span class="token punctuation">(<br/></span>                    $<span class="token string">"Entity with id {aggregateId.ToString()} cannot be <br/>                    found"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+            <span class="token function">operation</span><span class="token punctuation">(</span>aggregate<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token keyword">await</span> store<span class="token punctuation">.</span><span class="token generic-method"><span class="token function">Save</span><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">,</span> <span class="token class-name">TId</span><span class="token punctuation">&gt;</span></span><span class="token punctuation">(</span>aggregate<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></pre>
+<p class="mce-root">Then, we need to replace the repository dependency in the application service classes to <kbd>IAggregateStore</kbd> and change all calls. The work is a bit boring, and I have done it all for you, so here is the new code for <kbd>ClassifiedAdApplicationService</kbd>: </p>
+<pre class="language-csharp">using System;<br/>using System.Threading.Tasks;<br/>using Marketplace.Domain.ClassifiedAd;<br/>using Marketplace.Domain.Shared;<br/>using Marketplace.Framework;<br/>using static Marketplace.ClassifiedAd.Contracts;<br/><br/>namespace Marketplace.ClassifiedAd<br/>{<br/>    public class ClassifiedAdsApplicationService : IApplicationService<br/>    {<br/>        private readonly ICurrencyLookup _currencyLookup;<br/>        private readonly IAggregateStore _store;<br/><br/>        public ClassifiedAdsApplicationService(<br/>            IAggregateStore store, ICurrencyLookup currencyLookup<br/>        )<br/>        {<br/>            _currencyLookup = currencyLookup;<br/>            _store = store;<br/>        }<br/><br/>        public Task Handle(object command) =&gt;<br/>            command switch<br/>            {<br/>                V1.Create cmd =&gt;<br/>                    HandleCreate(cmd),<br/>                V1.SetTitle cmd =&gt;<br/>                    HandleUpdate(<br/>                        cmd.Id,<br/>                        c =&gt; c.SetTitle(<br/>                            ClassifiedAdTitle<br/>                                .FromString(cmd.Title)<br/>                        )<br/>                    ),<br/>                V1.UpdateText cmd =&gt;<br/>                    HandleUpdate(<br/>                        cmd.Id,<br/>                        c =&gt; c.UpdateText(<br/>                            ClassifiedAdText<br/>                                .FromString(cmd.Text)<br/>                        )<br/>                    ),<br/>                V1.UpdatePrice cmd =&gt;<br/>                    HandleUpdate(<br/>                        cmd.Id,<br/>                        c =&gt; c.UpdatePrice(<br/>                            Price.FromDecimal(<br/>                                cmd.Price,<br/>                                cmd.Currency,<br/>                                _currencyLookup<br/>                            )<br/>                        )<br/>                    ),<br/>                V1.RequestToPublish cmd =&gt;<br/>                    HandleUpdate(<br/>                        cmd.Id,<br/>                        c =&gt; c.RequestToPublish()<br/>                    ),<br/>                V1.Publish cmd =&gt;<br/>                    HandleUpdate(<br/>                        cmd.Id,<br/>                        c =&gt; c.Publish(new UserId(cmd.ApprovedBy))<br/>                    ),<br/>                _ =&gt; Task.CompletedTask<br/>            };<br/><br/>        private async Task HandleCreate(V1.Create cmd)<br/>        {<br/>            if (await _store.Exists&lt;Domain.ClassifiedAd.ClassifiedAd, <br/>                ClassifiedAdId&gt;(<br/>                new ClassifiedAdId(cmd.Id)<br/>            ))<br/>                throw new InvalidOperationException(<br/>                    $"Entity with id {cmd.Id} already exists");<br/><br/>            var classifiedAd = new Domain.ClassifiedAd.ClassifiedAd(<br/>                new ClassifiedAdId(cmd.Id),<br/>                new UserId(cmd.OwnerId)<br/>            );<br/><br/>            await _store.Save&lt;Domain.ClassifiedAd.ClassifiedAd, <br/>                ClassifiedAdId&gt;(classifiedAd);<br/>        }<br/><br/>        private Task HandleUpdate(<br/>            Guid id,<br/>            Action&lt;Domain.ClassifiedAd.ClassifiedAd&gt; update<br/>        ) =&gt;<br/>            this.HandleUpdate(<br/>                _store,<br/>                new ClassifiedAdId(id),<br/>                update<br/>            );<br/>    }<br/>}</pre>
+<p class="mce-root"/>
+<p class="mce-root"/>
+<p>As you can see, the changes are quite small. We call <kbd>_store.Save</kbd>, and we don't need to commit, since we don't have an explicit unit of work, because we don't execute an operation on multiple aggregates at the same time, otherwise, we would break the rule of an aggregate in a transactional boundary, thereby not having a unit of work which isn't a problem. We also have no issues with detecting changes, since our changes are always represented as events, and we don't need any ORM magic to figure out what we need to update.</p>
+<p>Following the same style, here is the new <kbd>UserProfileApplicationService</kbd> class:</p>
+<pre class="language-csharp">using System;<br/>using System.Threading.Tasks;<br/>using Marketplace.Domain.Shared;<br/>using Marketplace.Domain.UserProfile;<br/>using Marketplace.Framework;<br/>using static Marketplace.UserProfile.Contracts;<br/><br/>namespace Marketplace.UserProfile<br/>{<br/>    public class UserProfileApplicationService<br/>        : IApplicationService<br/>    {<br/>        private readonly IAggregateStore _store;<br/>        private readonly CheckTextForProfanity _checkText;<br/><br/>        public UserProfileApplicationService(<br/>            IAggregateStore store,<br/>            CheckTextForProfanity checkText<br/>        )<br/>        {<br/>            _store = store;<br/>            _checkText = checkText;<br/>        }<br/><br/>        public Task Handle(object command) =&gt;<br/>            command switch<br/>            {<br/>                V1.RegisterUser cmd =&gt;<br/>                    HandleCreate(cmd),<br/>                V1.UpdateUserFullName cmd =&gt;<br/>                    HandleUpdate(<br/>                        cmd.UserId,<br/>                        profile =&gt; profile.UpdateFullName(<br/>                            FullName.FromString(cmd.FullName)<br/>                        )<br/>                    ),<br/>                V1.UpdateUserDisplayName cmd =&gt;<br/>                    HandleUpdate(<br/>                        cmd.UserId,<br/>                        profile =&gt; profile.UpdateDisplayName(<br/>                            DisplayName.FromString(<br/>                                cmd.DisplayName,<br/>                                _checkText<br/>                            )<br/>                        )<br/>                    ),<br/>                V1.UpdateUserProfilePhoto cmd =&gt;<br/>                    HandleUpdate(<br/>                        cmd.UserId,<br/>                        profile =&gt; profile<br/>                            .UpdateProfilePhoto(<br/>                                new Uri(cmd.PhotoUrl)<br/>                            )<br/>                    ),<br/>                _ =&gt; Task.CompletedTask<br/>            };<br/><br/>        private async Task HandleCreate(V1.RegisterUser cmd)<br/>        {<br/>            if (await _store<br/>                .Exists&lt;Domain.UserProfile.UserProfile, UserId&gt;(<br/>                    new UserId(cmd.UserId)<br/>                ))<br/>                throw new InvalidOperationException(<br/>                    $"Entity with id {cmd.UserId} already exists"<br/>                );<br/><br/>            var userProfile = new Domain.UserProfile.UserProfile(<br/>                new UserId(cmd.UserId),<br/>                FullName.FromString(cmd.FullName),<br/>                DisplayName.FromString(cmd.DisplayName, _checkText)<br/>            );<br/><br/>            await _store<br/>                .Save&lt;Domain.UserProfile.UserProfile, UserId&gt;(<br/>                    userProfile<br/>                );<br/>        }<br/><br/>        private Task HandleUpdate(<br/>            Guid id,<br/>            Action&lt;Domain.UserProfile.UserProfile&gt; update<br/>        ) =&gt;<br/>            this.HandleUpdate(<br/>                _store,<br/>                new UserId(id),<br/>                update<br/>            );<br/>    }<br/>}</pre>
+<p>That's it; we don't need to do anything else to event-source our application! Let's see how it works now.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Running the event-sourced app</h1>
+                </header>
+            
+            <article>
+                
+<p>Finally, we can try things out and see how we can execute commands using our API, which remains unchanged from <a href="6f50ee65-024a-4c46-89c8-343183b05b8f.xhtml" target="_blank">Chapter 9</a>, <em>CQRS - The Read Side</em>. You might have noticed, however, that the query APIs and all code related to read models are not included in this chapter. That's because the read side of CQRS is vastly different from what we used for document and relational persistence.</p>
+<p>When you start the app and visit the Swagger UI at <kbd>http://localhost:5000</kbd>, the screen that you will get is exactly the same as before. Of course, the Event Store must run at this time, either in a Docker container or as an executable. Running Event Store using <kbd>docker-compose</kbd> is described in the <em>Technical requirements</em> section. I used two new GUIDs as the new classified ad ID and owner ID, in order to create a new ad. So, I called the <kbd>POST</kbd> endpoint and got <kbd>200 OK</kbd> as a result. Right after that, I executed the <kbd>rename</kbd> command by making the <kbd>PUT</kbd> request with the same ID and some text for the title. These operations are no different from what we were doing earlier.</p>
+<p>Now, we can look at the result of those operations in our new store. To do that, we need to visit the Event Store web UI by going to <kbd>http://localhost:2113</kbd> and log in by using the <kbd>admin</kbd> username and the <kbd>changeit</kbd> password. From there, we need to go to the <span class="packt_screen">Stream Browser</span> page, and on the right-hand pane, there is a list of recently-changed streams. In this list, we can see the new stream for our new classified ad:</p>
+<p class="CDPAlignCenter CDPAlign"><img src="assets/72963d6d-37f8-463c-934a-070468bf1b77.png" style="width:52.33em;height:20.42em;"/></p>
+<div class="packt_figref CDPAlignCenter CDPAlign">Here is our new aggregate stream</div>
+<p>You can click on the stream name to see what the stream contains. Here is what I have:</p>
+<p class="CDPAlignCenter CDPAlign"><img src="assets/34dd146f-7a9e-4e58-b8a2-24a9651ea243.png" style="width:56.08em;height:15.00em;"/></p>
+<div class="packt_figref CDPAlignCenter CDPAlign">Two new events in the stream</div>
+<p>Here, we can see two events that were added to the stream after I executed two commands. I can continue to run commands using the API until I get the ad published. When I look at the Event Store stream after that, I will see more events that were added to it:</p>
+<p class="CDPAlignCenter CDPAlign"><img src="assets/58b83135-38cd-4894-8b2b-12181fa2dbee.png" style="width:53.25em;height:17.75em;"/></p>
+<div class="packt_figref CDPAlignCenter CDPAlign">More events are added if we execute more commands</div>
+<p>That seems very nice. Each command triggers a state transition, but instead of overwriting the previous state with the new one, we can see the full history of changes, represented by events. For example, we can change the price several times, but we will always know about all the prices that the ad has had in the past.</p>
+<p>Now, let's see what an event looks like. I will open event number <span class="packt_screen">1</span>, which has the <kbd>ClassifiedAdTitleChanged</kbd> type, by clicking on the event name. Here is what I can see in the browser:</p>
+<p class="CDPAlignCenter CDPAlign"><img src="assets/c051c6cd-96a3-4982-beec-0730e01efdbd.png" style="width:51.58em;height:19.50em;"/></p>
+<div class="packt_figref CDPAlignCenter CDPAlign">Event content as JSON</div>
+<p>As you can see, the event data represents our domain event class—it has the aggregate ID and the title. The metadata only has one field that we decided to use for the purpose of deserialization—the FQCN of the event type. You can look at the content of other events to see what is stored there.</p>
+<p>It might seem redundant to have the aggregate ID in each event, since the stream name already contains the ID, and to recover the aggregate state from events, we always read only one stream. We will see how this ID inside each event is used when we start building read models.</p>
+<p>You can also execute some commands on the user profile command API to see the different type of aggregate to be stored in a stream with a different kind of name. Of course, it is possible to add more ads and users to the system now, and to see all those events coming into the Event Store.</p>
+<p>Congratulations; we have just converted our application to using Event Sourcing instead of a more traditional persistence. As you may have noticed, we didn't need to make any changes to our domain objects to make it work. We can even remove the setters from aggregate and value-object properties, and make those properties private for better encapsulation. None of those changes will have any effect on how aggregates get stored and loaded using events. That's because for this type of persistence, the impedance mismatch is gone. All our events are simple, plain objects with properties that have primitive or simple types. It means that those domain events can easily be serialized, and that's the only thing we need to ensure in order for the Event Sourcing to work. By the way, it is not a requirement for Event Store to use JSON serialization. You can certainly use something such as protobuf. However, in such cases, you will lose the ability to check the content of events in the UI, since it only understands JSON. Hence, we used the <kbd>IsJson</kbd> property of the <kbd>EventData</kbd> class to tell Event Store that our events are, in fact, JSON strings. Event Store also has an integrated projection engine that uses JavaScript to execute operations on events inside the store in order to produce new events or to run queries. This feature also requires that events are stored in JSON, since this is the format that the JavaScript code can easily interpret. We will not be touching upon the projections topic in this chapter, but we'll go back to it in <a href="c4156d9d-9130-4225-b205-ef76cb4bcca3.xhtml" target="_blank">Chapter 11</a>, <em>Projections and Queries.</em></p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Summary</h1>
+                </header>
+            
+            <article>
+                
+<p>In this chapter, you got to use the feature of representing state transitions inside aggregates as events. I used that code style from the start intentionally, although I can imagine that it may have caused you some confusion. At the end of the day, why would you need to split each operation into <kbd>Apply</kbd> and <kbd>When</kbd>? Using that approach was necessary to prepare the readers for this chapter. Using domain events is a good practice, overall. Even if you don't use Event Sourcing, you should definitely consider using domain events to communicate updates between aggregates, and even between different Bounded Contexts, and using domain events for state transition makes it easy, because you will always have a list of changes as a collection of new events.</p>
+<p>Since we had this collection ready, we only needed to figure out how to store those changes as-is, in an event stream that represents a single aggregate, and to also introduce the <kbd>Load</kbd> method to look through all events that we read from that stream to recover the aggregate state when we need to execute a new operation on it. That wasn't very hard. We used a bit of code to figure out how our infrastructure would work, and we needed to configure the serialization properly. We still kept the FQCN in the event metadata to be able to deserialize events back to C# objects, but we'll fix it in the future.</p>
+<p>Event Store is a very efficient product when it comes to Event Sourcing and storing events in streams. Unlike Kafka, this product allows us to create millions of streams. Since our approach to store aggregates is to keep the events for each aggregate in a separate stream, this solution is perfectly suitable for us. If your company has issues, such as a limited number of pre-approved products used as databases, and you can't use Event Store just yet, you can look at libraries, such as SQL Stream Store (<a href="https://github.com/SQLStreamStore/SQLStreamStore">https://github.com/SQLStreamStore/SQLStreamStore</a>), which implements an event store on a number of relational databases, including Microsoft SQL Server; or Marten (<a href="http://jasperfx.github.io/marten/">http://jasperfx.github.io/marten/</a>), which uses the JSONB-type fields of PostgreSQL to implement both the document database and event store types of persistence.</p>
+<p>In the next chapter, we will be looking at the challenges of querying the event-sourced system and solving these challenges by using separate read models and projections.</p>
+<p>So far, you can see that Event Sourcing is not hard!</p>
+<p class="mce-root"/>
+<p class="mce-root"/>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Further reading</h1>
+                </header>
+            
+            <article>
+                
+<p>There is not much literature about Event Sourcing available at the moment, but I can recommend watching a couple of talks by Greg Young, who coined the term CQRS and opened up Event Sourcing to the world:</p>
+<ul>
+<li><em>A Decade of DDD, CQRS, Event Sourcing</em>, by Greg Young, DDD Europe 2016: <a href="https://www.youtube.com/watch?v=LDW0QWie21s">https://www.youtube.com/watch?v=LDW0QWie21s</a></li>
+<li><em>Event Sourcing</em>, Greg Young, GOTO Conference 2014: <a href="https://www.youtube.com/watch?v=8JKjvY4etTY">https://www.youtube.com/watch?v=8JKjvY4etTY</a></li>
+</ul>
+<p>If you were already exploring this topic, you might have encountered some blog posts about the dark side of Event Sourcing, which mainly involves issues with event versions and eventual consistency. We'll be covering eventual consistency in the next chapter, and we'll learn even touch upon the versioning of events briefly; for more in-depth coverage of the event versions topic, refer to Greg's book:</p>
+<ul>
+<li><em>Versioning in an Event Sourced System</em>, Greg Young, LeanPub 2017:<a href="https://leanpub.com/esversioning"> https://leanpub.com/esversioning</a></li>
+</ul>
+
+
+            </article>
+
+            
+        </section>
+    </body></html>

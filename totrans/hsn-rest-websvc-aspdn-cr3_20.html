@@ -1,0 +1,238 @@
+<html><head></head><body>
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Caching Web Service Responses</h1>
+                </header>
+            
+            <article>
+                
+<p class="mce-root">In this chapter, we will explore the caching patterns of ASP.NET Core, as well as the caching strategies and the tools that are provided by the framework to help developers to implement them. The cache may become useful in order to avoid additional computation on the server, and consequently retrieve the fastest response to the client of a web service.  Furthermore, we will look at a concrete cache implementation of the catalog web service.</p>
+<p>In this chapter, we will cover the following topics:</p>
+<ul>
+<li>Introduction to the HTTP caching system</li>
+<li>Implementing response caching in ASP.NET Core</li>
+<li>Implementing a distributed cache</li>
+</ul>
+<p><span>By the end of this chapter, you will have a general understanding of caching mechanisms and the know-how needed in order to implement a distributed cache in ASP.NET Core using <kbd>Redis</kbd>.</span></p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Introduction to the HTTP caching system</h1>
+                </header>
+            
+            <article>
+                
+<p>Caching is an essential part of web service development. The primary purpose of web service caching is to improve the performance of our system and reduce the overload of the webserver. Furthermore, f<span>etching something over the network is slow and expensive, and so it is necessary to implement a caching system to improve the responsiveness of our web service and to avoid unnecessary additional computation. In t</span>his section, we will focus on some of the features that are defined in the HTTP 1.1 caching specification.</p>
+<p>These caching specifications are sent by the webserver to the client. Whoever has ownership of the client needs to read the caching specifications and respond appropriately. In general, there are two common use cases for caching responses: the first one is when a web service exposes very <em>dynamic content</em>. In this case, the data changes a lot, and the <em>caching time</em> can be reduced or avoided at all. The second case is when our service may serve some <em>static content</em>. In that case, we can set a high caching time for the content that doesn't change a lot.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">The HTTP caching specification</h1>
+                </header>
+            
+            <article>
+                
+<p><span>The HTTP 1.1 caching specification (<a href="https://tools.ietf.org/html/rfc7234">https://tools.ietf.org/html/rfc7234</a>) describes how caches should behave over HTTP. The main header related to HTTP caching is the </span><kbd>Cache-Control</kbd><span> header. This header is used to specify directives in the request and response. It is also essential to note that the <kbd>Cache-Control</kbd> directives that are defined in the request and the response are independent. The following diagram shows a typical request-response workflow:</span></p>
+<div class="CDPAlignCenter CDPAlign"><img src="assets/b151bd77-6d75-42b3-b1da-f0ef2be74433.png" style=""/></div>
+<p class="p1">The schema describes the interaction between a generic client and a server with a caching layer between them.</p>
+<p>First, the client requests a resource from the server, and the <em>caching layer</em> forwards it to the server. The server produces the data for the client and sends the response back; at this point, the caching server caches the response in the <em>caching layer</em>. Therefore, if the client performs another call to the same content, the request will not hit the server, but the cache system will provide the cached response.</p>
+<p class="mce-root">It is essential to note that the <em>cache layer</em> adds some headers to the response:</p>
+<pre>Cache-Control: max-age=100<br/>Age:0</pre>
+<p>Both of these are HTTP headers related to the caching directives. <kbd>Cache-Control</kbd> adds the <kbd>max-age</kbd> directive to indicate that the freshness lifetime of the content is equal to 100. The <kbd>Age</kbd> header specifies the age of the cached content. When <kbd>Age</kbd> reaches the <kbd>Cache-Control: max-age</kbd> value, the <em>caching layer</em> will forward the request to the server in order to serve the fresh data. Both of the values of the headers are specified in <em>seconds</em>.</p>
+<p>The <kbd>Cache-Control</kbd> header can be used to specify the caching mechanism. By default, it is possible to disable the cache by specifying the <kbd>no-cache</kbd> directive, that is, <kbd>Cache-Control: no-cache</kbd>. Another crucial aspect of the <kbd>Cache-Control</kbd> header is the public and private directives, such as <kbd>Cache-Control: public,max-age=100</kbd><span class="response-header-value">. The <kbd>public</kbd> instruction means that the cached response can also be stored in a shared cache, and any other client can access that information. On the other hand, when a response is private, this means that it probably contains sensitive information and it cannot be shared with other clients.</span></p>
+<p>The caching specification also defines the <kbd>Vary</kbd> header. This kind of header is used to indicate which fields influence the cache variation. More specifically, it is used <span>to decide whether a cached response can be used rather than requesting a fresh one from the original server:</span></p>
+<pre class="syntaxbox">Vary: *
+Vary: User-Agent</pre>
+<p>In the first line of the preceding code, each variation in the request is treated <span>as a single and uncacheable request. In the second line, the request is processed as uncacheable, but the <kbd>User-Agent</kbd> header is added.</span></p>
+<p>The <kbd>Expires</kbd> header has the same purpose as the <kbd>max-age</kbd> directive: to give the cache expiration time. The only reason they differ is that the <kbd>max-age</kbd> instruction focuses on a fixed date time. For example, we can set the following value:</p>
+<pre>Expires: Wed, 21 Oct 2015 07:28:00 GMT</pre>
+<p>It is essential to note that the <kbd>max-age</kbd> directive overrides the <kbd>Expires</kbd> header. Therefore, if both of them are present in the same response, the <kbd>Expires</kbd> header is ignored. In the next section, we will learn how to implement response caching using ASP.NET Core tools.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Implementing response caching in ASP.NET Core</h1>
+                </header>
+            
+            <article>
+                
+<p>ASP.NET Core implements a declarative way to manage caching directives in the responses of our web service. Furthermore, it provides an attribute that can be used for caching purposes. The attribute implementation is also compatible with the<span> </span>HTTP 1.1 caching specification, therefore, it becomes easy to implement these caching standards using <span>ASP.NET Core's</span> out-of-the-box implementations, and we don't have to worry about the details of each request. We can specify the caching behavior using the <kbd>[ResponseCache]</kbd><span> </span>attribute that's exposed by ASP.NET Core:</p>
+<pre><span>namespace </span><span>Catalog</span><span>.</span><span>API</span><span>.</span><span>Controllers<br/></span><span>{<br/></span><span>    [</span><span>Route</span><span>(</span><span>"api/items"</span><span>)]<br/></span><span>    [</span><span>ApiController</span><span>]<br/></span><span>    [</span><span>Authorize</span><span>]<br/></span><span>    </span><span>public class </span><span>ItemController </span>: <span>ControllerBase<br/></span><span>    </span><span>{<br/></span><span>        </span><span>private readonly </span><span>IItemService </span><span>_itemService</span><span>;<br/></span><span>        </span><span>private readonly </span><span>IEndpointInstance </span><span>_messageEndpoint</span><span>;<br/></span><span><br/></span><span>        </span><span>public </span><span>ItemController</span><span>(</span><span>IItemService </span><span>itemService, <br/></span><span>        IEndpointInstance </span><span>messageEndpoint)<br/></span><span>        {<br/></span><span>            </span><span>_itemService </span>= <span>itemService;<br/></span><span>            </span><span>_messageEndpoint </span>= <span>messageEndpoint;<br/></span><span>        }<br/><br/>        ...<br/></span><span><br/></span><span>        [</span><span>HttpGet</span><span>(</span><span>"{id:guid}"</span><span>)]<br/></span><span>        [</span><span>ItemExists</span><span>]<br/></span><strong><span>        [</span><span>ResponseCache</span><span>(</span><span>Duration </span>= <span>100</span><span>, </span><span>VaryByQueryKeys </span>= <span>new </span><span>[]{</span><span>"*"</span></strong><span><strong>})]</strong><br/></span><span>        </span><span>public async </span><span>Task</span>&lt;<span>IActionResult</span>&gt; <span>GetById</span><span>(</span><span>Guid </span><span>id)<br/></span><span>        {<br/></span><span>            </span><span>var </span><span>result </span>= <span>await </span><span>_itemService</span><span>.</span><span>GetItemAsync</span><span>(</span><span>new <br/>                </span><span>GetItemRequest </span><span>{ </span><span>Id </span>= <span>id });<br/></span><span>            </span><span>return </span><span>Ok</span><span>(result);<br/></span><span>        }<br/></span><span>        ...<br/></span><span>    }<br/></span><span>}</span></pre>
+<p>For example, in this case, the code defines a caching directive on the<span> </span><kbd>GetById</kbd><span> </span>action method of the<span> </span><kbd>ItemController</kbd><span> </span>class. The<span> </span><kbd>ResponseCache</kbd><span> </span>attribute sets a <kbd>Duration</kbd> field and<span> a </span><kbd>VaryByQueryKeys</kbd><span> </span>field: the first one corresponds to the<span> </span><kbd>max-age</kbd><span> instruction</span> while the second one reflects the<span> </span><kbd>Vary</kbd><span> </span>HTTP header.</p>
+<div class="packt_infobox">So far, we have only added the <kbd>Cache-Control</kbd> directive to the server responses. Therefore, we are <em>not</em> implementing any caching. The caching directives can be used by a third-party system or application, such as the client of our service, to cache information.</div>
+<p>In addition to the <kbd>ResponseCache</kbd> attribute, it is necessary to put caching middleware in front of the web service. <kbd>ResponseCachingMiddleware</kbd> is the default middleware provided by ASP.NET Core. It is compliant with the HTTP 1.1 caching specification (<a href="https://tools.ietf.org/html/rfc7234">https://tools.ietf.org/html/rfc7234</a>). Therefore, if we think about the <kbd>ResponseCachingMiddleware</kbd> type, it is possible to change the previous schema in the following way<span>:</span></p>
+<div class="CDPAlignCenter CDPAlign"><img src="assets/8213c3cc-1f17-4636-8e25-0774296650a9.png" style=""/></div>
+<p>The <kbd>ResponseCachingMiddleware</kbd> class can be initialized using the <kbd>AddResponseCaching</kbd> extension method provided by the <kbd>Microsoft.Extensions.DependencyInjection</kbd> package. In addition, we can add the <span><kbd>ResponseCachingMiddleware</kbd> middleware in the middleware pipeline by </span>executing the <kbd>UseResponseCaching</kbd> extension method in the <kbd>Configure</kbd> method of the <kbd>Startup</kbd> class. The <kbd>ResponseCachingMiddleware</kbd> type checks whether a response is cacheable and stores responses and serves answers from the cache. We can add <kbd>ResponseCachingMiddleware</kbd> to the service pipeline by editing the <kbd>Startup</kbd> class in the <kbd>Catalog.API</kbd> project:</p>
+<pre><span>public class </span><span>Startup<br/></span><span>    </span>{<br/>         ...<br/>        <span>public void </span><span>ConfigureServices</span>(<span>IServiceCollection </span>services)<br/>        {<br/>            services<br/>                  ...<br/>               <strong>.<span>AddResponseCaching</span>();</strong><br/>        }<br/><br/>        <span>public void </span><span>Configure</span>(<span>IApplicationBuilder </span>app, <br/><span>        IHostingEnvironment </span>env)<br/>        {     <br/>             ...<br/>             app.<span>UseHsts</span>();<br/>             app.<span>UseMiddleware</span>&lt;<span>ResponseTimeMiddlewareAsync</span>&gt;();<br/>             app.<span>UseHttpsRedirection</span>();<br/>             app.<span>UseAuthentication</span>();<br/>             app<strong>.<span>UseResponseCaching</span>();</strong><br/>             app.UseEndpoints(endpoints =&gt;<br/>                    {<br/>                        endpoints.MapControllers();<br/>                    });<br/>        }<br/>  }</pre>
+<p>The preceding code adds the caching middleware, but it is not enough to initialize a caching mechanism. Therefore, if we try to call the route decorated with the <kbd>ResponseCache</kbd> attribute using the <kbd>curl</kbd> command, we will receive the following response:</p>
+<pre><strong>curl --verbose -X GET http://localhost:5000/api/items/08164f57-1e80-4d2a-739a-08d6731ac140</strong><br/>Note: Unnecessary use of -X or --request, GET is already inferred.<br/>* Trying ::1...<br/>* TCP_NODELAY set<br/>* Connected to localhost (::1) port 5000 (#0)<br/>&gt; GET /api/items/08164f57-1e80-4d2a-739a-08d6731ac140 HTTP/1.1<br/>&gt; Host: localhost:5000<br/>&gt; User-Agent: curl/7.54.0<br/>&gt; Accept: */*<br/>&gt; <br/>&lt; HTTP/1.1 200 OK<br/>&lt; Date: Sat, 05 Jan 2019 16:55:21 GMT<br/>&lt; Content-Type: application/json; charset=utf-8<br/>&lt; Server: Kestrel<br/><strong>&lt; Cache-Control: public,max-age=100</strong><br/>&lt; Transfer-Encoding: chunked<br/>&lt; X-Response-Time-ms: 21<br/>&lt; <br/>* Connection #0 to host localhost left intact</pre>
+<p>As you can see, <kbd>Cache-Control</kbd> tells us that this information can be shared in the cache and that <kbd>max-age</kbd> is 100 seconds. Therefore, if we call the same route after <em>N (with N&lt;100)</em> seconds, we can also see the <kbd>Age</kbd> header, which<span> contains the time (in seconds)</span> that <span>the object has been in the cache for</span>.</p>
+<p>Moreover, if we call the same route after <em>N seconds</em> (with <em>N &gt;= 100</em>), we will hit the server and cache a new response in the memory. It is also necessary to note that we can cancel the cache middleware by appending a query string parameter to the calling URL. This is because we specified the <kbd>Vary</kbd> header using the following field:</p>
+<pre> <span>VaryByQueryKeys = new []{"*"}</span></pre>
+<div class="packt_infobox">It may be the case that defining the <kbd>ResponseCache</kbd> attribute uses the <kbd>VaryByQueryKeys</kbd> field. In that case, the attribute will not be able to detect the query string variation. Furthermore, the routes that are covered by the <kbd>ResponseCache</kbd> attribute will retrieve the following exception: 
+<p class="p1"><kbd><span class="s1">"ClassName":"System.InvalidOperationException","Message":"'VaryByQueryKeys' requires the response cache middleware."</span></kbd></p>
+</div>
+<p>An important thing to note about the <kbd>ResponseCachingMiddleware</kbd> class is that it uses the <kbd>IMemoryCache</kbd> interface to store the content of the response. Hence, if you examine the definition of the class on GitHub (<a href="https://github.com/aspnet/AspNetCore/blob/master/src/Middleware/ResponseCaching/src/ResponseCachingMiddleware.cs">https://github.com/aspnet/AspNetCore/.../ResponseCachingMiddleware.cs</a>), you will see the following constructor:</p>
+<pre>...<br/>       public ResponseCachingMiddleware(
+            RequestDelegate next,
+            IOptions&lt;ResponseCachingOptions&gt; options,
+            ILoggerFactory loggerFactory,
+            ObjectPoolProvider poolProvider)
+            : this(
+                next,
+                options,
+                loggerFactory,
+                new ResponseCachingPolicyProvider(),
+                <strong>new MemoryResponseCache(new MemoryCache(new <br/>                    MemoryCacheOptions
+                {
+                    SizeLimit = options.Value.SizeLimit
+                })),</strong>
+                new ResponseCachingKeyProvider(poolProvider, options))
+        { }<br/><br/>    internal ResponseCachingMiddleware(<br/>            RequestDelegate next,<br/>            IOptions&lt;ResponseCachingOptions&gt; options,<br/>            ILoggerFactory loggerFactory,<br/>            IResponseCachingPolicyProvider policyProvider,<br/>           <strong> IResponseCache cache,</strong><br/>            IResponseCachingKeyProvider keyProvider)<br/>        {<br/>....</pre>
+<p>The preceding method signature defines the constructor of the <kbd>ResposeCachingMiddleware</kbd> class. The constructor uses the <kbd>this</kbd> keyword to refer to another internal constructor overload that's used to initialize the properties of the class. As you can see, the <kbd>IResponseCache</kbd> interface is initialized using the <kbd>MemoryCache</kbd> type by default, which extends the <kbd>IMemoryCache</kbd> interface.</p>
+<p>The <kbd>IMemoryCache</kbd> interface represents the cache stored in the webserver. Additionally, it is possible to use the <kbd>IMemoryCache</kbd> interface as a standalone component by adding the <kbd>AddMemoryCache()</kbd> extension method to the initialization of the services in the <kbd>Startup</kbd> class:</p>
+<pre>        <span>public void </span><span>ConfigureServices</span>(<span>IServiceCollection </span>services)<br/>        {<br/>            services<br/>                  ...<br/>               <strong>.AddMemoryCache();</strong><br/>        }</pre>
+<p>This approach allows you to use the <kbd>IMemoryCache</kbd> interface through the dependency injection engine, which means you can call the <kbd>GetOrCreate</kbd> and <kbd>GetOrCreateAsync</kbd> methods to set the cache values in the memory of the webserver. Although the in-memory cache provides a really good abstraction for us to cache data, it does not work in a distributed approach. Therefore, if you want to store and share caches between different web servers, ASP.NET Core provides the tools you'll need to implement a distributed cache. In the next section, we will learn a bit more about how to implement a distributed cache in ASP.NET Core. </p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Implementing a distributed cache</h1>
+                </header>
+            
+            <article>
+                
+<p>As we mentioned previously, ASP.NET Core allows us to implement distributed caching. In this section, we will learn how to use <kbd>Redis</kbd> as a form of cache storage. It is possible to extend the behavior of the caching mechanism of ASP.NET Core by adding and executing the following CLI instruction in the <kbd>Catalog.API</kbd> project:</p>
+<pre><span><strong> dotnet add package Microsoft.Extensions.Caching.Redis</strong><br/></span></pre>
+<p class="mce-root">By doing this, we can connect the <kbd>Redis</kbd> server and use it by adding the following extension method to the <kbd>Startup</kbd> class:</p>
+<pre><span>public class </span><span>Startup<br/></span><span>    </span>{<br/>        ...<br/>        <span>public void </span><span>ConfigureServices</span>(<span>IServiceCollection </span>services)<br/>        {<br/>            ...<br/>            services<br/>              <strong> </strong><strong> .AddDistributedRedisCache(<br/>                       options =&gt; { options.Configuration = <br/>                       "catalog_cache:6380";<br/>                });</strong><br/>               ...<br/>        }<br/>    }<br/><span>}</span></pre>
+<p>Microsoft provides the <kbd>AddDistributedRedisCache</kbd> extension method, which accepts the options that are used to define the instance of <kbd>Redis</kbd> so that it can be used as a cache as input. The <kbd>AddDistributedRedisCache</kbd> extension method is connected to the <kbd>catalog_cache</kbd> <kbd>Redis</kbd> instance. Furthermore, we need to declare the new instance in the <kbd>docker-compose.yml</kbd> file of the catalog service:</p>
+<pre>    ...<span><br/></span><span>    </span><strong><span>catalog_cache</span><span>:<br/></span><span>        </span><span>container_name</span><span>: </span>catalog_cache</strong><br/><strong>        <span>image</span><span>: </span>redis:alpine</strong><br/><strong>        <span>networks</span><span>:<br/></span><span>            - </span>my_network</strong><br/><br/><span>networks</span><span>:<br/></span><span>    </span><span>my_network</span><span>:<br/></span><span>        </span><span>driver</span><span>: </span>bridge</pre>
+<p>The preceding code defines the catalog cache's <kbd>Redis</kbd> instance. Therefore, the application will be able to use this instance as part of <kbd>my_network</kbd>. Moreover, we can see what the primary purpose of the package <span>is</span><span> </span><span>by having a look at the source of the <kbd>AddDistributedRedisCache</kbd> extension method:</span></p>
+<pre><span>public static class </span><span>RedisCacheServiceCollectionExtensions<br/></span><span>{</span><span><br/></span><span>  </span><span>public static </span><span>IServiceCollection </span><span>AddDistributedRedisCache</span>(<br/>    <span>this </span><span>IServiceCollection </span>services,<br/>    <span>Action</span>&lt;<span>RedisCacheOptions</span>&gt; setupAction)<br/>  {<br/>    <span>if </span>(services == <span>null</span>)<br/>      <span>throw new </span><span>ArgumentNullException</span>(<span>nameof </span>(services));<br/>    <span>if </span>(setupAction == <span>null</span>)<br/>      <span>throw new </span><span>ArgumentNullException</span>(<span>nameof </span>(setupAction));<br/>    services.<span>AddOptions</span>();<br/>    services.<span>Configure</span>&lt;<span>RedisCacheOptions</span>&gt;(setupAction);<br/>   <strong> services.<span>Add</span>(<span>ServiceDescriptor</span>.<span>Singleton</span>&lt;<span>IDistributedCache</span>, <br/>        <span>RedisCache</span>&gt;());</strong><br/>    <span>return </span>services;<br/>  }<br/><span>}</span></pre>
+<p>I've omitted some documentation comments for brevity purposes, but you can find the open-source code at the following GitHub link: <a href="https://github.com/aspnet/Extensions/blob/master/src/Caching/StackExchangeRedis/src/StackExchangeRedisCacheServiceCollectionExtensions.cs">https://github.com/aspnet/Extensions/../StackExchangeRedisCacheServiceCollectionExtensions.cs</a>.</p>
+<p>As you can see from the preceding code, the extension methods configure and bind the <kbd>RedisCacheOptions</kbd> class. Secondly, the preceding snippet adds a new <kbd>IDistributedCache</kbd> interface to the built-in dependency injection of ASP.NET Core. This interface gives us some useful ways to interact with the <kbd>Redis</kbd> instance and store the caching information there. Furthermore, the instance is defined as a singleton, which means that all of the components inside the application will use the same instance.</p>
+<p>Let's have a look at the <kbd>IDistributedCache</kbd> interface:</p>
+<pre><span>  </span><span>public interface </span><span><strong>IDistributedCache</strong><br/></span><span>  </span>{<br/>    <span><br/></span><span>    </span><span>byte</span>[] <span>Get</span>(<span>string </span>key);<br/><span><br/></span><span>    </span><span>Task</span>&lt;<span>byte</span>[]&gt; <span>GetAsync</span>(<span>string </span>key, <span>CancellationToken </span>token = <br/><span>    default </span>(<span>CancellationToken</span>));<br/><span><br/></span><span>    </span><span>void </span><span>Set</span>(<span>string </span>key, <span>byte</span>[] value, <span>DistributedCacheEntryOptions <br/></span>    options);<br/><span><br/></span><span>    </span><span>Task </span><span>SetAsync</span>(<br/>      <span>string </span>key,<br/>      <span>byte</span>[] value,<br/>      <span>DistributedCacheEntryOptions </span>options,<br/>      <span>CancellationToken </span>token = <span>default </span>(<span>CancellationToken</span>));<br/><span><br/></span><span>    </span><span>void </span><span>Refresh</span>(<span>string </span>key);<span><br/></span><span>    </span><span>Task </span><span>RefreshAsync</span>(<span>string </span>key, <span>CancellationToken </span>token = <br/><span>    default </span>(<span>CancellationToken</span>));<span><br/></span><span>    </span><span>Task </span><span>RemoveAsync</span>(<span>string </span>key, <span>CancellationToken </span>token = <br/><span>    default </span>(<span>CancellationToken</span>));<br/>  }</pre>
+<p>In this case, I've omitted the documentation comments for brevity purposes. You can find the complete version at <a href="https://github.com/aspnet/Extensions/blob/master/src/Caching/Abstractions/src/IDistributedCache.cs">https://github.com/aspnet/Extensions/../IDistributedCache.cs</a>. The interface provides a utility method that we can use to read and write information into the <kbd>Redis</kbd> instance.</p>
+<p>Furthermore, the interface exposes both synchronous and asynchronous methods to do this. Since the interface is part of the dependency injection engine, we can use it in <span>any component, such as the <kbd>ItemController</kbd> class:</span></p>
+<pre><span>namespace </span><span>Catalog</span>.<span>API</span>.<span>Controllers<br/></span>{<br/>    [Route("api/items")]<br/>    [ApiController]<br/>    [JsonException]<br/>    [Authorize]<br/>    public class ItemController : ControllerBase<br/>    {<br/>        private readonly IItemService _itemService;<br/>        private readonly IEndpointInstance _messageEndpoint;<br/>       <strong> private readonly IDistributedCache _distributedCache;</strong><br/>        <br/>        public ItemController(IItemService itemService, <br/>        IEndpointInstance messageEndpoint, <br/><strong>        IDistributedCache distributedCache</strong>)<br/>        {<br/>            _itemService = itemService;<br/>            _messageEndpoint = messageEndpoint;<br/>            <strong>_distributedCache = distributedCache;</strong><br/>        }<br/>        <br/>        ...<br/>...</pre>
+<p>The <kbd>ItemController</kbd> class and any other components in the application can now be resolved and use the <kbd>IDistributedCache</kbd> singleton instance by including it in the constructor and action injection.</p>
+<div class="packt_infobox">ASP.NET Core also provides <kbd>AddDistributedMemoryCache()</kbd>, <span><span>which is part of the </span></span><kbd>Microsoft.Extensions.DependencyInjection</kbd> namespace. Despite its name, it doesn't initialize any distributed cache. Let's have an in-depth look at its implementation: 
+<pre><span>public static </span><span>IServiceCollection </span><span>AddDistributedMemoryCache</span>(<br/>  <span>this </span><span>IServiceCollection </span>services)<br/><span>{</span><br/>  <span>if </span>(services == <span>null</span>)<br/>    <span>throw new </span><span>ArgumentNullException</span>(<span>nameof </span>(services));<br/>  services.<span>AddOptions</span>();<br/>  services.<span>TryAdd</span>(<span>ServiceDescriptor</span>.<span>Singleton</span>&lt;<span>IDistributedCache</span>, <strong><span>MemoryDistributedCache</span></strong>&gt;());<br/>  <span>return </span>services;<br/><span>}</span></pre>
+<span>The extension method uses the memory of the webserver to store information. More specifically, the <kbd>AddDistributedMemoryCache</kbd> extension method is designed for development/testing environments, and it isn't a real distributed cache.</span></div>
+<p>Finally, we can optimize and refactor the <kbd>Startup</kbd> class by creating a new configuration class dedicated to the cache. First of all, let's create the following class in the <kbd>Configurations</kbd> folder of the catalog's domain project:</p>
+<pre><span>namespace </span><span>Catalog</span>.<span>Domain</span>.<span>Configurations<br/></span><span>{</span><br/>    <span>public class </span><span>CacheSettings<br/></span><span>    </span>{<br/>        <span>public string </span><span>ConnectionString </span>{ <span>get</span>; <span>set</span>; }<br/>    }<br/><span>}</span></pre>
+<p class="mce-root">The class definition contains the <kbd>ConnectionString</kbd> field of the <kbd>Redis</kbd> instance. We can proceed by adding <span>the </span><kbd><span>DistributedCacheExtensions</span></kbd><span> class to the </span><kbd>Catalog.Infrastructure</kbd><span> project, which can be found inside the</span> <kbd>Extensions</kbd> <span>folder:</span></p>
+<pre>using Catalog.Domain.Configurations;<br/>using Microsoft.Extensions.Configuration;<br/>using Microsoft.Extensions.DependencyInjection;<br/>using Newtonsoft.Json;<br/>namespace Catalog.Infrastructure.Extensions<br/>{<br/>    public static class DistributedCacheExtensions<br/>    {<br/>        public static IServiceCollection AddDistributedCache(this <br/>            IServiceCollection services,<br/>            IConfiguration configuration)<br/>        {<br/>            var settings = configuration.GetSection("CacheSettings");<br/>            var settingsTyped = settings.Get&lt;CacheSettings&gt;();<br/>            services.Configure&lt;CacheSettings&gt;(settings);<br/>            services.AddDistributedRedisCache(options =&gt; { <br/>            options.Configuration = settingsTyped.ConnectionString; });<br/>            return services;<br/>        }<br/>    }<br/>}</pre>
+<p>The preceding code declares a new <kbd>AddDistributedCache</kbd> extension method. The method configures the <span><kbd>CacheSettings</kbd> node of the</span> <kbd>appsettings.json</kbd> <span>file by reading and registering the node to the dependency injection engine. Next, it calls the <kbd>AddDistributedCache</kbd> method to configure the distributed cache so that it can use the provided connection string. </span></p>
+<p>Let's proceed by adding the new <kbd>CacheSettings</kbd> node to the <kbd>appsettings.json</kbd> file:</p>
+<pre><span>...<br/>"CacheSettings"</span>: {<br/>  <span>"ConnectionString"</span>: <span>"catalog_cache"<br/></span>}</pre>
+<p>Next, we need to call the <kbd>AddDistributedCache</kbd> extension method in the <kbd>Startup</kbd> class:</p>
+<pre><span>public class </span><span>Startup<br/></span>{<br/>    ...<span><br/></span><span>    </span><span>public void </span><span>ConfigureServices</span>(<span>IServiceCollection </span>services)<br/>    <span>{</span><br/>        services<br/>           ...<br/>            <strong>.<span>AddDistributedCache</span>(<span>Configuration</span>)</strong><br/>    <span>}</span></pre>
+<p class="mce-root">Now, our application initializes a new <kbd>IDistributedCache</kbd> instance in the dependency injection engine using the connection string provided by the <kbd>appsettings.json</kbd> file. In the next section, we will examine an additional level of customization for distributed caches.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Implementing the IDistributedCache interface</h1>
+                </header>
+            
+            <article>
+                
+<p>It is possible to extend the behavior of the <kbd>IDistributedCache</kbd> interface by overloading the extension methods. Furthermore, we need to store complex information and not bytes. For example, in the case of the <kbd>ItemController</kbd> class, we want to pass the <kbd>ItemResponse</kbd> type to the <kbd>Set</kbd> method of the <kbd>IDistributedCache</kbd> interface. </p>
+<p>Let's proceed by modifying the <kbd><span>DistributedCacheExtensions</span></kbd><span> class in the</span> <kbd>Catalog.API</kbd> <span>project:</span></p>
+<pre><span>using </span>System.Threading.Tasks;<br/><span>using </span>Catalog.Domain.Configurations;<br/><span>using </span>Microsoft.Extensions.Caching.Distributed;<br/><span>using </span>Microsoft.Extensions.Configuration;<br/><span>using </span>Microsoft.Extensions.DependencyInjection;<br/><span>using </span>Newtonsoft.Json;<br/><br/><span>namespace </span>Catalog.Infrastructure.Extensions<br/><span>{</span><br/>    <span>public static class </span><span>DistributedCacheExtensions<br/></span><span>    </span>{<br/>        <span>private static readonly </span><span>JsonSerializerSettings <br/>            </span>_serializerSettings = CreateSettings();<br/>        <br/>        ...<br/><br/>        <span>public static async </span><span>Task</span>&lt;<span>T</span>&gt; <span>GetObjectAsync</span>&lt;<span>T</span>&gt;(<span>this <br/>            </span><span>IDistributedCache </span>cache, <span>string </span>key)<br/>        {<br/>            <span>var </span>json = <span>await </span>cache.GetStringAsync(key);<br/><br/>            <span>return </span>json == <span>null </span>? <span>default</span><span>(T) </span>:<br/><br/>            <span>JsonConvert</span>.DeserializeObject&lt;<span>T</span>&gt;(json, <br/>                _serializerSettings);<br/>        }<br/>        <span>public static async </span><span>Task </span><span>SetObjectAsync</span>(<span>this </span><span>IDistributedCache <br/>            </span>cache, <span>string </span>key, <span>object </span>value)<br/>        {<br/>            <span>var </span>json = <span>JsonConvert</span>.SerializeObject(value, <br/>                _serializerSettings);<br/>            <span>await </span>cache.SetStringAsync(key, json);<br/>        }<br/><br/>        <span>public static async </span><span>Task </span><span>SetObjectAsync</span>(<span>this </span><span>IDistributedCache <br/>            </span>cache, <span>string </span>key,<br/>        <span>object </span>value, <span>DistributedCacheEntryOptions </span>options)<br/>        {<br/>            <span>var </span>json = <span>JsonConvert</span>.SerializeObject(value, <br/>                _serializerSettings);<br/>            <span>await </span>cache.SetStringAsync(key, json, options);<br/>        }<br/><br/>        <span>private static </span><span>JsonSerializerSettings </span>CreateSettings()<br/>        {<br/>            <span>return new </span><span>JsonSerializerSettings</span>();<br/>        }<br/>    }<br/><span>}</span></pre>
+<p>The preceding class defines the generic extension methods to get and set a complex object in the <kbd>Redis</kbd> cache. It uses the <kbd><span>Newtonsoft.Json</span></kbd><span> methods to store objects in JSON format. The class also defines two <kbd>SetObject&lt;T&gt;</kbd> methods with different signatures. One provides a default configuration of <kbd>DistributedCacheEntryOptions</kbd>, while the other one allows us to override the options inside this configuration. </span>Furthermore, it is possible to use these extension methods in the <kbd>ItemController</kbd> class, like so:</p>
+<pre><span>namespace </span>Catalog.API.Controllers<br/>{<br/>    [<span>Route</span>(<span>"api/items"</span>)]<br/>    [<span>ApiController</span>]<br/>    [<span>JsonException</span>]<br/>    [<span>Authorize</span>]<br/>    <span>public class </span><span>ItemController </span>: <span>ControllerBase<br/></span><span>    </span>{<br/>        <span>private readonly </span><span>IItemService </span>_itemService;<br/>        <span>private readonly </span><span>IEndpointInstance </span>_messageEndpoint;<br/>        <strong><span>private readonly </span><span>IDistributedCache </span>_distributedCache;</strong><br/><br/>        <span>public </span><span>ItemController</span>(<span>IItemService </span>itemService, <br/><span>        IEndpointInstance </span>messageEndpoint,<br/>            <strong><span>IDistributedCache </span>distributedCache</strong>)<br/>        {<br/>            _itemService = itemService;<br/>            _messageEndpoint = messageEndpoint;<br/>           <strong> _distributedCache = distributedCache;</strong><br/>        }<br/>        [<span>HttpGet</span>(<span>"{id:guid}"</span>)]<br/>        [<span>ItemExists</span>]<br/>        [<span>ResponseCache</span>(Duration = <span>100</span>, VaryByQueryKeys = <span>new</span>[] { <span>"*" </span>})]<br/>        <span>public async </span><span>Task</span>&lt;<span>IActionResult</span>&gt; GetById(<span>Guid </span>id)<br/>        <span>{</span><br/>            <span>var </span>key = <span>$"{</span><span>typeof</span>(<span>ItemController</span>).FullName<span>}.<br/>            {</span><span>nameof</span>(GetById)<span>}.{</span>id<span>}"</span>; <br/>           <strong> <span>var </span>cachedResult = <span>await </span>_distributedCache. <br/>                GetObjectAsync&lt;<span>ItemResponse</span>&gt;(key);</strong><br/><br/><strong>            <span>if </span>(cachedResult != <span>null</span>)</strong><br/><strong>            {</strong><br/><strong>                <span>return </span>Ok(cachedResult);</strong><br/><strong>            }</strong><br/>            <br/>            <span>var </span>result = <span>await </span>_itemService.GetItemAsync(<span>new <br/>                </span><span>GetItemRequest</span>{ Id = id });<br/>            <strong><span>await </span>_distributedCache.SetObjectAsync(key, result);</strong><br/>            <br/>            <span>return </span>Ok(result);<br/>        <span>}<br/></span><span>...</span></pre>
+<p>The <kbd>GetById</kbd> action method uses the <kbd>IDistributedCache</kbd> interface to save information about <kbd>ItemResponse</kbd>: it defines a key that's composed in the following way:</p>
+<pre>&lt;controller_full_name&gt;.&lt;action_method_name&gt;.&lt;input_id&gt;</pre>
+<p>The action method tries to retrieve this information from the cache; if this information is not present, it performs the request by using the <kbd>IItemService</kbd> interface, and it stores the result using the <kbd>SetObjectAsync</kbd> method of the <kbd>IDistributedCache</kbd> interface.</p>
+<p>Although this approach requires a discrete overhead in terms of implementation compared to the <kbd>ResponseCache</kbd> attribute, the <kbd>IDistributedCache</kbd> interface relies on an external caching system. Furthermore, it is possible to implement this kind of caching logic by using the filter pipeline stack. Therefore, it is possible to move the caching logic that's implemented in the <kbd>ItemController</kbd> class into a custom action filter:</p>
+<pre><br/><span>namespace </span>Catalog.API.Filters<br/><span>{</span><br/>    <span>public class </span><span>RedisCacheFilter </span>: <span>IAsyncActionFilter<br/></span><span>    </span>{<br/>       <strong> <span>private readonly </span><span>IDistributedCache </span>_distributedCache;</strong><br/>       <strong> <span>private readonly </span><span>DistributedCacheEntryOptions </span>_options;</strong><br/><br/>        <span>public </span><span>RedisCacheFilter</span>(<span>IDistributedCache </span>distributedCache, <br/><span>        int </span>cacheTimeSeconds)<br/>        {<br/>            _distributedCache = distributedCache;<br/>            _options = <span>new </span><span>DistributedCacheEntryOptions<br/></span><span>            </span>{<br/>                SlidingExpiration = <br/>                    <span>TimeSpan</span>.FromSeconds(cacheTimeSeconds)<br/>            };<br/>        }<br/><br/>        <span>public async </span><span>Task </span>OnActionExecutionAsync(<span>ActionExecutingContext <br/></span>        context, <span>ActionExecutionDelegate </span>next)<br/>        {<br/>            <span>if </span>(!context.ActionArguments.ContainsKey(<span>"id"</span>))<br/>            {<br/>                <span>await </span>next();<br/>            }<br/><br/>            <span>var </span>actionName = (<span>string</span>) <br/>                context.RouteData.Values[<span>"action"</span>];<br/>            <span>var </span>controllerName = (<span>string</span>) <br/>                context.RouteData.Values[<span>"controller"</span>];<br/><br/>            <span>var </span>id = context.ActionArguments[<span>"id"</span>];<br/><br/>            <span>var </span>key = <span>$"{</span>controllerName<span>}.{</span>actionName<span>}.{</span>id<span>}"</span>;<br/><br/>         <strong>   <span>var </span>result = <span>await </span>_distributedCache.<br/>                GetObjectAsync&lt;<span>ItemResponse</span>&gt;(key);</strong><br/><br/>            <span>if </span>(result != <span>null</span>)<br/>            {<br/>                context.Result = <span>new </span><span>OkObjectResult</span>(result);<br/>                <span>return</span>;<br/>            }<br/><br/>            <span>var </span>resultContext = <span>await </span>next();<br/><br/>           <strong> <span>if </span>(resultContext.Result <span>is </span><span>OkObjectResult </span>resultResponse <br/>            &amp;&amp; resultResponse.StatusCode == <span>200</span>)</strong><br/><strong>            {</strong><br/><strong>                <span>await </span>_distributedCache.SetObjectAsync(key, <br/>                    resultResponse.Value, _options);</strong><br/><strong>            }</strong><br/>        }<br/>    }<br/><span>}</span></pre>
+<p><kbd>RedisCacheFilter</kbd> encapsulates the cache logic to avoid replicating it in every action method. It implements the following logic: before the action is executed, it tries to get <kbd>ItemResponse</kbd> from the cache by composing the key using the controller name, the action name, and the requested <kbd>id</kbd> value. If the cache key is not populated, it proceeds with the execution of the action method, and if the resulting <kbd>StatusCode</kbd> is <kbd>200</kbd>, it continues by storing the result in the <kbd>Redis</kbd> cache. The next request with the same <kbd>id</kbd> value will have the cache populated, and the action filter will return the cached object.</p>
+<p>It is possible to use the action filter in the following way:</p>
+<pre><br/>    [<span>Route</span>(<span>"api/items"</span>)]<br/>    [<span>ApiController</span>]<br/>    [<span>JsonException</span>]<br/>    <span>public class </span><span>ItemController </span>: <span>ControllerBase<br/></span><span>    </span>{<br/>        ...<br/><br/>        [<span>HttpGet</span>(<span>"{id:guid}"</span>)]<br/>        [<span>ItemExists</span>]<br/>        <strong>[<span>TypeFilter</span>(<span>typeof</span>(<span>RedisCacheFilter</span>), <span>Arguments </span>= <span>new object</span>[] <br/>            {<span>20</span>})]</strong><span><br/></span><span>        </span><span>public async </span><span>Task</span>&lt;<span>IActionResult</span>&gt; <span>GetById</span>(<span>Guid </span>id)<br/>        {<br/>            ...<br/>        }<br/><br/>       ...<br/>    }</pre>
+<p>The action method uses the <kbd>TypeFilter</kbd> attribute to resolve <kbd>RedisCacheFilter</kbd>, and it passes the number that represents the cache expiration in seconds as an argument. This implementation strategy is more readable and allows us to avoid code replication between different action methods.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Inject memory cache into the tests</h1>
+                </header>
+            
+            <article>
+                
+<p>If we try to execute unit tests using <kbd>RedisCacheFilter</kbd>, we will notice that <span><kbd>get_by_id_should_return_right_data</kbd> will fail. This is because the Redis instance is not available in the development environment. Furthermore, we can use the</span> <span><kbd>MemoryDistributedCache</kbd> implementation to perform our tests. The <kbd>MemoryDistributedCache</kbd> implementation is done in the same class that's used by the <kbd>AddDistributedMemoryCache</kbd> extension method. As we mentioned in the previous chapter, the class doesn't provide a real distributed cache, and it is used for testing purposes.</span></p>
+<p>For that reason, we can add the following line to the <kbd><span>InMemoryApplicationFactory</span>&lt;<span>TStartup</span>&gt;</kbd> class, which is contained in the <kbd>Catalog.Fixtures</kbd> project:</p>
+<pre><span>namespace </span><span>Catalog</span>.<span>Fixtures<br/></span><span>{</span><br/>    <span>public class </span><strong><span>InMemoryApplicationFactory</span>&lt;<span>TStartup</span>&gt;</strong><br/>        : <span>WebApplicationFactory</span>&lt;<span>TStartup</span>&gt; <span>where </span><span>TStartup </span>: <span>class<br/></span><span>    </span>{<br/>        <span>protected override void </span><span>ConfigureWebHost</span>(<span>IWebHostBuilder <br/>            </span>builder)<br/>        {<br/>            builder.<span>UseEnvironment</span>(<span>"Testing"</span>)<br/>                .<span>ConfigureTestServices</span>(services =&gt;<br/>                {<br/>                    ...<br/>                   <strong>services.<span>AddSingleton</span>&lt;<span>IDistributedCache</span>, <br/>                      <span>MemoryDistributedCache</span>&gt;();</strong>              <br/>                    ...<br/>                });<br/>        }<br/>    }<br/><span>}<br/></span></pre>
+<p>The preceding code replaces the implementation of <kbd>IDistributedCache</kbd> with an instance of <kbd>MemoryDistributedCache</kbd>. Therefore, every time our implementation calls the <kbd>IDistributedCache</kbd> interface, the data is saved in the memory of the testing server.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Summary</h1>
+                </header>
+            
+            <article>
+                
+<p>In this chapter, we covered some of the main caching scenarios in ASP.NET Core so that you know how the HTTP cache works and how it can be implemented. Furthermore, we learned how to implement a distributed cache using the <kbd>IDistributedCache</kbd> interface and how to connect the web service to a Redis instance.  In the next chapter, we will look at how to deal with logging management and how to perform health checks on the dependencies of the catalog web service.</p>
+
+
+            </article>
+
+            
+        </section>
+    </body></html>

@@ -1,0 +1,320 @@
+<html><head></head><body><div class="chapter" title="Chapter&#xA0;2.&#xA0;Thread Synchronization"><div class="titlepage"><div><div><h1 class="title"><a id="ch02"/>Chapter 2. Thread Synchronization</h1></div></div></div><p>In this chapter, we will describe some of the common techniques of working with shared resources from multiple threads. You will learn the following recipes:</p><div class="itemizedlist"><ul class="itemizedlist"><li class="listitem" style="list-style-type: disc">Performing basic atomic operations</li><li class="listitem" style="list-style-type: disc">Using the <code class="literal">Mutex</code> construct</li><li class="listitem" style="list-style-type: disc">Using the <code class="literal">SemaphoreSlim</code> construct</li><li class="listitem" style="list-style-type: disc">Using the <code class="literal">AutoResetEvent</code> construct</li><li class="listitem" style="list-style-type: disc">Using the <code class="literal">ManualResetEventSlim</code> construct</li><li class="listitem" style="list-style-type: disc">Using the <code class="literal">CountDownEvent</code> construct</li><li class="listitem" style="list-style-type: disc">Using the <code class="literal">Barrier</code> construct</li><li class="listitem" style="list-style-type: disc">Using the <code class="literal">ReaderWriterLockSlim</code> construct</li><li class="listitem" style="list-style-type: disc">Using the <code class="literal">SpinWait</code> construct</li></ul></div><div class="section" title="Introduction"><div class="titlepage"><div><div><h1 class="title"><a id="ch02lvl1sec20"/>Introduction</h1></div></div></div><p>As we saw in <a class="link" href="ch01.html" title="Chapter 1. Threading Basics">Chapter 1</a>, <span class="emphasis"><em>Threading Basics</em></span>, it is problematic to use a shared object simultaneously from several threads. However, it is very important to synchronize those threads so that they perform operations on that shared object in a proper sequence. In the <span class="emphasis"><em>Locking with a C# lock keyword</em></span> recipe, we faced a problem called the race condition. The problem occurred because the execution of those multiple threads was not synchronized properly. When one thread performs increment and decrement operations, the other threads must wait for their turn. Organizing <a id="id43" class="indexterm"/>threads in such a way is often referred to as <span class="strong"><strong>thread synchronization</strong></span>.</p><p>There are several ways to achieve thread synchronization. First, if there is no shared object, there is no need for synchronization at all. Surprisingly, it is very often the case that we can get rid of complex synchronization constructs by just redesigning our program and removing a shared state. If possible, just avoid using a single object from several threads.</p><p>If we must have a shared <a id="id44" class="indexterm"/>state, the second approach is to use only <span class="strong"><strong>atomic</strong></span> operations. This means that an operation takes a single quantum of time and completes at once, so no other thread can perform another operation until the first operation is complete. Therefore, there is no need to make other threads wait for this operation to complete and there is no need to use locks; this in turn, excludes the deadlock situation.</p><p>If this is not possible and the program's logic is more complicated, then we have to use different constructs to coordinate threads. One group of these constructs puts a waiting thread into a <code class="literal">blocked</code> state. In a <code class="literal">blocked</code> state, a thread uses as little CPU time as possible. However, this <a id="id45" class="indexterm"/>means that it will include at least one so-called <span class="strong"><strong>context switch</strong></span>—the thread scheduler of an operating system will save the waiting thread's state and switch to another thread, restoring its state by turn. This takes a considerable amount of resources; however, if the thread is going to be suspended for a long time, it is good. These kind of constructs are <a id="id46" class="indexterm"/>also called <span class="strong"><strong>kernel-mode</strong></span> constructs because only the kernel of an operating system is able to stop a thread from using CPU time.</p><p>In case, we have to wait for a short period of time, it is better to simply wait than switch the thread to a <code class="literal">blocked</code> state. This will save us the context switch at the cost of some wasted CPU time while <a id="id47" class="indexterm"/>the thread is waiting. Such constructs are referred to as <span class="strong"><strong>user-mode</strong></span> constructs. They are very lightweight and fast, but they waste a lot of CPU time in case a thread has to wait for long.</p><p>To use the best of both <a id="id48" class="indexterm"/>worlds, there are <span class="strong"><strong>hybrid</strong></span> constructs; these try to use user-mode waiting first, and then, if a thread waits long enough, it switches to the <code class="literal">blocked</code> state, saving CPU resources.</p><p>In this chapter, we will look through the aspects of thread synchronization. We will cover how to perform atomic operations and how to use the existing synchronization constructs included in .NET Framework.</p></div></div>
+<div class="section" title="Performing basic atomic operations"><div class="titlepage"><div><div><h1 class="title"><a id="ch02lvl1sec21"/>Performing basic atomic operations</h1></div></div></div><p>This recipe will <a id="id49" class="indexterm"/>show you how to perform basic atomic operations on an object to prevent the race condition without blocking threads.</p><div class="section" title="Getting ready"><div class="titlepage"><div><div><h2 class="title"><a id="ch02lvl2sec40"/>Getting ready</h2></div></div></div><p>To step through this recipe, you will need Visual Studio 2015. There are no other prerequisites. The source code for this recipe can be found at <code class="literal">BookSamples\Chapter2\Recipe1</code>.</p></div><div class="section" title="How to do it..."><div class="titlepage"><div><div><h2 class="title"><a id="ch02lvl2sec41"/>How to do it...</h2></div></div></div><p>To understand basic atomic operations, perform the following steps:</p><div class="orderedlist"><ol class="orderedlist arabic"><li class="listitem">Start Visual Studio 2015. Create a new C# console application project.</li><li class="listitem">In the <code class="literal">Program.cs</code> file, add the following <code class="literal">using</code> directives:<div class="informalexample"><pre class="programlisting">using System;
+using System.Threading;
+using static System.Console;</pre></div></li><li class="listitem">Below the <a id="id50" class="indexterm"/><code class="literal">Main</code> method, add the following code snippet:<div class="informalexample"><pre class="programlisting">static void TestCounter(CounterBase c)
+{
+  for (int i = 0; i &lt; 100000; i++)
+  {
+    c.Increment();
+    c.Decrement();
+  }
+}
+
+class Counter : CounterBase
+{
+  private int _count;
+
+  public int Count =&gt; _count;
+
+  public override void Increment()
+  {
+    _count++;
+  }
+
+  public override void Decrement()
+  {
+    _count--;
+  }
+}
+
+class CounterNoLock : CounterBase
+{
+  private int _count;
+
+  public int Count =&gt; _count;
+
+  public override void Increment()
+  {
+    Interlocked.Increment(ref _count);
+  }
+
+  public override void Decrement()
+  {
+    Interlocked.Decrement(ref _count);
+  }
+}
+
+abstract class CounterBase
+{
+  public abstract void Increment();
+
+  public abstract void Decrement();
+}</pre></div></li><li class="listitem">Inside the <a id="id51" class="indexterm"/><code class="literal">Main</code> method, add the following code snippet:<div class="informalexample"><pre class="programlisting">WriteLine("Incorrect counter");
+
+var c = new Counter();
+
+var t1 = new Thread(() =&gt; TestCounter(c));
+var t2 = new Thread(() =&gt; TestCounter(c));
+var t3 = new Thread(() =&gt; TestCounter(c));
+t1.Start();
+t2.Start();
+t3.Start();
+t1.Join();
+t2.Join();
+t3.Join();
+
+WriteLine($"Total count: {c.Count}");
+WriteLine("--------------------------");
+
+WriteLine("Correct counter");
+
+var c1 = new CounterNoLock();
+
+t1 = new Thread(() =&gt; TestCounter(c1));
+t2 = new Thread(() =&gt; TestCounter(c1));
+t3 = new Thread(() =&gt; TestCounter(c1));
+t1.Start();
+t2.Start();
+t3.Start();
+t1.Join();
+t2.Join();
+t3.Join();
+
+WriteLine($"Total count: {c1.Count}");</pre></div></li><li class="listitem">Run the program.</li></ol></div></div><div class="section" title="How it works..."><div class="titlepage"><div><div><h2 class="title"><a id="ch02lvl2sec42"/>How it works...</h2></div></div></div><p>When the program runs, it creates three threads that will execute a code in the <code class="literal">TestCounter</code> method. This method runs a sequence of increment/decrement operations on an object. Initially, the <code class="literal">Counter</code> object is not thread-safe and we get a race condition here. So, in the first case, a counter value is not deterministic. We could get a zero value; however, if you run the program several times, you will eventually get some incorrect nonzero result.</p><p>In <a class="link" href="ch01.html" title="Chapter 1. Threading Basics">Chapter 1</a>, <span class="emphasis"><em>Threading Basics</em></span>, we resolved this problem by locking our object, causing other threads to be <a id="id52" class="indexterm"/>blocked while one thread gets the old counter value and then computes and assigns a new value to the counter. However, if we execute this operation in such a way, it cannot be stopped midway, we would achieve the proper result without any locking, and this is possible with the help of the <code class="literal">Interlocked</code> construct. It provides the <code class="literal">Increment</code>, <code class="literal">Decrement</code>, and <code class="literal">Add</code> atomic methods for basic math, and it helps us to write the <code class="literal">Counter</code> class without the use of locking.</p></div></div>
+<div class="section" title="Using the Mutex construct"><div class="titlepage"><div><div><h1 class="title"><a id="ch02lvl1sec22"/>Using the Mutex construct</h1></div></div></div><p>This recipe will <a id="id53" class="indexterm"/>describe how to synchronize two separate programs using the <code class="literal">Mutex</code> construct. A <code class="literal">Mutex</code> construct is a synchronization primitive that grants exclusive <a id="id54" class="indexterm"/>access of the shared resource to only one thread.</p><div class="section" title="Getting ready"><div class="titlepage"><div><div><h2 class="title"><a id="ch02lvl2sec43"/>Getting ready</h2></div></div></div><p>To step through this recipe, you will need Visual Studio 2015. There are no other prerequisites. The source code for this recipe can be found at <code class="literal">BookSamples\Chapter2\Recipe2</code>.</p></div><div class="section" title="How to do it..."><div class="titlepage"><div><div><h2 class="title"><a id="ch02lvl2sec44"/>How to do it...</h2></div></div></div><p>To understand the synchronization of two separate programs using the <code class="literal">Mutex</code> construct, perform the following steps:</p><div class="orderedlist"><ol class="orderedlist arabic"><li class="listitem">Start Visual Studio 2015. Create a new C# console application project.</li><li class="listitem">In the <code class="literal">Program.cs</code> file, add the following <code class="literal">using</code> directives:<div class="informalexample"><pre class="programlisting">using System;
+using System.Threading;
+using static System.Console;</pre></div></li><li class="listitem">Inside the <code class="literal">Main</code> method, add the following code snippet:<div class="informalexample"><pre class="programlisting">const string MutexName = "CSharpThreadingCookbook";
+
+using (var m = new Mutex(false, MutexName))
+{
+  if (!m.WaitOne(TimeSpan.FromSeconds(5), false))
+  {
+    WriteLine("Second instance is running!");
+  }
+  else
+  {
+    WriteLine("Running!");
+    ReadLine();
+    m.ReleaseMutex();
+  }
+}</pre></div></li><li class="listitem">Run the program.</li></ol></div></div><div class="section" title="How it works..."><div class="titlepage"><div><div><h2 class="title"><a id="ch02lvl2sec45"/>How it works...</h2></div></div></div><p>When the main program starts, it defines a mutex with a specific name, providing the <code class="literal">initialOwner</code> flag <a id="id55" class="indexterm"/>as <code class="literal">false</code>. This allows the program to acquire a mutex if it is already created. Then, if no mutex is acquired, the program simply displays <span class="strong"><strong>Running</strong></span> and <a id="id56" class="indexterm"/>waits for any key to be pressed in order to release the mutex and exit.</p><p>If we start a second copy of the program, it will wait for 5 seconds, trying to acquire the mutex. If we press any key in the first copy of a program, the second one will start the execution. However, if we keep waiting for 5 seconds, the second copy of the program will fail to acquire the mutex.</p><div class="note" title="Note" style=""><div class="inner"><h3 class="title"><a id="tip05"/>Tip</h3><p>Note that a mutex is a global operating system object! Always close the mutex properly; the best choice is to wrap a mutex object into a <code class="literal">using</code> block.</p></div></div><p>This makes it possible to synchronize threads in different programs, which could be useful in a large number of scenarios.</p></div></div>
+<div class="section" title="Using the SemaphoreSlim construct"><div class="titlepage"><div><div><h1 class="title"><a id="ch02lvl1sec23"/>Using the SemaphoreSlim construct</h1></div></div></div><p>This recipe <a id="id57" class="indexterm"/>will show you how to limit multithreaded access to some resources with the help of the <code class="literal">SemaphoreSlim</code> construct. <code class="literal">SemaphoreSlim</code> is a lightweight version of <code class="literal">Semaphore</code>; it limits the number of threads that can <a id="id58" class="indexterm"/>access a resource concurrently.</p><div class="section" title="Getting ready"><div class="titlepage"><div><div><h2 class="title"><a id="ch02lvl2sec46"/>Getting ready</h2></div></div></div><p>To step through this recipe, you will need Visual Studio 2015. There are no other prerequisites. The source code for this recipe can be found at <code class="literal">BookSamples\Chapter2\Recipe3</code>.</p></div><div class="section" title="How to do it..."><div class="titlepage"><div><div><h2 class="title"><a id="ch02lvl2sec47"/>How to do it...</h2></div></div></div><p>To understand how to limit a multithreaded access to a resource with the help of the <code class="literal">SemaphoreSlim</code> <a id="id59" class="indexterm"/>construct, perform the following steps:</p><div class="orderedlist"><ol class="orderedlist arabic"><li class="listitem">Start Visual Studio 2015. Create a new C# console application project.</li><li class="listitem">In the <code class="literal">Program.cs</code> file, add the following <code class="literal">using</code> directives:<div class="informalexample"><pre class="programlisting">using System;
+using System.Threading;
+using static System.Console;
+using static System.Threading.Thread;</pre></div></li><li class="listitem">Below the <code class="literal">Main</code> method, add the following code snippet:<div class="informalexample"><pre class="programlisting">static SemaphoreSlim _semaphore = new SemaphoreSlim(4);
+
+static void AccessDatabase(string name, int seconds)
+{
+  WriteLine($"{name} waits to access a database");
+  _semaphore.Wait();
+  WriteLine($"{name} was granted an access to a database");
+  Sleep(TimeSpan.FromSeconds(seconds));
+  WriteLine($"{name} is completed");
+  _semaphore.Release();
+}</pre></div></li><li class="listitem">Inside the <code class="literal">Main</code> method, add the following code snippet:<div class="informalexample"><pre class="programlisting">for (int i = 1; i &lt;= 6; i++)
+{
+  string threadName = "Thread " + i;
+  int secondsToWait = 2 + 2 * i;
+  var t = new Thread(() =&gt; AccessDatabase(threadName, secondsToWait));
+  t.Start();
+}</pre></div></li><li class="listitem">Run the program.</li></ol></div></div><div class="section" title="How it works..."><div class="titlepage"><div><div><h2 class="title"><a id="ch02lvl2sec48"/>How it works...</h2></div></div></div><p>When the main program starts, it creates a <code class="literal">SemaphoreSlim</code> instance, specifying the number of concurrent threads allowed in its constructor. Then, it starts six threads with different names and start times to run.</p><p>Every thread tries to <a id="id60" class="indexterm"/>acquire access to a database, but we restrict the number of concurrent accesses to a database to four threads with the help of a semaphore. When four threads get access to a database, the other two threads wait <a id="id61" class="indexterm"/>until one of the previous threads finishes its work and signals to other threads by calling the <code class="literal">_semaphore.Release</code> method.</p></div><div class="section" title="There's more…"><div class="titlepage"><div><div><h2 class="title"><a id="ch02lvl2sec49"/>There's more…</h2></div></div></div><p>Here, we use a hybrid construct, which allows us to save a context switch in cases where the wait time is very short. However, there is an older version of this construct called <code class="literal">Semaphore</code>. This version is a pure, kernel-time construct. There is no sense in using it, except in one very important scenario; we can create a named semaphore like a named mutex and use it to synchronize threads in different programs. <code class="literal">SemaphoreSlim</code> does not use Windows kernel semaphores and does not support interprocess synchronization, so use <code class="literal">Semaphore</code> in this case.</p></div></div>
+<div class="section" title="Using the AutoResetEvent construct"><div class="titlepage"><div><div><h1 class="title"><a id="ch02lvl1sec24"/>Using the AutoResetEvent construct</h1></div></div></div><p>In this recipe, there <a id="id62" class="indexterm"/>is an example of how to send notifications <a id="id63" class="indexterm"/>from one thread to another with the help of an <code class="literal">AutoResetEvent</code> construct. <code class="literal">AutoResetEvent</code> notifies a waiting thread that an event has occurred.</p><div class="section" title="Getting ready"><div class="titlepage"><div><div><h2 class="title"><a id="ch02lvl2sec50"/>Getting ready</h2></div></div></div><p>To step through this recipe, you will need Visual Studio 2015. There are no other prerequisites. The source code for this recipe can be found at <code class="literal">BookSamples\Chapter2\Recipe4</code>.</p></div><div class="section" title="How to do it..."><div class="titlepage"><div><div><h2 class="title"><a id="ch02lvl2sec51"/>How to do it...</h2></div></div></div><p>To understand how to send notifications from one thread to another with the help of the <code class="literal">AutoResetEvent</code> construct, perform the following steps:</p><div class="orderedlist"><ol class="orderedlist arabic"><li class="listitem">Start Visual Studio 2015. Create a new C# console application project.</li><li class="listitem">In the <code class="literal">Program.cs</code> file, add the following <code class="literal">using</code> directives:<div class="informalexample"><pre class="programlisting">using System;
+using System.Threading;
+using static System.Console;
+using static System.Threading.Thread;</pre></div></li><li class="listitem">Below the <a id="id64" class="indexterm"/><code class="literal">Main</code> method, add the following code snippet:<div class="informalexample"><pre class="programlisting">private static AutoResetEvent _workerEvent = new AutoResetEvent(false);
+private static AutoResetEvent _mainEvent = new AutoResetEvent(false);
+
+static void Process(int seconds)
+{
+  WriteLine("Starting a long running work...");
+  Sleep(TimeSpan.FromSeconds(seconds));
+  WriteLine("Work is done!");
+  _workerEvent.Set();
+  WriteLine("Waiting for a main thread to complete its work");
+  _mainEvent.WaitOne();
+  WriteLine("Starting second operation...");
+  Sleep(TimeSpan.FromSeconds(seconds));
+  WriteLine("Work is done!");
+  _workerEvent.Set();
+}</pre></div></li><li class="listitem">Inside the <a id="id65" class="indexterm"/><code class="literal">Main</code> method, add the following code snippet:<div class="informalexample"><pre class="programlisting">var t = new Thread(() =&gt; Process(10));
+t.Start();
+
+WriteLine("Waiting for another thread to complete work");
+_workerEvent.WaitOne();
+WriteLine("First operation is completed!");
+WriteLine("Performing an operation on a main thread");
+Sleep(TimeSpan.FromSeconds(5));
+_mainEvent.Set();
+WriteLine("Now running the second operation on a second thread");
+_workerEvent.WaitOne();
+WriteLine("Second operation is completed!");</pre></div></li><li class="listitem">Run the program.</li></ol></div></div><div class="section" title="How it works..."><div class="titlepage"><div><div><h2 class="title"><a id="ch02lvl2sec52"/>How it works...</h2></div></div></div><p>When the main program starts, it defines two <code class="literal">AutoResetEvent</code> instances. One of them is for signaling from the second thread to the main thread, and the second one is for signaling from the main thread to the second thread. We provide <code class="literal">false</code> to the <code class="literal">AutoResetEvent</code> constructor, specifying the initial sate of both the instances as <code class="literal">unsignaled</code>. This means that any thread calling the <code class="literal">WaitOne</code> method of one of these objects will be blocked until we call the <code class="literal">Set</code> method. If we initialize the event state to <code class="literal">true</code>, it becomes <code class="literal">signaled</code> and the first thread calling <code class="literal">WaitOne</code> will proceed immediately. The event state then becomes <code class="literal">unsignaled</code> automatically, so we need to call the <code class="literal">Set</code> method once again to let the other threads calling the <code class="literal">WaitOne</code> method on this instance to continue.</p><p>Then, we create a second thread, which executes the first operation for 10 seconds and waits for the signal from the second thread. The signal notifies that the first operation is completed. Now, the second thread waits for a signal from the main thread. We do some additional work on <a id="id66" class="indexterm"/>the main thread and send a signal by calling the <code class="literal">_mainEvent.Set</code> method. Then, we wait for another signal from the second thread.</p><p><code class="literal">AutoResetEvent</code> <a id="id67" class="indexterm"/>is a kernel-time construct, so if the wait time is not significant, it is better to use the next recipe with <code class="literal">ManualResetEventslim</code>, which is a hybrid construct.</p></div></div>
+<div class="section" title="Using the ManualResetEventSlim construct"><div class="titlepage"><div><div><h1 class="title"><a id="ch02lvl1sec25"/>Using the ManualResetEventSlim construct</h1></div></div></div><p>This recipe will <a id="id68" class="indexterm"/>describe how to make signaling <a id="id69" class="indexterm"/>between threads more flexible with the <code class="literal">ManualResetEventSlim</code> construct.</p><div class="section" title="Getting ready"><div class="titlepage"><div><div><h2 class="title"><a id="ch02lvl2sec53"/>Getting ready</h2></div></div></div><p>To step through this recipe, you will need Visual Studio 2015. There are no other prerequisites. The source code for this recipe can be found at <code class="literal">BookSamples\Chapter2\Recipe5</code>.</p></div><div class="section" title="How to do it..."><div class="titlepage"><div><div><h2 class="title"><a id="ch02lvl2sec54"/>How to do it...</h2></div></div></div><p>To understand the use of the <code class="literal">ManualResetEventSlim</code> construct, perform the following steps:</p><div class="orderedlist"><ol class="orderedlist arabic"><li class="listitem">Start Visual Studio 2015. Create a new C# console application project.</li><li class="listitem">In the <code class="literal">Program.cs</code> file, add the following <code class="literal">using</code> directives:<div class="informalexample"><pre class="programlisting">using System;
+using System.Threading;
+using static System.Console;
+using static System.Threading.Thread;</pre></div></li><li class="listitem">Below the <code class="literal">Main</code> method, add the following code:<div class="informalexample"><pre class="programlisting">static void TravelThroughGates(string threadName, int seconds)
+{
+  WriteLine($"{threadName} falls to sleep");
+  Sleep(TimeSpan.FromSeconds(seconds));
+  WriteLine($"{threadName} waits for the gates to open!");
+  _mainEvent.Wait();
+  WriteLine($"{threadName} enters the gates!");
+}
+
+static ManualResetEventSlim _mainEvent = new ManualResetEventSlim(false);</pre></div></li><li class="listitem">Inside the <a id="id70" class="indexterm"/><code class="literal">Main</code> method, add the <a id="id71" class="indexterm"/>following code:<div class="informalexample"><pre class="programlisting">var t1 = new Thread(() =&gt; TravelThroughGates("Thread 1", 5));
+var t2 = new Thread(() =&gt; TravelThroughGates("Thread 2", 6));
+var t3 = new Thread(() =&gt; TravelThroughGates("Thread 3", 12));
+t1.Start();
+t2.Start();
+t3.Start();
+Sleep(TimeSpan.FromSeconds(6));
+WriteLine("The gates are now open!");
+_mainEvent.Set();
+Sleep(TimeSpan.FromSeconds(2));
+_mainEvent.Reset();
+WriteLine("The gates have been closed!");
+Sleep(TimeSpan.FromSeconds(10));
+WriteLine("The gates are now open for the second time!");
+_mainEvent.Set();
+Sleep(TimeSpan.FromSeconds(2));
+WriteLine("The gates have been closed!");
+_mainEvent.Reset();</pre></div></li><li class="listitem">Run the program.</li></ol></div></div><div class="section" title="How it works..."><div class="titlepage"><div><div><h2 class="title"><a id="ch02lvl2sec55"/>How it works...</h2></div></div></div><p>When the main program starts, it first creates an instance of the <code class="literal">ManualResetEventSlim </code>construct. Then, we start three threads that wait for this event to signal them to continue the execution.</p><p>The whole process of working with this construct is like letting people pass through a gate. The <code class="literal">AutoResetEvent</code> event that we looked at in the previous recipe works like a turnstile, allowing only one person to pass at a time. <code class="literal">ManualResetEventSlim</code>, which is a hybrid version of <code class="literal">ManualResetEvent</code>, stays open until we manually call the <code class="literal">Reset</code> method. Going back to the code, when we call <code class="literal">_mainEvent.Set</code>, we open it and allow the threads that are ready to accept this signal to continue working. However, thread number three is still sleeping and does not make it in time. We call <code class="literal">_mainEvent.Reset</code> and we thus close it. The last thread is now ready to go on, but it has to wait for the next signal, which will <a id="id72" class="indexterm"/>happen a few seconds later.</p></div><div class="section" title="There's more…"><div class="titlepage"><div><div><h2 class="title"><a id="ch02lvl2sec56"/>There's more…</h2></div></div></div><p>As in one of the <a id="id73" class="indexterm"/>previous recipes, we use a hybrid construct that lacks the possibility to work at the operating system level. If we need to have a global event, we should use the <code class="literal">EventWaitHandle</code> construct, which is the base class for <code class="literal">AutoResetEvent</code> and <code class="literal">ManualResetEvent</code>.</p></div></div>
+<div class="section" title="Using the CountDownEvent construct"><div class="titlepage"><div><div><h1 class="title"><a id="ch02lvl1sec26"/>Using the CountDownEvent construct</h1></div></div></div><p>This recipe <a id="id74" class="indexterm"/>will describe how to use the <code class="literal">CountdownEvent</code> <a id="id75" class="indexterm"/>signaling construct to wait until a certain number of operations complete.</p><div class="section" title="Getting ready"><div class="titlepage"><div><div><h2 class="title"><a id="ch02lvl2sec57"/>Getting ready</h2></div></div></div><p>To step through this recipe, you will need Visual Studio 2015. There are no other prerequisites. The source code for this recipe can be found at <code class="literal">BookSamples\Chapter2\Recipe6</code>.</p></div><div class="section" title="How to do it..."><div class="titlepage"><div><div><h2 class="title"><a id="ch02lvl2sec58"/>How to do it...</h2></div></div></div><p>To understand the use of the <code class="literal">CountDownEvent</code> construct, perform the following steps:</p><div class="orderedlist"><ol class="orderedlist arabic"><li class="listitem">Start Visual Studio 2015. Create a new C# console application project.</li><li class="listitem">In the <code class="literal">Program.cs</code> file, add the following <code class="literal">using</code> directives:<div class="informalexample"><pre class="programlisting">using System;
+using System.Threading;
+using static System.Console;
+using static System.Threading.Thread;</pre></div></li><li class="listitem">Below the <code class="literal">Main</code> method, add the following code:<div class="informalexample"><pre class="programlisting">static CountdownEvent _countdown = new CountdownEvent(2);
+
+static void PerformOperation(string message, int seconds)
+{
+  Sleep(TimeSpan.FromSeconds(seconds));
+  WriteLine(message);
+  _countdown.Signal();
+}</pre></div></li><li class="listitem">Inside the <a id="id76" class="indexterm"/><code class="literal">Main</code> method, add the following code:<div class="informalexample"><pre class="programlisting">WriteLine("Starting two operations");
+var t1 = new Thread(() =&gt; PerformOperation("Operation 1 is completed", 4));
+var t2 = new Thread(() =&gt; PerformOperation("Operation 2 is completed", 8));
+t1.Start();
+t2.Start();
+_countdown.Wait();
+WriteLine("Both operations have been completed.");
+_countdown.Dispose();</pre></div></li><li class="listitem">Run the program.</li></ol></div></div><div class="section" title="How it works..."><div class="titlepage"><div><div><h2 class="title"><a id="ch02lvl2sec59"/>How it works...</h2></div></div></div><p>When the main program starts, we create a new <code class="literal">CountdownEvent</code> instance, specifying that we want it to signal when two operations complete in its constructor. Then, we start two threads that <a id="id77" class="indexterm"/>signal to the event when they are complete. As soon as the second thread is complete, the main thread returns from waiting on <code class="literal">CountdownEvent</code> and proceeds further. Using this construct, it is very convenient to wait for multiple asynchronous operations to complete.</p><p>However, there is a significant disadvantage; <code class="literal">_countdown.Wait()</code> will wait forever if we fail to call <code class="literal">_countdown.Signal()</code> the required number of times. Make sure that all your threads <a id="id78" class="indexterm"/>complete with the <code class="literal">Signal</code> method call when using <code class="literal">CountdownEvent</code>.</p></div></div>
+<div class="section" title="Using the Barrier construct"><div class="titlepage"><div><div><h1 class="title"><a id="ch02lvl1sec27"/>Using the Barrier construct</h1></div></div></div><p>This recipe <a id="id79" class="indexterm"/>illustrates another interesting synchronization construct called <code class="literal">Barrier</code>. The <code class="literal">Barrier</code> construct helps to organize several threads so that they meet at some point in time, providing a callback that will be executed each time the threads call <a id="id80" class="indexterm"/>the <code class="literal">SignalAndWait</code> method.</p><div class="section" title="Getting ready"><div class="titlepage"><div><div><h2 class="title"><a id="ch02lvl2sec60"/>Getting ready</h2></div></div></div><p>To step through this recipe, you will need Visual Studio 2015. There are no other prerequisites. The source code for this recipe can be found at <code class="literal">BookSamples\Chapter2\Recipe7</code>.</p></div><div class="section" title="How to do it..."><div class="titlepage"><div><div><h2 class="title"><a id="ch02lvl2sec61"/>How to do it...</h2></div></div></div><p>To understand the use of the <code class="literal">Barrier</code> construct, perform the following steps:</p><div class="orderedlist"><ol class="orderedlist arabic"><li class="listitem">Start Visual Studio 2015. Create a new C# console application project.</li><li class="listitem">In the <code class="literal">Program.cs</code> file, add the following <code class="literal">using</code> directives:<div class="informalexample"><pre class="programlisting">using System;
+using System.Threading;
+using static System.Console;
+using static System.Threading.Thread;</pre></div></li><li class="listitem">Below the <a id="id81" class="indexterm"/><code class="literal">Main</code> method, add the following code:<div class="informalexample"><pre class="programlisting">static Barrier _barrier = new Barrier(2,
+  b =&gt; WriteLine($"End of phase {b.CurrentPhaseNumber + 1}"));
+
+static void PlayMusic(string name, string message, int seconds)
+{
+  for (int i = 1; i &lt; 3; i++)
+  {
+    WriteLine("----------------------------------------------");
+    Sleep(TimeSpan.FromSeconds(seconds));
+    WriteLine($"{name} starts to {message}");
+    Sleep(TimeSpan.FromSeconds(seconds));
+    WriteLine($"{name} finishes to {message}");
+    _barrier.SignalAndWait();
+  }
+}</pre></div></li><li class="listitem">Inside the <code class="literal">Main</code> method, add the following code:<div class="informalexample"><pre class="programlisting">var t1 = new Thread(() =&gt; PlayMusic("the guitarist", "play an amazing solo", 5));
+var t2 = new Thread(() =&gt; PlayMusic("the singer", "sing his song", 2));
+
+t1.Start();
+t2.Start();</pre></div></li><li class="listitem">Run the program.</li></ol></div></div><div class="section" title="How it works..."><div class="titlepage"><div><div><h2 class="title"><a id="ch02lvl2sec62"/>How it works...</h2></div></div></div><p>We create a <code class="literal">Barrier</code> construct, specifying that we want to synchronize two threads, and after each of those two threads call the <code class="literal">_barrier.SignalAndWait</code> method, we need to execute a callback that will print out the number of phases completed.</p><p>Each thread will send a signal to <code class="literal">Barrier</code> twice, so we will have two phases. Every time both the threads call the <code class="literal">SignalAndWait</code> method, <code class="literal">Barrier</code> will execute the callback. It is useful for working with multithreaded iteration algorithms, to execute some calculations on each <a id="id82" class="indexterm"/>iteration end. The end of the iteration is <a id="id83" class="indexterm"/>reached when the last thread calls the <code class="literal">SignalAndWait</code> method.</p></div></div>
+<div class="section" title="Using the ReaderWriterLockSlim construct"><div class="titlepage"><div><div><h1 class="title"><a id="ch02lvl1sec28"/>Using the ReaderWriterLockSlim construct</h1></div></div></div><p>This recipe <a id="id84" class="indexterm"/>will describe how to create a thread-safe mechanism to read and write to a collection from multiple threads using a <code class="literal">ReaderWriterLockSlim</code> construct. <code class="literal">ReaderWriterLockSlim</code> represents a lock that is used to manage <a id="id85" class="indexterm"/>access to a resource, allowing multiple threads for reading or exclusive access for writing.</p><div class="section" title="Getting ready"><div class="titlepage"><div><div><h2 class="title"><a id="ch02lvl2sec63"/>Getting ready</h2></div></div></div><p>To step through this recipe, you will need Visual Studio 2015. There are no other prerequisites. The source code for this recipe can be found at <code class="literal">BookSamples\Chapter2\Recipe8</code>.</p></div><div class="section" title="How to do it..."><div class="titlepage"><div><div><h2 class="title"><a id="ch02lvl2sec64"/>How to do it...</h2></div></div></div><p>To understand how to create a thread-safe mechanism to read and write to a collection from multiple threads using the <code class="literal">ReaderWriterLockSlim</code> construct, perform the following steps:</p><div class="orderedlist"><ol class="orderedlist arabic"><li class="listitem">Start Visual Studio 2015. Create a new C# console application project.</li><li class="listitem">In the <code class="literal">Program.cs</code> file, add the following <code class="literal">using</code> directives:<div class="informalexample"><pre class="programlisting">using System;
+using System.Collections.Generic;
+using System.Threading;
+using static System.Console;
+using static System.Threading.Thread;</pre></div></li><li class="listitem">Below the <a id="id86" class="indexterm"/><code class="literal">Main</code> method, add the following code:<div class="informalexample"><pre class="programlisting">static ReaderWriterLockSlim _rw = new ReaderWriterLockSlim();
+static Dictionary&lt;int, int&gt; _items = new Dictionary&lt;int, int&gt;();
+
+static void Read()
+{
+  WriteLine("Reading contents of a dictionary");
+  while (true)
+  {
+    try
+    {
+      _rw.EnterReadLock();
+      foreach (var key in _items.Keys)
+      {
+        Sleep(TimeSpan.FromSeconds(0.1));
+      }
+    }
+    finally
+    {
+      _rw.ExitReadLock();
+    }
+  }
+}
+
+static void Write(string threadName)
+{
+  while (true)
+  {
+    try
+    {
+      int newKey = new Random().Next(250);
+      _rw.EnterUpgradeableReadLock();
+      if (!_items.ContainsKey(newKey))
+      {
+        try
+        {
+          _rw.EnterWriteLock();
+          _items[newKey] = 1;
+          WriteLine($"New key {newKey} is added to a dictionary by a {threadName}");
+        }
+        finally
+        {
+          _rw.ExitWriteLock();
+        }
+      }
+      Sleep(TimeSpan.FromSeconds(0.1));
+    }
+    finally
+    {
+      _rw.ExitUpgradeableReadLock();
+    }
+  }
+}</pre></div></li><li class="listitem">Inside the <code class="literal">Main</code> method, add the following code:<div class="informalexample"><pre class="programlisting">new Thread(Read){ IsBackground = true }.Start();
+new Thread(Read){ IsBackground = true }.Start();
+new Thread(Read){ IsBackground = true }.Start();
+
+new Thread(() =&gt; Write("Thread 1")){ IsBackground = true }.Start();
+new Thread(() =&gt; Write("Thread 2")){ IsBackground = true }.Start();
+
+Sleep(TimeSpan.FromSeconds(30)); </pre></div></li><li class="listitem">Run the <a id="id87" class="indexterm"/>program.</li></ol></div></div><div class="section" title="How it works..."><div class="titlepage"><div><div><h2 class="title"><a id="ch02lvl2sec65"/>How it works...</h2></div></div></div><p>When the main program starts, it simultaneously runs three threads that read data from a dictionary and two threads that write some data into this dictionary. To achieve thread safety, we use the <code class="literal">ReaderWriterLockSlim</code> construct, which was designed especially for such scenarios.</p><p>It has two kinds of <a id="id88" class="indexterm"/>locks: a read lock that allows multiple threads to read and a write lock that blocks every operation from other threads until this write lock is released. There is also an interesting scenario when we obtain a read lock, read some data from the collection, and, depending on that data, decide to obtain a write lock and change the collection. If we get the write locks at once, too much time is spent, not allowing our readers to read the data because the collection is blocked when we get a write lock. To minimize this time, there are <code class="literal">EnterUpgradeableReadLock</code>/<code class="literal">ExitUpgradeableReadLock</code> methods. We get a read lock and read the data; if we find that we have to change the underlying collection, we just upgrade our lock using the <code class="literal">EnterWriteLock</code> method, then perform a write operation quickly and release a write lock using <code class="literal">ExitWriteLock</code>.</p><p>In our case, we <a id="id89" class="indexterm"/>get a random number; we then get a read lock and check whether this number exists in the dictionary key collection. If not, we upgrade our lock to a write lock and then add this new key to a dictionary. It is a good practice to use <code class="literal">try</code>/<code class="literal">finally</code> blocks to make sure that we always release locks after acquiring them.</p><p>All our threads have been created as background threads, and after waiting for 30 seconds, the <a id="id90" class="indexterm"/>main thread as well as all the background threads get completed.</p></div></div>
+<div class="section" title="Using the SpinWait construct"><div class="titlepage"><div><div><h1 class="title"><a id="ch02lvl1sec29"/>Using the SpinWait construct</h1></div></div></div><p>This recipe will <a id="id91" class="indexterm"/>describe how to wait on a thread without involving kernel-mode constructs. In addition, we introduce <code class="literal">SpinWait</code>, a hybrid synchronization <a id="id92" class="indexterm"/>construct designed to wait in the user mode for some time, and then switch to the kernel mode to save CPU time.</p><div class="section" title="Getting ready"><div class="titlepage"><div><div><h2 class="title"><a id="ch02lvl2sec66"/>Getting ready</h2></div></div></div><p>To step through this recipe, you will need Visual Studio 2015. There are no other prerequisites. The source code for this recipe can be found at <code class="literal">BookSamples\Chapter2\Recipe9</code>.</p></div><div class="section" title="How to do it..."><div class="titlepage"><div><div><h2 class="title"><a id="ch02lvl2sec67"/>How to do it...</h2></div></div></div><p>To understand how to wait on a thread without involving kernel-mode constructs, perform the following steps:</p><div class="orderedlist"><ol class="orderedlist arabic"><li class="listitem">Start Visual Studio 2015. Create a new C# console application project.</li><li class="listitem">In the <code class="literal">Program.cs</code> file, add the following <code class="literal">using</code> directives:<div class="informalexample"><pre class="programlisting">using System;
+using System.Threading;
+using static System.Console;
+using static System.Threading.Thread;</pre></div></li><li class="listitem">Below the <code class="literal">Main</code> method, add the following code:<div class="informalexample"><pre class="programlisting">static volatile bool _isCompleted = false;
+
+static void UserModeWait()
+{
+  while (!_isCompleted)
+  {
+    Write(".");
+  }
+  WriteLine();
+  WriteLine("Waiting is complete");
+}
+
+static void HybridSpinWait()
+{
+  var w = new SpinWait();
+  while (!_isCompleted)
+  {
+    w.SpinOnce();
+    WriteLine(w.NextSpinWillYield);
+  }
+  WriteLine("Waiting is complete");
+}</pre></div></li><li class="listitem">Inside the <a id="id93" class="indexterm"/><code class="literal">Main</code> method, add the following code:<div class="informalexample"><pre class="programlisting">var t1 = new Thread(UserModeWait);
+var t2 = new Thread(HybridSpinWait);
+
+WriteLine("Running user mode waiting");
+t1.Start();
+Sleep(20);
+_isCompleted = true;
+Sleep(TimeSpan.FromSeconds(1));
+_isCompleted = false;
+WriteLine("Running hybrid SpinWait construct waiting");
+t2.Start();
+Sleep(5);
+_isCompleted = true;</pre></div></li><li class="listitem">Run the program.</li></ol></div></div><div class="section" title="How it works..."><div class="titlepage"><div><div><h2 class="title"><a id="ch02lvl2sec68"/>How it works...</h2></div></div></div><p>When the main program starts, it defines a thread that will execute an endless loop for 20 milliseconds until the main thread sets the <code class="literal">_isCompleted</code> variable to <code class="literal">true</code>. We could experiment and run this cycle for 20-30 seconds instead, measuring the CPU load with the Windows task manager. It will show a significant amount of processor time, depending on how many cores the CPU has.</p><p>We use the <code class="literal">volatile</code> <a id="id94" class="indexterm"/>keyword to declare the <code class="literal">_isCompleted</code> static field. The <code class="literal">volatile</code> keyword indicates that a field might be modified by multiple threads being executed at the same time. Fields that are declared <code class="literal">volatile</code> are not subject to compiler and processor optimizations that assume access by a single thread. This ensures that the most up-to-date value is present in the field at all times.</p><p>Then, we use a <code class="literal">SpinWait</code> version, which on each iteration prints a special flag that shows us whether a thread is going to switch to a <code class="literal">blocked</code> state. We run this thread for 5 milliseconds to see that. In the beginning, <code class="literal">SpinWait</code> tries to stay in the user mode, and after about nine iterations, it begins to switch the thread to a blocked state. If we try to measure the CPU <a id="id95" class="indexterm"/>load with this version, we will not see any CPU usage <a id="id96" class="indexterm"/>in the Windows task manager.</p></div></div></body></html>

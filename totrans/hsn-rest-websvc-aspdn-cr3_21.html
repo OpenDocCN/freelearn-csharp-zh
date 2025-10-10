@@ -1,0 +1,358 @@
+<html><head></head><body>
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Logging and Health Checking</h1>
+                </header>
+            
+            <article>
+                
+<p class="gmail-mce-root">One of the essential aspects of building web services is logging and health checks. Nowadays, it is preferred to have services with a small scope. This kind of approach provides enormous benefits, but it makes it hard for us to verify whether a service behaves in the right way. Logging helps us to track the actions and the information processed by the web service on the other side, the health check mechanisms provide a way to verify that the service is healthy and all the required dependencies are satisfied. The chapter goes through some of the logging parts of ASP.NET Core, and it shows how to implement health checks using the tools provided by the framework.</p>
+<p>In this chapter, we will cover the following topics:</p>
+<ul>
+<li>Logging in ASP.NET Core</li>
+<li><span>Implementing logging</span></li>
+<li>Implementing logging providers</li>
+<li>Implementing custom logging in tests</li>
+<li>Web service health check</li>
+</ul>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Logging in ASP.NET Core</h1>
+                </header>
+            
+            <article>
+                
+<p>We will start this chapter by providing an overview of the different logging components of ASP.NET Core. The framework provides different interfaces that support logging:</p>
+<ul>
+<li><kbd>ILoggerProvider</kbd> is used to define a specific type of logging bind with an output channel</li>
+<li><span class="lang-csharp"><kbd>ILoggerFactory</kbd> takes an <kbd>ILoggerProvider</kbd> interface and initializes it</span></li>
+<li><span class="lang-csharp">The <kbd>ILogger</kbd> interface is a particular instance of the logging component</span></li>
+</ul>
+<p>The logging interface structure of ASP.NET Core can be described using the following schema:</p>
+<div class="CDPAlignCenter CDPAlign"><img src="assets/86e0d6bc-3ac4-474f-bda7-eb95785ea19f.png" style=""/></div>
+<p>In short, the <kbd>ILoggerProvider</kbd> interface represents the output of the logs, <kbd>ILoggerFactory</kbd> creates the right type of instance, and <kbd>ILogger</kbd> is the actual instance of the logger.</p>
+<p>This kind of approach guarantees secure isolation between the <kbd>ILogger</kbd> interface consumer and the logging provider part. Furthermore, we may choose to add the calls to the <kbd>ILogger</kbd> interface in the development phase; then, during the release phase, we can decide which provider to use to output our logging data. Moreover, our logging code becomes very flexible, and we can change the output based on the type of environment our service runs in. Let's proceed by learning about the different characteristics of the logging system of ASP.NET Core.</p>
+<p class="mce-root"/>
+<p class="mce-root"/>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">The key characteristics of logging</h1>
+                </header>
+            
+            <article>
+                
+<p><span>The ASP.NET Core logging system is characterized by some key attributes that are always present in each log record. Furthermore, it is essential to keep logs as coherent as possible. The crucial components of the ASP.NET Core logging system are the </span><em>log category</em><span>, the </span><em>log level</em><span>, the </span><em>log event id</em><span>, and the </span><em>log message</em><span>.</span></p>
+<p>The <em>log category</em><span> </span>is specified when the <kbd>ILogger&lt;T&gt;</kbd> interface is initialized. It is an essential part of the logging process because it identifies the component that is emitting the log record. The <em>log category</em> usually corresponds to the type or class that's firing the log records. Let's use the <kbd>ItemController</kbd> class of the catalog service as an example. The <em>log category</em> is defined during the <kbd>ILogger</kbd> interface injection process:</p>
+<pre><span>namespace </span>Catalog.API.Controllers<br/>{<br/>    [<span>Route</span>(<span>"api/items"</span>)]<br/>    [<span>ApiController</span>]<br/>    [<span>JsonException</span>]<br/>    [<span>Authorize</span>]<br/>    <span>public class </span><span>ItemController </span>: <span>ControllerBase<br/></span><span>    </span>{<br/>        <span>private readonly </span><span>IItemService </span>_itemService;<br/>        <span>private readonly </span><span>IEndpointInstance </span>_messageEndpoint;<br/>        <strong><span>private readonly </span><span>ILogger</span>&lt;<span>ItemController</span>&gt; <span>_logger</span>;</strong><br/><br/>        <span>public </span><span>ItemController</span>(<span>IItemService </span>itemService, <br/><span>        IEndpointInstance </span>messageEndpoint,<br/>            <span>IDistributedCache </span><span>distributedCache</span>, <br/><strong><span>            ILogger</span>&lt;<span>ItemController</span>&gt; logger</strong>)<br/>        <span>{</span><br/>            _itemService = itemService;<br/>            _messageEndpoint = messageEndpoint;<br/>            <strong>_logger = logger;</strong><br/>        <span>}</span><span><br/>...<br/></span></pre>
+<p>The <kbd>ItemController</kbd> class uses the widespread technique of constructor injection to initialize the <kbd>ILogger&lt;ItemController&gt;</kbd> type. Therefore, the log category is implicitly defined in the signature of the <kbd>_logger</kbd> property. Although the <em>log category</em> helps us identify which component is firing that specific log message, we also need to define the importance of that message.</p>
+<p class="mce-root"/>
+<p class="mce-root"/>
+<p>The <em>log level</em> provides information that indicates the severity or importance of the log record. ASP.NET Core provides a helpful extension method that offers some abstraction over the log level:</p>
+<pre>_logger.LogInformation, _logger.LogWarning, _logger.LogError, _logger.LogCritical</pre>
+<p>Each of these methods is an abstraction that's provided by the <kbd>Microsoft.Extensions.Logging</kbd> namespace. For example, if we examine the <kbd>_logger.LogInformation</kbd> method implementation, under the hood, it merely calls the generic <kbd>logger.Log</kbd> method:</p>
+<pre><span>public static void </span><span>LogInformation</span>(<br/>  <span>this </span><span>ILogger </span>logger,<br/>  <span>EventId </span>eventId,<br/>  <span>Exception </span>exception,<br/>  <span>string </span>message,<br/>  <span>params object</span>[] args)<br/><span>{</span><br/>  logger.<span>Log</span>(<strong><span>LogLevel</span>.<span>Information</span></strong>, eventId, exception, message, args);<br/><span>}</span></pre>
+<p>The <kbd>LogInformation</kbd> extension method wraps the <kbd>logger.Log</kbd> method calls by implicitly defining the level of information provided by the framework. The <kbd>LogLevel</kbd> attribute is an <kbd>enum</kbd> structure that's exposed by the <kbd>Microsoft.Extension.Logging</kbd> namespace, which provides the following out of the box logging levels:</p>
+<pre><span>namespace </span><span>Microsoft</span>.<span>Extensions</span>.<span>Logging</span><span><br/></span>{<span><br/></span><span>  </span><span>public enum </span><span>LogLevel<br/></span><span>  </span>{<span><br/></span><span>    </span><span>Debug</span>,<span><br/></span><span>    </span><span>Warning</span>,<span><br/></span><span>    </span><span>Error,</span><span><br/></span><span>    </span><span>Critical</span>,<span><br/></span><span>    </span><span>None</span>,<br/>  }<br/>}</pre>
+<p>The preceding code describes the different log levels that are provided by<span> </span>the <kbd>LogLevel</kbd> enumerator. The log levels go from <kbd>Trace</kbd>, which describes detailed information about the system, to the <kbd>Critical</kbd> level, which means that the service is unable to work correctly and is shutting down. The <kbd>LogLevel</kbd> attribute is essential because it is usually used to filter the log messages which tells us of the priority of a logging message.</p>
+<p class="mce-root"/>
+<p class="mce-root"/>
+<p>Once we've identified the level of severity of a specific log message, we need to provide the <em>log event id</em>, which helps us identify a specific event in the logging output. While the <em>log category</em> usually represents the full path of the class, the <em>log event id</em> is useful if we wish to express the method that is currently generating the logging output. Let's use the action methods contained in the <kbd>ItemController</kbd> class as an example (<span><kbd>Get</kbd>, <kbd>GetById</kbd>, <kbd>Create</kbd>, <kbd>Update</kbd>, and <kbd>Delete</kbd>). It is possible to create a log event class that maps each action method to a specific event id:</span></p>
+<pre><span>namespace </span><span>Catalog</span>.<span>API</span><span><br/></span><span>{</span><br/>    <span>public class </span><span>LoggingEvents<br/></span><span>    </span>{<br/>            <span>public const int </span><span>Get </span>= <span>1000</span>;<br/>            <span>public const int </span><span>GetById </span>= <span>1001</span>;<br/>            <span>public const int </span><span>Create </span>= <span>1002</span>;<br/>            <span>public const int </span><span>Update </span>= <span>1003</span>;<br/>            <span>public const int </span><span>Delete </span>= <span>1004</span>;<br/>    }<br/><span>}</span></pre>
+<p>Therefore, we can pass the corresponding log event id when we call the <kbd>ILogger</kbd> interface in an action method of the <kbd>ItemController</kbd> class. By doing this, it is possible to identify and group events:</p>
+<pre><span> _logger.LogInformation(LoggingEvents.GetById, </span><span class="hljs-string">"Getting item"</span><span>);</span></pre>
+<p>Finally, another essential part of logging records is the message associated with the log record. The logging system of ASP.NET Core also provides a templating system that's analogous to the C# string interpolation feature. Therefore, it is possible to use the templating system in the following way:</p>
+<pre><span> _logger.LogInformation(</span><span>LoggingEvents.GetById, </span><span class="hljs-string">"GetById {id} "</span><span>, id);</span></pre>
+<p>The preceding code logs a message about <em>information</em> severity using the <kbd>LoggingEvents.GetById</kbd> event id and adds the message <kbd>"GetById {id} "</kbd>. Now that we have looked at the different logging characteristics provided by ASP.NET Core, we will look at a concrete implementation that's been applied to the <em>catalog service</em> project.</p>
+<p class="mce-root"/>
+<p class="mce-root"/>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Implementing the logging part</h1>
+                </header>
+            
+            <article>
+                
+<p>In this section, we will learn how to perform logging in the <em>catalog web service</em>. Let's start by choosing a layer where we'll execute the logging statements. Since the logic<span> </span>is encapsulated<span> </span>in the <kbd>Catalog.Domain</kbd> layer project, we will continue by implementing the logging part on the service classes defined in the project. First of all, let's start by defining a new logging class, which contains the corresponding <em>event id</em> for each operation:</p>
+<pre><span>namespace </span><span>Catalog</span>.<span>Domain.Logging</span><span><br/></span><span>{</span><br/>    <span>public class </span><span>Events<br/></span><span>    </span>{<br/>        <span>public const int </span><span>Get </span>= <span>1000</span>;<br/>        <span>public const int </span><span>GetById </span>= <span>1001</span>;<br/>        <span>public const int </span><span>Add </span>= <span>1002</span>;<br/>        <span>public const int </span><span>Edit </span>= <span>1003</span>;<br/>        <span>public const int </span><span>Delete </span>= <span>1004</span>;<br/>    }<br/><span>}</span></pre>
+<p>Once we have established a corresponding <em>log event id</em> for each activity, we need to define the logging messages that will be used by the <kbd>ILogger</kbd> interface. For now, we can determine the following messages:</p>
+<pre><span>namespace </span><span>Catalog</span>.<span>Domain</span>.<span>Logging<br/></span><span>{</span><br/>    <span>public class </span><span>Messages<br/></span><span>    </span>{<br/>        <span>public const string </span><span>NumberOfRecordAffected_modifiedRecords </span>= <br/>            <span>"Number of record affected {records}"</span>;<br/>        <span>public const string </span><span>ChangesApplied_id </span>= <span>"Changes applied to the <br/>            following entity id ({id})"</span>;<br/>        <span>public const string </span><span>TargetEntityChanged_id </span>= <span>"Target entity id <br/>            ({id})"</span>;<br/>    }<br/><span>}</span></pre>
+<p>The first one refers to the number of records affected by a change, while the second is the entity that's been changed. Finally, the third one provides a message for the target entity of the handler. It is essential to note that both constants follow a naming convention: the first part of their name refers to the content of the message; after the first underscore, we have the parameters that will be replaced by values when we use the logging templating system.</p>
+<p class="mce-root"/>
+<p class="mce-root"/>
+<p>Furthermore, we can proceed by changing the <kbd>IItemService</kbd> methods by implementing logging. Let's start with the <kbd>AddItemAsync</kbd> method:</p>
+<pre><strong>using Microsoft.Extensions.Logging;<br/></strong><strong>using Catalog.Domain.Logging;</strong><br/>...<br/><br/><span>namespace </span>Catalog.Domain.Services<br/>{<br/>    <span>public class </span><span>ItemService </span>: <span>IItemService<br/></span><span>    </span>{<br/>        <span>private readonly </span><span>IItemMapper </span>_itemMapper;<br/>        <span>private readonly </span><span>IItemRepository </span>_itemRepository;<br/>       <strong> <span>private readonly </span><span>ILogger</span>&lt;<span>IItemService</span>&gt; _logger;</strong><br/><br/>        <span>public </span><span>ItemService</span>(<span>IItemRepository </span>itemRepository, <br/><span>        IItemMapper </span>itemMapper, <strong><span>ILogger</span>&lt;<span>IItemService</span>&gt; logger</strong>)<br/>        {<br/>            _itemRepository = itemRepository;<br/>            _itemMapper = itemMapper;<br/>           <strong> _logger = logger;</strong><br/>        }<br/>        <br/>        ...<br/><br/>        <span>public async </span><span>Task</span>&lt;<span>ItemResponse</span>&gt; AddItemAsync(<span>AddItemRequest <br/>            </span>request)<br/>        {<br/>            <span>var </span>item = _itemMapper.Map(request);<br/>            <span>var </span>result = _itemRepository.Add(item);<br/><br/>            <span>var </span><strong>modifiedRecords</strong> = <span>await </span>_itemRepository. <br/>                UnitOfWork.SaveChangesAsync();<br/>     <br/>           <strong> _logger.LogInformation(<span>Events</span>.Add, <span>Messages</span>.<br/>            NumberOfRecordAffected_modifiedRecords, modifiedRecords);</strong><br/><strong>            _logger.LogInformation(<span>Events</span>.Add, <span>Messages</span>.<br/>            ChangesApplied_id, result?.Id);</strong><br/><br/>            <span>return </span>_itemMapper.Map(result);<br/>        }<br/><br/>        ...<br/>    } <br/>}</pre>
+<p class="mce-root"/>
+<p class="mce-root"/>
+<p><span>The preceding code tracks the information about the number of affected records and the id of the added record. We can do the same with the other methods of the <kbd>ItemService</kbd> class. In the case of read-only operations, we can add the id of the target record; for example, in the case of the <kbd>GetItemAsync</kbd></span><span> method:</span></p>
+<pre><span>public class </span><span>ItemService </span>: <span>IItemService<br/></span>{<br/>    ...<br/><br/>    <span>public async </span><span>Task</span>&lt;<span>ItemResponse</span>&gt; GetItemAsync(<span>GetItemRequest <br/>        </span>request)<br/>    <span>{</span><br/>        <span>if </span>(request?.Id <span>== </span><span>null</span>) <span>throw new </span><span>ArgumentNullException</span>();<br/>        <span>var </span>entity = <span>await </span>_itemRepository.GetAsync(request.Id);<br/>        <br/>       <strong> _logger.LogInformation(<span>Events</span>.GetById, <br/>            <span>Messages</span>.TargetEntityChanged_id, entity?.Id);</strong><br/>        <br/>        <span>return </span>_itemMapper.Map(entity);<br/>    <span>}</span></pre>
+<p>The preceding code logs the information related to the id that was retrieved by the service by using the <kbd>Event.GetById</kbd> field. It uses the <kbd>Messages</kbd> type to specify the event message. In the next section, we will learn how to log exceptions by enhancing the exception handling implementation of logs.  </p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Exception logging</h1>
+                </header>
+            
+            <article>
+                
+<p><span>What if part of the service throws an exception? Handling exceptions is a crucial part of the development process of services. As we saw in </span><a href="13fd7d18-3ebe-4f60-89ff-4666d1c9671a.xhtml">Chapter 7</a>, <em>Filter Pipeline</em><span>, it is possible to use them to catch exceptions using a filter. Filters are one of the crucial parts of the MVC stack: they act before and after action methods, and they can be used to log exceptions in a single implementation. Let's have a look at</span> <kbd>JsonExceptionAttribute</kbd> <span>in</span> <kbd>Catalog.API</kbd><em><span> </span></em><span>again</span><em>:</em></p>
+<pre><span>using </span><span>System</span>.<span>Net</span>;<br/><span>using </span><span>Microsoft</span>.<span>AspNetCore</span>.<span>Hosting</span>;<br/><span>using </span><span>Microsoft</span>.<span>AspNetCore</span>.<span>Mvc</span>;<br/><span>using </span><span>Microsoft</span>.<span>AspNetCore</span>.<span>Mvc</span>.<span>Filters</span>;<br/><span>using </span><span>Microsoft</span>.<span>Extensions</span>.<span>Logging</span>;<br/><span>using </span><span>Catalog</span>.<span>API</span>.<span>Exceptions</span>;<br/><br/><span>namespace </span><span>Catalog</span>.<span>API.</span><span>Filters<br/></span>{<br/>    <span>public class </span><span>JsonExceptionAttribute </span>: <span>TypeFilterAttribute<br/></span><span>    </span>{<br/>        <span>public </span><span>JsonExceptionAttribute</span>() : <span>base</span>(<span>typeof</span>(<span>HttpCustomExceptionFilterImpl</span>))<br/>        {<br/>        }<br/><br/>        <span>public class </span><span>HttpCustomExceptionFilterImpl </span>: <span>IExceptionFilter<br/></span><span>        </span>{<br/>            <span>private readonly </span><span>IHostingEnvironment </span><span>_env</span>;<br/>           <strong> <span>private readonly </span><span>ILogger </span><span>_logger</span>;</strong><br/><br/>            <span>public </span><span>HttpCustomExceptionFilterImpl</span>(<span>IHostingEnvironment <br/>                </span>env,<br/>               <strong> <span>ILogger</span>&lt;<span>HttpCustomExceptionFilterImpl</span>&gt; logger</strong>)<br/>            {<br/>                <span>_env </span>= env;<br/>                <span>_logger </span>= logger;<br/>            }<br/><br/>            <span>public void </span><span>OnException</span>(<span>ExceptionContext </span>context)<br/>            {<br/>                <span>var </span>eventId = <span>new </span><span>EventId</span>(context.<span>Exception</span>.<span>HResult</span>);<br/><br/>                <strong><span>_logger</span>.<span>LogError</span>(eventId, </strong><strong>context.<span>Exception</span>, <br/>                    </strong><strong>context.<span>Exception</span>.<span>Message</span>);</strong><br/><br/>                <span>var </span>json = <span>new </span><span>JsonErrorPayload<br/></span><span>                </span>{<br/>                    <span>EventId </span>= eventId.<span>Id<br/></span><span>                </span>};<br/><br/>                json.<span>DetailedMessage </span>= context.<span>Exception</span>;<br/><br/>                <span>var </span>exceptionObject = <span>new </span><span>ObjectResult</span>(json) { <br/>                    <span>StatusCode </span>= <span>500 </span>};<br/><br/>                context.<span>Result </span>= exceptionObject;<br/>                context.<span>HttpContext</span>.<span>Response</span>.<span>StatusCode </span>= (<span>int</span>) <br/><span>                HttpStatusCode</span>.<span>InternalServerError</span>;<br/>            }<br/>        }<br/>    }<br/>}</pre>
+<p><span>The class tracks and returns exceptions using the analog pattern, which can be seen in the implementation of the handler: the </span><kbd>ILogger&lt;T&gt;</kbd><span> interface is injected into the constructor using dependency injection and the </span><kbd>_logger.LogError</kbd><span> method. </span></p>
+<p>In the next section, we will learn how to verify logging in our test using <kbd>Moq</kbd>.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Verifying logging using Moq</h1>
+                </header>
+            
+            <article>
+                
+<p>Let's learn how to verify our implemented logging. The dependency injection system of the <kbd>ILogger</kbd> interface helps us to mock the logging mechanism and validate the resulting implementation. It is essential to note that our handlers are using the extension methods of the <kbd>ILogger</kbd> interface. Let's use the ASP.NET Core implementation of the <kbd>LogInformation</kbd> extension method in the <kbd>Microsoft.Extensions.Logging</kbd> namespace as an example:</p>
+<pre><span>using </span>Microsoft.Extensions.Logging.Internal;<br/><span>using </span>System;<br/><br/><span>namespace </span><strong>Microsoft.Extensions.Logging</strong><br/>{<br/>  <span>/// &lt;summary&gt;ILogger extension methods for common scenarios.&lt;/summary&gt;<br/></span><span>  </span><span>public static class </span>LoggerExtensions<br/>  {<br/>        <strong><span>public static void </span><span>LogInformation</span></strong>(<span>this </span><span>ILogger </span>logger, <br/>           <span>Exception </span>exception, <span>string </span>message, <span>params object</span>[] args)<br/><span>        {</span><br/>              logger.<span>Log</span>(<span>LogLevel</span>.<span>Information</span>, exception, message, <br/>                   args);<br/><span>        }<br/></span>}</pre>
+<p class="mce-root">Extension methods are <em>not</em> a mock-oriented construct. They are static methods and, by definition, it is not possible to mock a static construct in C#'s runtime. Thus, we need to provide an <em>abstraction</em> over the <kbd>ILogger</kbd> factory that allows us to inject and mock the interface that's used in our tests.</p>
+<div class="packt_infobox"><span>In general, it isn't possible to test static methods. Moreover, mock libraries typically create mocks by dynamically creating classes at runtime. Typically, they override the behavior of types by extending them. Since the static methods cannot be overridden, it isn't possible to mock them. Therefore, when we need to mock a static element, it is suggested that we abstract them and encapsulate them into classes.</span></div>
+<p class="mce-root">Let's look at the declaration of the <kbd>LoggerAbstraction</kbd> class in the <kbd>Catalog.Fixture</kbd> project:</p>
+<pre><span>using </span>System;<br/><span>using </span>Microsoft.Extensions.Logging;<br/><br/><span>namespace </span>Catalog.Fixtures<br/><span>{</span><br/>    <strong><span>public abstract class </span><span>LoggerAbstraction</span>&lt;<span>T</span>&gt;</strong> : <span>ILogger</span>&lt;<span>T</span>&gt;<br/>    {<br/>        <span>public </span><span>IDisposable </span>BeginScope&lt;<span>TState</span>&gt;(<span>TState </span>state) =&gt; <span>throw <br/>            new </span><span>NotImplementedException</span>();<br/><br/>        <span>public bool </span>IsEnabled(<span>LogLevel </span>logLevel) =&gt; <span>true</span>;<br/><br/>        <span>public void </span>Log&lt;<span>TState</span>&gt;(<span>LogLevel </span>logLevel, <span>EventId </span>eventId, <br/>            <span>TState </span>state, <span>Exception </span>exception, <span>Func</span>&lt;<span>TState</span>, <span>Exception</span>,<br/>             <span>string</span>&gt; formatter)<br/>            =&gt; Log(logLevel, exception, formatter(state, exception));<br/><br/>       <strong> </strong><strong><span>public abstract void </span>Log(<span>LogLevel </span>logLevel, <span>Exception </span>ex, <br/>            <span>string </span>information);</strong><br/>    }<br/><span>}</span></pre>
+<p><kbd>LoggerAbstraction</kbd> is a generic class that implements the <kbd>ILogger&lt;T&gt;</kbd> interface. More specifically, the abstract class defines the <kbd>Log&lt;TState&gt;</kbd> method by executing an overloaded version of the <kbd>void Log</kbd> method. Both the <kbd>Log</kbd> method and the <kbd>LoggerAbstraction</kbd> class are abstract, which means we can mock their behavior. Thus, it is possible to mock the behavior of the logging class, as shown in the following modified version of the <kbd>ItemServiceTests</kbd> class:</p>
+<pre><span>namespace </span>Catalog.Domain.Tests.Services<br/>{<br/>    <span>public class </span><span>ItemServiceTests </span>: <span>IClassFixture</span>&lt;<span>CatalogContextFactory</span>&gt;<br/>    {<br/>        <span>private readonly </span><span>ItemRepository </span>_itemRepository;<br/>        <span>private readonly </span><span>IItemMapper </span>_mapper;<br/>       <strong> <span>private readonly </span><span>Mock</span>&lt;<span>LoggerAbstraction</span>&lt;<span>IItemService</span>&gt;&gt; _logger;</strong><br/>        <br/>              public ItemServiceTests(CatalogContextFactory <br/>                catalogContextFactory, <strong>ITestOutputHelper outputHelper</strong>)<br/>        {<br/>            _itemRepository = new ItemRepository<br/>    <br/>            (catalogContextFactory.ContextInstance);<br/>            _mapper = catalogContextFactory.ItemMapper;<br/>            _logger = new Mock&lt;LoggerAbstraction&lt;IItemService&gt;&gt;();<br/>           <br/>           <strong> _logger.Setup(x =&gt; x.Log(It.IsAny&lt;LogLevel&gt;(),It.IsAny      <br/>                &lt;Exception&gt;(), It.IsAny&lt;string&gt;()))</strong><br/><strong>                   .Callback((LogLevel logLevel, Exception exception, <br/>                        string information) =&gt; </strong><br/><strong>                       outputHelper.WriteLine($"{logLevel}:<br/>                            {information}"));</strong><br/>        }<br/><br/>        ...<br/>        <br/>        [<span>Theory</span>]<br/>        [<span>LoadData</span>(<span>"item"</span>)]<br/>        <span>public async </span><span>Task </span>additem_should_log_information(<span>AddItemRequest <br/>            </span>request)<br/>        {<br/>            <span>var </span>sut = <span>new </span><span>ItemService</span>(_itemRepository, _mapper, <br/>                _logger.Object);<br/><br/>            <span>await </span>sut.AddItemAsync(request);<br/><br/>           <strong> _logger</strong><br/><strong>             .Verify(x =&gt; x.Log(<span>It</span>.IsAny&lt;<span>LogLevel</span>&gt;(), <span>It</span>.IsAny<br/>                &lt;<span>Exception</span>&gt;(), <span>It</span>.IsAny&lt;<span>string</span>&gt;()), <span>Times</span>.AtMost(<span>2</span>));</strong><br/>        }<br/>        ...<br/>    }<br/>}</pre>
+<p>The <span><kbd>ItemServiceTests</kbd> class initializes the</span> <kbd>Logger<span>Abstraction</span>&lt;<span>IItemService</span>&gt;</kbd> type as a class attribute. The constructor of the class uses <kbd>ITestOutputHelper</kbd> to mock the logging system that's used by the service layer:</p>
+<pre> _logger.Setup(x =&gt; x.Log(It.IsAny&lt;LogLevel&gt;(),It.IsAny&lt;Exception&gt;(), <br/>    It.IsAny&lt;string&gt;()))<br/>        .Callback((LogLevel logLevel, Exception exception, string <br/>            information) =&gt; <br/>                       outputHelper.WriteLine($"{logLevel}:<br/>                          {information}"));</pre>
+<p class="mce-root"><kbd>ITestOutputHelper</kbd><span> is an interface that's exposed by the </span><kbd>Xunit.Abstractions</kbd> <span>namespace and resolved by the <kbd>Xunit</kbd> runtime. It allows us to write in the test console of the test runner. Finally, the test class implements the</span> <kbd>additem_should_log_information</kbd><span> test method. The test method calls the </span><kbd>AddItemAsync</kbd><span> method that we implemented in the </span><kbd>ItemService</kbd><span> class. Finally, it is possible to verify the </span><kbd>ILogger</kbd><span> interface using the following snippet:</span></p>
+<pre>    _logger<br/>     .Verify(x =&gt; x.Log(It.IsAny&lt;LogLevel&gt;(),It.IsAny&lt;Exception&gt;(), <br/>        It.IsAny&lt;string&gt;()), Times.AtMost(2));</pre>
+<p>The preceding snippet verifies that the <kbd>Log</kbd> method is called two times. It also outputs the resulting log as part of the logging system that's defined by the <kbd>ITestOutputHelper</kbd> interface. Now that we have implemented the logging mechanism in the service layer of the <kbd>Catalog.Domain</kbd> project, we will examine and implement the necessary logging providers.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Implementing logging providers</h1>
+                </header>
+            
+            <article>
+                
+<p>So far, we have defined <em>what</em> to log in our application; in this section, we will illustrate<span> </span><em>how</em> to do this. In ASP.NET Core, the logging provider is initialized using dependency injection. Moreover, it is possible to conditionally initialize it, depending on the environment or other startup options.</p>
+<p>ASP.NET Core provides some <em>built-in</em> logging providers, as shown in the following table:</p>
+<table border="1" style="border-collapse: collapse;width: 90%">
+<tbody>
+<tr>
+<td class="CDPAlignCenter CDPAlign" style="width: 16%"><strong>Providers</strong></td>
+<td class="CDPAlignCenter CDPAlign" style="width: 29.0302%"><strong>Namespace</strong></td>
+<td class="CDPAlignCenter CDPAlign" style="width: 51.9698%"><strong>Description</strong></td>
+</tr>
+<tr>
+<td style="width: 16%"><kbd>Console</kbd> </td>
+<td style="width: 29.0302%"><kbd>Microsoft.Extensions.Logging.Console</kbd></td>
+<td style="width: 51.9698%">
+<div>Sets the console of the running application as the output of the logs.</div>
+</td>
+</tr>
+<tr>
+<td style="width: 16%"><kbd>Debug</kbd> </td>
+<td style="width: 29.0302%"><kbd>Microsoft.Extensions.Logging.Debug</kbd></td>
+<td style="width: 51.9698%">
+<div>Writes messages in the debug output window when a debugger is attached.</div>
+</td>
+</tr>
+<tr>
+<td style="width: 16%"><kbd>EventSource</kbd> </td>
+<td style="width: 29.0302%"><kbd>Microsoft.Extensions.Logging.EventSource</kbd></td>
+<td style="width: 51.9698%">
+<div>Sets the Windows ETW as the main log's output.</div>
+</td>
+</tr>
+<tr>
+<td style="width: 16%"><kbd>EventLog</kbd></td>
+<td style="width: 29.0302%"><kbd>Microsoft.Extensions.Logging.EventLog</kbd></td>
+<td>
+<div>Sets the Windows event log as the main log's output.</div>
+</td>
+</tr>
+<tr>
+<td style="width: 16%"><kbd>TraceSource</kbd></td>
+<td style="width: 29.0302%"><kbd>Microsoft.Extensions.Logging.TraceSource</kbd></td>
+<td style="width: 51.9698%">
+<div class="mce-root">To use this provider, ASP.NET Core needs to run on the .NET Framework. The application will use the listeners that are provided by the trace source.</div>
+</td>
+</tr>
+</tbody>
+</table>
+<p> </p>
+<p><span>It is crucial to note that all the logging providers are complementary. Furthermore, it is possible to add many of them so that we can perform trace logging in more sources. We can configure the provider in the </span><kbd>Startup</kbd><span> class and in the </span><kbd>Program</kbd><span> class. Let's take a look at the </span><kbd>Program</kbd><span> class of</span> <kbd>Catalog.API</kbd><span>:</span></p>
+<pre><span>using </span><span>Microsoft</span>.<span>AspNetCore</span>;<br/><span>using </span><span>Microsoft</span>.<span>AspNetCore</span>.<span>Hosting</span>;<br/><br/><span>namespace </span><span>Catalog</span>.<span>API<br/></span><span>{</span><br/>    <span>public class </span><span>Program<br/></span><span>    </span>{<br/>        <span>public static void </span><span>Main</span>(<span>string</span>[] args)<br/>        {<br/>            <span>CreateWebHostBuilder</span>(args).<span>Build</span>().<span>Run</span>();<br/>        }<br/><br/>        <span>public static </span><span>IWebHostBuilder </span><span>CreateWebHostBuilder</span>(<span>string</span>[] <br/>            args)<br/>        {<br/>            <span>return </span><strong><span>WebHost</span>.<span>CreateDefaultBuilder</span>(args)</strong><br/>                .<span>UseStartup</span>&lt;<span>Startup</span>&gt;();<br/>        }<br/>    }<br/><span>}<br/></span></pre>
+<p>Here, the <kbd>Program</kbd> class uses <kbd>WebHost.CreateDefaultBuilder</kbd> to create the <kbd>WebHostBuilder</kbd> instance of the service. If we go further into the method, we will see that it uses the following syntax to define the log's provider:</p>
+<pre>...<br/>.<span>ConfigureLogging</span><span>(</span>(<span>Action</span>&lt;<span>WebHostBuilderContext</span>, <span>ILoggingBuilder</span>&gt;) ((hostingContext, logging) =&gt;<br/>{<br/>  logging.<span>AddConfiguration</span>((<span>IConfiguration</span>) <br/>  hostingContext.<span>Configuration</span>.<span>GetSection</span>(<span>"Logging"</span>));<br/>  logging.<span>AddConsole</span>();<br/>  logging.<span>AddDebug</span>();<br/>  logging.<span>AddEventSourceLogger</span>();<br/>})<span>)</span></pre>
+<p><span>As you can see, the </span><kbd>Program</kbd><span> class defines three built-in providers by default. Also, it uses the </span><kbd>Configuration</kbd><span> instance to pass the configurations that are described in the</span> <kbd>appsettings.json</kbd><span> file.</span></p>
+<p><span>Moreover, it is possible to override the default provider by explicitly calling the</span> <kbd>ConfigureLogging</kbd><span> extension method in the </span><kbd>Program</kbd><span> class:</span></p>
+<pre>...<br/>    <span>public class </span><span>Program<br/></span><span>    </span>{<br/>          ...<br/>        <span>public static </span><span>IWebHostBuilder </span><span>CreateWebHostBuilder</span>(<span>string</span>[] <br/>            args)<br/>        {<br/>            <span>return </span><span>WebHost</span>.<span>CreateDefaultBuilder</span>(args)<br/>              <strong>  .<span>ConfigureLogging</span>(builder =&gt;</strong><br/><strong>                {</strong><br/><strong>                    builder.[...]</strong><br/><strong>                })</strong><br/>                .<span>UseStartup</span>&lt;<span>Startup</span>&gt;();<br/>        }<br/>    }</pre>
+<p>The preceding snippet is useful if we want to add a custom logging provider to our application. <span>ASP.NET Core </span>also provides us with<span> a convenient way to configure the logging provider in the </span><kbd>Startup</kbd><span> class: it is possible to use the </span><kbd>AddLogging</kbd><span> extension method in</span> <kbd>ConfigureServices</kbd><span>:</span></p>
+<pre><br/>    <span>public class </span><span>Startup<br/></span><span>    </span>{<br/>       ...<br/>        <span>public void </span><span>ConfigureServices</span>(<span>IServiceCollection </span><span>services</span>)<br/>        {<br/>            ...<br/>            <strong><span>services</span>.<span>AddLogging</span>(builder =&gt; builder.<span>AddConsole</span>());</strong><br/>        }<br/><br/>       ...<br/>    }<br/>}</pre>
+<p>The preceding snippet initializes the logging services on the execution of <kbd>ConfigureServices</kbd> in the <kbd>Startup</kbd> class. The initialization of the logging provider at the <kbd>Startup</kbd> level is useful when we want to initialize the log provider in terms of the environment or a specific configuration flag. Let's proceed by learning how to implement a custom logging provider.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Implementing a custom log provider in tests</h1>
+                </header>
+            
+            <article>
+                
+<p>As we already have seen, the logging system of ASP.NET Core<span> </span>is designed<span> </span>for maximum extensibility. In this section, we will learn how to implement a custom logging provider that we can use in our tests. All the test classes that are present in the <kbd>Catalog.API.Tests</kbd> project use <kbd>InMemoryApplicationFactory&lt;T&gt;</kbd> to run a web server and provide <kbd>HttpClient</kbd> to call the API. As you may have noticed, the tests don't return an explicit error when one of the tests fails. For example, let's examine the following test method in the  <kbd>ItemControllerTests</kbd> class:</p>
+<pre><span>public class </span><span>ItemController </span>: <span>IClassFixture</span>&lt;<span>InMemoryApplicationFactory</span>&lt;<span>Startup</span>&gt;&gt;<br/>    {<br/>        ...<br/>    <br/>        [Fact]<br/>        <span>public async </span><span>Task </span><span>update_should_returns_not_found<br/>            _when_item_is_not_present</span>()<br/>        {<br/>            <span>var </span>client = <span>_factory</span>.<span>CreateClient</span>();<br/><br/>            <span>var </span>httpContent = <span>new </span><span>StringContent</span>(jsonPayload.<span>ToString</span>(), <br/><span>            Encoding</span>.<span>UTF8</span>, <span>"application/json"</span>);<br/>            <span>var </span>response = <span>await </span>client.<span>PutAsync</span>(<span>$</span><span>"/api/items/<br/>              {</span><span>Guid</span>.<span>NewGuid</span>()<span>}"</span>, httpContent);<br/><br/>            <strong>response.<span>StatusCode</span>.<span>ShouldBe</span>(<span>HttpStatusCode</span>.<span>NotFound</span>);</strong><br/>        }<br/>        ..<br/>    }</pre>
+<p>If for any reason, the call returns an error, we will receive the following message on the test side:</p>
+<pre>...<br/>Shouldly.ShouldAssertException : response.StatusCode<br/> should be<br/><strong>HttpStatusCode.NotFound</strong><br/> but was<br/><strong>HttpStatusCode.InternalServerError<br/></strong>...</pre>
+<p><span>Here, we don't know </span><em>why</em><span> the API has returned an</span> <kbd>InternalServerError</kbd><span>. Here, we can use the </span><kbd>ITestOutputHelper</kbd><span> interface provided by <kbd>Xunit</kbd></span><span> to create a new logger provider and use it in our tests. To declare a logger in ASP.NET Core, we need the following structure and components:</span></p>
+<div class="CDPAlignCenter CDPAlign"><img src="assets/5dfecc86-0882-4390-82df-2e36edc66afb.png" style=""/></div>
+<p>The preceding schema describes two main components: the <kbd>TestOutputLoggerProvider</kbd> type and the <kbd>TestOutputLogger</kbd> type. The <kbd>TestOutputLoggerProvider</kbd> type's purpose is to manage a list of logger instances. The <kbd>TestOutputLogger</kbd> class describes the actual implementation of the logging mechanism. Let's start by defining the custom <kbd>ILogger</kbd> component:</p>
+<pre><span>using </span>System;<br/><span>using </span>Microsoft.Extensions.Logging;<br/><span>using </span>Xunit.Abstractions;<br/><br/><span>namespace </span>Catalog.Fixtures<br/>{<br/>    <span>public class </span><span>TestOutputLogger </span>: <span>ILogger<br/></span><span>    </span>{<br/>        <span>private readonly </span><span>ITestOutputHelper </span>_output;<br/><br/>        <span>public </span><span>TestOutputLogger</span>(<span>ITestOutputHelper </span>output) =&gt;<br/>            _output = output;<br/><br/>        <span>public </span><span>IDisposable </span>BeginScope&lt;<span>TState</span>&gt;(<span>TState </span>state) =&gt; <span>null</span>;<br/><br/>        <span>public bool </span>IsEnabled(<span>LogLevel </span>logLevel) =&gt;<br/>             logLevel == <span>LogLevel</span>.Error;<br/><br/>        <span>public void </span>Log&lt;<span>TState</span>&gt;(<span>LogLevel </span>logLevel, <span>EventId </span>eventId, <br/>             <span>TState </span>state, <span>Exception </span>exception, <span>Func</span>&lt;<span>TState</span>,<br/>             <span>Exception</span>, <span>string</span>&gt; formatter)<br/>        <span>{</span><br/>            <span>if </span>(!IsEnabled(logLevel))<br/>                <span>return</span>;<br/><br/>           <strong> _output.WriteLine(<span>$"{</span>logLevel.ToString()<span>} - <br/>                {</span>exception.Message<span>} - {</span>exception.StackTrace<span>}"</span>);</strong><br/>        <span>}</span><br/>    }<br/>}</pre>
+<p><kbd>ITestOutputClass</kbd> implements the methods provided by the <kbd>ILogger</kbd> interface. First of all, it declares an <kbd>ITestOutputHelper</kbd> field in the constructor. Then, it uses the <kbd>_output</kbd> attribute inside the concrete implementation of the <kbd>Log</kbd> method by calling the <kbd>_output.WriteLine</kbd> method. The class also implements the <kbd>IsEnabled</kbd> method to check whether the log level corresponds to the <kbd>LogLevel.Error</kbd> field. If the log record doesn't do this, <kbd>LogLevel.Error</kbd> is written in the console's output. To finalize this implementation, we need a logger provider to initialize the custom logger. Let's continue by creating another class called <kbd>TestOutputLoggerProvider</kbd>, which extends the <kbd>ILoggerProvider</kbd> interface:</p>
+<pre><span>using </span>System.Collections.Concurrent;<br/><span>using </span>Microsoft.Extensions.Logging;<br/><span>using </span>Xunit.Abstractions;<br/><span>namespace </span>Catalog.Fixtures<br/>{<br/>    <span>public class </span><span>TestOutputLoggerProvider </span>: <span>ILoggerProvider<br/></span><span>    </span>{<br/>        <span>private readonly </span><span>ConcurrentDictionary</span>&lt;<span>string</span>, <span>TestOutputLogger</span>&gt; <br/>            _loggers = <span>new </span><span>ConcurrentDictionary<br/>            </span>&lt;<span>string</span>, <span>TestOutputLogger</span>&gt;();<br/>        <br/>       <strong> <span>private readonly </span><span>ITestOutputHelper </span>_testOutputHelper;</strong><br/>        <br/>        <span>public </span><span>TestOutputLoggerProvider</span>(<span>ITestOutputHelper <br/>            </span>testOutputHelper) =&gt; _testOutputHelper = testOutputHelper;<br/><br/>        <span>public </span><span>ILogger </span>CreateLogger(<span>string </span>categoryName) =&gt; <br/>            _loggers.GetOrAdd(categoryName, name =&gt;  <span>new <br/>            </span><span>TestOutputLogger</span>(_testOutputHelper));<br/><br/>        <span>public void </span>Dispose() =&gt; _loggers.Clear();<br/>    }<br/>}</pre>
+<p><kbd>TestOutputLoggerProvider</kbd> defines a <kbd>ConcurrentDictionary</kbd>, which contains a pair of <kbd>string</kbd> and <kbd>TestOutputLogger</kbd>; it also accepts the <kbd>ITestOutputHelper</kbd> interface as an interface, which is used in the <kbd>CreateLogger</kbd> method to add the logger to the logging pipeline. By doing this, we can integrate the custom logger into our tests. We will use the <kbd>InMemoryApplicationFactory&lt;T&gt;</kbd> class, which is implemented in the <kbd>Catalog.Fixtures</kbd> project, to add the custom logger, as follows:</p>
+<pre><span><strong>using Xunit.Abstractions;<br/></strong>...<br/><br/>namespace </span>Catalog.Fixtures<br/>{<br/>    <span>public class </span><span>InMemoryApplicationFactory</span>&lt;<span>TStartup</span>&gt;<br/>        : <span>WebApplicationFactory</span>&lt;<span>TStartup</span>&gt; <span>where </span><span>TStartup </span>: <span>class<br/></span><span>    </span><span>{</span><br/>        <strong><span>private </span><span>ITestOutputHelper </span>_testOutputHelper;</strong><br/><strong>        <span>public void </span><span>SetTestOutputHelper</span>(<span>ITestOutputHelper <br/>            </span>testOutputHelper)</strong><br/><strong>        {</strong><br/><strong>            _testOutputHelper = testOutputHelper;</strong><br/><strong>        }</strong><br/>        <span>protected override void </span>ConfigureWebHost(<span>IWebHostBuilder <br/>            </span>builder)<br/>        {<br/>            builder<br/>                .UseEnvironment(<span>"Testing"</span>)<br/>                .ConfigureTestServices(services =&gt;<br/>                {<br/>                    ...<br/>                <strong>    <span>if </span>(_testOutputHelper != <span>null</span>)</strong><br/><strong>                    {</strong><br/><strong>                        services.AddLogging(cfg =&gt; cfg.AddProvider(<span>new <br/>                        </span><span>TestOutputLoggerProvider</span>(_testOutputHelper)));</strong><br/><strong>                    }</strong><br/>                   ...<br/>                });<br/>        }<br/>    <span>}</span><br/>}</pre>
+<p>The preceding class declares a new <kbd>ITestOutputHelper</kbd> attribute type and defines a setter. It is possible to add our custom logger by calling the <kbd>AddProvider</kbd> extension method inside the <kbd>ConfigureTestService</kbd> class by creating a new instance of <kbd>TestOutputLoggerProvider</kbd>. After making these changes, we can proceed by integrating the custom logger into the <kbd>ItemControllerTests</kbd> class:</p>
+<pre><span>...<br/>namespace </span>Catalog.API.Tests.Controllers<br/>{<br/>    <span>public class </span><span>ItemControllerTests </span>: <span><br/>        IClassFixture</span>&lt;<span>InMemoryApplicationFactory</span>&lt;<span>Startup</span>&gt;&gt;<br/>    {<br/>        <strong><span>private readonly </span><span>InMemoryApplicationFactory</span>&lt;<span>Startup</span>&gt; _factory;</strong>   <br/>      <strong>  <span>public </span><span>ItemControllerTests</span>(<span>InMemoryApplicationFactory</span>&lt;<span>Startup</span>&gt; <br/>        factory, <span>ITestOutputHelper </span>outputHelper)</strong><br/><strong>        <span>{</span></strong><br/><strong>            _factory = factory;</strong><br/><strong>            _factory.SetTestOutputHelper(outputHelper);</strong><br/><strong>        <span>}<br/></span></strong><span>...</span></pre>
+<p>As you can see, <kbd>ItemControllerTests</kbd> calls <kbd>_factory.SetTestOutputHelper</kbd> in the constructor by setting the injected <kbd>ITestOutputHelper</kbd> interface. Now, we'll get detailed error messages every time a test throws an error. It is essential to note that the <kbd>ITestOutputHelper</kbd> interface is assigned in the test class, which means this is the only point where it is possible to obtain the interface using dependency injection. In the next section, we will learn how to implement health checks related to web service dependencies.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Web service health check </h1>
+                </header>
+            
+            <article>
+                
+<p class="mce-root"><span>Another es</span><span>sential feature that's always present in web services is the </span><em>health checking process</em><span> for dependencies. In general, the health check processes are used by the CI/CD pipeline to check whether a</span><span> </span><span>service</span><span> is healthy after its deployment or to perform the feature check-in a monitoring dashboard.</span><span> </span><span>Health checks </span><span>are usually performed</span><span> by calling HTTP routes to detect whether there are any ongoing issues in the web service.</span></p>
+<div class="packt_tip"><span>Note that these services expose the health check routes. The monitoring of these health checks </span>is implemented<span> in an independent and separate application. Furthermore, this practice allows us to keep the services independent from the monitoring logic.</span></div>
+<p><span>ASP.NET Core provides some out-of-the-box implementations to help developers add health check processes to their services. These features are implemented using a </span><em>middleware-oriented approach.</em> <span>Furthermore, the health checks are exposed as HTTP endpoints, and they can be used to check the status of third-party services, databases, and data storage systems. Thus, we can test the dependencies of the service to confirm their availability and functionality.</span></p>
+<div class="packt_infobox"><span>The health checks feature was introduced with the </span><em>ASP.NET Core 2.2.0-preview1</em> <span>version in August 2018. This feature introduced the</span> <kbd>IHealthCheck</kbd> <span>interface</span><em>.</em><span> In the future, it will be integrated with the <kbd>Polly</kbd> library to provide better resilience when users perform logging checks.</span></div>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Implementing health checks on databases</h1>
+                </header>
+            
+            <article>
+                
+<p>Databases are usually one of the main dependencies of a web service. Therefore, it is always essential to check the connection between the service and the database. Let's start by learning how to implement health checks using the <kbd>AspNetCore.HealthChecks.SqlServer</kbd> (<a href="https://www.nuget.org/packages/AspNetCore.HealthChecks.SqlServer/">https://www.nuget.org/packages/AspNetCore.HealthChecks.SqlServer/</a>) and <kbd>Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore</kbd> (<a href="https://www.nuget.org/packages/Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore/">https://www.nuget.org/packages/Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore/</a>) packages. We are going to apply these changes to the <em>catalog service</em> project. Let's start by adding this package to the <kbd>Catalog.API</kbd><em> </em>project:</p>
+<pre><strong>dotnet add package AspNetCore.HealthChecks.SqlServer</strong></pre>
+<p>The <kbd>AspNetCore.HealthChecks.SqlServer</kbd> package allows us to perform health checks on SQL Server instances. Let's proceed by registering the following services in the <kbd>Startup</kbd> class: </p>
+<pre><span>namespace </span>Catalog.API<br/><span>{</span><br/>    <span>public class </span><span>Startup<br/></span><span>    </span>{<br/>        ...<br/><br/>        <span>public void </span>ConfigureServices(<span>IServiceCollection </span>services)<br/>        {<br/>            ...<br/>           <strong> services</strong><br/><strong>                .AddHealthChecks()</strong><br/><strong>                .AddSqlServer(Configuration.GetSection<br/>                (<span>"DataSource:ConnectionString"</span>).Value);</strong><br/>            ...<br/>        }<br/><br/>        <span>public void </span><span>Configure</span>(<span>IApplicationBuilder </span>app, <br/>            <span>IWebHostEnvironment </span>env)<br/>        {<br/>            <span>if </span>(!env.IsTesting())<br/>                app.ApplicationServices.GetService&lt;<span>CatalogContext</span>&gt;()<br/>                .Database.Migrate();<br/><br/>            app.UseAuthentication();<br/>            app.UseAuthorization();<br/>            app.UseResponseCaching();<br/>           <strong> app.UseHealthChecks(<span>"/health"</span>);</strong><br/>            ...<br/>        }<br/>    }<br/><span>}</span></pre>
+<p>As you can see, the code configures the <em>health check middleware</em> using the <kbd>AddHealthChecks</kbd> extension method, which returns an <kbd>IHealthChecksBuilder</kbd> interface; it calls the <kbd>AddSqlServer</kbd> extension method provided by the builder to bind the health check with the SQL Server database. Finally, the code adds the middleware by calling the <kbd>UseHealthChecks</kbd> method and passing in the health check route. If we can call our service at the <kbd>https://&lt;hostname&gt;:&lt;port&gt;/health</kbd> route, we will receive the <kbd>Healthy</kbd>/<kbd>Unhealthy</kbd> response, depending on the connection to our data source.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Implementing custom health checks</h1>
+                </header>
+            
+            <article>
+                
+<p><span>ASP.NET Core's health check feature is not only suitable for the data source of our service; it can also be used to perform sophisticated and custom health checks. The framework provides the </span><kbd>IHealthCheck</kbd><span> interface so that we can implement our health check. Let's create a new class called <kbd>RedisCacheHealthCheck</kbd> in the</span> <kbd>HealthCheck</kbd><span> folder, inside the </span><kbd>Catalog.API</kbd><span> project</span><span>:</span></p>
+<pre><span>using </span>System;<br/><span>using </span>System.Threading;<br/><span>using </span>System.Threading.Tasks;<br/><span>using </span>Microsoft.Extensions.Diagnostics.HealthChecks;<br/><span>using </span>Microsoft.Extensions.Options;<br/><span>using </span>StackExchange.Redis;<br/><span>using </span>Catalog.Domain.Settings;<br/><br/><span>namespace </span>Catalog.API.HealthChecks<br/><span>{</span><br/>    <span>public class </span><span>RedisCacheHealthCheck </span>: <span><strong>IHealthCheck</strong><br/></span><span>    </span>{<br/>    <strong>    <span>private readonly </span><span>CacheSettings </span>_settings;</strong><br/>        <br/>      <strong>  <span>public </span><span>RedisCacheHealthCheck</span>(<span>IOptions</span>&lt;<span>CacheSettings</span>&gt; settings)</strong><br/><strong>        {</strong><br/><strong>            _settings = settings.Value;</strong><br/><strong>        }</strong><br/><br/>        <span>public async </span><span>Task</span>&lt;<span>HealthCheckResult</span>&gt; <br/>        CheckHealthAsync(<span>HealthCheckContext </span>context, <br/>            <span>CancellationToken </span>cancellationToken = <span>default</span>)<br/>        {<br/>            <span>try<br/></span><span>            </span>{<br/>                <span>var </span>redis = <span>ConnectionMultiplexer</span>.Connect<br/>                (_settings.ConnectionString);<br/>                <span>var </span>db = redis.GetDatabase();<br/><br/>                <span>var </span>result =  <span>await </span>db.PingAsync();<br/>                <span>if </span>(result <span>&lt; </span><span>TimeSpan</span>.FromSeconds(<span>5</span>))<br/>                {<br/>                    <span>return await </span><span>Task</span>.FromResult(<br/>                        <span>HealthCheckResult</span>.Healthy());<br/>                }<br/>                <br/>                <span>return await </span><span>Task</span>.FromResult(<br/>                    <span>HealthCheckResult</span>.Unhealthy());<br/>            }<br/>            <span>catch </span>(<span>Exception </span>e)<br/>            {<br/>                <span>return await </span><span>Task</span>.FromResult(<br/>                    <span>HealthCheckResult</span>.Unhealthy(e.Message));<br/>            }<br/>        }<br/>    }<br/><span>}</span></pre>
+<p>The <kbd>RedisCacheHealthCheck</kbd> class uses the <kbd>StackExchange.Redis</kbd> package to create a connection with the Redis instance specified in the setting's connection string. The core part of this class is the <kbd>CheckHealthAsync</kbd> method; it returns <kbd>HealthCheckResult.Healthy</kbd> or <kbd>HealthCheckResult.Unhealthy</kbd>, depending on the response time of the Redis instance. If a ping takes less than five seconds to come back, it means that the<span> </span>instance<span> </span>is healthy; otherwise, it isn't. The class is part of the ASP.NET Core stack, and it can use the dependency injection engine of the framework to solve dependencies.</p>
+<p>Therefore, it is possible to add the class to the health check stack by adding the following snippet to the <kbd>ConfigureServices</kbd> method of the <kbd>Startup</kbd> class:</p>
+<pre>...<br/>            services<br/>                .<span>AddHealthChecks</span>()<br/>               <strong> .<span>AddCheck</span>&lt;<span>RedisCacheHealthCheck</span>&gt;(<span>"cache_health_check"</span>)</strong><br/>                .<span>AddSqlServer</span>(<span>Configuration</span>.<span>GetSection<br/>                </span>(<span>"DataSource:ConnectionString"</span>).<span>Value</span>);<br/>..</pre>
+<p><span>This approach will add the check for the SQL Server connection and the custom check we implemented in the </span><kbd>RedisCacheHealthCheck</kbd><span> class to the middleware pipeline. If both of them succeed, the service will be classed as healthy. Futhermore it will be possible to run the catalog containers using the <kbd>docker-compose up --build</kbd> command and verify the status of the dependencies of the catalog web service by calling the <kbd>http://&lt;hostname:port&gt;/health</kbd> route.</span></p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Summary</h1>
+                </header>
+            
+            <article>
+                
+<p class="mce-root"><span>In this chapter, we learned how to track the state of our services using logging. We also learned how to customize a logger provider and how to integrate it with an ASP.NET Core application. Furthermore, we dealt with the new health checking feature of ASP.NET Core and learned how to build a custom health check.</span></p>
+<p class="mce-root"><span>Now, you know how to implement logging in an ASP.NET Core application and create a custom logger provider. You will be able to use these skills to keep track of the data that's exposed by your services and monitor the status of your web service instance. </span></p>
+<p class="mce-root"><span>In the next chapter, we will learn how to bring our web service to the cloud using Azure.</span></p>
+
+
+            </article>
+
+            
+        </section>
+    </body></html>

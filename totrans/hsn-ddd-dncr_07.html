@@ -1,0 +1,983 @@
+<html><head></head><body>
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Consistency Boundary</h1>
+                </header>
+            
+            <article>
+                
+<p>In monolithic systems, everything seems to be fully consistent. To achieve consistency, a lot of logic is <strong>outsourced</strong> to the database engine and becomes implicit, hard to figure out at a glance, and hard to test. Database transactions are frequently used to ensure that multiple-state mutations are executed at once. If the data becomes inconsistent, that usually means failure, and that requires an extensive investigation to fix the issue.</p>
+<p><strong>Domain-Driven Design</strong> (<strong>DDD</strong>) means avoiding complex graphs of entities. Instead, developers need to find a minimal logical set of entities that belong together and therefore need to be updated together to ensure consistency. Such a group of entities is called an <strong>aggregate</strong>.</p>
+<p>The following topics will be covered in this chapter:</p>
+<ul>
+<li>Command handling as a unit of work</li>
+<li>Consistency and transactions</li>
+<li>Aggregates and aggregate root patterns</li>
+<li>Constraints and invariants</li>
+</ul>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Technical requirements</h1>
+                </header>
+            
+            <article>
+                
+<p>The code for this chapter can be found in the <kbd>Chapter07</kbd> folder of the book repository on GitHub. Since we aren't using any infrastructure components yet (we will start using some in the next chapter), you still need nothing other than the IDE or code editor. The code in the repository represents the final version for the chapter, and if you want to follow along, you can use the previous chapter code as a starting point.</p>
+<p class="mce-root"/>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Domain model consistency</h1>
+                </header>
+            
+            <article>
+                
+<p>When it comes to modeling, we often hear that data models need to be at the center of any system. <em>If you want a good system, you need a good data model</em>.<em> </em>I have heard that saying countless times in my career as a software engineer. One of my colleagues once said this, and then added: "<em>I participated in a large project where we started with defining the data model, and, after eighteen months, the project was shut down because the model wasn't complete</em>." Strangely, these two statements created no causal relationship for him, since the first statement was an axiom, and the project failure seemed to be caused by numerous reasons, but not by the fact that designing a single data model for complex systems is always a death march—many tables, directly and indirectly, connected to one another by foreign keys, an endless push for the third normal form to avoid data duplication that results in heavy queries to retrieve a meaningful set of data—these are the realities of taking this approach.</p>
+<p>If we create a data model first and then try to create our code around it, it is very hard to understand why some rules are being enforced, why those columns in that table are mandatory, and why one table has a many-to-many relationship with another table. These relationships are also hard to test, and even if we have tests, we can only run them if we have a properly configured database with a pre-populated set of data, so our tests are also becoming database-oriented.</p>
+<p>DDD advocates a different approach when the domain model is essentially detached from the persistence, and it is primarily designed to serve specific business rules. When we deal with domain models, we pursue different goals with the design. We need to encapsulate just enough information in our classes so we can ensure that our model keeps being consistent after any state transition. The kind of consistency we mean there is not the relational database consistency that can be <strong>outsourced </strong>to the database engine. Instead, we want to ensure that our objects cannot violate the rules that are defined by the business, and these rules need to be explicitly defined in code. Let's look at what kind of principles we can apply, and how we can define different types of consistency boundaries in a domain model-centric design approach.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Transaction boundaries</h1>
+                </header>
+            
+            <article>
+                
+<p>As we discussed before, commands express the intent of a user to do something with the system. It could be the case that command comes from another system or even from a timer, but it still expresses some intent. Before the command is handled, our domain model finds itself in a valid state. When the command is handled, the domain model should also be in a valid state. This can be a new state if the command handling resulted in an operation being executed, or the same state as before, if the command handling has failed.</p>
+<p>Let's look at the code for handling commands that we created in the previous chapter:</p>
+<pre class="language-csharp"><span class="token keyword">private</span> <span class="token keyword">async</span> <span class="token class-name">Task</span> <span class="token function">HandleUpdate</span><span class="token punctuation">(</span><span class="token class-name">Guid</span> classifiedAdId<span class="token punctuation">,</span> Action<span class="token operator">&lt;</span>ClassifiedAd<span class="token operator">&gt;</span> operation<span class="token punctuation">)</span>  
+<span class="token punctuation">{</span>  
+    <span class="token keyword">var</span> classifiedAd <span class="token operator">=</span> <span class="token keyword">await</span> _store<span class="token punctuation">.</span><span class="token generic-method"><span class="token function">Load</span><span class="token punctuation">&lt;</span><span class="token class-name">ClassifiedAd</span><span class="token punctuation">&gt;</span></span><span class="token punctuation">(<br/></span>        classifiedAdId<span class="token punctuation">.</span><span class="token function">ToString</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>classifiedAd <span class="token operator">==</span> <span class="token keyword">null</span><span class="token punctuation">)</span>  
+        <span class="token keyword">throw</span> <span class="token keyword">new</span> <span class="token class-name">InvalidOperationException</span><span class="token punctuation">(</span>  
+            $<span class="token string">"Entity with id {classifiedAdId} cannot be found"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  
+  
+    <span class="token function">operation</span><span class="token punctuation">(</span>classifiedAd<span class="token punctuation">)</span><span class="token punctuation">;</span>  
+  
+    <span class="token keyword">await</span> _store<span class="token punctuation">.</span><span class="token function">Save</span><span class="token punctuation">(</span>classifiedAd<span class="token punctuation">)</span><span class="token punctuation">;</span>  
+<span class="token punctuation">}</span></pre>
+<p>This is a generic handler for any operation that does not create a new instance of the <kbd>ClassifiedAd</kbd> entity and doesn't remove an existing instance. The only reason we were able to generalize the command handling like this was because all the commands are handled in a similar fashion:</p>
+<ul>
+<li>Retrieve an entity from the store by means of the entity ID</li>
+<li>Execute an operation</li>
+<li>Commit changes back to the store</li>
+</ul>
+<p>If the operation fails, or the store cannot find anything by a given ID, the handler will throw an exception.</p>
+<p>For this chapter, the most important thing in the preceding code and in this list of steps that are performed when our application service is handling commands is that we execute an operation on <em>one single entity</em> only.</p>
+<p>Let's look at why this is so, and, for this purpose, we need to reflect on a very common way of implementing business applications, where the database is the center of everything that the application does. We will use the e-commerce domain as an example since it is reasonably complex and the code won't interfere with our ongoing work with the <kbd>Marketplace</kbd> application.</p>
+<p>If you have several year's experience of developing software in .NET, you might have seen many codebases with methods such as this:</p>
+<pre class="language-csharp"><span class="token punctuation">[</span><span class="token class-name">Route</span><span class="token punctuation">(</span><span class="token string">"/api/order/pay/credit/{orderId}"</span><span class="token punctuation">)</span><span class="token punctuation">]</span>  
+<span class="token keyword">public</span> <span class="token keyword">async</span> <span class="token class-name">Task</span> <span class="token function">TakeOnCustomerCredit</span><span class="token punctuation">(</span><span class="token keyword">int</span> orderId<span class="token punctuation">)</span>  
+<span class="token punctuation">{</span>  
+    <span class="token keyword">using</span> <span class="token punctuation">(</span><span class="token keyword">var</span> context <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">CommerceContext</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>  
+    <span class="token keyword">using</span> <span class="token punctuation">(</span>context<span class="token punctuation">.</span>Database<span class="token punctuation">.</span><span class="token function">BeginTransaction</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>  
+    <span class="token punctuation">{</span>  
+        <span class="token keyword">var</span> order <span class="token operator">=</span> <span class="token keyword">await</span> context<span class="token punctuation">.</span>Orders  
+            <span class="token punctuation">.</span><span class="token function">Where</span><span class="token punctuation">(</span>x <span class="token operator">=</span><span class="token operator">&gt;</span> x<span class="token punctuation">.</span>Id <span class="token operator">==</span> orderId<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">FirstAsync</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  
+  
+        <span class="token keyword">var</span> amount <span class="token operator">=</span> order<span class="token punctuation">.</span>UnpaidAmount<span class="token punctuation">;</span>  
+  
+        <span class="token keyword">var</span> customer <span class="token operator">=</span> order<span class="token punctuation">.</span>Customer<span class="token punctuation">;</span>  
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>customer<span class="token punctuation">.</span>Credit <span class="token operator">&lt;</span> amount<span class="token punctuation">)</span>  
+            <span class="token keyword">throw</span> <span class="token keyword">new</span> <span class="token class-name">InvalidOperationException</span><span class="token punctuation">(</span><span class="token string">"Not enough credit"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  
+  
+        customer<span class="token punctuation">.</span>Credit <span class="token operator">-</span><span class="token operator">=</span> amount<span class="token punctuation">;</span>  
+        order<span class="token punctuation">.</span>PaidAmount <span class="token operator">+</span><span class="token operator">=</span> amount<span class="token punctuation">;</span>  
+        order<span class="token punctuation">.</span>UnpaidAmount <span class="token operator">-</span><span class="token operator">=</span> amount<span class="token punctuation">;</span>  
+        customer<span class="token punctuation">.</span>TotalSpent <span class="token operator">+</span><span class="token operator">=</span> amount<span class="token punctuation">;</span>  
+  
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>customer<span class="token punctuation">.</span>TotalSpent <span class="token operator">&gt;</span> CommerceConstants<span class="token punctuation">.</span>PreferredLimit<span class="token punctuation">)</span>  
+            customer<span class="token punctuation">.</span>Preferred <span class="token operator">=</span> <span class="token keyword">true</span><span class="token punctuation">;</span>  
+  
+        order<span class="token punctuation">.</span>IsPaid <span class="token operator">=</span> order<span class="token punctuation">.</span>UnpaidAmount <span class="token operator">==</span> <span class="token number">0</span><span class="token punctuation">;</span>  
+  
+        <span class="token keyword">await</span> context<span class="token punctuation">.</span><span class="token function">SaveChangesAsync</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  
+    <span class="token punctuation">}</span>  
+<span class="token punctuation">}</span></pre>
+<p>Here, the controller seems to be completing a single logical operation, and it might look like a command handling directly in the HTTP endpoint request-handling method. The operation seems to be isolated and concise. To be honest, during my career, I have seen much worse code, where one request of a user results in many unrelated database operations, but let's stick to this example since it seems quite reasonable at first. So, this code uses the <strong>unit of work</strong> pattern, and <span><kbd>DbContext</kbd> of the entity frame</span><span>work wrapped in the <kbd>using</kbd> block implements this pattern perfectly because it accumulat</span><span>es all changes in the database elements and commits those changes all at once when we call </span><kbd>context.SaveChangesAsync()</kbd><span>.</span></p>
+<p>Let's look at the data model that is associated with this code:</p>
+<p class="CDPAlignCenter CDPAlign"><img src="assets/1aeaf441-0fd5-4dda-b8d3-14f356eecca4.png" style="width:43.00em;height:25.08em;"/></p>
+<div class="CDPAlignCenter CDPAlign packt_figref">Simplified eCommerce data model</div>
+<p>Of course, we could expect a lot more tables in the overall model. It could include things such as <kbd>Product</kbd>, <kbd>Supplier</kbd>, and <kbd>Shipment</kbd>. For our purposes, it is enough to have these four tables only. These tables all have relations to other tables, and those relations are all one-to-many (or zero-to-many). Our Entity Framework model uses an object reference between <kbd>Order</kbd> and <kbd>Customer</kbd>. This kind of reference is very popular when using ORM frameworks because it brings convenience to developers. We can access the <kbd>Customer</kbd> object that is associated with a particular order just by using the <kbd>order.Customer</kbd> property and modify any of the <kbd>Customer</kbd> properties as we wish, and this is exactly what the code does. It changes properties for both the order and the customer in one logical operation. This operation needs to either complete entirely, or fail. We cannot tolerate the fact that the customer's credit amount gets decreased but the order remains unpaid. Such behavior is typically associated with database transactions. A transaction is characterized by four principles, known as <strong>ACID</strong>:</p>
+<ul>
+<li>Atomicity</li>
+<li>Consistency</li>
+<li>Isolation</li>
+<li>Durability</li>
+</ul>
+<p class="mce-root"/>
+<p>For now, let's concentrate on atomicity. This characteristic means that all operations within a transaction must be complete or nothing happens at all, and it is often referred to as an <strong>all-or-nothing</strong> proposition.</p>
+<p>In the preceding code, we can see that the transaction is wrapping the whole operation for paying an order using customer credit. This is correct, and what we are dealing with here is a<strong> transactional boundary</strong>. For that particular method, <kbd>TakeOnCustomerCredit</kbd>, the transactional boundary would include two tables—<kbd>Customer</kbd> and <kbd>Order</kbd>. If we imagine another operation on the same model, that could be something such as this:</p>
+<pre class="language-csharp"><span class="token keyword">public</span> <span class="token keyword">async</span> <span class="token class-name">Task</span> <span class="token function">ShipOrderLine</span><span class="token punctuation">(</span><span class="token keyword">int</span> orderLineId<span class="token punctuation">)</span>  
+<span class="token punctuation">{</span>  
+    <span class="token keyword">using</span> <span class="token punctuation">(</span><span class="token keyword">var</span> context <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">CommerceContext</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>  
+    <span class="token keyword">using</span> <span class="token punctuation">(</span>context<span class="token punctuation">.</span>Database<span class="token punctuation">.</span><span class="token function">BeginTransaction</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>  
+    <span class="token punctuation">{</span>  
+        <span class="token keyword">var</span> orderLine <span class="token operator">=</span> <span class="token keyword">await</span> context<span class="token punctuation">.</span>OrderLines  
+            <span class="token punctuation">.</span><span class="token function">Where</span><span class="token punctuation">(</span>x <span class="token operator">=</span><span class="token operator">&gt;</span> x<span class="token punctuation">.</span>Id <span class="token operator">==</span> orderLineId<span class="token punctuation">)<br/></span><span class="token punctuation">            .</span><span class="token function">FirstAsync</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  
+  
+        orderLine<span class="token punctuation">.</span>IsShipped <span class="token operator">=</span> <span class="token keyword">true</span><span class="token punctuation">;</span>  
+  
+        orderLine<span class="token punctuation">.</span>Order<span class="token punctuation">.</span>DeliveryStatus <span class="token operator">=</span>  
+            orderLine<span class="token punctuation">.</span>Order<span class="token punctuation">.</span>OrderLines<span class="token punctuation">.</span><span class="token function">All</span><span class="token punctuation">(</span>x <span class="token operator">=</span><span class="token operator">&gt;</span> x<span class="token punctuation">.</span>IsShipped<span class="token punctuation">)</span>  
+                <span class="token operator">?</span> DeliveryStatus<span class="token punctuation">.</span>Shipped  
+                <span class="token punctuation">:</span> DeliveryStatus<span class="token punctuation">.</span>PartiallyShipped<span class="token punctuation">;</span>  
+  
+        <span class="token keyword">await</span> context<span class="token punctuation">.</span><span class="token function">SaveChangesAsync</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  
+    <span class="token punctuation">}</span>  
+<span class="token punctuation">}</span></pre>
+<p>This method still uses the same model, and it has a few worrying concerns. But, for now, let's see what transaction boundary we are dealing with here. In this unit of work, we have records in <kbd>Order</kbd> and <kbd>OrderLine</kbd> tables changed in one transaction.</p>
+<p>These two code snippets show that in <em>traditional</em> layered architecture, with no real domain model in place, transactional boundaries are being deliberately decided by any piece of code that performs changes in the database. The model itself does not enforce any kind of boundary. Two methods, which could even be located in one controller class, operate on two different transactional boundaries, although the <kbd>Order</kbd> table that both methods change will be a part of both transactions. It is quite easy to imagine that processing the remaining order payment on a customer's credit by calling the <kbd>TakeOnCustomerCredit</kbd> method could happen in parallel, with one order line being marked as shipped by the <kbd>ShipOrderLine</kbd> method:</p>
+<p class="CDPAlignCenter CDPAlign"><img src="assets/92515a7b-5908-4033-9423-cb2462af3047.png" style="width:39.17em;height:23.00em;"/></p>
+<div class="CDPAlignCenter CDPAlign packt_figref">Updates for different reasons cause unjustified conflicting transactions</div>
+<p>From the business logic point of view, these are two different operations, but because of the <em>consistency</em> part of ACID, one of these methods will fail. It would be very weird for users of this system to know that credit and payment processing is somehow related to shipment and delivery.</p>
+<p>The reason for the appearance of this kind of model is quite clear. The very definition of the object-oriented approach in programming declares that objects in software programs represent objects in the real world.</p>
+<p>Data models follow a similar approach. Very often, we see a system with one global data model that closely represents the model of the real world, covering all aspects of the domain that the system implements. It naturally results in large object graphs in code that reflect such a holistic data model. Nevertheless, DDD advocates another approach when we need to concentrate on modeling; only those aspects of the real-world models that are absolutely required to implement a set of use cases for the system. We already touched upon this essential aspect of the modeling in <a href="bea6a7db-f270-4c0b-a3c3-bedb4182cafb.xhtml" target="_blank">Chapter 4</a>, <em>Designing the Model</em>.</p>
+<p>Let's see what we can do to build our model in a way that we can define transactional boundaries such that different use cases will not conflict with one another when our software needs to execute operations on the same real-world objects that, however, can be represented by different objects in the software model, or even belong to different models.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Aggregate pattern</h1>
+                </header>
+            
+            <article>
+                
+<p>In the case of the data model that we were dealing with earlier in this chapter, we have one composition—<kbd>Order</kbd> is a composition of the <kbd>OrderLine</kbd> elements. You probably know how this model would look if we moved from a data model to a class diagram:</p>
+<p class="CDPAlignCenter CDPAlign"><img src="assets/5b8187e0-a6ca-4f64-bcf4-d8f4cb04c4a1.png" style="width:34.33em;height:22.17em;"/></p>
+<div class="CDPAlignCenter CDPAlign packt_figref">Aggregation in UML</div>
+<p>In UML, composition implies that child elements cannot exist without their parent element. Indeed, having order lines that aren't linked to any order makes no sense. Such a composition as a whole forms a logical indivisible structure, although, inside this structure, we can find individual elements. For the outside world, an order includes its order lines and is seen as one thing, although the order can have many order lines. In DDD, such constructs are known as <strong>aggregates</strong>. Since we were using UML for a short while, it can create some confusion, because, in UML, aggregation means something else, and the closest analogy to a DDD aggregate is the UML concept of composition. Aggregates share the same propositions as UML compositions that the parent object consists of or owns all child objects, and when the parent object is removed, all child objects must be removed too, because it doesn't make sense for those objects to exist anymore. The parent object of an aggregate is called an <strong>aggregate root</strong>. Complex object graphs with a single parent could be visualized like a tree, where the parent object is where all the tree branches are growing from, so the root analogy makes perfect sense.</p>
+<p>However, an aggregate is more than just a composition of classes. Aggregate boundaries also serve as transaction boundaries. For the purpose of this chapter, we will concentrate on two aspects of it—<strong>atomicity</strong> and <strong>consistency</strong>. As mentioned before, transactions imply the all-or-nothing principle of operations. An aggregate changes its state as a whole, no matter how the aggregate is persisted. If we use an ORM tool and our aggregate spans multiple database tables, all operations on those tables need to be wrapped in a database transaction. Furthermore, the consistency aspect requires an aggregate to ensure that the aggregate state is being validated across all operations that are executed on that aggregate. Hence, it is not a database or a code that is not part of the aggregate itself, such as an API controller or an application service. Unlike the preceding code, all these validity checks need to be a part of the aggregate code, and therefore they need to be implemented inside the domain model.</p>
+<p>We already have quite a few characteristics of aggregates, so we can see how this pattern would apply to our preceding sample. If we start looking from the data model, we could suspect that <kbd>Order</kbd> and <kbd>OrderLine</kbd> form some sort of composition, since <kbd>OrderLine</kbd> records cannot exist without a parent <kbd>Order</kbd>. It applies both to atomicity and consistency. If we change the order status because one line of that order is marked as shipped—these changes need to be executed together; otherwise, the order state would become invalid—we might get an order with the status <em>pending</em> when one order line has already been marked as shipped. So, we would expect such an order to have a <em>partially delivered</em> status, and if that isn't the case, then our order state is not valid. Since we know that an order line is a child object, we don't really want to expose any operations on order lines directly from outside the domain model. It would make much more sense if the order lines are manipulated by the <kbd>Order</kbd> class itself. In this case, the <kbd>Order</kbd> class becomes our aggregate root, and it will have methods that change the state of its lines.</p>
+<p>At the same time, an aggregate does not guarantee any consistency constraints that are external to the aggregate. For the relational data model, it would mean that we cannot have referential integrity between the table that is used to persist our aggregate root (<kbd>Order</kbd>) and anything that is outside the aggregate boundary.</p>
+<p>If we make some changes in the data model to reflect the new insight, it would look like this:</p>
+<p class="CDPAlignCenter CDPAlign"><img src="assets/648435b5-247f-492a-9454-da3944bdd6d7.png" style="width:39.00em;height:22.92em;"/></p>
+<div class="CDPAlignCenter CDPAlign packt_figref">Removing references create explicit boundaries</div>
+<p>Note that relations between <kbd>Order</kbd> and <kbd>Customer</kbd> tables and <kbd>OrderLine</kbd> and <kbd>Product</kbd> table are now gone, but we kept the reference fields—<kbd>CustomerId</kbd> and <kbd>ProductId</kbd>. We still need to know whether the customer has placed the order and what products we are selling. However, as regards the normal operation of our system, we don't need object references in ORM, and a lack of referential integrity that some developers might perceive as a negative side-effect of isolating the aggregate, in fact, gives us a new degree of freedom. For example, order lines need to stay intact if the product that was used for those lines goes out of sales and is then removed from the <kbd>Product</kbd> table. We won't discuss flags and other soft-delete methods since I am making a point of keeping these things separate.</p>
+<p>Let's now take a look at how the code for the API controller would look:</p>
+<pre class="language-csharp"><span class="token keyword">public</span> <span class="token keyword">async</span> <span class="token class-name">Task</span> <span class="token function">ShipOrderLine</span><span class="token punctuation">(</span><span class="token keyword">int</span> orderId<span class="token punctuation">,</span> <span class="token keyword">int</span> orderLineId<span class="token punctuation">)</span>  
+<span class="token punctuation">{</span>  
+    <span class="token keyword">var</span> order <span class="token operator">=</span> <span class="token keyword">await</span> _orderRepository<span class="token punctuation">.</span><span class="token function">Get</span><span class="token punctuation">(</span>orderId<span class="token punctuation">)</span><span class="token punctuation">;</span>  
+    order<span class="token punctuation">.</span><span class="token function">ShipOrderLine</span><span class="token punctuation">(</span>orderLineId<span class="token punctuation">)</span><span class="token punctuation">;</span>  
+    <span class="token keyword">await</span> _orderRepository<span class="token punctuation">.</span><span class="token function">Commit</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  
+<span class="token punctuation">}</span></pre>
+<p class="mce-root"/>
+<p class="mce-root"/>
+<p>That's quite a change, isn't it? Of course, the logic has not disappeared; it has moved to the <kbd>Order</kbd> class itself:</p>
+<pre class="language-csharp"><span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">ShipOrderLine</span><span class="token punctuation">(</span><span class="token keyword">int</span> orderLineId<span class="token punctuation">)</span>  
+<span class="token punctuation">{</span>  
+    <span class="token keyword">var</span> orderLine <span class="token operator">=</span> OrderLines<span class="token punctuation">.</span><span class="token function">First</span><span class="token punctuation">(</span>x <span class="token operator">=</span><span class="token operator">&gt;</span> x<span class="token punctuation">.</span>Id <span class="token operator">==</span> orderLineId<span class="token punctuation">)</span><span class="token punctuation">;</span>  
+  
+    orderLine<span class="token punctuation">.</span>IsShipped <span class="token operator">=</span> <span class="token keyword">true</span><span class="token punctuation">;</span>  
+  
+    DeliveryStatus <span class="token operator">=</span>  
+        OrderLines<span class="token punctuation">.</span><span class="token function">All</span><span class="token punctuation">(</span>x <span class="token operator">=</span><span class="token operator">&gt;</span> x<span class="token punctuation">.</span>IsShipped<span class="token punctuation">)</span>  
+            <span class="token operator">?</span> DeliveryStatus<span class="token punctuation">.</span>Shipped  
+            <span class="token punctuation">:</span> DeliveryStatus<span class="token punctuation">.</span>PartiallyShipped<span class="token punctuation">;</span>  
+<span class="token punctuation">}</span></pre>
+<p>As you can see, the accidental complexity of two-way object reference for order lines can now be removed. On the other hand, we have to change the API because we cannot just ask for an order line's ID. We need to know the order ID as well, because the order line's ID is internal to a given order, and we are using our aggregate root to access its child elements.</p>
+<p>Of course, more complex operations would now require more work. How would we perform something such as what the <kbd>TakeOnCustomerCredit</kbd> method does? Since we do not have object relations between our <kbd>Customer</kbd> and <kbd>Order</kbd> objects, and we have decided that our aggregate is wrapping all about the <kbd>order</kbd> handling, but not <kbd>Customer</kbd>, we cannot complete one transaction on these two distinct objects. This might sound like an impossible task, and often, such dilemmas lead to workaround and shortcuts, and then the aggregate pattern is seen as something that gets in the way and needs to be ignored in one or two specific cases. In fact, we need to do quite the opposite. We have to go back to the modeling space to find out more about this problem.</p>
+<p>Looking back at the method code, we can see that it does the following:</p>
+<ul>
+<li>Checks whether the customer has enough credit to cover what remains unpaid in relation to an order</li>
+<li>Decreases the customer's credit amount for the unpaid amount of the order</li>
+<li>Increases the order's paid amount</li>
+<li>Decreases the order's unpaid amount</li>
+<li>Sets the order status to <em>paid</em> if the unpaid amount is zero (for that code, it will always be true)</li>
+<li>Increases the customer's total spent amount by the payment amount</li>
+<li>Upgrades the customer to <em>preferred</em> status if this customer has spent over a certain threshold</li>
+</ul>
+<p>That's quite a lot, and now we are going to use the power of aggregates to make more sense of the whole flow.</p>
+<p>First, we need to check what does not belong here. The first candidate would be to evaluate the last two actions on the list: updating the total spent amount and upgrading the customer. It seems as if something has happened not only after taking a credit payment but also for the credit card, cash, and any other sorts of payments. Keeping the code here means that we need to either copy and paste it or have some shared code. None of these alternatives are really appealing. Most importantly, these two actions have no relation to the order processing. Imagine one of these actions failing. Such a failure should have no effect on the order processing.</p>
+<p>Then, we need to check what we have to know and do in order to complete the operation. In our case, we must ensure that the remaining credit limit is higher or equal to the order unpaid amount. For our code to make a decision regarding whether to proceed with the payment on credit, we need to have the information about the available credit limit for the ordering customer. But these details are now out of our aggregate scope, so what can we do about it to ensure that an order cannot violate the consistency rule?</p>
+<p>Here comes another aspect of emerging aggregate boundaries, where we need to evaluate the speed of change in objects that our system works with. The <kbd>Customer</kbd> object now contains some information that forms a customer profile—name, address, and so on. At the same time, it contains some financial details that potentially change for every order that we process. It is clear from our code that when we process orders, we do not have any rules that give a discount for customers that have their name starting with <em>A</em>, or their location in Belgium. We could imagine such a requirement due to logistics reasons, but it is not relevant to our example. Our conclusion should be that the customer profile information changes very rarely, while the remaining customer credit limit changes quite often. At the same time, information about the total allowed credit limit might still belong to the customer profile, and it changes rarely too. This means that we are dealing with two different aspects of customer details:</p>
+<table style="border-collapse: collapse;width: 90%" border="1">
+<thead>
+<tr>
+<th class="CDPAlignLeft CDPAlign">Customer profile</th>
+<th class="CDPAlignLeft CDPAlign">Customer running credit</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Name, address, total credit limit</td>
+<td>Available credit limit</td>
+</tr>
+<tr>
+<td>Changes now and then</td>
+<td>Changes for each credit order</td>
+</tr>
+<tr>
+<td>No rules for order processing</td>
+<td>Required for the consistency of order processing</td>
+</tr>
+</tbody>
+</table>
+<p class="mce-root">We finally come to the conclusion that our <em>holistic</em> <kbd>Customer</kbd> object is not suitable for these different use cases. The solution for our model would be to move the information that is required to ensure order processing consistency and that the business rules need to be moved closer to the order processing logic. We can do this by splitting our <kbd>Customer</kbd> entity into two, each of which is responsible for its own set of use cases. We can even give the new entity a more explicit name: <kbd>CustomerCredit</kbd>, to express the specific use of this information. Our diagram would look like this:</p>
+<p class="CDPAlignCenter CDPAlign"><img src="assets/b6e2409f-849a-48c0-a98a-e6d4879fff07.png" style="width:35.33em;height:22.83em;"/></p>
+<div class="CDPAlignCenter CDPAlign packt_figref">Moving all related concerns to one boundary</div>
+<p>In fact, what we did here belongs more to finding linguistic and contextual boundaries, and this topic will be covered in more detail in <a href="6f50ee65-024a-4c46-89c8-343183b05b8f.xhtml" target="_blank">Chapter 9</a>, <em>CQRS - The Read Side</em>. For now, we will continue discussing the aggregate boundaries only.</p>
+<p>Our new model looks better, but it has one issue—the aggregation has now shifted to the <kbd>CustomerCredit</kbd> entity, and it seems to become our aggregate root. From the relational consistency point of view, this is perfectly fine. From another point of view, it looks weird to process all orders by calling methods on the <kbd>CustomerCredit</kbd> entity. Another negative aspect is that the ownership of objects has also changed. Before, we had <kbd>Order</kbd>, which is responsible for its <kbd>OrderLine</kbd>. Now, we have <kbd>CustomerCredit</kbd>, which is responsible for everything. It looks as though if we remove the <kbd>CustomerCredit</kbd> object from the system, we also need to remove all of its orders. This is definitely not what we need. Customers come and go, but we definitely need to keep track of all our orders, including the completed ones, and not remove them. In this case, we clearly see the downside of having a larger aggregate with the dubious responsibility of the supportive entity.</p>
+<p>It is also important to remember that despite having a constraint, we need to have enough credit to cover the order total before we can proceed with it, as the order itself can be valid even if this constraint is violated. The order has its own invariants—a set of unbreakable rules that guarantee the consistency of each order. Let's see what invariants the <kbd>Order</kbd> aggregate has:</p>
+<ul>
+<li>The sum of <kbd>PaidAmount</kbd> and <kbd>UnpaidAmount</kbd> should be equal to <kbd>TotalAmount</kbd>.</li>
+<li><kbd>DeliveryStatus</kbd> of an order can only be set to <kbd>Delivered</kbd> if, for all order lines of the <kbd>IsShipped</kbd> property, this is set to <kbd>true</kbd>.</li>
+<li>The <kbd>TotalAmount</kbd> of an order must be equal to the sum of the <kbd>LineTotal</kbd> of all the order lines.</li>
+<li>For each order line, <kbd>LineTotal</kbd> must equal the <kbd>ProductPrice</kbd> multiplied by <kbd>Quantity</kbd>.</li>
+</ul>
+<p>As you can see, there is nothing in these invariants that requires us to know the customer's available credit or any information about the product, and so on. So, for us to decide whether an order is consistent, it is sufficient to have the details pertaining to the order itself and all of its lines.</p>
+<p>As regards ownership, it is also obvious that individual order lines cannot exist without the order they belong to.</p>
+<p>Therefore, our final move would be to break the relationship between orders and customers, even for the more explicit <kbd>CustomerCredit</kbd> entity, while keeping the aggregation between <kbd>Order</kbd> and the <kbd>OrderLine</kbd> entities:</p>
+<p class="CDPAlignCenter CDPAlign"><img src="assets/5b1c5fc1-92f4-40ee-8d9c-260eaad67fc8.png" style="width:36.08em;height:23.33em;"/></p>
+<div class="CDPAlignCenter CDPAlign packt_figref">Making the boundaries smaller decrease transaction scopes</div>
+<p>In this model, we have two aggregates inside an isolated part of the system. We know that these aggregates need to be inside the same contextual boundaries, but they need to be separated and form different transactional and consistency boundaries for the reason we discussed previously. Now, the question arises of how can we enforce our constraints if orders have no information about the available credit for the ordering customer, from inside the aggregate object graph. We will use the power of domain services to perform this check.</p>
+<p>Inside our domain project, we can define an interface for such a domain service:</p>
+<pre class="language-csharp"><span class="token keyword">public</span> <span class="token keyword">interface</span> <span class="token class-name">ICustomerCreditService</span>
+<span class="token punctuation">{</span>
+    Task<span class="token operator">&lt;</span><span class="token keyword">bool</span><span class="token operator">&gt;</span> <span class="token function">EnsureEnoughCredit</span><span class="token punctuation">(</span><span class="token keyword">int</span> customerId<span class="token punctuation">,</span> <span class="token keyword">decimal</span> amount<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span></pre>
+<p>Notice that we have the <kbd>EnsureEnoughCredit</kbd> method that returns a Boolean value, instead of returning the available credit limit itself. By doing this, we enforce the utilization of the ubiquitous language and shift the credit limit check logic to the domain service. The service might, for example, decide that for preferred customers, we can allow an overdraft above the available limit. Of course, in such an instance, we'd also need to move the <kbd>Preferred</kbd> attribute to the <kbd>CustomerCredit</kbd> entity.</p>
+<p>Then, we can use our application service to handle the <kbd>TakeOnCustomerCredit</kbd> command, where it will use the domain service to check whether this command can be processed:</p>
+<pre class="language-csharp"><span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">OrderHandlingApplicationService</span>
+<span class="token punctuation">{</span>
+    <span class="token keyword">private</span> <span class="token keyword">readonly</span> <span class="token class-name">IOrderRepository</span> _orderRepository<span class="token punctuation">;</span>
+    <span class="token keyword">private</span> <span class="token keyword">readonly</span> <span class="token class-name">ICustomerCreditService</span> _customerCreditService<span class="token punctuation">;</span>
+
+    <span class="token keyword">public</span> <span class="token function">OrderHandlingApplicationService</span><span class="token punctuation">(</span>
+        <span class="token class-name">IOrderRepository</span> orderRepository<span class="token punctuation">,</span> 
+        <span class="token class-name">ICustomerCreditService</span> customerCreditService<span class="token punctuation">)</span>
+    <span class="token punctuation">{</span>
+        _orderRepository <span class="token operator">=</span> orderRepository<span class="token punctuation">;</span>
+        _customerCreditService <span class="token operator">=</span> customerCreditService<span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+
+    <span class="token keyword">public</span> <span class="token keyword">async</span> <span class="token class-name">Task</span> <span class="token function">Handle</span><span class="token punctuation">(</span><span class="token class-name">TakeOnCustomerCredit</span> command<span class="token punctuation">)</span>
+    <span class="token punctuation">{</span>
+        <span class="token keyword">var</span> order <span class="token operator">=</span> <span class="token keyword">await</span> _orderRepository<span class="token punctuation">.</span><span class="token function">Get</span><span class="token punctuation">(</span>command<span class="token punctuation">.</span>OrderId<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">var</span> hasEnoughCredit <span class="token operator">=</span> 
+            <span class="token keyword">await</span> _customerCreditService<span class="token punctuation">.</span><span class="token function">EnsureEnoughCredit</span><span class="token punctuation">(</span>
+                command<span class="token punctuation">.</span>CustomerId<span class="token punctuation">,</span>
+                order<span class="token punctuation">.</span>UnpaidAmount<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span>hasEnoughCredit<span class="token punctuation">)</span>
+            <span class="token keyword">throw</span> <span class="token keyword">new</span> <span class="token class-name">DomainException</span><span class="token punctuation">(</span>
+                $<span class="token string">"Not enough credit for order {command.OrderId}"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        order<span class="token punctuation">.</span><span class="token function">TakeOnCredit</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></pre>
+<div class="packt_tip">I have to mention that moving the customer credit to a separate entity can cause situations when the credit amount goes below zero due to race conditions. When applying the credit limit change in a separate transaction, you might want to check if the operation results in the negative value and then decide what to do if the result is negative. One possible technique is to inform the account manager by email about the situation and let them resolve it with the customer. From a technical side, it is possible to create a compensating action to put the order on hold until the issue is resolved. Overall, those decisions should never be seen as technical. Talk to domain experts and ask them what solution would they prefer.</div>
+<p>This approach moves some domain logic to the application service, and that might not be desirable in some cases. To solve this, we could use the double dispatch pattern and let the <kbd>Order</kbd> aggregate decide on the constraint. If we decide to use double dispatch, it would look like this:</p>
+<pre class="language-csharp"><span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">Order</span> <span class="token punctuation">:</span> <span class="token class-name">Aggregate</span><span class="token operator">&lt;</span>OrderId<span class="token operator">&gt;</span>
+<span class="token punctuation">{</span>
+    <span class="token keyword">public</span> <span class="token keyword">async</span> <span class="token class-name">Task</span> <span class="token function">TakeOnCredit</span><span class="token punctuation">(</span><span class="token class-name">ICustomerCreditService</span> customerCreditService<span class="token punctuation">)</span>
+    <span class="token punctuation">{</span>
+        <span class="token keyword">var</span> hasEnoughCredit <span class="token operator">=</span> 
+            <span class="token keyword">await</span> _customerCreditService<span class="token punctuation">.</span><span class="token function">EnsureEnoughCredit</span><span class="token punctuation">(</span>
+                command<span class="token punctuation">.</span>CustomerId<span class="token punctuation">,</span>
+                order<span class="token punctuation">.</span>UnpaidAmount<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span>hasEnoughCredit<span class="token punctuation">)</span>
+            <span class="token keyword">throw</span> <span class="token keyword">new</span> <span class="token class-name">DomainException</span><span class="token punctuation">(</span>
+                $<span class="token string">"Not enough credit for order {command.OrderId}"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token comment">// actual domain logic here</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></pre>
+<p>Then, the application service will pass the dependency when calling the aggregate root method:</p>
+<pre class="language-csharp"><span class="token keyword">public</span> <span class="token keyword">async</span> <span class="token class-name">Task</span> <span class="token function">Handle</span><span class="token punctuation">(</span><span class="token class-name">TakeOnCustomerCredit</span> command<span class="token punctuation">)</span>
+<span class="token punctuation">{</span>
+    <span class="token keyword">var</span> order <span class="token operator">=</span> <span class="token keyword">await</span> _orderRepository<span class="token punctuation">.</span><span class="token function">Get</span><span class="token punctuation">(</span>command<span class="token punctuation">.</span>OrderId<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">await</span> order<span class="token punctuation">.</span><span class="token function">TakeOnCredit</span><span class="token punctuation">(</span>_customerCreditService<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span></pre>
+<p>It might look as if we are creating a dependency between our domain model and the infrastructure since it is clear that the domain service needs to fetch the <kbd>CustomerCredit</kbd> entity to get the data. However, our <kbd>Order</kbd> aggregate root only gets the interface dependency, and, as you remember, the interface itself is defined inside the domain project. Its implementation is indeed located inside the application itself, but this is perfectly normal.</p>
+<p>We have still not seen how our aggregate is protecting its invariants, but now it is time to get back to our <kbd>Marketplace</kbd> application and add some code there, based on what we have learned about aggregates so far. We also need to cover the aggregate persistence, since we already used the <kbd>IOrderRepository</kbd> interface that is responsible for getting the aggregate state from the database.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Protecting invariants</h1>
+                </header>
+            
+            <article>
+                
+<p>In <a href="034423e8-8080-4073-bd08-b98a129384a4.xhtml" target="_blank">Chapter 5</a>, <em>Implementing the Model</em>, we went through using value objects to protect invalid values from even being used as parameters for entity constructors and methods. This technique allows us to move a lot of checks to value objects, provides nice encapsulation, and enables type safety. Then, when we create a new entity or execute some behavior using entity methods, we need to execute further checks. Since we can be quite sure that all parameters already contain valid individual values, we need to ensure that a given combination of parameters, the current entity state, and the executed behavior are not going to bring the entity to an invalid state.</p>
+<p>Protecting the internal state from being invalid and, as a result, bringing the model into an inconsistent state, is one of the most important characteristics of aggregates. Aggregate invariants must be satisfied for each operation that triggers a state change; thus, we need to ensure that we control the aggregate state when calling any command method on the aggregate.</p>
+<p>Let's look at what complex rules we have for our classified ad entity. To find such rules, we can use some sticky notes from our detailed EventStorming session in <a href="07ee37fb-0189-467c-865d-18e72868b137.xhtml" target="_blank">Chapter 3</a>, <em>EventStorming</em>, and put them on a chart, as follows:</p>
+<p class="CDPAlignCenter CDPAlign"><img src="assets/b6384d06-e912-4801-8f1b-eae2c188752c.png" style="width:20.67em;height:9.83em;"/></p>
+<div class="CDPAlignCenter CDPAlign packt_figref">Business rules can prevent the command execution</div>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Analyzing constraints for a command</h1>
+                </header>
+            
+            <article>
+                
+<p>We put the command to the left side, the event to the right side, and try to find out what could prevent our command from being executed in a way that it produces the desired outcome (the event). In our case here, we need to ensure that before an ad can be put to the review queue, it must have a non-empty title, text, and price.</p>
+<p class="mce-root"/>
+<p class="mce-root"/>
+<p>We cannot put these checks combined with the value object, since before the ad is sent to review, it can have an empty title and text, and it can have no price. Only when a given command is being executed do we need to check whether these constraints are satisfied. It is what we can call an invariant for this entity—an ad that is in a pending review cannot have an empty title, empty text, or zero price.</p>
+<p>There are at least two ways of ensuring that our entity never gets to an invalid state. The first and most obvious way is to add checks to the operation code. There is no way of requesting that the ad be published, so let's add it and make some changes related to the fact of using value objects for the entity state as well:</p>
+<pre class="language-csharp"><span class="token keyword">namespace</span> Marketplace<span class="token punctuation">.</span>Domain  
+<span class="token punctuation">{</span>  
+    <span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">ClassifiedAd</span>  
+    <span class="token punctuation">{</span>  
+        <span class="token keyword">public</span> <span class="token class-name">ClassifiedAdId</span> Id <span class="token punctuation">{</span> <span class="token keyword">get</span><span class="token punctuation">;</span> <span class="token punctuation">}</span>  
+
+        <span class="token keyword">public</span> <span class="token function">ClassifiedAd</span><span class="token punctuation">(</span><span class="token class-name">ClassifiedAdId</span> id<span class="token punctuation">,</span> <span class="token class-name">UserId</span> ownerId<span class="token punctuation">)</span>  
+        <span class="token punctuation">{</span>  
+            Id <span class="token operator">=</span> id<span class="token punctuation">;</span>  
+            OwnerId <span class="token operator">=</span> ownerId<span class="token punctuation">;</span>  
+            State <span class="token operator">=</span> ClassifiedAdState<span class="token punctuation">.</span>Inactive<span class="token punctuation">;</span>  
+        <span class="token punctuation">}</span>  
+
+        <span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">SetTitle</span><span class="token punctuation">(</span><span class="token class-name">ClassifiedAdTitle</span> title<span class="token punctuation">)</span> <span class="token operator">=</span><span class="token operator">&gt;</span> Title <span class="token operator">=</span> title<span class="token punctuation">;</span>  
+
+        <span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">UpdateText</span><span class="token punctuation">(</span><span class="token class-name">ClassifiedAdText</span> text<span class="token punctuation">)</span> <span class="token operator">=</span><span class="token operator">&gt;</span> Text <span class="token operator">=</span> text<span class="token punctuation">;</span>  
+
+        <span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">UpdatePrice</span><span class="token punctuation">(</span><span class="token class-name">Price</span> price<span class="token punctuation">)</span> <span class="token operator">=</span><span class="token operator">&gt;</span> Price <span class="token operator">=</span> price<span class="token punctuation">;</span>  
+
+        <span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">RequestToPublish</span><span class="token punctuation">(</span><span class="token punctuation">)</span>  
+        <span class="token punctuation">{</span>  
+            <span class="token keyword">if</span> <span class="token punctuation">(</span>Title <span class="token operator">==</span> <span class="token keyword">null</span><span class="token punctuation">)</span>  
+                <span class="token keyword">throw</span> <span class="token keyword">new</span> <span class="token class-name">InvalidEntityStateException</span><span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">,</span> <br/><span class="token string">                    "title cannot be empty"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  
+              
+            <span class="token keyword">if</span> <span class="token punctuation">(</span>Text <span class="token operator">==</span> <span class="token keyword">null</span><span class="token punctuation">)</span>  
+                <span class="token keyword">throw</span> <span class="token keyword">new</span> <span class="token class-name">InvalidEntityStateException</span><span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">,</span> <br/><span class="token string">                    "text cannot be empty"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  
+              
+            <span class="token keyword">if</span> <span class="token punctuation">(</span>Price<span class="token operator">?</span><span class="token punctuation">.</span>Amount <span class="token operator">==</span> <span class="token number">0</span><span class="token punctuation">)</span>  
+                <span class="token keyword">throw</span> <span class="token keyword">new</span> <span class="token class-name">InvalidEntityStateException</span><span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">,</span> <br/><span class="token string">                    "price cannot be zero"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  
+
+            State <span class="token operator">=</span> ClassifiedAdState<span class="token punctuation">.</span>PendingReview<span class="token punctuation">;</span>  
+        <span class="token punctuation">}</span>  
+
+        <span class="token keyword">public</span> <span class="token class-name">UserId</span> OwnerId <span class="token punctuation">{</span> <span class="token keyword">get</span><span class="token punctuation">;</span> <span class="token punctuation">}</span>  
+        <span class="token keyword">public</span> <span class="token class-name">ClassifiedAdTitle</span> Title <span class="token punctuation">{</span> <span class="token keyword">get</span><span class="token punctuation">;</span> <span class="token keyword">private</span> <span class="token keyword">set</span><span class="token punctuation">;</span> <span class="token punctuation">}</span>  
+        <span class="token keyword">public</span> <span class="token class-name">ClassifiedAdText</span> Text <span class="token punctuation">{</span> <span class="token keyword">get</span><span class="token punctuation">;</span> <span class="token keyword">private</span> <span class="token keyword">set</span><span class="token punctuation">;</span> <span class="token punctuation">}</span>  
+        <span class="token keyword">public</span> <span class="token class-name">Price</span> Price <span class="token punctuation">{</span> <span class="token keyword">get</span><span class="token punctuation">;</span> <span class="token keyword">private</span> <span class="token keyword">set</span><span class="token punctuation">;</span> <span class="token punctuation">}</span>  
+        <span class="token keyword">public</span> <span class="token class-name">ClassifiedAdState</span> State <span class="token punctuation">{</span> <span class="token keyword">get</span><span class="token punctuation">;</span> <span class="token keyword">private</span> <span class="token keyword">set</span><span class="token punctuation">;</span> <span class="token punctuation">}</span>  
+        <span class="token keyword">public</span> <span class="token class-name">UserId</span> ApprovedBy <span class="token punctuation">{</span> <span class="token keyword">get</span><span class="token punctuation">;</span> <span class="token keyword">private</span> <span class="token keyword">set</span><span class="token punctuation">;</span> <span class="token punctuation">}</span>  
+
+        <span class="token keyword">public</span> <span class="token keyword">enum</span> ClassifiedAdState  
+        <span class="token punctuation">{</span>  
+            PendingReview<span class="token punctuation">,</span>  
+            Active<span class="token punctuation">,</span>  
+            Inactive<span class="token punctuation">,</span>  
+            MarkedAsSold  
+        <span class="token punctuation">}</span>  
+    <span class="token punctuation">}</span>  
+<span class="token punctuation">}</span></pre>
+<p>In the new entity code, we enforce the constraints that became visible from our detailed model, so the operation is only executed if all constraints are satisfied. To let the caller know if our entity is not ready to be published when some of those checks fail, we use our custom exception, which is implemented like this:</p>
+<pre class="language-csharp"><span class="token keyword">using</span> System<span class="token punctuation">;</span>  
+
+<span class="token keyword">namespace</span> Marketplace<span class="token punctuation">.</span>Domain  
+<span class="token punctuation">{</span>  
+    <span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">InvalidEntityStateException</span> <span class="token punctuation">:</span> <span class="token class-name">Exception</span>  
+    <span class="token punctuation">{</span>  
+        <span class="token keyword">public</span> <span class="token function">InvalidEntityStateException</span><span class="token punctuation">(</span><span class="token keyword">object</span> entity<span class="token punctuation">,</span> <span class="token keyword">string</span> <br/>        message<span class="token punctuation">)</span>  
+            <span class="token punctuation">:</span> <span class="token keyword">base</span><span class="token punctuation">(</span>$<span class="token string">"Entity {entity.GetType().Name}" +<br/>              $"state change rejected, {message}"</span><span class="token punctuation">)</span>  
+        <span class="token punctuation">{</span>  
+        <span class="token punctuation">}</span>  
+    <span class="token punctuation">}</span>  
+<span class="token punctuation">}</span></pre>
+<p>This method of checking constraints before executing the operation, in the operation method itself, has one disadvantage. If, now, we change the price to zero, it will go through, because the <kbd>UpdatePrice</kbd> method is not checking the price value. We could, of course, copy the price check to the <kbd>UpdatePrice</kbd> method too, but there might be more methods that need the same tests and we will keep copying the control blocks. This will lead to a situation where, if we need to change any of those rules, we need to go to numerous places to replace all of the checks. This approach is very error prone.</p>
+<p class="mce-root"/>
+<p>To combine rules in one place, we can use contract programming techniques. Part of contract programming can be seen in value objects, since we evaluate pre-conditions for each parameter of the operation method. When we execute the operation without doing any additional checks, we will need to do a combined test (post-condition control). This check can be implemented in one place for the whole entity, and each operation will need to call it at the last line in the method.</p>
+<p>For our classified ad entity, it could look like this:</p>
+<pre class="language-csharp"><span class="token keyword">namespace</span> Marketplace<span class="token punctuation">.</span>Domain  
+<span class="token punctuation">{</span>  
+    <span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">ClassifiedAd</span>  
+    <span class="token punctuation">{</span>  
+        <span class="token keyword">public</span> <span class="token class-name">ClassifiedAdId</span> Id <span class="token punctuation">{</span> <span class="token keyword">get</span><span class="token punctuation">;</span> <span class="token punctuation">}</span>  
+
+        <span class="token keyword">public</span> <span class="token function">ClassifiedAd</span><span class="token punctuation">(</span><span class="token class-name">ClassifiedAdId</span> id<span class="token punctuation">,</span> <span class="token class-name">UserId</span> ownerId<span class="token punctuation">)</span>  
+        <span class="token punctuation">{</span>  
+            Id <span class="token operator">=</span> id<span class="token punctuation">;</span>  
+            OwnerId <span class="token operator">=</span> ownerId<span class="token punctuation">;</span>  
+            State <span class="token operator">=</span> ClassifiedAdState<span class="token punctuation">.</span>Inactive<span class="token punctuation">;</span>  
+            <span class="token function">EnsureValidState</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  
+        <span class="token punctuation">}</span>  
+
+        <span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">SetTitle</span><span class="token punctuation">(</span><span class="token class-name">ClassifiedAdTitle</span> title<span class="token punctuation">)</span>  
+        <span class="token punctuation">{</span>  
+            Title <span class="token operator">=</span> title<span class="token punctuation">;</span>  
+            <span class="token function">EnsureValidState</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  
+        <span class="token punctuation">}</span>  
+
+        <span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">UpdateText</span><span class="token punctuation">(</span><span class="token class-name">ClassifiedAdText</span> text<span class="token punctuation">)</span>  
+        <span class="token punctuation">{</span>  
+            Text <span class="token operator">=</span> text<span class="token punctuation">;</span>  
+            <span class="token function">EnsureValidState</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  
+        <span class="token punctuation">}</span>  
+
+        <span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">UpdatePrice</span><span class="token punctuation">(</span><span class="token class-name">Price</span> price<span class="token punctuation">)</span>  
+        <span class="token punctuation">{</span>  
+            Price <span class="token operator">=</span> price<span class="token punctuation">;</span>  
+            <span class="token function">EnsureValidState</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  
+        <span class="token punctuation">}</span>  
+
+        <span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">RequestToPublish</span><span class="token punctuation">(</span><span class="token punctuation">)</span>  
+        <span class="token punctuation">{</span>  
+            State <span class="token operator">=</span> ClassifiedAdState<span class="token punctuation">.</span>PendingReview<span class="token punctuation">;</span>  
+            <span class="token function">EnsureValidState</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  
+        <span class="token punctuation">}</span>  
+
+        private void EnsureValidState()<br/>        {<br/>            var valid =<br/>                Id != null &amp;&amp;<br/>                OwnerId != null &amp;&amp;<br/>                (State switch<br/>                {<br/>                    ClassifiedAdState.PendingReview =&gt;<br/>                        Title != null<br/>                        &amp;&amp; Text != null<br/>                        &amp;&amp; Price?.Amount &gt; 0,<br/>                    ClassifiedAdState.Active =&gt;<br/>                        Title != null<br/>                        &amp;&amp; Text != null<br/>                        &amp;&amp; Price?.Amount &gt; 0<br/>                        &amp;&amp; ApprovedBy != null,<br/>                    _ =&gt; true<br/>                });<br/><br/>            if (!valid)<br/>                throw new InvalidEntityStateException(<br/>                    this, $"Post-checks failed in state {State}");<br/>        }<br/><br/>        <span class="token keyword">public</span> <span class="token class-name">UserId</span> OwnerId <span class="token punctuation">{</span> <span class="token keyword">get</span><span class="token punctuation">;</span> <span class="token punctuation">}</span>  
+        <span class="token keyword">public</span> <span class="token class-name">ClassifiedAdTitle</span> Title <span class="token punctuation">{</span> <span class="token keyword">get</span><span class="token punctuation">;</span> <span class="token keyword">private</span> <span class="token keyword">set</span><span class="token punctuation">;</span> <span class="token punctuation">}</span>  
+        <span class="token keyword">public</span> <span class="token class-name">ClassifiedAdText</span> Text <span class="token punctuation">{</span> <span class="token keyword">get</span><span class="token punctuation">;</span> <span class="token keyword">private</span> <span class="token keyword">set</span><span class="token punctuation">;</span> <span class="token punctuation">}</span>  
+        <span class="token keyword">public</span> <span class="token class-name">Price</span> Price1 <span class="token punctuation">{</span> <span class="token keyword">get</span><span class="token punctuation">;</span> <span class="token keyword">private</span> <span class="token keyword">set</span><span class="token punctuation">;</span> <span class="token punctuation">}</span>  
+        <span class="token keyword">public</span> <span class="token class-name">ClassifiedAdState</span> State <span class="token punctuation">{</span> <span class="token keyword">get</span><span class="token punctuation">;</span> <span class="token keyword">private</span> <span class="token keyword">set</span><span class="token punctuation">;</span> <span class="token punctuation">}</span>  
+        <span class="token keyword">public</span> <span class="token class-name">UserId</span> ApprovedBy <span class="token punctuation">{</span> <span class="token keyword">get</span><span class="token punctuation">;</span> <span class="token keyword">private</span> <span class="token keyword">set</span><span class="token punctuation">;</span> <span class="token punctuation">}</span>  
+
+        <span class="token keyword">public</span> <span class="token keyword">enum</span> ClassifiedAdState  
+        <span class="token punctuation">{</span>  
+            PendingReview<span class="token punctuation">,</span>  
+            Active<span class="token punctuation">,</span>  
+            Inactive<span class="token punctuation">,</span>  
+            MarkedAsSold  
+        <span class="token punctuation">}</span>  
+    <span class="token punctuation">}</span>  
+
+<span class="token punctuation">}</span></pre>
+<p>As you can see, we have added a method called <kbd>EnsureValidState</kbd>, which checks that in any situation, the entity state is valid, and if it is not valid, an exception will be thrown. When we call this method from any operation method, we can be sure that no matter what we are trying to do, our entity will always be in a valid state or the caller will get an exception.</p>
+<p class="mce-root"/>
+<div class="packt_tip">Throwing an exception when the entity becomes invalid is the easiest way to prevent inconsistencies, but it has its downsides. The whole application needs to be able to handle such exceptions gracefully so the user gets properly informed. <br/>
+<br/>
+The web API code for this chapter, for example, doesn't do it and expects all operations to be successfully executed. As a result, when we try executing commands that bring the entity to some incorrect state, will crash the API method and return the exception via HTTP.  The web API code will be improved as we move along and we will start returning proper errors results from the API.<br/>
+<br/>
+When using Event Sourcing one of the techniques to expose incorrect operations is to emit domain events like <kbd>PriceChangeDenied</kbd>, which include all values that the application tried to apply to an entity but failed. Using this method gives developers a powerful tool to find out why certain commands weren't executed and even potentially discover malicious behavior of the user.</div>
+<p>Also, we converted all private fields to public read-only properties. We need public properties to write tests, although we don't necessarily need to expose the internal entity state. To prevent setting values of these properties outside operation methods, all properties have private setters, or no setters for properties that are set in the constructor.</p>
+<p>Now, let's write some tests to ensure that our constraints work:</p>
+<pre class="language-csharp"><span class="token keyword">using</span> System<span class="token punctuation">;</span>  
+<span class="token keyword">using</span> Marketplace<span class="token punctuation">.</span>Domain<span class="token punctuation">;</span>  
+<span class="token keyword">using</span> Xunit<span class="token punctuation">;</span>  
+
+<span class="token keyword">namespace</span> Marketplace<span class="token punctuation">.</span>Tests  
+<span class="token punctuation">{</span>  
+    <span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">ClassifiedAd_Publish_Spec</span>  
+    <span class="token punctuation">{</span>  
+        <span class="token keyword">private</span> <span class="token keyword">readonly</span> <span class="token class-name">ClassifiedAd</span> _classifiedAd<span class="token punctuation">;</span>  
+
+        <span class="token keyword">public</span> <span class="token function">ClassifiedAd_Publish_Spec</span><span class="token punctuation">(</span><span class="token punctuation">)</span>  
+        <span class="token punctuation">{</span>  
+            _classifiedAd <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">ClassifiedAd</span><span class="token punctuation">(</span>  
+                <span class="token keyword">new</span> <span class="token class-name">ClassifiedAdId</span><span class="token punctuation">(</span>Guid<span class="token punctuation">.</span><span class="token function">NewGuid</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>   
+                <span class="token keyword">new</span> <span class="token class-name">UserId</span><span class="token punctuation">(</span>Guid<span class="token punctuation">.</span><span class="token function">NewGuid</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  
+        <span class="token punctuation">}</span>  
+
+        <span class="token punctuation">[</span><span class="token class-name">Fact</span><span class="token punctuation">]</span>  
+        <span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">Can_publish_a_valid_ad</span><span class="token punctuation">(</span><span class="token punctuation">)</span>  
+        <span class="token punctuation">{</span>  
+            _classifiedAd<span class="token punctuation">.</span><span class="token function">SetTitle</span><span class="token punctuation">(<br/></span>                ClassifiedAdTitle<span class="token punctuation">.</span><span class="token function">FromString</span><span class="token punctuation">(</span><span class="token string">"Test ad"</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  
+            _classifiedAd<span class="token punctuation">.</span><span class="token function">UpdateText</span><span class="token punctuation">(<br/></span>                ClassifiedAdText<span class="token punctuation">.</span><span class="token function">FromString</span><span class="token punctuation">(</span><span class="token string">"Please buy my stuff"</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  
+            _classifiedAd<span class="token punctuation">.</span><span class="token function">UpdatePrice</span><span class="token punctuation">(</span>  
+                Price<span class="token punctuation">.</span><span class="token function">FromDecimal</span><span class="token punctuation">(</span><span class="token number">100.10</span>m<span class="token punctuation">,</span> <span class="token string">"EUR"</span><span class="token punctuation">,</span> <br/><span class="token keyword">                    new</span> <span class="token class-name">FakeCurrencyLookup</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  
+              
+            _classifiedAd<span class="token punctuation">.</span><span class="token function">RequestToPublish</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  
+
+            Assert<span class="token punctuation">.</span><span class="token function">Equal</span><span class="token punctuation">(<br/></span>                ClassifiedAd<span class="token punctuation">.</span>ClassifiedAdState<span class="token punctuation">.</span>PendingReview<span class="token punctuation">,</span>  
+                _classifiedAd<span class="token punctuation">.</span>State<span class="token punctuation">)</span><span class="token punctuation">;</span>  
+        <span class="token punctuation">}</span>  
+
+        <span class="token punctuation">[</span><span class="token class-name">Fact</span><span class="token punctuation">]</span>  
+        <span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">Cannot_publish_without_title</span><span class="token punctuation">(</span><span class="token punctuation">)</span>  
+        <span class="token punctuation">{</span>  
+            _classifiedAd<span class="token punctuation">.</span><span class="token function">UpdateText</span><span class="token punctuation">(<br/></span>                ClassifiedAdText<span class="token punctuation">.</span><span class="token function">FromString</span><span class="token punctuation">(</span><span class="token string">"Please buy my stuff"</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  
+            _classifiedAd<span class="token punctuation">.</span><span class="token function">UpdatePrice</span><span class="token punctuation">(</span>  
+                Price<span class="token punctuation">.</span><span class="token function">FromDecimal</span><span class="token punctuation">(</span><span class="token number">100.10</span>m<span class="token punctuation">,</span> <span class="token string">"EUR"</span><span class="token punctuation">,</span> <br/>                    <span class="token keyword">new</span> <span class="token class-name">FakeCurrencyLookup</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  
+              
+            Assert<span class="token punctuation">.</span><span class="token generic-method"><span class="token function">Throws</span><span class="token punctuation">&lt;</span><span class="token class-name">InvalidEntityStateException</span><span class="token punctuation">&gt;</span></span><span class="token punctuation">(<br/>                </span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">=</span><span class="token operator">&gt;</span> _classifiedAd<span class="token punctuation">.</span><span class="token function">RequestToPublish</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  
+        <span class="token punctuation">}</span>  
+
+        <span class="token punctuation">[</span><span class="token class-name">Fact</span><span class="token punctuation">]</span>  
+        <span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">Cannot_publish_without_text</span><span class="token punctuation">(</span><span class="token punctuation">)</span>  
+        <span class="token punctuation">{</span>  
+            _classifiedAd<span class="token punctuation">.</span><span class="token function">SetTitle</span><span class="token punctuation">(<br/>                </span>ClassifiedAdTitle<span class="token punctuation">.</span><span class="token function">FromString</span><span class="token punctuation">(</span><span class="token string">"Test ad"</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  
+            _classifiedAd<span class="token punctuation">.</span><span class="token function">UpdatePrice</span><span class="token punctuation">(</span>  
+                Price<span class="token punctuation">.</span><span class="token function">FromDecimal</span><span class="token punctuation">(</span><span class="token number">100.10</span>m<span class="token punctuation">,</span> <span class="token string">"EUR"</span><span class="token punctuation">,</span> <br/>                    <span class="token keyword">new</span> <span class="token class-name">FakeCurrencyLookup</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  
+              
+            Assert<span class="token punctuation">.</span><span class="token generic-method"><span class="token function">Throws</span><span class="token punctuation">&lt;</span><span class="token class-name">InvalidEntityStateException</span><span class="token punctuation">&gt;</span></span><span class="token punctuation">(<br/>                </span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">=</span><span class="token operator">&gt;</span> _classifiedAd<span class="token punctuation">.</span><span class="token function">RequestToPublish</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  
+        <span class="token punctuation">}</span>  
+
+        <span class="token punctuation">[</span><span class="token class-name">Fact</span><span class="token punctuation">]</span>  
+        <span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">Cannot_publish_without_price</span><span class="token punctuation">(</span><span class="token punctuation">)</span>  
+        <span class="token punctuation">{</span>  
+            _classifiedAd<span class="token punctuation">.</span><span class="token function">SetTitle</span><span class="token punctuation">(<br/>                </span>ClassifiedAdTitle<span class="token punctuation">.</span><span class="token function">FromString</span><span class="token punctuation">(</span><span class="token string">"Test ad"</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  
+            _classifiedAd<span class="token punctuation">.</span><span class="token function">UpdateText</span><span class="token punctuation">(<br/>                </span>ClassifiedAdText<span class="token punctuation">.</span><span class="token function">FromString</span><span class="token punctuation">(</span><span class="token string">"Please buy my stuff"</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  
+              
+            Assert<span class="token punctuation">.</span><span class="token generic-method"><span class="token function">Throws</span><span class="token punctuation">&lt;</span><span class="token class-name">InvalidEntityStateException</span><span class="token punctuation">&gt;</span></span><span class="token punctuation">(<br/>                </span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">=</span><span class="token operator">&gt;</span> _classifiedAd<span class="token punctuation">.</span><span class="token function">RequestToPublish</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  
+        <span class="token punctuation">}</span>  
+
+        <span class="token punctuation">[</span><span class="token class-name">Fact</span><span class="token punctuation">]</span>  
+        <span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">Cannot_publish_with_zero_price</span><span class="token punctuation">(</span><span class="token punctuation">)</span>  
+        <span class="token punctuation">{</span>  
+            _classifiedAd<span class="token punctuation">.</span><span class="token function">SetTitle</span><span class="token punctuation">(<br/>                </span>ClassifiedAdTitle<span class="token punctuation">.</span><span class="token function">FromString</span><span class="token punctuation">(</span><span class="token string">"Test ad"</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  
+            _classifiedAd<span class="token punctuation">.</span><span class="token function">UpdateText</span><span class="token punctuation">(<br/>                </span>ClassifiedAdText<span class="token punctuation">.</span><span class="token function">FromString</span><span class="token punctuation">(</span><span class="token string">"Please buy my stuff"</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  
+            _classifiedAd<span class="token punctuation">.</span><span class="token function">UpdatePrice</span><span class="token punctuation">(</span>  
+                Price<span class="token punctuation">.</span><span class="token function">FromDecimal</span><span class="token punctuation">(</span><span class="token number">0.0</span>m<span class="token punctuation">,</span> <span class="token string">"EUR"</span><span class="token punctuation">,</span> <br/>                    <span class="token keyword">new</span> <span class="token class-name">FakeCurrencyLookup</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  
+              
+            Assert<span class="token punctuation">.</span><span class="token generic-method"><span class="token function">Throws</span><span class="token punctuation">&lt;</span><span class="token class-name">InvalidEntityStateException</span><span class="token punctuation">&gt;</span></span><span class="token punctuation">(<br/>                </span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">=</span><span class="token operator">&gt;</span> _classifiedAd<span class="token punctuation">.</span><span class="token function">RequestToPublish</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  
+        <span class="token punctuation">}</span>  
+    <span class="token punctuation">}</span>  
+<span class="token punctuation">}</span></pre>
+<p>This spec contains several tests for one operation (publish, or submit for review) with different pre-conditions. Here, we test a happy path when all necessary details are correctly set before the ad can be sent for review; we also test several negative cases when publishing is not allowed due to missing mandatory information. Perhaps testing negative scenarios is even more essential, since it is straightforward to find out when the happy path does not work—your users will immediately complain. Testing negative scenarios prevents bugs in controlling entity invariants, which, in turn, prevent entities from becoming invalid.</p>
+<p>When we moved the entity state checks to one method, we effectively set up a holistic set of rules that need to be executed for each operation. This means that those rules aren't command-specific any more, and our <kbd>EnsureValidState</kbd> method has become a guardian for the entire object. It protects the invariants of our <kbd>ClassifiedAd</kbd> entity so it can never become invalid. The ability to protect its own invariants is one of the main aspects of the aggregate pattern. By executing each command for the <kbd>ClassifiedAd</kbd> entity within individual transactions, and by establishing invariant protection, we created our first aggregate.</p>
+<p>Now, we have learned how to protect our entity from becoming invalid. But we expect more entities to appear in our application, and the code of the <kbd>ClassifiedAd</kbd> entity becomes quite verbose because we have to call the <kbd>EnsureValidState</kbd> method in each operation. Also, it is certainly possible to forget to put the call in an entity method and then get a chance to get the entity in an invalid state without getting any exceptions. However, this cannot possibly happen if we want to have a true aggregate, so let's see how we can use the power of events to ensure the state validity for all operations.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Enforcing the rules</h1>
+                </header>
+            
+            <article>
+                
+<p>Let's now examine how we execute operations on the entity:</p>
+<ul>
+<li>Call the entity method for operation (the CQS command)</li>
+<li>The method emits an event</li>
+<li>An event is then applied to the entity state to perform the state transition</li>
+</ul>
+<p>So, if we want to ensure that all state transitions do not break our invariants, we can move the call to <kbd>EnsureValidState</kbd> to the <kbd>Apply</kbd> method. The need to protect its state only applies to the aggregate root entity because it must ensure that the whole aggregate state is correct, and not just its own state validity. Therefore, we can make a new base class for this special type of entity:</p>
+<pre class="language-csharp"><span class="token keyword">using</span> System<span class="token punctuation">.</span>Collections<span class="token punctuation">.</span>Generic<span class="token punctuation">;</span>
+<span class="token keyword">using</span> System<span class="token punctuation">.</span>Linq<span class="token punctuation">;</span>
+
+<span class="token keyword">namespace</span> Marketplace<span class="token punctuation">.</span>Framework
+<span class="token punctuation">{</span>
+    <span class="token keyword">public</span> <span class="token keyword">abstract</span> <span class="token keyword">class</span> <span class="token class-name">AggregateRoot</span><span class="token operator">&lt;</span>TId<span class="token operator">&gt;</span>
+        <span class="token keyword">where</span> TId <span class="token punctuation">:</span> Value<span class="token operator">&lt;</span>TId<span class="token operator">&gt;</span>
+    <span class="token punctuation">{</span>
+        <span class="token keyword">public</span> <span class="token class-name">TId</span> Id <span class="token punctuation">{</span> <span class="token keyword">get</span><span class="token punctuation">;</span> <span class="token keyword">protected</span> <span class="token keyword">set</span><span class="token punctuation">;</span> <span class="token punctuation">}</span>
+
+        <span class="token keyword">protected</span> <span class="token keyword">abstract</span> <span class="token keyword">void</span> <span class="token function">When</span><span class="token punctuation">(</span><span class="token keyword">object</span> @<span class="token keyword">event</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        
+        <span class="token keyword">private</span> <span class="token keyword">readonly</span> List<span class="token operator">&lt;</span><span class="token keyword">object</span><span class="token operator">&gt;</span> _changes<span class="token punctuation">;</span>
+
+        <span class="token keyword">protected</span> <span class="token function">AggregateRoot</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">=</span><span class="token operator">&gt;</span> _changes <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token generic-method"><span class="token function">List</span><span class="token punctuation">&lt;</span><span class="token keyword">object</span><span class="token punctuation">&gt;</span></span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token keyword">protected</span> <span class="token keyword">void</span> <span class="token function">Apply</span><span class="token punctuation">(</span><span class="token keyword">object</span> @<span class="token keyword">event</span><span class="token punctuation">)</span>
+        <span class="token punctuation">{</span>
+            <span class="token function">When</span><span class="token punctuation">(</span>@<span class="token keyword">event</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token function">EnsureValidState</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            _changes<span class="token punctuation">.</span><span class="token function">Add</span><span class="token punctuation">(</span>@<span class="token keyword">event</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">}</span>
+
+        <span class="token keyword">public</span> IEnumerable<span class="token operator">&lt;</span><span class="token keyword">object</span><span class="token operator">&gt;</span> <span class="token function">GetChanges</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <br/>            <span class="token operator">=</span><span class="token operator">&gt;</span> _changes<span class="token punctuation">.</span><span class="token function">AsEnumerable</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">ClearChanges</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">=</span><span class="token operator">&gt;</span> _changes<span class="token punctuation">.</span><span class="token function">Clear</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token keyword">protected</span> <span class="token keyword">abstract</span> <span class="token keyword">void</span> <span class="token function">EnsureValidState</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></pre>
+<p>Here, we have renamed the <kbd>_events</kbd> collection to <kbd>_changes</kbd> to make the naming more explicit. We also added a call to <kbd>EnsureValidState</kbd> to the <kbd>Apply</kbd> method. This means that whenever we execute an operation that is supposed to change the aggregate root entity state, we apply a new event and the state changes in the <kbd>When</kbd> method. However, before adding the new event to the list of changes, we check whether the new state is valid and that no invariants are broken. If the new state violates the invariants, we throw an exception.</p>
+<p>After we refactor our <kbd>ClassifiedAd</kbd> class to use the new base class, the code becomes simpler:</p>
+<pre class="language-csharp">using Marketplace.Framework;<br/>using static Marketplace.Domain.Events;<br/><br/>namespace Marketplace.Domain<br/>{<br/>    public class ClassifiedAd : Entity&lt;ClassifiedAdId&gt;<br/>    {<br/>        public ClassifiedAdId Id { get; private set; }<br/>        public UserId OwnerId { get; private set; }<br/>        public ClassifiedAdTitle Title { get; private set; }<br/>        public ClassifiedAdText Text { get; private set; }<br/>        public Price Price { get; private set; }<br/>        public ClassifiedAdState State { get; private set; }<br/>        public UserId ApprovedBy { get; private set; }<br/><br/>        public ClassifiedAd(ClassifiedAdId id, UserId ownerId) =&gt;<br/>            Apply(new ClassifiedAdCreated<br/>            {<br/>                Id = id,<br/>                OwnerId = ownerId<br/>            });<br/><br/>        public void SetTitle(ClassifiedAdTitle title) =&gt;<br/>            Apply(new ClassifiedAdTitleChanged<br/>            {<br/>                Id = Id,<br/>                Title = title<br/>            });<br/><br/>        public void UpdateText(ClassifiedAdText text) =&gt;<br/>            Apply(new ClassifiedAdTextUpdated<br/>            {<br/>                Id = Id,<br/>                AdText = text<br/>            });<br/><br/>        public void UpdatePrice(Price price) =&gt;<br/>            Apply(new ClassifiedAdPriceUpdated<br/>            {<br/>                Id = Id,<br/>                Price = price.Amount,<br/>                CurrencyCode = price.Currency.CurrencyCode<br/>            });<br/><br/>        public void RequestToPublish() =&gt;<br/>            Apply(new ClassidiedAdSentForReview {Id = Id});<br/><br/>        protected override void When(object @event)<br/>        {<br/>            switch (@event)<br/>            {<br/>                case ClassifiedAdCreated e:<br/>                    Id = new ClassifiedAdId(e.Id);<br/>                    OwnerId = new UserId(e.OwnerId);<br/>                    State = ClassifiedAdState.Inactive;<br/>                    break;<br/>                case ClassifiedAdTitleChanged e:<br/>                    Title = new ClassifiedAdTitle(e.Title);<br/>                    break;<br/>                case ClassifiedAdTextUpdated e:<br/>                    Text = new ClassifiedAdText(e.AdText);<br/>                    break;<br/>                case ClassifiedAdPriceUpdated e:<br/>                    Price = new Price(e.Price, e.CurrencyCode);<br/>                    break;<br/>                case ClassidiedAdSentForReview _:<br/>                    State = ClassifiedAdState.PendingReview;<br/>                    break;<br/>            }<br/>        }<br/><br/>        protected override void EnsureValidState()<br/>        {<br/>            var valid =<br/>                Id != null &amp;&amp;<br/>                OwnerId != null &amp;&amp;<br/>                (State switch<br/>                {<br/>                    ClassifiedAdState.PendingReview =&gt;<br/>                        Title != null<br/>                        &amp;&amp; Text != null<br/>                        &amp;&amp; Price?.Amount &gt; 0,<br/>                    ClassifiedAdState.Active =&gt;<br/>                        Title != null<br/>                        &amp;&amp; Text != null<br/>                        &amp;&amp; Price?.Amount &gt; 0<br/>                        &amp;&amp; ApprovedBy != null,<br/>                    _ =&gt; true<br/>                });<br/><br/>            if (!valid)<br/>                throw new InvalidEntityStateException(<br/>                    this, $"Post-checks failed in state {State}");<br/>        }<br/><br/>        public enum ClassifiedAdState<br/>        {<br/>            PendingReview,<br/>            Active,<br/>            Inactive,<br/>            MarkedAsSold<br/>        }<br/>    }<br/>}</pre>
+<p>As you can see, all the conditions are now consolidated in one place, and no matter what we do, we cannot publish an ad that has no price or no text. Also, it is impossible to have a hidden bug in any other places of the application that could make an ad active and visible without being approved first. This technique to ensure the validity of the state is consistently very powerful, and it also improves the readability of our code by giving developers a clue as to where they can look when trying to figure out all the rules that an entity must adhere to.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Entities inside an aggregate</h1>
+                </header>
+            
+            <article>
+                
+<p>It might seem weird that we just added a base class called <kbd>AggregateRoot</kbd> and used it instead of the <kbd>Entity</kbd> class that we already had before. We could have just added new code to the <kbd>Entity</kbd> base class. However, this was done on purpose, because, as you might remember, aggregates can potentially form larger object graphs, and, in addition to the root entity, we might have several entities that will be the children of the root. We already discussed the ownership strategy, so when an aggregate is removed, the aggregate root and all its children are also removed from the system.</p>
+<p>For all the child objects, we would be talking about value objects or entities, as the rule of the aggregate pattern is strict. None of those child objects should be referenced, accessed, or manipulated outside the aggregate boundary. All operations on an aggregate need to be performed by calling methods on the aggregate root. Also, accessing any child objects inside the aggregate needs to go via the aggregate root as well.</p>
+<p>Let's illustrate this principle by adding an entity to our <kbd>ClassifiedAd</kbd> aggregate. One of our EventStorming sessions helped us to discover that we need pictures to be added to ads since, without pictures, people are really hesitant to buy anything. An ad can have multiple pictures, and we could think of these pictures as value objects because users cannot <em>change</em> images. They can either upload new ones or remove existing ones. However, it seems as if users need to be able to choose in what order those images appear and what image is shown in the search results, as the <em>main</em> image. We can solve this issue by using a value object called <kbd>ImageOrder</kbd>, which will be replaced each time the user changes the order of the pictures. But, even in this case, we would need to reference images somehow, using some sort of identity. It makes us certain that our future <kbd>Picture</kbd> objects will be entities so we can reference them by an identity inside the aggregate. If we do that, we do not need to have an <kbd>ImageOrder</kbd> object, since we can keep the ordering attribute inside the <kbd>Picture</kbd> object itself. So, our entity will have the option of a state change, and we need to handle that too.</p>
+<p>We can use the <kbd>Entity</kbd> base class to create our new <kbd>Picture</kbd> class in the <kbd>Domain</kbd> project:</p>
+<pre class="language-csharp"><span class="token keyword">using</span> System<span class="token punctuation">;</span>
+<span class="token keyword">using</span> System<span class="token punctuation">.</span>Collections<span class="token punctuation">.</span>Generic<span class="token punctuation">;</span>
+<span class="token keyword">using</span> Marketplace<span class="token punctuation">.</span>Framework<span class="token punctuation">;</span>
+
+<span class="token keyword">namespace</span> Marketplace<span class="token punctuation">.</span>Domain
+<span class="token punctuation">{</span>
+    <span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">Picture</span> <span class="token punctuation">:</span> <span class="token class-name">Entity</span><span class="token operator">&lt;</span>PictureId<span class="token operator">&gt;</span>
+    <span class="token punctuation">{</span>
+        <span class="token keyword">internal</span> <span class="token class-name">PictureSize</span> Size <span class="token punctuation">{</span> <span class="token keyword">get</span><span class="token punctuation">;</span> <span class="token keyword">set</span><span class="token punctuation">;</span> <span class="token punctuation">}</span>
+        <span class="token keyword">internal</span> <span class="token class-name">Uri</span> Location <span class="token punctuation">{</span> <span class="token keyword">get</span><span class="token punctuation">;</span> <span class="token keyword">set</span><span class="token punctuation">;</span> <span class="token punctuation">}</span>
+        <span class="token keyword">internal</span> <span class="token keyword">int</span> Order <span class="token punctuation">{</span> <span class="token keyword">get</span><span class="token punctuation">;</span> <span class="token keyword">set</span><span class="token punctuation">;</span> <span class="token punctuation">}</span>
+
+        <span class="token keyword">protected</span> <span class="token keyword">override</span> <span class="token keyword">void</span> <span class="token function">When</span><span class="token punctuation">(</span><span class="token keyword">object</span> @<span class="token keyword">event</span><span class="token punctuation">)</span>
+        <span class="token punctuation">{</span>
+        <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+
+    <span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">PictureId</span> <span class="token punctuation">:</span> <span class="token class-name">Value</span><span class="token operator">&lt;</span>PictureId<span class="token operator">&gt;</span>
+    <span class="token punctuation">{</span>
+        <span class="token keyword">public</span> <span class="token function">PictureId</span><span class="token punctuation">(</span><span class="token class-name">Guid</span> <span class="token keyword">value</span><span class="token punctuation">)</span> <span class="token operator">=</span><span class="token operator">&gt;</span> Value <span class="token operator">=</span> <span class="token keyword">value</span><span class="token punctuation">;</span>
+
+        <span class="token keyword">public</span> <span class="token class-name">Guid</span> Value <span class="token punctuation">{</span> <span class="token keyword">get</span><span class="token punctuation">;</span> <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></pre>
+<p>Here, we do not expect to hold the image itself inside the entity as a byte array. The physical image itself is not a concern for our domain. Within the domain model, we assume that all images are stored somewhere and we just need to have an image location (a URL to an external resource) to be connected to the classified ad.</p>
+<p>We still need to remember that all operations are executed by calling the aggregate root, so we add an operation to the <kbd>ClassifiedAd</kbd> class:</p>
+<pre class="language-csharp"><span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">AddPicture</span><span class="token punctuation">(</span><span class="token class-name">Uri</span> pictureUri<span class="token punctuation">,</span> <span class="token class-name">PictureSize</span> size<span class="token punctuation">)</span> <span class="token operator">=</span><span class="token operator">&gt;</span>
+    <span class="token function">Apply</span><span class="token punctuation">(</span><span class="token keyword">new</span> <span class="token class-name">Events<span class="token punctuation">.</span>PictureAddedToAClassifiedAd</span>
+    <span class="token punctuation">{</span>
+        PictureId <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">Guid</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        ClassifiedAdId <span class="token operator">=</span> Id<span class="token punctuation">,</span>
+        Url <span class="token operator">=</span> pictureUri<span class="token punctuation">.</span><span class="token function">ToString</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        Height <span class="token operator">=</span> size<span class="token punctuation">.</span>Height<span class="token punctuation">,</span>
+        Width <span class="token operator">=</span> size<span class="token punctuation">.</span>Width
+    <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span></pre>
+<p>Of course, we need to create a class for the <kbd>PictureAddedToAClassifiedAd</kbd> event as well:</p>
+<pre class="language-csharp"><span class="token keyword">namespace</span> Marketplace<span class="token punctuation">.</span>Domain
+<span class="token punctuation">{</span>
+    <span class="token keyword">public</span> <span class="token keyword">static</span> <span class="token keyword">class</span> <span class="token class-name">Events</span>
+    <span class="token punctuation">{</span>
+        <span class="token comment">// all events are still here</span>
+
+        <span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">PictureAddedToAClassifiedAd</span>
+        <span class="token punctuation">{</span>
+            <span class="token keyword">public</span> <span class="token class-name">Guid</span> ClassifiedAdId <span class="token punctuation">{</span> <span class="token keyword">get</span><span class="token punctuation">;</span> <span class="token keyword">set</span><span class="token punctuation">;</span> <span class="token punctuation">}</span>
+            <span class="token keyword">public</span> <span class="token class-name">Guid</span> PictureId <span class="token punctuation">{</span> <span class="token keyword">get</span><span class="token punctuation">;</span> <span class="token keyword">set</span><span class="token punctuation">;</span> <span class="token punctuation">}</span>
+            <span class="token keyword">public</span> <span class="token keyword">string</span> Url <span class="token punctuation">{</span> <span class="token keyword">get</span><span class="token punctuation">;</span> <span class="token keyword">set</span><span class="token punctuation">;</span> <span class="token punctuation">}</span>
+            <span class="token keyword">public</span> <span class="token keyword">int</span> Height <span class="token punctuation">{</span> <span class="token keyword">get</span><span class="token punctuation">;</span> <span class="token keyword">set</span><span class="token punctuation">;</span> <span class="token punctuation">}</span>
+            <span class="token keyword">public</span> <span class="token keyword">int</span> Width <span class="token punctuation">{</span> <span class="token keyword">get</span><span class="token punctuation">;</span> <span class="token keyword">set</span><span class="token punctuation">;</span> <span class="token punctuation">}</span>
+        <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></pre>
+<p>In the event class, <kbd>ClassifiedAdId</kbd> is the ID of our aggregate root. The picture ID is externally generated, and it will be sent to the application service by the client, but we will never use this ID to directly reference the picture from outside the aggregate boundaries. Also, we assume that pictures are always added to the end of the list, so we don't need to send the order number since it will be assigned by the aggregate logic.</p>
+<p class="mce-root"/>
+<p class="mce-root"/>
+<p>We used two value objects as parameters for the <kbd>AddPicture</kbd> method. The <kbd>System.Uri</kbd> type is a .NET framework standard type, and we only need to define the <kbd>PictureSize</kbd> value object:</p>
+<pre class="language-csharp"><span class="token keyword">using</span> System<span class="token punctuation">;</span>
+<span class="token keyword">using</span> Marketplace<span class="token punctuation">.</span>Framework<span class="token punctuation">;</span>
+
+<span class="token keyword">namespace</span> Marketplace<span class="token punctuation">.</span>Domain
+<span class="token punctuation">{</span>
+    <span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">PictureSize</span> <span class="token punctuation">:</span> <span class="token class-name">Value</span><span class="token operator">&lt;</span>PictureSize<span class="token operator">&gt;</span>
+    <span class="token punctuation">{</span>
+        <span class="token keyword">public</span> <span class="token keyword">int</span> Width <span class="token punctuation">{</span> <span class="token keyword">get</span><span class="token punctuation">;</span> <span class="token keyword">internal</span> <span class="token keyword">set</span><span class="token punctuation">;</span> <span class="token punctuation">}</span>
+        <span class="token keyword">public</span> <span class="token keyword">int</span> Height <span class="token punctuation">{</span> <span class="token keyword">get</span><span class="token punctuation">;</span> <span class="token keyword">internal</span> <span class="token keyword">set</span><span class="token punctuation">;</span> <span class="token punctuation">}</span>
+
+        <span class="token keyword">public</span> <span class="token function">PictureSize</span><span class="token punctuation">(</span><span class="token keyword">int</span> width<span class="token punctuation">,</span> <span class="token keyword">int</span> height<span class="token punctuation">)</span>
+        <span class="token punctuation">{</span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span>Width <span class="token operator">&lt;=</span> <span class="token number">0</span><span class="token punctuation">)</span>
+                <span class="token keyword">throw</span> <span class="token keyword">new</span> <span class="token class-name">ArgumentOutOfRangeException</span><span class="token punctuation">(</span>
+                    <span class="token function">nameof</span><span class="token punctuation">(</span>width<span class="token punctuation">)</span><span class="token punctuation">,</span> 
+                    <span class="token string">"Picture width must be a positive number"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            
+            <span class="token keyword">if</span> <span class="token punctuation">(</span>Height <span class="token operator">&lt;=</span> <span class="token number">0</span><span class="token punctuation">)</span>
+                <span class="token keyword">throw</span> <span class="token keyword">new</span> <span class="token class-name">ArgumentOutOfRangeException</span><span class="token punctuation">(</span>
+                    <span class="token function">nameof</span><span class="token punctuation">(</span>height<span class="token punctuation">)</span><span class="token punctuation">,</span> 
+                    <span class="token string">"Picture height must be a positive number"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            
+            Width <span class="token operator">=</span> width<span class="token punctuation">;</span>
+            Height <span class="token operator">=</span> height<span class="token punctuation">;</span>
+        <span class="token punctuation">}</span>
+
+        <span class="token keyword">internal</span> <span class="token function">PictureSize</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span> <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></pre>
+<p>Again, we use the power of value objects and ensure the validity of input values inside it, so we don't need to spread this logic everywhere. We still need an internal constructor that will allow us to create this object without validating values because we need to be able to unconditionally retrieve the existing object from the database, and we cannot rely on the idea that validation rules will not change over time.</p>
+<p class="mce-root"/>
+<p class="mce-root"/>
+<div class="packt_tip">Also here, throwing an exception is not the only way you can use to protect value objects from becoming invalid. One alternative way is to create a property <kbd>IsValid</kbd> for the value object but then you need to check it everywhere when using the value, probably in the application service. Another alternative is to create a special static object instance that would indicate an incorrect value. You can then check if the value you are trying to apply is valid or not. Although you'd need more code to implement both of those methods, you will avoid throwing exceptions. Remember that unlike Java, C# has no way to explicitly inform those who call your objects that the method can throw an exception.  Therefore, some callers won't be considering wrapping the call in a try-catch block and the application can blow up at runtime.</div>
+<p>Now, we have to change the aggregate state after we apply the new event to the aggregate root. We do this by adding a new case to our pattern matching <kbd>case</kbd> in the <kbd>When</kbd> method of the <kbd>ClassifiedAd</kbd> class:</p>
+<pre class="language-csharp"><span class="token keyword">protected</span> <span class="token keyword">override</span> <span class="token keyword">void</span> <span class="token function">When</span><span class="token punctuation">(</span><span class="token keyword">object</span> @<span class="token keyword">event</span><span class="token punctuation">)</span>
+<span class="token punctuation">{</span>
+    <span class="token keyword">switch</span> <span class="token punctuation">(</span>@<span class="token keyword">event</span><span class="token punctuation">)</span>
+    <span class="token punctuation">{</span>
+        <span class="token comment">// previous cases as before, removed for brevity</span>
+
+        <span class="token comment">// picture</span>
+        <span class="token keyword">case</span> <span class="token class-name">Events<span class="token punctuation">.</span>PictureAddedToAClassifiedAd</span> e<span class="token punctuation">:</span>
+            <span class="token keyword">var</span> newPicture <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">Picture</span><span class="token punctuation">{</span>
+                Size <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">PictureSize</span><span class="token punctuation">(</span>e<span class="token punctuation">.</span>Height<span class="token punctuation">,</span> e<span class="token punctuation">.</span>Width<span class="token punctuation">)</span><span class="token punctuation">,</span>
+                Location <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">Uri</span><span class="token punctuation">(</span>e<span class="token punctuation">.</span>Url<span class="token punctuation">)</span><span class="token punctuation">,</span>
+                Order <span class="token operator">=</span> Pictures<span class="token punctuation">.</span><span class="token function">Max</span><span class="token punctuation">(</span>x <span class="token operator">=</span><span class="token operator">&gt;</span> x<span class="token punctuation">.</span>Order<span class="token punctuation">)</span> <span class="token operator">+</span> <span class="token number">1</span>
+            <span class="token punctuation">}</span><span class="token punctuation">;</span>
+            Pictures<span class="token punctuation">.</span><span class="token function">Add</span><span class="token punctuation">(</span>newPicture<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token keyword">break</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></pre>
+<p>As you might have noticed, we referenced a new property called <kbd>Pictures</kbd>. It is the list of entities that are held inside the aggregate, so they are child objects of our aggregate root. We declare it as a list. We also need to initialize the list in the aggregate root constructor, so we don't get a null reference exception when we don't have any pictures and try to add one:</p>
+<pre class="language-csharp">    <span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">ClassifiedAd</span> <span class="token punctuation">:</span> <span class="token class-name">AggregateRoot</span><span class="token operator">&lt;</span>ClassifiedAdId<span class="token operator">&gt;</span>
+    <span class="token punctuation">{</span>
+        <span class="token comment">// existing code</span>
+
+        <span class="token keyword">public</span> <span class="token function">ClassifiedAd</span><span class="token punctuation">(</span><span class="token class-name">ClassifiedAdId</span> id<span class="token punctuation">,</span> <span class="token class-name">UserId</span> ownerId<span class="token punctuation">)</span>
+        <span class="token punctuation">{</span>
+            Pictures <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token generic-method"><span class="token function">List</span><span class="token punctuation">&lt;</span><span class="token class-name">Picture</span><span class="token punctuation">&gt;</span></span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span> <span class="token comment">// &lt;-- this is the new line</span>
+            <span class="token function">Apply</span><span class="token punctuation">(</span><span class="token keyword">new</span> <span class="token class-name">Events<span class="token punctuation">.</span>ClassifiedAdCreated</span>
+            <span class="token punctuation">{</span>
+                Id <span class="token operator">=</span> id<span class="token punctuation">,</span>
+                OwnerId <span class="token operator">=</span> ownerId
+            <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">}</span>
+
+        <span class="token keyword">public</span> List<span class="token operator">&lt;</span>Picture<span class="token operator">&gt;</span> Pictures <span class="token punctuation">{</span> <span class="token keyword">get</span><span class="token punctuation">;</span> <span class="token keyword">private</span> <span class="token keyword">set</span><span class="token punctuation">;</span> <span class="token punctuation">}</span>
+
+        <span class="token comment">// existing code</span>
+<span class="token punctuation">}</span></pre>
+<p>This all seems fine, except it isn't. Our aggregate root performs the logic that belongs to the <kbd>Picture</kbd> entity itself. For now, it is just one operation, but we definitely expect at least the re-ordering functionality. The entity needs to be responsible for updating its own state, and since we do it using events, it needs to get the events that concern that entity. Notice that our <kbd>Picture</kbd> class implements the <kbd>When</kbd> method from the base class, but it is completely empty. We need to find a way to empower our entities to handle their own events. In addition, entities can have their own methods, so the aggregate root doesn't contain the logic that belongs to entities, and instead calls entity methods. When we add methods to an entity class, it will produce events to change the entity state. But those events can be of interest for the aggregate root as well, so we need to have some code that will traverse events from the entity level to the aggregate root level. Finally, we need events that are raised on the entity level to be added to the list of changes for the whole aggregate, and this list is maintained by the aggregate root. All those things require us to change the base classes, and that is what we are going to do now.</p>
+<p>First, we add a new interface that both our entity base classes will implement. This interface has one method that applies domain events to an entity state (currently, we use the <kbd>When</kbd> method):</p>
+<pre class="language-csharp"><span class="token keyword">namespace</span> Marketplace<span class="token punctuation">.</span>Framework
+<span class="token punctuation">{</span>
+    <span class="token keyword">public</span> <span class="token keyword">interface</span> <span class="token class-name">IInternalEventHandler</span>
+    <span class="token punctuation">{</span>
+        <span class="token keyword">void</span> <span class="token function">Handle</span><span class="token punctuation">(</span><span class="token keyword">object</span> @<span class="token keyword">event</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></pre>
+<p class="mce-root"/>
+<p class="mce-root"/>
+<p class="mce-root"/>
+<p class="mce-root"/>
+<p class="mceNonEditable"/>
+<p class="mceNonEditable"/>
+<p>Then, we make a number of changes to the <kbd>AggregateRoot</kbd> base class. This will implement the new interface using a private explicit method. In addition, we add the <kbd>ApplyToEntity</kbd> method, which will allow us to push domain events to entities. This method does nothing when we pass <kbd>null</kbd> as the entity parameter because we plan to call it from the <kbd>When</kbd> method of the aggregate root and it should <em>never</em> fail. We will elaborate on why that is so in <a href="4eea9289-d77e-4568-a9c0-c5e1265e3b4e.xhtml" target="_blank">Chapter 8</a>, <em>Aggregate Persistence</em>, when we'll talk about Event Sourcing. For now, we shall assume that our action method in the aggregate root will ensure that the child entity is present before producing an event that we will be propagating to the entity:</p>
+<pre class="language-csharp"><span class="token keyword">using</span> System<span class="token punctuation">.</span>Collections<span class="token punctuation">.</span>Generic<span class="token punctuation">;</span>
+<span class="token keyword">using</span> System<span class="token punctuation">.</span>Linq<span class="token punctuation">;</span>
+
+<span class="token keyword">namespace</span> Marketplace<span class="token punctuation">.</span>Framework
+<span class="token punctuation">{</span>
+    <span class="token keyword">public</span> <span class="token keyword">abstract</span> <span class="token keyword">class</span> <span class="token class-name">AggregateRoot</span><span class="token operator">&lt;</span>TId<span class="token operator">&gt;</span> <br/>        <span class="token punctuation">:</span> <span class="token class-name">IInternalEventHandler</span> <span class="token keyword">where</span> TId <span class="token punctuation">:</span> Value<span class="token operator">&lt;</span>TId<span class="token operator">&gt;</span>
+    <span class="token punctuation">{</span>
+        <span class="token keyword">public</span> <span class="token class-name">TId</span> Id <span class="token punctuation">{</span> <span class="token keyword">get</span><span class="token punctuation">;</span> <span class="token keyword">protected</span> <span class="token keyword">set</span><span class="token punctuation">;</span> <span class="token punctuation">}</span>
+
+        <span class="token keyword">protected</span> <span class="token keyword">abstract</span> <span class="token keyword">void</span> <span class="token function">When</span><span class="token punctuation">(</span><span class="token keyword">object</span> @<span class="token keyword">event</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        
+        <span class="token keyword">private</span> <span class="token keyword">readonly</span> List<span class="token operator">&lt;</span><span class="token keyword">object</span><span class="token operator">&gt;</span> _changes<span class="token punctuation">;</span>
+
+        <span class="token keyword">protected</span> <span class="token function">AggregateRoot</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">=</span><span class="token operator">&gt;</span> _changes <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token generic-method"><span class="token function">List</span><span class="token punctuation">&lt;</span><span class="token keyword">object</span><span class="token punctuation">&gt;</span></span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token keyword">protected</span> <span class="token keyword">void</span> <span class="token function">Apply</span><span class="token punctuation">(</span><span class="token keyword">object</span> @<span class="token keyword">event</span><span class="token punctuation">)</span>
+        <span class="token punctuation">{</span>
+            <span class="token function">When</span><span class="token punctuation">(</span>@<span class="token keyword">event</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token function">EnsureValidState</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            _changes<span class="token punctuation">.</span><span class="token function">Add</span><span class="token punctuation">(</span>@<span class="token keyword">event</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">}</span>
+
+        <span class="token keyword">public</span> IEnumerable<span class="token operator">&lt;</span><span class="token keyword">object</span><span class="token operator">&gt;</span> <span class="token function">GetChanges</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <br/>            <span class="token operator">=</span><span class="token operator">&gt;</span> _changes<span class="token punctuation">.</span><span class="token function">AsEnumerable</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">ClearChanges</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">=</span><span class="token operator">&gt;</span> _changes<span class="token punctuation">.</span><span class="token function">Clear</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token keyword">protected</span> <span class="token keyword">abstract</span> <span class="token keyword">void</span> <span class="token function">EnsureValidState</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token keyword">protected</span> <span class="token keyword">void</span> <span class="token function">ApplyToEntity</span><span class="token punctuation">(<br/>            </span><span class="token class-name">IInternalEventHandler</span> entity<span class="token punctuation">,</span> <br/>            <span class="token keyword">object</span> @<span class="token keyword">event</span><span class="token punctuation">)</span>
+            <span class="token operator">=</span><span class="token operator">&gt;</span> entity<span class="token operator">?</span><span class="token punctuation">.</span><span class="token function">Handle</span><span class="token punctuation">(</span>@<span class="token keyword">event</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token keyword">void</span> IInternalEventHandler<span class="token punctuation">.</span><span class="token function">Handle</span><span class="token punctuation">(</span><span class="token keyword">object</span> @<span class="token keyword">event</span><span class="token punctuation">)</span> <br/>            <span class="token operator">=</span><span class="token operator">&gt;</span> <span class="token function">When</span><span class="token punctuation">(</span>@<span class="token keyword">event</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></pre>
+<p>Finally, we need to change the <kbd>Entity</kbd> base class code in a way that it implements the new interface as well:</p>
+<pre class="language-csharp"><span class="token keyword">using</span> System<span class="token punctuation">;</span>
+
+<span class="token keyword">namespace</span> Marketplace<span class="token punctuation">.</span>Framework
+<span class="token punctuation">{</span>
+    <span class="token keyword">public</span> <span class="token keyword">abstract</span> <span class="token keyword">class</span> <span class="token class-name">Entity</span><span class="token operator">&lt;</span>TId<span class="token operator">&gt;</span> <br/>        <span class="token punctuation">:</span> <span class="token class-name">IInternalEventHandler</span> <span class="token keyword">where</span> TId <span class="token punctuation">:</span> Value<span class="token operator">&lt;</span>TId<span class="token operator">&gt;</span>
+    <span class="token punctuation">{</span>
+        <span class="token keyword">private</span> <span class="token keyword">readonly</span> Action<span class="token operator">&lt;</span><span class="token keyword">object</span><span class="token operator">&gt;</span> _applier<span class="token punctuation">;</span>
+        
+        <span class="token keyword">public</span> <span class="token class-name">TId</span> Id <span class="token punctuation">{</span> <span class="token keyword">get</span><span class="token punctuation">;</span> <span class="token keyword">protected</span> <span class="token keyword">set</span><span class="token punctuation">;</span> <span class="token punctuation">}</span>
+
+        <span class="token keyword">protected</span> <span class="token function">Entity</span><span class="token punctuation">(</span>Action<span class="token operator">&lt;</span><span class="token keyword">object</span><span class="token operator">&gt;</span> applier<span class="token punctuation">)</span> <br/>            <span class="token operator">=</span><span class="token operator">&gt;</span> _applier <span class="token operator">=</span> applier<span class="token punctuation">;</span>
+
+        <span class="token keyword">protected</span> <span class="token keyword">abstract</span> <span class="token keyword">void</span> <span class="token function">When</span><span class="token punctuation">(</span><span class="token keyword">object</span> @<span class="token keyword">event</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token keyword">protected</span> <span class="token keyword">void</span> <span class="token function">Apply</span><span class="token punctuation">(</span><span class="token keyword">object</span> @<span class="token keyword">event</span><span class="token punctuation">)</span>
+        <span class="token punctuation">{</span>
+            <span class="token function">When</span><span class="token punctuation">(</span>@<span class="token keyword">event</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token function">_applier</span><span class="token punctuation">(</span>@<span class="token keyword">event</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">}</span>
+
+        <span class="token keyword">void</span> IInternalEventHandler<span class="token punctuation">.</span><span class="token function">Handle</span><span class="token punctuation">(</span><span class="token keyword">object</span> @<span class="token keyword">event</span><span class="token punctuation">)</span> <br/>            <span class="token operator">=</span><span class="token operator">&gt;</span> <span class="token function">When</span><span class="token punctuation">(</span>@<span class="token keyword">event</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></pre>
+<p>We also added a constructor to this class that will accept an <kbd>applier</kbd> delegate. Since we always instantiate entities from the aggregate root, we will pass the <kbd>Apply</kbd> method of the root to all entities. Then, an entity will use double dispatch to inform the aggregate root of events that the entity will be producing. By doing this, we'll make sure that the aggregate root can also handle events from its child entities, that it calls the <kbd>EnsureValidState</kbd> method to ensure that there is no consistency violation within the aggregate boundaries, and that it adds new events to the single list of changes for the whole aggregate.</p>
+<p>We use private methods to implement the new interface, so these methods will not be exposed when we use a class that is inherited from the <kbd>AggregateRoot</kbd> or <kbd>Entity</kbd> base classes, and this is exactly what we want.</p>
+<p class="mce-root"/>
+<p>So, our <kbd>Picture</kbd> entity now requires a little refactoring:</p>
+<pre class="language-csharp"><span class="token keyword">using</span> System<span class="token punctuation">;</span>
+<span class="token keyword">using</span> Marketplace<span class="token punctuation">.</span>Framework<span class="token punctuation">;</span>
+
+<span class="token keyword">namespace</span> Marketplace<span class="token punctuation">.</span>Domain
+<span class="token punctuation">{</span>
+    <span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">Picture</span> <span class="token punctuation">:</span> <span class="token class-name">Entity</span><span class="token operator">&lt;</span>PictureId<span class="token operator">&gt;</span>
+    <span class="token punctuation">{</span>
+        <span class="token keyword">internal</span> <span class="token class-name">PictureSize</span> Size <span class="token punctuation">{</span> <span class="token keyword">get</span><span class="token punctuation">;</span> <span class="token keyword">private</span> <span class="token keyword">set</span><span class="token punctuation">;</span> <span class="token punctuation">}</span>
+        <span class="token keyword">internal</span> <span class="token class-name">Uri</span> Location <span class="token punctuation">{</span> <span class="token keyword">get</span><span class="token punctuation">;</span> <span class="token keyword">private</span> <span class="token keyword">set</span><span class="token punctuation">;</span> <span class="token punctuation">}</span>
+        <span class="token keyword">internal</span> <span class="token keyword">int</span> Order <span class="token punctuation">{</span> <span class="token keyword">get</span><span class="token punctuation">;</span> <span class="token keyword">private</span> <span class="token keyword">set</span><span class="token punctuation">;</span> <span class="token punctuation">}</span>
+
+        <span class="token keyword">protected</span> <span class="token keyword">override</span> <span class="token keyword">void</span> <span class="token function">When</span><span class="token punctuation">(</span><span class="token keyword">object</span> @<span class="token keyword">event</span><span class="token punctuation">)</span>
+        <span class="token punctuation">{</span>
+            <span class="token keyword">switch</span> <span class="token punctuation">(</span>@<span class="token keyword">event</span><span class="token punctuation">)</span>
+            <span class="token punctuation">{</span>
+                <span class="token keyword">case</span> <span class="token class-name">Events<span class="token punctuation">.</span>PictureAddedToAClassifiedAd</span> e<span class="token punctuation">:</span>
+                    Id <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">PictureId</span><span class="token punctuation">(</span>e<span class="token punctuation">.</span>PictureId<span class="token punctuation">)</span><span class="token punctuation">;</span>
+                    Location <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">Uri</span><span class="token punctuation">(</span>e<span class="token punctuation">.</span>Url<span class="token punctuation">)</span><span class="token punctuation">;</span>
+                    Size <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">PictureSize<br/>                        </span><span class="token punctuation">{</span> Height <span class="token operator">=</span> e<span class="token punctuation">.</span>Height<span class="token punctuation">,</span> Width <span class="token operator">=</span> e<span class="token punctuation">.</span>Width<span class="token punctuation">}</span><span class="token punctuation">;</span>
+                    Order <span class="token operator">=</span> e<span class="token punctuation">.</span>Order<span class="token punctuation">;</span>
+                    <span class="token keyword">break</span><span class="token punctuation">;</span>
+            <span class="token punctuation">}</span>
+        <span class="token punctuation">}</span>
+
+        <span class="token keyword">public</span> <span class="token function">Picture</span><span class="token punctuation">(</span>Action<span class="token operator">&lt;</span><span class="token keyword">object</span><span class="token operator">&gt;</span> applier<span class="token punctuation">)</span> <span class="token punctuation">:</span> <span class="token keyword">base</span><span class="token punctuation">(</span>applier<span class="token punctuation">)</span> <span class="token punctuation">{</span> <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+
+    <span class="token comment">// the identity class code is still here</span>
+<span class="token punctuation">}</span></pre>
+<p>We changed two things:</p>
+<ul>
+<li>We added the constructor that accepts a reference to the <kbd>applier</kbd> delegate.</li>
+<li>We changed the <kbd>When</kbd> method, so it can now handle the creation of new pictures.</li>
+</ul>
+<p>You perhaps noticed that the order is now coming from the event, so we need to add a new property to the event class. Currently, we don't use the <kbd>applier</kbd> delegate, because we have not added any operations to the entity yet, but we will be using it in the future. Also, it is important to stress that we are not using the public constructor for our <kbd>PictureSize</kbd> value object in the <kbd>When</kbd> method because the public constructor always applies business rules and can potentially fail, but it happens when we construct the value object in our application service before it even reaches the aggregate. In the <kbd>When</kbd> method, we need to process the event without checking those rules, because the <kbd>When</kbd> method should never fail.</p>
+<p>Then, we can change the aggregate root code. First, we change the <kbd>AddPicture</kbd> method:</p>
+<pre class="language-csharp"><span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">AddPicture</span><span class="token punctuation">(</span><span class="token class-name">Uri</span> pictureUri<span class="token punctuation">,</span> <span class="token class-name">PictureSize</span> size<span class="token punctuation">)</span> <span class="token operator">=</span><span class="token operator">&gt;</span>
+    <span class="token function">Apply</span><span class="token punctuation">(</span><span class="token keyword">new</span> <span class="token class-name">Events<span class="token punctuation">.</span>PictureAddedToAClassifiedAd</span>
+    <span class="token punctuation">{</span>
+        PictureId <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">Guid</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        ClassifiedAdId <span class="token operator">=</span> Id<span class="token punctuation">,</span>
+        Url <span class="token operator">=</span> pictureUri<span class="token punctuation">.</span><span class="token function">ToString</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        Height <span class="token operator">=</span> size<span class="token punctuation">.</span>Height<span class="token punctuation">,</span>
+        Width <span class="token operator">=</span> size<span class="token punctuation">.</span>Width<span class="token punctuation">,</span>
+        Order <span class="token operator">=</span> Pictures<span class="token punctuation">.</span><span class="token function">Max</span><span class="token punctuation">(</span>x <span class="token operator">=</span><span class="token operator">&gt;</span> x<span class="token punctuation">.</span>Order<span class="token punctuation">)</span>
+    <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span></pre>
+<p>Then, we change the event handling in the <kbd>When</kbd> method (only changes are shown):</p>
+<pre class="language-csharp"><span class="token keyword">case</span> <span class="token class-name">Events<span class="token punctuation">.</span>PictureAddedToAClassifiedAd</span> e<span class="token punctuation">:</span>
+    <span class="token keyword">var</span> picture <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">Picture</span><span class="token punctuation">(</span>Apply<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token function">ApplyToEntity</span><span class="token punctuation">(picture, </span>e<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    Pictures<span class="token punctuation">.</span><span class="token function">Add</span><span class="token punctuation">(</span>newPicture<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">break</span><span class="token punctuation">;</span></pre>
+<p>Let's now demonstrate how can we add some logic to the <kbd>Picture</kbd> entity and make sense of the <kbd>applier</kbd> delegate. One thing that can happen with an image is that it could be resized and we get new sizes. Out page, cannot be smaller than 800 x 600 pixels.</p>
+<p>Again, we need to add a new event to our <kbd>Events</kbd> class:</p>
+<pre class="language-csharp"><span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">ClassifiedAdPictureResized</span>
+<span class="token punctuation">{</span>
+    <span class="token keyword">public</span> <span class="token class-name">Guid</span> PictureId <span class="token punctuation">{</span> <span class="token keyword">get</span><span class="token punctuation">;</span> <span class="token keyword">set</span><span class="token punctuation">;</span> <span class="token punctuation">}</span>
+    <span class="token keyword">public</span> <span class="token keyword">int</span> Height <span class="token punctuation">{</span> <span class="token keyword">get</span><span class="token punctuation">;</span> <span class="token keyword">set</span><span class="token punctuation">;</span> <span class="token punctuation">}</span>
+    <span class="token keyword">public</span> <span class="token keyword">int</span> Width <span class="token punctuation">{</span> <span class="token keyword">get</span><span class="token punctuation">;</span> <span class="token keyword">set</span><span class="token punctuation">;</span> <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></pre>
+<p>Then, we need to add a <kbd>ResizePicture</kbd> method to the aggregate root. Since the command will get a picture <kbd>id</kbd>, we need to be able to find this picture in the list. To avoid spreading LINQ queries, we can add the following method to the <kbd>ClassifiedAd</kbd> class:</p>
+<pre class="language-csharp"><span class="token keyword">private</span> <span class="token class-name">Picture</span> <span class="token function">FindPicture</span><span class="token punctuation">(</span><span class="token class-name">PictureId</span> id<span class="token punctuation">)</span>
+    <span class="token operator">=</span><span class="token operator">&gt;</span> Pictures<span class="token punctuation">.</span><span class="token function">FirstOrDefault</span><span class="token punctuation">(</span>x <span class="token operator">=</span><span class="token operator">&gt;</span> x<span class="token punctuation">.</span>Id <span class="token operator">==</span> id<span class="token punctuation">)</span><span class="token punctuation">;</span></pre>
+<p class="mce-root"/>
+<p class="mce-root"/>
+<p>Now, we can add the action method to the same class:</p>
+<pre class="language-csharp"><span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">ResizePicture</span><span class="token punctuation">(</span><span class="token class-name">PictureId</span> pictureId<span class="token punctuation">,</span> <span class="token class-name">PictureSize</span> newSize<span class="token punctuation">)</span>
+<span class="token punctuation">{</span>
+    <span class="token keyword">var</span> picture <span class="token operator">=</span> <span class="token function">FindPicture</span><span class="token punctuation">(</span>pictureId<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>picture <span class="token operator">==</span> <span class="token keyword">null</span><span class="token punctuation">)</span>
+        <span class="token keyword">throw</span> <span class="token keyword">new</span> <span class="token class-name">InvalidOperationException</span><span class="token punctuation">(<br/>            </span><span class="token string">"Cannot resize a picture that I don't have"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    
+    picture<span class="token punctuation">.</span><span class="token function">Resize</span><span class="token punctuation">(</span>newSize<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span></pre>
+<p>When this is done, we can add a new <kbd>Resize</kbd> method to the <kbd>Picture</kbd> entity:</p>
+<pre class="language-csharp"><span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">Resize</span><span class="token punctuation">(</span><span class="token class-name">PictureSize</span> newSize<span class="token punctuation">)</span>
+    <span class="token operator">=</span><span class="token operator">&gt;</span> <span class="token function">Apply</span><span class="token punctuation">(</span><span class="token keyword">new</span> <span class="token class-name">Events<span class="token punctuation">.</span>ClassifiedAdPictureResized</span>
+    <span class="token punctuation">{</span>
+        PictureId <span class="token operator">=</span> Id<span class="token punctuation">.</span>Value<span class="token punctuation">,</span>
+        Height <span class="token operator">=</span> newSize<span class="token punctuation">.</span>Width<span class="token punctuation">,</span>
+        Width <span class="token operator">=</span> newSize<span class="token punctuation">.</span>Width
+    <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span></pre>
+<p>Then, we add some code to change the <kbd>Picture</kbd> state when the event is raised to the <kbd>When</kbd> method of the entity:</p>
+<pre class="language-csharp"><span class="token keyword">case</span> <span class="token class-name">Events<span class="token punctuation">.</span>ClassifiedAdPictureResized</span> e<span class="token punctuation">:</span>
+    Size <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">PictureSize</span><span class="token punctuation">{</span>Height <span class="token operator">=</span> e<span class="token punctuation">.</span>Height<span class="token punctuation">,</span> Width <span class="token operator">=</span> e<span class="token punctuation">.</span>Width<span class="token punctuation">}</span><span class="token punctuation">;</span>
+    <span class="token keyword">break</span><span class="token punctuation">;</span></pre>
+<p>When we are done with these changes, we can add an additional invariant to our aggregate. We can define the picture size rule directly in each check inside the <kbd>EnsureValidState</kbd> method, but it will be quite verbose and not very clear from the language perspective. Instead, let's create a new extension method for the <kbd>Picture</kbd> entity, using a new <kbd>PictureRules</kbd> class:</p>
+<pre class="language-csharp"><span class="token keyword">namespace</span> Marketplace<span class="token punctuation">.</span>Domain
+<span class="token punctuation">{</span>
+    <span class="token keyword">public</span> <span class="token keyword">static</span> <span class="token keyword">class</span> <span class="token class-name">PictureRules</span>
+    <span class="token punctuation">{</span>
+        <span class="token keyword">public</span> <span class="token keyword">static</span> <span class="token keyword">bool</span> <span class="token function">HasCorrectSize</span><span class="token punctuation">(</span><span class="token keyword">this</span> <span class="token class-name">Picture</span> picture<span class="token punctuation">)</span>
+            <span class="token operator">=</span><span class="token operator">&gt;</span> picture <span class="token operator">!=</span> <span class="token keyword">null</span> 
+               <span class="token operator">&amp;&amp;</span> picture<span class="token punctuation">.</span>Size<span class="token punctuation">.</span>Width <span class="token operator">&gt;=</span> <span class="token number">800</span> 
+               <span class="token operator">&amp;&amp;</span> picture<span class="token punctuation">.</span>Size<span class="token punctuation">.</span>Height <span class="token operator">&gt;=</span> <span class="token number">600</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></pre>
+<p>We use an extension method instead of putting this logic inside the entity itself because it is not really a rule for the entity. Perhaps the class name <kbd>PictureRules</kbd> is not very good and we need to fix it. On the other hand, we will never use the class name itself because it will only contain extension methods.</p>
+<p>Let's change the invariant check code to include a new rule:</p>
+<pre class="language-csharp"><span class="token keyword">private</span> <span class="token class-name">Picture</span> FirstPicture <br/>    <span class="token operator">=</span><span class="token operator">&gt;</span> Pictures<span class="token punctuation">.</span><span class="token function">OrderBy</span><span class="token punctuation">(</span>x <span class="token operator">=</span><span class="token operator">&gt;</span> x<span class="token punctuation">.</span>Order<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">FirstOrDefault</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+<span class="token punctuation">protected override void EnsureValidState()<br/>{<br/>    var valid =<br/>        Id != null &amp;&amp;<br/>        OwnerId != null &amp;&amp;<br/>        (State switch<br/>        {<br/>            ClassifiedAdState.PendingReview =&gt;<br/>                Title != null<br/>                &amp;&amp; Text != null<br/>                &amp;&amp; Price?.Amount &gt; 0<br/>                &amp;&amp; FirstPicture.HasCorrectSize(),<br/>            ClassifiedAdState.Active =&gt;<br/>                Title != null<br/>                &amp;&amp; Text != null<br/>                &amp;&amp; Price?.Amount &gt; 0<br/>                &amp;&amp; FirstPicture.HasCorrectSize()<br/>                &amp;&amp; ApprovedBy != null,<br/>            _ =&gt; true<br/>        });<br/><br/>    if (!valid)<br/>        throw new InvalidEntityStateException(<br/>            this, $"Post-checks failed in state {State}");<br/>}<br/><br/></span></pre>
+<p>You can see that we need one more piece of code to make things more explicit. Instead of using a LINQ expression in every call to find the <em>first</em> picture (we might need a better domain name for that too), we will use the <kbd>FirstPicture</kbd> property of the aggregate root. Now the check became less technical and more explicit in terms of the domain language. We might also create some more methods to enforce the language for other rules as well, and we will do this later throughout the course of this book.</p>
+<p class="mce-root"/>
+<p class="mce-root"/>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Summary</h1>
+                </header>
+            
+            <article>
+                
+<p>In this chapter, we composed a few aggregates and performed operations on them via the aggregate root. We also evaluated possible persistence methods for aggregates and learned about the concept of the repository—a place where the aggregate state is stored.</p>
+<p><span>Now, it is time to find a way to store our domain objects in a database and see our application working for the first time. </span><span>In the next chapter, we will take a deep dive into the topic of aggregate persistence.</span></p>
+
+
+            </article>
+
+            
+        </section>
+    </body></html>

@@ -1,0 +1,596 @@
+<html><head></head><body>
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Implementing the Model</h1>
+                </header>
+            
+            <article>
+                
+<p>In previous chapters, we went through a different level of knowledge crunching and domain analysis. We used EventStorming as our primary tool, so, as a result of our efforts, we got plenty of paper rolls, with lots of colorful sticky notes on them. But how can we make some working code from it? That is a good question, and this is precisely what we will start doing when moving along in this chapter.</p>
+<p>By the end of this chapter, we will have a basis for our domain model implemented in code. We will go through different styles of performing the behavior in domain entities and also write some tests.</p>
+<p>The following topics will be covered:</p>
+<ul>
+<li>Create a project for the domain model</li>
+<li>Add domain objects to the new project</li>
+<li>What the entities and value objects are</li>
+<li>How to ensure that the domain model is always in a valid state</li>
+</ul>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Technical requirements</h1>
+                </header>
+            
+            <article>
+                
+<p>This chapter will provide guidelines to do some hands-on work. To follow up with that, you will need to have the following tools:</p>
+<ul>
+<li>.NET Core 2.2.203 or higher (<a href="https://www.asp.net/">https://www.asp.net/</a>)</li>
+<li>Visual Studio 2017 or higher (<a href="https://www.visualstudio.com/vs/">https://www.visualstudio.com/vs/</a>), or JetBrains Rider (<a href="https://www.jetbrains.com/rider/">https://www.jetbrains.com/rider/</a>)</li>
+</ul>
+<p>There is no particular requirement on a platform since .NET Core, and the tooling is available almost everywhere. Throughout this book, I will be using Rider on macOS. Initial screenshots will be from Visual Studio 2017 for Windows since most readers would be using this IDE. Some dialog boxes vary significantly between Visual Studio for Windows, Visual Studio for Mac, and Rider.</p>
+<p>I will be using some features of C# 8.0 in the code, so it is necessary to use .<strong>NET Core SDK 2.2.203</strong> or higher.</p>
+<p>I assume that you are familiar with the tool that you are using and with the .NET Stack in general, so you know how to create projects, build them and execute applications in different environments.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Starting up the implementation</h1>
+                </header>
+            
+            <article>
+                
+<p>In this section, we will create a new project and add a domain project to it.</p>
+<p>Since we plan to implement a web application, we will consider this from the beginning and will use a web application template. We will also add some projects to host different parts of our system and tests.</p>
+<p>If you aren't familiar with tools for .NET, you can always check Mapt, the extensive library of Packt books and video courses, and use materials from there to improve your skills. In this book, we assume that readers have an adequate level of knowledge of C# and the tools to develop applications using .NET.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Creating projects</h1>
+                </header>
+            
+            <article>
+                
+<p>We will start with an empty project. You need to create a .NET Core web application and don't forget to enable the creation of a Git repository so it can keep a history of your changes.</p>
+<p>We would expect our system to get more substantial, but we start small. Let's call the solution <kbd>Marketplace</kbd>, and our first project would be called just that. The type of project to create is an <span class="packt_screen">ASP.NET Core Web Application</span>. This project is our startup, which will be executed by the .NET runtime. You need to choose the  <span class="packt_screen">Empty</span> project type for the new Web API project because we won't be using Razor or SPA (single page application) templates.</p>
+<p>We already discussed that the domain model should not have dependencies on infrastructure. In general, it should not have references to anything but standard language types, itself, and some set of base classes and interfaces, if necessary. To enforce this, let's create a separate project where we will put all our domain objects. Add one more project to the solution and call it <kbd>Marketplace.Domain</kbd>. This project will not be executed by itself, so the project type should be <span class="packt_screen">Class Library (.NET Standard)</span> and don't forget to change the framework for it to <span class="packt_screen">netstandard2.0</span> (or later). The <span class="packt_screen">.NET Standard</span> is the default for class libraries, but feel free to use ASP.NET Core target framework as well if you aren't planning to use your library in the legacy .NET Framework applications.</p>
+<p>Then, we need to add one more project for unit tests. You can do it by adding a project to your solution, which would be called <kbd>Marketplace.Tests</kbd>. The project type is a unit test project, and type is <span class="packt_screen">xUnit</span> since we will be using xUnit.net testing framework for our tests in this book. The xUnit.NET test project is one of the default test project templates of the ASP.NET Core SDK. Remember to add a reference to the <kbd>Marketplace.Domain</kbd> project to the test project, since we'll be mostly testing our domain code.</p>
+<p>The solution should now look like the following screenshot:</p>
+<p class="CDPAlignCenter CDPAlign"><img src="assets/06b99eb9-e0d9-40d7-bdd8-2b7ea7bed559.png" style="width:24.08em;height:19.58em;"/></p>
+<div class="packt_figref CDPAlignCenter CDPAlign">A glimpse of the solution structure</div>
+<p>It makes sense to remove the <kbd>wwwroot</kbd> and <kbd>Properties</kbd> folders, <kbd>Class1.cs</kbd> and <kbd>UnitTest1.cs</kbd> files, since we will create new classes from scratch and we do not need empty folders to hang around.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">The framework</h1>
+                </header>
+            
+            <article>
+                
+<p><span>We will need somewhere to place <em>this set of base classes and interfaces</em> mentioned in the previous section. We might dispute whether these things are required at all. They are not required to start a simple <kbd>Hello World</kbd> style project, but, as we go along, we will need to create more abstractions.</span></p>
+<p>Also, we will need some components that will allow our domain model to work with things like database, message bus, web server, and so on. According to onion architecture principles, these are<strong> adapters</strong>. Our project, in the end, will need to have a collection of adapters for all pieces of infrastructure that are being used.</p>
+<p>You might rightfully ask—are we going to build a framework? Aren't frameworks considered evil and shouldn't they be avoided? Well, we should take everything with a grain of salt and having a set of useful abstractions for our domain object and infrastructure would greatly help us while moving along. Also, we definitely will need to build some of the adapters, and although these can be separated in t<span>h</span><span>eir</span> <span>own libraries, which will connect to our abstractions (hence ports and adapters), for the reason of simplicity, we will put most of these things in one project, and this project will be called</span> <kbd>Marketplace.Framework</kbd><span>. You can choose any other name for this project if you don't like the name </span><kbd>Framework</kbd><span>, but in this book, we will be referencing it a lot, so I hope you don't get confused.</span></p>
+<p>Most of the abstractions and implementations in this framework would be production ready by the end of this book. And unlike third-party frameworks, you keep full control of what is inside it and how it works, so this should make it a milder evil, even if you don't like frameworks at all.</p>
+<p>Many DDD practitioners keep reciting the mantra <em>you don't need DDD framework</em>, and this is partially true, but people always need to have some baseline for their applications to speed up the development. We use the .NET Framework, built by Microsoft, rather than creating all these classes from scratch for every project. When we get to the point of having a set of useful abstractions and components in our framework, we can use it, or something similar to it, in some other project and be entirely in control.</p>
+<p class="mce-root">So, to finish up this section, add a class library project to the same solution. The framework for it should be<span class="packt_screen"> netstandard2.0</span> (or later), just as it was for the <kbd>Marketplace.Domain</kbd> project. Call this new project <kbd>Marketplace.Framework</kbd></p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Transferring the model to code</h1>
+                </header>
+            
+            <article>
+                
+<p>Since we aren't doing a <kbd>Hello World</kbd> exercise, we won't be using the executable project for a while. Instead, we will concentrate on writing things inside the domain project, adding some practical classes and interfaces to the framework projects, and writing tests.</p>
+<p>First, we need to identify which building blocks our implementation will be based on. These building blocks are often referenced as <strong>Domain-Driven Design</strong> (<strong>DDD</strong>) tactical patterns, as opposed to DDD strategic patterns. Some even say that tactical patterns can be ignored in favor of strategic patterns. Although I agree that Ubiquitous Language, Bounded Context, and Context Map are the essential parts of DDD, I still believe that some tactical patterns are useful and bring clarity and common language for the implementation. This book is not a collection of tactical DDD patterns, and relevant concepts will only be used when necessary to implement the model.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Entities</h1>
+                </header>
+            
+            <article>
+                
+<p>Let's get back to our EventStorming session and look at part of our model, shown as follows:</p>
+<div class="packt_figref CDPAlignCenter CDPAlign"><img src="assets/3376c726-aa18-4964-9d98-ed835ed7cd00.png" style="width:37.00em;height:25.67em;"/></div>
+<div class="CDPAlignCenter CDPAlign packt_figref">The core domain modeled with sticky notes</div>
+<p>There is a repetition in all those commands. Can you see it? All those commands are being executed on something that is called a <strong>Classified Ad</strong>. Also, if you recall all those conversations with domain experts, our team members frequently referred to this term when talking about the business in general, and also about the model.</p>
+<p>Mainly, we have an entity here. Entities represent unique objects of the same type. In addition to classified ads, we might expect our system to hold information about sellers and buyers, and those might be entities too, apart from being just roles in the system. It is because we need to identify those people, so we need to have something unique, like username or email address, to understand who is who. The same is valid for a classified ad. Imagine ads like the following:</p>
+<p class="CDPAlignCenter CDPAlign"><img src="assets/6d8866b7-3a3f-4597-972b-c469605f5798.png" style="width:30.00em;height:18.33em;"/></p>
+<div class="CDPAlignCenter CDPAlign packt_figref">Draft sketch of the user interface</div>
+<p>Both ads are the same if we ignore who is selling and for what price. But, most probably, these are two different objects. Because of the mass-production of IKEA, there is a significant chance that multiple similarly used objects are being sold at the same time, but for us, those objects are different. It is because we are not using object properties, like model and size, to find out if two objects are identical. In our system, these objects will be represented in two different classified ads and will have separate identities.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Identities</h1>
+                </header>
+            
+            <article>
+                
+<p>We mentioned a username or email as an identity of users in the system, but what can be used as an identity for objects? In real life, many objects are already identified. The most common identity is an item serial number. Complex objects like smartphones, TV sets, computers, and cars have unique identifiers that help manufacturers to know in what configuration these objects were produced, and therefore, they can provide better support. Also, due to the significant price of such objects, they are usually tracked individually.</p>
+<p>However, when we talk about our system, most of the time we need to use our own identity. The only important rule, really, is that all entities need to be uniquely identified. There are a few ways to get such an identity, and you might already be familiar with some. Probably the most frequently used method to get unique identities <span>today </span>(later referenced as <strong>IDs</strong>) is to use unique database keys. It is because most systems out there are data-oriented and designed with persistence-first in mind. Such a system will not work without persisting stuff to a particular database. Such a method has at least one definite advantage—such IDs are usually numeric and incremental, so it is straightforward to dictate such an ID over the phone. But the most significant disadvantage comes from the ID source—the database must be present to get such an identity, even if later in the flow, the system will decide not to accept the object and drop it instead, so it never gets persisted. Most of the experienced developers have seen weird constructs in the code where an empty or dummy row is being inserted into some table to get an object ID, and later, such a row either needs to be populated with real values or removed. Such an approach creates a whole load of issues, and we will not be using it.</p>
+<p>Instead, we will use generated unique IDs. Because we would prefer not to use any infrastructure to create our IDs, we will use one reliable method and identity type—a <strong>globally unique identifier</strong> (<strong>GUID</strong>), more commonly known as a <strong>universally unique identifier</strong> (<strong>UUID</strong>). Such an ID can be generated using the current time and some information about the computer, where it is produced. There is a very high probability that such an ID is globally unique. When using GUIDs, we can generate identities for objects before touching any infrastructure and therefore, for example, create references to an object that only exists in memory.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Classified ad entity</h1>
+                </header>
+            
+            <article>
+                
+<p>As we have understood from our EventStorming model, we most probably need an entity to represent a classified ad. It seems to be one of the central concepts of our system. We spent a great deal of time discussing our model with domain experts, and this term kept coming up in the conversation. It is a perfect indicator that we have identified some vital domain concept also, because we keep getting a repeated pattern when one command results in one event, and we keep having a <em>classified ad</em> as an object.</p>
+<p>Entities are represented in code as objects, and, therefore, we need a class so we can create instances of such a class. Here is our first attempt to create a class to represent a classified ad:</p>
+<pre>namespace Marketplace.Domain<br/>{<br/>    public class ClassifiedAd<br/>    {<br/>        public Guid Id { get; private set; }<br/><br/>        private Guid _ownerId;<br/>        private string _title;<br/>        private string _text;<br/>        private decimal _price;<br/>    }<br/>}</pre>
+<p>You might feel puzzled about this class, and you'd be right to question this kind of entity implementation. It looks like a property bag, and the only difference with a <strong>DTO</strong> (short for <strong>data transfer object</strong>) here, is that this class only has one property, and all other details are represented by private fields. This class will compile, but it is practically unusable because even the single public property can only be set from inside the class, but we have not exposed any way of doing this.</p>
+<p>However, despite being useless, this implementation demonstrates two essential principles that we need to keep in mind while going further. First, all entities need to have an ID, and it must be accessible from outside the entity. Second, since we are using an object-oriented language, we shall try to encapsulate as much as we can, and keep our internals safe, and preferably invisible to the outside world.</p>
+<p>To be able to instantiate this class correctly, let's create a constructor that will at least allow us to set the entity <kbd>id</kbd>:</p>
+<pre>using System;<br/><br/>namespace Marketplace.Domain<br/>{<br/>    public class ClassifiedAd<br/>    {<br/>        public Guid Id { get; }<br/><br/>        public ClassifiedAd(Guid id)<br/>        {<br/>            if (id == default)<br/>                throw new ArgumentException(<br/>                 "Identity must be specified", nameof(id));<br/>            <br/>            Id = id;<br/>        }<br/><br/>        private Guid _ownerId;<br/>        private string _title;<br/>        private string _text;<br/>        private decimal _price;<br/>    }<br/>}</pre>
+<p>The following things are added here:</p>
+<ul>
+<li>Since we only set the <kbd>Id</kbd> property value in the constructor, we can make it a read-only property.</li>
+<li>When creating an instance of <kbd>ClassifiedAd</kbd>, we must supply <kbd>id</kbd>, because there is no parameterless constructor.</li>
+<li>The supplied <kbd>id</kbd> must be valid. Otherwise, the constructor will throw an argument exception.</li>
+</ul>
+<p>Right here, we enforced the rule that our entity can only be created giving a valid set of arguments (currently only one), and any created entity of the given type will be, by definition, legitimate. You might be concerned that a classified ad without some human-readable attributes, like title and price, is in fact not correct, but this concern is not technical. The business might decide that this is indeed a valid entity.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Adding behavior</h1>
+                </header>
+            
+            <article>
+                
+<p>The next thing for us to do is to figure out what we can tell our entity to do. Remember, we need to design (and implement) behavior-first. The only reason for us to add those <kbd>private</kbd> fields to the entity was actually to support the behavior. As we discussed before, each action that is performed in the system amends the system state, and those <kbd>private</kbd> fields represent just that—state. But again, encapsulation being enforced, we shall not allow manipulating the entity state by changing property values from outside the entity; this will lead us to the dusty land of CRUD. Let's see how we can breathe life into the entity:</p>
+<pre>namespace Marketplace.Domain<br/>{<br/>    public class ClassifiedAd<br/>    {<br/>        public Guid Id { get; }<br/><br/>        public ClassifiedAd(Guid id)<br/>        {<br/>            if (id == default)<br/>                throw new ArgumentException(<br/>                 "Identity must be specified", nameof(id));<br/><br/>            Id = id;<br/>        }<br/><br/>        public void SetTitle(string title) =&gt; _title = title;<br/><br/>        public void UpdateText(string text) =&gt; _text = text;<br/><br/>        public void UpdatePrice(decimal price) =&gt; _price = price;<br/><br/>        private Guid _ownerId;<br/>        private string _title;<br/>        private string _text;<br/>        private decimal _price;<br/>    }<br/>}</pre>
+<p>We have added three straightforward methods, and you might feel a bit disappointed because these are property setters (not even glorified). But, what we do here is express the idea of using Ubiquitous Language in code, and transfer words from sticky notes (commands in this case) to methods.</p>
+<p>Of course, this is just a start. In the following section, we will look deeper into our entity implementation, and find out how methods that express behavior can become more useful. </p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Ensuring correctness</h1>
+                </header>
+            
+            <article>
+                
+<p>In the previous section, we were checking the entity constructor parameter to be valid to ensure the newly created entity object is also correct. We applied a constraint, which does not allow creating a new entity without specifying the valid parameter value. By doing this, we are guarding our domain model against getting objects that aren't valid. It is one of the essential functions of the domain model as such, and since we are embracing <em>the behavior-first</em> approach, this type of code needs to be a part of the domain model implementation and not outsourced to external layers, like UI or application service layer. Of course, since our domain model is the system core, it takes a few hops for data to move from the user interface to domain objects. It is a valid approach to do a preliminary quality check on the data that tries to enter the domain model before it does. It improves the user experience due to much faster feedback. However, the ultimate control is always performed inside the domain model itself, since it shall never come to an invalid state.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Constraints for input values</h1>
+                </header>
+            
+            <article>
+                
+<p><span>You may have recognized some flaws in the entity implementation in the previous section. There are quite a few of them at the moment, but let's look at the most obvious one. What is sorely missing here is the owner</span> ID<span>. It is hard to believe we can allow having ads without anyone owning them. How in this case will we understand who can modify the content of such ads? Plus, we already have the </span><kbd>_ownerId</kbd><span> field in this class. So, let's add one more parameter to the constructor to enforce this constraint:</span></p>
+<pre>public ClassifiedAd(Guid id, Guid ownerId)<br/>{<br/>    if (id == default)<br/>        throw new ArgumentException(<br/>         "Identity must be specified", nameof(id));<br/>    <br/>    if (ownerId == default)<br/>        throw new ArgumentException(<br/>         "Owner id must be specified", nameof(ownerId));<br/><br/>    Id = id;<br/>    _ownerId = ownerId;<br/>}</pre>
+<div class="packt_infobox"><span>From this moment on, we will not list the whole class, but just a part of it that is being changed.</span></div>
+<p>We have not only added one more parameter but also added one more check. So now, our entity is guaranteed to be valid after it is created, since the client must supply both the ad ID and the owner ID.</p>
+<p>The code that creates a classified ad entity would look like the following:</p>
+<pre>public void CreateClassifiedAd(Guid id, Guid ownerId)<br/>{<br/>    var classifiedAd = new ClassifiedAd(id, ownerId);<br/>    <br/>    // store the entity somehow<br/>}</pre>
+<p>Notice that we are adding more parameters to the entity constructor, and the constructor itself grows since we add more checks for these parameters. In the end, it is not very easy to understand what is going on, because many rules are mixed in one large chunk of code. Also, it is quite evident that we are not checking core complex rules, which involve multiple properties of the entity. In our case, all we control is that each parameter has a value. This approach is not wrong but is also not ideal. Instead, we can check the validity of such values, even before reaching the entity constructor, using <strong>value objects</strong>.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Value objects</h1>
+                </header>
+            
+            <article>
+                
+<p>Value object pattern is not unique to DDD, but it probably became most popular within the DDD community. It probably happened due to such characteristics of value objects as expressiveness and strong encapsulation. Fundamentally, value objects allow declaring entity properties with explicit types that use Ubiquitous Language. Besides, such objects can explicitly define how they can be created and what operations can be performed within and between them. It is a perfect example of making implicit, explicit.</p>
+<p>Let's look closer at what a value object is, by creating one in our code. Before, we were taking the <kbd>ownerId</kbd> parameter in the entity constructor, and checking it to have a non-default GUID. What we want here is a user ID, since we know that the ad owner is one of our users, because people need to be registered in the system before creating classified ads. It means that we can embrace the type system and make implicit more explicit by using a new type called <kbd>UserId</kbd>, instead of using <kbd>Guid</kbd>.</p>
+<p>Let's create a new class in the <kbd>Marketplace.Domain</kbd> project and call it <kbd>UserId</kbd>. The initial code for this class would look like the following:</p>
+<pre>using System;<br/><br/>namespace Marketplace.Domain<br/>{<br/>    public class UserId<br/>    {<br/>        private readonly Guid _value;<br/><br/>        public UserId(Guid value)<br/>        {<br/>            if (value == default)<br/>                throw new ArgumentNullException(<br/>                 nameof(value), "User id cannot be empty");<br/>            <br/>            _value = value;<br/>        }<br/>    }<br/>}</pre>
+<p>As you can see, we moved the assertion that the identity value is not an empty GUID, to the <kbd>UserId</kbd> constructor. It means that we can change our entity constructor to the following:</p>
+<pre>public class ClassifiedAd<br/>{<br/>    public Guid Id { get; }<br/>    <br/>    private UserId _ownerId;<br/><br/>    public ClassifiedAd(Guid id, UserId ownerId)<br/>    {<br/>        if (id == default)<br/>            throw new ArgumentException(<br/>             "Identity must be specified", nameof(id));<br/><br/>        Id = id;<br/>        _ownerId = ownerId;<br/>    }<br/>    <br/>    // rest of the code skipped<br/>}</pre>
+<p>Our entity has no check for the <kbd>ownerId</kbd>, since, by receiving the argument of type <kbd>UserId</kbd>, we guarantee that the value is valid. Of course, we do not check here if the supplied GUID points to a valid user, but this was not our intention, at least for now.</p>
+<p>However, we still have one more check for the argument validity in the entity constructor. Let's make the entity <kbd>id</kbd> type a value object too by adding a <kbd>ClassifiedAdId</kbd> class with the following code:</p>
+<pre>using System;<br/><br/>namespace Marketplace.Domain<br/>{<br/>    public class ClassifiedAdId<br/>    {<br/>        private readonly Guid _value;<br/><br/>        public ClassifiedAdId(Guid value)<br/>        {<br/>            if (value == default)<br/>                throw new ArgumentNullException(<br/>                    nameof(value), <br/>                    "Classified Ad id cannot be empty");<br/>            <br/>            _value = value;<br/>        }<br/>        <br/>    }<br/>}</pre>
+<p>Now our constructor has no checks at all, and it still makes a valid entity:</p>
+<pre>public class ClassifiedAd<br/>{<br/>    public ClassifiedAdId Id { get; }<br/>    <br/>    private UserId _ownerId;<br/><br/>    public ClassifiedAd(ClassifiedAdId id, UserId ownerId)<br/>    {<br/>        Id = id;<br/>        _ownerId = ownerId;<br/>    }<br/>    <br/>    // rest of the code skipped<br/>}</pre>
+<p>As we move to the application layer, where our entity would be constructed, we could imagine that calls to the constructor would look like this (assuming that <kbd>id</kbd> and <kbd>ownerId</kbd> are of type <kbd>Guid</kbd>):</p>
+<pre>var classifiedAd = new ClassifiedAd(new ClassifiedAdId(id), new UserId(ownerId));</pre>
+<p>The preceding code clearly says that we are sending the classified ad ID first, and the owner ID second to the entity constructor. When we use <kbd>Guid</kbd> as the type for both parameters, if we accidentally change the order of parameters, our application would still compile, but of course, our entities will be constructed incorrectly, and the whole system would break somewhere deep down the execution pipeline. Strongly typed parameters of value object types force the compiler to engage type checking, and if we messed up arguments, the code won't compile.</p>
+<p>But value objects aren't just wrapper types around primitive types. As we learned before, entities are considered equal if their identities are the same. Value objects are different since their equality is establishing by value, hence the pattern name. A classical example of a value object is money. If we take two €5 banknotes, they represent two different entities, since they are in fact two distinctly different objects, and even have unique numbers printed on them. But for payment, both are entirely identical, since they have the same value of €5.</p>
+<p>But how do we represent it in code? Let's create the <kbd>Money</kbd> class and give it a try:</p>
+<pre>namespace Marketplace.Domain<br/>{<br/>    public class Money<br/>    {<br/>        public decimal Amount { get; }<br/><br/>        public Money(decimal amount) Amount = amount;<br/>    }<br/>}</pre>
+<p>Now, let's write a simple test to check whether two objects of the <kbd>Money</kbd> <span>type </span>are equal if the amount is equal:</p>
+<pre>using Marketplace.Domain;<br/>using Xunit;<br/><br/>namespace Marketplace.Tests<br/>{<br/>    public class MoneyTest<br/>    {<br/>        [Fact]<br/>        public void <br/>        Money_objects_with_the_same_amount_should_be_equal()<br/>        {<br/>            var firstAmount = new Money(5);<br/>            var secondAmount = new Money(5);<br/>            <br/>            Assert.Equal(firstAmount, secondAmount);<br/>        }<br/>    }<br/>}</pre>
+<p>Of course, this test fails because a class instance is a reference object, and two instances of the same class are different objects, no matter what their properties and fields contain. We can conclude that neither the <kbd>Money</kbd> class nor our <kbd>UserId</kbd> and <kbd>ClassifiedAdId</kbd> classes can represent value objects.</p>
+<p>To make the <kbd>Money</kbd> class closer to proper value object type, we need it to implement the <kbd>IEquatable</kbd> interface. The class instance will need to be compared with instances of the same type, so we need <kbd>Money</kbd> to implement <kbd>IEquatable&lt;Money&gt;</kbd>. If you add this interface to the class, in Rider, and in Visual Studio with Resharper, there will be an option to generate the necessary code automatically using the <span class="packt_screen">Generate equality to members</span> refactoring suggestion:</p>
+<p class="CDPAlignCenter CDPAlign"><img src="assets/cb68a9dd-bc5b-4174-8732-b9762ca373e4.png" style="width:48.50em;height:23.67em;"/></p>
+<div class="packt_figref CDPAlignCenter CDPAlign">Generate equality members in Rider</div>
+<p>Therefore, if the <span class="packt_screen">Overload equality operators</span> option is enabled, code for implicit equality operators will also be created. So, the code for our <kbd>Money</kbd> class will look like the following:</p>
+<pre>using System;<br/><br/>namespace Marketplace.Domain<br/>{<br/>    public class Money : IEquatable&lt;Money&gt;<br/>    {<br/>        public decimal Amount { get; }<br/><br/>        public Money(decimal amount) =&gt; Amount = amount;<br/><br/>        public bool Equals(Money other)<br/>        {<br/>            if (ReferenceEquals(null, other)) return false;<br/>            if (ReferenceEquals(this, other)) return true;<br/>            return Amount.Equals(other.Amount);<br/>        }<br/><br/>        public override bool Equals(object obj)<br/>        {<br/>            if (ReferenceEquals(null, obj)) return false;<br/>            if (ReferenceEquals(this, obj)) return true;<br/>            if (obj.GetType() != this.GetType()) return false;<br/>            return Equals((Money) obj);<br/>        }<br/><br/>        public override int GetHashCode() =&gt; Amount.GetHashCode();<br/><br/>        public static bool operator ==(Money left, Money right) =&gt; <br/>        Equals(left, right);<br/><br/>        public static bool operator !=(Money left, Money right) =&gt; <br/>        !Equals(left, right);<br/>    }<br/>}</pre>
+<p>If we run the same test now, it will pass, because, when we call <kbd>Assert.Equals(firstAmount, secondAmount)</kbd>, the preceding code will compare the values of the <kbd>_value</kbd> field for both instances when these values are the same. Because we also created code for implicit equality operators, we can use comparisons like <kbd>if (firstAmount == secondAmount)</kbd> in our code.</p>
+<p>Now, imagine we need all this code for each value object type we create. Yes, with some nice auto-magic from Resharper, we can generate this code very quickly, and then hide it in a region, which will always be collapsed. But, if we decide to add one more attribute to the value object, we will need to reopen this region and add this new attribute in several places.</p>
+<p>We can reduce the amount of boilerplate code, and provide the ability for equality comparison methods to be dynamic, by using a base class. There are at least two ways to create such a base class. One includes using reflections to discover all fields in the implementation type, and use all of them for equality purposes. Another method involves creating an abstract method that needs to be overridden in each implementation to provide specific values that are used for equality. While the first method allows writing less code since all fields are automatically discovered and used, the second method allows us to choose which attributes will be used for equality.</p>
+<div class="packt_infobox">In one of the next versions of C#, which might already be available when you read this book, the new feature will be introduced that is called <span class="packt_screen">record types</span>. On a high level, record types will be similar to F# records. Using record types, declaration of value objects would become very short, and all boilerplate code for equality (and more) will be generated by the compiler.<br/>
+<br/>
+For example, declaring the <kbd>Money</kbd> type earlier would be done in one line like this:<br/>
+<br/>
+<kbd>public class Money(double amount);</kbd><br/>
+<br/>
+Throughout this book, I use classes, which are reference types, unlike structs, which are value types. It means that those value objects aren't completely following the immutability principle. We, however, will try to do as much as we can to ensure that these objects cannot be changed freely, but using the assignment operator for the object instance will only assign the reference to the original object, which is different for value types.</div>
+<p>Using the abstract base class in the <kbd>Marketplace.Framework</kbd> project, we can now refactor the <kbd>Money</kbd> class to the following:</p>
+<pre>using Marketplace.Framework;<br/><br/>namespace Marketplace.Domain<br/>{<br/>    public class Money : Value&lt;Money&gt;<br/>    {<br/>        public decimal Amount { get; }<br/><br/>        public Money(decimal amount) =&gt; Amount = amount;<br/>    }<br/>}</pre>
+<p>As you can see, all the boilerplate code is now moved to the base class, and we get back to essentials. The test, however, still passes because of the proper equality implementation in the base class.</p>
+<p>So far, we have only had straightforward rules in value objects, but when we work with money, we should be adding one useful check. Rarely, if we talk about money, we mean a negative amount. Yes, such amounts exist in accounting, but we are not building an accounting system. In our domain, classified ads need to have a price, and the price cannot be negative, as our domain expert explained. So, we can represent this rule in a new value object, shown in the following code:</p>
+<pre>using System;<br/><br/>namespace Marketplace.Domain<br/>{<br/>    public class Price : Money<br/>    {<br/>        public Price(decimal amount) : base(amount)<br/>        {<br/>            if (amount &lt; 0)<br/>                throw new ArgumentException(<br/>                    "Price cannot be negative",<br/>                    nameof(amount));<br/>        }<br/>    }<br/>}</pre>
+<p>Thus, despite our base, <kbd>Money</kbd> class still allows its amount to be negative or zero; the price will always be positive and, as a result, valid in our domain.</p>
+<p>Speaking about immutability, we must ensure that there are no methods that our value objects expose, which allow changing field values inside these objects. If we want to do some operation on a value object instance, it needs to produce a new instance of the same type, but with a new value. By doing this, we ensure that the original object will retain its value.</p>
+<p>Let's look at the <kbd>Money</kbd> example and add some useful operations to it, keeping immutability in mind:</p>
+<pre>using Marketplace.Framework;<br/><br/>namespace Marketplace.Domain<br/>{<br/>    public class Money : Value&lt;Money&gt;<br/>    {<br/>        public decimal Amount { get; }<br/><br/>        public Money(decimal amount) =&gt; Amount = amount;<br/>        <br/>        public Money Add(Money summand) =&gt; <br/>            new Money(Amount + summand.Amount);<br/>        <br/>        public Money Subtract(Money subtrahend) =&gt; <br/>            new Money(Amount - subtrahend.Amount);<br/>        <br/>        public static Money operator +(<br/>         Money summand1, Money summand2) =&gt; summand1.Add(summand2);<br/><br/>        public static Money operator -(<br/>         Money minuend, Money subtrahend) =&gt; <br/>          minuend.Subtract(subtrahend);<br/>    }<br/>}</pre>
+<p>If we have a sum of €1 coin and two €2 coins, the total value is €5. If we compare it with a banknote of €5, its value is the same. Since we aren't interested in shape, size, and weight of those monetary instruments and we are only interested in value, we can conclude that those two have equal value. Our preceding new <kbd>Money</kbd> class lets us express this statement in the test code, which will be green when we run it:</p>
+<pre>[Fact]<br/>public void Sum_of_money_gives_full_amount()<br/>{<br/>    var coin1 = new Money(1);<br/>    var coin2 = new Money(2);<br/>    var coin3 = new Money(2);<br/>    <br/>    var banknote = new Money(5);<br/>    <br/>    Assert.Equal(banknote, coin1 + coin2 + coin3);<br/>}</pre>
+<p>Now, we can finally rewrite our identity classes to proper value object implementations:</p>
+<pre>public class ClassifiedAdId : Value&lt;ClassifiedAdId&gt;<br/>{<br/>    private readonly Guid _value; <br/>    <br/>    public ClassifiedAdId(Guid value) =&gt; _value = value;<br/>}<br/><br/>public class UserId : Value&lt;UserId&gt;<br/>{<br/>    private readonly Guid _value; <br/>    <br/>    public UserId(Guid value) =&gt; _value = value;<br/>}</pre>
+<p>Now, let's have a more in-depth look at more advanced ways to instantiate value objects and entities.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Factories</h1>
+                </header>
+            
+            <article>
+                
+<p>Now, we can implement more value objects that will be used for other fields in our entity. Remember, we have three methods in the entity that expressed its basic behaviour—<kbd>SetTitle(string)</kbd>, <kbd>UpdateText(string)</kbd>, and <kbd>UpdatePrice(double)</kbd>. The easiest one to deal with would be the last one since we already have a value object type for it—<kbd>Price</kbd>. Let's focus on the other two methods and see what constraints we can implement using value objects instead of plain strings for ad title and text.</p>
+<p>The complete value object class for the classified ad title could look like this:</p>
+<pre>using System;<br/>using Marketplace.Framework;<br/><br/>namespace Marketplace.Domain<br/>{<br/>    public class ClassifiedAdTitle : Value&lt;ClassifiedAdTitle&gt;<br/>    {<br/>        public static ClassifiedAdTitle FromString(string title) =&gt;<br/>            new ClassifiedAdTitle(title);<br/>            <br/>        private readonly string _value;<br/><br/>        private ClassifiedAdTitle(string value)<br/>        {<br/>            if (value.Length &gt; 100)<br/>                throw new ArgumentOutOfRangeException(<br/>                    "Title cannot be longer that 100 characters",<br/>                    nameof(value));<br/><br/>            _value = value;<br/>        }<br/>    }<br/>}</pre>
+<p>Let's go through it to understand how it works.</p>
+<p>First, we use our abstract <kbd>Value&lt;T&gt;</kbd> base class to remove the boilerplate code, just as we did before in the identity and <kbd>price</kbd> value objects. Then, skipping the <kbd>static</kbd> method, you can see the <kbd>private</kbd> value field, again, like in other value objects we have created before. However, then we have a private constructor, which accepts a regular string argument. Inside the constructor, we enforce the constraint that the ad title cannot be longer than <kbd>100</kbd> characters. It will not allow us to spread such checks to other parts of the application. You might ask the question—why is the constructor <kbd>private</kbd> in this case? It is because we might have different sources of data for the title string, and, before calling the constructor, we might need to take some additional operations. It is not done in the preceding code snippet just yet, but we will add such functionality later. The next question would be—how do we construct new instances of this class if the constructor is <kbd>private</kbd>? It is where the <strong>factory</strong> pattern becomes useful.</p>
+<p>Factories are functions that are used to create instances of domain objects, which are, by definition, valid. Factory functions can execute some logic to construct valid instances, and such logic could be different per factory. It is why we would expect to have multiple factory methods in one value object class, although this is not a requirement. Factories also help to make implicit things more explicit by using proper naming. In our <kbd>ClassifiedAdTitle</kbd> class, we only have one factory, which converts the string to the value object instance. It is quite clear what it does and what kind of argument it accepts.</p>
+<p>Let's see how we can use factories to handle different use cases. Imagine that we get a requirement for ad title to support <kbd>Markdown</kbd> partially. In fact, we only need to support italic and bold. We do need to validate the existing factory argument since any string is a valid <kbd>Markdown</kbd> string anyway. But, if we can get input from some online editor that can only produce pure HTML, we can do a conversion in a new factory function:</p>
+<pre>public static ClassifiedAdTitle FromHtml(string htmlTitle)<br/>{<br/>    var supportedTagsReplaced = htmlTitle<br/>        .Replace("&lt;i&gt;", "*")<br/>        .Replace("&lt;/i&gt;", "*")<br/>        .Replace("&lt;b&gt;", "**")<br/>        .Replace("&lt;/b&gt;", "**");<br/>    return new ClassifiedAdTitle(Regex.Replace(<br/>      supportedTagsReplaced, "&lt;.*?&gt;", string.Empty));<br/>}</pre>
+<p>I have to admit that this function is not perfect because it is insufficient in the number of tags it handles. It also cannot correctly handle HTML tags that are written using capital letters. But it is good enough for demo purposes to give you an idea of what kind of logic can be included in factory functions.</p>
+<p>Now, let's move to the <kbd>Price</kbd> class and see if it can create some factories and apply more rules to it. Since <kbd>Price</kbd> inherits from <kbd>Amount</kbd>, we can look to make the <kbd>Amount</kbd> class more strict:</p>
+<pre>using System;<br/>using Marketplace.Framework;<br/><br/>namespace Marketplace.Domain<br/>{<br/>    public class Money : Value&lt;Money&gt;<br/>    {<br/>        public static Money FromDecimal(decimal amount) =&gt;<br/>            new Money(amount);<br/>        <br/>        public static Money FromString(string amount) =&gt;<br/>            new Money(decimal.Parse(amount));<br/>        <br/>        protected Money(decimal amount)<br/>        {<br/>            if (decimal.Round(amount, 2) != amount)<br/>                throw new ArgumentOutOfRangeException(<br/>                    nameof(amount),<br/>                    "Amount cannot have more than two decimals");<br/>            <br/>            Amount = amount;<br/>        }<br/><br/>        public decimal Amount { get; }<br/><br/>        // Public methods go here as before<br/>    }<br/>}</pre>
+<p>As you can see here, <kbd>Money</kbd> class now has a <kbd>protected</kbd> constructor, which cannot be called from outside, except inherited classes like <kbd>Price</kbd>. The constructor now checks if the amount argument has more than two decimal points, and throws an exception if this is the case. Finally, we have two factory functions that create instances of <kbd>Money</kbd> from decimal or string arguments. Most probably, we will receive strings from the API so we can try parsing them inside the factory. It will, of course, throw the decimal parsing exception should the given string not represent a valid number.</p>
+<div class="packt_infobox"><span>We are checking if an amount of money has two decimal places, and usually, this is what we need to do. </span><span>However, bear in mind that not all currencies support two decimals. For example, the Japanese Yen must have no decimals at all. Amounts in Yen are always round. You'd probably be surprised to know that Omani Rial supports three decimal places, so if you plan to deliver your application in Oman, you should not use the </span><kbd>Money</kbd><span> class from this book, or at least change the rules.</span><br/>
+<br/>
+<span>Always check if rules that you apply are valid on all markets that you plan to support. Things like currencies, date and time formats, people names, bank accounts, and addresses can have surprisingly large varieties across the globe, and it is always worth checking if you are applying rules that make sense.</span></div>
+<p>Now, let's imagine that our application needs to support different currencies. I mean that currency information would also need to be included in this value object. After adding it, we get code like this:</p>
+<pre>using System;<br/>using Marketplace.Framework;<br/><br/>namespace Marketplace.Domain<br/>{<br/>    public class Money : Value&lt;Money&gt;<br/>    {<br/>        private const string DefaultCurrency = "EUR";<br/><br/>        public static Money FromDecimal(<br/>         decimal amount, string currency = DefaultCurrency) =&gt;<br/>            new Money(amount, currency);<br/><br/>        public static Money FromString(<br/>         string amount, string currency = DefaultCurrency) =&gt;<br/>            new Money(decimal.Parse(amount), currency);<br/><br/>        protected Money(decimal amount, string currencyCode = "EUR")<br/>        {<br/>            if (decimal.Round(amount, 2) != amount)<br/>                throw new ArgumentOutOfRangeException(<br/>                    nameof(amount),<br/>                    "Amount cannot have more than two decimals");<br/><br/>            Amount = amount;<br/>            CurrencyCode = currencyCode;<br/>        }<br/><br/>        public decimal Amount { get; }<br/>        public string CurrencyCode { get; }<br/><br/>        public Money Add(Money summand)<br/>        {<br/>            if (CurrencyCode != summand.CurrencyCode)<br/>                throw new CurrencyMismatchException(<br/>                    "Cannot sum amounts with different currencies");<br/><br/>            return new Money(Amount + summand.Amount);<br/>        }<br/><br/>        public Money Subtract(Money subtrahend)<br/>        {<br/>            if (CurrencyCode != subtrahend.CurrencyCode)<br/>                throw new CurrencyMismatchException(<br/>                 "Cannot subtract amounts with different currencies");<br/><br/>            return new Money(Amount - subtrahend.Amount);<br/>        }<br/><br/>        public static Money operator +(<br/>          Money summand1, Money summand2) =&gt; <br/>            summand1.Add(summand2);<br/><br/>        public static Money operator -(<br/>          Money minuend, Money subtrahend) =&gt; <br/>           minuend.Subtract(subtrahend);<br/>    }<br/><br/>    public class CurrencyMismatchException : Exception<br/>    {<br/>        public CurrencyMismatchException(string message) : <br/>          base(message)<br/>        {<br/>        }<br/>    }<br/>}</pre>
+<p>First, we passed currency information to the constructor and both factory methods. By default, factories will use <kbd>EUR</kbd> if no currency is specified. We also keep currency information inside the class. Second, <kbd>Add</kbd> and <kbd>Subtract</kbd> methods started to check if both operands have the same currency. In case currencies of operands don't match, these methods throw an exception.</p>
+<p>We also added a domain-specific exception that explicitly tells us that operations on two instances of <kbd>Money</kbd> cannot be completed because they have different currencies.</p>
+<p>Imagine how many bugs such simple technique can prevent in a multicurrency system, where developers too often forget that monetary value for the same decimal amount can be drastically different, depending on which currency this amount of money is issued? For example, one US Dollar is roughly equal to 110 Japanese Yen and adding <kbd>1</kbd> to <kbd>110</kbd>, in this case, won't give you the right result.</p>
+<p>One thing that remains uncovered with our <kbd>Money</kbd> object is that we can supply any string as currency code and it will be accepted. As you might imagine we can have this failure very easily:</p>
+<pre>var firstAmount = Money.FromDecimal(10, "USD");<br/>var secondAmount = Money.FromDecimal(20, "Usd");<br/>var thirdAmount = Money.FromDecimal(30, "$");</pre>
+<p>Looking at the <kbd>Money</kbd> class code, we can quickly conclude that no operations can be performed on combinations of these objects. <kbd>firstAmount + secondAmount</kbd> will crash because our class will decide that they have different currencies. The <kbd>thirdAmount</kbd> is utterly invalid because the Dollar sign is not a valid currency code, but our class still accepts it. Let's see what can we do to fix it.</p>
+<p>To be able to check the currency code validity, we either need to keep all valid country codes inside the code of our value object class or use some external service to do the check. The first option is self-contained, so we will not have any dependencies for the value object class. However, by doing this, we will inject a somewhat alien concept to the value object code, which we will need to change each time something happens in the world of finances. One might argue that new currencies do not appear every day, but at the same time, Eurozone has been expanded during the last few years, and each time a new country starts using Euro, their old currency disappears, and this needs to be taken into account. These factors are utterly external to our system, and it would not be smart to create such an easy-to-forget time bomb in our code.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Domain services</h1>
+                </header>
+            
+            <article>
+                
+<p>We can go for a dependency on some external service, but we know that domain models should not have external dependencies, so how do we solve this issue? We can use a pattern called <strong>domain service</strong>. In DDD, domain services can perform different kinds of tasks, and here, we will look into one type of them.</p>
+<p>Our domain service needs to check if a given country code is valid. The <kbd>Money</kbd> class will get it as a dependency, so we need to declare the domain service inside our domain model. Because we do not want to depend on anything on the outside of our domain model, we should not put any implementation details inside the domain model. It means that the only thing we are going to have inside the domain project is the domain service interface, shown in the following code:</p>
+<pre>namespace Marketplace.Domain<br/>{<br/>    public interface ICurrencyLookup<br/>    {<br/>        CurrencyDetails FindCurrency(string currencyCode);<br/>    }<br/><br/>    public class CurrencyDetails : Value&lt;CurrencyDetails&gt;<br/>    {<br/>        public string CurrencyCode { get; set; }<br/>        public bool InUse { get; set; }<br/>        public int DecimalPlaces { get; set; }<br/><br/>        public static CurrencyDetails None = new CurrencyDetails {<br/>            InUse = false};<br/>    }<br/>}</pre>
+<p class="mce-root">The new interface will not just check if a given currency code can be matched with some currency. Since we already discussed that different currencies might have a different number of decimal places, the service will return an instance of <kbd>CurrencyDetails</kbd> class with this information included. If there is no currency found for the given code, the service will return <kbd>CurrencyDetails.None</kbd> constant.</p>
+<p><span>It is very common in C#, that if a function is expected to return an instance of a reference type, it also can return</span> null t<span>o indicate that there is no valid result that the function can produce. Although, at first, this approach might seem easy, it creates massive problems. Our code becomes full of null checks because we suspect that every function can return</span> null<span>, so we must trust no one to avoid </span><kbd>NullReferenceException</kbd><span>. Null has a specific null-type, and it is too easy to assign</span> null to something that should never be null<span>.</span></p>
+<div class="packt_infobox">Sir Charles Antony Richard Hoare, better known as Tony Hoare, introduced null references to the Algol programming language back in 1965. He remembers doing this <span class="packt_screen">because it was so easy to implement</span>. Much later, at the QCon conference in London in 2009, he apologized for null reference saying <span><em>I call it my billion dollar mistake</em></span>.<span><br/>
+<br/>
+Video: <a href="https://www.infoq.com/presentations/Null-References-The-Billion-Dollar-Mistake-Tony-Hoare">https://www.infoq.com/presentations/Null-References-The-Billion-Dollar-Mistake-Tony-Hoare</a>.</span></div>
+<p>In most functional languages, the null reference does not exist, because it can easily break the functional composition. Instead, optional types are being used. In the preceding code snippet, we use a similar technique to return a pre-defined value that indicates that there is no currency found for a given code. This constant has the proper type and proper name, and we should never check the function output for null.</p>
+<div class="packt_tip">To mitigate the null reference issue, Microsoft decided to allow explicit declaration of nullable reference types. By default, reference types will be assumed as non-nullable. This feature will remain until the next version of C#, and you can get more details about the proposal here: <a href="https://github.com/dotnet/csharplang/blob/master/proposals/nullable-reference-types.md">https://github.com/dotnet/csharplang/blob/master/proposals/nullable-reference-types.md</a>.</div>
+<p>When the interface is there, we can change our value object like to look like the following:</p>
+<pre>using System;<br/>using Marketplace.Framework;<br/><br/>namespace Marketplace.Domain<br/>{<br/>    public class Money : Value&lt;Money&gt;<br/>    {<br/>        public static string DefaultCurrency = "EUR";<br/>        <br/>        public static Money FromDecimal(<br/>          decimal amount, string currency, <br/>            ICurrencyLookup currencyLookup) =&gt;<br/>            new Money(amount, currency, currencyLookup);<br/><br/>        public static Money FromString(string amount, string currency,<br/>            ICurrencyLookup currencyLookup) =&gt;<br/>            new Money(decimal.Parse(amount), currency, currencyLookup);<br/><br/>        protected Money(decimal amount, string currencyCode, <br/>          ICurrencyLookup currencyLookup)<br/>        {<br/>            if (string.IsNullOrEmpty(currencyCode))<br/>                throw new ArgumentNullException(<br/>                    nameof(currencyCode), <br/>                    "Currency code must be specified");<br/>            <br/>            var currency = currencyLookup.FindCurrency(currencyCode);<br/>            if (!currency.InUse)<br/>                throw new ArgumentException(<br/>                  $"Currency {currencyCode} is not valid");<br/>            <br/>            if (decimal.Round(<br/>              amount, currency.DecimalPlaces) != amount)<br/>                throw new ArgumentOutOfRangeException(<br/>                    nameof(amount),<br/>                    $"Amount in {<br/>                     currencyCode} cannot have more than {<br/>                          currency.DecimalPlaces} decimals");<br/><br/>            Amount = amount;<br/>            Currency = currency;<br/>        }<br/><br/>        private Money(decimal amount, CurrencyDetails currency)<br/>        {<br/>            Amount = amount;<br/>            Currency = currency;<br/>        }<br/><br/>        public decimal Amount { get; }<br/>        public CurrencyDetails Currency { get; }<br/><br/>        public Money Add(Money summand)<br/>        {<br/>            if (Currency != summand.Currency)<br/>                throw new CurrencyMismatchException(<br/>                    "Cannot sum amounts with different currencies");<br/><br/>            return new Money(Amount + summand.Amount, Currency);<br/>        }<br/><br/>        public Money Subtract(Money subtrahend)<br/>        {<br/>            if (Currency != subtrahend.Currency)<br/>                throw new CurrencyMismatchException(<br/>                 "Cannot subtract amounts with different currencies");<br/><br/>            return new Money(Amount - subtrahend.Amount, Currency);<br/>        }<br/><br/>        public static Money operator +(Money summand1, Money summand2) <br/>          =&gt; summand1.Add(summand2);<br/><br/>        public static Money operator -(Money minuend, Money subtrahend) <br/>          =&gt; minuend.Subtract(subtrahend);<br/><br/>        public override string ToString() =&gt; $"{<br/>            Currency.CurrencyCode} {Amount}";<br/>    }<br/><br/>    public class CurrencyMismatchException : Exception<br/>    {<br/>        public CurrencyMismatchException(string message) : <br/>          base(message)<br/>        {<br/>        }<br/>    }<br/>}</pre>
+<p>There are a couple of new things going on here, listed as follows:</p>
+<ul>
+<li>We give the value object a dependency on the currency lookup domain service. Since we are using the interface, our domain model still has no external dependencies.</li>
+<li>Since we are not using the null reference to indicate that there is no currency found for the specified code, we do not use null checks. Instead, we check if the returned currency is valid or not. Since the <kbd>CurrencyDetails.NotFound</kbd> constant has its <kbd>InUse</kbd> property set to <kbd>false</kbd>, we will throw an exception just as we would do for any currency that exists, but is not in use.</li>
+<li>We do not use two as the maximum number of decimal places. Instead, we get this number from the currency lookup, so our value object becomes more flexible.</li>
+<li>For our public methods, we need a simplified constructor, since these methods control that both operands have the same (valid) currency. Because we only trust our internals to use this constructor, it needs to be private. Both <kbd>Add</kbd> and <kbd>Subtract</kbd> methods use this constructor.</li>
+<li>Added <kbd>ToString</kbd> override to be able to see the human-readable value of the value object, for example, in test results.</li>
+</ul>
+<p>Our <kbd>Money</kbd> value object is still very much testable since we can supply a fake currency lookup:</p>
+<pre>using System.Collections.Generic;<br/>using System.Linq;<br/>using Marketplace.Domain;<br/><br/>namespace Marketplace.Tests<br/>{<br/>    public class FakeCurrencyLookup : ICurrencyLookup<br/>    {<br/>        private static readonly IEnumerable&lt;CurrencyDetails&gt; <br/>        _currencies =<br/>            new[]<br/>            {<br/>                new CurrencyDetails<br/>                {<br/>                    CurrencyCode = "EUR",<br/>                    DecimalPlaces = 2,<br/>                    InUse = true<br/>                },<br/>                new CurrencyDetails<br/>                {<br/>                    CurrencyCode = "USD",<br/>                    DecimalPlaces = 2,<br/>                    InUse = true<br/>                },<br/>                new CurrencyDetails<br/>                {<br/>                    CurrencyCode = "JPY",<br/>                    DecimalPlaces = 0,<br/>                    InUse = true<br/>                },<br/>                new CurrencyDetails<br/>                {<br/>                    CurrencyCode = "DEM",<br/>                    DecimalPlaces = 2,<br/>                    InUse = false<br/>                }<br/>            };<br/><br/>        public CurrencyDetails FindCurrency(string currencyCode)<br/>        {<br/>            var currency = _currencies.FirstOrDefault(x =&gt; <br/>              x.CurrencyCode == currencyCode);<br/>            return currency ?? CurrencyDetails.None;<br/>        }<br/>    }<br/>}</pre>
+<p>With this implementation in place, we can refactor the tests for <kbd>Money</kbd> as follows:</p>
+<pre>using System;<br/>using Marketplace.Domain;<br/>using Xunit;<br/><br/>namespace Marketplace.Tests<br/>{<br/>    public class Money_Spec<br/>    {<br/>        private static readonly ICurrencyLookup CurrencyLookup =<br/>            new FakeCurrencyLookup();<br/>        <br/>        [Fact]<br/>        public void Two_of_same_amount_should_be_equal()<br/>        {<br/>            var firstAmount = Money.FromDecimal(5, "EUR", <br/>            CurrencyLookup);<br/>            var secondAmount = Money.FromDecimal(5, "EUR", <br/>            CurrencyLookup);<br/><br/>            Assert.Equal(firstAmount, secondAmount);<br/>        }<br/>        <br/>        [Fact]<br/>        public void Two_of_same_amount_but_different<em>Currencies<br/>        </em>should_not_be_equal()<br/>        {<br/>            var firstAmount = Money.FromDecimal(5, "EUR", <br/>            CurrencyLookup);<br/>            var secondAmount = Money.FromDecimal(5, "USD", <br/>            CurrencyLookup);<br/><br/>            Assert.NotEqual(firstAmount, secondAmount);<br/>        }<br/><br/><br/>        [Fact]<br/>        public void FromString_and_FromDecimal_should_be_equal()<br/>        {<br/>            var firstAmount = Money.FromDecimal(5, "EUR", <br/>            CurrencyLookup);<br/>            var secondAmount = Money.FromString("5.00", "EUR", <br/>            CurrencyLookup);<br/><br/>            Assert.Equal(firstAmount, secondAmount);<br/>        }<br/><br/>        [Fact]<br/>        public void Sum_of_money_gives_full_amount()<br/>        {<br/>            var coin1 = Money.FromDecimal(1, "EUR", CurrencyLookup);<br/>            var coin2 = Money.FromDecimal(2, "EUR", CurrencyLookup);<br/>            var coin3 = Money.FromDecimal(2, "EUR", CurrencyLookup);<br/>            <br/>            var banknote = Money.FromDecimal(5, "EUR", CurrencyLookup);<br/>            <br/>            Assert.Equal(banknote, coin1 + coin2 + coin3);<br/>        }<br/><br/>        [Fact]<br/>        public void Unused_currency_should_not_be_allowed()<br/>        {<br/>            Assert.Throws&lt;ArgumentException&gt;(() =&gt;<br/>                Money.FromDecimal(100, "DEM", CurrencyLookup)<br/>            );<br/>        }<br/><br/>        [Fact]<br/>        public void Unknown_currency_should_not_be_allowed()<br/>        {<br/>            Assert.Throws&lt;ArgumentException&gt;(() =&gt;<br/>                Money.FromDecimal(100, "WHAT?", CurrencyLookup)<br/>            );<br/>        }<br/><br/>        [Fact]<br/>        public void Throw_when_too_many_decimal_places()<br/>        {<br/>            Assert.Throws&lt;ArgumentOutOfRangeException&gt;(() =&gt;<br/>                Money.FromDecimal(100.123m, "EUR", CurrencyLookup)<br/>            );<br/>        }<br/><br/>        [Fact]<br/>        public void Throws_on_adding_different_currencies()<br/>        {<br/>            var firstAmount = Money.FromDecimal(5, "USD", <br/>            CurrencyLookup);<br/>            var secondAmount = Money.FromDecimal(5, "EUR", <br/>            CurrencyLookup);<br/><br/>            Assert.Throws&lt;CurrencyMismatchException&gt;(() =&gt; <br/>                firstAmount + secondAmount<br/>            );<br/>        }<br/>        <br/>        [Fact]<br/>        public void Throws_on_substracting_different_currencies()<br/>        {<br/>            var firstAmount = Money.FromDecimal(5, "USD", <br/>            CurrencyLookup);<br/>            var secondAmount = Money.FromDecimal(5, "EUR", <br/>            CurrencyLookup);<br/><br/>            Assert.Throws&lt;CurrencyMismatchException&gt;(() =&gt; <br/>                firstAmount - secondAmount<br/>            );<br/>        }<br/>    }<br/>}</pre>
+<p>You can see here that we are testing some positive and some adverse scenarios to ensure those valid operations are correctly completed, and also, those invalid operations aren't allowed to be executed.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Entity invariants</h1>
+                </header>
+            
+            <article>
+                
+<p>We have gone through using value objects to protect invalid values from being even used as parameters for entity constructors and methods. This technique allows moving a lot of checks to value objects, provides nice encapsulation, and enables type safety. Then, when we create a new entity or execute some behavior using entity methods, we need to do some more checks. Since we can be quite sure that all parameters already contain valid individual values, we need to ensure that a given combination of parameters, current entity state, and execute behavior, is not going to bring the entity to some invalid state.</p>
+<p>Let's look at what complex rules we have for our classified ad entity. To find such rules, we can use some sticky notes from our detailed EventStorming session in <a href="07ee37fb-0189-467c-865d-18e72868b137.xhtml" target="_blank">Chapter 3</a>, <em>EventStorming</em>, and put them on a chart like this:</p>
+<p class="CDPAlignCenter CDPAlign"><img src="assets/73066e67-6f7e-4849-a927-d016e8486af9.png" style="width:31.75em;height:18.08em;"/></p>
+<div class="packt_figref CDPAlignCenter CDPAlign">Analyzing constraints for a command</div>
+<p>We put the command to the left side, the event to the right side, and try to find out what could prevent our command being executed in a way that produces the desired outcome (the event). In our case here, we need to ensure that, before an ad can be put to the review queue, it must have a non-empty title, text, and price. By using value objects alone, we cannot guarantee that our entity state is correct as a whole. The entity state validity can change depending on what state the entity has at a particular moment of its life cycle.<span> </span>Only when a given command is being executed, we need to check if these constraints are satisfied. <span>It is what we can call an invariant for this entity—an ad that is in a pending review cannot have an empty title, an empty text, or zero price.</span></p>
+<p>There are at least two ways to ensure that our entity never gets to an invalid state. The first and most obvious way is to add checks to the operation code. We have no method to request the ad to be published, so let's add it and make some changes related to the fact of using value objects for entity state as well:</p>
+<pre>namespace Marketplace.Domain<br/>{<br/>    public class ClassifiedAd<br/>    {<br/>        public ClassifiedAdId Id { get; }<br/><br/>        public ClassifiedAd(ClassifiedAdId id, UserId ownerId)<br/>        {<br/>            Id = id;<br/>            OwnerId = ownerId;<br/>            State = ClassifiedAdState.Inactive;<br/>        }<br/><br/>        public void SetTitle(ClassifiedAdTitle title) =&gt; Title = title;<br/><br/>        public void UpdateText(ClassifiedAdText text) =&gt; Text = text;<br/><br/>        public void UpdatePrice(Price price) =&gt; Price = price;<br/><br/>        public void RequestToPublish()<br/>        {<br/>            if (Title == null)<br/>                throw new InvalidEntityStateException(this, "title <br/>                cannot be empty");<br/>            <br/>            if (Text == null)<br/>                throw new InvalidEntityStateException(this, "text <br/>                cannot be empty");<br/>            <br/>            if (Price?.Amount == 0)<br/>                throw new InvalidEntityStateException(this, "price <br/>                cannot be zero");<br/><br/>            State = ClassifiedAdState.PendingReview;<br/>        }<br/><br/>        public UserId OwnerId { get; }<br/>        public ClassifiedAdTitle Title { get; private set; }<br/>        public ClassifiedAdText Text { get; private set; }<br/>        public Price Price { get; private set; }<br/>        public ClassifiedAdState State { get; private set; }<br/>        public UserId ApprovedBy { get; private set; }<br/><br/>        public enum ClassifiedAdState<br/>        {<br/>            PendingReview,<br/>            Active,<br/>            Inactive,<br/>            MarkedAsSold<br/>        }<br/>    }<br/>}</pre>
+<p>In the new entity code, we have all properties to be typed as value objects, and we got one more property for the classified ad current state. In the beginning, it is set to <kbd>Inactive</kbd>, and when the ad is requested to be published, we change the state to <kbd>PendingReview</kbd>. However, we only do it when all the checks are satisfied.</p>
+<p>To let the caller know if our entity is not ready to be published when some of those checks fail, we use our custom exception, which is implemented like this:</p>
+<pre>using System;<br/><br/>namespace Marketplace.Domain<br/>{<br/>    public class InvalidEntityStateException : Exception<br/>    {<br/>        public InvalidEntityStateException(object entity, string <br/>        message)<br/>            : base($"Entity {entity.GetType().Name} state change <br/>            rejected, {message}")<br/>        {<br/>        }<br/>    }<br/>}</pre>
+<p>This method of checking constraints before executing the operation, in the operation method itself, has one disadvantage. If we <span>now </span>change the price to zero, it will go through, because <kbd>UpdatePrice</kbd> method is not checking the price value.</p>
+<p>We could, of course, copy the price check to the <kbd>UpdatePrice</kbd> method too, but there might be more methods that need the same tests, and we will keep copying control blocks. It will lead to a situation when, if we need to change any of those rules, we need to go to numerous places to replace all of the checks; this is very error-prone.</p>
+<p>To combine rules in one place, we can use techniques of contract programming. Part of contract programming can be seen in value objects since we evaluate pre-conditions for each parameter of the operation method. When we execute the operation without doing any additional checks, we will need to do a combined test (post-condition control). This check can be implemented in one place for the whole entity, and each operation will need to call it at the last line in the method.</p>
+<p>For our classified ad entity, it could look like this:</p>
+<pre>namespace Marketplace.Domain<br/>{<br/>    public class ClassifiedAd<br/>    {<br/>        public ClassifiedAdId Id { get; }<br/><br/>        public ClassifiedAd(ClassifiedAdId id, UserId ownerId)<br/>        {<br/>            Id = id;<br/>            OwnerId = ownerId;<br/>            State = ClassifiedAdState.Inactive;<br/>            EnsureValidState();<br/>        }<br/><br/>        public void SetTitle(ClassifiedAdTitle title)<br/>        {<br/>            Title = title;<br/>            EnsureValidState();<br/>        }<br/><br/>        public void UpdateText(ClassifiedAdText text)<br/>        {<br/>            Text = text;<br/>            EnsureValidState();<br/>        }<br/><br/>        public void UpdatePrice(Price price)<br/>        {<br/>            Price = price;<br/>            EnsureValidState();<br/>        }<br/><br/>        public void RequestToPublish()<br/>        {<br/>            State = ClassifiedAdState.PendingReview;<br/>            EnsureValidState();<br/>        }<br/><br/>        protected override void EnsureValidState()<br/>        {<br/>            var valid =<br/>                Id != null &amp;&amp;<br/>                OwnerId != null &amp;&amp;<br/>                (State switch<br/>                {<br/>                    ClassifiedAdState.PendingReview =&gt;<br/>                        Title != null<br/>                        &amp;&amp; Text != null<br/>                        &amp;&amp; Price?.Amount &gt; 0,<br/>                    ClassifiedAdState.Active =&gt;<br/>                        Title != null<br/>                        &amp;&amp; Text != null<br/>                        &amp;&amp; Price?.Amount &gt; 0<br/>                        &amp;&amp; ApprovedBy != null,<br/>                    _ =&gt; true<br/>                });<br/><br/>            if (!valid)<br/>                throw new InvalidEntityStateException(<br/>                    this, $"Post-checks failed in state {State}");<br/>        }<br/><br/>        public UserId OwnerId { get; }<br/>        public ClassifiedAdTitle Title { get; private set; }<br/>        public ClassifiedAdText Text { get; private set; }<br/>        public Price Price1 { get; private set; }<br/>        public ClassifiedAdState State { get; private set; }<br/>        public UserId ApprovedBy { get; private set; }<br/><br/>        public enum ClassifiedAdState<br/>        {<br/>            PendingReview,<br/>            Active,<br/>            Inactive,<br/>            MarkedAsSold<br/>        }<br/>    }<br/>}</pre>
+<p>As you can see, we have added one method called <kbd>EnsureValidState</kbd> checking that, in any situation, the entity state is valid, and, if it is not valid, an exception will be thrown. When we call this method from any operation method, we can be sure that, no matter what we are trying to do, our entity will always be in a valid state or the caller will get an exception.</p>
+<p>Also, we converted all <kbd>private</kbd> fields to public read-only properties. We need public properties to write tests, although we don't necessarily need to expose the internal entity state. To prevent setting values of these properties outside of operation methods, all properties have private setters, or no setters, for properties that are set in the constructor.</p>
+<p>Now, let's write some tests to ensure that our constraints work:</p>
+<pre>using System;<br/>using Marketplace.Domain;<br/>using Xunit;<br/><br/>namespace Marketplace.Tests<br/>{<br/>    public class ClassifiedAd_Publish_Spec<br/>    {<br/>        private readonly ClassifiedAd _classifiedAd;<br/>        <br/>        public ClassifiedAd_Publish_Spec()<br/>        {<br/>            _classifiedAd = new ClassifiedAd(<br/>                new ClassifiedAdId(Guid.NewGuid()), <br/>                new UserId(Guid.NewGuid()));<br/>        }<br/><br/>        [Fact]<br/>        public void Can_publish_a_valid_ad()<br/>        {<br/>            _classifiedAd.SetTitle(<br/>                ClassifiedAdTitle.FromString("Test ad"));<br/>            _classifiedAd.UpdateText(<br/>                ClassifiedAdText.FromString("Please buy my stuff"));<br/>            _classifiedAd.UpdatePrice(<br/>                Price.FromDecimal(100.10m, "EUR", <br/>                new FakeCurrencyLookup()));<br/>            <br/>            _classifiedAd.RequestToPublish();<br/><br/>            Assert.Equal(ClassifiedAd.ClassifiedAdState.PendingReview,<br/>                _classifiedAd.State);<br/>        }<br/><br/>        [Fact]<br/>        public void Cannot_publish_without_title()<br/>        {<br/>            _classifiedAd.UpdateText(<br/>                ClassifiedAdText.FromString("Please buy my stuff"));<br/>            _classifiedAd.UpdatePrice(<br/>                Price.FromDecimal(100.10m, "EUR", <br/>                    new FakeCurrencyLookup()));<br/>            <br/>            Assert.Throws&lt;InvalidEntityStateException&gt;(() =&gt; <br/>            _classifiedAd.RequestToPublish());<br/>        }<br/><br/>        [Fact]<br/>        public void Cannot_publish_without_text()<br/>        {<br/>            _classifiedAd.SetTitle(<br/>                ClassifiedAdTitle.FromString("Test ad"));<br/>            _classifiedAd.UpdatePrice(<br/>                Price.FromDecimal(100.10m, "EUR", <br/>                    new FakeCurrencyLookup()));<br/>            <br/>            Assert.Throws&lt;InvalidEntityStateException&gt;(<br/>                () =&gt; _classifiedAd.RequestToPublish());<br/>        }<br/><br/>        [Fact]<br/>        public void Cannot_publish_without_price()<br/>        {<br/>            _classifiedAd.SetTitle(<br/>                ClassifiedAdTitle.FromString("Test ad"));<br/>            _classifiedAd.UpdateText(<br/>                ClassifiedAdText.FromString("Please buy my stuff"));<br/>            <br/>            Assert.Throws&lt;InvalidEntityStateException&gt;(<br/>                () =&gt; _classifiedAd.RequestToPublish());<br/>        }<br/><br/>        [Fact]<br/>        public void Cannot_publish_with_zero_price()<br/>        {<br/>            _classifiedAd.SetTitle(<br/>                ClassifiedAdTitle.FromString("Test ad"));<br/>            _classifiedAd.UpdateText(<br/>                ClassifiedAdText.FromString("Please buy my stuff"));<br/>            _classifiedAd.UpdatePrice(<br/>                Price.FromDecimal(0.0m, "EUR", <br/>                    new FakeCurrencyLookup()));<br/>            <br/>            Assert.Throws&lt;InvalidEntityStateException&gt;(<br/>                () =&gt; _classifiedAd.RequestToPublish());<br/>        }<br/>    }<br/>}</pre>
+<p>This spec contains several tests for one operation (publish, or submit for review) with different pre-conditions. Here, we test a happy path when all necessary details are correctly set before the ad can be sent for review; we also test several negative cases when publishing is not allowed, due to missing mandatory information. Perhaps testing negative scenarios is even more essential, since it is straightforward to find out when the happy path does not work—your users will immediately complain. Testing negative scenarios prevents bugs in controlling entity invariants, which, in turn, prevents entities from becoming invalid.</p>
+<p>By now, you might be wondering why we spent so much time talking about domain events and have not seen a single one in code? We will be discussing this in the next section.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Domain events in code</h1>
+                </header>
+            
+            <article>
+                
+<p>EventStorming allowed us to make useful domain discoveries. We gained some knowledge about the domain and managed to visualize it for shared understanding. Commands also appeared on the more detailed model. In this chapter, we learned how to create entities that protect themselves from executing invalid operations and never come to an invalid state. Operations on entities are performed by executing methods, which quite closely resemble commands that we discovered on our detailed model. So, this part is more or less clear, but events have never appeared in our code so far.</p>
+<p>In fact, you can implement a system using DDD principles and patterns without having any domain events. It might sound strange after spending so much time working with them using sticky notes, but this is a fact. When we execute an entity method, it changes the entity state. This state change is an implicit event. For example, when our system executes the <kbd>RequestToPublish</kbd> method of the <kbd>ClassifiedAd</kbd> entity, it will set the entity <kbd>State</kbd> property to <kbd>ClassifiedAdState.PendingReview</kbd> value. Effectively, this can be translated to <strong>classified ad sent to revie</strong><strong>w</strong>, and this is what we wrote on an orange sticky a while ago.</p>
+<p>However, most of the time, making domain events first-class citizens in the domain model has excellent benefits. There are two primary use cases for domain events that are implemented explicitly as part of the domain model, listed as follows:</p>
+<ul>
+<li>Allowing one part of the system to inform other parts of the system about its state changes, using Ubiquitous Language, and state change details: we already discussed the idea of splitting the system into multiple pieces, and those pieces need to play well together by listening to each others' events and executing necessary operations. If a system is built in such a way that different parts of the system react to each others' changes, such a system is called a <strong>reactive system</strong>. </li>
+<li>Persisting domain events to get a full history of state changes inside the domain model: then, the state for any entity can be reconstructed by reading those events and reapplying them to the entity. This pattern is known as <strong>Event Sourcing</strong>, and we will spend a great deal of time discussing it in this book, especially in <a href="75bc64ae-a642-42b2-a44a-05ae0cb2b750.xhtml" target="_blank">Chapter 10</a>, <em>Event Sourcing</em>. </li>
+</ul>
+<p>These two techniques can be combined, so when we persist domain events, we can also listen to everything that is being written in other parts of the system, and execute reactions to those events.</p>
+<p>In this chapter, we will be looking at how we can bring domain events to code, and how our entity methods can raise them so we can use these events later.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Domain events as objects</h1>
+                </header>
+            
+            <article>
+                
+<p>Bringing domain events to code is easy. Each event is an object. It means that we can represent event types as classes or structs. Since we will need to serialize events later, and structs aren't playing nicely with serializers, we will implement domain events as classes.</p>
+<p>We have the following basic operations on our <kbd>ClassifiedAd</kbd> entity:</p>
+<ul>
+<li>Create a new classified ad</li>
+<li>Set the ad title</li>
+<li>Update text</li>
+<li>Update price</li>
+<li>Publish the ad (send for review)</li>
+</ul>
+<p>Each of those operations changes the state of our entity, and by doing this, raises an imaginary domain event. We have all those events on our sticky notes, shown as follows:</p>
+<div class="packt_figref CDPAlignCenter CDPAlign"><img src="assets/ca6ec97c-790d-4cdb-abf9-d7e87311f639.png" style="width:33.50em;height:27.17em;"/></div>
+<div class="CDPAlignCenter CDPAlign packt_figref">The full picture for the core business domain</div>
+<p>Classes that represent events need to clearly describe events (what happened) and contain the necessary information that explains how the system state has changed. Usually, events are reactions to executions of commands. Therefore, data in events typically represent data in commands, and maybe some other details from the entity from which the event has been raised.</p>
+<p>Let's create some domain event classes now. Bear in mind that this is our first ever implementation of domain events, and if you were reading about things like Event Sourcing, you might find it oversimplified, but this is intentional:</p>
+<pre>using System;<br/><br/>namespace Marketplace.Domain<br/>{<br/>    public static class Events<br/>    {<br/>        public class ClassifiedAdCreated<br/>        {<br/>            public Guid Id { get; set; }<br/>            public Guid OwnerId { get; set; }<br/>        }<br/><br/>        public class ClassifiedAdTitleChanged<br/>        {<br/>            public Guid Id { get; set; }<br/>            public string Title { get; set; }<br/>        }<br/><br/>        public class ClassifiedAdTextUpdated<br/>        {<br/>            public Guid Id { get; set; }<br/>            public string AdText { get; set; }<br/>        }<br/><br/>        public class ClassifiedAdPriceUpdated<br/>        {<br/>            public Guid Id { get; set; }<br/>            public decimal Price { get; set; }<br/>            public string CurrencyCode { get; set; }<br/>        }<br/><br/>        public class ClassifiedAdSentForReview<br/>        {<br/>            public Guid Id { get; set; }<br/>        }<br/>    }<br/>}</pre>
+<p>Event classes are wrapped inside the <kbd>Events</kbd> static class, which gives us some namespace.. Therefore, all properties in these classes are of primitive types. We do not use value objects in events. It is a significant thing to remember. The reason for only using primitive types in events is because domain events, as mentioned before, are often used <em>across</em> systems. Events can be seen as our system published contract. If we use Event Sourcing, and events are being persisted, we also cannot tolerate a situation where the rules in some value objects have changed. Furthermore, we cannot load our event anymore, because the data for the value object is now considered to be invalid. Of course, not using value objects in events mean that some more complex value objects need to be flattered. In our case, we extract values from the <kbd>Price</kbd> property to two properties of the <kbd>ClassifiedAdPriceUpdated</kbd>: <kbd>Price</kbd>, which represents the amount, and <kbd>CurrencyCode</kbd>.</p>
+<p>You can see that each event has the <kbd>Id</kbd> property because it makes no sense to raise an event without knowing which entity it comes from. So, each operation needs to take care that the entity <kbd>id</kbd> is populated in the events that it raises.</p>
+<p>Again, the most critical thing about domain events is to represent things that happened, and these things cannot be changed, because we have no time machine or TARDIS to erase or fix the past. Therefore, events should be as simple as possible so we can always load past events, and this should never fail.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Raising events</h1>
+                </header>
+            
+            <article>
+                
+<p>Now, let's see how domain events are being used in our entity. First, we need to raise events from our methods. To do this, we need some event list inside the entity so we can keep events that are being created. Otherwise, there is little point in creating event instances in the first place.</p>
+<p>Since we expect this functionality of keeping events in some sort of a list inside the entity, we can move this to a base class for entities, which we didn't have before.</p>
+<p>Let's create an abstract class and call it <kbd>Entity</kbd>:</p>
+<pre>using System.Collections.Generic;<br/>using System.Linq;<br/><br/>namespace Marketplace.Framework<br/>{<br/>    public abstract class Entity<br/>    {<br/>        private readonly List&lt;object&gt; _events;<br/><br/>        protected Entity() =&gt; _events = new List&lt;object&gt;();<br/><br/>        protected void Raise(object @event) =&gt; _events.Add(@event);<br/><br/>        public IEnumerable&lt;object&gt; GetChanges() =&gt; <br/>        _events.AsEnumerable();<br/><br/>        public void ClearChanges() =&gt; _events.Clear();<br/>    }<br/>}</pre>
+<p>Since raised events will represent changes in the entity, methods that retrieve the list of events and clear this list are called <kbd>GetChanges</kbd> and <kbd>ClearChanges</kbd>.</p>
+<p>The next step is to add this base class to our entity and start raising events from methods:</p>
+<pre>using Marketplace.Framework;<br/><br/>namespace Marketplace.Domain<br/>{<br/>    public class ClassifiedAd : Entity<br/>    {<br/>        public ClassifiedAdId Id { get; }<br/><br/>        public ClassifiedAd(ClassifiedAdId id, UserId ownerId)<br/>        {<br/>            Id = id;<br/>            OwnerId = ownerId;<br/>            State = ClassifiedAdState.Inactive;<br/>            <br/>            EnsureValidState();<br/>            <br/>            Raise(new Events.ClassifiedAdCreated<br/>            {<br/>                Id = id,<br/>                OwnerId = ownerId<br/>            });<br/>        }<br/><br/>        public void SetTitle(ClassifiedAdTitle title)<br/>        {<br/>            Title = title;<br/>            EnsureValidState();<br/>            <br/>            Raise(new Events.ClassifiedAdTitleChanged<br/>            {<br/>                Id = Id,<br/>                Title = title<br/>            });<br/>        }<br/><br/>        public void UpdateText(ClassifiedAdText text)<br/>        {<br/>            Text = text;<br/>            EnsureValidState();<br/>            <br/>            Raise(new Events.ClassifiedAdTextUpdated<br/>            {<br/>                Id = Id,<br/>                AdText = text<br/>            });<br/>        }<br/><br/>        public void UpdatePrice(Price price)<br/>        {<br/>            Price = price;<br/>            EnsureValidState();<br/>            <br/>            Raise(new Events.ClassifiedAdPriceUpdated<br/>            {<br/>                Id = Id,<br/>                Price = Price.Amount,<br/>                CurrencyCode = Price.Currency.CurrencyCode<br/>            });<br/>        }<br/><br/>        public void RequestToPublish()<br/>        {<br/>            State = ClassifiedAdState.PendingReview;<br/>            EnsureValidState();<br/>            <br/>            Raise(new Events.ClassidiedAdSentForReview{Id = Id});<br/>        }<br/><br/>        // Rest of the entity code remains the same<br/>    }<br/>}</pre>
+<p>So now, if we imagine how our entity is used from the application service layer (which we will be discussing in detail later in this book), it could look like this:</p>
+<pre>public async Task Handle(RequestToPublish command)<br/>{<br/>    var entity = await _repository.Load&lt;ClassifiedAd&gt;(command.Id);<br/>    entity.RequestToPublish();<br/>    await _repository.Save(entity);<br/><br/>    foreach (var @event in entity.GetChanges())<br/>    {<br/>        await _bus.Publish(@event);<br/>    }<br/>}</pre>
+<p>This code is not production ready, as you could imagine, but serves the purpose of demonstrating how domain events can be used for integration between different parts of the system. If we publish events to some message bus, and other components in our system subscribe to those messages, they can execute reactive behavior, and make some changes in their domain models, or execute some particular actions, like sending emails, text messages, or real-time notifications. With modern single-page application frameworks that embrace client-side state management, you can even update information that your users currently have in their browsers, to enable real-time updates in web applications as well.</p>
+<p>It is worth adding one small remark about the code that instantiates events. There we assign values of value objects to primitive types directly. It is done using the implicit conversion feature of C#, and the implementation looks like this:</p>
+<pre>using System;<br/><br/>namespace Marketplace.Domain<br/>{<br/>    public class ClassifiedAdId<br/>    {<br/>        private readonly Guid _value;<br/><br/>        public ClassifiedAdId(Guid value)<br/>        {<br/>            if (value == default)<br/>                throw new ArgumentNullException(nameof(value), <br/>                    "Classified Ad id cannot be empty");<br/>            <br/>            _value = value;<br/>        }<br/><br/>        public static implicit operator Guid(ClassifiedAdId self) =&gt; <br/>        self._value;<br/>    }<br/>}</pre>
+<p>Implicit conversion allows us to simplify the assignments between entity properties and event properties significantly, although they are of incompatible types.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Events change state</h1>
+                </header>
+            
+            <article>
+                
+<p>If we move on to the idea of Event Sourcing, events represent the fact of state change. It means that an entity state cannot be changed without some interaction with a domain event. However, in our code so far, the fact of changing the system state and raising a domain event is completely separated. Let's see how we can change it.</p>
+<p>First, we need to make some changes in the <kbd>Entity</kbd> base class:</p>
+<pre>using System.Collections.Generic;<br/>using System.Linq;<br/><br/>namespace Marketplace.Framework<br/>{<br/>    public abstract class Entity<br/>    {<br/>        private readonly List&lt;object&gt; _events;<br/><br/>        protected Entity() =&gt; _events = new List&lt;object&gt;();<br/><br/>        protected void Apply(object @event)<br/>        {<br/>            When(@event);<br/>            EnsureValidState();<br/>            _events.Add(@event);<br/>        }<br/><br/>        protected abstract void When(object @event);<br/><br/>        public IEnumerable&lt;object&gt; GetChanges() <br/>            =&gt; _events.AsEnumerable();<br/><br/>        public void ClearChanges() =&gt; _events.Clear();<br/><br/>        protected abstract void EnsureValidState();<br/>    }<br/>}</pre>
+<p>We have renamed the <kbd>Raise</kbd> method to <kbd>Apply</kbd> since it will not only add events to the list of changes but physically apply the content of each event to the entity state. We do it by using the <kbd>When</kbd> method, which each entity needs to implement. The <kbd>Apply</kbd> method also calls the <kbd>EnsureValidState</kbd> method, which we previously had in the entity, but not in the base class. By doing this, we remove the need to call this method for each operation on the entity.</p>
+<p>The next step would be to apply domain events and move all state changes to the <kbd>When</kbd> method:</p>
+<pre>using Marketplace.Framework;<br/><br/>namespace Marketplace.Domain<br/>{<br/>    public class ClassifiedAd : Entity<br/>    {<br/>        public ClassifiedAdId Id { get; private set; }<br/>        public UserId OwnerId { get; private set; }<br/>        public ClassifiedAdTitle Title { get; private set; }<br/>        public ClassifiedAdText Text { get; private set; }<br/>        public Price Price { get; private set; }<br/>        public ClassifiedAdState State { get; private set; }<br/>        public UserId ApprovedBy { get; private set; }<br/><br/>        public ClassifiedAd(ClassifiedAdId id, UserId ownerId) =&gt;<br/>            Apply(new Events.ClassifiedAdCreated<br/>            {<br/>                Id = id,<br/>                OwnerId = ownerId<br/>            });<br/><br/>        public void SetTitle(ClassifiedAdTitle title) =&gt;<br/>            Apply(new Events.ClassifiedAdTitleChanged<br/>            {<br/>                Id = Id,<br/>                Title = title<br/>            });<br/><br/>        public void UpdateText(ClassifiedAdText text) =&gt;<br/>            Apply(new Events.ClassifiedAdTextUpdated<br/>            {<br/>                Id = Id,<br/>                AdText = text<br/>            });<br/><br/>        public void UpdatePrice(Price price) =&gt;<br/>            Apply(new Events.ClassifiedAdPriceUpdated<br/>            {<br/>                Id = Id,<br/>                Price = price.Amount,<br/>                CurrencyCode = price.Currency.CurrencyCode<br/>            });<br/><br/>        public void RequestToPublish() =&gt;<br/>            Apply(new Events.ClassidiedAdSentForReview {Id = Id});<br/><br/>        protected override void When(object @event)<br/>        {<br/>            switch (@event)<br/>            {<br/>                case Events.ClassifiedAdCreated e:<br/>                    Id = new ClassifiedAdId(e.Id);<br/>                    OwnerId = new UserId(e.OwnerId);<br/>                    State = ClassifiedAdState.Inactive;<br/>                    break;<br/>                case Events.ClassifiedAdTitleChanged e:<br/>                    Title = new ClassifiedAdTitle(e.Title);<br/>                    break;<br/>                case Events.ClassifiedAdTextUpdated e:<br/>                    Text = new ClassifiedAdText(e.AdText);<br/>                    break;<br/>                case Events.ClassifiedAdPriceUpdated e:<br/>                    Price = new Price(e.Price, e.CurrencyCode);<br/>                    break;<br/>                case Events.ClassidiedAdSentForReview e:<br/>                    State = ClassifiedAdState.PendingReview;<br/>                    break;<br/>            }<br/>        }<br/><br/>        protected override void EnsureValidState()<br/>        {<br/>            var valid =<br/>                Id != null &amp;&amp;<br/>                OwnerId != null &amp;&amp;<br/>                (State switch<br/>                {<br/>                    ClassifiedAdState.PendingReview =&gt;<br/>                        Title != null<br/>                        &amp;&amp; Text != null<br/>                        &amp;&amp; Price?.Amount &gt; 0,<br/>                    ClassifiedAdState.Active =&gt;<br/>                        Title != null<br/>                        &amp;&amp; Text != null<br/>                        &amp;&amp; Price?.Amount &gt; 0<br/>                        &amp;&amp; ApprovedBy != null,<br/>                    _ =&gt; true<br/>                });<br/><br/>            if (!valid)<br/>                throw new InvalidEntityStateException(<br/>                    this, $"Post-checks failed in state {State}");<br/>        }<br/><br/><br/>        public enum ClassifiedAdState<br/>        {<br/>            PendingReview,<br/>            Active,<br/>            Inactive,<br/>            MarkedAsSold<br/>        }<br/>    }<br/>}</pre>
+<p>There are two essential things that we changed in the entity class, listed as follows:</p>
+<ul>
+<li>All public methods to amend the entity state (operations) now apply to domain events. There are no state changes or validity checks left in those methods. As you remember, the validity contract method is now being called from the <kbd>Apply</kbd> method in the <kbd>Entity</kbd> base class.</li>
+<li>We have added a <kbd>When</kbd> method override, where the advanced pattern matching feature of C# 7.1 is being used to identify what kind of event is being applied, and how the entity state needs to be changed.</li>
+</ul>
+<p>Hence, there are no changes in tests. If we execute all tests in the solution that have been created so far, they will all pass. It means that raising domain events and applying them to change the entity state can be considered as implementation details. Indeed, this is a style of working with domain events, typically used when DDD is applied with Event Sourcing, which we will be discussing later.</p>
+<p>Please keep in mind that using DDD in general and domain events, in particular, does not imply using Event Sourcing, and vice versa. This book has more of a focus on Event Sourcing; therefore, this technique to change the state of the domain by applying events is presented quite early.</p>
+<p>Some further changes are not that obvious but were required to make the whole thing work. If you look closely at the <kbd>When</kbd> method, entity properties that are still of value object types, use constructors for value objects instead of factory functions. It is because factory functions apply constraints and perform checks while constructing valid value objects. However, domain events represent something that already happened, so there is no point in checking these past facts for validity. If they were valid at the time, they should be just let through. Even if the logic in value object has changed, this should never have any effects on applying events with historical data.</p>
+<p>To fix this, we needed to change value objects, so they have internal constructors instead of private ones. Also, checks are moved from constructors to factory functions, so constructors are now accepting any value. For the more complex <kbd>Price</kbd> object, we needed to add a constructor that does not require a currency lookup service. Even if the currency is not valid anymore, when we are trying to load some past event, it should get through. However, it does not change the use of factory functions. They still require the lookup service and will be using it as soon as we create new instances of the value objects in our application service layer. It will keep protecting us from executing commands that have some incorrect information, and therefore, can bring our model to an invalid state.</p>
+<p>In the following, you can find changed value object for the classified ad text:</p>
+<pre>using Marketplace.Framework;<br/><br/>namespace Marketplace.Domain<br/>{<br/>    public class ClassifiedAdText : Value&lt;ClassifiedAdText&gt;<br/>    {<br/>        public string Value { get; }<br/><br/>        internal ClassifiedAdText(string text) =&gt; Value = text;<br/>        <br/>        public static ClassifiedAdText FromString(string text) <br/>            =&gt; new ClassifiedAdText(text);<br/>        <br/>        public static implicit operator string(ClassifiedAdText text)<br/>            =&gt; text.Value;<br/>    }<br/>}</pre>
+<p>Here is the full code for the value object that represents the ad title:</p>
+<pre>using System;<br/>using System.Text.RegularExpressions;<br/>using Marketplace.Framework;<br/><br/>namespace Marketplace.Domain<br/>{<br/>    public class ClassifiedAdTitle : Value&lt;ClassifiedAdTitle&gt;<br/>    {<br/>        public static ClassifiedAdTitle FromString(string title)<br/>        {<br/>            CheckValidity(title);<br/>            return new ClassifiedAdTitle(title);<br/>        }<br/><br/>        public static ClassifiedAdTitle FromHtml(string htmlTitle)<br/>        {<br/>            var supportedTagsReplaced = htmlTitle<br/>                .Replace("&lt;i&gt;", "*")<br/>                .Replace("&lt;/i&gt;", "*")<br/>                .Replace("&lt;b&gt;", "**")<br/>                .Replace("&lt;/b&gt;", "**");<br/><br/>            var value = Regex.Replace(supportedTagsReplaced, <br/>                "&lt;.*?&gt;", string.Empty);<br/>            CheckValidity(value);<br/><br/>            return new ClassifiedAdTitle(value);<br/>        }<br/><br/>        public string Value { get; }<br/><br/>        internal ClassifiedAdTitle(string value) =&gt; Value = value;<br/><br/>        public static implicit operator string(ClassifiedAdTitle title) <br/>            =&gt; title.Value;<br/><br/>        private static void CheckValidity(string value)<br/>        {<br/>            if (value.Length &gt; 100)<br/>                throw new ArgumentOutOfRangeException(<br/>                    "Title cannot be longer that 100 characters",<br/>                    nameof(value));<br/>        }<br/>    }<br/>}</pre>
+<p>Finally, the <kbd>Price</kbd> class, which is based on the <kbd>Money</kbd> class but has some additional rules in place:</p>
+<pre>using System;<br/><br/>namespace Marketplace.Domain<br/>{<br/>    public class Price : Money<br/>    {<br/>        private Price(<br/>            decimal amount, <br/>            string currencyCode, <br/>            ICurrencyLookup currencyLookup<br/>        ) : base(amount, currencyCode, currencyLookup)<br/>        {<br/>            if (amount &lt; 0)<br/>                throw new ArgumentException(<br/>                    "Price cannot be negative",<br/>                    nameof(amount));<br/>        }<br/><br/>        internal Price(decimal amount, string currencyCode) <br/>            : base(amount, new CurrencyDetails{CurrencyCode = <br/>              currencyCode}) { }<br/><br/>        public static Price FromDecimal(decimal amount, string <br/>        currency,<br/>            ICurrencyLookup currencyLookup) =&gt;<br/>            new Price(amount, currency, currencyLookup);<br/>    }<br/>}</pre>
+<p>Again, although these changes might seem significant, we were not changing any domain logic and constraints. We have all existing tests intact, and they are still passing, so our refactoring was successful, and we managed to change implementation details while keeping the essence of our domain model intact.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Summary</h1>
+                </header>
+            
+            <article>
+                
+<p>In this chapter, we started to write a lot of code and learned the basics of implementing domain models in code. We looked at entities and value objects, what they <span>are </span>needed for, and how different they are. Explaining the power of value objects consumed a significant part of this chapter, but this topic is vital since value objects are often overlooked. </p>
+<p>We used factory functions to create different ways of constructing value objects. A similar technique can be used to form valid entities, but we were not touching this topic just yet. We also used a domain service to make use of some external services inside our value object, while keeping the domain model itself clean from any external dependencies.</p>
+<p>Constraints and invariants that play such an important role in keeping the state of the system valid at all times were also discussed, and we used different techniques to implement them.</p>
+<p>Finally, we moved on to domain events and implemented some events that we previously only saw on orange stickies, directly in our code. Going forward, we learned how, from being a supportive tool, domain events could become the driver for state change in our model, and this lays a strong foundation for us before we move on to Event Sourcing.</p>
+<p>In this chapter, we also wrote some tests. Writing tests and keeping them actual is crucial in any programming work, but when using DDD and being in an explorative mode inside the model, tests become one of the most important instruments to handle regression, and even express and document business rules, as we will see in the following chapters.</p>
+<p>Since we started to move some of our sticky notes to code, in the next chapter, we will look at how to implement commands, and how commands are the glue between our domain model and the world outside it. In this state, we will learn how to make our model useful by letting people interact with it. </p>
+
+
+            </article>
+
+            
+        </section>
+    </body></html>

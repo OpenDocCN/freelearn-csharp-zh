@@ -1,0 +1,974 @@
+<html><head></head><body>
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Scripting Strategies</h1>
+                </header>
+            
+            <article>
+                
+<p>Since scripting will consume a great deal of our development time, it will be enormously beneficial to learn some best practices. Scripting is a very broad term, so we will try to limit our exposure in this chapter to situations that are very Unity-specific, focusing on problems surrounding MonoBehaviours, GameObjects, and related functionality.</p>
+<div class="packt_tip">We will discuss the nuances and advanced topics of the C# language, .NET library, and Mono framework in <a href="">Chapter 8</a>, <em>Masterful Memory Management</em>.</div>
+<p>In this chapter, we will explore ways of applying performance enhancements for the following:</p>
+<ul>
+<li>Obtaining components in other game objects</li>
+<li>Optimizing component callbacks (<kbd>Update()</kbd>, <kbd>Awake()</kbd>, and so on)</li>
+<li>Using coroutines</li>
+<li>Using <kbd>GameObject</kbd> and <kbd>Transform</kbd> efficiently</li>
+<li>Exchanging messages between different objects</li>
+<li>Optimizing mathematical calculations</li>
+<li>Serializing/deserializing during scene and Prefab loading</li>
+</ul>
+<p>Whether you have some specific problems in mind that you wish to solve or you just want to learn some techniques for future reference, this chapter will introduce you to a wide array of methods that you can use to improve your scripting efforts now and in the future. In each case, we will explore how and why the performance issue arises, an example situation in which the problem occurs, and one or more solutions to combat the issue.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Obtaining components using the fastest method</h1>
+                </header>
+            
+            <article>
+                
+<p>There are several variations of the <kbd>GetComponent()</kbd> method, and they each have a different performance cost, so it is prudent to call the fastest possible version of this method. The three overloads available are <kbd>GetComponent(string)</kbd>, <kbd>GetComponent&lt;T&gt;()</kbd>, and <kbd>GetComponent(typeof(T))</kbd>. It turns out that the fastest version depends on which version of Unity we are running since several optimizations have been made to these methods through the years; however, if you are using any version of Unity (from Unity 2017 onward), it is best to use the <kbd>GetComponent&lt;T&gt;()</kbd> variant.</p>
+<p>Let's prove this with some simple testing:</p>
+<pre>int numTests = 1000000;<br/>TestComponent test;<br/>using (new CustomTimer("GetComponent(string)", numTests)) {<br/>  for (var i = 0; i &lt; numTests; ++i) {<br/>    test = (TestComponent)GetComponent("TestComponent");<br/>  }<br/>}<br/><br/>using (new CustomTimer("GetComponent&lt;ComponentName&gt;", numTests)) {<br/>  for (var i = 0; i &lt; numTests; ++i) {<br/>    test = GetComponent&lt;TestComponent&gt;();<br/>  }<br/>}<br/><br/>using (new CustomTimer("GetComponent(typeof(ComponentName))", numTests))  {<br/>  for (var i = 0; i &lt; numTests; ++i) {<br/>    test = (TestComponent)GetComponent(typeof(TestComponent));<br/>  }<br/>}</pre>
+<p>The preceding code tests each of the <kbd>GetComponent()</kbd> overloads a million times. This is far more tests than would be sensible for a typical project, but it helps to make the relative costs clear.</p>
+<p>Here is the result we get when the tests complete (of course, the specific numeric values may be different on your machine):</p>
+<div class="CDPAlignCenter CDPAlign"><img src="assets/4ff13d26-1b2f-4301-8140-d2787c6bc483.png"/></div>
+<p>As you can see, the <kbd>GetComponent&lt;T&gt;()</kbd> method is only a tiny fraction faster than <kbd>GetComponent(typeof(T))</kbd>, whereas <kbd>GetComponent(string)</kbd> is significantly slower than the alternatives. Therefore, it is pretty safe to use either of the type-based versions of <kbd>GetComponent()</kbd> because of the small performance difference. However, we should ensure that we never use <kbd><span>GetComponent(string)</span></kbd> since the outcome is identical, and there are no benefits for the costs incurred. There are some very rare exceptions. Imagine that we were writing a custom debug console for Unity that can parse a user-input <kbd>string</kbd> to acquire a component. In this case, we would <span><span>acquire a component by using the expensive <kbd>GetComponent(string)</kbd></span></span> only during debugging and diagnostics situations. In these cases, performance isn't too important. On the contrary, for a production-level application, the use of <kbd>GetComponent(string)</kbd> is just a needless waste of CPU cycles.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Removing empty callback definitions</h1>
+                </header>
+            
+            <article>
+                
+<p>The primary means of scripting in Unity is to write callback functions in classes derived from <kbd>MonoBehaviour</kbd>, which we know Unity will call when necessary. Perhaps the four most commonly used callbacks are <kbd>Awake()</kbd>, <kbd>Start()</kbd>, <kbd>Update()</kbd>, and <kbd>FixedUpdate()</kbd>.</p>
+<p><kbd>Awake()</kbd> is called the moment <kbd>MonoBehaviour</kbd> is first created, whether this occurs during scene initialization or when a new <kbd>GameObject</kbd> instance containing the <kbd>MonoBehaviour</kbd> component is instantiated at runtime from a Prefab. <kbd>Start()</kbd> will be called shortly after <kbd>Awake()</kbd> but before its first <kbd>Update()</kbd>. During scene initialization, every <kbd>MonoBehaviour</kbd> component's <kbd>Awake()</kbd> callback will be called before any of their <kbd>Start()</kbd> callbacks are.</p>
+<p>After this, <kbd>Update()</kbd> will be called repeatedly, each time the rendering pipeline presents a new image. <kbd>Update()</kbd> will continue to be called provided <kbd>MonoBehaviour</kbd> is still present in the scene, it is still enabled, and its parent <kbd>GameObject</kbd> is active.</p>
+<p class="mce-root"/>
+<p class="mce-root"/>
+<p>Finally, <kbd>FixedUpdate()</kbd> is called just before the physics engine updates. Fixed updates are used whenever we want activity similar in behavior to <kbd>Update()</kbd> but that isn't tied directly to the render frame rate and is called more consistently over time.</p>
+<div class="packt_infobox">Refer to the following page in the Unity documentation for an accurate picture of when various Unity callbacks are called: <a href="https://docs.unity3d.com/Manual/ExecutionOrder.html">https://docs.unity3d.com/Manual/ExecutionOrder.html</a>.</div>
+<p>Whenever a <kbd>MonoBehaviour</kbd> component is first instantiated in our scene, Unity will add any defined callbacks to a list of function pointers, which it will call at key moments. However, it is important to realize that Unity will hook into these callbacks even if the function body is empty. The core Unity Engine has no awareness that these function bodies may be empty and only knows that the method has been defined and, therefore, that it must acquire it and then call it when necessary. Consequently, if we leave empty definitions of these callbacks scattered throughout the code base, then they will waste a small amount of CPU due to the overhead cost of the engine invoking them.</p>
+<p>This can be a problem since, anytime we create a new <kbd>MonoBehaviour</kbd> script file in Unity, it will automatically generate two boilerplate callback stubs for us for <kbd>Start()</kbd> and <kbd>Update()</kbd>:</p>
+<pre>// Use this for initialization<br/>void Start () {<br/><br/>}<br/><br/>// Update is called once per-frame<br/>void Update () {<br/><br/>}</pre>
+<p>It can be easy to accidentally leave these empty definitions on scripts that don't actually need them. An empty <kbd>Start()</kbd> definition is liable to cause any object to initialize a little more slowly, for no good reason. This effect may not be particularly noticeable for a handful of MonoBehaviours, but as development on the project continues and we populate our scenes with thousands of custom MonoBehaviours with lots of empty <kbd>Start()</kbd> definitions, it could start to become a problem, causing slow scene initialization and wasting CPU time whenever a new Prefab is created via <kbd>GameObject.Instantiate()</kbd>.</p>
+<p>Such calls typically happen during key gameplay events; for instance, when two objects collide, we might spawn a particle effect, create some floating damage text, play a sound effect, and so on. This can be a critical moment for performance because we've suddenly requested that the CPU makes a lot of complicated changes, but with only a finite amount of time to complete them before the current frame ends. If this process takes too long, then we would experience a frame drop as the Rendering Pipeline isn't allowed to present a new frame until all of the <kbd>Update()</kbd> callbacks—counted across all MonoBehaviours in the scene—have finished. Ergo, a bunch of empty <kbd>Start()</kbd> definitions being called at this time is a needless waste and could potentially cut into our tight time-budget at a critical moment.</p>
+<p>Meanwhile, if our scene contains thousands of MonoBehaviours with these empty <kbd>Update()</kbd> definitions, then we would be wasting a lot of CPU cycles every frame, potentially causing havoc on our frame rate.</p>
+<p>Let's prove all of this with a simple test. Our test scene should have GameObjects with two types of component, <kbd>EmptyClassComponent</kbd>, with no methods defined at all, and <kbd>EmptyCallbackComponent</kbd>, with an empty <kbd>Update()</kbd> callback defined:</p>
+<pre>public class EmptyClassComponent : MonoBehaviour {<br/>}<br/><br/>public class EmptyCallbackComponent : MonoBehaviour {<br/>  void Update () {}<br/>}</pre>
+<p>The following are the test results for 30,000 components of each type. If we enable all GameObjects with attached <kbd>EmptyClassComponents</kbd> during runtime, then nothing interesting happens under the <span class="packt_screen">CPU Usage</span> area of the <span class="packt_screen">Profiler</span>. There will be a small amount of background activity, but none of this activity will be caused by <kbd>EmptyClassComponents</kbd>. However, as soon as we enable all objects with <kbd>EmptyCallbackComponent</kbd>, we will observe a huge increase in CPU usage:</p>
+<p class="CDPAlignCenter CDPAlign"><img class="alignnone size-full wp-image-719 image-border" src="assets/a2a791aa-9c6a-4d68-9d2e-fdae438d9d7c.png" style="width:28.42em;height:13.17em;"/></p>
+<p>It's hard to imagine a scene with more than 30,000 objects in it, but keep in mind that MonoBehaviours contain the <kbd>Update()</kbd> callback, not GameObjects. A single <kbd>GameObject</kbd> instance can contain multiple MonoBehaviours at once, and each of their children can contain even more MonoBehaviours, and so on. A few thousand or even a hundred empty <kbd>Update()</kbd> callbacks will inflict a noticeable impact on frame rate budget, for zero potential gain. This is particularly common with Unity UI components, which tend to attach a lot of different components in a very deep hierarchy.</p>
+<p>The fix for this is simple: delete the empty callback definitions. Unity will have nothing to hook into, and nothing will be called. Finding such empty definitions in an expansive code base may be difficult, but if we use some basic regular expressions (known as <em>regex</em>), we should be able to find what we're looking for relatively easily.</p>
+<div class="packt_tip">All common code-editing tools for Unity, such as MonoDevelop, Visual Studio, and even Notepad++, provide a way to perform a regex-based search on the entire code base. Check out the tool's documentation for more information, since the method can vary greatly depending on the tool and its version.</div>
+<p>The following regex search should find any empty <kbd>Update()</kbd> definitions in our code:</p>
+<pre>void\s*Update\s*?\(\s*?\)\s*?\n*?\{\n*?\s*?\}</pre>
+<p>This regex checks for a standard method definition of the <kbd>Update()</kbd> callback, while including any surplus whitespace and newline characters that can be distributed throughout the method definition.</p>
+<p>Naturally, all of the preceding is also true for the non-boilerplate Unity callbacks, such as <kbd>OnGUI()</kbd>, <kbd>OnEnable()</kbd>, <kbd>OnDestroy()</kbd>, and <kbd>LateUpdate()</kbd>. The only difference is that only <kbd>Start()</kbd> and <kbd>Update()</kbd> are defined automatically in a new script.</p>
+<div class="packt_infobox">Check out the <kbd>MonoBehaviour</kbd> Unity Documentation page for a complete list of these callbacks at <a href="http://docs.unity3d.com/ScriptReference/MonoBehaviour.html">http://docs.unity3d.com/ScriptReference/MonoBehaviour.html</a>.</div>
+<p>It might also seem unlikely that someone generated so many empty versions of these callbacks in our code base, but never say never. For example, if we use a common base class, <kbd>MonoBehaviour</kbd>, throughout all of our custom components, then a single empty callback definition in that base class will permeate the entire game, which can cost us dearly. Be particularly careful of the <kbd>OnGUI()</kbd> method, as it can be invoked multiple times within the same frame or UI event.</p>
+<p>Perhaps the most common source of performance problems in Unity scripting is to misuse the <kbd>Update()</kbd> callback by doing one or more of the following things:</p>
+<ul>
+<li>Repeatedly recalculating a value that rarely or never changes</li>
+<li>Having too many components perform work for a result that could be shared</li>
+<li>Performing work far more often than is necessary</li>
+</ul>
+<p>It's worth getting into the habit of remembering that literally every single line of code we write in an <kbd>Update()</kbd> callback, and functions called by those callbacks, will eat into our frame rate budget. To hit 60 fps, we have 16.667 milliseconds to complete all of the work in all of our <kbd>Update()</kbd> callbacks, every frame. This seems like plenty of time when we start prototyping, but somewhere in the middle of development, we will probably start noticing things getting slower and less responsive because we've gradually been eating away at that budget, due to an unchecked desire to cram more stuff into our project.</p>
+<p>Let's cover some tips that directly address these problems.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Caching component references</h1>
+                </header>
+            
+            <article>
+                
+<p>Repeatedly recalculating a value is a common mistake when scripting in Unity, and particularly when it comes to the <kbd>GetComponent()</kbd> method. For example, the following script code is trying to check a creature's health value, and if its health goes below <kbd>0</kbd>, it will disable a series of components to prepare it for a death animation:</p>
+<pre class="mce-root">void TakeDamage() {<br/><br/>  Rigidbody rigidbody = GetComponent&lt;Rigidbody&gt;();<br/>  Collider collider = GetComponent&lt;Collider&gt;();<br/>  AIControllerComponent ai = GetComponent&lt;AIControllerComponent&gt;();<br/>  Animator anim = GetComponent&lt;Animator&gt;();<br/><br/>  if (GetComponent&lt;HealthComponent&gt;().health &lt; 0) {<br/>    rigidbody.enabled = false;<br/>    collider.enabled = false;<br/>    ai.enabled = false;<br/>    anim.SetTrigger("death");<br/>  }<br/>}</pre>
+<p>Each time this poorly optimized method executes, it will reacquire five different component references. This is not very friendly on CPU usage. This is particularly problematic if the main method was called during <kbd>Update()</kbd>. Even if it is not, it still might coincide with other important events, such as creating particle effects, replacing an object with a Ragdoll (hence invoking various activity in the Physics Engine), and so on. This coding style can seem harmless, but it can cause a lot of long-term problems and runtime work for very little benefit.</p>
+<p>It costs us a small amount of memory space (only 32 or 64 bits each time—Unity version, platform, and fragmentation permitting) to cache these references for future use. So, unless you're extremely bottlenecked on memory, a better approach would be to acquire the references during initialization and keep them until they are needed:</p>
+<pre>private HealthComponent _healthComponent;<br/>private Rigidbody _rigidbody;<br/>private Collider _collider;<br/>private AIControllerComponent _ai;<br/>private Animator _anim;<br/><br/>void Awake() {<br/>  _healthComponent = GetComponent&lt;HealthComponent&gt;();<br/>  _rigidbody = GetComponent&lt;Rigidbody&gt;();<br/>  _collider = GetComponent&lt;Collider&gt;();<br/>  _ai = GetComponent&lt;AIControllerComponent&gt;();<br/>  _anim = GetComponent&lt;Animator&gt;();<br/>}<br/><br/>void TakeDamage() {<br/>  if (_healthComponent.health &lt; 0) {<br/>    _rigidbody.detectCollisions = false;<br/>    _collider.enabled = false;<br/>    _ai.enabled = false;<br/>    _anim.SetTrigger("death");<br/>  }<br/>}</pre>
+<p>Caching component references in this way spares us from reacquiring them each time they're needed, saving us some CPU overhead each time. The cost is a small amount of additional memory consumption, which is very often worth the price.</p>
+<p>The same tip applies to literally any piece of data we decide to calculate at runtime. There's no need to ask the CPU to keep recalculating the same value every <kbd>Update()</kbd> callback when we can just store it in memory for future reference.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Sharing calculation output</h1>
+                </header>
+            
+            <article>
+                
+<p>Performance can be saved by having multiple objects share the result of some calculation; of course, this only works if all of them generate the same result. <span>Such situations are often easy to spot but can be tricky to refactor, and so e</span>xploiting this would be very implementation-dependent. </p>
+<p>Some examples might include finding an object in a scene, reading data from a file, parsing data (such as XML or JSON), finding something in a big list or deep dictionary of information, calculating pathing for a group of <strong>Artificial Intelligence</strong> (<strong>AI</strong>) objects, complex mathematics-like trajectories, raycasting, and so on.</p>
+<p>Think about each time an expensive operation is undertaken, and consider whether it is being called from multiple locations but always results in the same output. If this is the case, then it would be wise to restructure things so that the result is calculated once and then distributed to every object that needs it to minimize the amount of recalculation. The biggest cost is typically just a small loss in code simplicity, although we may inflict some extra overhead by moving the value a<span>roun</span><span>d.</span></p>
+<p>Note that it's often easy to get into the habit of hiding some big complex function in a base class, and then we define derived classes that make use of that function, completely forgetting how costly that function is because we rarely glance at that code again. It's best to use the Unity Profiler to tell us how many times that expensive function may be called, and as always, don't preoptimize those functions unless it's been proven to be a performance issue. No matter how expensive it may be, if it doesn't cause us to exceed performance restrictions (such as frame rate and memory consumption), then it's not really a performance problem.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Update, coroutines, and InvokeRepeating</h1>
+                </header>
+            
+            <article>
+                
+<p>Another habit that's easy to fall into is to call something repeatedly in an <kbd>Update()</kbd> callback way more often than is needed. For example, we may start with a situation like this:</p>
+<pre>void Update() {<br/>  ProcessAI();<br/>}</pre>
+<p>In this case, we're calling some custom <kbd>ProcessAI()</kbd> subroutine every single frame. This may be a complex task, requiring the AI system to check some grid system to figure out where it's meant to move or determine some fleet maneuvers for a group of spaceships or whatever our game needs for its AI.</p>
+<p>If this activity is eating into our frame rate budget too much, and the task can be completed less frequently than every frame with no significant drawbacks, then a good trick to improve performance is to simply reduce the frequency at which that <kbd>ProcessAI()</kbd> gets called:</p>
+<pre>private float _aiProcessDelay = 0.2f;<br/>private float _timer = 0.0f;<br/><br/>void Update() {<br/>  _timer += Time.deltaTime;<br/>  if (_timer &gt; _aiProcessDelay) {<br/>    ProcessAI();<br/>    _timer -= _aiProcessDelay;<br/>  }<br/>}</pre>
+<p>In this case, we've reduced the <kbd>Update()</kbd> callback's overall cost by only invoking <kbd>ProcessAI()</kbd> about five times every second, which is an improvement over the previous situation, at the expense of code that can take a bit of time to understand at first glance, and a little extra memory to store some floating-point data—although, at the end of the day, we're still having Unity call an empty callback function more often than not.</p>
+<p>This function is a perfect example of a function, which can be converted into a coroutine to make use of their delayed invocation properties. As mentioned previously, coroutines are typically used to script a short sequence of events, either as a one-time or repeated action. They should not be confused with threads, which would run on a completely different CPU core concurrently, and multiple threads can be running simultaneously. Instead, coroutines run on the main thread in a sequential manner such that only one coroutine is handled at any given moment, and each coroutine decides when to pause and resume via <kbd>yield</kbd> statements. The following code is an example of how we might rewrite the preceding <kbd>Update()</kbd> callback in the form of a coroutine:</p>
+<pre>void Start() {<br/>  StartCoroutine(ProcessAICoroutine ());<br/>}</pre>
+<pre><br/>IEnumerator ProcessAICoroutine () {<br/>  while (true) {<br/>    ProcessAI();<br/>    yield return new WaitForSeconds(_aiProcessDelay);<br/>  }<br/>}</pre>
+<p>The preceding code demonstrates a coroutine that calls <kbd>ProcessAI()</kbd>, then pauses at the <kbd>yield</kbd> statement for the given number of seconds (the value of <kbd>_aiProcessDelay</kbd>) before the main thread resumes the coroutine again, at which point, it will return to the start of the loop, call <kbd>ProcessAI()</kbd>, pause on the <kbd>yield</kbd> statement again, and repeat forever (<span>via the </span><kbd>while(true)</kbd><span> statement) until </span>asked to stop.</p>
+<p>The main benefit of this approach is that this function will only be called as often as dictated by the value of <kbd>_aiProcessDelay</kbd>, and it will sit idle until that time, reducing the performance hit inflicted in most of our frames. However, this approach has its drawbacks.</p>
+<p>For one, starting a coroutine comes with an additional overhead cost relative to a standard function call (around three times as slow), as well as some memory allocations to store the current state in memory until it is invoked<span> the next time</span>. This additional overhead is also not a one-time cost because coroutines often constantly call <kbd>yield</kbd>, which inflicts the same overhead cost again and again, so we need to ensure that the benefits of reduced frequency outweigh this cost.</p>
+<div class="packt_infobox">In a test of 1,000 objects with empty <kbd>Update()</kbd> callbacks, it took 1.1 milliseconds to process, whereas 1,000 coroutines yielding on <kbd>WaitForEndOfFrame</kbd> (which has an identical frequency to <kbd>Update()</kbd> callbacks) took 2.9 milliseconds. So, the relative cost is almost three times as much.</div>
+<p>Secondly, once initialized, coroutines run independently of the triggering <kbd>MonoBehaviour</kbd> component's <kbd>Update()</kbd> callback and will continue to be invoked regardless of whether the component is disabled or not, which can make them unwieldy if we're performing a lot of <kbd>GameObject</kbd> construction and destruction.</p>
+<p>Thirdly, the coroutine will automatically stop the moment the <kbd>GameObject</kbd> instance that <span>contains it</span><span> </span><span>is made inactive for whatever reason (whether it was set inactive or one of its parents was) and will not automatically restart if</span> <kbd>GameObject</kbd> <span>is set to active again.</span></p>
+<p>Finally, by converting a method into a coroutine, we may have reduced the performance hit inflicted during most of our frames, but if a single invocation of the method body causes us to break our frame rate budget, then it will still be exceeded no matter how rarely we call the method. Therefore, this approach is best used for situations where we are only breaking our frame rate budget because of the sheer number of times the method is called in a given frame, not because the method is too expensive on its own. In those cases, we have no option but to either dig into and improve the performance of the method itself or reduce the cost of other tasks to free up the time it needs to complete its work.</p>
+<p>There are several <kbd>yield</kbd> types available to us when generating coroutines. <kbd>WaitForSeconds</kbd> is fairly self-explanatory; the coroutine will pause at the <kbd>yield</kbd> statement for a given number of seconds. It is not really an exact timer, however, so expect a small amount of variation when this <kbd>yield</kbd> type actually resumes.</p>
+<p><kbd>WaitForSecondsRealTime</kbd> is another option and is different from <kbd>WaitForSeconds</kbd> only in that it uses unscaled time. <kbd>WaitForSeconds</kbd> compares against scaled time, which is affected by the global <kbd>Time.timeScale</kbd> property while <kbd>WaitForSecondsRealTime</kbd> is not, so be careful about which <kbd>yield</kbd> type you use if you're tweaking the time scale value (for example, for slow-motion effects).</p>
+<p>There is also <kbd>WaitForEndOfFrame</kbd>, which would continue at the end of the next <kbd>Update()</kbd> callback, and then there's <kbd>WaitForFixedUpdate</kbd>, which would continue at the end of the next <kbd>FixedUpdate()</kbd> invocation. Lastly, Unity 5.3 introduced <kbd>WaitUntil</kbd> and <kbd>WaitWhile</kbd>, where we provide a delegate function, and the coroutine will pause until the given delegate returns <kbd>true</kbd> or <kbd>false</kbd>, respectively. Note that the delegates provided to these <kbd>yield</kbd> types will be executed for each <kbd>Update()</kbd> until they return the Boolean value needed to stop them, which makes them very similar to a coroutine using <kbd>WaitForEndOfFrame</kbd> in a <kbd>while</kbd> loop that ends on a certain condition. Of course, it is also important that the delegate function we provide is not too expensive to execute.</p>
+<div class="packt_tip">Delegate functions are incredibly useful constructs in C# that allow us to pass local methods around as arguments to other methods and are typically used for callbacks. Check out the MSDN <em>C# Programming Guide</em> for more information on delegates at <a href="https://docs.microsoft.com/en-us/dotnet/csharp/programming-guide/delegates/">https://docs.microsoft.com/en-us/dotnet/csharp/programming-guide/delegates/</a>.</div>
+<p>The way that some <kbd>Update()</kbd> callbacks are written could probably be condensed down into simple coroutines that always call <kbd>yield</kbd> on one of these types, but we should be aware of the drawbacks mentioned previously. Coroutines can be tricky to debug since they don't follow normal execution flow; there's no caller in the callstack we can directly blame for why a coroutine triggered at a given time, and if coroutines perform complex tasks and interact with other subsystems, then they can result in some impossibly difficult bugs because they happened to be triggered at a moment that some other code didn't expect, which also tend to be the kinds of bugs that are painstakingly difficult to reproduce. If you do wish to make use of coroutines, the best advice is to keep them simple and independent of other complex subsystems.</p>
+<p>Indeed, if our coroutine is simple enough that it can be boiled down to a <kbd>while</kbd> loop that always calls <kbd>yield</kbd> on <kbd>WaitForSeconds</kbd> or <kbd>WaitForSecondsRealtime</kbd>, as in the <span><span>preceding </span></span>example, then we can usually replace it with an <kbd>InvokeRepeating()</kbd> call, which is even simpler to set up and has a slightly lower overhead cost. The following code is functionally equivalent to the previous implementation that used a coroutine to regularly invoke a <kbd>ProcessAI()</kbd> method:</p>
+<pre>void Start() {<br/>  InvokeRepeating("ProcessAI", 0f, _aiProcessDelay);<br/>}</pre>
+<p>An important difference between <kbd>InvokeRepeating()</kbd> and coroutines is that <kbd>InvokeRepeating()</kbd> is completely independent of <span>the states of </span><span>both </span><kbd>MonoBehaviour</kbd> <span>and</span> <kbd>GameObject</kbd><span>. The only two ways to stop an</span> <kbd>InvokeRepeating()</kbd> <span>call is to either call</span> <kbd>CancelInvoke()</kbd><span>, which stops all</span> <kbd>InvokeRepeating()</kbd> <span>callbacks initiated by the given</span> <kbd>MonoBehaviour</kbd> <span>(note that they cannot be canceled individually) or to destroy the associated</span> <kbd>MonoBehaviour</kbd> <span>or its parent</span> <kbd>GameObject</kbd><span>. Disabling either</span> <kbd>MonoBehaviour</kbd> <span>or</span> <kbd>GameObject</kbd> <span>does not stop</span> <kbd>InvokeRepeating()</kbd><span>.</span></p>
+<div class="packt_infobox"><span>A test of 1,000 </span><kbd>InvokeRepeating()</kbd><span> calls was processed in about 2.6 milliseconds; this is slightly faster than 1,000 equivalent coroutine </span><kbd>yield</kbd><span> calls, which took 2.9 milliseconds.</span></div>
+<p>That covers most of the useful information related to the <kbd>Update()</kbd> callback. Let's look into some other useful scripting tips.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Faster GameObject null reference checks</h1>
+                </header>
+            
+            <article>
+                
+<p>It turns out that performing a <kbd>null</kbd> reference check against a <kbd>GameObject</kbd> will result in some unnecessary performance overhead. GameObjects and MonoBehaviours are special objects compared to a typical C# object, in that they have two representations in memory: one exists within the memory managed by the same system managing the C# code we write (managed code), whereas the other exists in a different memory space, which is handled separately (native code). Data can move between these two memory spaces, but each time this happens will result in some additional CPU overhead and possibly an extra memory allocation.</p>
+<p>This effect is commonly referred to as crossing the Native-Managed Bridge. If this happens, it is likely to generate an additional memory allocation for an object's data to get copied across the bridge, which will require the garbage collector to eventually perform some automatic cleanup of memory for us. This subject will be explored in much more detail in <a href="">Chapter 8</a>, <em>Masterful Memory Management</em>, but for the time being, just consider that there are many subtle ways to accidentally trigger this extra overhead, and a simple <kbd>null</kbd> reference check against <kbd>GameObject</kbd> is one of them:</p>
+<pre>if (gameObject != null) {<br/>  // do stuff with gameObject<br/>}</pre>
+<p>An alternative that generates a functionally equivalent output that operates around twice as quickly (although it does obfuscate the purpose of the code a little) is <kbd>System.Object.ReferenceEquals()</kbd>:</p>
+<pre>if (!System.Object.ReferenceEquals(gameObject, null)) {<br/>  // do stuff with gameObject<br/>}</pre>
+<p>This applies to both GameObjects and MonoBehaviours, as well as other Unity objects, which have both native and managed representations such as the <kbd>WWW</kbd> class. However, some rudimentary testing reveals that either <kbd>null</kbd> reference check approach still consumes mere nanoseconds on an Intel Core i5 3570K processor. So, unless you are performing massive amounts of <kbd>null</kbd> reference checks, the gains might be marginal at best. However, this is a warning worth keeping in mind for the future, as it will come up a lot.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Avoid retrieving string properties from GameObjects</h1>
+                </header>
+            
+            <article>
+                
+<p>Ordinarily, retrieving a <kbd>string</kbd> property from an object is the same as retrieving any other reference type property in C#; it should be acquired with no additional memory cost. However, retrieving <kbd>string</kbd> properties from GameObjects is another subtle way of accidentally crossing over the Native-Managed Bridge.</p>
+<p>The two properties of <kbd>GameObject</kbd> affected by this behavior are <kbd>tag</kbd> and <kbd>name</kbd>. Therefore, it is unwise to use either property during gameplay, and you should only use them in performance-inconsequential areas, such as editor scripts. However, the tag system is commonly used for the runtime identification of objects, which can make this a significant problem for some teams.</p>
+<p>For example, the following code would cause an additional memory allocation during every iteration of the loop:</p>
+<pre>for (int i = 0; i &lt; listOfObjects.Count; ++i) {<br/>  if (listOfObjects[i].tag == "Player") {<br/>    // do something with this object<br/>  }<br/>}</pre>
+<p>It is often a better practice to identify objects by their components and class types and to identify values that do not involve <kbd>string</kbd> objects, but sometimes we're forced into a corner. Maybe we didn't know any better when we started, we inherited someone else's code base, or we're using it as a workaround for something. Let's assume that, for whatever reason, we're stuck with the tag system, and we want to avoid the Native-Managed Bridge overhead cost.</p>
+<p>Fortunately, the <kbd>tag</kbd> property is most often used in comparison situations, and <kbd>GameObject</kbd> provides <span>the </span><kbd>CompareTag()</kbd><span> method, which is </span>an alternative way to compare <kbd>tag</kbd> properties that avoids the Native-Managed Bridge entirely.</p>
+<p>Let's perform a simple test to prove how this simple change can make all the difference:</p>
+<pre>void Update() {<br/><br/>  int numTests = 10000000;<br/><br/>  if (Input.GetKeyDown(KeyCode.Alpha1)) {<br/>    for(int i = 0; i &lt; numTests; ++i) {<br/>      if (gameObject.tag == "Player") {<br/>        // do stuff<br/>      }<br/>    }<br/>  }<br/><br/>  if (Input.GetKeyDown(KeyCode.Alpha2)) {<br/>    for(int i = 0; i &lt; numTests; ++i) {<br/>      if (gameObject.CompareTag ("Player")) {<br/>        // do stuff<br/>      }<br/>    }<br/>  }<br/>}</pre>
+<p>We can execute these tests by pressing the <em>1</em> and <em>2</em> keys to trigger the respective <kbd>for</kbd> loops. Here are the results:</p>
+<p class="CDPAlignCenter CDPAlign"><img src="assets/734fa0a1-c811-4c02-90cc-84c9b339efee.png" style="width:39.42em;height:21.33em;"/></p>
+<p>Looking at the breakdown view for each spike, we can see two completely different outcomes:</p>
+<p class="CDPAlignCenter CDPAlign"><img src="assets/1d563564-de53-4404-af35-b354e8cc25f1.png"/></p>
+<div class="packt_tip"><span>It's worth noting how the two spikes in the Timeline View appear relatively the same height, and yet one operation took twice as long as the other. The Profiler doesn't have the vertical resolution necessary to generate relatively accurate peaks when we go beyond the 15FPS marker. Both would result in a poor gameplay experience anyway, so the accuracy doesn't really matter.</span></div>
+<p>Retrieving the <kbd>tag</kbd> property 10 million times (way more than makes sense in reality, but this is useful for comparison) results in about 400 megabytes of memory being allocated just for <kbd>string</kbd> objects alone. We can see this memory allocation happening in the spike within the <span class="packt_screen">GC Allocated</span> element in the Memory Area of the Timeline View. Also, this process takes around 2,000 milliseconds to process, where another 400 milliseconds are spent on garbage collection once the <kbd>string</kbd> objects are no longer needed.</p>
+<p>Meanwhile, using <kbd>CompareTag()</kbd> 10 million times costs around 1,000 milliseconds to process and causes no memory allocations, and hence no garbage collection. This is made apparent from the lack of a spike in the <span class="packt_screen">GC Allocated</span> element in the Memory Area. This should make it abundantly clear that we must avoid accessing the <kbd>name</kbd> and <kbd>tag</kbd> properties whenever possible. If <kbd>tag</kbd> comparison becomes necessary, then we should make use of <kbd>CompareTag()</kbd>. Unfortunately, there is no equivalent for the <kbd>name</kbd> property, so we should stick to using tags where possible.</p>
+<div class="packt_tip">Note that passing in a <kbd>string</kbd> literal, such as <kbd>"Player"</kbd>, into <kbd>CompareTag()</kbd> does not result in a runtime memory allocation since the application allocates hardcoded strings like this during initialization and merely references them at runtime.</div>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Using appropriate data structures</h1>
+                </header>
+            
+            <article>
+                
+<p>C# offers many different data structures in the<span> </span><kbd>System.Collections</kbd><span> </span>namespace and we shouldn't become too accustomed to using the same ones over and over again. A common performance problem in software development is making use of an inappropriate data structure for the problem we're trying to solve simply because it's convenient. The two most commonly used are perhaps lists (<kbd>List&lt;T&gt;</kbd>) and dictionaries (<kbd>Dictionary&lt;K,V&gt;</kbd>).</p>
+<p>If we want to iterate through a set of objects, then a list is preferred, since it is effectively a dynamic array where the objects and/or references reside next to one another in memory, and therefore iteration causes minimal cache misses. Dictionaries are best used if two objects are associated with one another and we wish to acquire, insert, or remove these associations quickly. For example, we might associate a level number with a particular scene file, or an<span> </span><kbd>enum</kbd><span> </span>representing different body parts on a character, with<span> </span><kbd>Collider</kbd><span> </span>components for those body parts.</p>
+<p>However, it's fairly common that we want a data structure that handles both scenarios; we want to quickly figure out which object maps to another, while also being able to iterate through the group. Typically, the developer of this system will use a dictionary and then iterate over it. However, this process is unfortunately very slow, compared to iterating over a list, since it must check every potential hash in the dictionary to iterate over it fully.</p>
+<p>In these cases, it is often better to store data in both a list and a dictionary to better support this behavior. This will cost additional memory overhead to maintain multiple data structures, and insertion and deletion will require adding and removing objects from both data structures each time, but the benefits of iteration on the list (which tends to happen way more often) will be a stark contrast compared to iterating over a dictionary.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Avoiding re-parenting transforms at runtime</h1>
+                </header>
+            
+            <article>
+                
+<p>In earlier versions of Unity (version 5.3 and older), the references to <kbd>Transform</kbd> components would be laid out in memory in a generally random order. This meant that iteration over multiple <kbd>Transform</kbd> components was fairly slow due to the likelihood of cache misses. The upside was that re-parenting <kbd>GameObject</kbd> to another one wouldn't really cause a significant performance hit since the <kbd>Transforms</kbd> operated a lot like a heap data structure, which tend to be relatively fast at insertion and deletion. This behavior wasn't something we could control, and so we simply lived with it.</p>
+<p>However, since Unity 5.4 and beyond, the <kbd>Transform</kbd> component's memory layout has changed significantly. Since then, a <kbd>Transform</kbd> component's parent-child relationships have operated more like dynamic arrays, whereby Unity attempts to store all <kbd>Transforms</kbd> that share the same parent sequentially in memory inside a pre-allocated memory buffer and are sorted by their depth in the <span class="packt_screen">Hierarchy</span> window beneath the parent. This data structure allows for much, much faster iteration across the entire group, which is particularly beneficial to multiple subsystems such as physics and animation.</p>
+<p>The downside of this change is that if we re-parent <kbd>GameObject</kbd> to another one, the parent must fit the new child within its pre-allocated memory buffer as well as sorting all of these <kbd>Transforms</kbd> based on the new depth. Also, if the parent has not pre-allocated enough space to fit the new child, then it must expand its buffer to be able to fit the new child, and all of its children, in depth-first order. This could take some time to complete for deep and complex <kbd>GameObject</kbd> structures.</p>
+<p>When we instantiate a new <kbd>GameObject</kbd> through <kbd>GameObject.Instantiate()</kbd>, one of its arguments is the <kbd>Transform</kbd> component we wish to parent <kbd>GameObject</kbd> to, which is <kbd>null</kbd> by default and which would place <kbd>Transform</kbd> at the root of the <span class="packt_screen">Hierarchy</span> window. All <kbd>Transforms</kbd> at the root of the <span class="packt_screen">Hierarchy</span> window need to allocate a buffer to store its current children as well as those that might be added later (child <kbd>Transforms</kbd> do not need to do this). But, if we then re-parent <kbd>Transform</kbd> to another one immediately after instantiation, then it discards the buffer we just allocated! To avoid this, we should provide the parent <kbd>Transform</kbd> argument into the <kbd>GameObject.Instantiate()</kbd> call, which skips this buffer allocation step.</p>
+<p>Another way to reduce the costs of this process is to make root <kbd>Transform</kbd> pre-allocate a larger buffer before we need it so that we don't need to both expand and re-parent another <kbd>GameObject</kbd> instance into the buffer in the same frame. This can be accomplished by modifying a <kbd>Transform</kbd> component's <kbd>hierarchyCapacity</kbd> property. If we can estimate the number of child <kbd>Transforms</kbd> the parent will contain, then we can save a lot of unnecessary memory allocations.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Considering caching transform changes</h1>
+                </header>
+            
+            <article>
+                
+<p>The<span> </span><kbd>Transform</kbd><span> </span>component stores data<span> only </span>relative to its own parent. This means that accessing and modifying a<span> </span><kbd>Transform</kbd><span> </span>component's<span> </span><kbd>position</kbd>,<span> </span><kbd>rotation</kbd>, and/or<span> </span><kbd>scale</kbd><span> </span>properties could potentially result in a lot of unanticipated matrix multiplication calculations to generate the correct<span> </span><kbd>Transform</kbd> representation for the object through its parent<span> </span><kbd>Transforms</kbd>. The deeper the object is in the <span class="packt_screen">Hierarchy</span> window, the more calculations are needed to determine the final result. </p>
+<p>However, this also means that using<span> </span><kbd>localPosition</kbd>,<span> </span><kbd>localRotation</kbd>, and<span> </span><kbd>localScale</kbd><span> </span>has a relatively trivial cost associated with it since these are the values stored directly in the given<span> </span><kbd>Transform</kbd> component and they can be retrieved without any additional matrix multiplication. Therefore, these local property values should be used whenever possible.</p>
+<p>Unfortunately, changing our mathematical calculations from world-space to local-space can over-complicate what were originally simple (and solved) problems, so making such changes risks breaking our implementation and introducing a lot of unexpected bugs. Sometimes, it's worth absorbing a minor performance hit to solve a complex 3D mathematical problem more easily.</p>
+<p>Another problem with constantly changing a <kbd>Transform</kbd> component's properties is that it also sends internal notifications to components such as <kbd>Collider</kbd>,<span> </span><kbd>Rigidbody</kbd>,<span> </span><kbd>Light</kbd>, and<span> </span><kbd>Camera</kbd>, which must also be processed since the physics and rendering systems both need to know the new value of <kbd>Transform</kbd> and update accordingly.</p>
+<p>It is not uncommon, during a complex event chain, that we replace a <kbd>Transform</kbd> component's properties multiple times in the same frame (although this is probably a warning sign of over-engineered design). This would cause the internal messages to fire each and every time this happens, even if they occur during the same frame or even the same function call. Ergo, we should consider minimizing the number of times we modify <kbd>Transform</kbd> properties by caching them in a member variable and committing them only at the end of the frame, as follows:</p>
+<pre>private bool _positionChanged;<br/>private Vector3 _newPosition;<br/><br/>public void SetPosition(Vector3 position) {<br/>  _newPosition = position;<br/>  _positionChanged = true;<br/>}<br/><br/>void FixedUpdate() {<br/>  if (_positionChanged) {<br/>    transform.position = _newPosition;<br/>    _positionChanged = false;<br/>  }<br/>}</pre>
+<p>This code will only commit changes to <kbd>position</kbd> in the next<span> </span><kbd>FixedUpdate()</kbd><span> </span>method.</p>
+<p>Note that changing the<span> </span><kbd>Transform</kbd> component in this manner does not result in strange-looking behavior or teleporting objects during gameplay. The whole purpose of those internal events is to make sure the physics and rendering systems are always synchronized with the current <kbd>Transform</kbd> state. Hence, Unity doesn't skip a beat and fires the internal events every time changes come through the <kbd>Transform</kbd> component, just to be sure nothing gets missed.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Avoiding Find() and SendMessage() at runtime</h1>
+                </header>
+            
+            <article>
+                
+<p>The <kbd>SendMessage()</kbd> method and family of <kbd>GameObject.Find()</kbd> methods are notoriously expensive and should be avoided at all costs. The <kbd>SendMessage()</kbd> method is about 2,000 times slower than a simple function call, and the cost of the <kbd>Find()</kbd> method scales very poorly with scene complexity since it must iterate through every <kbd>GameObject</kbd> in the scene. It is sometimes forgivable to call <kbd>Find()</kbd> during the initialization of a scene, such as during an <kbd>Awake()</kbd> or <kbd>Start()</kbd> callback. Even in this case, it should only be used to acquire objects that we know for certain already exist in the scene and for scenes that have only a handful of GameObjects in them. Regardless, using either of these methods for inter-object communication at runtime is likely to generate a very noticeable overhead and, potentially, dropped frames.</p>
+<p>Relying on <kbd>Find()</kbd> and <kbd>SendMessage()</kbd> is typically symptomatic of poor design, inexperience in programming with C# and Unity, or just plain laziness during prototyping. Their usage has become something of an epidemic among beginner-level and intermediate-level projects, so much so that Unity Technologies feels the need to keep reminding users to avoid using them in a real game over and over again in their documentation and at their conferences. They only exist as a less <em>programmer-y</em> way to introduce new users to inter-object communication, and for some special cases where they can be used in a responsible way (which are few and far between). In other words, they're so ridiculously expensive that they break the rule of not pre-optimizing our code, and it's worth going out of our way to avoid using them if our project is going beyond the prototyping stage (which is a distinct possibility since you're reading this book).</p>
+<p>To be fair, Unity targets a wide demographic of users, from hobbyists to students and professionals, to individual developers, to hundreds of people on the same team. This results in an incredibly wide range of software development ability. When you're starting out with Unity, it can be difficult to figure out on your own what you should be doing differently, especially given how the Unity engine does not adhere to the design paradigms of many other game engines we might be familiar with. It has some foreign and quirky concepts relating to scenes and Prefabs and does not have a built-in <kbd>God</kbd> class entry point, nor any obvious raw data storage systems to work with.</p>
+<div class="packt_tip packt_infobox">A <kbd>God</kbd> class is a fancy name for the first object we might create in our application and whose job would be to create everything else we need based on the current context (what level to load, which subsystems to activate, and so on). These can be particularly useful if we want a single centralized location that controls the order of events as they happen during the entire lifecycle of our application.</div>
+<p>Understanding how to exchange messages between intricate software architecture components is not useful just for Unity's performance, but also for the design of any real-time event-driven system (including, but not limited to games), so it is worth exploring the subject in some detail, evaluating some alternative methods for inter-object communication.</p>
+<p>Let's start by examining a worst-case example, which uses both <kbd>Find()</kbd> and <kbd>SendMessage()</kbd> to communicate between objects, and then look into ways to improve upon it.</p>
+<p>The following is a class definition for a simple <kbd>EnemyManagerComponent</kbd> instance that tracks a list of GameObjects representing enemies in our game and provides a <kbd>KillAll()</kbd> method to destroy them all when needed:</p>
+<pre>using UnityEngine;<br/>using System.Collections.Generic;<br/><br/>class EnemyManagerComponent : MonoBehaviour {<br/>  List&lt;GameObject&gt; _enemies = new List&lt;GameObject&gt;();<br/><br/>  public void AddEnemy(GameObject enemy) {<br/>    if (!_enemies.Contains(enemy)) {<br/>      _enemies.Add(enemy);<br/>    }<br/>  }<br/><br/>  public void KillAll() {<br/>    for (int i = 0; i &lt; _enemies.Count; ++i) {<br/>      GameObject.Destroy(_enemies[i]);<br/>    }<br/>    _enemies.Clear();<br/>  }<br/>}</pre>
+<p>We would then place a <kbd>GameObject</kbd> instance in our scene containing this component, and name it <kbd>EnemyManager</kbd>.</p>
+<p>The following example method attempts to instantiate several enemies from a given Prefab, and then notifies the <kbd>EnemyManager</kbd> object of their existence:</p>
+<pre>public void CreateEnemies(int numEnemies) {<br/>  for(int i = 0; i &lt; numEnemies; ++i) {<br/>    GameObject enemy = (GameObject)GameObject.Instantiate(_enemyPrefab, <br/>                       5.0f * Random.insideUnitSphere, <br/>                       Quaternion.identity);<br/>    string[] names = { "Tom", "Dick", "Harry" };<br/>    enemy.name = names[Random.Range(0, names.Length)];<br/>    GameObject enemyManagerObj = GameObject.Find("EnemyManager");<br/>    enemyManagerObj.SendMessage("AddEnemy", <br/>                                enemy, <br/>                                SendMessageOptions.DontRequireReceiver);<br/>  }<br/>}</pre>
+<p>Initializing data and putting method calls inside any kind of loop, which always outputs to the same result, is a big red flag for poor performance, and when we're dealing with expensive methods, such as <kbd>Find()</kbd>, we should always look for ways to call them as few times as possible. Ergo, one improvement we can make is to move the <kbd>Find()</kbd> call outside of the <kbd>for</kbd> loop and cache the result in a local variable so that we don't need to keep reacquiring the <kbd>EnemyManager</kbd> object over and over again.</p>
+<div class="packt_tip">Moving the initialization of the <kbd>names</kbd> variable outside of the <kbd>for</kbd> loop is not necessarily critical since the compiler is often smart enough to realize it doesn't need to keep reinitializing data that isn't being changed elsewhere. However, it does often make the code easier to read.</div>
+<p>Another big improvement we can implement is to optimize our usage of the <kbd>SendMessage()</kbd> method by replacing it with a <kbd>GetComponent()</kbd> call. This replaces a very costly method with an equivalent and much cheaper alternative.</p>
+<p>This gives us the following result:</p>
+<pre>public void CreateEnemies(int numEnemies) {<br/>  GameObject enemyManagerObj = GameObject.Find("EnemyManager");<br/>  EnemyManagerComponent enemyMgr = enemyManagerObj.GetComponent&lt;EnemyManagerComponent&gt;();<br/>  string[] names = { "Tom", "Dick", "Harry" };<br/><br/>  for(int i = 0; i &lt; numEnemies; ++i) {<br/>    GameObject enemy = (GameObject)GameObject.Instantiate(_enemyPrefab, <br/>                        5.0f * Random.insideUnitSphere, <br/>                        Quaternion.identity);<br/>    enemy.name = names[Random.Range(0, names.Length)];<br/>    enemyMgr.AddEnemy(enemy);<br/>  }<br/>}</pre>
+<p>If this method is called during the initialization of the scene, and we're not overly concerned with loading time, then we can probably consider ourselves finished with our optimization work.</p>
+<p>However, we will often need new objects that are instantiated at runtime to find an existing object to communicate with. In this example, we want new enemy objects to register with our <kbd>EnemyManagerComponent</kbd> so that it can do whatever it needs to do to track and control the enemy objects in our scene. We would also like <kbd>EnemyManager</kbd> to handle all enemy-related behavior so that objects calling its functions don't need to perform work on its behalf. This will improve the coupling (how well our code base separates related behavior) and encapsulation (how well our classes prevent outside changes to the data they manage) of our application. The ultimate aim is to find a reliable and fast way for new objects to find existing objects in the scene without unnecessary usage of the <kbd>Find()</kbd> method so that we can minimize complexity and performance costs.</p>
+<p>There are multiple approaches we can take to solving this problem, each with their own benefits and pitfalls:</p>
+<ul>
+<li>Assign references to preexisting objects</li>
+<li>Static classes</li>
+<li>Singleton components</li>
+<li>A global messaging system</li>
+</ul>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Assigning references to pre-existing objects</h1>
+                </header>
+            
+            <article>
+                
+<p><span>A simple </span>approach to the problem of inter-object communication is to use Unity's built-in serialization system. Software design purists tend to get a little combative about this feature since it breaks encapsulation; it makes any field <span>(the C# term for a </span><span>member variable</span><span>)</span> marked<span> </span><kbd>private</kbd><span> </span>act in a way that treats it like a<span> </span><kbd>public</kbd><span> </span>field. However, it is a very effective tool for improving development workflow. This is particularly true when artists, designers, and programmers are all tinkering when the same product, where each has wildly varying levels of computer science and software programming knowledge, and with some of whom would prefer to stay away from modifying code files. Sometimes, it's worth bending a few rules in the name of productivity.</p>
+<p>Whenever we create a<span> </span><kbd>public</kbd><span> </span>field in <kbd>MonoBehaviour</kbd>, Unity automatically serializes and exposes the value in the <span class="packt_screen">Inspector</span> window when the component is selected. However, <kbd>public</kbd><span> </span>fields are always dangerous from a software design perspective. These variables can be changed through code at anytime from anywhere, making it hard to keep track of the variable and it's liable to introduce a lot of unexpected bugs.</p>
+<p>A better solution is to take any<span> </span><kbd>private</kbd><span> </span>or<span> </span><kbd>protected</kbd><span> </span>member variable of a class and expose it to the <span class="packt_screen">Inspector</span> window with the<span> </span><kbd>[SerializeField]</kbd><span> </span>attribute. T<span>he value will then behave like a</span><span> </span><kbd>public</kbd><span> </span><span>field with respect to the <span class="packt_screen">Inspector</span> window, allowing us to change it through the Editor interface for convenience, but will keep</span> the data safely encapsulated from other parts of our code base. </p>
+<p>For example, the following class exposes three<span> </span><kbd>private</kbd><span> </span>fields to the <span class="packt_screen">Inspector</span> window:</p>
+<pre>using UnityEngine;<br/><br/>public class EnemyCreatorComponent : MonoBehaviour {<br/>  [SerializeField] private int _numEnemies;<br/>  [SerializeField] private GameObject _enemyPrefab;<br/>  [SerializeField] private EnemyManagerComponent _enemyManager;<br/><br/>  void Start() {<br/>    for (int i = 0; i &lt; _numEnemies; ++i) {<br/>      CreateEnemy();<br/>    }<br/>  }<br/><br/>  public void CreateEnemy() {<br/>    _enemyManager.CreateEnemy(_enemyPrefab); <br/>  }<br/>}</pre>
+<div class="packt_tip">Note that the<span> </span><kbd>private</kbd><span> </span>access specifiers shown in the preceding code are redundant keywords in C# since fields and methods default to<span> </span><kbd>private</kbd><span> </span>unless specified otherwise. However, it is often best practice to be explicit about the intended access level.</div>
+<p>Looking at this component in the <span class="packt_screen">Inspector</span> window reveals three values, initially given default values of<span> </span><kbd>0</kbd> or<span> </span><kbd>null</kbd>, which can be modified through the Editor interface:</p>
+<p class="CDPAlignCenter CDPAlign"><img src="assets/5f599976-6b0f-4c49-9202-7d2205825918.png"/></p>
+<p>We can drag and drop a Prefab reference from the <span class="packt_screen">Project</span> window into the <span class="packt_screen">Enemy Prefab</span> field revealed in the <span class="packt_screen">Inspector</span> window.</p>
+<div class="packt_tip">Note how Unity automatically takes a camel-cased field name and creates a convenient <span class="packt_screen">Inspector</span> window name for it.<span> </span><kbd>_numEnemies</kbd><span> </span>becomes<span> </span><span class="packt_screen">Num Enemies</span>,<span> </span><kbd>_enemyPrefab</kbd><span> </span>becomes<span> </span><span class="packt_screen">Enemy<span> </span>Prefab</span>, and so on.</div>
+<p>Meanwhile, the<span> </span><kbd>_enemyManager</kbd><span> </span>field is interesting because it is a reference to a specific <kbd>MonoBehaviour</kbd> class type. If a <kbd>GameObject</kbd> is dragged and dropped into this field, then it will refer to the<span> </span>component<span> </span>on the given object as opposed to the <kbd>GameObject</kbd> itself. Note that if <kbd>GameObject</kbd> does not contain the expected <kbd>MonoBehaviour</kbd>, instance, then nothing will be assigned to the field.</p>
+<div class="packt_tip">A common usage of this component reference technique is to obtain references to other components attached to the very same <kbd>GameObject</kbd> a component is attached to. This is an alternative means of caching components with zero cost, as discussed in the section entitled <em>Cache component references</em>, earlier in this chapter.</div>
+<p>There is some danger to using this method. Much of our code would assume that a Prefab is assigned to a field that is used like a Prefab and <kbd>GameObject</kbd> is assigned to a field that refers to an instance of <kbd>GameObject</kbd>. However, <span>since Prefabs are essentially</span> GameObjects<span>, any Prefab or <kbd>GameObject</kbd> can be assigned to a serialized <kbd>GameObject</kbd> reference field, which means we could assign the wrong type by accident.</span></p>
+<p>If we do assign the wrong type, then we could accidentally instantiate a new <kbd>GameObject</kbd> instance from an existing one that was previously modified, or we could make changes to a Prefab, which would then change the state of all GameObjects instantiated from it. To make matters worse, any accidental changes to a Prefab become permanent since Prefabs occupy the same memory space whether Playmode is active or not. This is the case even if the Prefab is only modified during Playmode.</p>
+<p>Therefore, this approach is a very team-friendly way of solving the problem of inter-object communication, but it is not ideal due to all of the risks involved with team members accidentally leaving<span> </span><kbd>null</kbd><span> </span>references in place, assigning Prefabs to references that expect an instance of <kbd>GameObject</kbd> from the scene or vice versa.</p>
+<p>It is also important to note that not all objects can be serialized and revealed in the <span class="packt_screen">Inspector</span> window. Unity can serialize all primitive data types (<kbd>int</kbd>,<span> </span><kbd>float</kbd>,<span> </span><kbd>string</kbd>, and<span> </span><kbd>bool</kbd>), various built-in types (<kbd>Vector3</kbd>,<span> </span><kbd>Quaternion</kbd>, and so on), <kbd>enum</kbd>,<span> </span><kbd>class</kbd>,<span> </span><kbd>struct</kbd>, and various data structures containing other serializable types such as <kbd>List</kbd>. However, it is unable to serialize<span> </span><kbd>static</kbd><span> </span>fields,<span> </span><kbd>readonly</kbd><span> </span>fields, properties, and dictionaries.</p>
+<div class="packt_tip">Some Unity developers like to implement the pseudo-serialization of dictionaries via two separate lists for keys and values, along with a Custom Editor script, or via a single list of<span> </span><kbd>struct</kbd> objects, which contain both keys and values. Both of these solutions are a little clumsy, and are rarely as performant as a proper dictionary, but they can still be useful.</div>
+<p>Another solution to the problem of inter-object communication is to try and make use of globally accessible objects to minimize the number of custom assignments we need to make.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Static classes</h1>
+                </header>
+            
+            <article>
+                
+<p>This approach involves creating a class that is globally accessible to the entire code base at anytime. Any kind of global manager class is often frowned upon in software engineering circles, partly since the name manager is vague and doesn't say much about what it's meant to do, but mostly because problems can be difficult to debug. Changes can occur from anywhere and at any point during runtime, and such classes tend to maintain state information that other systems rely upon. It is also perhaps the most difficult approach to change or replace since many of our classes might contain direct function calls into it, requiring each to be modified at a future date if it were to be replaced. Despite all of these drawbacks, it is by far the easiest solution to understand and implement.</p>
+<p>The singleton design pattern is a common way of ensuring only one instance of a certain object type ever exists in memory. <span>This design pattern is implemented by giving the class a </span><kbd>private</kbd><span> constructor, a </span><kbd>static</kbd><span> variable is maintained to keep track of the object instance, and the class can only be accessed through a </span><kbd>static</kbd><span> property it provides. </span>Singletons can be useful for managing shared resources or heavy data traffic, such as file access, downloads, data parsing, and messaging. A singleton ensures that we have a single entry point for such activities, rather than having tons of different subsystems competing for shared resources and potentially bottlenecking one another.</p>
+<p>Singletons don't necessarily have to be globally accessible objects—their most important feature is that only a single instance of the object exists at a time. However, the way that singletons are primarily used in most projects is to be a global access point to some shared functionality, <span>and they are designed to be created once during application initialization, persist through the entire lifecycle of the application, and only be destroyed during application shutdown. </span>As such, a simpler way of implementing this kind of behavior in C# is to use a static class. In other words, implementing the typical singleton design pattern in C# just provides the same behavior as a static class, but takes more time and code to implement.</p>
+<p>A static class that functions in much the same way as <kbd>EnemyManagerComponent</kbd>, as demonstrated in the previous example, can be defined as follows:</p>
+<pre>using System.Collections.Generic;<br/>using UnityEngine;<br/><br/>public static class StaticEnemyManager {<br/>  private static List&lt;Enemy&gt; _enemies;<br/><br/>  public static void CreateEnemy(GameObject prefab) {<br/>    string[] names = { "Tom", "Dick", "Harry" };<br/>    GameObject enemy = GameObject.Instantiate(prefab, 5.0f * <br/>    Random.insideUnitSphere, Quaternion.identity);<br/>    Enemy enemyComp = enemy.GetComponent&lt;Enemy&gt;();<br/>    enemy.gameObject.name = names[Random.Range(0, names.Length)];<br/>    _enemies.Add(enemyComp);<br/>  }<br/><br/>  public static void KillAll() {<br/>    for (int i = 0; i &lt; _enemies.Count; ++i) {<br/>      _enemies[i].Die();<br/>      GameObject.Destroy(_enemies[i].gameObject);<br/>    }<br/>    _enemies.Clear();<br/>  }<br/>}</pre>
+<p>Note that every method, property, and field in a static class must have the <kbd>static</kbd> keyword attached, which implies that only one instance of this object will ever reside in memory. This also means that its <kbd>public</kbd> methods and fields are accessible from anywhere. Static classes, by definition, do not allow any non-<kbd>static</kbd> fields to be defined.</p>
+<p>If static class fields need to be initialized (such as the <kbd>_enemies</kbd> field, which is initially set to <kbd>null</kbd>), then static class fields can be initialized inline like so:</p>
+<pre>private static List&lt;Enemy&gt; _enemies = new List&lt;Enemy&gt;();</pre>
+<p>However, if object construction needs to be more complicated than this, then static classes can be given a <kbd>static</kbd> constructor, instead. <span>The</span> static <span>class constructor is automatically </span><span>called the moment the class is first accessed through any of its fields, properties, or methods and </span>can be defined like so:</p>
+<pre>static StaticEnemyManager() {<br/>  _enemies = new List&lt;Enemy&gt;();<br/>  // more complicated initialization activity goes here<br/>}</pre>
+<p><span>This time, we have implemented the <kbd>CreateEnemy()</kbd> method so that it handles much of the activity for creating an enemy object. However, </span>the static class must still be given a reference to a Prefab from which it can instantiate an enemy object. A static class can only contain <kbd>static</kbd> member variables, and therefore cannot easily interface with the <span class="packt_screen">Inspector</span> window in the same way that MonoBehaviours can, therefore requiring the caller to provide some implementation-specific information to it. To solve this problem, we could implement a companion-component for our static class to keep our code properly <em>decoupled</em>. The following code demonstrates what this class might look like:</p>
+<pre>using UnityEngine;<br/><br/>public class EnemyCreatorCompanionComponent : MonoBehaviour {<br/>  [SerializeField] private GameObject _enemyPrefab;<br/><br/>  public void CreateEnemy() {<br/>    StaticEnemyManager.CreateEnemy(_enemyPrefab);<br/>  }<br/>}</pre>
+<p>Despite these drawbacks, the <kbd>StaticEnemyManager</kbd> class illustrates a simple example of how a static class might be used to provide information or communication between external objects, providing a better alternative than using <kbd>Find()</kbd> or <kbd>SendMessage()</kbd>.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Singleton components</h1>
+                </header>
+            
+            <article>
+                
+<p>As mentioned previously, static classes have difficulty interfacing with Unity-related functionality and cannot directly make use of <kbd>MonoBehaviour</kbd> features, such as event callbacks, coroutines, hierarchical design, and Prefabs. Also, since there's no object to select in the <span class="packt_screen">Inspector</span> window, we lose the ability to inspect the data of a static class at runtime through the <span class="packt_screen">Inspector</span> window, which can make debugging difficult. These are features that we may wish to make use of in our global classes.</p>
+<p>A common solution to this problem is to implement a component that acts as a singleton—<span>it </span><span>provides </span><kbd>static</kbd><span> methods to grant global access, and </span>only one instance of <kbd>MonoBehaviour</kbd> is ever allowed to exist at any given time.</p>
+<p>The following is the definition for a <kbd>SingletonComponent</kbd> class:</p>
+<pre>using UnityEngine;<br/><br/>public class SingletonComponent&lt;T&gt; : MonoBehaviour where T : SingletonComponent&lt;T&gt; {<br/>  private static T __Instance;<br/><br/>  protected static SingletonComponent&lt;T&gt; _Instance {<br/>    get {<br/>      if(!__Instance) {<br/>        T[] managers = GameObject.FindObjectsOfType(typeof(T)) as T[];<br/>        if (managers != null) {<br/>          if (managers.Length == 1) {<br/>            __Instance = managers[0];<br/>            return __Instance;<br/>          } else if (managers.Length &gt; 1) {<br/>            Debug.LogError("You have more than one " + <br/>                            typeof(T).Name + <br/>                            " in the Scene. You only need " + <br/>                            "one - it's a singleton!");<br/>            for(int i = 0; i &lt; managers.Length; ++i) {<br/>              T manager = managers[i];<br/>              Destroy(manager.gameObject);<br/>            }<br/>          }<br/>        }<br/>        GameObject go = new GameObject(typeof(T).Name, typeof(T));<br/>        __Instance = go.GetComponent&lt;T&gt;();<br/>        DontDestroyOnLoad(__Instance.gameObject);<br/>      }<br/>      return __Instance;<br/>    }<br/>    set {<br/>      __Instance = value as T;<br/>    }<br/>  }<br/>}</pre>
+<p>This class works by creating <kbd>GameObject</kbd> containing a component of itself the first time it is accessed. Since we wish this to be a global and persistent object, we will need to call <kbd>DontDestroyOnLoad()</kbd> shortly after <kbd>GameObject</kbd> is created. This is a special function that tells Unity that we want the object to persist between scenes for as long as the application is running. From that point onward, when a new scene is loaded, the object will not be destroyed and will retain all of its data.</p>
+<p>This class definition assumes two things. Firstly, because it is using <em>generics</em> to define its behavior, we must derive it to create a concrete class. Secondly, a method must be defined to assign the <kbd>_Instance</kbd> property (which, in turn, sets the private <kbd>__Instance</kbd> field) and cast it to/from the correct class type.</p>
+<p>For example, the following is the minimum amount of code that is needed to successfully generate a new <kbd>SingletonComponent</kbd> derived class called <kbd>EnemyManagerSingletonComponent</kbd>:</p>
+<pre>public class EnemyManagerSingletonComponent : SingletonComponent&lt; EnemyManagerSingletonComponent &gt; {<br/>  public static EnemyManagerSingletonComponent Instance {<br/>    get { return ((EnemyManagerSingletonComponent)_Instance); }<br/>    set { _Instance = value; }<br/>  }<br/><br/>  public void CreateEnemy(GameObject prefab) {<br/>    // same as StaticEnemyManager<br/>  }<br/><br/>  public void KillAll() {<br/>    // same as StaticEnemyManager<br/>  }<br/>}</pre>
+<p>This class can be used at runtime by having any other object access the <kbd>Instance</kbd> property at anytime. If the component does not already exist in our scene, then the <kbd>SingletonComponent</kbd> base class will instantiate its own <kbd>GameObject</kbd> and attach an instance of the derived class to it as a component. From that point forward, access through the <kbd>Instance</kbd> property will reference the component that was created, and only one instance of that component will exist at a time.</p>
+<p>Note that <span>this means</span> <span>we don't need to implement </span><kbd>static</kbd><span> methods in a singleton component class definition. </span><span>For example, we could simply call </span><kbd>EnemyManagerSingletonComponent.Instance.KillAll()</kbd><span> to access the </span><kbd>KillAll()</kbd><span> method.</span><span> </span></p>
+<p>Note that it is possible to place an instance of <kbd>SingletonComponent</kbd> in a <span class="packt_screen">Hierarchy</span> window since it derives from <kbd>MonoBehaviour</kbd>. Although, be warned, the <kbd>DontDestroyOnLoad()</kbd> method would never be called, which would prevent the singleton component's <kbd>GameObject</kbd> from persisting when the next scene is loaded. We will perhaps need to call <kbd>DontDestroyOnLoad()</kbd> in the <kbd>Awake()</kbd> callback of the <span>derived class </span>to make this work, unless, of course, we actually want destructible singletons. Sometimes, it makes sense to allow such singletons to be destroyed between scenes so that it can start fresh each time; it all depends on our particular use cases.</p>
+<p>In either case, the shutdown of a singleton component can be a little convoluted because of how Unity tears down scenes. An object's <kbd>OnDestroy()</kbd> callback is called whenever it is destroyed during runtime. The same method is called during application shutdown, whereby every component on each <kbd>GameObject</kbd> has its <kbd>OnDestroy()</kbd> callback called by Unity. The same activities take place when we end Playmode in the Editor, hence returning to edit mode. However, the destruction of objects occurs in a random order, and we cannot assume that the <kbd>SingletonComponent</kbd> object will be the last object destroyed.</p>
+<p>Consequently, if any object attempts to do anything with the singleton component in the middle of their <kbd>OnDestroy()</kbd> callback, then they may be calling the <kbd>SingletonComponent</kbd> object's <kbd>Instance</kbd> property. However, if the singleton component has already been destroyed before this moment, then a new instance of <kbd>SingletonComponent</kbd> will be created in the middle of the application shutdown. This can corrupt our scene files, as instances of our singleton components will be left behind in the scene. If this happens, then Unity will throw the following error message:</p>
+<p class="mce-root"><span class="packt_screen">"Some objects were not cleaned up when closing the scene. (Did you spawn new GameObjects from OnDestroy?)"</span></p>
+<p>The obvious workaround is to simply never call into a <kbd>SingletonComponent</kbd> object during any <kbd>MonoBehaviour</kbd> component's <kbd>OnDestroy()</kbd> callback. However, there are some legitimate reasons we may wish to do so: most notable is that singletons are often designed to make use of the observer design pattern. This design pattern allows other objects to register/deregister with them for certain tasks, similar to how Unity latches onto callback methods, such as <kbd>Start()</kbd> and <kbd>Update()</kbd>, but in a more strict fashion.</p>
+<p>With the observer design pattern, objects will typically register with the system when they are created, will make use of it during runtime, and then either deregister from it during runtime when they are finished using it or deregister during their own shutdown for the sake of cleanup. We will see an example of this design pattern in the upcoming section, <em>A global messaging system</em>, but if we imagine <kbd>MonoBehaviour</kbd> making use of such a system, then the most convenient place to perform shutdown deregistration would be within an <kbd>OnDestroy()</kbd> callback. Consequently, such objects are likely to run into the aforementioned problem, where a new <kbd>GameObject</kbd> instance for <kbd>SingletonComponent</kbd> is accidentally created during application shutdown.</p>
+<p>To solve this problem, we will need to make three changes. Firstly, we need to add an additional flag to <kbd>SingletonComponent</kbd>, which keeps track of its active state and disables it at the appropriate times. This includes the singleton's own destruction, as well as application shutdown (<kbd>OnApplicationQuit()</kbd> is another useful Unity callback for MonoBehaviours, which is called during this time):</p>
+<pre class="mce-root">private bool _alive = true;<br/>void OnDestroy() { _alive = false; }<br/>void OnApplicationQuit() { _alive = false; }</pre>
+<p class="mce-root">Secondly, we should implement a way for external objects to verify the singleton's current state:</p>
+<pre>public static bool IsAlive {<br/>  get {<br/>    if (__Instance == null)<br/>      return false;<br/>    return __Instance._alive;<br/>  }<br/>}</pre>
+<p>Finally, any object that attempts to call into the singleton during its own <kbd>OnDestroy()</kbd> method must first verify the state using the <kbd>IsAlive</kbd> property before calling <kbd>Instance</kbd>, as follows:</p>
+<pre>public class SomeComponent : MonoBehaviour {<br/>  void OnDestroy() {<br/>    if (MySingletonComponent.IsAlive) {<br/>        MySingletonComponent.Instance.SomeMethod();<br/>    }<br/>  }<br/>}</pre>
+<p>This will ensure that nobody attempts to access the singleton instance during destruction. If we don't follow this rule, then we will run into problems where instances of our singleton object will be left behind in the scene after returning to Edit Mode.</p>
+<p>The irony of the <kbd>SingletonComponent</kbd> approach is that we are using a <kbd>Find()</kbd> call to determine whether or not one of these <kbd>SingletonComponent</kbd> objects already exists in the scene before we attempt to assign the <kbd>__Instance</kbd> reference variable. Fortunately, this will only happen when the singleton component is first accessed, which is usually not a problem if there aren't too many GameObjects in the scene, but it's possible that the initialization of the singleton component may not necessarily occur during scene initialization and can, therefore, cost us a performance spike at a bad time during gameplay when an instance is first acquired and <kbd>Find()</kbd> gets called. The workaround for this is to have some <kbd>God</kbd> class confirm that the important singletons are instantiated during scene initialization by simply accessing the <kbd>Instance</kbd> property on each one.</p>
+<p>Another downside to this approach is that if we later decide that we want more than one of these singletons executing at once or we wish to separate out its behavior to be more modular, then there would be a lot of code that needs to change.</p>
+<p><span>The final approach we will explore will attempt to solve many of the problems revealed by the previous solutions and provide a way to gain all of their benefits, by combining ease of implementation, ease of extension, and strict usage that also reduces the likelihood of human error during configuration.</span></p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">A global messaging system</h1>
+                </header>
+            
+            <article>
+                
+<p>The final suggested approach to solve the problem of interobject communication is to implement a global messaging system that any object can access and send messages through to any object that may be interested in listening to that specific type of message. Objects can send messages or listen for them (sometimes both!), and the responsibility is on the listener to decide what messages they are interested in. The message sender can broadcast the message without caring at all who is listening, and a message can be sent through the system regardless of the specific contents of the message. This approach is by far the most complex and may require some effort to implement and maintain, but it is an excellent long-term solution to keep our object communication modular, decoupled, and fast as our application gets more and more complex.</p>
+<p>The kinds of message we wish to send can take many forms, including data values, references, instructions for listeners, and more, but they should all have a common, basic definition that our messaging system can use to determine what the message is and who it is intended for.</p>
+<p>The following is a simple class definition for a <kbd>Message</kbd> object:</p>
+<pre>public class Message {<br/>  public string type;<br/>  public Message() { type = this.GetType().Name; }<br/>}</pre>
+<p>The <kbd>Message</kbd> class constructor caches the message's <kbd>type</kbd> in a local <kbd>string</kbd> property to be used later for cataloging and distribution purposes. Caching this value is important, as each call to <kbd>GetType().Name</kbd> will result in a new string being allocated, and we've previously learned that we want to minimize this activity as much as possible.</p>
+<p>Any custom messages can contain whatever superfluous data they wish so long as they derive from this base class, which will allow it to be sent through our messaging system. Take note that despite acquiring <kbd>type</kbd> from the object during its base class constructor, the <kbd>name</kbd> property will still contain the name of the derived class, not the base class.</p>
+<p>Moving on to our <kbd>MessagingSystem</kbd> class, we should define its features by what kind of requirements we need it to fulfill:</p>
+<ul>
+<li>It should be globally accessible</li>
+<li>Any object (<kbd>MonoBehaviour</kbd> or not) should be able to register/deregister as listeners to receive specific message types (that is, the observer design pattern)</li>
+<li>Registering objects should provide a method to call when the given message is broadcasted from elsewhere</li>
+<li>The system should send the message to all listeners within a reasonable time frame, but not choke on too many requests at once</li>
+</ul>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">A globally accessible object</h1>
+                </header>
+            
+            <article>
+                
+<p>The first requirement makes the messaging system an excellent candidate for a singleton object, since we would only ever need one instance of the system. Although, it is wise to think long and hard as to whether this is truly the case before committing to implementing a singleton.</p>
+<p>If we later decide that we want multiple instances of this object to exist, wish to allow the systems to be created/destroyed during runtime, or even wish to create test cases that allow us to fake or create/destroy them in the middle of a test, then it can be a difficult task to refactor a singleton out of our code base. This is due to all of the dependencies we will gradually introduce to our code as we use the system more and more.</p>
+<p>If we wish to avoid singletons due to the above drawbacks, then it may be easier to create a single instance of the messaging system during initialization and then pass it around from subsystem to subsystem as needed, or we might wish to go further and explore the concept of dependency injection, which attempts to solve problems like these. However, for the sake of simplicity, we will assume that a singleton fits our needs and design our <kbd>MessagingSystem</kbd> class accordingly.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Registration</h1>
+                </header>
+            
+            <article>
+                
+<p>The second and third requirements can be achieved by offering some public methods that allow registration with the messaging system. If we force the listening object to provide us a delegate function to call when the message is broadcast, then this allows listeners to customize which method is called for which message. We can make our code base very easy to understand if we name the delegate after the message it is intended to process.</p>
+<p>In some cases, we might wish to broadcast a general notification message and have all listeners do something in response, such as an <em>Enemy Created</em> message. Other times, we might be sending a message that specifically targets a single listener among a group. For example, we might want to send an <em>Enemy Health Value Changed</em> message that is intended for a specific health bar object that is attached to the enemy that was damaged. However, we may have many health bar objects in the scene, all of which are interested in this message type, but each is only interested in hearing health update messages for the enemy they're providing health information for. So, if we implement a way for the system to stop checking after it has been handled, then we can probably save a good number of CPU cycles when many listeners are waiting for the same message type.</p>
+<p>The delegate we define should, therefore, provide a way to retrieve the message via an argument and return a response that determines whether or not processing for the message should stop if and when the listener is done with it. The decision on whether to stop processing or not can be achieved by returning a simple Boolean, where <kbd>true</kbd> implies that this listener has handled the message and the processing for the message must stop, and <kbd>false</kbd> implies that this listener has not handled the message and the messaging system should try the next listener.</p>
+<p>Here is the definition for the delegate:</p>
+<pre>public delegate bool MessageHandlerDelegate(Message message);</pre>
+<p>Listeners must define a method of this form and pass a delegate reference to the messaging system during registration, hence providing a means for the messaging system to tell the listening object when the message is being broadcast.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Message processing</h1>
+                </header>
+            
+            <article>
+                
+<p>The final requirement for our messaging system is that this object should have some kind of timing-based mechanism built in to prevent it from choking on too many messages at once. This means that, somewhere in the code base, we will need to make use of <kbd>MonoBehaviour</kbd> event callbacks to tell our messaging system to perform work during Unity's <kbd>Update()</kbd>, essentially enabling it to count time.</p>
+<p>This could be achieved with the static class singleton (which we defined earlier), which would require some other <kbd>MonoBehaviour</kbd>-based <kbd>God</kbd> class to call into it, informing it that the scene has been updated. Alternatively, we can use the singleton component to achieve the same thing, which has its own means of determining when <kbd>Update()</kbd> is called and hence handle its workload independently of any <kbd>God</kbd> class. The most notable difference between the two approaches is whether or not the system is dependent on the control of other objects and the various pros and cons of managing a singleton component (such that it won't get destroyed between scenes; we don't want to accidentally recreate it during shutdown).</p>
+<p>The singleton component approach is probably the best since there aren't too many occasions where we wouldn't want this system acting independently, even if much of our game logic depends upon it. For example, even if the game was paused, we wouldn't want the game logic to pause our messaging system. We would still want the messaging system to continue receiving and processing messages so that we could, for example, keep UI-related components communicating with one another while the gameplay is in a paused state.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Implementing the messaging system</h1>
+                </header>
+            
+            <article>
+                
+<p>Let's define our messaging system by deriving from the <kbd>SingletonComponent</kbd> class and provide a method for objects to register with it:</p>
+<pre>using System.Collections.Generic;<br/>using UnityEngine;<br/><br/>public class MessagingSystem : SingletonComponent&lt;MessagingSystem&gt; {<br/>  public static MessagingSystem Instance {<br/>    get { return ((MessagingSystem)_Instance); }<br/>    set { _Instance = value; }<br/>  }<br/><br/>  private Dictionary&lt;string,List&lt;MessageHandlerDelegate&gt;&gt; _listenerDict = new Dictionary&lt;string,List&lt;MessageHandlerDelegate&gt;&gt;();<br/><br/>  public bool AttachListener(System.Type type, MessageHandlerDelegate handler) {<br/>    if (type == null) {<br/>      Debug.Log("MessagingSystem: AttachListener failed due to having no " + <br/>                "message type specified");<br/>      return false;<br/>    }<br/><br/>    string msgType = type.Name;<br/>    if (!_listenerDict.ContainsKey(msgType)) {<br/>      _listenerDict.Add(msgType, new List&lt;MessageHandlerDelegate&gt;());<br/>    }<br/><br/>    List&lt;MessageHandlerDelegate&gt; listenerList = _listenerDict[msgType];<br/>    if (listenerList.Contains(handler)) {<br/>      return false; // listener already in list<br/>    }<br/><br/>    listenerList.Add(handler);<br/>    return true;<br/>  }<br/>}</pre>
+<p>The <kbd>_listenerDict</kbd> field is a dictionary of strings mapped to lists containing <kbd>MessageHandlerDelegate</kbd>. This dictionary organizes our listener delegates into lists by which message type they wish to listen to. Hence, if we know what message type is being sent, then we can quickly retrieve a list of all delegates that have been registered for that message type. We can then iterate through the list, querying each listener to check whether one of them wants to handle it.</p>
+<p>The <kbd>AttachListener()</kbd> method requires two parameters: a message type in the form of its <kbd>System.Type</kbd> and <kbd>MessageHandlerDelegate</kbd> to send the message to when the given message type comes through the system.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Message queuing and processing</h1>
+                </header>
+            
+            <article>
+                
+<p>To process messages, our messaging system should maintain a queue of incoming message objects so that we can process them in the order they were broadcast:</p>
+<pre>private Queue&lt;Message&gt; _messageQueue = new Queue&lt;Message&gt;();<br/><br/>public bool QueueMessage(Message msg) {<br/>  if (!_listenerDict.ContainsKey(msg.type)) {<br/>    return false;<br/>  }<br/>  _messageQueue.Enqueue(msg);<br/>  return true;<br/>}</pre>
+<p>The <kbd>QueueMessage()</kbd> method simply checks whether the given message type is present in our dictionary before adding it to the queue. This effectively tests whether or not an object actually cares to listen to the message before we queue it to be processed later. We have introduced a new <kbd>private</kbd> field, <kbd>_messageQueue</kbd>, for this purpose.</p>
+<p>Next, we'll add a definition for <kbd>Update()</kbd>. This callback will be called regularly by the Unity Engine. Its purpose is to iterate through the current contents of the message queue, one message a time; verify whether or not too much time has passed since we began processing; and if not, pass them along to the next stage in the process:</p>
+<pre>private const int _maxQueueProcessingTime = 16667;<br/>private System.Diagnostics.Stopwatch timer = new System.Diagnostics.Stopwatch();<br/><br/>void Update() {<br/>  timer.Start();<br/>  while (_messageQueue.Count &gt; 0) {<br/>    if (_maxQueueProcessingTime &gt; 0.0f) {<br/>      if (timer.Elapsed.Milliseconds &gt; _maxQueueProcessingTime) {<br/>         timer.Stop();<br/>         return;<br/>      }<br/>    }<br/><br/>    Message msg = _messageQueue.Dequeue();<br/>    if (!TriggerMessage(msg)) {<br/>      Debug.Log("Error when processing message: " + msg.type);<br/>    }<br/>  }<br/>}</pre>
+<p>The time-based safeguard is in place to make sure that it does not exceed a processing time limit threshold. This prevents the messaging system from freezing our game if too many messages get pushed through the system too quickly. If the total time limit is exceeded, then all message processing will stop, leaving any remaining messages to be processed during the next frame.</p>
+<p class="mce-root"/>
+<div class="packt_tip">Note that we use the full namespace when creating the <kbd>Stopwatch</kbd> object. We could have added <kbd>using System.Diagnostics</kbd>, but this would lead to a namespace conflict between <kbd>System.Diagnostics.Debug</kbd> and <kbd>UnityEngine.Debug</kbd>. Omitting it allows us to continue to call Unity's debug logger with <kbd>Debug.Log()</kbd>, without having to explicitly call <kbd>UnityEngine.Debug.Log()</kbd> each time.</div>
+<p>Lastly, we will need to define the <kbd>TriggerMessage()</kbd> method, which distributes messages to listeners:</p>
+<pre>public bool TriggerMessage(Message msg) {<br/>  string msgType = msg.type;<br/>  if (!_listenerDict.ContainsKey(msgType)) {<br/>    Debug.Log("MessagingSystem: Message \"" + msgType + "\" has no listeners!");<br/>    return false; // no listeners for message so ignore it<br/>  }<br/><br/>  List&lt;MessageHandlerDelegate&gt; listenerList = _listenerDict[msgType];<br/><br/>  for(int i = 0; i &lt; listenerList.Count; ++i) {<br/>    if (listenerList[i](msg)) {<br/>      return true; // message consumed by the delegate<br/>    }<br/>    return true;<br/>  }  <br/>}</pre>
+<p>The preceding method is the main workhorse behind the messaging system. The <kbd>TriggerEvent()</kbd> method's purpose is to obtain the list of listeners for the given message type and give each of them an opportunity to process it. If one of the delegates returns <kbd>true</kbd>, then the processing of the current message ceases and the method exits, allowing the <kbd>Update()</kbd> method to process the next message.</p>
+<p>Normally, we would want to use <kbd>QueueEvent()</kbd> to broadcast messages, but we also provide direct access to <kbd>TriggerEvent()</kbd> as an alternative. Using <kbd>TriggerEvent()</kbd> directly allows message senders to force their messages to be processed immediately without waiting for the next <kbd>Update()</kbd> event. This bypasses the throttling mechanism, which might be necessary for messages that need to be sent during critical moments of gameplay, where waiting an additional frame might result in strange-looking behavior.</p>
+<p>For example, if we intend for two objects to be destroyed and create a <span class="packt_screen">Particle Effect</span> the moment they collide with one another, and this work is handled by another subsystem (hence an event needs to be sent for it), then we would want to send the message via <kbd>TriggerEvent()</kbd> to prevent the objects from continuing to exist for one frame before the event is handled. Conversely, if we wanted to do something less frame-critical, such as create a pop-up message when the player walks into a new area, we could safely use a <kbd>QueueEvent()</kbd> call to handle it.</p>
+<p>Try to avoid habitually using <kbd>TriggerEvent()</kbd> for all events, as we could end up handling too many calls simultaneously in the same frame, causing a sudden drop in frame rate. Decide which events are frame-critical, and which are not, and use the <kbd>QueueEvent()</kbd> and <kbd>TriggerEvent()</kbd> methods appropriately.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Implementing custom messages</h1>
+                </header>
+            
+            <article>
+                
+<p>We've created the messaging system, but an example of how to use it would help us to wrap our heads around the concept. Let's start by defining a pair of simple classes that derive from <kbd>Message</kbd>, which we can use to create a new enemy, as well as to notify other parts of our code base that an enemy was created:</p>
+<pre>public class CreateEnemyMessage : Message {}<br/><br/>public class EnemyCreatedMessage : Message {<br/><br/>  public readonly GameObject enemyObject;<br/>  public readonly string enemyName;<br/><br/>  public EnemyCreatedMessage(GameObject enemyObject, string enemyName) {<br/>    this.enemyObject = enemyObject;<br/>    this.enemyName = enemyName;<br/>  }<br/>}</pre>
+<p><kbd>CreateEnemyMessage</kbd> is the simplest form of message that contains no special data, while <kbd>EnemyCreatedMessage</kbd> will contain a reference to the enemy's <kbd>GameObject</kbd> as well as its name. Good practice for message objects is to make their member variables not only <kbd>public</kbd> but also <kbd>readonly</kbd>. This ensures that the data is easily accessible but cannot be changed after the object's construction. This safeguards the content of our messages against being altered, as they're passed between one listener and another.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Message sending</h1>
+                </header>
+            
+            <article>
+                
+<p>To send one of these message objects, we simply need to call either <kbd>QueueEvent()</kbd> or <kbd>TriggerEvent()</kbd> and pass it an instance of the message we wish to send. The following code demonstrates how we would broadcast a <kbd>CreateEnemyMessage</kbd> object when the spacebar is pressed:</p>
+<pre>public class EnemyCreatorComponent : MonoBehaviour {<br/>  void Update() {<br/>    if (Input.GetKeyDown(KeyCode.Space)) {<br/>      MessagingSystem.Instance.QueueMessage(new CreateEnemyMessage()); <br/>    }<br/>  }<br/>}</pre>
+<p>If we were to test this code right now, nothing would happen, because even though we are sending a message through the messaging system, there are no listeners for this message type. Let's cover how to register listeners with the messaging system.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Message registration</h1>
+                </header>
+            
+            <article>
+                
+<p>The following code contains a pair of simple classes that register with the messaging system, each requesting to have one of their methods called whenever certain types of messages have been broadcast from anywhere in our code base:</p>
+<pre><br/>public class EnemyManagerWithMessagesComponent : MonoBehaviour {<br/>  private List&lt;GameObject&gt; _enemies = new List&lt;GameObject&gt;();<br/>  [SerializeField] private GameObject _enemyPrefab;<br/><br/>  void Start() {<br/>    MessagingSystem.Instance.AttachListener(typeof(CreateEnemyMessage), <br/>                                            this.HandleCreateEnemy);<br/>  }<br/><br/>  bool HandleCreateEnemy(Message msg) {<br/>    CreateEnemyMessage castMsg = msg as CreateEnemyMessage;<br/>    string[] names = { "Tom", "Dick", "Harry" };<br/>    GameObject enemy = GameObject.Instantiate(_enemyPrefab, <br/>                       5.0f * Random.insideUnitSphere, <br/>                       Quaternion.identity);<br/>    string enemyName = names[Random.Range(0, names.Length)];<br/>    enemy.gameObject.name = enemyName;<br/>    _enemies.Add(enemy);<br/>    MessagingSystem.Instance.QueueMessage(new EnemyCreatedMessage(enemy, <br/>                                                                  enemyName));<br/>    return true;<br/>  }<br/>}<br/><br/>public class EnemyCreatedListenerComponent : MonoBehaviour {<br/>  void Start () {<br/>    MessagingSystem.Instance.AttachListener(typeof(EnemyCreatedMessage), <br/>                                            HandleEnemyCreated);<br/>  }<br/>  <br/>  bool HandleEnemyCreated(Message msg) {<br/>    EnemyCreatedMessage castMsg = msg as EnemyCreatedMessage;<br/>    Debug.Log(string.Format("A new enemy was created! {0}", <br/>                            castMsg.enemyName));<br/>    return true;<br/>  }<br/>}</pre>
+<p>During initialization, the <kbd>EnemyManagerWithMessagesComponent</kbd> class registers to receive messages of the <kbd>CreateEnemyMessage</kbd><span> </span><span>type</span><span>, and will process the message through its</span> <kbd>HandleCreateEnemy()</kbd><span> delegate. During this method, it can typecast the message into the appropriate derived message type and resolves the message in its own unique way. Other classes can register for the same message and resolve it differently through its own custom delegate method (assuming that an earlier listener didn't return</span> <kbd>true</kbd> <span>from its own delegate).</span></p>
+<p>We know what type of messages will be provided by the <kbd>msg</kbd> argument of the <kbd><span>HandleCreateEnemy</span>()</kbd> method, because we defined it during registration through the <kbd>AttachListener()</kbd> call. Due to this, we can be certain that our typecasting is safe, and we can save time by not having to do a <kbd>null</kbd> reference check although, technically, nothing is stopping us using the same delegate to handle multiple message types. In these cases, though, we will need to implement a way to determine which message object is being passed and treat it accordingly. However, the best approach is to define a unique method for each message type to keep things appropriately decoupled. There really is little benefit in trying to use one monolithic method to handle all message types.</p>
+<p>Note how the <kbd>HandleEnemyCreated()</kbd> method definition matches the function signature of <kbd>MessageHandlerDelegate</kbd> (that is, it has the same return type and argument list), and that it is being referenced in the <kbd>AttachListener()</kbd> call. This is how we tell the messaging system what method to call when the given message type is broadcast and how delegates ensure type-safety.</p>
+<p>If the function signature had a different return value or a different list of arguments, then it would be an invalid delegate for the <kbd>AttachListener()</kbd> method, and we would get compiler errors. Also, note that <kbd>HandleEnemyCreated()</kbd> is a <kbd>private</kbd> method, and yet our <kbd>MessagingSystem</kbd> class can call it. This is a useful feature of delegates in that we can allow only systems we give permission to call this message handler. Exposing the method publicly might lead to some confusion in our code's API, and developers may think that they're meant to call the method directly, which is not its intended use.</p>
+<p>The beautiful part is that we're free to give the delegate method whatever name we want. The most sensible approach is to name the method after the message that it handles. This makes it clear to anyone reading our code what the method is used for and what message object type must be sent to call it. This makes the future parsing and debugging of our code much more straightforward since we can follow the chain of events by the matching names of the messages and their handler delegates.</p>
+<p>During the <kbd>HandleCreateEnemy()</kbd> method, we also queue another event, which broadcasts <kbd>EnemyCreatedMessage</kbd> instead. The second class, <kbd>EnemyCreatedListenerComponent</kbd>, registers to receive these messages and then prints out a message containing that information. This is how we would implement a way for subsystems to notify other subsystems of changes. In a real application, we might register a UI system to listen for these types of messages and update a counter on the screen to show how many enemies are now active. In this case, the enemy management and UI systems are appropriately <em>decoupled</em> such that neither needs to know any specific information about how the other operates to do their assigned tasks.</p>
+<p>If we now add <kbd>EnemyManagerWithMessagesComponent</kbd>, <kbd>EnemyCreatorComponent</kbd>, and <kbd>EnemyCreatedListenerComponent</kbd> to our scene, and press the<span> s</span>pacebar several times, we should see log messages appear in the <span class="packt_screen">Console</span> window, informing us of a successful test:</p>
+<p class="CDPAlignCenter CDPAlign"><img src="assets/3d70bb31-226c-4f62-b217-b386d32cde0b.png" style="width:30.33em;height:15.08em;"/></p>
+<p>Note that a<span> </span><kbd>MessagingSystem</kbd><span> </span>singleton object will be created during scene initialization, when either the<span> </span><kbd>EnemyManagerWithMessagesComponent</kbd> or <kbd>EnemyCreatedListenerComponent</kbd> object's<span> </span><kbd>Start()</kbd><span> </span>methods are called (whichever happens first), since that is when they register their delegates with the messaging system, which accesses the <kbd>Instance</kbd> property, and hence creates the necessary <kbd>GameObject</kbd> instance containing the singleton component. No additional effort is required on our part to create the<span> </span><kbd>MessagingSystem</kbd><span> </span>object.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Message cleanup</h1>
+                </header>
+            
+            <article>
+                
+<p>Since message objects are classes, they will be created dynamically in memory and will be disposed of shortly afterward when the message has been processed and distributed among all listeners. However, as you will learn in <a href="">Chapter 8</a>, <em>Masterful Memory Management</em>, this will eventually result in garbage collection, as memory accumulates over time. If our application runs for long enough, it will eventually result in occasional garbage collection, which is the most common cause of unexpected and sudden CPU performance spikes in Unity applications. Therefore, it is wise to use the messaging system sparingly and avoid spamming messages too frequently on every update.</p>
+<p>The more important cleanup operation to consider is the deregistration of delegates if an object needs to be destroyed. If we don't handle this properly, then the messaging system will hang on to delegate references that prevent objects from being fully destroyed and freed from memory.</p>
+<p>Essentially, we will need to pair every <kbd>AttachListener()</kbd> call with an appropriate <kbd>DetachListener()</kbd> call when the object is destroyed or disabled or we otherwise decide that we no longer need it to be queried when messages are being sent.</p>
+<p>The following method definition in the <kbd>MessagingSystem</kbd> class will detach a listener for a specific event:</p>
+<pre>public bool DetachListener(System.Type type, MessageHandlerDelegate handler) {<br/>  if (type == null) {<br/>    Debug.Log("MessagingSystem: DetachListener failed due to having no " + <br/>              "message type specified");<br/>    return false;<br/>  }<br/><br/>  string msgType = type.Name;<br/><br/>  if (!_listenerDict.ContainsKey(type.Name)) {<br/>    return false;<br/>  }<br/><br/>  List&lt;MessageHandlerDelegate&gt; listenerList = _listenerDict[msgType];<br/>  if (!listenerList.Contains (handler)) {<br/>    return false;<br/>  }<br/>  listenerList.Remove(handler);<br/>  return true;<br/>}</pre>
+<p>Here is an example usage of the <kbd>DetachListener()</kbd> method added to our <kbd>EnemyManagerWithMessagesComponent</kbd> class:</p>
+<pre>void OnDestroy() {<br/>  if (MessagingSystem.IsAlive) {<br/>    MessagingSystem.Instance.DetachListener(typeof(EnemyCreatedMessage), <br/>                                            this.HandleCreateEnemy);<br/>  }<br/>}</pre>
+<p>Note how this definition makes use of the <kbd>IsAlive</kbd> property declared in the <kbd>SingletonComponent</kbd> class. This safeguards us against the aforementioned problem of accidentally creating a new <kbd>MessagingSystem</kbd> class during application shutdown since we can never guarantee that the singleton gets destroyed last.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Wrapping up the messaging system</h1>
+                </header>
+            
+            <article>
+                
+<p>Congratulations are in order, as we have finally built a fully functional global messaging system that any and all objects can interface with and use it to send messages between one another. A useful feature of this approach is that it is <kbd>Type</kbd>-agnostic, meaning that the message senders and listeners do not even need to derive from any particular class in order to interface with the messaging system; it just needs to be a class that provides a message type and a delegate function of the matching function signature, which makes it accessible to both ordinary classes and MonoBehaviours.</p>
+<p>As far as benchmarking the <kbd>MessagingSystem</kbd> class goes, we will find that it is capable of processing hundreds, if not thousands, of messages in a single frame with minimal CPU overhead (depending on the CPU, of course). The CPU usage is essentially the same, whether one message is being distributed to 100 different listeners or 100 messages are distributed to just one listener. E<span>ither way, i</span>t costs about the same.</p>
+<p>Even if we're predominantly sending messages during UI or gameplay events, this probably has far more power than we need. So, if it does seem to be causing performance problems, then it's far more likely to be caused by what the listener delegates are doing with the message than the messaging system's ability to process those messages.</p>
+<p>There are many ways to enhance the messaging system to provide more useful features we may need in the future, as follows:</p>
+<ul>
+<li>Allow message senders to suggest a delay (in time or frame count) before a message is delivered to its listeners.</li>
+<li>Allow message listeners to define a priority for how urgently it should receive messages compared to other listeners waiting for the same message type. This is a means for a listener to skip to the front of the queue if it was registered later than other listeners.</li>
+<li>Implement some safety checks to handle situations where a listener gets added to the list of message listeners for a particular message while a message of that type is still being processed. Currently, C# will throw <kbd>EnumerationException</kbd> at us since the delegate list will be changed by <kbd>AttachListener()</kbd>, while it is still being iterated through in <kbd>TriggerEvent()</kbd>.</li>
+</ul>
+<p>At this point, we've probably explored the messaging system enough, so these tasks will be left as an academic exercise for you to undertake if you become comfortable using this solution in your games. Let's continue to explore more ways to improve performance through script code.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Disabling unused scripts and objects</h1>
+                </header>
+            
+            <article>
+                
+<p>Scenes can get pretty busy sometimes, especially when we're building large, open worlds. The more objects there are invoking code in an <kbd>Update()</kbd> callback, the worse it will scale and the slower the game becomes. However, much of what is being processed may be completely unnecessary if it is outside of the player's view or simply too far away to matter. This may not be a possibility in large city-building simulation games, where the entire simulation must be processed at all times, but it is often possible in first-person and racing games since the player is wandering around a large expansive area, where non-visible objects can be temporarily disabled without having any noticeable effect on gameplay.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Disabling objects by visibility</h1>
+                </header>
+            
+            <article>
+                
+<p>Sometimes, we may want components or GameObjects to be disabled when they're not visible. Unity comes with built-in rendering features to avoid rendering objects that are not visible to the player's camera view (through a technique known as <strong>Frustum Culling</strong>, which is an automatic process) and to avoid rendering objects that are hidden behind other objects (<strong>Occlusion Culling</strong>, which will be discussed in <a href="">Chapter 6</a>, <em>Dynamic Graphics</em>), but these are only rendering optimizations. <span><span>Frustum and Occlusion Culling</span></span> do not affect components that perform tasks on the CPU, such as AI scripts, user interface, and gameplay logic. We must control their behavior ourselves.</p>
+<p>A good solution to this problem is using the <kbd>OnBecameVisible()</kbd> and <kbd>OnBecameInvisible()</kbd> callbacks. As the names imply, these callback methods are invoked when a renderable object has become visible or invisible with respect to any cameras in our <span>s</span>cene. Also, when there are multiple cameras in a <span>s</span>cene (for example, a local multiplayer game), the callbacks are only invoked if the object becomes visible to any one camera and becomes invisible to all cameras. This means that the aforementioned callbacks will be called at exactly the right times we expect; if nobody can see it, <kbd>OnBecameInvisible()</kbd> gets called, and if at least one player can see it, <kbd>OnBecameVisible()</kbd> gets called.</p>
+<p>Since the visibility callbacks must communicate with the rendering pipeline, <kbd>GameObject</kbd> must have a renderable component attached, such as <kbd>MeshRenderer</kbd> or <kbd>SkinnedMeshRenderer</kbd>. We must ensure that the components we want to receive the visibility callbacks from are also attached to the same <kbd>GameObject</kbd> instance as the renderable object and are not a parent or child <kbd>GameObject</kbd>; otherwise, they won't be invoked.</p>
+<div class="packt_tip">Note that Unity also counts the hidden camera of the <span class="packt_screen">Scene</span> window toward the <kbd>OnBecameVisible()</kbd> and <kbd>OnBecameInvisible()</kbd> callbacks. If we find that these methods are not being invoked properly during Playmode testing, ensure that you turn the <span><span class="packt_screen">Scene</span> </span><span>window c</span>amera away from everything or disable the <span class="packt_screen">Scene</span> <span>window </span>entirely.</div>
+<p>To enable/disable individual components with the visibility callbacks, we can add the following methods:</p>
+<pre>void OnBecameVisible() { enabled = true; }<br/>void OnBecameInvisible() { enabled = false; }</pre>
+<p>Also, to enable/disable the entire <kbd>GameObject</kbd> the component is attached to, we can implement the methods this way instead:</p>
+<pre>void OnBecameVisible() { gameObject.SetActive(true); }<br/>void OnBecameInvisible() { gameObject.SetActive(false); }</pre>
+<p>Although, be warned that disabling the <kbd>GameObject</kbd> containing the renderable object, or one of its parents, will make it impossible for <kbd>OnBecameVisible()</kbd> to be called since there's now no graphical representation for the camera to see and trigger the callback with. We should place the component on a child <kbd>GameObject</kbd>, and have the script disable that instead, leaving the renderable object always visible (or find another way to re-enable it later).</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Disabling objects by distance</h1>
+                </header>
+            
+            <article>
+                
+<p>In other situations, we may want components or GameObjects to be disabled after they are <span>far enough</span> away from the player such that they may be barely visible, but too far away to matter. A good candidate for this type of activity is roaming Non-Player Character creatures: we want to see them at a distance, but where we don't need them to process anything, and therefore they can sit idle until we get closer.</p>
+<p>The following code is a simple coroutine that periodically checks the total distance from a given target object and disables itself if it strays too far away from it:</p>
+<pre>[SerializeField] GameObject _target;<br/>[SerializeField] float _maxDistance;<br/>[SerializeField] int _coroutineFrameDelay;<br/><br/>void Start() {<br/>  StartCoroutine(DisableAtADistance());<br/>}<br/><br/>IEnumerator DisableAtADistance() {<br/>  while(true) {<br/>    float distSqrd = (transform.position - _target.transform.position).sqrMagnitude;<br/>    if (distSqrd &lt; _maxDistance * _maxDistance) {<br/>      enabled = true;<br/>    } else {<br/>      enabled = false;<br/>    }<br/><br/>    for (int i = 0; i &lt; _coroutineFrameDelay; ++i) {<br/>      yield return new WaitForEndOfFrame();<br/>    }<br/>  }<br/>}</pre>
+<p>We should assign the player's character object (or whatever object we want it to compare with) to the <kbd>_target</kbd> field in the <span class="packt_screen">Inspector</span> window, define the maximum distance in <kbd>_maxDistance</kbd>, and modify the frequency with which the coroutine is invoked using the <kbd>_coroutineFrameDelay</kbd> field. Anytime the object goes further than <kbd>_maxDistance</kbd> distance away from the object assigned to <kbd>_target</kbd>, it will be disabled. It will be re-enabled if it returns within that distance.</p>
+<p>A subtle performance-enhancing feature of this implementation is comparing against distance-squared instead of the raw distance. This leads us conveniently to our next section.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Using distance-squared over distance</h1>
+                </header>
+            
+            <article>
+                
+<p>It is safe to say that CPUs are relatively good at multiplying floating-point numbers together, but relatively dreadful at calculating square roots from them. Every time we ask <kbd>Vector3</kbd> to calculate a distance with the <kbd>magnitude</kbd> property or with the <kbd>Distance()</kbd> method, we're asking it to perform a square root calculation (as per Pythagorean theorem), which can cost a lot of CPU overhead compared to many other types of vector math calculations.</p>
+<p>However, the <kbd>Vector3</kbd> class also offers a <kbd>sqrMagnitude</kbd> property, which provides the same result as distance, only the value is squared. This means that if we also square the value we wish to compare distance against, then we can perform essentially the same comparison without the cost of an expensive square-root calculation.</p>
+<p>For example, consider the following code:</p>
+<pre>float distance = (transform.position – other.transform.position).Distance();<br/>if (distance &lt; targetDistance) {<br/>  // do stuff<br/>}</pre>
+<p>This can be replaced with the following and achieve a nearly identical result:</p>
+<pre>float distanceSqrd = (transform.position – other.transform.position).sqrMagnitude;<br/>if (distanceSqrd &lt; (targetDistance * targetDistance)) {<br/>  // do stuff<br/>}</pre>
+<p>The reason the result is nearly identical is because of the floating-point precision. We're likely to lose some of the precision that we would have had from using the square root values, since the value will be adjusted to an area with a different density of representable numbers; it could land exactly on, or closer to, a more accurate representable number, or, more likely, it will land on a number with less accuracy. As a result, the comparison is not exactly the same, but, in most cases, it is close enough to be unnoticeable, and the performance gain can be quite significant for each instruction we replace in this manner.</p>
+<p>If this minor precision loss is not important, then this performance trick should be considered. However, if precision is very important (such as running an accurate large-scale galactic space simulation), then you may want to give this tip a pass.</p>
+<p>Note that this technique can be used for any square-root calculations, not just for distance. This is simply the most common example you might come across, and it brings to light the important <kbd>sqrMagnitude</kbd> property of the <kbd>Vector3</kbd> class. This is a property that Unity Technologies intentionally exposed for us to make use of in this manner.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Minimizing deserialization behavior</h1>
+                </header>
+            
+            <article>
+                
+<p>Unity's serialization system is mainly used for scenes, Prefabs, ScriptableObjects, and various asset types (which tend to derive from ScriptableObject). When one of these object types is saved to disk, it is converted into a text file using the <strong>Yet Another Markup Language</strong> (<strong>YAML</strong>) format, which can be deserialized back into the original object type at a later time. All GameObjects and their properties get serialized when a Prefab or scene is serialized, including <kbd>private</kbd> and <kbd>protected</kbd> fields and all of their components, as well as child GameObjects and their components and so on.</p>
+<p>When our application is built, this serialized data is bundled together in large binary data files internally called serialized files in Unity. Reading and deserializing this data from disk at runtime is an incredibly slow process (relatively speaking) and so all deserialization activity comes with a significant performance cost.</p>
+<p>This kind of deserialization takes place anytime we call <kbd>Resources.Load()</kbd> for a file path found under a folder named <kbd>Resources</kbd>. Once the data has been loaded from disk into memory, then reloading the same reference later is much faster, but disk activity is always required the first time it is accessed. Naturally, the larger the dataset we need to deserialize, the longer this process takes. Since every component of a Prefab gets serialized, then the deeper the hierarchy is, the more data needs to be deserialized.</p>
+<p>This can be a problem for Prefabs with very deep hierarchies, Prefabs with many empty GameObjects <span>(since every <kbd>GameObject</kbd> always contains at least a <kbd>Transform</kbd> component), and particularly problematic for</span> <strong>User Interface</strong> (<strong>UI</strong>) Prefabs, since they tend to house many more components than a typical Prefab.</p>
+<p><span>Loading in large serialized datasets like these could cause a significant spike in CPU the first time they are loaded, which tends to increase loading time if they're needed immediately at the start of the scene. More importantly, they can cause frame drops if they are loaded at runtime. </span>There are a couple of approaches we can use to minimize the costs of deserialization.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Reducing serialized object size</h1>
+                </header>
+            
+            <article>
+                
+<p>We should aim to make our serialized objects as small as possible or partition them into smaller data pieces we combine together piece by piece so that they can be loaded one piece at a time over time. This can be tricky to manage for Prefabs since Unity does not inherently support nested Prefabs, and so we would be implementing such a system ourselves, which is a notoriously difficult problem to solve in Unity. UI Prefabs are good candidates for separating into smaller pieces since we don't normally need the entire UI at any given moment, and so we can usually afford to load them in one piece at a time.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Loading serialized objects asynchronously</h1>
+                </header>
+            
+            <article>
+                
+<p>Prefabs and other serialized content can be loaded in asynchronously via <kbd>Resources.LoadAsync()</kbd>, which will offload reading from disk onto a worker thread that eases the burden on the main thread. It will take some time for the serialized object to become available, which can be checked by calling the <kbd>isDone</kbd> property on the <kbd>ResourceRequest</kbd> object returned by the previous method call.</p>
+<p>This is not ideal for Prefabs we need immediately at the start of the game, but all future Prefabs are good candidates for asynchronous loading if we're willing to create systems that manage this behavior.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Keeping previously loaded serialized objects in memory</h1>
+                </header>
+            
+            <article>
+                
+<p>As previously mentioned, once a serialized object has been loaded into memory, then it remains there and can be copied if we need it again later, such as instantiating more copies of a Prefab. We can free this data later with explicit calls to <kbd>Resources.Unload()</kbd><span>, which will release the memory space to be reused later. But if we have a lot of surplus memory in the application's budget, then we could choose to keep this data in memory, which would reduce the need to reload it again from disk later. This naturally consumes a lot of memory with more and more serialized data, making it a risky strategy for memory management, and so we should only do this when necessary.</span></p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Moving common data into ScriptableObjects</h1>
+                </header>
+            
+            <article>
+                
+<p>If we have a lot of different Prefabs with components that contain a lot of properties that tend to share data, such as game design values such as hit points, strength, and speed, then all of this data will be serialized into every Prefab that uses them. A better approach is to serialize this common data in a <kbd>ScriptableObject</kbd>, which they load and use instead. This reduces the amount of data stored within the serialized file for the Prefab and could significantly reduce the loading time of our scenes by avoiding too much repetitive work.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Loading scenes additively and asynchronously</h1>
+                </header>
+            
+            <article>
+                
+<p>Scenes can be loaded either to replace the current scene or can be loaded additively to add its contents to the current scene without unloading the preceding one. This can be toggled via the <kbd>LoadSceneMode</kbd> argument of the <kbd>SceneManager.LoadScene()</kbd> family of functions. </p>
+<p>Another mode of scene loading is to complete it either synchronously or asynchronously, and there are good reasons to use both. Synchronous loading is the typical means of loading a scene by calling <kbd>SceneManager.LoadScene()</kbd>, where the main thread will block until the given scene completes loading. This normally results in poor user experience, as the game appears to freeze as the contents are loaded in (whether as a replacement or additively). This is best used if we want to get the player into the action as soon as possible, or we have no time to wait for scene objects to appear. This would normally be used if we're loading into the first level of the game or returning to the main menu.</p>
+<p>For future scene loading, however, we may wish to reduce the performance impact so that we can continue to keep the player in action. Loading a scene can take a lot of work, and the larger the scene, the longer it will take. However, the option of asynchronous additive loading offers a huge benefit: we can let the scene gradually load in the background without causing a significant impact on the user experience. This can be accomplished with <kbd>SceneManager.LoadSceneAsync()</kbd> combined with passing in <kbd>LoadSceneMode.Additive</kbd> for the loading mode argument.</p>
+<p>It's important to realize that scenes do not strictly follow the concept of a game level. In most games, players are normally trapped in one level at a time, but Unity can support multiple scenes being loaded simultaneously through additive loading, allowing each scene to represent a small chunk of a level. Ergo, we could initialize the first scene for the level (<em>Scene-1-1a</em>), and as the player nears the next section, asynchronously and additively load in the next (<em>Scene-1-1b</em>), and repeat this continuously as the player travels through the level.</p>
+<p>Exploiting this feature would require a system that either constantly checks the player's position in the level until they get close or uses trigger volumes to broadcast a message that the player is nearing the next section and begin asynchronous loading at the appropriate time. Another important consideration is that the scene's contents won't appear immediately since asynchronous loading effectively spreads the loading out over a handful of frames to cause as little visible impact as possible. We need to make sure that we trigger asynchronous scene loading with more than enough time to spare so that the player won't see objects popping into the game.</p>
+<p>Scenes can also be unloaded to clear them out of memory. This will save some memory or runtime performance in the form of removing any components making use of <kbd>Update()</kbd> that we no longer need. Again, this can be done both synchronously and asynchronously with <kbd>SceneManager.UnloadScene()</kbd> and <kbd>SceneManager.UnloadSceneAsync()</kbd>. This can be an enormous performance benefit because we're only using what we need due to the player's location in the level, but note that it is not possible to unload small chunks of a monolithic scene. If the original scene file was enormous, then unloading it would unload everything. The original scene would have to be broken up into smaller scenes and then loaded and unloaded as needed. Similarly, we should only begin to unload a scene if we're certain the player can no longer see its constituent objects; otherwise, they would witness objects disappearing out of nowhere. One last consideration is that scene unloading would trigger the destruction of many objects, which is likely to free up a lot of memory and trigger the garbage collector. The efficient use of memory is also important when making use of this tip.</p>
+<p>This approach would require a significant amount of scene redesign work, scriptwriting, testing, and debugging, which is not to be underestimated, but the benefits of improving user experience are exceptional. Having seamless transitions between areas in a game is a benefit that is often praised by players and critics because it doesn't take the player out of the action. If we use it appropriately, it can save a significant amount of runtime performance, improving the user experience further.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Creating a custom Update() layer</h1>
+                </header>
+            
+            <article>
+                
+<p>Earlier in this chapter, in the <em>Update, coroutines, and InvokeRepeating</em> <span>section</span>, we discussed the relative pros and cons of using these Unity Engine features as a means of avoiding excessive CPU workload during most of our frames. Regardless of which of these approaches we might adopt, there is an additional risk of having lots of MonoBehaviours written to periodically call some function, which is having too many methods triggering in the same frame simultaneously.</p>
+<p>Imagine thousands of MonoBehaviours that initialized together at the start of a scene, each starting a coroutine at the same time that will process their AI tasks every 500 milliseconds. It is highly likely that they would all trigger within the same frame, causing a huge spike in its CPU usage for a moment, which settles down temporarily and then spikes again a few moments later when the next round of AI processing is due. Ideally, we would want to spread these invocations out over time.</p>
+<p>The following are the possible solutions to this problem:</p>
+<ul>
+<li>Generating a random amount of time to wait each time the timer expires or a coroutine triggers</li>
+<li>Spreading out coroutine initialization so that only a handful of them are started at each frame</li>
+<li>Passing the responsibility of calling updates to some <kbd>God</kbd> class that places a limit on the number of invocations that occur each frame</li>
+</ul>
+<p>The first two options are appealing since they're relatively simple and we know that coroutines can potentially save us a lot of unnecessary overhead. However, as we discussed, there are many dangers and unexpected side effects associated with such drastic design changes.</p>
+<p>A potentially better approach to optimize updates is to not use<span> </span><kbd>Update()</kbd><span> </span>at all—or, more accurately, to use it <span>only </span>once. When Unity calls<span> </span><kbd>Update()</kbd>, and in fact, any of its callbacks, it crosses the aforementioned Native-Managed Bridge, which can be a costly task. In other words, the processing cost of executing 1,000 separate<span> </span><kbd>Update()</kbd><span> </span>callbacks will be more expensive than executing one<span> </span><kbd>Update()</kbd><span> </span>callback, which calls into 1,000 regular functions. As we witnessed in the <q>Remove empty callback definitions</q><span> section</span>, calling<span> </span><kbd>Update()</kbd><span> </span>thousands of times is not a trivial amount of work for the CPU to undertake, primarily because of the bridge. We can, therefore, minimize how often Unity needs to cross the bridge by having a <kbd>God</kbd> class <kbd>MonoBehaviour</kbd> use its own<span> </span><kbd>Update()</kbd><span> </span>callback to call our own custom update-style system used by our custom components.</p>
+<p>In fact, many Unity developers prefer implementing this design right from the start of their projects, as it gives them finer control over when and how updates propagate throughout the system; this can be used for things such as menu pausing, cool-time manipulation effects, or prioritizing important tasks and/or suspending low-priority tasks if we detect that we're about to reach our CPU budget for the current frame.</p>
+<p>All objects wanting to integrate with such a system must have a common entry point. We can achieve this through an <kbd>Interface</kbd> class with the <kbd>interface</kbd> keyword. An <kbd>Interface</kbd> is a code construct used to essentially set up a contract whereby any class that implements the <kbd>Interface</kbd> class must provide a specific series of methods. In other words, if we know the object implements an <kbd>Interface</kbd> class, then we can be certain about what methods are available. In C#, classes can only derive from a single base class, but they can implement any number of <kbd>Interface</kbd> classes (this avoids the <em>deadly diamond of death</em> problem that C++ programmers will be familiar with).</p>
+<p>The following <kbd>Interface</kbd> class definition will suffice, which only requires the implementing class to define a single method called<span> </span><kbd>OnUpdate()</kbd>:</p>
+<pre>public interface IUpdateable {<br/>  void OnUpdate(float dt);<br/>}</pre>
+<div class="packt_tip">It's common practice to start an <kbd>Interface</kbd> class definition with an uppercase "I" to make it clear that it is an <kbd>Interface</kbd> class we're dealing with. The beauty of <kbd>Interface</kbd> classes is that they improve the decoupling of our code base, allowing huge subsystems to be replaced, and as long as the <kbd>Interface</kbd> class is adhered to, we will have greater confidence that it will continue to function as intended.</div>
+<p>Next, we'll define a custom <kbd>MonoBehaviour</kbd> type that implements this <kbd>Interface</kbd> class:</p>
+<pre>public class UpdateableComponent : MonoBehaviour, IUpdateable {<br/>  public virtual void OnUpdate(float dt) {}<br/>}</pre>
+<p>Note that we're naming the method<span> </span><kbd>OnUpdate()</kbd><span> </span>rather than<span> </span><kbd>Update()</kbd>. We're defining a custom version of the same concept, but we want to avoid name collisions with the built-in<span> </span><kbd>Update()</kbd><span> </span>callback.</p>
+<p>The<span> </span><kbd>OnUpdate()</kbd><span> </span>method of the <kbd>UpdateableComponent</kbd> class retrieves the current delta time (<kbd>dt</kbd>), which spares us from a bunch of unnecessary<span> </span><kbd>Time.deltaTime</kbd><span> </span>calls, which are commonly used in<span> </span><kbd>Update()</kbd><span> </span>callbacks. We've also created the <span> </span><kbd>virtual</kbd> function to allow derived classes to customize it.</p>
+<p>This function will never be called as it's currently being written. Unity automatically grabs and invokes methods defined with the <kbd>Update()</kbd><span> name,</span><span> </span>but has no concept of our<span> </span><kbd>OnUpdate()</kbd><span> </span>function, so we will need to implement something that will call this method when the time is appropriate. For example, some kind of <kbd>GameLogic</kbd> <kbd>God</kbd> class could be used for this purpose.</p>
+<p>During the initialization of this component, we should do something to notify our <kbd>GameLogic</kbd> object of both its existence and its destruction so that it knows when to start and stop calling its<span> </span><kbd>OnUpdate()</kbd><span> </span>function.</p>
+<p>In the following example, we will assume that our <kbd>GameLogic</kbd> class is <kbd>SingletonComponent</kbd>, as defined earlier, in the <q>Singleton components</q> sectio<span>n</span>, and has appropriate <kbd>static</kbd> functions defined for registration and deregistration. Bear in mind that it could just as easily use the aforementioned <kbd>MessagingSystem</kbd> to notify <kbd>GameLogic</kbd> of its creation/destruction.</p>
+<p>For MonoBehaviours to hook into this system, the most appropriate place is within their <kbd>Start()</kbd> and <kbd>OnDestroy()</kbd> callbacks:</p>
+<pre>void Start() {<br/>  GameLogic.Instance.RegisterUpdateableObject(this);<br/>}<br/><br/>void OnDestroy() {<br/>  if (GameLogic.Instance.IsAlive) {<br/>    GameLogic.Instance.DeregisterUpdateableObject(this);<br/>  }<br/>}</pre>
+<p>It is best to use the<span> </span><kbd>Start()</kbd><span> </span>method for the task of registration, since using<span> </span><kbd>Start()</kbd><span> </span>means that we can be certain all other pre-existing components will have at least had their<span> </span><kbd>Awake()</kbd><span> </span>methods called prior to this moment. This way, any critical initialization work will have already been done on the object before we start invoking updates on it.</p>
+<p>Note that because we're using<span> </span><kbd>Start()</kbd><span> </span>in a <kbd>MonoBehaviour</kbd> base class, if we define a<span> </span><kbd>Start()</kbd><span> </span>method in a derived class, it will effectively override the base class definition, and Unity will grab the derived<span> </span><kbd>Start()</kbd><span> </span>method as a callback instead. It would, therefore, be wise to implement a virtual<span> </span><kbd>Initialize()</kbd><span> </span>method so that derived classes can override it to customize initialization behavior without interfering with the base class's task of notifying the <kbd>GameLogic</kbd> object of our component's existence.</p>
+<p>The following code provides an example of how we might implement a virtual <kbd>Initialize()</kbd> method:</p>
+<pre>void Start() {<br/>  GameLogic.Instance.RegisterUpdateableObject(this);<br/>  Initialize();<br/>}<br/><br/>protected virtual void Initialize() {<br/>  // derived classes should override this method for initialization code, and NOT reimplement Start()<br/>}</pre>
+<p>Finally, we will need to implement the <kbd>GameLogic</kbd> class. The implementation is effectively the same whether it is <kbd>SingletonComponent</kbd> or <kbd>MonoBehaviour</kbd>, and whether or not it uses <kbd>MessagingSystem</kbd>. Either way, our <kbd>UpdateableComponent</kbd> class must register and deregister as <kbd>IUpdateable</kbd> objects, and the <kbd>GameLogic</kbd> class must use its own<span> </span><kbd>Update()</kbd><span> </span>callback to iterate through every registered object and call their<span> </span><kbd>OnUpdate()</kbd><span> </span>function.</p>
+<p>Here is the definition for our <kbd>GameLogic</kbd> class:</p>
+<pre class="mce-root">public class GameLogicSingletonComponent : SingletonComponent&lt;GameLogicSingletonComponent&gt; {<br/>  public static GameLogicSingletonComponent Instance {<br/>    get { return ((GameLogicSingletonComponent)_Instance); }<br/>    set { _Instance = value; }<br/>  }<br/><br/>  List&lt;IUpdateable&gt; _updateableObjects = new List&lt;IUpdateable&gt;();<br/><br/>  public void RegisterUpdateableObject(IUpdateable obj) {<br/>    if (!_updateableObjects.Contains(obj)) {<br/>      _updateableObjects.Add(obj);<br/>    }<br/>  }<br/>        <br/>  public void DeregisterUpdateableObject(IUpdateable obj) {<br/>    if (_updateableObjects.Contains(obj)) {<br/>      _updateableObjects.Remove(obj);<br/>    }<br/>  } <br/><br/>  void Update()<br/>  {<br/>    float dt = Time.deltaTime;<br/>    for (int i = 0; i &lt; _updateableObjects.Count; ++i) {<br/>      _updateableObjects[i].OnUpdate(dt);<br/>    }<br/>  }<br/>}</pre>
+<p>If we make sure that all of our custom components inherit from the <kbd>UpdateableComponent</kbd> class, then we've effectively replaced <em>N</em> invocations of the<span> </span><kbd>Update()</kbd><span> </span>callback with just one<span> </span><kbd>Update()</kbd><span> </span>callback, plus <q>N</q> virtual function calls. This can save us a large amount of performance overhead because even though we're calling virtual functions (which cost a small overhead more than non-virtual function calls because they need to redirect the call to the correct place), we're still keeping the overwhelming majority of update behavior inside our managed code and avoiding the Native-Managed Bridge as much as possible. This class can even be expanded to provide priority systems, to skip low-priority tasks if it detects that the current frame has taken too long, and many other possibilities.</p>
+<p>Depending on how deep you already are into your current project, such changes can be incredibly daunting, time-consuming, and likely to introduce a lot of bugs as subsystems are updated to make use of a completely different set of dependencies. However, the benefits can outweigh the risks if time is on your side. It would be wise to do some testing on a group of objects in a scene that is similarly designed to your current scene files to verify that the benefits outweigh the costs.</p>
+
+
+            </article>
+
+            
+        </section>
+    
+
+        <section>
+
+                            <header>
+                    <h1 class="header-title">Summary</h1>
+                </header>
+            
+            <article>
+                
+<p>This chapter introduced you to many methods that will improve your scripting practices in the Unity Engine and to improve performance if (and only if) you have already proven some scripts are the cause of a performance problem. Some of these techniques demand some forethought and profiling investigation before being implemented since they often come with introducing additional risks or obfuscating our code base. Workflow is often just as important as performance and design, so before you make any performance changes to the code, you should consider whether or not you're sacrificing too much on the altar of performance optimization.</p>
+<p>We will investigate more advanced scripting improvement techniques later, in <a href="">Chapter 8</a>, <em>Masterful Memory Management</em>, but let's take a break from staring at code and explore some ways to improve graphics performance using a pair of built-in Unity features known as dynamic batching and static batching.</p>
+
+
+            </article>
+
+            
+        </section>
+    </body></html>

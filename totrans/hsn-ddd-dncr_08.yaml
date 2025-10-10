@@ -1,0 +1,1006 @@
+- en: Aggregate Persistence
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: We have spent enough time discussing how to ensure domain model consistency
+    with explicitly defined business rules. In this chapter, we will go further with
+    persisting our aggregates to the database. Since our model is not being designed
+    around any database, we might encounter issues when trying to get a complex object
+    graph to be stored by using a database engine. That's because the database does
+    not work with objects. Instead, relational databases are optimized to store data
+    in tables that might have relations that use primary and foreign keys. Document
+    databases store objects in machine-readable formats, like JSON, and are, by definition,
+    able to persist complex object graphs as-is; however, we shouldn't fool ourselves,
+    since there are still serious constraints about how these objects need to be organized
+    so that the database client library can convert our objects to JSON and back.
+    All these differences between having a domain object to persist on one side and
+    a database engine with all its quirks and tweaks on the other side, will create
+    challenges for developers.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In this chapter, we will cover the following topics:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The repository pattern
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Impedance mismatch
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Using a document database for persistence
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Using a relational database for persistence
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Technical requirements
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The code for this chapter can be found in the `Chapter08` folder of the book
+    repository on GitHub. There are three subfolders there. One is called `before`,
+    and the code there can be used to follow the course of this chapter as it goes
+    further with the persistence implementation. Two other folders, `ravendb` and
+    `ef-core`, contain the final code that implements the aggregate persistence using
+    the RavenDB document database and the Entity Framework Core and PostgreSQL.
+  prefs: []
+  type: TYPE_NORMAL
+- en: You will need to use `docker-compose` to run the infrastructure. This implies
+    that you need to have Docker installed, as well. Follow the Docker CE installation
+    guidelines at [https://docs.docker.com/install/](https://docs.docker.com/install/)
+    and the Docker Compose installation guidelines at [https://docs.docker.com/compose/install/](https://docs.docker.com/compose/install/).
+  prefs: []
+  type: TYPE_NORMAL
+- en: If you have not run Docker on your machine before, or if you did it a while
+    ago, you might need to log in using the `docker login` command. For that command,
+    you need to have an account on Docker Hub, which you can create for free at [https://hub.docker.com](https://hub.docker.com).
+  prefs: []
+  type: TYPE_NORMAL
+- en: Aggregate persistence
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Now that we have discussed in detail how complex object graphs with complex
+    business rules can be implemented using the **a****ggregate** pattern, we need
+    to look at how to enable persistence for the aggregates that we use in our system.
+    In the previous chapter, we briefly looked at the **repository** pattern that
+    allows us to abstract persistence from the domain. We also started implementing
+    an implementation of the persistence layer by using the RavenDB document database,
+    since it's easier to save complex objects as documents. However, we also learned
+    that we will most likely face impedance mismatch when trying to comply with the
+    requirements that a chosen persistence method might have for our objects, so that
+    we can both save them to the database and retrieve them back.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Repository and units of work
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'Let''s go back to the point where we used the repository pattern to persist
+    our aggregates. As you will remember, the purpose of the repository pattern is
+    to abstract aggregate persistence. That is exactly what we are going to do now.
+    We still have the repository interface, and it looks like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE0]'
+  prefs: []
+  type: TYPE_PRE
+- en: The repository pattern is one of the most debated patterns that exists, and
+    to understand why that is, we need to get back to the definition. For example,
+    this is how this pattern is defined in the *Patterns of Enterprise Application
+    Architecture* book by Martin Fowler (extract taken from [https://martinfowler.com/eaaCatalog/repository.html](https://martinfowler.com/eaaCatalog/repository.html)). 
+    It's recommended that you have a look at the definition given on that page.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The diagram that you can find on the web page that we mentioned earlier shows
+    that a client can ask a repository to retrieve a set of objects that satisfy certain
+    criteria. The client can also add and remove objects from the repository.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The debate about repositories generally involves the fact that in many cases,
+    developers also implement a repository as a unit of work. In addition, it is quite
+    common to see *generic repositories*, like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE1]'
+  prefs: []
+  type: TYPE_PRE
+- en: The `Query` method allows for sending a lambda expression to a typed repository,
+    and the generic repository implementation will then send the query to the underlying
+    ORM framework or document database API, without much thinking.
+  prefs: []
+  type: TYPE_NORMAL
+- en: This approach makes people think that repositories are just unnecessary abstractions
+    on top of ORM frameworks. Many argue that when developers send a free-form query
+    and leave it to the ORM framework to translate this query to an SQL statement,
+    it creates a sense of ignorance of the database technology for developers, and
+    it rarely ends well. We cannot just ignore the database and send any query to
+    it, because it can lead to performance issues, due to a lack of query optimization.
+    For some document databases, this approach might not even work, because the database
+    requires having a predefined index to execute queries. RavenDB can create automatic
+    indexes based on any query, but it is not recommended, for performance reasons.
+    For relational databases, using LINQ query translators via ORMs can lead to suboptimal
+    queries that can severely impact not only the application performance, but the
+    performance of the database server itself.
+  prefs: []
+  type: TYPE_NORMAL
+- en: At the same time, if we decide not to have repositories, we might end up dealing
+    with persistence when designing our domain model, and that should not be the case.
+    A domain model exists on its own, and it is designed to deal with business rules
+    and invariants, and not to deal with the database.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Eric Evans insists that querying repositories must happen by using predefined
+    specifications and not by sending any queries. These specifications need to use
+    the Ubiquitous Language to express the intent of a client to retrieve a set of
+    objects from the repository.
+  prefs: []
+  type: TYPE_NORMAL
+- en: For example, we must prefer using `IEnumerable<ClassifiedAd> GetAdsPendingReview()`
+    or `IEnumerable<ClassifiedAd> Query(Specifications.GetAdsPendingReview)` over
+    a generic call, like `IEnumerable<ClassifiedAd> Query(x => x.State == ClassifiedAdState.PendingReview)`.
+    One reason for it is to make queries more expressive and use the domain language.
+    Another reason is to let the repository decide how to execute that particular
+    query, since we have control over all queries that can be used by the client.
+    The last reason is that we put the query conditions inside the specification,
+    or inside the repository method, so we are free to change those rules if needed,
+    and those rules are only defined in one place.
+  prefs: []
+  type: TYPE_NORMAL
+- en: So, if we spend less time arguing about repositories and more time understanding
+    the original definitions, we'll see that executing queries using a specification
+    is not equal to shoving queries to ORMs, but involves executing specific queries
+    that are named following the Ubiquitous Language and are optimized to work with
+    the database that our application intends to use.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let''s see how we can change our repository to be closer to the original definition.
+    First, we need to get rid of the `Save` method, since it is the repository client
+    (our application service) that will control the unit of work and will have a final
+    say on whether changes need to be committed to the database. Then, we add at least
+    one query that we will need in the application service when we check if an object
+    already exists in the database:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE2]'
+  prefs: []
+  type: TYPE_PRE
+- en: With this interface, we have no ability for the repository implementation to
+    control transactions, and that will become the responsibility of our application
+    layer. We don't still want our application service to be directly coupled to the
+    persistence layer, following the ports and adapters architecture.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Implementation for RavenDB
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Now, let's start doing stuff with a real database; our first exercise will be
+    using the RavenDB document database. This database was created with the NHibernate
+    API in mind, but without the burden of object-relational mapping. It stores objects
+    as JSON documents, supports transactions, and can handle queries on stored documents
+    using quite complex filters. RavenDB is a commercial product, but it has a free
+    license option, which is perfectly suitable to build a small application and put
+    it into production.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The choice of RavenDB for this book may not be obvious for some readers. Apparently,
+    MongoDB would be a better choice in terms of popularity. Also, Azure Cosmos DB
+    has the Mongo API and it makes the MongoDB driver more attractive to use in the
+    sample app. At the same time, RavenDB has quite a lot of traction in the .NET
+    community, and it also has a best-in-class web user interface that will be really
+    helpful for seeing what is going on in the database as we move along with this
+    chapter.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The choice of a document database is based on the fact that a document database
+    has much less impedance mismatch as compared with relational databases, since
+    document databases manipulate with objects, unlike relational databases, which
+    deal with tables and relations.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We will start by implementing the repository interface with RavenDB persistence,
+    in order to save and load individual aggregates.
+  prefs: []
+  type: TYPE_NORMAL
+- en: To make things a bit more explicit, we can move the infrastructural parts, like
+    database-specific classes, to a new folder in the `Marketplace` project, called
+    `Infrastructure`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Since we have already implemented our repository for RavenDB, we can start
+    there. But now, we want to remove the `Save` method, because we want to remove
+    the commit responsibility to the unit of work. Also, we can now move this file
+    to the new `Infrastructure` folder. To implement the new repository interface,
+    we need to make minor changes, so our code will look like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE3]'
+  prefs: []
+  type: TYPE_PRE
+- en: Here, we removed the `Save` method, and we now have the `Add` method that will
+    only be used when we add new aggregates to the database. RavenDB uses the *session*
+    not only to control the connection to the database, but also to track changes
+    for objects that were added to the session by either calling the `Store` or `StoreAsync`
+    methods for new objects or by loading existing objects from the database using
+    the session. So, as soon as we use the `Load` or `Add` methods of our repository,
+    the underlying session will track all changes that happen in these objects. In
+    fact, the session itself represents the unit of work, since all changes that happened
+    for all objects that are attached to the session will be committed to the database
+    when we tell the session to commit changes as one transaction.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The ability to track and commit changes as a transaction is not an exclusive
+    property of the RavenDB client library. For relational databases, **Entity Framework**
+    (**EF**) and NHibernate allow for using the same technique. In particular, NHibernate
+    also has an `ISession` interface with exactly the same abilities, since the RavenDB
+    API was originally designed to resemble the NHibernate API quite closely. Also,
+    the Marten ([http://jasperfx.github.io/marten/](http://jasperfx.github.io/marten/))
+    open source library that uses the native ability of PostgreSQL to work with document-like
+    structures in JSONB fields has an implementation of a session that tracks changes
+    in connected objects.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'To complete the abstraction, we need to have an interface for the unit of work.
+    We can start with something like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE4]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The implementation of this interface will be quite trivial, since we are using
+    the power of the RavenDB session to track changes in objects:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE5]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'In order to make it work with our application service, we need to make sure
+    that the service gets both the repository and the unit of work interfaces in its
+    constructor as parameters. The new code for `ClassifiedAdAplicationService` looks
+    like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE6]'
+  prefs: []
+  type: TYPE_PRE
+- en: You can see that our application service gets three dependencies, instead of
+    the two that it had before. We added the unit of work interface so that the service
+    can decide when to commit changes to the database. It creates the challenge of
+    rewriting our application startup code, so we add the missing dependency. One
+    more issue awaits us there, because our unit of work commits using the document
+    session that it gets as a dependency to itself. The repository also depends on
+    the document session. You might remember that the document session tracks all
+    changes in objects that are loaded or explicitly added to the session; that is
+    what the repository does. But we do the commit in our unit of work, and it means
+    that the repository and the unit of work that is used in the same instance of
+    the application service must have *the same* document session.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'That part is quite tricky if we decide to instantiate the dependency graph
+    ourselves. For our application, we will use the ASP.NET ([https://www.asp.net/](https://www.asp.net/))
+    Core service collection to define dependencies. The service collection also works
+    as a **dependency injection** container, so if we configure it properly, we get
+    the dependencies right. The following startup code serves the purpose:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE7]'
+  prefs: []
+  type: TYPE_PRE
+- en: This code is for the `Startup.cs` file in the `Marketplace` project. There,
+    we register the document session using a factory delegate, `RavenDbUnitOfWork`,
+    and `ClassifiedAdRepository` as scoped dependencies. Our application service is
+    also registered as a scoped service. When we register any dependency as *scoped*,
+    its lifetime will be limited by the lifetime of a single HTTP request. For our
+    code, it means that only one document session will be instantiated for the request,
+    and it will be used as a dependency for all other objects that are instantiated
+    to handle the request. As a result, we will get one application service instance,
+    one repository, and one unit of work. The last two will also get the same instance
+    of the document session, and this is exactly what we want.
+  prefs: []
+  type: TYPE_NORMAL
+- en: As a side note, I have to make it clear that the moment we encounter a strong
+    need to have a dependency injection container to manage our dependencies and we
+    cannot configure our dependencies manually, we need to notice that something is
+    not going well with our code. In such a case, we need to reconsider the dependencies
+    graph and try to simplify it so that we have less of a need, or no need, to use
+    a container. In this particular case, we have no control over how ASP.NET Core
+    instantiates the controller that it calls to handle HTTP requests. Therefore,
+    we are forced to use the container. However, we will try to make the list of dependencies
+    smaller to avoid injection hell and take back control of the request handling
+    scope.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In the code for this chapter, you can also see that we have one helper method
+    in the `ClassifiedAdCommandsApi` class, to handle HTTP requests by sending them
+    to the application service and wrapping any exceptions that it might throw. We
+    could have just used the developer error page provided by the web API; however,
+    it contains a lot of HTML, and we are using Swagger, which won''t render it and
+    show the HTML source instead. It makes diagnostics harder, because we''d need
+    to dig into a bunch of HTML tags to find the exception information and the stack
+    trace. The method that is added is as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE8]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Since we use the generic type argument here, we can send any request to this
+    method, along with the application service `Handle` method as a delegate to handle
+    the request. For example, the `Post` method in our controller now looks like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE9]'
+  prefs: []
+  type: TYPE_PRE
+- en: You probably noticed that the `HandleRequest` method uses logging, as well.
+    In this book, we use the `Serilog` open source logging library, which was the
+    first library that provided structured logging to the .NET space and quickly became
+    the most popular logging library for the .NET space.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Our initial stage of preparing to save our aggregate to RavenDB is complete.
+    For the next step, we need to get RavenDB running, and the easiest way to do it
+    is to use Docker Compose with the configuration file that is provided in the book
+    repository for this chapter. The `docker-compose.yml` file contains instructions
+    for Docker Compose to start two containers—one is RavenDB, and another one is
+    PostgreSQL, which we will use later in this chapter, when we explore using relational
+    databases to persist aggregates.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'You should be able to run the `docker-compose up` command from the chapter
+    folder in the Terminal window, and you will see something like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![](img/3f931305-f508-4a91-aa7e-761481004004.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: The Terminal output of the docker-compose command
+  prefs: []
+  type: TYPE_NORMAL
+- en: If you have any issues when executing the command, please check the *Technical
+    requirements* section for this chapter.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Remember that you can stop your `docker-compose` session by pressing *Ctrl *+
+    *C* in the Terminal window where it runs, and in that case, the containers will
+    be stopped. All data inside the containers will be kept, so when you use `docker-compose
+    up` next time, you will see your databases again. If you use `docker-compose down`,
+    the containers will be removed, and when you start them again, you will need to
+    create the databases again. If you want to keep the data no matter what, consider
+    specifying volumes in the `docker-compose.yml` file.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'When you have RavenDB up and running for the first time, or any time the container
+    gets recreated, you need to visit the database web UI by going to `http://localhost:8080`
+    and accepting the license agreement. RavenDB is free to use for development and
+    in small-scale production systems. When you accept the agreement, you will be
+    redirected to the RavenDB Studio page:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![](img/7fa93254-2121-4311-93dc-1fe340c7aa65.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: RavenDB user interface
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Before we can save anything to RavenDB, we need to create a database. For this
+    chapter, the database name in the sample application code is hardcoded to `Marketplace_Chapter8`.
+    To create a new database, you can use the CREATE DATABASE button on the RavenDB
+    Studio home page:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![](img/09e6b198-25aa-426d-b387-5f9f57275f9c.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: This button lets you create a new database
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'When you click on this button, you will get a popup where you can enter the
+    database name and click on Create:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![](img/4b2af2ef-cc81-4973-b99a-249c8314fe00.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: New database creation screen
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Now, we can start our sample application. After the application starts, it
+    produces output similar to this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE10]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'By default, any ASP.NET Core application would start listening on `http://localhost:5000`.
+    There is no user interface in our app, but we have the Swagger UI to send requests
+    to the API added to the application configuration. Therefore, if you visit the
+    `http://localhost:5000/swagger/index.html` page, you will see all the API endpoints
+    that we have created so far:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![](img/61c9dd34-d8d8-402a-bbf4-e7a7b28b7a8d.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: Command API of the Swagger UI
+  prefs: []
+  type: TYPE_NORMAL
+- en: Finally, we get very close to send commands to our application and see how it
+    will work. First things first; before doing any updates, we need to create our
+    first aggregate. So, we can click on the POST and then the Try it out button.
+    We will get two fields to fill out with new GUIDs, which can easily be generated
+    by an online GUID generator, or a similar tool that is available in JetBrains
+    Rider or Visual Studio.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'After entering two newly generated GUIDs into the parameter fields for a new
+    `POST` request, you can press the Execute button, and after a short while, you
+    will get a response:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![](img/f38ffdbd-921f-49d7-9147-ce1310d63733.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: An exception is thrown when we try executing the command
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'But wait; we have an error! Let''s look at what the error message tells us
+    about what happened:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE11]'
+  prefs: []
+  type: TYPE_PRE
+- en: Here, we have our first example of impedance mismatch. We have been modeling
+    our domain classes without considering persistence and we have based all decisions
+    on the structure of our classes only on the requirements for the domain. As soon
+    as we started working with a database, although this database is document-based,
+    and in theory, should persist any object we give it, the reality is a bit different.
+    Now, we are forced to start adapting our domain classes in a way that they can
+    be persisted. That is quite unfortunate, because ideally, we should keep our domain
+    model implementation clean of any persistence concerns.
+  prefs: []
+  type: TYPE_NORMAL
+- en: But, let's look at what we can do now. RavenDB requires any document that is
+    being saved there to have an identity property or field of the type string. We
+    are using the `ClassifiedAdId` value object type for the identity property. We
+    explicitly tell RavenDB the object identity in our repository `Add` method, so
+    it doesn't use the `Id` property for that. However, it failed to write the string
+    value back to the `Id` field, because it is not the string. This can only be fixed
+    by adding a new property or field with the type string to our aggregate class.
+    RavenDB uses the name `Id` for the identity property, but we can configure conventions
+    so that the database client API will use something else, instead.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We can start fixing the issue by adding a new `private` field to the `ClassifiedAd`
+    class:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE12]'
+  prefs: []
+  type: TYPE_PRE
+- en: It might seem weird that we don't use the property setter, but the database
+    will read the `Id` property as an object, and we will get the value back. So,
+    we can safely use the `Id` property for the `get` part, and `set` will only be
+    used to keep the database happy.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We also need to explain to the database API that it needs to use this new property
+    as the document identity. It is done by using conventions when we create the `DocumentStore`
+    instance in `Startup.cs`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE13]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Now, let''s start the application again and repeat the call from Swagger. We
+    can use the same values, so if you kept the browser window open while changing
+    the code, you can just execute the same request that previously generated an error.
+    Now, the response is different:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![](img/84c0bd6e-2209-4960-ace7-a7fa5e9e2ae8.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: Getting 200 OK means everything worked
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'To confirm that our persistence code worked, we need to turn to the RavenDB
+    Studio again, and if we open the database there, we will have one document that
+    represents the state of the new aggregate:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![](img/d1b43618-6612-4e89-8da7-eafdf4ae3aac.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: The document is successfully stored
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'For the next step, we can execute one of the commands that perform state changes
+    on an existing aggregate. To start, we can set the ad title by calling the `/ad/name/`
+    API endpoint with `PUT`. We need to use the same aggregate ID that we used for
+    the `POST` call, since that''s the only object we currently have in the system.
+    In the following screenshot, you can see when the action has already been executed
+    and the API has returned a `200 OK` status:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![](img/79986107-368e-4676-9272-d11f3fe32de0.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: Successful execution of the update command
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let''s check what happened with the document in RavenDB. If the document was
+    still open in the Studio, you will see a small popup saying, This document has
+    been modified outside of the studio. Click here to refresh. You can go on and
+    click on the link so that the document gets refreshed and the new version shows
+    up. Now, we can see that the document content has changed and the `Title` property
+    has a proper value (further, I will only use the document content as JSON):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE14]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Now, let''s try to call other endpoints. You can even try calling the same
+    endpoint again, so that it tries to set the title to some other value. Surprisingly,
+    this won''t work. We can see the following error message:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE15]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'This message is not very informative, but what RavenDB is trying to tell us
+    is that we have a serialization issue. Let''s look at what the inner exception
+    could tell us. The message here is as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE16]'
+  prefs: []
+  type: TYPE_PRE
+- en: The issue here is that since we are only allowing our value objects to be created
+    using factory methods in order to prevent the creation of value objects with invalid
+    content. When we bypass the validation the serializer will not use it unless we
+    put an `[JsonConstructor]` attribute on it. We definitely don't want to do that,
+    because by doing so, our domain model will take a dependency on the `Newtonsoft.Json`
+    library, which is a purely infrastructural concern. The only way to avoid this
+    without compromising the purity of our domain project is to create a parameterless
+    private constructor. It will allow us to keep the encapsulation and satisfy the
+    serializer at the same time. This is yet another issue with a mismatch between
+    the persistence layer and the domain layer.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let''s solve the issue by adding this line of code to the `ClassifiedAdTitle`
+    class:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE17]'
+  prefs: []
+  type: TYPE_PRE
+- en: Similar lines need to be added to all value object types, except for the identity
+    types, because they already have public constructors with one parameter of `Guid`,
+    and the serializer is happy to use it. After all these changes are done, all of
+    the HTTP endpoints will start to work.
+  prefs: []
+  type: TYPE_NORMAL
+- en: So, we can now conclude that the small changes that we made to overcome the
+    impedance mismatch worked fine. You may have already noticed that all properties
+    that have value object types are stored as a JSON object. This is a nice feature
+    of any document database that can store and retrieve complex object graphs as
+    one document.
+  prefs: []
+  type: TYPE_NORMAL
+- en: It is possible to take a similar approach to implementing the persistence by
+    using other types of document storage that support sessions and change tracking
+    within a session. I already mentioned Marten earlier in this chapter. However,
+    for other document databases, like MongoDB or Cosmos DB, you would need to step
+    away from collection-style repositories and start committing updates from inside
+    the repository, instead of using the unit of work. Such an approach might look
+    as *not-by-the-book*, and because of that, developers sometimes feel guilty when
+    implementing it. However, if we remember that an aggregate must be seen as a transactional
+    boundary, there is no chance that you would need to update multiple objects within
+    one transaction. If this rule is violated, then you might have a bigger issue
+    than just having a `Save` method in your repository interface. But, when we only
+    operate on one aggregate in the application service, the whole story with a separate
+    unit of work starts to feel redundant. When our application services conform to
+    the pattern of *load-act-save*, there might not be a practical reason to separate
+    repositories from the unit of work. The application service will still be in charge
+    of committing changes, but it can do it by calling the `_repository.Save()`, just
+    as it calls `_unitOfWork.Commit()` in our code. We will look more closely at the
+    repository pattern and its usefulness when we start discussing event-based persistence,
+    in [Chapter 10](75bc64ae-a642-42b2-a44a-05ae0cb2b750.xhtml), *Event Sourcing*.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Implementation of Entity Framework Core
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Although nowadays, developers have a wide choice of databases, in many cases,
+    a relational database is still preferred. The reasons for this can be different,
+    but the most popular ones include that some RDBMS databases, like Oracle or Microsoft
+    SQL Server, are already used in the organization, and there are people available
+    who can maintain it, or the development team itself has vast experience in working
+    with relational databases. Of course, it often creates issues, due to the risk
+    for domain models to quickly become data models, and the whole application would
+    be built around the persistence.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Relational databases are also notorious for having a significant impedance mismatch.
+    Although developers often tend to think that classes can be perfectly stored in
+    tables, and relations between classes can be represented as foreign keys, that's
+    not the whole picture. We will see this very soon, after the first iteration of
+    the persistence implementation for our single aggregate is complete.
+  prefs: []
+  type: TYPE_NORMAL
+- en: To overcome the impedance mismatch and make the persistence for relational databases
+    more transparent for developers that work with objects, our industry invented
+    a solution. Most of us are familiar with the **object-relational mappers** (**ORM**)
+    that promise to transparently put objects into the database and retrieve them
+    back. In the .NET space, in particular, we have two major ORM frameworks that
+    are widely used. These frameworks are NHibernate and Entity Framework. NHibernate
+    has a long history, and it was started as a clone of a popular Java ORM framework
+    (Hibernate). For several years, NHibernate was the only ORM tool for the .NET
+    space. Then, after a failed attempt from Microsoft to enter the ORM space with
+    LINQ2SQL, the Entity Framework was born. Criticized by many for being slow, rigid,
+    and not well designed, it nevertheless quickly became the tool of choice for many
+    .NET developers, for the single reason that it was backed by Microsoft. Entity
+    Framework also delivered the first visual designer tool that allowed for creating 
+    class models mapped to the persistence layer by drag and drop. After a few years
+    of continuous improvement of the framework, Entity Framework gained a lot of adoption,
+    and at some point, many considered NHibernate as dead. However, during the last
+    couple of years, the NHibernate community has released version 4 with async/await
+    support, and then version 5, with .NET Core support. The Entity Framework team
+    has decided to step back and rethink the design, coming back with Entity Framework
+    Core. This version is now being actively developed, and it is also included in
+    the umbrella `Microsoft.AspNet.Core` NuGet package group, so it is directly available
+    for all .NET Core applications.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Thanks to many members of the community that have an influence at Microsoft,
+    like Julie Lerman, who dove deeply into DDD and its principles, and then provides
+    a lot of valuable input for the Entity Framework team to improve their product
+    in terms of mitigating the impedance mismatch, and support concepts like immutable
+    value objects, out of the box. Therefore, I decided to include an example of how
+    this framework can be used as a domain model persistence for relational databases,
+    although this book is more oriented toward Event Sourcing.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The code for this part is available in the book's GitHub repository, in the
+    folder `Chapter08/ef-core`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We will be using the PostgreSQL database for this example, but the code can
+    easily be converted for Microsoft SQL Server, since we won't be using any features
+    that are specific to PostgreSQL. The `docker-compose.yml` file in the `ef-core`
+    folder for this chapter will help you to start the database inside a container,
+    just like we did with RavenDB. The initialization script will automatically be
+    executed when the container is created. The script takes care of creating a database
+    user and a new database called `Marketplace_Chapter8`, so you don't need to do
+    anything before starting the application.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Now, let's see what we need to do to use a relational database to persist our
+    aggregate. Since we already have the reference to the `Microsoft.AspNetCore.App`
+    set of packages in our project, the Entity Framework Core itself is available
+    to use straight away. We need to add a PostgreSQL driver package, called `Npgsql.EntityFrameworkCore.PostgreSQL`,
+    to our project.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We need to tell the framework that it needs to map our `ClassifiedAd` class
+    to the database. To do that, we need to create a new class, `ClassifiedAdDbContext`,
+    in the `Infrastructure` folder of our `Marketplace` project. We will use the code-first
+    approach and let the framework decide how the table will look and how to map the
+    class `ClassifiedAd` properties to the table columns. Here is the first version
+    of the class:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE18]'
+  prefs: []
+  type: TYPE_PRE
+- en: We don't do a lot here. By adding a property with the type `DbSet<ClassifiedAd>`,
+    we tell the framework that it needs to map that class. Then, we also explain that
+    the property `ClassifiedAd.ClassifiedAdId` should be used as the primary key.
+    We didn't have this property before, but we already used something similar in
+    the previous section for RavenDB, since the database needs to know what value
+    is used as the entity identity, and it cannot be a value object.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Therefore, we also need to add this property to our aggregate. We want to encapsulate
+    as much as we can, but since we need to have access to the property from the infrastructure
+    configuration, we are forced to make it public, at least for getting its value.
+    Unlike with RavenDB, we cannot specify the property by its name.
+  prefs: []
+  type: TYPE_NORMAL
+- en: One more thing that we do in our `DbContext` implementation is tell Entity Framework
+    Core to do logging, and also, to log sensitive data. It will be useful for debugging
+    purposes, as it allows us to see what Entity Framework Core does behind the scenes,
+    including all SQL statements and parameters. Remember that you should not use
+    `EnableSensitiveDataLogging` in production, since it exposes all data, and it
+    might result in some sensitive data becoming exposed via log files or the logging
+    server.
+  prefs: []
+  type: TYPE_NORMAL
+- en: There is one more class in the preceding code that implements an extension for
+    the `IApplicationBuilder`. We will use this extension to create or migrate the
+    necessary tables. This approach also isn't good for production, since you will
+    probably want to do the migration separately.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'So, we need to make the following changes in our aggregate class:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE19]'
+  prefs: []
+  type: TYPE_PRE
+- en: This would count as our first chance to address the impedance mismatch and to
+    add one property, just to satisfy the persistence. For RavenDB, that was all we
+    needed to do to get things rolling. Let's see if that's enough for EF Core.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'As the next step, we need to have a new implementation of the unit of work.
+    We will add a new class `EfUnitOfWork` to the `Infrastructure` namespace:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE20]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Then, we will make the necessary changes in the repository class, `ClassifiedAdRepository`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE21]'
+  prefs: []
+  type: TYPE_PRE
+- en: As you can see, we are relying on `DbContext` to be instantiated per scope.
+    In fact, `DbContext` is the Entity Framework implementation of the unit of work
+    pattern, because it tracks all changes in objects that are attached to it during
+    its lifetime and creates all necessary SQL statements to commit those changes
+    to the database when we call `_dbContext.SaveChangesAsync()`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The last part is the wiring. We need to change the `Startup.cs` file to tell
+    the ASP.NET Core to use our context and register the database context in its IoC
+    container. Certainly, we also need to register the new implementation of the unit
+    of work. We do all of this in the `ConfigureServices` method, as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE22]'
+  prefs: []
+  type: TYPE_PRE
+- en: Here, we also instructed Entity Framework Core to use PostgreSQL as the database
+    and to use the hardcoded connection string. Remember that you should avoid hardcoding
+    connection strings, as they must be part of the configuration. We use the simplified
+    approach to have the connection string visible.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The last thing we need to do before starting the app is call our extension
+    method to create or migrate the database objects. We do it in the `Configure`
+    method of the `Startup` class:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE23]'
+  prefs: []
+  type: TYPE_PRE
+- en: The changes that we have made more or less represent all the changes that we
+    needed to do to use RavenDB for persistence. Ideally, everything should work now.
+    Let's start the application and see what happens.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'After pressing *F5*, we will see that the application doesn''t start. Instead,
+    it throws an exception immediately:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The entity type `ClassifiedAdId` requires a primary key to be defined.
+  prefs: []
+  type: TYPE_NORMAL
+- en: That sounds weird, because `ClassifiedAdId` is not an entity. Here comes trouble.
+    Entity Framework Core considers all object-to-object relations to be relationships
+    between different entities. It wants to create a separate table to store the `ClassifiedAdId`
+    object in it, but as an entity, it must have an identifier. Just about a couple
+    of years ago, we'd be stuck right here, and the only way to overcome this limitation
+    would be to use the **memento** pattern. The essence of this pattern is to be
+    able to persist the object state and to be able to restore it later. Sometimes,
+    it is referred to as **undo rollback**, but that is just a narrow use case for
+    this pattern. Essentially, every object persistence method uses some implementation
+    of the memento pattern.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In order to implement memento, we need to have a way to convert our complex
+    object to something that can be persisted, like a text file, relational table,
+    or JSON object. Upon any save operation, we''d need to manually convert the state
+    of our aggregate to the memento, and when we retrieved the state back, a reverse
+    operation would be required. However, today, we can solve this issue by telling
+    Entity Framework Core that we are, in fact, dealing with value objects, and not
+    work entities. In fact, the EF Core has implemented all of the pieces of the pattern
+    for us. To use this feature, we need to add more code to the `ClassifiedAdEntityTypeConfiguration`
+    class:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE24]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The `OwnsOne` method tells EF Core that it needs to persist the given property
+    not as a separate entity in a separate table, but as a part of the same table.
+    Since EF Core would only save the content of public properties, we need to expose
+    the properties of our value objects for the `get` part. We still want encapsulation,
+    so the setter remains private. This is what we need to add to the `PictureSize`
+    value object code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE25]'
+  prefs: []
+  type: TYPE_PRE
+- en: EF Core also requires all objects that it persists to have either a constructor
+    that accepts values for all properties, or a parameterless constructor. We use
+    the second option, but we make the constructor internal, so no one can use it
+    from outside of the `Domain` project.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Now, we also know that EF Core wants to know more about how to map objects
+    to tables; it has also become clear that we need to map the `Picture` entity,
+    as well. There, we want to keep objects persisted in a separate table. To do that,
+    we need to add a new class `PictureEntityTypeConfiguration`. It can be added to
+    the same `ClassifiedAdDbContext.cs` file:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE26]'
+  prefs: []
+  type: TYPE_PRE
+- en: Notice that we need to do the same trick with the picture ID that we did with
+    the classified ad ID. I am not putting the code changes in the text for the sake
+    of brevity, since all of the code can be found in the book repository for this
+    chapter.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The `ClassifiedAdDbContext.OnModelCreating` now needs to include this additional
+    mapping configuration, as well:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE27]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Now let''s run the application again. This time, it start just fine; at first
+    glance, all mappings seem to be correct. If we also look at the database (use
+    the tool of your choice, like Database Explorer in Visual Studio or the Database
+    tool window in Rider) we will see that two tables were created:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![](img/9c00a144-0f67-4acf-8171-5f6a990e8daa.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: The database structure in the Visual Studio database explorer
+  prefs: []
+  type: TYPE_NORMAL
+- en: As you can see, there are two tables for each entity type. Since the `Picture`
+    entity is a part of the `ClassifiedAd` aggregate, we use the object-to-object
+    relationship, and it was mapped as a foreign key in the database. For each value
+    object, EF Core has created a set of columns to store all properties of each value
+    object in the same table as the parent entity. So far, so good; now, we can try
+    calling our API. You'd need two GUIDs to be filled out in Swagger, and after clicking
+    on Execute, we will have quite a long wait. That's because EF Core initialization
+    is implicit, and it is being called when we try to do anything with `DbContext`
+    for the first time. Subsequent calls are processed faster, since the initialized
+    model will be cached.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let''s look at what we got back from the HTTP call. This is not really surprising,
+    it is an exception again. We are getting all the issues associated with the impedance
+    mismatch, one by one! The new error message is as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE28]'
+  prefs: []
+  type: TYPE_PRE
+- en: This time, the error message is not really clear. In reality, what EF Core is
+    telling us now is that it cannot handle value object properties of the `ClassifiedAd`
+    object that are null. When we apply the `ClassifiedAdCreated` event in the `When`
+    method, we only assign values to the properties that we have—the ID, and the owner
+    ID.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'There are a few ways to work around this limitation, and the most prominent
+    one is to use instances of value objects that represent *no value*. In fact, this
+    method also allows us to mitigate the risk of getting the null reference exception.
+    We already touched upon the issue of null earlier in this book. Having specific
+    *no value* instances for all our value objects would be similar to using the optional
+    types that are commonly used in functional languages. In the following, you can
+    see the code to implement such a value for the `ClassifiedAdTitle` class by adding
+    a static property to it:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE29]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'When we have such properties in all value object types that can be empty (for
+    example, `PictureSize` or `ClassifiedAdId` are always assigned, so we can skip
+    these types), we need to assign empty values in the `When` method of the `ClassifiedAd`
+    class for the `ClassifiedAdCreated` event handler:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE30]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'With these changes complete, we can do the API call again, and now, it should
+    work. On the console, we can see the following debug output:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE31]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'We can also call the `PUT` method for `/ad/title` and get this debug output:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE32]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'We can also look at the content of the `ClassifiedAd` table and see that the
+    values are indeed being assigned:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![](img/a57984ff-6c46-4662-b559-dac02120e979.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: Updated data in the ClassifiedAd table
+  prefs: []
+  type: TYPE_NORMAL
+- en: By now, we have managed to handle all the challenges that come from the mismatch
+    between our domain model and the data model. This is not the only way to handle
+    aggregate persistence using relational databases. Many developers prefer having
+    the domain model and the data model completely separate. By doing that, they obtain
+    more flexibility for changing the domain model without looking at persistence
+    concerns all the time. However, such flexibility comes with the associated costs
+    of overly increasing the complexity for the persistence layer, since the mappings
+    between domain objects and data objects need to be handled manually. For larger
+    applications, this approach might be preferred, because it also allows for tuning
+    the data model to satisfy the performance needs of the underlying database. When
+    we use the ORM framework to deal with our domain objects and persist them directly,
+    we put a lot of trust in the framework capabilities to handle the data aspect
+    properly. At the same time, EF Core is constantly improving to make database calls
+    more optimal and to mitigate the impedance mismatch more transparently for developers.
+    So far, we have been able to fix most of the issues by applying a more advanced
+    configuration in the infrastructure configuration classes, and the changes in
+    the domain model itself have not been that significant.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Summary
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In this chapter, we dove deeply into the topic of aggregate persistence. You
+    have seen many challenges that are associated with what is known as **impedance
+    mismatch**, when we can clearly see that databases aren't exactly happy to persist
+    complex object graphs as is due to specific requirements that different types
+    of databases have. Also, you learned about using the repository pattern to abstract
+    the persistence and keep both our domain model and the application service away
+    from the database-related concerns.
+  prefs: []
+  type: TYPE_NORMAL
+- en: You learned how to use RavenDB to persist our aggregate as a document, and what
+    challenges we might encounter on this road. It became clear that document databases
+    are, in general, more suitable for persisting complex objects, but some concerns
+    still need to be addressed, like handling identities and exposing properties.
+  prefs: []
+  type: TYPE_NORMAL
+- en: This chapter also covered the topic of persisting aggregates in a relational
+    database. We used the Entity Framework Core with a PostgreSQL database to represent
+    our aggregate as a set of tables with relations between them. Despite the significant
+    improvements that the EF Core team has made during the last couple of years, persisting
+    value objects is a particularly challenging subject, and we had to do quite a
+    lot of configuration changes to make it work. However, the changes that we had
+    to make in the domain model were not that dramatic, and we were still able to
+    use value objects as-is, including the important characteristic of their immutability.
+  prefs: []
+  type: TYPE_NORMAL
+- en: However, we haven't touched the topic of retrieving data from the database.
+    Our API still only has endpoints to create new domain objects and perform state
+    transitions in the existing object. In fact, we can only handle commands. You
+    might wonder why we don't start adding more methods to our repository to fetch
+    collections of aggregates based on some criteria or specification. That is one
+    of the fallacies of persistence implementations that we see in many systems when
+    trying to apply the principles of DDD. That's why I have dedicated the next chapter
+    exclusively to queries. As you will see, it is not as straightforward, and there
+    are some interesting things to discover ahead.
+  prefs: []
+  type: TYPE_NORMAL

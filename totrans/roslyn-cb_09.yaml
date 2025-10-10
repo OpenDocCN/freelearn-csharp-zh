@@ -1,0 +1,1247 @@
+- en: Design and Implement a New C# Language Feature
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'In this chapter, we will cover the following recipes:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Designing syntax and grammar for a new C# language feature
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Implementing parser support for a new C# language feature
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Implementing binding/semantic analysis support for a new C# language feature
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Implementing lowering/code generation support for a new C# language feature
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Writing unit tests for C# parsing, binding, and codegen phases
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Introduction
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'This chapter enables developers to design a new C# language feature and implement
+    various compiler phases for this language feature. On a high level, the C# compiler
+    has following important phases:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![](img/f8321116-8694-43b3-9228-c3657aada528.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: '**Lexical Analysis** ([https://en.wikipedia.org/wiki/Lexical_analysis](https://en.wikipedia.org/wiki/Lexical_analysis)):
+    This transforms the sequence of characters in a source file to into tokens such
+    as keywords, identifiers, operators, and so on. `Lexer.Lex` ([http://source.roslyn.io/#Microsoft.CodeAnalysis.CSharp/Parser/Lexer.cs,5ad0cc36317d33e7](http://source.roslyn.io/#Microsoft.CodeAnalysis.CSharp/Parser/Lexer.cs,5ad0cc36317d33e7))
+    is the primary entry point into the C# lexer that fetches the next token and increments
+    the current position within the source text. For example, consider the following
+    source code:'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[PRE0]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'This gets transformed into the following sequence of tokens during lexical
+    analysis (white space and newline trivia excluded for brevity):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE1]'
+  prefs: []
+  type: TYPE_PRE
+- en: '**Syntax Analysis** ([https://en.wikipedia.org/wiki/Parsing](https://en.wikipedia.org/wiki/Parsing)):
+    This transforms the sequence of tokens generated from the lexical analysis phase
+    into a syntax tree with nodes, tokens, and trivia. It also verifies that the syntax
+    conforms to the C# language specification and generates syntax diagnostics. `SyntaxFactory.ParseCompilationUnit`
+    ([http://source.roslyn.io/#q=SyntaxFactory.ParseCompilationUnit](http://source.roslyn.io/#q=SyntaxFactory.ParseCompilationUnit))
+    is the primary entry point into the C# language parser that generates a `CompilationUnitSyntax`
+    node, which is then used to create a `SyntaxTree` rooted at this node (see `CSharpSyntaxTree.Create`
+    ([http://source.roslyn.io/#Microsoft.CodeAnalysis.CSharp/Syntax/CSharpSyntaxTree.cs,d40da3b7b4e39486](http://source.roslyn.io/#Microsoft.CodeAnalysis.CSharp/Syntax/CSharpSyntaxTree.cs,d40da3b7b4e39486))).
+    For the preceding example source code and lexical tokens, we get the following
+    syntax tree:'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '![](img/8011f62c-a48f-4348-b206-feff2e00f4a5.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: '**Semantic Analysis or Binding** ([https://en.wikipedia.org/wiki/Semantic_analysis_(compilers)](https://en.wikipedia.org/wiki/Semantic_analysis_(compilers))):
+    Transforms the syntax tree generated from the parsing phase into a bound tree
+    with `BoundNodes`. A bound tree is essentially an abstract syntax tree with rich
+    semantic information associated with each node in the tree. All the semantic information
+    provided by the `SemanticModel` APIs at the CodeAnalysis layer is from the bound
+    nodes associated with the syntax. This phase analyzes the semantics of source
+    code, such as type checking, method overload resolution, conversions, and so on,
+    and generates semantic diagnostics. The primary entry points for binding statements
+    and expressions are `Binder.BindStatement` ([http://source.roslyn.io/#q=Binder.BindStatement](http://source.roslyn.io/#q=Binder.BindStatement))
+    and `Binder.BindExpression` ([http://source.roslyn.io/#q=Binder.BindExpression](http://source.roslyn.io/#q=Binder.BindExpression)),
+    respectively. For the preceding example, the following bound tree is generated
+    for the method body for `Method`:'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[PRE2]'
+  prefs: []
+  type: TYPE_PRE
+- en: '**Lowering**: This transforms the bound tree generated from the binding phase
+    into a simplified bound tree. For example, a bound *for* loop node gets rewritten
+    into a bound block with labels and conditional jumps (see `LocalRewriter.RewriteForStatement`
+    ([http://source.roslyn.io/#q=RewriteForStatement](http://source.roslyn.io/#q=RewriteForStatement))).
+    `LocalRewriter.Rewrite` ([http://source.roslyn.io/#Microsoft.CodeAnalysis.CSharp/Lowering/LocalRewriter/LocalRewriter.cs,c30511823bc3c19f](http://source.roslyn.io/#Microsoft.CodeAnalysis.CSharp/Lowering/LocalRewriter/LocalRewriter.cs,c30511823bc3c19f))
+    is the primary entry point to lower each method block in the compilation.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Flow analysis** ([https://en.wikipedia.org/wiki/Data-flow_analysis](https://en.wikipedia.org/wiki/Data-flow_analysis)):
+    This phase performs basic data flow and control flow analysis of the lowered bound
+    tree to generate unreachable code and uninitialized variable diagnostics. `FlowAnalysisPass.Rewrite`
+    ([http://source.roslyn.io/#q=FlowAnalysisPass.Rewrite](http://source.roslyn.io/#q=FlowAnalysisPass.Rewrite))
+    is the primary entry point into the flow analysis phase.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Code generation** ([https://en.wikipedia.org/wiki/Code_generation_(compiler)](https://en.wikipedia.org/wiki/Code_generation_(compiler))):
+    This transforms lowered bound tree into MSIL represented with a sequence of bytes
+    that gets emitted into a .NET assembly. `CodeGenerator.Generate` ([http://source.roslyn.io/#Microsoft.CodeAnalysis.CSharp/CodeGen/CodeGenerator.cs,c28190700f8e314c](http://source.roslyn.io/#Microsoft.CodeAnalysis.CSharp/CodeGen/CodeGenerator.cs,c28190700f8e314c))
+    is the primary entry point into the code generator. For the preceding code example,
+    the C# compiler generates the following MSIL for `Method`:'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[PRE3]'
+  prefs: []
+  type: TYPE_PRE
+- en: You can read a more detailed overview of Roslyn at [https://github.com/dotnet/roslyn/wiki/Roslyn%20Overview](https://github.com/dotnet/roslyn/wiki/Roslyn%20Overview).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'New language feature: Switch Operator (?::)'
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'In this chapter, we will design a new C# langauge feature that we call *Switch
+    operator (?::)*. This feature is derived from two existing C# language constructs:
+    switch statement ([https://docs.microsoft.com/en-us/dotnet/csharp/language-reference/keywords/switch](https://docs.microsoft.com/en-us/dotnet/csharp/language-reference/keywords/switch))
+    and conditional operator `(?:)` ([https://docs.microsoft.com/en-us/cpp/cpp/conditional-operator-q](https://docs.microsoft.com/en-us/cpp/cpp/conditional-operator-q)).
+    It allows writing conditional expressions that can switch on multiple values of
+    the expression and return a corresponding value or a default value. For example,
+    consider the following switch statement that computes a string representation
+    for an integral expression:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE4]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'This code basically switches on different possible values of the *expression*
+    and returns a descriptive string for its runtime value. The underlying intent
+    of the user is to just return a mapped expression for different possible values
+    of *expression*, with some default value. The switch operator designed in this
+    chapter will allow you to rewrite the preceding code using a single expression:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE5]'
+  prefs: []
+  type: TYPE_PRE
+- en: Designing syntax and grammar for a new C# language feature
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: '**Syntax** and **Grammar** are the core elements for implementing a new language
+    feature. This section will enable you to define the syntax (nodes and tokens)
+    and grammar for a new C# language feature: Switch operator `(?::)`. For details
+    on the intended functionality of this operator, read the section *New language
+    feature:* *Switch Operator (?::)* at the start of this chapter.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Getting Started
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: You need to ensure that you have enlisted and built Roslyn sources with *VS2017*
+    tag on your machine. For further guidance, refer to the recipe, *Setting up Roslyn
+    enlistment* in
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[Chapter 8](a7277d51-330b-45f3-aa10-5a9453afe569.xhtml), *Contribute Simple
+    Functionality to Roslyn C# Compiler Open Source Code*.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: For the steps in the recipe that mention *Define ... in the C# language specification*,
+    the reader should create a new GitHub issue on ([https://github.com/dotnet/roslyn/issues/new](https://github.com/dotnet/roslyn/issues/new))
+    with labels Language-C# and Area-Language Design and get the specification reviewed
+    by the language team. If approved, the reviewers will ensure that it gets added
+    to the C# language specification.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How to do it...
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'Define the grammar for the new ternary operator `?::` in the C# language specification
+    :'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE6]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Define the compile time semantics associated with the new operator and the
+    switch expression in C# language specification:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'A switch expression of the form `expr ?: [label1, label2, ..., labeln] : [val1,
+    val2, ..., valn, valn+1]` has the following compile time semantics:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The governing type of the switch expression is established by the same set of
+    rules as the governing type of a switch statement.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The first bracketed argument list `[label1, label2, ..., labeln]` must contain
+    expressions labeli with a constant value that is implicitly convertible to the
+    switch governing type. A compile-time error occurs if two or more `labeli` in
+    the same switch expression specify the same constant value.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'The second bracketed argument list `[val1, val2, ..., valn, valn+1]` controls
+    the type of the switch expression resultant value. Applying the following checks
+    to each pair vali and valj in the list must yield the same value for type Z; otherwise,
+    a compile time error occurs:'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'If `vali` has type X and `valj` has type Y then:'
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: If an implicit conversion exists from X to Y, but not from Y to X, then Y is
+    the type of the expression (Z = Y).
+  prefs:
+  - PREF_IND
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: If an implicit conversion exists from Y to X, but not from X to Y, then X is
+    the type of the expression (Z = X).
+  prefs:
+  - PREF_IND
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Otherwise, no expression type can be determined, and a compile-time error occurs.
+  prefs:
+  - PREF_IND
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: If only one of `vali` and `valj` has a type, and both `vali` and `valj` are
+    implicitly convertible to a type Z, then that is the type of the expression.
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Otherwise, no expression type can be determined, and a compile-time error occurs.
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Define the associativity and precedence for the new operator in the C# language
+    specification:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: The switch operator is right-associative, meaning that operations are grouped
+    from right to left.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The switch operator has the same precedence as other ternary operators (such
+    as conditional operator `?:`).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Define the runtime execution semantics of the switch expression in the C# language
+    specification:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'A switch expression is evaluated as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The expression expr is evaluated and converted to the governing type.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: If one of the n constants, say `labeli`, specified in the first bracketed list
+    in the same switch expression is equal to the value of the expression `expr`,
+    then expression `vali` in the second bracketed list is evaluated and converted
+    to type Z and becomes the resultant value of the expression.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: If none of the n constants specified in the first bracketed list in the same
+    switch expression is equal to the value of the expression `expr`, then the last
+    expression `valn+1` in the second bracketed list is evaluated and converted to
+    type Z and becomes the resultant value of the expression.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Open `Roslyn.sln` in Visual Studio 2017 and open source file `%REPO_ROOT%\src\Compilers\CSharp\Portable\Syntax\SyntaxKind.cs`.
+    Add new `SyntaxKinds` for the `QuestionColonToken` and `SwitchExpression` at lines
+    77 and 334, respectively:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE7]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Open source file `%REPO_ROOT%\src\Compilers\CSharp\Portable\Syntax\Syntax.xml`
+    and add XML definition for the new syntax node `SwitchExpressionSyntax` with fields
+    `Expression`*,* `QuestionColonToken`*,* `Labels`*,* `ColonToken`*,* and `Values`
+    at line 686:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE8]'
+  prefs: []
+  type: TYPE_PRE
+- en: Build the project `CSharpCodeAnalysis` to auto generate the source code for
+    the new `SwitchExpressionSyntax` node added earlier. Note that the build will
+    fail with a bunch of *RS0016* errors as we haven't added the new public types
+    to the public API surface.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Switch back to source file `%REPO_ROOT%\src\Compilers\CSharp\Portable\Syntax\SyntaxKind.cs`
+    and invoke the code fix at line 334 defining the `SwitchExpression` using *Ctrl*
+    + *.* and apply Fix all occurrences in Project to fix all *RS0016* diagnostics:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '![](img/9ec078ac-f9b2-451c-ac85-92366274d38c.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: Build the project again and verify it succeeds this time.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: You can view all the source changes made in this recipe at [https://github.com/mavasani/roslyn/commit/4b50f662c53e1b9fc83f81a819f29d11b85505d5](https://github.com/mavasani/roslyn/commit/4b50f662c53e1b9fc83f81a819f29d11b85505d5).
+  prefs: []
+  type: TYPE_NORMAL
+- en: How it works...
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In the first half of this recipe, we walked through the steps to define the
+    grammar, compile time, and runtime semantics, associativity and precedence of
+    the new switch expression/operator. In the second half, we defined the new syntax
+    kinds and syntax node in the compiler.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The grammar, associativity, and precedence for the new switch expression is
+    identical to the grammar for the existing conditional ternary expression.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'As both the ternary operators come just after the null coalescing operator
+    (??) in the precedence order, the grammar specifies:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE9]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The grammar specifies the labels and the values for the switch expression to
+    be a comma separated argument list within square brackets, for example, `[ arg1[,]
+    arg[2], ..., arg[n] ]`. Some examples of expressions:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE10]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Compile time semantics enforce that the type of the expression being switched
+    on has the same semantic requirements as the switch governing type for a switch
+    statement:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The governing type of a switch statement is established by the switch expression.
+    If the type of the switch expression is sbyte, byte, short, ushort, int, uint,
+    long, ulong, char, string, or an enum-type, then that is the governing type of
+    the switch statement. Otherwise, exactly one user-defined implicit conversion
+    (Section 6.4) must exist from the type of the switch expression to one of the
+    following possible governing types: sbyte, byte, short, ushort, int, uint, long,
+    ulong, char, string. If no such implicit conversion exists, or if more than one
+    such implicit conversion exists, a compile-time error occurs.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Compile time semantics also enforce that:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The first bracketed argument list be all constant labels, such that there is
+    an implicit conversion to the switch governing type
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The second argument list be of length one greater than the first list and all
+    arguments be expressions, such that they are convertible to a common type `Z`
+    with implicit conversions
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'The following are some examples of semantically valid and invalid switch expressions:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE11]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Runtime semantics of the switch expression are identical to the switch statement.
+    The expression on which we switch is first evaluated, and its value compared against
+    each label in the first argument list. For a match, we evaluate the corresponding
+    expression in the second list and convert it to type `Z` and that becomes the
+    result of the expression. If there is no match, the last expression in the second
+    argument list is evaluated and converted to type `Z` and becomes the default result
+    of the expression:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE12]'
+  prefs: []
+  type: TYPE_PRE
+- en: Implementing parser support for a new C# language feature
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: '**Lexical analysis** and **Syntax analysis** (**Parsing**) are initial phases
+    of the C# compiler that transform the input source text into a syntax tree with
+    nodes and tokens and reports syntax diagnostics. This section will enable you
+    to add the lexer and parser support for a new C# language feature: *Switch operator
+    (?::)*. For details on the intended functionality of this operator, read the section
+    *New language feature: Switch Operator (?::)* at the start of this chapter. For
+    details on the grammar and syntax definitions for this operator, read the previous
+    recipe.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Getting Started
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: You need to ensure that you have enlisted and built Roslyn sources with *VS2017*
+    tag on your machine. For further guidance, refer to the recipe, *Setting up Roslyn*,
+    *enlistment* in [Chapter 8](a7277d51-330b-45f3-aa10-5a9453afe569.xhtml), *Contribute
+    Simple Functionality to Roslyn C# Compiler Open Source Code*.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Additionally, git commit [https://github.com/mavasani/roslyn/commit/4b50f662c53e1b9fc83f81a819f29d11b85505d5](https://github.com/mavasani/roslyn/commit/4b50f662c53e1b9fc83f81a819f29d11b85505d5)
+    on your enlistment to get the syntax definitions and build `CSharpCodeAnalysis`
+    project.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How to do it...
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Open `Roslyn.sln` in Visual Studio 2017
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Open source file `%REPO_ROOT%\src\Compilers\CSharp\Portable\Parser\Lexer.cs`
+    and add the highlighted `else if` statement at line 565 in the method `ScanSyntaxToken`*:*
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE13]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Open source file `%REPO_ROOT%\src\Compilers\CSharp\Portable\Parser\LanguageParser.cs`
+    and add the highlighted `else if` statement at line 9426 in the method `ParseSubExpressionCore`:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE14]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Go to line 10552 in the same file (method `CanFollowCast`*)* add the highlighted
+    case clause:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE15]'
+  prefs: []
+  type: TYPE_PRE
+- en: Open source file `%REPO_ROOT%\src\Compilers\CSharp\Portable\Syntax\SyntaxKindFacts.cs`
+    and add the highlighted case clause at line 1278 in the method `GetText`*:*
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE16]'
+  prefs: []
+  type: TYPE_PRE
+- en: Set `Roslyn.csproj` as the startup project.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Change the solution configuration from Debug to Release (to avoid asserts in
+    the binder) and rebuild the solution.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Hit *Ctrl* + *F5* to start new instance of VS from the `RoslynDev` hive with
+    our local changes.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'In the new instance of VS, create a new C# class library project and add the
+    following code, which uses the new switch operator:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE17]'
+  prefs: []
+  type: TYPE_PRE
+- en: Open the Roslyn syntax visualizer from View | Other Windows | Syntax Visualizer
+    and select the switch expression in the editor to view the parsed syntax nodes
+    and tokens for the expression. For guidance on the syntax visualizer, refer to
+    the recipe, *Using Roslyn syntax visualizer to view Roslyn syntax tokens and nodes
+    for a source file* in [Chapter 8](a7277d51-330b-45f3-aa10-5a9453afe569.xhtml),
+    *Contribute Simple Functionality to Roslyn C# Compiler Open Source Code.*
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '![](img/82e46abf-99ba-4048-8bb6-f028d93192ac.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'Verify that there are no squiggles or intellisense errors in the error list:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '![](img/0aa474cb-ee17-4fef-9386-9796ee60a144.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'Remove the colon token and the second bracketed argument list, that is, `:
+    ["One", "Two", "Three", "More than three"]`, and verify you get syntax errors
+    for missing tokens in the switch expression:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE18]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Revert step 11 and try to build the project and verify it fails with `CSC :
+    error CS7038: Failed to emit module ''ClassLibrary''` as we have not implemented
+    any binding or code generation for the new construct.'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: You can view all the source changes made in this recipe at [https://github.com/mavasani/roslyn/commit/24144442e4faa9c54fe2a4b519455a1a45c29569](https://github.com/mavasani/roslyn/commit/24144442e4faa9c54fe2a4b519455a1a45c29569).
+  prefs: []
+  type: TYPE_NORMAL
+- en: How it works...
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In this recipe, we added basic lexer and parser support for the switch operator
+    (?:). Lexer is primarily responsible for scanning the text and generating tokens.
+    LanguageParser is responsible for parsing the lexed tokens and generate syntax
+    tree with nodes and tokens.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let''s walk through our code changes in this recipe. We added the following
+    highlighted code to the lexer:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE19]'
+  prefs: []
+  type: TYPE_PRE
+- en: In the original code, when we were scanning the text and identify a `'?'` character,
+    we peeked at the next character to identify it is another `'?'` character (the
+    ?? null coalescing operator) or a whitespace (the `?` token for the conditional
+    operator). Our new code adds an additional check for whether the next character
+    is `':'` (the `?:` token for the switch operator). If so, it advances the current
+    character in the text window and sets the syntax kind for the current token to
+    `SyntaxKind.QuestionColonToken`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We added the following highlighted code to the parser:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE20]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'We extended the original code that parsed the `QuestionToken` in the parser
+    to also check for the `QuestionColonToken` and ternary precedence. If so, we eat
+    the next token as the `questionColonToken`. Then, we attempt to parse the `labels`
+    as a bracketed argument list by invoking `ParseBracketedArgumentList` (this code
+    already exists in the language parser for parsing the bracketed argument list
+    for a dictionary initializer). This is followed by parsing the colon token by
+    invoking `EatToken` with the expected syntax kind for the colon token. This method
+    handles both the valid and invalid token cases:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE21]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'For a valid token of the expected kind, it moves to the next token and returns
+    the current colon token. If the next token is not of the expected kind, it generates
+    a missing token and also reports a syntax diagnostic for the missing token:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE22]'
+  prefs: []
+  type: TYPE_PRE
+- en: Finally, we parse the *values* as another bracketed argument list. We invoke
+    the newly auto generated syntax factory helper `SwitchExpression` to generate
+    a `SwitchExpressionSyntax` node with the parsed tokens.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Implementing binding/semantic analysis support for a new C# language feature
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: '**Semantic analysis** (**Binding)** is the intermediate phase of the C# compiler
+    that transforms syntax trees into C# bound trees and reports semantic diagnostics.
+    This section will enable you to add the binding support for a new C# language
+    feature: `Switch operator (?::)`. For details on the intended functionality of
+    this operator, read the section, *New language feature: Switch Operator (?::)*
+    at the start of this chapter. For details on the grammar and syntax definitions
+    for this operator, read the first recipe of this chapter, *Designing syntax and
+    grammar for a new C# language feature*.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Getting Started
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: You need to ensure that you have enlisted and built Roslyn sources with *VS2017*
+    tag on your machine. For further guidance, refer to the recipe, *Setting up Roslyn
+    enlistment* in [Chapter 8](a7277d51-330b-45f3-aa10-5a9453afe569.xhtml), *Contribute
+    Simple Functionality to Roslyn C# Compiler Open Source Code*.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Additionally, the following two git commits on your enlistment to get the syntax
+    definitions and parser support, respectively, and build `CSharpCodeAnalysis` project:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[https://github.com/mavasani/roslyn/commit/4b50f662c53e1b9fc83f81a819f29d11b85505d5](https://github.com/mavasani/roslyn/commit/4b50f662c53e1b9fc83f81a819f29d11b85505d5)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[https://github.com/mavasani/roslyn/commit/24144442e4faa9c54fe2a4b519455a1a45c29569](https://github.com/mavasani/roslyn/commit/24144442e4faa9c54fe2a4b519455a1a45c29569)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: How to do it...
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Open `Roslyn.sln` in Visual Studio 2017
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Open source file `%REPO_ROOT%\src\Compilers\CSharp\Portable\BoundTree\BoundNodes.xml`
+    and add the following `BoundSwitchOperator` definition at line 437*:*
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE23]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Open source file `%REPO_ROOT%\src\Compilers\CSharp\Portable\Binder\Binder_Expression.cs`
+    and add the `switch` section at line 535 in the method `BindExpressionInternal`:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE24]'
+  prefs: []
+  type: TYPE_PRE
+- en: Copy the method implementations for `BindSwitchOperator` and `BindSwitchOperatorArguments`
+    from the attached code sample source file `CSharpCodeAnalysis\Binder_Operators.cs`
+    and paste them into source file `%REPO_ROOT%\src\Compilers\CSharp\Portable\Binder\Binder_Operators.cs`
+    at line 3521.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Copy the partial type definition for `BoundSwitchOperator` from the attached
+    code sample source file `CSharpCodeAnalysis\Expression.cs` and paste it into source
+    file `%REPO_ROOT%\src\Compilers\CSharp\Portable\BoundTree\Expression.cs` at line
+    1221.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Add a new source file `%REPO_ROOT%\src\Compilers\CSharp\Portable\Lowering\LocalRewriter\LocalRewriter_SwitchOperator.cs`
+    to the project `CSharpCodeAnalysis` with a stub implementation of the lowering
+    for the switch operator copied from `CSharpCodeAnalysis\LocalRewriter_SwitchOperator.cs`:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE25]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Add stub flow analysis implementation for the switch operator to `%REPO_ROOT%\src\Compilers\CSharp\Portable\FlowAnalysis\PreciseAbstractFlowPass_Switch.cs`
+    at line 260:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE26]'
+  prefs: []
+  type: TYPE_PRE
+- en: Build project `csc.csproj` to generate `%REPO_ROOT%\Binaries\Debug\Exes\csc\csc.exe`
+    with our local changes.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Create a new source file, say `test.cs`, with the following source code:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE27]'
+  prefs: []
+  type: TYPE_PRE
+- en: Compile this source file with locally built `csc.exe` and verify that the build
+    succeeds.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Run the generated executable `test.exe` and verify it runs fine, but the output
+    is still not the expected result due to a stub codegen implementation for the
+    switch operator:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '![](img/2f6edcd0-fffb-4765-9b60-8f661c836e6d.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: You can view all the source changes made in this recipe at [https://github.com/mavasani/roslyn/commit/7a666595c8bf8d5e8c897540ec85ae3fa9fc5236](https://github.com/mavasani/roslyn/commit/7a666595c8bf8d5e8c897540ec85ae3fa9fc5236).
+  prefs: []
+  type: TYPE_NORMAL
+- en: How it works...
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In this recipe, we added basic binding/semantic analysis support for the switch
+    operator `(?:)`, which enabled us to compile and execute source code with this
+    new operator. Note that this is not a comprehensive implementation of the binding
+    phase for this operator, and requires further work such as enhanced error reporting.
+    See the next section, *There's more...*, in this recipe for further details.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The C# binder is responsible for semantic analysis of the syntax tree produced
+    by the parser. It transforms the syntax tree into a bound tree with `BoundNodes`,
+    which is essentially an abstract syntax tree with rich semantic information associated
+    with each node in the tree.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We first added a new BoundNode definition for the switch operator, `BoundSwitchOperator`**,**
+    into a template file `BoundNodes.xml`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE28]'
+  prefs: []
+  type: TYPE_PRE
+- en: Note the difference between syntax nodes and bound nodes for the switch operator.
+    We no longer store any purely syntactic information, such as the question colon
+    token or the brackets around the argument list. The expression on which the switch
+    operates is expected to bind to a `BoundExpression`, and labels and values are
+    also expected be a list of bound expressions.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Building the project `CSharpCodeAnalysis` runs a generator tool over BoundNodes.xml
+    file as a pre-build step to auto-generate `BoundNodes.generated.cs` file with
+    the source definitions for the bound nodes.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`BoundNodes.generated.cs` is no longer automatically generated during the build
+    of `CSharpCodeAnalysis` project in the latest Roslyn master branch, which was
+    a post *VS2017* change. On the latest sources, you must explicitly run the following
+    script to auto-generate this code: [https://github.com/dotnet/roslyn/blob/master/build/scripts/generate-compiler-code.cmd](https://github.com/dotnet/roslyn/blob/master/build/scripts/generate-compiler-code.cmd).'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The core binding support involved appending the switch case in `BindExpressionInternal`
+    to handle the syntax node of `SyntaxKind.SwitchExpression` and invoke `BindSwitchOperator`
+    method.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We added the new method `BindSwitchOperator` to the binder to handle top level
+    binding of the `SwitchExpressionSyntax` node:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE29]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'We bind the expression of the switch operator as a value using `BindValue`
+    ([http://source.roslyn.io/#Microsoft.CodeAnalysis.CSharp/Binder/Binder_Expressions.cs,608d49de0066ede1,references](http://source.roslyn.io/#Microsoft.CodeAnalysis.CSharp/Binder/Binder_Expressions.cs,608d49de0066ede1,references))
+    invocation. This guarantees that we have an actual expression with a value, rather
+    than a type, as the node''s expression. For example, we get the following semantic
+    error when this is violated:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![](img/d78108e5-7438-4828-8deb-afeeeba71ede.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'We added the new method, `BindSwitchOperatorArguments`, to bind the `Labels`
+    and `Values` of the switch operator:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE30]'
+  prefs: []
+  type: TYPE_PRE
+- en: This method invokes the existing binder method, `BindArgumentsAndNames` ([http://source.roslyn.io/#q=BindArgumentsAndNames](http://source.roslyn.io/#q=BindArgumentsAndNames)),
+    to bind the argument list and then build arguments for error recovery.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We also added a stub partial type implementation for `BoundSwitchOperator`
+    for implementing `IOperation` ([http://source.roslyn.io/#Microsoft.CodeAnalysis/Operations/IOperation.cs,7743f66521e66763](http://source.roslyn.io/#Microsoft.CodeAnalysis/Operations/IOperation.cs,7743f66521e66763))
+    APIs:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE31]'
+  prefs: []
+  type: TYPE_PRE
+- en: '`IOperation` is a new experimental feature that is currently being implemented
+    in the compiler layers to expose the semantics associated with the compiler bound
+    nodes as a publically supported API. The API is not released or publically supported
+    as of VS2017, which may or may not change in a future release.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Additionally, we added stub implementations for flow analysis and lowering
+    to enable us to build source code with the switch operator, though the generated
+    MSIL or the output of the compiled executable is not the same as the expected
+    final outcome. More specifically, the lowering implementation just replaced the
+    entire `BoundSwitchOperator` node with a bound string literal stating that codegen
+    is not yet implemented for the new switch operator:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE32]'
+  prefs: []
+  type: TYPE_PRE
+- en: Refer to the next recipe in this chapter for implementing lowering support for
+    the operator.
+  prefs: []
+  type: TYPE_NORMAL
+- en: There's more...
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'The current binder implementation of the switch operator has a bunch of pending
+    work items, primarily related to more comprehensive semantic validation and error
+    generation. The validation items to be implemented are:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Add semantic validation that the expression of the switch operator has a type
+    as per the requirements of a switch governing type; otherwise, generate a compile
+    time error.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Add new compiler diagnostics for argument list validations. For example:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Ensure that the number of expressions in values is one greater than the number
+    of expression in labels; otherwise, generate a compile time error.
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Ensure that the labels are all compile time constants with implicit conversions
+    to the switch governing type. If not, generate required compile time errors.
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Validate that the types of the expressions in Values are implicitly convertible
+    to a common type Z, which is the type of the expression.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: These items are left as an exercise for the reader. For further guidance on
+    implementing a new semantic error in the compiler code base, refer to recipe,
+    *Implementing a new semantic error in the C# compiler code base,* in [Chapter
+    8](a7277d51-330b-45f3-aa10-5a9453afe569.xhtml), *Contribute Simple Functionality
+    to Roslyn C# Compiler Open Source Code.*
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We also added basic stub implementations for the following pieces, which need
+    further enhancements:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`IOperation` support the switch operator: This will involve creating a new
+    `OperationKind` ([http://source.roslyn.io/#Microsoft.CodeAnalysis/Operations/IOperationKind.cs,bf7324631c03b2e7](http://source.roslyn.io/#Microsoft.CodeAnalysis/Operations/IOperationKind.cs,bf7324631c03b2e7))
+    for the switch expression, adding a new interface, say `ISwitchChoiceExpression`,
+    with the following API shape and then implementing this interface on the `BoundSwitchOperator`.'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE33]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Add lowering support for the switch operator: This is covered in the next recipe.'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Add flow analysis support for the switch operator: This is not covered in this
+    book, but should be implemented to ensure we report proper flow analysis diagnostics
+    in code involving the switch operator.'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Implementing lowering/code generation support for a new C# language feature
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: '**Lowering** is an intermediate phase that executes after binding and transforms
+    high level bound trees into simplified bound trees. These simplified bound trees
+    are provided to the **Code Generation** phase and converted into MSIL and emitted
+    into a .NET assembly. This section will enable you to add the lowering support
+    for a new C# language feature: Switch operator `(?::)`. This will enable you to
+    write, compile, and correctly execute C# programs with the new operator. For details
+    on the intended functionality of this operator, read the section, *New language
+    feature: Switch Operator (?::)* at the start of this chapter. For details on the
+    grammar and syntax definitions for this operator, read the first recipe of this
+    chapter, *Designing syntax and grammar for a new C# language feature*.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Getting Started
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: You need to ensure that you have enlisted and built Roslyn sources with *VS2017*
+    tag on your machine. For further guidance, refer to the recipe *Setting up Roslyn
+    enlistment* in [Chapter 8](a7277d51-330b-45f3-aa10-5a9453afe569.xhtml), *Contribute
+    Simple Functionality to Roslyn C# Compiler Open Source Code*.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Additionally, the following three git commits on your enlistment to get the
+    syntax definitions, parser support and binder support, respectively, and build
+    `CSharpCodeAnalysis` project:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[https://github.com/mavasani/roslyn/commit/4b50f662c53e1b9fc83f81a819f29d11b85505d5](https://github.com/mavasani/roslyn/commit/4b50f662c53e1b9fc83f81a819f29d11b85505d5)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[https://github.com/mavasani/roslyn/commit/24144442e4faa9c54fe2a4b519455a1a45c29569](https://github.com/mavasani/roslyn/commit/24144442e4faa9c54fe2a4b519455a1a45c29569)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[https://github.com/mavasani/roslyn/commit/7a666595c8bf8d5e8c897540ec85ae3fa9fc5236](https://github.com/mavasani/roslyn/commit/7a666595c8bf8d5e8c897540ec85ae3fa9fc5236)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: How to do it...
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Open `Roslyn.sln` in Visual Studio 2017
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Copy the method implementations for `VisitSwitchOperator` and `RewriteSwitchOperator`
+    from the attached code sample source file `CSharpCodeAnalysis\LocalRewriter_SwitchOperator.cs`
+    and paste them into source file `%REPO_ROOT%\src\Compilers\CSharp\Portable\Lowering\LocalRewriter\LocalRewriter_SwitchOperator.cs`.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Build project `csc.csproj` to generate `%REPO_ROOT%\Binaries\Debug\Exes\csc\csc.exe`
+    with our local changes.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Create a new source file, say `test.cs`, with the following source code:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE34]'
+  prefs: []
+  type: TYPE_PRE
+- en: Compile this source file with locally built `csc.exe` and verify that the build
+    succeeds.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Run the generated executable `test.exe` with a different number of arguments
+    and verify the corresponding outputs are as expected from the switch operator.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '![](img/4585ef22-787d-4ff1-827a-33444ef00026.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'Execute the `ildasm.exe test.exe` command and verify the MSIL for the generated
+    executable contains sequential checks of the switch expression against the list
+    of labels and conditional branches to the corresponding values:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE35]'
+  prefs: []
+  type: TYPE_PRE
+- en: You can view all the source changes made in this recipe at [https://github.com/mavasani/roslyn/commit/2c1ec4dc60ab0a64b7e9c01d1ec9a1fbcaa611da](https://github.com/mavasani/roslyn/commit/2c1ec4dc60ab0a64b7e9c01d1ec9a1fbcaa611da).
+  prefs: []
+  type: TYPE_NORMAL
+- en: How it works...
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In this recipe, we added basic lowering support for the switch operator `(?:`),
+    which enabled us to compile and execute source code with this new operator and
+    give expected runtime results. Note that this is not an optimal implementation
+    of the lowering/code generation phase for this operator, and requires further
+    work to generate optimized MSIL. This is left as an exercise for the reader.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The C# lowering phase is responsible for transforming the initial bound tree
+    from the binder into a simpler bound tree that can be operated by the code generation
+    phase. The code generation phase operates on the lowered bound tree and transforms
+    it into MSIL. In this recipe, we added lowering support for the switch operator
+    that rewrites a switch operator into nested conditional branches.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let''s take an example to clarify the lowering algorithm. Consider the switch
+    expression used in our recipe:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE36]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'This operator gets rewritten into following lowered (pseudo)code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE37]'
+  prefs: []
+  type: TYPE_PRE
+- en: We walk through each constant and compare the value of the expression against
+    this constant. If it succeeds, we jump to a label and evaluate the corresponding
+    switch operator value, load it into the result, and jump to the exit label. If
+    the check fails, then we recursively operate on the remaining labels and values,
+    until the expression doesn't match any constant and we evaluate the last (default)
+    value.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let''s now walk through the details of the code added in the lowering phase
+    that implements the preceding algorithm. `LocalRewriter` type implements the bound
+    tree lowering/rewrite. This type is essentially an implementation of `BoundTreeRewriter`
+    ([http://source.roslyn.io/#q=BoundTreeRewriter](http://source.roslyn.io/#q=BoundTreeRewriter)),
+    which uses a visitor pattern to visit the entire bound tree. It has an overridable
+    *VisitXXX* method for every bound node to convert it into a simpler rewritten
+    bound node and return the rewritten node. We override the `VisitSwitchOperator`
+    method as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE38]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'A general requirement and pattern of bound tree rewriter is to first visit
+    each of the child nodes of the bound node and use the rewritten child nodes for
+    the core rewrite functionality. We first rewrite the switch expression, then the
+    labels, values, and the expression type. We also fetch the well-known System.Boolean
+    type to be used in the rewrite helper. We pass all these values into the core
+    rewrite method, `RewriteSwitchOperator`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE39]'
+  prefs: []
+  type: TYPE_PRE
+- en: The rewrite method first validates that we are operating on a switch operator
+    with one or more labels, and the count of values is one more than the count of
+    the values (otherwise we would have generated a binding error and the lowering
+    phase wouldn't have executed).
+  prefs: []
+  type: TYPE_NORMAL
+- en: This method uses a recursive approach to rewrite the switch operator. We first
+    generate a `BoundBinaryOperator` with the `==` operator. The `rewrittenExpression`
+    is the left of the operator, and the first label in the `rewrittenLabels` is the
+    right. This forms our `condition` bound node. The first value in `rewrittenValues`
+    list is the `consequence`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: If we have more than one `rewrittenLabels`, then we recursively invoke `RewriteSwitchOperator`
+    using only the remaining `rewrittenLabels` and `rewrittenValues` except the first
+    ones in each list, and this becomes the `alternative`. Otherwise, the second label
+    in the current `rewrittenValues` list becomes the alternative.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Finally, we use the preceding `condition` (`BoundBinaryOperator`), `consequence`
+    (first rewritten value) and `alternative` (recursive rewrite of rest the of the
+    expression) to create a `BoundConditionalOperator` `condition ? consequence :
+    alternative` and return that as the final rewritten node*.*'
+  prefs: []
+  type: TYPE_NORMAL
+- en: As the lowered bound tree has no new bound node kind, we did not require the
+    adding of any new codegen support (it already handled conditional branches). Refer
+    to the `CodeGenerator` ([http://source.roslyn.io/#Microsoft.CodeAnalysis.CSharp/CodeGen/CodeGenerator.cs,8838d807a9a1d615](http://source.roslyn.io/#Microsoft.CodeAnalysis.CSharp/CodeGen/CodeGenerator.cs,8838d807a9a1d615))
+    type for any implementation details of the code generator.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Writing unit tests for C# parsing, binding, and codegen phases
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'This section will enable you to add unit tests for a new C# language feature:
+    Switch operator `(?::)`. For details on the intended functionality of this operator,
+    read the section, *New language feature: Switch Operator (?::)*, at the start
+    of this chapter.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'C# compiler has the following set of unit test projects in Roslyn.sln:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`CSharpCompilerSyntaxTest`: This unit tests for parsing and syntax errors.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`CSharpCompilerSemanticTest`: This unit tests for semantic errors and semantic
+    model APIs.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`CSharpCompilerSymbolTest`: This unit tests for symbols defined in the compiler
+    layer.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`CSharpCommandLineTest`: This unit tests for the compiler''s command line options.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`CSharpCompilerEmitTest`: This unit tests for the code generation phase that
+    verifies the generated MSIL.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: In this section, we will add unit tests to `CSharpCompilerSyntaxTest`**,** `CSharpCompilerSemanticTest`
+    and `CSharpCompilerEmitTest` for parsing, binding, and codegen support, respectively.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Getting Started
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: You need to ensure that you have enlisted and built Roslyn sources with *VS2017*
+    tag on your machine. For further guidance, refer to the recipe, *Setting up Roslyn
+    enlistment* in [Chapter 8](a7277d51-330b-45f3-aa10-5a9453afe569.xhtml), *Contribute
+    Simple Functionality to Roslyn C# Compiler Open Source Code*.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Additionally, the following four git commits on your enlistment to get the
+    syntax definitions, parser support, binder support, and lowering support for the
+    new operator and build `CSharpCodeAnalysis` project:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[https://github.com/mavasani/roslyn/commit/4b50f662c53e1b9fc83f81a819f29d11b85505d5](https://github.com/mavasani/roslyn/commit/4b50f662c53e1b9fc83f81a819f29d11b85505d5)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[https://github.com/mavasani/roslyn/commit/24144442e4faa9c54fe2a4b519455a1a45c29569](https://github.com/mavasani/roslyn/commit/24144442e4faa9c54fe2a4b519455a1a45c29569)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[https://github.com/mavasani/roslyn/commit/7a666595c8bf8d5e8c897540ec85ae3fa9fc5236](https://github.com/mavasani/roslyn/commit/7a666595c8bf8d5e8c897540ec85ae3fa9fc5236)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[https://github.com/mavasani/roslyn/commit/2c1ec4dc60ab0a64b7e9c01d1ec9a1fbcaa611da](https://github.com/mavasani/roslyn/commit/2c1ec4dc60ab0a64b7e9c01d1ec9a1fbcaa611da)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: How to do it...
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Open `Roslyn.sln` in Visual Studio 2017.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Open source file `<%REPO_ROOT%>\src\Compilers\CSharp\Test\Syntax\Parsing\ExpressionParsingTests.cs`.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[Parsing Test] Add the following new unit test at the end of the source file:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE40]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Build the test project `CSharpCompilerSyntaxTest` and execute the unit test
+    on a command-line console using the command line copied from the project''s `Debug`
+    property page and appending `-method` switch for the newly added unit test:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE41]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Verify the unit test passes successfully:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '![](img/322e1701-d411-41a3-9893-3ec9bc11616c.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'If you get a `DirectoryNotFoundException`, ensure that the test results directory
+    exists on the machine: `<%REPO_ROOT%>\Binaries\Debug\UnitTests\CSharpCompilerSyntaxTest\xUnitResults`.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[Binding Test] Open source file `<%REPO_ROOT%>\src\Compilers\CSharp\Test\Semantic\Semantics\BindingTests.cs`'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Add the following new unit test to the source file:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE42]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Build the test project `CSharpCompilerSemanticTest` and execute the unit test
+    on a command line console by using the command line copied from the project''s
+    `Debug` property page and appending `-method` switch for the newly added unit
+    test:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE43]'
+  prefs: []
+  type: TYPE_PRE
+- en: Verify the unit test passes successfully.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[CodeGen Test] Open source file `<%REPO_ROOT%>\src\Compilers\CSharp\Test\Emit\CodeGen\CodeGenTests.cs`.'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Add the following new unit test to the source file:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE44]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Build the test project `CSharpCompilerEmitTest` and execute the unit test on
+    a command-line console by using the command line copied from the project''s `Debug`
+    property page and appending `-method` switch for the newly added unit test:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE45]'
+  prefs: []
+  type: TYPE_PRE
+- en: Verify the unit test passes successfully.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: You can also execute the unit tests inside Visual Studio using the Test Explorer
+    window, but the test discovery for *Roslyn.sln* is quite slow due to thousands
+    of unit tests across the solution. Hence, you might have to wait for a few minutes
+    before you can execute the first unit test.
+  prefs: []
+  type: TYPE_NORMAL
+- en: You can view all the source changes made in this recipe at [https://github.com/mavasani/roslyn/commit/ca1b555aef3d3f5dbe4efecda3580822d382a56f](https://github.com/mavasani/roslyn/commit/ca1b555aef3d3f5dbe4efecda3580822d382a56f).
+  prefs: []
+  type: TYPE_NORMAL

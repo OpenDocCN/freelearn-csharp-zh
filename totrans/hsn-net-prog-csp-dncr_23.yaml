@@ -1,0 +1,610 @@
+- en: Network Analysis and Packet Inspection
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In this chapter, we'll look at writing software and systems that allow us to
+    explore the network they're deployed on. Whereas previously, we looked at how
+    our software was performing in the context of the network, in this chapter, we'll
+    be looking specifically at how the network itself is performing. We'll examine
+    how to implement resource and device discovery from within our network software,
+    as well as how we can collect, examine, and then pass along packets traveling
+    over the network. We'll consider how the activity on our network can potentially
+    negatively impact our software, and how to proactively account for those impacts
+    and recover from or avoid them altogether.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following topics will be covered in this chapter:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Broadcast ports and IP addresses, and using them to identify your own software
+    or host on a network, or learn information about other hosts on a network
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Capturing and analyzing device and traffic information for the host to which
+    your software is deployed
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Identifying some of the risks posed by traffic on our network and how to build
+    our applications to be resilient against those risks
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Technical requirements
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In this chapter, we'll be using sample code that is available from this book's
+    GitHub repository, here: [https://github.com/PacktPublishing/Hands-On-Network-Programming-with-C-and-.NET-Core/tree/master/Chapter
+    18](https://github.com/PacktPublishing/Hands-On-Network-Programming-with-C-and-.NET-Core/tree/master/Chapter%2018).
+  prefs: []
+  type: TYPE_NORMAL
+- en: Check out the following video to see the code in action: [http://bit.ly/2HUai2a](http://bit.ly/2HUai2a)
+  prefs: []
+  type: TYPE_NORMAL
+- en: Additionally, we'll briefly discuss the merits of using WireShark to examine
+    and understand the breadth and volume of network requests that are interacting
+    with our machine. If you haven't already downloaded this software for the previous
+    chapters, it can be found here: [https://www.wireshark.org/#download](https://www.wireshark.org/#download).
+  prefs: []
+  type: TYPE_NORMAL
+- en: I strongly recommend familiarizing yourself with it, as it can prove invaluable
+    as a tool for network software engineers.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Network resources and topography
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: As we discussed all the way back in [Chapter 1](7dd1ec0d-a43e-470e-ad8a-d86d69db2d9b.xhtml),
+    *Networks in a Nutshell*, a network is a system that is agnostic of the participants
+    of that system. Any given network has no knowledge of the entities or hosts that
+    are wired up to it. As such, it can give no such information to any new hosts
+    that try to connect to it. Instead, those hosts are responsible for broadcasting
+    information about themselves out to others. Not only that, they're responsible
+    for listening for broadcast information coming from other hosts so that they might
+    know what other resources or hosts are on their network. So, how exactly does
+    this happen?
+  prefs: []
+  type: TYPE_NORMAL
+- en: Node-to-node communication
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In just about all of the host-to-host interactions we've described in this book,
+    one host must resolve a domain name or IP address for another host by communicating
+    over a path of routers, switches, and gateways. However, this process of address
+    resolution through a chain of external host devices doesn't help us establish
+    the *initial* communication with the next host on our network. If we want our
+    host to successfully transmit information to the nearest neighbor in the network
+    path, we need to know specifically what address it might be listening on.
+  prefs: []
+  type: TYPE_NORMAL
+- en: While I realize you're already aware of this fact, I would wager that you don't
+    often think about the fact that when you establish a connection between two hosts,
+    that connection is purely *logical*. The expectation is that each router or switch
+    along the network path between your hosts will simply forward your packets along
+    to their target, creating an unbroken chain of physical connections. Taken together,
+    that chain of connections constitutes a single, logical connection. However, for
+    that to work, your host must first connect to the next-nearest neighbor in that
+    connection chain.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Every time we want to establish a higher-level connection with a remote host
+    over something such as TCP or HTTP, the software that operates at the device and
+    network level must determine the path for us. It does so by sending a message
+    to its nearest neighbor and, essentially, asking if that neighbor can resolve
+    a path. Then, that network device will forward the request to any of its neighbors,
+    asking the same thing. As long as one of them responds affirmatively, your nearest
+    neighbor will also respond affirmatively. If we consider our network as a tree,
+    with our host as the root, we can think of this process in terms of a recursive
+    tree-traversal algorithm. This recursive algorithm continues until one of two
+    possible determinations is made. In the event that a path cannot be established,
+    every leaf node of the network tree responds negatively, shown in the following
+    diagram:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![](img/eeb00f10-578c-4072-9ff7-4a5ea8b62b64.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'Meanwhile, in the event of a successful path determination, the target host
+    is eventually reached by some path through our network tree. In that case, *any *node
+    in our tree that can connect directly with our destination host will respond affirmatively,
+    and the affirmative responses will propagate all the way back to our source host,
+    notifying it that a connection can be made, shown in the following diagram:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![](img/dd7392f5-f1ab-456d-acdf-ab844953ccc6.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: Note, though, that the source only learns that a path *can* be established.
+    Even in the best cases, if multiple paths can be established between two hosts,
+    there is no guarantee that any given packet will travel along the optimal path
+    (if there even is an optimal path). In fact, there's no guarantee that all the
+    packets of a given request will even travel along the *same *path. This is what
+    causes the out-of-order packet delivery that we discussed in [Chapter 11](a4847953-41ef-48ee-aa39-75f920467992.xhtml),
+    *The Transport Layer – TCP, UDP, and Multicasting*.
+  prefs: []
+  type: TYPE_NORMAL
+- en: So far, we've only considered connections as being established between two hosts
+    over a transport or application layer protocol. With that as our context, there
+    hasn't been any need for us to *identify* anything but our target host, using
+    an IP address or domain name and the designated listening port. Using only these
+    identifying details, network and device layer protocols have done the work of
+    establishing a path on our network and forwarding our requests packets along that
+    path. Our software simply receives an open line of communication between the two
+    hosts.
+  prefs: []
+  type: TYPE_NORMAL
+- en: What you may not realize, though, is that the software running at the network
+    layer has to explicitly identify the nearest neighbor in our network by *its*
+    network address. Moreover, our host has to communicate with its nearest neighbor
+    through a port and communication mechanism that the neighbor is configured to
+    listen for. This leaves us with the sort of chicken-and-egg problem that is so
+    common when trying to solve communication over an agnostic network. How can a
+    source host identify the address and protocol with which to communicate with a
+    destination host, without first communicating with the destination host to learn
+    of those details? The answer is with a broadcast address.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Broadcast addressing
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: When you first connect a device to a network, there are a number of things that
+    must be coordinated between the new device and any other devices on the network
+    before it can effectively communicate over that network. Your device must be assigned
+    a local IP address, and it must be informed of the IP addresses and listening
+    ports or sockets for any devices to which it has a direct connection. Additionally,
+    any gateways into your subnetwork must be made aware of the new device so that,
+    if any host outside your subnetwork wants to establish a connection, the gateways
+    will respond affirmatively to any pathing requests they receive while attempting
+    to establish a connection.
+  prefs: []
+  type: TYPE_NORMAL
+- en: To establish the initial identity of a new host on a network, every standard
+    network device will have what's known as a **broadcast address. **A broadcast
+    address is simply any address on which every device on a given network or subnetwork
+    is expected to be listening. With this standard universally established, any new
+    host attempting to connect to a network can establish its presence for any devices
+    that may need to know about it by sending out basic identifying information to
+    a broadcast address. Once a message is broadcast, routers, switches, and gateways
+    can use whatever conventions or protocols they've been configured with to mutually
+    agree on a new network address to provision for the new host.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In the initial broadcast message, a new host won't have been assigned an IP
+    address from its network. However, it still needs to establish a unique identifier
+    by which other devices can communicate *back *to it. To give its nearest physical
+    neighbor some identifier by that to return configuration information, a new host
+    will typically send a **media access control address**, or **MAC address,** as
+    part of its initial broadcast message. A MAC address is a globally unique identifier
+    that's given to every single physical **network interface card** (**NIC**).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The MAC address is occasionally called the **burned-in** address, since it
+    is configured and fixed at the hardware level at the time the network card was
+    fabricated, and cannot be changed by any means. A MAC address consists of six
+    hexadecimal digits, separated by a colon, hyphen, or no separator at all. And
+    because there is a unique MAC address per network card, any host which is configured
+    with multiple network cards is going to have multiple MAC addresses, identifying
+    each physical interface it has available to it. If you''ve ever opened up your
+    command Terminal and run this command, you''ll have seen your MAC address for
+    any network card installed on your machine:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE0]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'In the following command terminal, it''s the property labeled Physical Address:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![](img/6de78d99-45ad-4a9e-9ad2-b29915b915ff.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: Since a MAC address cannot be changed and is known to be globally unique, a
+    new host may broadcast it out to its network and hope for network configuration
+    details, including IP address assignment and subnet mask specification, in response.
+  prefs: []
+  type: TYPE_NORMAL
+- en: By using the broadcast information from each connection host, network servers
+    and routers can build an internal representation of the logical topology of their
+    network. This topology and registry of device configuration are used to control
+    and monitor the flow of inter-network communication. So, now, the question is,
+    how can we leverage these broadcasts and other information when we need to establish
+    the same knowledge about the networks our software is hosted on?
+  prefs: []
+  type: TYPE_NORMAL
+- en: Network analysis
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Now that we have a basic picture of how network information is communicated
+    between arbitrary nodes across our network, we can start to leverage that information
+    to implement lower-level network software from within our .NET Core projects.
+    So, what information are we looking for and how can we use it in code?
+  prefs: []
+  type: TYPE_NORMAL
+- en: Understanding the NetworkInformation namespace
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Many of the details and network interactions we discussed in the previous section
+    exist and are managed by software and devices lower in the network stack than
+    .NET Core libraries can provide access to. There is, however, a wealth of information
+    about the transport layer traffic that moves through your application's listening
+    network sockets and interfaces. For that information, the .NET Standard provides
+    the `System.Net.NetworkInformation` namespace.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The `NetworkInformation` namespace provides an array of utility classes and
+    interfaces that can be used to build a comprehensive picture of the ways in which
+    your software interacts with the network it's connected to. Using the classes
+    in this namespace, you can learn about packet traffic, device addresses, including
+    the registered IP addresses for routers and gateways on your current sub-network,
+    and utilities for identifying the availability of remote devices in your network.
+  prefs: []
+  type: TYPE_NORMAL
+- en: What's especially interesting about this namespace and its use case is that
+    it can be used to investigate *all *connections and traffic moving across your
+    host machine. This gives you the ability to analyze how network requests targeting
+    a different process co-located on your machine could potentially impact the performance
+    and behavior of your own network software. Additionally, leveraging this class
+    gives your code the information that's necessary to manage connections and sockets
+    for more internal processes, allowing for such applications as writing your own
+    application server or a request management solution. So, what kind of information
+    can we glean from the classes in this namespace?
+  prefs: []
+  type: TYPE_NORMAL
+- en: Querying physical device information
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Suppose for a moment that you want to write an application that provides detailed
+    information about the network devices on the host computer. Certainly, you could
+    use something such as Powershell scripting or simple batch processes to run terminal
+    commands such as `ipconfig /all` or the `netsh dump` command, writing the results
+    to a text file. But what if you want more information about your system? What
+    if you want to deploy this software to multiple hosts with incompatible terminals?
+    A scripting solution, while relatively simple, is incredibly inflexible and limited
+    in its potential scope.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Instead, using the `NetworkInterface` class and its subclasses, you could access
+    information about your network devices directly from within your software solution.
+    Using the `NetworkInterface` abstract class, we can access every physical network
+    device detectable from our software''s host operating system and display information
+    about the current active status, interface type, physical MAC address, current
+    operational status, and more. To see that in action, let''s write our network
+    information display software. We''ll start by creating a console application for
+    our demo code for this chapter:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE1]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Then, from within our `Main()` method, we''ll get a list of all network adapters
+    that are currently detectable by our operating system using the `GetAllNetworkInterfaces()`
+    static method on the `NetworkInterface` class. This will return an array of subclasses
+    of the `NetworkInterface` abstract class, with each instance in the array representing
+    exactly one physical device on your system. Once we have the list of devices,
+    we''ll loop through them and see what information we can discover about them using
+    this interface:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE2]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The `NetworkInterface` class is actually an abstract base class. The resulting
+    instances that are returned to our adapters container will be instances of a `SystemNetworkInterface`.
+    Now, let''s find out what information we can glean from these adapter instances.
+    We''ll just use a basic loop through our adapters to print out some of the more
+    interesting properties and find out just what kind of details we can learn about:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE3]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'As you can see by the properties, through this class, we can gather just about
+    the same level of detail about our host machine as we might gather from a terminal
+    command querying our NIC. In fact, we can confirm as much by running an `ipconig
+    /all` command, and comparing the device details that are returned against the
+    output of our program. Doing so on my own machine, we can compare my program output
+    against the terminal output I showed you in the previous section of this chapter:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![](img/29444859-3296-4464-9475-3f3c13e688a5.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: Here, we can see that we can access much of the information returned by our
+    `ipconfig /all` call from the previous section. While the hex digits aren't grouped
+    into dash-delimited pairs, the `PhysicalAddress` property obviously maps directly
+    to the MAC address for your adapter, and the `OperationalStatus` property gives
+    an accurate representation of the availability of the device for network requests.
+    We can also see that my operating system is configured to use a Teredo tunneling
+    adapter to allow IPv4 communication over IPv6 sub-networks, just as we discussed
+    in [Chapter 12](0311281d-9a21-4dd0-a3cd-4e047ced436a.xhtml), *The Internet Protocol*.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Exploring the `NetworkInterface` class more, you can find information about
+    the devices your network adapters are connected to. By requesting information
+    that's through the `GetIPProperties()` method, you have access to details about
+    the network configuration information currently set for each adapter. This includes
+    the IP addresses for  DHCP servers, DNS servers, and your sub-networks gateway
+    device, as well as any registered multicast or unicast addresses registered on
+    your machine for other devices on your network.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The depth of information we can learn about our physical adapters from this
+    class is considerably more extensive than what we can learn from our terminal
+    commands. Especially when we consider the information retrieved by the `GetIPProperties()`
+    method. The benefit of using this class over a simple terminal command, though,
+    is that it gives us access to all of this information from insideour software.
+    We can implement conditional behavior based on device availability, or provide
+    meaningful statistics and information to a system health report all without having
+    to rely on host-specific terminal commands and external load modules.
+  prefs: []
+  type: TYPE_NORMAL
+- en: With this information, we could feasibly implement our own software for broadcasting
+    our MAC address and requesting addressing, as well as configuration information
+    from our network. Even if you don't ever find a need for implementing that code
+    yourself, this hopefully paints a clear picture of the kind of features opened
+    up to you with this class. This provides a host-agnostic mechanism for low-level
+    network details and programming. So, what other information can we learn from
+    the classes in the `System.Net.NetworkInformation` namespace?
+  prefs: []
+  type: TYPE_NORMAL
+- en: Querying connection information
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: While learning information about the status and availability of our own network
+    interfaces is useful (and, indeed, even critical in many contexts), it doesn't
+    paint the complete picture. For that, we'll need to examine the incoming and outgoing
+    network traffic our adapters are being exposed to. Thankfully, as was the case
+    with information about our network adapters, the .NET standard provides a set
+    of classes that can display and monitor this information through clean and easy-to-use
+    abstractions.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Instead of interacting with a `NetworkInterface` method, we'll want to look
+    at our TCP connections, so for this next segment, we'll be looking at the `IPGlobalProperties`
+    abstract base class. In much the same way that we examined the network interface
+    information by calling the `GetAllNetworkInterfaces()` method, we can collect
+    a wealth of IP traffic information using the `GetIpGlobalProperties()` static
+    method. Once we have that, we can get everything from a list of all the active
+    TCP connections (useful for determining the current load on your device), to statistics
+    about incoming and outgoing IP packets. You can even sort your IP traffic statistics
+    by the transport protocol that facilitated their delivery, with distinct methods
+    targeting TCP statistics and UDP statistics.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let''s see what sort of information we can learn about using these classes
+    and their queries. We''ll start by learning about what active TCP connections
+    we have running against our machine at the current moment. First, we''ll get our
+    global properties, and then we''ll request our active TCP connection information:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE4]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Now that we have our active connections, we can loop through them to determine
+    who is connected to who, and what state the connection is in:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE5]'
+  prefs: []
+  type: TYPE_PRE
+- en: By running this, you should see some variation of your localhost address (either
+    `192.168.1.XXX`, or `127.0.0.1`) as the local address for every connection, and
+    it might not seem entirely obvious why you might want access to that information.
+    However, consider a scenario where you've got multiple IP addresses registered
+    to a single host, and each address is mapped to a single, distinct application
+    process. Let's say you've configured these distinct listening patterns through
+    the `UsingUrls(...)` method of your kestrel `IWebHostBuilder`, as we discussed
+    in [Chapter 9](e93c024e-3366-46f3-b565-adc20317e6ec.xhtml), *HTTP in .NET*. If
+    that's the case, you could use the local address information to distinguish between
+    connections to different applications on your host. This could give you insight
+    into application traffic and resource usage. I expect by now you've got an intuitive
+    idea of how that could be immensely useful in a number of contexts.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Monitoring traffic and remote device information
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Finally, let's wrap up our discussion about the `System.Net.NetworkInterface`
+    namespace by looking at some of the traffic statistics and information made available
+    through its classes. This will give us statistical information that's about the
+    total number of packets we've received at a given point in time, fragmentation
+    failures, dropped outbound packets, and much more. We can request these statistics
+    based on IP version, with distinct methods for `GetIPv4GlobalStatistics()` and
+    `GetIPv6GlobalStatistics()`, as well as filtering those statistics by transport
+    protocol with `GetTcpIPv4Statistics()` and `GetUdpIPv4Statistics()`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Taking a look at some of the properties made available through instances of
+    the `IPGlobalStatistics` class, we can see the kind of valuable information we
+    can draw out of our traffic. Let''s look at just a few examples of this in some
+    sample code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE6]'
+  prefs: []
+  type: TYPE_PRE
+- en: Here, you can see the kind of picture you can paint about your network's overall
+    health and stability. We have access to information about fragmentation and reassembly
+    failure, dropped packets, and the overall incoming and outgoing traffic. In this
+    case, we were looking at our global IP traffic, but we could have just as easily
+    sorted this by TCP and UDP for more meaningful breakdowns of our network interactions.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Not all properties of the `IpGlobalStatistics` are supported on all platforms.
+    Some information about discarded packets and fragment failures will only be available
+    on Windows hosts. Make sure to validate that the statistical information you want
+    access to is supported by the platform your software will be deployed to, and
+    always write your code to degrade gracefully when host support may be limited.
+  prefs: []
+  type: TYPE_NORMAL
+- en: While I hope this has provided a clear understanding of just what sort of information
+    you can learn about the broader network context surrounding your hosted software,
+    I've only begun to scratch the service of the information that's available through
+    the `System.Net.NetworkInformation` namespace. I'd strongly encourage you to read
+    through the Microsoft docs yourself to see what other tools are at your disposal.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Additional tools and analysis
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'While the information we can capture with the `System.Net.NetworkInformation`
+    namespace provides a very clear picture of the state of our network, it does have
+    one major shortcoming when it comes to network analysis: it cannot provide any
+    insight into the content of any traffic or requests in real time. The only way
+    to access that information in code is to actively register a listener on an open
+    port and process the incoming traffic accordingly. So, for network and DevOps
+    engineers who need to monitor the content of their network traffic as well as
+    the volume and context, what other tools are available?'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Using Wireshark for packet inspection
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: As we saw back in [Chapter 4](9d6266fb-4428-4044-b63b-44f1317f64e7.xhtml), *Packets
+    and Streams*, Wireshark can be a powerful tool for performing network analysis
+    and what's called **packet sniffing**. Put simply, packet sniffing is inspecting
+    the content of packets outside the context of their intended recipient. So, for
+    example, if I've requested a web page in my browser, but then investigate the
+    packet stream that makes up that web page with a tool such as Wireshark, that
+    would constitute packet sniffing. The packets were intended for receipt and use
+    by my browser, not Wireshark. It doesn't actually matter whether I was the one
+    who requested them through the browser in the first place.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In some contexts, this can be a dangerous tool for malicious actors to gain
+    access to other internet traffic. However, in the hands of a network engineer
+    behaving ethically, it can be a wonderful way to identify unintended or undesirable
+    activity on your network.  So, how can we use this to our advantage?
+  prefs: []
+  type: TYPE_NORMAL
+- en: Consider a case where you've got software running that uses the `System.Net.NetworkInformation`
+    classes to provide real-time health information about your hosting environment.
+    If you've designed your alerting mechanism well (as discussed in [Chapter 16](5abf726d-855c-410e-8547-a54da3deac58.xhtml),* Performance
+    Analysis and Monitoring*), you would quickly be made aware of any unanticipated
+    spikes in network traffic beyond a given threshold. If that happens, the information
+    that's available to you from your health monitoring software is limited by what's
+    provided by the `System.Net.NetworkInformation` library.
+  prefs: []
+  type: TYPE_NORMAL
+- en: With the resources we've discussed in this chapter, you can devise a sound strategy
+    for detecting and responding to those kinds of critical network events. Simply
+    use the statistical information that's available through the `System.Net.NetworkInformation`
+    classes as your alert system, and a more robust inspection tool, such as Wireshark,
+    for deeper analysis when alerts arise. This can give you deeper insight into what
+    information is being conveyed to your host in that high-volume spike of packets.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The basics of using Wireshark for rudimentary packet sniffing were discussed
+    in [Chapter 4](9d6266fb-4428-4044-b63b-44f1317f64e7.xhtml), *Packets and Streams*,
+    in the *The Anatomy of a Packet* *section*. With that in mind, I won't belabor
+    the point, as more advanced use cases for Wireshark are well beyond the scope
+    of this book. However, I felt it was important to address it in this chapter,
+    since anyone who's serious about network programming and all it entails should
+    have as deep of a set of tools at their disposal as possible. To that end, I'd
+    highly encourage you to set aside time at your job, or even in your free time,
+    to learn and practice using Wireshark and other packet inspection tools for deep
+    network analysis.
+  prefs: []
+  type: TYPE_NORMAL
+- en: With that out of the way, we're ready to tackle our final topic. In the next
+    chapter, we'll be exploring the SSH interaction scheme. We'll learn how it came
+    about, how it's evolved over time, and how we can use it for remote process invocation
+    and host access.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Summary
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In this chapter, we explored the very niche, but extremely powerful, subject
+    of network device analysis using .NET Core libraries. We started by learning about
+    how network devices communicate information about themselves across device-agnostic
+    connections to establish an internal registry of nearby device addresses and interaction
+    mechanisms. In doing so, we learned about the use of broadcasting, and broadcast
+    addresses for transmitting messages reliably, even without any connection information
+    about the devices you intend to communicate with. Finally, we learned how uniquely
+    addressing hardware interfaces can facilitate device identification even in the
+    absence of a registered network address.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Once we learned about the features and interactions that are necessary to facilitate
+    more typical interactions between hosts on a network, we looked at how we can
+    access that low-level network information from within our .NET applications. We
+    explored various classes within the `System.Net.NetworkInformation` namespace,
+    and saw how we could use them to access valuable information about our network
+    adapters, and the devices to which they were connected. We saw how we could access
+    critical operational information about our physical network adapters programmatically,
+    giving us access to a wide range of diagnostic and statistical information. We
+    also looked at how we could examine and monitor IP traffic against each of our
+    network interfaces to perform packet inspection and network health analysis. Finally,
+    we considered additional tools available that could provide greater context and
+    detail about network traffic, and how we could use all of this information to
+    identify and respond to an unstable network. Going into our final chapter, we'll
+    look at how computers can control and operate hosts remotely over a network using
+    SSH.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Questions
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Describe the process of address resolution, as it occurs at the network layer.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: What is a broadcast address? How is it used?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: What is a MAC address? How is it distinct from other network addresses?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: What sort of information can be learned from instances of the `NetworkInterface`
+    class?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: What is packet sniffing? How is it useful in network analysis?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: What sort of traffic information can we query using the `NetworkInformation`
+    classes?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: How can we use traffic statistics to detect and respond to unstable network
+    conditions?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Further reading
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Once again, we've covered a relatively niche topic in this chapter, and the
+    additional resources for learning more are few and far between. I'd certainly
+    recommend you explore the Microsoft documentation for the `System.Net.NetworkInformation`
+    namespace, which can be found here: [https://docs.microsoft.com/en-us/dotnet/api/system.net.networkinformation?view=netcore-3.0](https://docs.microsoft.com/en-us/dotnet/api/system.net.networkinformation?view=netcore-3.0)
+  prefs: []
+  type: TYPE_NORMAL
+- en: Additionally, if you have any interest in continuing down the path of network
+    traffic analysis and packet inspection, I'd recommend the book *Packet Analysis
+    with Wireshark* by Anish Nath. This book provides an extensive how-to for investigating
+    and understanding the nature of the raw network packets that come into contact
+    with your network adapters moment to moment. It's available through Packt, here: [https://www.packtpub.com/networking-and-servers/packet-analysis-wireshark](https://www.packtpub.com/networking-and-servers/packet-analysis-wireshark).
+  prefs: []
+  type: TYPE_NORMAL

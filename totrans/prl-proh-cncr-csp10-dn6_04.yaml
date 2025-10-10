@@ -1,0 +1,1063 @@
+- en: '*Chapter 3*: Best Practices for Managed Threading'
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: When building applications that leverage parallelism and concurrency, developers
+    need to be aware of some best practices regarding integrating managed threading
+    concepts. This chapter will assist in this capacity. We will cover important concepts
+    such as working with static data, avoiding deadlocks, and exhausting managed resources.
+    These are all areas that can lead to unstable applications and unexpected behavior.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In this chapter, you will learn the following concepts:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Handling static objects
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Managing deadlocks and race conditions
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Threading limits and other recommendations
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: By the end of this chapter, you will have the knowledge to avoid the most common
+    managed threading pitfalls.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Technical requirements
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'To follow along with the examples in this chapter, the following software is
+    recommended for Windows developers:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Visual Studio 2022 version 17.0 or later
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: .NET 6
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: While these are recommended, if you have .NET 6 installed, you can use your
+    preferred editor. For example, Visual Studio 2022 for Mac on macOS 10.13 or later,
+    JetBrains Rider, or Visual Studio Code will work just as well.
+  prefs: []
+  type: TYPE_NORMAL
+- en: All the code examples for this chapter can be found on GitHub at [https://github.com/PacktPublishing/Parallel-Programming-and-Concurrency-with-C-sharp-10-and-.NET-6/tree/main/chapter03](https://github.com/PacktPublishing/Parallel-Programming-and-Concurrency-with-C-sharp-10-and-.NET-6/tree/main/chapter03).
+  prefs: []
+  type: TYPE_NORMAL
+- en: We will get started by discussing some best practices for handling static data
+    in .NET.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Handling static objects
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: When working with static data in .NET, there are some important things to understand
+    when it comes to managed threading.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Static data and constructors
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: One important item to understand about accessing static data from managed threads
+    relates to constructors. Before a static member of any class can be accessed,
+    its **static constructor** must first finish running. The runtime will block thread
+    execution until the static constructor has run to ensure that all required initialization
+    has finished.
+  prefs: []
+  type: TYPE_NORMAL
+- en: If you are using static objects within your own code base, you will know which
+    classes have static constructors and can control the complexity of the logic inside
+    them. When the static data is outside of your control, inside a third-party library
+    or .NET itself, things may not be so clear.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Let’s try a quick example to illustrate the potential delays that can be encountered
+    in this scenario.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Start by creating a new .NET console application in Visual Studio named `ThreadingStaticDataExample`.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Add a new class to the project named `WorkstationState` with the following
+    static members:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE0]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: This class will hold some information about the current workstation, including
+    the host name, local IP address, and whether the network is currently available.
+    The private `GetLocalIpAddress` method fetches the local IP based on a provided
+    host name.
+  prefs: []
+  type: TYPE_NORMAL
+- en: There is a static constructor for `WorkstationState` that sets the initial property
+    data and injects a delay of two seconds with a `Thread.Sleep` call. This will
+    help us simulate the application fetching some other network information that
+    takes some time to retrieve on a slow network connection.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Next, add a class named `WorkstationHelper`. This class will contain an async
+    method to update the static `IsNetworkAvailable` and `NetworkConnectivityLastUpdated`
+    properties in `WorkstationState` and return the value of `IsNetworkAvailable`
+    to the caller:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE1]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: There is also a `Task.Delay` call being awaited if you would like to call this
+    in a loop and experiment by varying the injected delay.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Finally, update `Program.cs` to call `GetNetworkAvailability` and update the
+    console output with the connectivity, host name, and IP address:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE2]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Run the program and examine the output. You can see that there is a two second
+    delay between the times in the two `Console.WriteLine` calls injected by the static
+    constructor:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE3]'
+  prefs: []
+  type: TYPE_PRE
+- en: Static constructors are one aspect of static data to keep in mind when working
+    with managed threading. A more common issue is controlling concurrent read/write
+    access to static objects across threads.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Controlling shared access to static objects
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: When it comes to static data, the best practice is to avoid using it whenever
+    possible. In general, it makes your code less testable, less scalable, and more
+    prone to unexpected behavior when working with concurrency. However, there are
+    times when static data cannot be avoided. You may be working with a legacy code
+    base, where refactoring the code to remove statics can be risky or too large an
+    effort to undertake. Static classes can also be useful when data rarely changes,
+    or when the classes are stateless.
+  prefs: []
+  type: TYPE_NORMAL
+- en: For cases where static objects are unavoidable, some precautions can be taken.
+    Let’s review some of them and discuss the merits of each, starting with locking
+    mechanisms.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Locks
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: In [*Chapter 1*](B18552_01_ePub.xhtml#_idTextAnchor014)*,* we discussed some
+    strategies for locking objects for shared use. **Locks** are even more important
+    when working with static variables because of the chance of concurrent access
+    increases with the increased scope of the object.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The simplest way of preventing concurrent access to an object from multiple
+    threads is to enclose any code that accesses it with a lock. Let’s modify the
+    code in `WorkstationHelper` to prevent multiple calls to `GetNetworkActivity`
+    from writing to `WorkstationState` properties concurrently:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE4]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE5]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE6]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE7]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE8]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE9]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE10]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE11]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE12]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE13]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE14]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE15]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE16]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE17]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE18]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE19]'
+  prefs: []
+  type: TYPE_PRE
+- en: We have added a private static `_workstationLock` object, and we are using it
+    as part of the lock block enclosing the writes to `WorkstationState` properties.
+    If `GetNetworkAvailability` were now used in a `Parallel.ForEach` or some other
+    concurrent operation, only one thread could enter that lock block at a time.
+  prefs: []
+  type: TYPE_NORMAL
+- en: You can use any of the locking mechanisms that were discussed in [*Chapter 1*](B18552_01_ePub.xhtml#_idTextAnchor014).
+    Choose the feature that works best for your scenario. Another .NET feature you
+    can leverage with static members is the `ThreadStatic` attribute.
+  prefs: []
+  type: TYPE_NORMAL
+- en: ThreadStatic attribute
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: The `ThreadStatic` attribute can be added to a static field to indicate that
+    a separate static instance of the object should be created for each thread. The
+    `ThreadStatic` attribute should only be used when this is the desired behavior,
+    and it is well documented in your code. It can produce unexpected results when
+    used improperly.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Fields marked as `ThreadStatic` should not have their data initialized in a
+    constructor, as the initialization will only apply to the current thread. The
+    value on all other threads will be `null` or the default value for that type.
+  prefs: []
+  type: TYPE_NORMAL
+- en: If you applied the `ThreadStatic` attribute to the `NetworkConnectivityLastUpdated`
+    property of `WorkstationState` and call `WorkstationHelper.GetNetworkAvailability`
+    thirty times in a `Parallel.For` loop, the value read in `Program.cs` at the end
+    may or may not be the last value written to one of the static instances. The variable
+    in `Program.cs` will contain the last value written from the main thread inside
+    the `Parallel.For` loop.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'To try it for yourself, add the `ThreadStatic` attribute to `NetworkConnectivityLastUpdated`
+    and make it an internal field instead of a property. The attribute cannot be applied
+    to properties:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE20]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Then update `Program.cs` to use a `Parallel.For` loop:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE21]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: The time between the date/time values in the output will now vary each time
+    you run the program because the final value written to the console may not be
+    the final value across all threads.
+  prefs: []
+  type: TYPE_NORMAL
+- en: While `ThreadStatic` should be applied only in scenarios where instances per
+    thread are necessary, another pattern similar in application to statics is the
+    **singleton**. Let’s discuss the use of singletons in a multithreaded application.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Working with singletons
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: The singleton pattern is an object **design pattern** that only allows a single
+    instance of itself to be created. This design pattern is one of the most common
+    and is known by most .NET developers. Every mainstream **dependency injection
+    (DI)** framework allows registered types to be registered as singletons. The container
+    will only create one instance for each of these types, providing the same instances
+    every time the type is requested.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We can manually create a singleton for our `WorkstationState` with a `lock`
+    and a little extra code. This is the `WorkstationStateSingleton`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE22]'
+  prefs: []
+  type: TYPE_PRE
+- en: The complete implementation of the class can be found in the GitHub repository
+    referenced in the *Technical requirements* section of this chapter. Look at the
+    `ThreadingStaticDataExample` in the `chapter3` folder.
+  prefs: []
+  type: TYPE_NORMAL
+- en: There are two steps taken to make this a singleton. First, the constructor is
+    private so only the `WorkstationStateSingleton` can create an instance of itself.
+    Second, a static `Instance` method is created. It returns the `_singleton` instance
+    of itself if it is not `null`. Otherwise, it creates the instance to return. Surrounding
+    this code with the `_lock` ensures that the instances are not created twice on
+    different concurrent threads.
+  prefs: []
+  type: TYPE_NORMAL
+- en: A singleton presents the same challenges as a static class. All shared data
+    should be protected by locks if they can be accessed concurrently by managed threads.
+    The added challenge with singletons that are registered in a DI container is that
+    a `lock` object, `Mutex`, or another mechanism must be declared at the same scope
+    as the container. This will ensure that all data that can potentially use the
+    singleton can also enforce the same lock.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs: []
+  type: TYPE_NORMAL
+- en: Please note that the use of singletons is generally not considered a good practice
+    today. For this reason, many developers consider them an anti-pattern. However,
+    it is important to understand them and how existing singletons in your code may
+    be impacted by multithreaded code.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**Deadlocks** are one of the pitfalls of aggressive locking. Aggressive locking
+    is when you are locking uses of an object in many parts of the code that could
+    be executing in parallel. In the next section, we will discuss deadlocks and **race
+    conditions** in managed threading.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Managing deadlocks and race conditions
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'As with many tools at a developer’s disposal, misusing features of managed
+    threading can have adverse impacts on your applications at runtime. Deadlocks
+    and race conditions are two scenarios that can be created because of multithreaded
+    programming:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: A **deadlock** happens when multiple threads are trying to lock the same resource
+    and as a result, cannot continue executing.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Race conditions** happen when multiple threads are proceeding toward updating
+    a particular routine, and a correct outcome is dependent on the order in which
+    they execute it.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '![Figure 3.2 – Two threads in contention for the same resources, causing a
+    deadlock ](img/Figure_3.1_B18552.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Figure 3.2 – Two threads in contention for the same resources, causing a deadlock
+  prefs: []
+  type: TYPE_NORMAL
+- en: First, let’s discuss deadlocks and some techniques for avoiding them.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Mitigating deadlocks
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: It is critical to avoid deadlocks in your applications. If one of the threads
+    involved in a deadlock is the application’s UI thread, it will cause the application
+    to freeze. When only non-UI threads are deadlocked, it can be harder to diagnose
+    the problem. Deadlocked thread pool threads will prevent an application from closing,
+    but deadlocked background threads will not.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Well-instrumented code is essential in debugging problems when they occur in
+    a production environment. If the issue can be reproduced in your own development
+    environment, stepping through the code with the Visual Studio debugger is the
+    fastest way to find the source of a deadlock. We will discuss debugging techniques
+    in detail in [*Chapter 10*](B18552_10_ePub.xhtml#_idTextAnchor158).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'One of the easiest ways to create a deadlock is through recursion or nested
+    methods that try to acquire a lock on the same resource. Look at the following
+    code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE23]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE24]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE25]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE26]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE27]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE28]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE29]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE30]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE31]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE32]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE33]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE34]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE35]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE36]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE37]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE38]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE39]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE40]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE41]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE42]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE43]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE44]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE45]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE46]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE47]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE48]'
+  prefs: []
+  type: TYPE_PRE
+- en: The `ProcessData` method is locking the `_lock` object and processing with `_data`.
+    However, it is calling `AddData,` which also tries to acquire the same lock. This
+    lock will never become available, and the process will be deadlocked. In this
+    case, the problem is apparent. What if `AddData` is called from multiple places
+    or some `Parallel.ForEach` any loops are involved in the parent code? Some of
+    the parent code uses `_data` and acquire a lock, but some do not. This is a case
+    where non-blocking read locks in the `ReaderWriterLockSlim` can help prevent deadlocks.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Another way to prevent deadlocks is by adding a timeout to the lock attempt
+    with `Monitor.TryEnter`. In this example, the code will time out if a lock cannot
+    be acquired within one second:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE49]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE50]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE51]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE52]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE53]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE54]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE55]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE56]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE57]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE58]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE59]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE60]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE61]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE62]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE63]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE64]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE65]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE66]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE67]'
+  prefs: []
+  type: TYPE_PRE
+- en: Logging any failures to acquire locks can help to pinpoint possible sources
+    of deadlocks in your code so you can rework the code to avoid them.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Next, let’s examine how race conditions can occur in multithreaded applications.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Avoiding race conditions
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'A race condition occurs when multiple threads are reading and writing the same
+    variables simultaneously. Without any locks in place, the outcome can be wildly
+    unpredictable. Some operations can be overwritten by other parallel threads’ results.
+    Even with locks in place, the order of two thread operations can change the result.
+    Here is a simple example without locks that performs some addition and multiplication
+    in parallel:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE68]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE69]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE70]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE71]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE72]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE73]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE74]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE75]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE76]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE77]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE78]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE79]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE80]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE81]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE82]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE83]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE84]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE85]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE86]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE87]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE88]'
+  prefs: []
+  type: TYPE_PRE
+- en: We all know that when combining addition and multiplication, the order of operations
+    is important. If the two operations are processed sequentially, the two results
+    could be either `180` or `45`, but if both `AddValue` and `MultiplyValue` read
+    the initial value of `3` before performing their respective operations, the last
+    method to complete will write either `18` or `30` as the final value of `_runningTotal`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'If you want to ensure that multiplication happens before addition, the `PerformCalculations`
+    method can be rewritten to use the `ContinueWith` method on the `Task` returned
+    from `MultiplyValue`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE89]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE90]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE91]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE92]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE93]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE94]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE95]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE96]'
+  prefs: []
+  type: TYPE_PRE
+- en: This code will always multiply before adding and will always finish with `_runningTotal`
+    equaling `45`. Using `async` and `await` throughout the code ensures that the
+    UI or service process remains responsive while using threads from the thread pool
+    as needed.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The `Interlocked` class discussed in the previous chapter can also be used
+    to perform mathematic operations on shared resources. `Interlocked.Add` and `Interlocked.Exchange`
+    can perform thread-safe operations on the `_runningTotal` variable in parallel.
+    Here is the original `Parallel.Invoke` example modified to use `Interlocked` methods
+    with `_runningTotal`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE97]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE98]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE99]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE100]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE101]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE102]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE103]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE104]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE105]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE106]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE107]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE108]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE109]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE110]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE111]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE112]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE113]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE114]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE115]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE116]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE117]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE118]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE119]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE120]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE121]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE122]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE123]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE124]'
+  prefs: []
+  type: TYPE_PRE
+- en: The two operations could still perform in different orders, but the uses of
+    `_runningTotal` are now locked and thread-safe. The **Interlocked** class is more
+    efficient than using a lock statement and will yield greater performance for simple
+    changes like these.
+  prefs: []
+  type: TYPE_NORMAL
+- en: It is important to guard all shared resources when performing concurrent operations
+    in your code. By creating a well-designed locking strategy, you will achieve the
+    best possible performance while maintaining thread safety in your application.
+    Let’s finish up this chapter with some guidance around threading limits.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Threading limits and other recommendations
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: So, it sounds like using multiple threads can really speed up your application’s
+    performance. You should probably start replacing all your `foreach` loops with
+    `Parallel.ForEach` loop and start calling all your services and helper methods
+    on thread pool threads, right? Are there any limits and what are they? Well, when
+    it comes to threading, there absolutely are limits.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The number of threads that can execute simultaneously is limited by the number
+    of processors and processor cores on the system. There is no way around hardware
+    limitations, as the CPU (or virtual CPU when running on a virtual machine) can
+    only run so many threads. In addition, your application must share these CPUs
+    with other processes running on the system. If your CPU has four cores, it is
+    actively running five other applications, and your program is trying to execute
+    a process with multiple threads, the system is not likely to accept more than
+    one of your threads at a time.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The .NET thread pool is optimized to handle different scenarios based on the
+    number of threads available, but you can do some things to guard against taxing
+    the system. Some parallel operations such as `Parallel.ForEach` can limit how
+    many threads the loop will try to use. You can provide a `ParallelOptions` object
+    to the operation and set the `MaxDegreeOfParallelism` option. By default, the
+    loop will use as many threads as the scheduler will provide.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'You can ensure that the maximum does not exceed half the number of available
+    cores on the system with the following implementation:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE125]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE126]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE127]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE128]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE129]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE130]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE131]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE132]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE133]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE134]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE135]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE136]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE137]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'PLINQ operations can also limit the max degree of parallelism with the `WithDegreeOfParallelism`
+    extension method:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE138]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE139]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE140]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE141]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE142]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE143]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE144]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE145]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE146]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE147]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE148]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE149]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'An application can also adjust the thread pool maximum values, if necessary.
+    By calling `ThreadPool.SetMaxThreads`, you can change the maximum values for `workerThreads`
+    and `completionPortThreads`. `completionPortThreads` is the number of async I/O
+    threads on the thread pool. It is usually not required to change these values,
+    and there are some limits to the values you can set. The maximum cannot be set
+    to less than the number of cores on the system or less than the current minimum
+    values on the thread pool. You can query the current minimums with `ThreadPool.GetMinThreads`.
+    Here is an example of how to safely set the maximum thread values to values greater
+    than the current minimums:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE150]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE151]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE152]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE153]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE154]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE155]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE156]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE157]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE158]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE159]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE160]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE161]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE162]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE163]'
+  prefs: []
+  type: TYPE_PRE
+- en: There are some other general guidelines to follow regarding the number of threads
+    to assign to an operation in your application. Try to avoid assigning multiple
+    threads to operations that share a resource. For example, if you have a service
+    that logs activity to a file, you should not assign more than one background worker
+    to do the logging. The blocking file I/O operations will prevent the second thread
+    from writing until the first one is complete. You are not gaining any efficiency
+    in this case.
+  prefs: []
+  type: TYPE_NORMAL
+- en: If you find yourself adding extensive locking to objects in your application,
+    you are either using too many threads or the task distribution needs to be changed
+    to reduce contention for resources. Try to divide threaded task responsibility
+    by the types of data being consumed. You might have many parallel tasks calling
+    services to fetch data, but only one or two threads are needed to process the
+    data once it is returned.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'You may have heard the term **thread starvation**. This usually happens when
+    too many threads are blocking or waiting for resources to become available. There
+    are some common scenarios where this happens:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**Locks**: There are too many threads competing for the same locked resources.
+    Analyze your code to determine how to reduce contention.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`async`. This allows the webserver to serve other requests while yours are
+    waiting for operations to complete.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Too much threading**: Creating too many thread pool threads will result in
+    more idle threads waiting to be processed. It also increases the likelihood of
+    thread contention and starvation.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Avoid these practices, and .NET will do its best to manage the thread pool to
+    serve your application and others on the system.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Finally, do not use `Thread.Suspend` and `Thread.Resume` trying to control the
+    sequence of operations across multiple threads. Instead, leverage other techniques
+    discussed in this chapter, including locking mechanisms and `Task.ContinueWith`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We have covered plenty of best practices for managed threading in this chapter.
+    Let’s wrap up by reviewing what we have learned.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Summary
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In this chapter, we discussed some best practices to follow when working with
+    managed threads in C# and .NET. We started by creating some examples of how to
+    manage and process static data in a multithreaded application. The examples illustrated
+    how to leverage locks, work with singletons, and how static constructors can impact
+    performance when working with static data. Next, we explored some techniques for
+    avoiding deadlocks and race conditions. Both pitfalls can be avoided if you design
+    your algorithms to minimize the need for locking. Finally, we looked at some features
+    of .NET that can adjust the limits of several parallel and thread pool operations.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'At this point, you are well prepared to start using managed threads responsibly
+    in your .NET projects. For some further reading on best practices with managed
+    threading, you can check out some recommendations on Microsoft Docs: https://docs.microsoft.com/en-us/dotnet/standard/threading/managed-threading-best-practices.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: In the next chapter, [*Chapter 4*](B18552_04_ePub.xhtml#_idTextAnchor072), you
+    will learn how to leverage parallelism and concurrency to keep your application
+    responsive and pick up some best practices for updating the UI from a non-UI thread.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Questions
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Which design pattern models how to create an object that only has one instance?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: What .NET attribute will cause a static field to have one instance per thread?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: What is a threading deadlock?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Which method on the `Monitor` class can be used to specify a timeout when trying
+    to access a locked resource?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Which lightweight class can be used to lock value types for atomic operations?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Which thread-safe operation can be used to add two integers?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: What option can be set on a `Parallel.For` or `Parallel.ForEach` loop to limit
+    the number of threads used?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: How can you limit the number of threads used in a PLINQ query?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: What is the name of the method to find the current minimum thread values on
+    the thread pool?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL

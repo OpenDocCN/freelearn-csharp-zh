@@ -1,0 +1,1140 @@
+- en: Event Sourcing
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: You should already understand what domain events are, why they are important,
+    and how to find and code them. Now, we will look into other uses for events. Hopefully,
+    after reading this chapter, it will be clear why we need to use events to update
+    the aggregate state. Before, we only used events inside our aggregates, and it
+    might look a bit like overkill to raise those events and do the state transition
+    separately, in the `When` method.
+  prefs: []
+  type: TYPE_NORMAL
+- en: This time, you will learn how events can be used to persist the state of an
+    object, instead of using traditional persistence mechanisms, such as SQL or a
+    document database. That is not an easy thing to grasp, but the reward is satisfying.
+    Using events to represent the system behavior and derive its state for any given
+    moment in time has many advantages. Of course, silver bullets do not exist, and
+    before deciding whether Event Sourcing is for you, it is essential that you understand
+    the possible drawbacks.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We will continue developing our aggregates with more event handlers. Also, we
+    will cover the concept of event streams and how streams relate to aggregates.
+    We will use an event store to persist our aggregates in streams and load them
+    back.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following topics will be covered in this chapter:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: What is Event Sourcing?
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Why do we use Event Sourcing?
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The challenges and drawbacks of Event Sourcing
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Why Event Sourcing became popular in the DDD community
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Using the Event Store
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Technical requirements
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In this chapter, we will be using the Event Store ([https://eventstore.org](https://eventstore.org/)),
+    which is an open source database.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The easiest way to run Event Store is to use Docker. We've used `docker-compose`
+    in previous chapters, so it will be the same experience with the Event Store.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The code for this chapter contains a `docker-compose.yml` file that allows
+    you to use Event Store by executing this command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE0]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Docker will pull the latest image from Docker Hub and start a named container.
+    Two ports are mapped by this command from the container to your machine: `2113`
+    and `1113`. Port `2113` is used to access Event Store via HTTP, and `1113` is
+    used for TCP connections.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'After the container starts, you can check its status by opening `http://localhost:2113` in
+    your browser. You will get the following login prompt:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![](img/b56a97c7-9a79-44c4-a71f-6661792c7413.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'There, you need to enter the default credentials: `admin` as the username and `changeit` as
+    the password. Then, click on the Sign In button, and the following screen should
+    appear:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![](img/125ecde9-c70f-4a12-929e-56405d528a8b.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: The product version and menu items might differ, depending on the latest version
+    of Event Store.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Why Event Sourcing
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In this section, we will not only discuss why one might want to use Event Sourcing—we
+    will also look into the definition of this pattern and some history behind it.
+    Like Greg Young often puts it, "*Event Sourcing is not new"*, and we will get
+    into some history that should help you to understand the concept better.
+  prefs: []
+  type: TYPE_NORMAL
+- en: After that, we will get into the *why* part. Armed with some knowledge about
+    its history, it won't be very hard to understand why this way of storing data
+    is becoming more popular.
+  prefs: []
+  type: TYPE_NORMAL
+- en: By the end of this section, we will make it clear why one might not want to
+    use Event Sourcing in their system, and what challenges are awaiting those who
+    start using it for the first time.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Issues with state persistence
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In the previous chapters, we used the term *domain event* many times. During
+    the design phase, we used orange sticky notes to visualize domain events on the
+    whiteboard. Later, during the implementation, we created classes for domain events.
+    These classes translate things that happened in the system into something that
+    the machine can read.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Each action in the domain model, represented as a method in aggregate, makes
+    changes in the system state. We also made our aggregate to use events to describe
+    these changes. When such a change is made, we then use the pattern-matching code
+    to amend the aggregate state before it gets persisted to a database.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Now, let''s suppose that we are not saving the aggregate state to the database,
+    as we did in [Chapter 8](4eea9289-d77e-4568-a9c0-c5e1265e3b4e.xhtml), *CQRS -
+    The Read Side*. Instead, we will collect all new events that are generated when
+    an action is executed. For example, in our code for the `ClassifiedAd` aggregate,
+    we have an `UpdatePrice` method:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE1]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'This method already creates a new event when we call it from our application
+    service. We also have the `When` method for projecting events to the aggregate
+    state, so when we call the `Apply` method, such as in the preceding code snippet,
+    the aggregate state changes accordingly:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE2]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'So, if we look at how the aggregate state is changing over time, when we apply
+    different events to it on a timeline, it will look like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![](img/55dff57b-3a4d-48d0-a949-b2629dc839aa.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: In the previous chapters, we were saving the aggregate state to the database
+    by committing it to the repository for that aggregate type. Each time we needed
+    to perform an operation of the aggregate, we would fetch its state back from the
+    database by calling the `Get(int id)` method of the repository.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Each time we commit a new state, the previous state gets overwritten, so at
+    any given moment, our database contains a snapshot of the system state, although
+    there could have been many changes that made our system come to that state. We
+    can visualize it using the timeline:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![](img/6ef06f95-c9e9-4ad4-8ef3-037b3ba3208c.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'This is how executing any action on an aggregate will look:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![](img/43b9aed0-a542-4a68-b6d4-5fe7b1171769.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: It works very well if we are only interested in the current state of things.
+    We know the current sale price for a given classified ad. However, when the product
+    owner says that we need to show a graph of the selling price history, we cannot
+    do that. Another typical use case would be to only show those ads that had their
+    price updated during the last couple of days. We can do this by adding the date
+    of the last price update to our aggregate (just for the purpose of showing this
+    new search result) but it will only work for new updates. It would mean that we
+    cannot show the feature to our users before we collect enough data, since our
+    persistence model is unable to provide us with any historical data.
+  prefs: []
+  type: TYPE_NORMAL
+- en: As developers, we often encounter situations where we get some elements of a
+    system in an unexpected or invalid state. Usually, we use log files to figure
+    out what happened. When this approach fails, we start to interrogate the usual
+    suspect—our users, who definitely did something wrong, something that they shouldn't
+    have been even able to do. Of course, the users deny everything and say that they
+    did nothing wrong, or did nothing at all; it happened **all by itself**.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Anyone who has found themselves in such a situation remembers the level of despair
+    that is usually associated with an inability to find a cause. We end up dealing
+    with the consequences, fixing the system state according to our best knowledge
+    of how it should be corrected. Sometimes these issues exist for months, or even
+    years, without developers being able to determine the cause of the problem. It
+    is because they don't know the sequence of events that happened in the system,
+    which led to this invalid state.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The importance of keeping a history of the events that led to a particular state
+    is well described by Mathias Verraes in his blog post from 2014, *Domain-Driven
+    Design is Linguistic* ([http://verraes.net/2014/01/domain-driven-design-is-linguistic/](http://verraes.net/2014/01/domain-driven-design-is-linguistic/)).
+  prefs: []
+  type: TYPE_NORMAL
+- en: As you would read there, having half a million Euros is the final system state.
+    However, the preceding sequence of events might lead us to different conclusions
+    about some other aspects of the system state that we did not consider before.
+    If we want to add the emotional state or the level of happiness of our subjects
+    to the system state, we won't be able to get this information if we haven't stored
+    the history of events.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The issue of collecting the history of changes, for both reporting and debugging,
+    can often be solved by introducing an artificial log of changes. Then, it would
+    seem that all changes are being captured for future analysis. At the same time,
+    there will be no direct relationship between event processing and records in the
+    audit log. It could potentially lead to situations wherein some changes won't
+    be recorded.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Another issue with only keeping the latest state is that to get any information
+    about the system, we can only rely on those tables or documents that we use to
+    persist our aggregates. Of course, if we have a CQRS system with two databases,
+    we will be fetching the information from the read-side. But for those cases when
+    we need to have a new screen in the system that contains data from different existing
+    read models, the only thing we can do is make a complex query with joins to get
+    the data we need. With time, it might diminish the advantages of using CQRS, because
+    what we used to have optimized for reading is not tuned anymore, considering a
+    bunch of new queries spanning across what looked like a perfectly clean model
+    a while ago.
+  prefs: []
+  type: TYPE_NORMAL
+- en: What is Event Sourcing?
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: We often need to see what behavior has triggered the state transition, and that
+    is why we started using domain events. However, without having those events stored
+    somewhere, to be used as the source of truth for the system state, we can never
+    be sure that the behavior that we have recorded is precisely the one that brought
+    our system to the state where it is now.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The principle of Event Sourcing is encoded in its name. It is quite simple.
+    We already have an event generation in place in our code. So, instead of persisting
+    the state of our aggregate, we save all new events to the database. When we fetch
+    the aggregate from the database, instead of reading its state as one record in
+    a table or document, we read all events that were saved before and call the `When`
+    method for each of those events. By doing that, we get the aggregate state reconstructed
+    from history.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Then, when we need to execute a command, we call a method of the aggregate,
+    it generates new events, and we add those events to the list of events that are
+    already in the database for that aggregate. It means that we never change or remove
+    anything in the database; we only append new events.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We can visualize the execution of a single operation like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![](img/81f33f9e-34ab-4d61-bc4d-cf244cb07047.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: Notice that although reading the aggregate might look more complicated since
+    we are doing two activities (reading and executing `When`), in the code, it seems
+    the same. We need to put the code to do the whole `Get` into the persistence implementation,
+    and it will allow us to keep the persistence implementation unchanged, at least
+    for the reading part.
+  prefs: []
+  type: TYPE_NORMAL
+- en: This approach addresses the issues of having historical data for different purposes—as
+    an audit log, as a ledger, as a source for reports that need to get data from
+    the past, and as a path that could help to find a trail that led the system to
+    come into an invalid state.
+  prefs: []
+  type: TYPE_NORMAL
+- en: One of the significant advantages of Event Sourcing is that it removes impedance
+    mismatch. We were discussing this issue in [Chapter 7](1c04605e-ffe3-49fb-94c6-2bb6e4fe269d.xhtml), *Consistency
+    Boundary*, when we talked about persisting aggregates to relational and document
+    databases. Since using Event Sourcing we stop persisting object as-is entirely,
+    the impedance mismatch just becomes irrelevant. Remember how complex the mapping
+    between objects and databases could be? Being able to remove this burden from
+    the software development process is a precious feature of using events to persist
+    objects.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Event Sourcing around us
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Although it might look like Event Sourcing is a new technique, it is not.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Back in 2007, Greg Young started the process of shaping Event Sourcing into
+    the form that we have now. But, as Greg mentioned several times, we can trace
+    similar techniques back to ancient Mesopotamia. The origins of writing are related
+    to accounting, and cuneiform writing, the first known writing, was initially developed
+    for accounting purposes. We know that from around 3500 BC, scribes recorded commercial
+    transactions on clay tablets. Those tablets were then dried, making permanent,
+    unchangeable records.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Accounting has changed a lot since Mesopotamian and Sumerian times. Nevertheless,
+    modern principles of accounting are similar to Event Sourcing. Each operation
+    in double-entry accounting is recorded at least twice—once on a debit account
+    and once on a credit account. These two records form one operation. The sum of
+    amounts within an operation must be zero. There is no concept of state for an
+    account in the chart of accounts. The running balance is a sum of the starting
+    balance and the amounts from any record on that account. So, to get the current
+    balance, we need to read all the records for that account.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The same technique is used in many areas of finance. An example that we are
+    all familiar with is banking. Bank accounts follow the same rule as accounts in
+    bookkeeping. There is no *account balance* that is stored in a large SQL table
+    that is called `Accounts`, in a field called `Balance`. It won't be possible for
+    a bank to prove that the balance is correct in case of any disputes. The balance
+    is therefore calculated by summing the amounts of all the transactions for that
+    account. Of course, for a very intensively-used account, such sums would take
+    too long to figure out. In this case, the bank makes an account snapshot once
+    in a while. Most of us are familiar with the concept of the fiscal year. On one
+    day, by the end of the fiscal year, all balances get fixed and all accounting
+    is started anew, only transferring balances from the previous year.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In any case, there are two common principles of Event Sourcing that are observed
+    in real-world applications, such as accounting and banking:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Events are recorded for each operation, so an object state can be reconstructed
+    by reading all those events
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Events cannot be changed or removed, because such an operation would undermine
+    the whole concept of the audit log and make it invalid
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: For the purpose of corrections, accountants make new transactions that compensate
+    for previously-entered operations that appeared to be incorrect. The same happens
+    in banks. If you get an amount placed on your account by mistake, the bank will
+    never **remove** the transaction, although it is wrong. You will see another transaction
+    on your account, taking the same sum of money away from you. We can also see it
+    happening when we get partial refunds. Instead of changing the sum of a transaction
+    that is being partially refunded, we get a new transaction for the amount of the
+    partial refund.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Event Sourced aggregates
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Now, it is time to take a better look at how we can persist aggregates by saving
+    the history of changes. In this section, we will discuss what event streams are
+    and how we can use streams to persist aggregates to an event store and retrieve
+    them. Of course, this implies that we will cover the topic of event stores, as
+    well.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Event streams
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: So far, on all of the diagrams, we have seen events for only one aggregate.
+    Of course, such a system is useless, and we need to find a way to store events
+    for different aggregates, in order to make the system functional. The main requirement
+    here would be that we need to be able to retrieve events for a single aggregate,
+    preferably in one read. Of course, if there are thousands of events, we will need
+    to split the read into multiple batches, but this is not in our scope right now.
+    To achieve this ability to read events for only one aggregate, we need to write
+    events with some metadata that indicates the aggregate identity. The second requirement is
+    that events need to be read in the same strict order as they were written; and
+    when we write changes as events to the database, these events need to be written
+    in the exact order as we send them to the database.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Events that are coming to the system in a particular order form an event stream.
+    For the purpose of Event Sourcing, the most comfortable solution would be to have
+    a database that allows us to have one stream per aggregate. In this case, we will
+    write to a known stream and read from it. The stream name will be a combination
+    of the aggregate type and the aggregate identity; for example, for our `ClassifiedAd`
+    aggregate with an ID of `e99460470a7b4133827d06f32dd4714e`, the stream name would
+    be `ClassifiedAd-e99460470a7b4133827d06f32dd4714e`. An aggregate stream contains
+    all events that happened during the aggregate life cycle. When we decide that
+    we don't need the aggregate in the system, we can either remove the whole stream
+    or write a final event, such as `ClassifiedAdRemoved`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: A critical feature of a database that we can use to persist events is to have
+    a single stream with all events that have ever come to the system, in addition
+    to individual streams. It won't be ideal, but we can deduce aggregate streams
+    by controlling the stream ID metadata property, in case our database doesn't support
+    separate streams natively. However, having a single stream that contains all events
+    is absolutely necessary. Throughout the course of this book, we will reference
+    this master stream as the `$all` stream, because this is what it is called in
+    the Event Store, the database that we will use in our examples.
+  prefs: []
+  type: TYPE_NORMAL
+- en: It is crucial to understand that we are referring to the same events when dealing
+    with the `$all` stream and aggregate streams. You can see it in a way that all
+    events are always present in the `$all` stream but in addition, there is an index
+    that is put on top of these events. This index tells the system which individual
+    stream an event belongs to.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following diagram represents the `$all` stream with some events that are
+    also indexed per aggregate stream:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![](img/1f044552-bfa3-4849-8969-33e13ed65e55.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: Aggregate streams and the $all stream
+  prefs: []
+  type: TYPE_NORMAL
+- en: So far, we have been able to formulate the requirements for a database that
+    we can use to persist our aggregate as streams of events. Now, we will look at
+    concrete examples of such databases.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Event stores
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In the preceding section, we discussed that in order to consider a database
+    to be used as an event store, we need to ensure that this database can store events
+    and metadata and put indexes on the metadata. We cannot put any indexes on events,
+    because there is no single denominator for event objects; they are all different.
+    Metadata, however, is structured in a known way. For example, the stream name
+    must be present in the metadata for all events.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Such a definition could lead us to a conclusion that any database that supports
+    querying events by stream ID can be used as an event store. This is true. Here,
+    you can find examples of how different databases can be used as event stores:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '| Database | How to store events | How to read a single stream |'
+  prefs: []
+  type: TYPE_TB
+- en: '| --- | --- | --- |'
+  prefs: []
+  type: TYPE_TB
+- en: '| RDBMS (SQL Server, PostgreSQL, and so on) | Use a single table; add one column
+    for the stream name and one column for the event payload. One row is one event.
+    | Select all rows where the stream name is what we want. |'
+  prefs: []
+  type: TYPE_TB
+- en: '| Document database (MongoDB, Azure Cosmos DB, RavenDB) | Use a document collection.
+    Each document should have a metadata object and a field to store the payload.
+    One document is one event. | Query all documents where the stream name (part of
+    the metadata) is what we need. |'
+  prefs: []
+  type: TYPE_TB
+- en: '| Partitioned tables (Azure Table Storage, AWS DynamoDB) | Use a single table;
+    add one field for the stream name (or ID) to be used as the partition key and
+    another field as the row key (Azure) or sort key (DynamoDB). The third field will
+    contain the event payload. One record is one event. | Query all records where
+    the partition key is the name of the stream we are reading. |'
+  prefs: []
+  type: TYPE_TB
+- en: '| Specialized database (Event Store) | Native support for streams. | Read all
+    events from a single stream. |'
+  prefs: []
+  type: TYPE_TB
+- en: Notice that for some relational databases, there are tools and libraries that
+    can help to store events for Event Sourced systems. For example, the Marten framework
+    ([http://jasperfx.github.io/marten/](http://jasperfx.github.io/marten/)) uses
+    the native PostgreSQL feature to store unstructured data in JSONB-type columns
+    and has an event store implementation based on that database. The SQL Stream Store
+    ([https://github.com/SQLStreamStore/SQLStreamStore](https://github.com/SQLStreamStore/SQLStreamStore))
+    can also help you to use a variety of relational databases, including Microsoft
+    SQL Server and PostgreSQL, as event stores. Both of these open source tools are
+    actively being used in production systems around the world and have active communities
+    behind them.
+  prefs: []
+  type: TYPE_NORMAL
+- en: So far, we've been concentrating on persisting a single aggregate as an event
+    stream and reading all events for a single aggregate from the database. However,
+    this is not the only characteristic that we need to be looking at for an event
+    store that we would be comfortable using. If you haven't noticed yet, we haven't
+    touched the query part, when we need to read data for some aggregates, based on
+    some criteria. Our primary requirement for an event store does not include the
+    ability to query anything except events by the stream name. Definitely, a query
+    such as `ClassifiedAdsPendingReview` wouldn't be possible, just because we would
+    need to read all events (potentially millions) for all classified ads and then
+    query in the memory. This is not a feasible approach for production, although
+    it might be quite useful for prototyping. To solve this issue, we need to get
+    back to CQRS, and this time, we need to use domain events to build our read models.
+    In the case of an Event Sourced system, we will have to use a conventional database,
+    SQL or NoSQL, which can be queried, to handle the query side of CQRS, and this
+    query side can only be built from events. Thus, we need to have a reliable way
+    to get real-time (or near real-time) updates about all new events from  the event
+    store to our read model builders. If we use traditional relational databases to
+    store events, we almost inevitably turn to frequent polling. Some NoSQL databases,
+    such as Azure Cosmos DB, RavenDB, and AWS DynamoDB, let us subscribe to the change
+    stream and get information about all database operations. We will be using the
+    term *subscription* when talking about this feature.
+  prefs: []
+  type: TYPE_NORMAL
+- en: For all of the examples in this book, we will be using the Event Store ([https://eventstore.org](https://eventstore.org),)
+    because it has years of experience building Event Sourced systems put into it
+    by its creator, the *father* of CQRS and longtime advocate of Event Sourcing,
+    Greg Young, the company behind this product and the open source developers community
+    that keeps helping to make Event Store better. In addition, this product is free,
+    and you only need to pay to get production-grade support. The Event Store has
+    native support for store events, and it has transactional writes; we can subscribe
+    to event streams to get all new (and existing) events from there, and so on.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Before going further, please ensure that you have completed the steps described
+    in the *Technical requirements* section.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Event-oriented persistence
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Now, we are going to write some code that will allow us to use events to persist
+    our aggregates.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In [Chapter 9](6f50ee65-024a-4c46-89c8-343183b05b8f.xhtml), *CQRS - The Read
+    Side*, we used repositories to store aggregates, but now, we will do something
+    else. Appending events to a stream for the `ClassifiedAd` aggregate is no different
+    from doing the same thing for the `UserProfile` aggregate. The specifics of repositories
+    therefore disappear, and everything about persisting aggregates and retrieving
+    them is done in exactly the same way. Consequently, we can use one interface, `IAggregateStore`,
+    that will handle the persistence for any type of aggregate.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Now, let's start to implement some lower-level code to write events to Event
+    Store streams and read them back. It will include serialization, paging, type
+    handling, and optimistic concurrency.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Throughout this chapter, we will be using the term **event store** when talking
+    about a place where we can write events to streams and read them back. When we
+    use the term Event Store, we will be referring to the product that you should
+    have been able to execute by following the *Technical requirements* section.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Writing to Event Store
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'Before any read, there must be a write, so that is where we will start. Let''s
+    look at the Event Store API to write events to streams. The method that we would
+    most likely use is this one:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE3]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'All of the parameters here are quite clear: a stream name and a list of events
+    to be saved to the stream. Besides, we need to supply the aggregate version to
+    handle optimistic concurrency. It will prevent overriding changes that someone
+    else could have made in parallel by processing another command for the same aggregate.
+    Event Store supports stream versioning out of the box, and we just need to supply
+    the expected version when trying to save new events to the stream.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We will start to write the code by adding the following interface to the `Marketplace.Framework`
+    project:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE4]'
+  prefs: []
+  type: TYPE_PRE
+- en: You can compare it to the repository interfaces we used in [Chapter 8](4eea9289-d77e-4568-a9c0-c5e1265e3b4e.xhtml), *Aggregate
+    Persistence*, and you'll see that the new interface is some kind of a generic
+    repository. Although we discussed why using generic repositories is usually not
+    a good idea, in our case, it is perfectly acceptable, since all persistence aspects are handled
+    in the same way for all aggregates.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The serialization code would require some external dependencies to be installed.
+    In the preceding snippet, we used the `JsonConvert` class for serializing events
+    to JSON. Therefore, we need to add the `Newtonsoft.Json` package to our `Marketplace.Framework`
+    project. To get the Event Store API, we also need the `EventStore.ClientAPI.NetCore`
+    package. We can either use the Manage NuGet Packages context menu on the project
+    or run the following two commands in the Terminal window:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE5]'
+  prefs: []
+  type: TYPE_PRE
+- en: Now, we can start implementing this interface in a new class, `EsAggregateStore`,
+    that we will add to the `Infrastructure` folder of the `Marketplace` project.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'First, the stream name. At the beginning of this chapter, we already went through
+    the concept of event streams, and since writing into one stream is a transaction,
+    a stream becomes our transaction boundary, along with the aggregate boundary too.
+    We will use the aggregate-per-stream strategy, and therefore, we can safely make
+    the stream name derive from our aggregate name. But, what are the names of our
+    aggregates? Well, we can start with the CRL type, such as `Marketplace.Domain.ClassifiedAd`.
+    Then, we need to make those names unique. To do this, the obvious solution would
+    be to add an aggregate ID. I want to cover two cases to create the stream ID: when
+    we have an aggregate that needs to be persisted, and when we just have an ID of
+    an aggregate that we want to load. To do that, I will add two methods to the `EsAggregateStore`
+    class:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE6]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Looking further at the list of parameters for `AppendToStreamAsync`, the method
+    doesn''t accept `IEnumerable<object>`, but instead expects a collection of objects
+    that have the `EventData` type. This class has the following public members:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE7]'
+  prefs: []
+  type: TYPE_PRE
+- en: For us, it is important to understand that we need to save the event type as
+    a string, so that we can deserialize the event back to an object of the event
+    CLR type. We also have to convert the event object to a byte array when we save
+    events, and convert a byte array to an object when we read events. So, for `Type`,
+    we can again use the CLR type name of the event object. For the payload (`Data`),
+    we can use whatever serialization is useful.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Nevertheless, Event Store has a nice UI that can show us the content of events,
+    but it only does that if an event is serialized as JSON. This is exactly what
+    the `IsJson` Boolean property is for. For the majority of applications, which doesn't
+    require optimizing the performance by using more compact representations and a
+    faster serialization process, such as protobuf, it is enough to use JSON, and
+    that's what we are going to do.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Since we need to convert our objects to byte arrays and still use JSON, we
+    can create a method that will help us in doing that:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE8]'
+  prefs: []
+  type: TYPE_PRE
+- en: Then, we need to think of how to get a list of new events from an aggregate
+    and build a collection of `EventData` objects to represent those events.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'From the very early versions of our application, we have the `GetChanges` method.
+    First, we had it in the `Entity` base class, which we later renamed `AggregateRoot`.
+    We can finally start using this method to get all new events that are generated
+    as part of command execution. Here is the code that will get all changes from
+    an aggregate and build a collection of `EventData` objects, just like we need
+    for calling the `AppendToStreamAsync` method:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE9]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'In the preceding snippet, we specify the short event type name to be used as
+    the event type in Event Store. It will be something like `ClassifiedAdRenamed`.
+    But, when we start loading events back, we need to deserialize JSON strings back
+    to concrete event types. The `Newtonsoft.Json` library won''t understand the short-type;
+    it needs to know the **fully-qualified class name** (**FQCN**). If the events
+    are defined in a different assembly, we also need to include the assembly information.
+    If we use FQCN as an event type for Event Store, we will get quite an ugly picture
+    in the Event Store UI, since it will be polluted with all that technical information
+    about namespaces and assembly names. I don''t like that, and therefore, I will
+    still use the short-type name. However, we need a way to be able to tell the deserializer
+    about the concrete event type. The best place to store any kind of technical information
+    about the event is metadata, and that''s what I am going to do. First, I will
+    add a private nested class that we''ll use for the event metadata:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE10]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Now, I can modify the preceding code snippet to keep the FQCN with the event,
+    as metadata:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE11]'
+  prefs: []
+  type: TYPE_PRE
+- en: Using the event CLR type name as the event name and the FQCN in the event metadata
+    is a temporary solution. For production systems, I would recommend using the concept
+    of a *type mapper*, which translates CLR types to strings and back. This method
+    gives you some freedom to change namespaces if needed, without breaking the ability
+    to deserialize events that were persisted in the past. I will not go into detail
+    on using the type mapper, but you will find the working code in the repository
+    for [Chapter 13](https://www.packtpub.com/sites/default/files/downloads/Splitting_the_System.pdf), *Splitting
+    the System*.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let''s put this code into our new `EsAggregateStore` class:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE12]'
+  prefs: []
+  type: TYPE_PRE
+- en: The only thing that we have not touched upon previously is `IEventStoreConnection`.
+    All reads and writes between our application and Event Store need to be executed
+    on the open TCP connection to the Event Store cluster, which can also be a single-node
+    cluster that we can create by running the Docker image. Our application will establish
+    the connection when it starts, and we need to close the connection when the application
+    stops. We will add this infrastructure code to our executable project.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Reading from Event Store
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'In our application service, the only command that doesn''t require reading
+    an aggregate before handling is the `CreateClassifiedAd` command. For all other
+    actions, we need to read our aggregate first, and that''s what we do by calling
+    `_store.Load<ClassifiedAd>(id.ToString())`. While saving an aggregate to the store
+    by collecting all changes and saving them to an event stream seems quite obvious,
+    reading the aggregate back from the event stream is a little less trivial. Let''s
+    describe the steps to retrieve an aggregate from the event store:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Find out the stream name for an aggregate
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Read all of the events from the aggregate stream
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Loop through all of the events, and call the `When` handler for each of them
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: After we have done all these steps, we will recover all the history of a given
+    aggregate and use the aggregate event handling rules to reapply all historical
+    events to an empty aggregate object. By doing this, we will be bringing our aggregate
+    to its latest state.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In the code, we will do all these steps in the `Load` method of the `EsAggregateStore`
+    class:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE13]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Let''s go through the `Load` method. In steps, it does the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Ensures that the aggregate ID parameter is not null
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Gets the stream name for a given aggregate type
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Creates a new instance of the aggregate type by using reflections
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Reads events from the stream as a collection of `ResolvedEvent` objects
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Deserializes those raw events to a collection of domain events
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Calls the `Load` method of the empty aggregate instance to recover the aggregate
+    state
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: There are a couple of things that need additional explanations.
+  prefs: []
+  type: TYPE_NORMAL
+- en: First, we could have used the `new` constraint on the `T` generic type parameter,
+    so we can instantiate an empty aggregate using a parameterless constructor. However,
+    that would break encapsulation and force us to expose a public parameterless constructor,
+    and we don't want that. Using reflections allows us to invoke the protected constructor
+    that we already have in all our aggregate root types. You need to remember that
+    this solution might cause performance issues if your system is dealing with loads
+    of commands, and in such a case, an alternative solution is required. Exposing
+    a public parameterless constructor could be an acceptable trade-off.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Secondly, we use a magic number, `1024`, to read what is called a **stream slice**,
+    which is nothing more than a page. Your event streams can get bigger, and the
+    Event Store doesn't allow us to read more than 4,096 events at once. For large
+    streams, we would need to implement paging, but for this example, it is not necessary,
+    since the life cycle of our aggregates don't assume having long streams.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The last thing is the missing `Load` method for the `AggregateRoot` abstract
+    class. We didn''t need this method, because we were not using Event Sourcing before.
+    The `Load` method will complete the last step in the aggregate recovery sequence,
+    looping through all events and calling the matching `When` for each of them. Let''s
+    see how we can implement this method in the `AggregateRoot` class:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE14]'
+  prefs: []
+  type: TYPE_PRE
+- en: As you can see, it is a very simple piece of code, and essentially, it represents
+    what Event Sourcing is. We get a collection of events that we previously stored
+    and then rebuild the state of our domain object from those events. The `When`
+    method knows how to change the aggregate state for each event in the collection,
+    so when we call it for each event from the history, we get our aggregate back
+    to the last known state.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Notice that we also increase the `Version` property of the aggregate for each
+    applied event, so we know what version our aggregate should have when we commit
+    changes to the store. We discussed the aggregate version when talking about the
+    optimistic concurrency. Unlike using state persistence, where we needed to have
+    a property in our database for the aggregate version, we don't really store the
+    version when we use events, because one event always increases the aggregate version
+    by one, so we can just count events to get the current version.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'One last thing that I need to use to finalize the implementation of the `IAggregateStore`
+    interface is the `Exists` method. There is no simple way to ask Event Store whether
+    a stream exists, but we can easily overcome this by trying to read a single event
+    from a given stream:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE15]'
+  prefs: []
+  type: TYPE_PRE
+- en: By now, we should have a working implementation of the aggregate persistence
+    that uses events.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The wiring infrastructure
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: To finish the work and make our application make use of all these changes, we
+    need to write some initialization code for the Event Store connection, and also
+    do the wiring for our application service so that it uses `EsAggregateStore`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'First, we need to configure our application by using the .NET Core configuration
+    extensions. We will start by adding a simple `appsettings.json` configuration
+    file. The content for this file, for now, will just be a connection string for
+    Event Store that runs locally:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE16]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Then, we need to read this configuration so that we will have access to these
+    values. To do that, we will change the `BuildConfiguration` method of our `Program`
+    class:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE17]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'For the `settings` file to be copied to the application output directory, we
+    need to change its properties in the `Marketplace.csproj` file, to ensure that
+    the project file has lines like these:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE18]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The connection to Event Store needs to open when our application starts and
+    close when we shut down the application. To enable this, we will implement the
+    `Microsoft.Extensions.Hosting.IHostedService` interface with a new class called
+    `HostedService`. To do that, we will add a new file, called `HostedService.cs`,
+    to our executable project:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE19]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The final wiring takes place in the `Startup.cs` file, where we need to change
+    the `ConfigureServices` method so it includes the Event Store connection and the
+    `EsAggregateStore` registrations. Also, we need to register our `HostingService`,
+    so that the web host knows that it needs to run something on startup and shutdown.
+    The new version of the `Startup.ConfigureServices` method looks like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE20]'
+  prefs: []
+  type: TYPE_PRE
+- en: Here, we created a new connection instance and registered it in the service
+    collection as a singleton. It will then be injected into the `HostedService` constructor,
+    and we will open it when the application starts. We will also change the registration
+    for `IAggregateStore`, so that it takes our new `EsAggregateStore` class. Then,
+    we will register `HostedService`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We will also use `store` as a parameter for our application services. This parameter
+    replaces the repositories we used before, so we need to change both application
+    services, as well.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The aggregate store in application services
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'The changes required for application services are quite small. To make the
+    work even more comfortable, I created a small extension for the `IApplicationService`
+    interface that allows us to handle commands with one line of code. We already
+    did it before, by using a private method `HandleUpdate` in each application service.
+    Now, since we use the `IAggregateStore` interface instead of repositories, we
+    can abstract that method, so that it has no dependencies on the specific infrastructure.
+    Therefore, we can place it in the `Marketplace.Framework` project. Here is the
+    code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE21]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Then, we need to replace the repository dependency in the application service
+    classes to `IAggregateStore` and change all calls. The work is a bit boring, and
+    I have done it all for you, so here is the new code for `ClassifiedAdApplicationService`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE22]'
+  prefs: []
+  type: TYPE_PRE
+- en: As you can see, the changes are quite small. We call `_store.Save`, and we don't
+    need to commit, since we don't have an explicit unit of work, because we don't
+    execute an operation on multiple aggregates at the same time, otherwise, we would
+    break the rule of an aggregate in a transactional boundary, thereby not having
+    a unit of work which isn't a problem. We also have no issues with detecting changes,
+    since our changes are always represented as events, and we don't need any ORM
+    magic to figure out what we need to update.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Following the same style, here is the new `UserProfileApplicationService` class:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE23]'
+  prefs: []
+  type: TYPE_PRE
+- en: That's it; we don't need to do anything else to event-source our application!
+    Let's see how it works now.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Running the event-sourced app
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Finally, we can try things out and see how we can execute commands using our
+    API, which remains unchanged from [Chapter 9](6f50ee65-024a-4c46-89c8-343183b05b8f.xhtml), *CQRS
+    - The Read Side*. You might have noticed, however, that the query APIs and all
+    code related to read models are not included in this chapter. That's because the
+    read side of CQRS is vastly different from what we used for document and relational
+    persistence.
+  prefs: []
+  type: TYPE_NORMAL
+- en: When you start the app and visit the Swagger UI at `http://localhost:5000`,
+    the screen that you will get is exactly the same as before. Of course, the Event
+    Store must run at this time, either in a Docker container or as an executable.
+    Running Event Store using `docker-compose` is described in the *Technical requirements*
+    section. I used two new GUIDs as the new classified ad ID and owner ID, in order
+    to create a new ad. So, I called the `POST` endpoint and got `200 OK` as a result.
+    Right after that, I executed the `rename` command by making the `PUT` request
+    with the same ID and some text for the title. These operations are no different
+    from what we were doing earlier.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Now, we can look at the result of those operations in our new store. To do
+    that, we need to visit the Event Store web UI by going to `http://localhost:2113`
+    and log in by using the `admin` username and the `changeit` password. From there,
+    we need to go to the Stream Browser page, and on the right-hand pane, there is
+    a list of recently-changed streams. In this list, we can see the new stream for
+    our new classified ad:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![](img/72963d6d-37f8-463c-934a-070468bf1b77.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: Here is our new aggregate stream
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'You can click on the stream name to see what the stream contains. Here is what
+    I have:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![](img/34dd146f-7a9e-4e58-b8a2-24a9651ea243.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: Two new events in the stream
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Here, we can see two events that were added to the stream after I executed
+    two commands. I can continue to run commands using the API until I get the ad
+    published. When I look at the Event Store stream after that, I will see more events
+    that were added to it:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![](img/58b83135-38cd-4894-8b2b-12181fa2dbee.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: More events are added if we execute more commands
+  prefs: []
+  type: TYPE_NORMAL
+- en: That seems very nice. Each command triggers a state transition, but instead
+    of overwriting the previous state with the new one, we can see the full history
+    of changes, represented by events. For example, we can change the price several
+    times, but we will always know about all the prices that the ad has had in the
+    past.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Now, let''s see what an event looks like. I will open event number 1, which
+    has the `ClassifiedAdTitleChanged` type, by clicking on the event name. Here is
+    what I can see in the browser:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![](img/c051c6cd-96a3-4982-beec-0730e01efdbd.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: Event content as JSON
+  prefs: []
+  type: TYPE_NORMAL
+- en: As you can see, the event data represents our domain event class—it has the
+    aggregate ID and the title. The metadata only has one field that we decided to
+    use for the purpose of deserialization—the FQCN of the event type. You can look
+    at the content of other events to see what is stored there.
+  prefs: []
+  type: TYPE_NORMAL
+- en: It might seem redundant to have the aggregate ID in each event, since the stream
+    name already contains the ID, and to recover the aggregate state from events,
+    we always read only one stream. We will see how this ID inside each event is used
+    when we start building read models.
+  prefs: []
+  type: TYPE_NORMAL
+- en: You can also execute some commands on the user profile command API to see the
+    different type of aggregate to be stored in a stream with a different kind of
+    name. Of course, it is possible to add more ads and users to the system now, and
+    to see all those events coming into the Event Store.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Congratulations; we have just converted our application to using Event Sourcing
+    instead of a more traditional persistence. As you may have noticed, we didn't
+    need to make any changes to our domain objects to make it work. We can even remove
+    the setters from aggregate and value-object properties, and make those properties
+    private for better encapsulation. None of those changes will have any effect on
+    how aggregates get stored and loaded using events. That's because for this type
+    of persistence, the impedance mismatch is gone. All our events are simple, plain
+    objects with properties that have primitive or simple types. It means that those
+    domain events can easily be serialized, and that's the only thing we need to ensure
+    in order for the Event Sourcing to work. By the way, it is not a requirement for
+    Event Store to use JSON serialization. You can certainly use something such as
+    protobuf. However, in such cases, you will lose the ability to check the content
+    of events in the UI, since it only understands JSON. Hence, we used the `IsJson`
+    property of the `EventData` class to tell Event Store that our events are, in
+    fact, JSON strings. Event Store also has an integrated projection engine that
+    uses JavaScript to execute operations on events inside the store in order to produce
+    new events or to run queries. This feature also requires that events are stored
+    in JSON, since this is the format that the JavaScript code can easily interpret.
+    We will not be touching upon the projections topic in this chapter, but we'll
+    go back to it in [Chapter 11](c4156d9d-9130-4225-b205-ef76cb4bcca3.xhtml), *Projections
+    and Queries.*
+  prefs: []
+  type: TYPE_NORMAL
+- en: Summary
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In this chapter, you got to use the feature of representing state transitions
+    inside aggregates as events. I used that code style from the start intentionally,
+    although I can imagine that it may have caused you some confusion. At the end
+    of the day, why would you need to split each operation into `Apply` and `When`?
+    Using that approach was necessary to prepare the readers for this chapter. Using
+    domain events is a good practice, overall. Even if you don't use Event Sourcing,
+    you should definitely consider using domain events to communicate updates between
+    aggregates, and even between different Bounded Contexts, and using domain events
+    for state transition makes it easy, because you will always have a list of changes
+    as a collection of new events.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Since we had this collection ready, we only needed to figure out how to store
+    those changes as-is, in an event stream that represents a single aggregate, and
+    to also introduce the `Load` method to look through all events that we read from
+    that stream to recover the aggregate state when we need to execute a new operation
+    on it. That wasn't very hard. We used a bit of code to figure out how our infrastructure
+    would work, and we needed to configure the serialization properly. We still kept
+    the FQCN in the event metadata to be able to deserialize events back to C# objects,
+    but we'll fix it in the future.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Event Store is a very efficient product when it comes to Event Sourcing and
+    storing events in streams. Unlike Kafka, this product allows us to create millions
+    of streams. Since our approach to store aggregates is to keep the events for each
+    aggregate in a separate stream, this solution is perfectly suitable for us. If
+    your company has issues, such as a limited number of pre-approved products used
+    as databases, and you can't use Event Store just yet, you can look at libraries,
+    such as SQL Stream Store ([https://github.com/SQLStreamStore/SQLStreamStore](https://github.com/SQLStreamStore/SQLStreamStore)),
+    which implements an event store on a number of relational databases, including
+    Microsoft SQL Server; or Marten ([http://jasperfx.github.io/marten/](http://jasperfx.github.io/marten/)),
+    which uses the JSONB-type fields of PostgreSQL to implement both the document
+    database and event store types of persistence.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In the next chapter, we will be looking at the challenges of querying the event-sourced
+    system and solving these challenges by using separate read models and projections.
+  prefs: []
+  type: TYPE_NORMAL
+- en: So far, you can see that Event Sourcing is not hard!
+  prefs: []
+  type: TYPE_NORMAL
+- en: Further reading
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'There is not much literature about Event Sourcing available at the moment,
+    but I can recommend watching a couple of talks by Greg Young, who coined the term
+    CQRS and opened up Event Sourcing to the world:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '*A Decade of DDD, CQRS, Event Sourcing*, by Greg Young, DDD Europe 2016: [https://www.youtube.com/watch?v=LDW0QWie21s](https://www.youtube.com/watch?v=LDW0QWie21s)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '*Event Sourcing*, Greg Young, GOTO Conference 2014: [https://www.youtube.com/watch?v=8JKjvY4etTY](https://www.youtube.com/watch?v=8JKjvY4etTY)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'If you were already exploring this topic, you might have encountered some blog
+    posts about the dark side of Event Sourcing, which mainly involves issues with
+    event versions and eventual consistency. We''ll be covering eventual consistency
+    in the next chapter, and we''ll learn even touch upon the versioning of events
+    briefly; for more in-depth coverage of the event versions topic, refer to Greg''s
+    book:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '*Versioning in an Event Sourced System*, Greg Young, LeanPub 2017:[ https://leanpub.com/esversioning](https://leanpub.com/esversioning)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL

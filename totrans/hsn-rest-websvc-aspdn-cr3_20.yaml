@@ -1,0 +1,505 @@
+- en: Caching Web Service Responses
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In this chapter, we will explore the caching patterns of ASP.NET Core, as well
+    as the caching strategies and the tools that are provided by the framework to
+    help developers to implement them. The cache may become useful in order to avoid
+    additional computation on the server, and consequently retrieve the fastest response
+    to the client of a web service. Furthermore, we will look at a concrete cache
+    implementation of the catalog web service.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In this chapter, we will cover the following topics:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Introduction to the HTTP caching system
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Implementing response caching in ASP.NET Core
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Implementing a distributed cache
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: By the end of this chapter, you will have a general understanding of caching
+    mechanisms and the know-how needed in order to implement a distributed cache in
+    ASP.NET Core using `Redis`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Introduction to the HTTP caching system
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Caching is an essential part of web service development. The primary purpose
+    of web service caching is to improve the performance of our system and reduce
+    the overload of the webserver. Furthermore, fetching something over the network
+    is slow and expensive, and so it is necessary to implement a caching system to
+    improve the responsiveness of our web service and to avoid unnecessary additional
+    computation. In this section, we will focus on some of the features that are defined
+    in the HTTP 1.1 caching specification.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'These caching specifications are sent by the webserver to the client. Whoever
+    has ownership of the client needs to read the caching specifications and respond
+    appropriately. In general, there are two common use cases for caching responses:
+    the first one is when a web service exposes very *dynamic content*. In this case,
+    the data changes a lot, and the *caching time* can be reduced or avoided at all.
+    The second case is when our service may serve some *static content*. In that case,
+    we can set a high caching time for the content that doesn''t change a lot.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The HTTP caching specification
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'The HTTP 1.1 caching specification ([https://tools.ietf.org/html/rfc7234](https://tools.ietf.org/html/rfc7234))
+    describes how caches should behave over HTTP. The main header related to HTTP
+    caching is the `Cache-Control` header. This header is used to specify directives
+    in the request and response. It is also essential to note that the `Cache-Control`
+    directives that are defined in the request and the response are independent. The
+    following diagram shows a typical request-response workflow:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![](img/b151bd77-6d75-42b3-b1da-f0ef2be74433.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: The schema describes the interaction between a generic client and a server with
+    a caching layer between them.
+  prefs: []
+  type: TYPE_NORMAL
+- en: First, the client requests a resource from the server, and the *caching layer*
+    forwards it to the server. The server produces the data for the client and sends
+    the response back; at this point, the caching server caches the response in the
+    *caching layer*. Therefore, if the client performs another call to the same content,
+    the request will not hit the server, but the cache system will provide the cached
+    response.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'It is essential to note that the *cache layer* adds some headers to the response:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE0]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Both of these are HTTP headers related to the caching directives. `Cache-Control`
+    adds the `max-age` directive to indicate that the freshness lifetime of the content
+    is equal to 100\. The `Age` header specifies the age of the cached content. When
+    `Age` reaches the `Cache-Control: max-age` value, the *caching layer* will forward
+    the request to the server in order to serve the fresh data. Both of the values
+    of the headers are specified in *seconds*.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The `Cache-Control` header can be used to specify the caching mechanism. By
+    default, it is possible to disable the cache by specifying the `no-cache` directive,
+    that is, `Cache-Control: no-cache`. Another crucial aspect of the `Cache-Control`
+    header is the public and private directives, such as `Cache-Control: public,max-age=100`.
+    The `public` instruction means that the cached response can also be stored in
+    a shared cache, and any other client can access that information. On the other
+    hand, when a response is private, this means that it probably contains sensitive
+    information and it cannot be shared with other clients.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The caching specification also defines the `Vary` header. This kind of header
+    is used to indicate which fields influence the cache variation. More specifically,
+    it is used to decide whether a cached response can be used rather than requesting
+    a fresh one from the original server:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE1]'
+  prefs: []
+  type: TYPE_PRE
+- en: In the first line of the preceding code, each variation in the request is treated
+    as a single and uncacheable request. In the second line, the request is processed
+    as uncacheable, but the `User-Agent` header is added.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The `Expires` header has the same purpose as the `max-age` directive: to give
+    the cache expiration time. The only reason they differ is that the `max-age` instruction
+    focuses on a fixed date time. For example, we can set the following value:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE2]'
+  prefs: []
+  type: TYPE_PRE
+- en: It is essential to note that the `max-age` directive overrides the `Expires`
+    header. Therefore, if both of them are present in the same response, the `Expires`
+    header is ignored. In the next section, we will learn how to implement response
+    caching using ASP.NET Core tools.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Implementing response caching in ASP.NET Core
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'ASP.NET Core implements a declarative way to manage caching directives in the
+    responses of our web service. Furthermore, it provides an attribute that can be
+    used for caching purposes. The attribute implementation is also compatible with
+    the HTTP 1.1 caching specification, therefore, it becomes easy to implement these
+    caching standards using ASP.NET Core''s out-of-the-box implementations, and we
+    don''t have to worry about the details of each request. We can specify the caching
+    behavior using the `[ResponseCache]` attribute that''s exposed by ASP.NET Core:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE3]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'For example, in this case, the code defines a caching directive on the `GetById`
+    action method of the `ItemController` class. The `ResponseCache` attribute sets
+    a `Duration` field and a `VaryByQueryKeys` field: the first one corresponds to
+    the `max-age` instruction while the second one reflects the `Vary` HTTP header.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: So far, we have only added the `Cache-Control` directive to the server responses.
+    Therefore, we are *not* implementing any caching. The caching directives can be
+    used by a third-party system or application, such as the client of our service,
+    to cache information.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In addition to the `ResponseCache` attribute, it is necessary to put caching
+    middleware in front of the web service. `ResponseCachingMiddleware` is the default
+    middleware provided by ASP.NET Core. It is compliant with the HTTP 1.1 caching
+    specification ([https://tools.ietf.org/html/rfc7234](https://tools.ietf.org/html/rfc7234)).
+    Therefore, if we think about the `ResponseCachingMiddleware` type, it is possible
+    to change the previous schema in the following way:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![](img/8213c3cc-1f17-4636-8e25-0774296650a9.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'The `ResponseCachingMiddleware` class can be initialized using the `AddResponseCaching`
+    extension method provided by the `Microsoft.Extensions.DependencyInjection` package.
+    In addition, we can add the `ResponseCachingMiddleware` middleware in the middleware
+    pipeline by executing the `UseResponseCaching` extension method in the `Configure`
+    method of the `Startup` class. The `ResponseCachingMiddleware` type checks whether
+    a response is cacheable and stores responses and serves answers from the cache.
+    We can add `ResponseCachingMiddleware` to the service pipeline by editing the
+    `Startup` class in the `Catalog.API` project:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE4]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The preceding code adds the caching middleware, but it is not enough to initialize
+    a caching mechanism. Therefore, if we try to call the route decorated with the
+    `ResponseCache` attribute using the `curl` command, we will receive the following
+    response:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE5]'
+  prefs: []
+  type: TYPE_PRE
+- en: As you can see, `Cache-Control` tells us that this information can be shared
+    in the cache and that `max-age` is 100 seconds. Therefore, if we call the same
+    route after *N (with N<100)* seconds, we can also see the `Age` header, which
+    contains the time (in seconds) that the object has been in the cache for.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Moreover, if we call the same route after *N seconds* (with *N >= 100*), we
+    will hit the server and cache a new response in the memory. It is also necessary
+    to note that we can cancel the cache middleware by appending a query string parameter
+    to the calling URL. This is because we specified the `Vary` header using the following
+    field:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE6]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'It may be the case that defining the `ResponseCache` attribute uses the `VaryByQueryKeys`
+    field. In that case, the attribute will not be able to detect the query string
+    variation. Furthermore, the routes that are covered by the `ResponseCache` attribute
+    will retrieve the following exception:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`"ClassName":"System.InvalidOperationException","Message":"''VaryByQueryKeys''
+    requires the response cache middleware."`'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'An important thing to note about the `ResponseCachingMiddleware` class is that
+    it uses the `IMemoryCache` interface to store the content of the response. Hence,
+    if you examine the definition of the class on GitHub ([https://github.com/aspnet/AspNetCore/.../ResponseCachingMiddleware.cs](https://github.com/aspnet/AspNetCore/blob/master/src/Middleware/ResponseCaching/src/ResponseCachingMiddleware.cs)),
+    you will see the following constructor:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE7]'
+  prefs: []
+  type: TYPE_PRE
+- en: The preceding method signature defines the constructor of the `ResposeCachingMiddleware`
+    class. The constructor uses the `this` keyword to refer to another internal constructor
+    overload that's used to initialize the properties of the class. As you can see,
+    the `IResponseCache` interface is initialized using the `MemoryCache` type by
+    default, which extends the `IMemoryCache` interface.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The `IMemoryCache` interface represents the cache stored in the webserver.
+    Additionally, it is possible to use the `IMemoryCache` interface as a standalone
+    component by adding the `AddMemoryCache()` extension method to the initialization
+    of the services in the `Startup` class:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE8]'
+  prefs: []
+  type: TYPE_PRE
+- en: This approach allows you to use the `IMemoryCache` interface through the dependency
+    injection engine, which means you can call the `GetOrCreate` and `GetOrCreateAsync`
+    methods to set the cache values in the memory of the webserver. Although the in-memory
+    cache provides a really good abstraction for us to cache data, it does not work
+    in a distributed approach. Therefore, if you want to store and share caches between
+    different web servers, ASP.NET Core provides the tools you'll need to implement
+    a distributed cache. In the next section, we will learn a bit more about how to
+    implement a distributed cache in ASP.NET Core.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Implementing a distributed cache
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'As we mentioned previously, ASP.NET Core allows us to implement distributed
+    caching. In this section, we will learn how to use `Redis` as a form of cache
+    storage. It is possible to extend the behavior of the caching mechanism of ASP.NET
+    Core by adding and executing the following CLI instruction in the `Catalog.API`
+    project:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE9]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'By doing this, we can connect the `Redis` server and use it by adding the following
+    extension method to the `Startup` class:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE10]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Microsoft provides the `AddDistributedRedisCache` extension method, which accepts
+    the options that are used to define the instance of `Redis` so that it can be
+    used as a cache as input. The `AddDistributedRedisCache` extension method is connected
+    to the `catalog_cache` `Redis` instance. Furthermore, we need to declare the new
+    instance in the `docker-compose.yml` file of the catalog service:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE11]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The preceding code defines the catalog cache''s `Redis` instance. Therefore,
+    the application will be able to use this instance as part of `my_network`. Moreover,
+    we can see what the primary purpose of the package is by having a look at the
+    source of the `AddDistributedRedisCache` extension method:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE12]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'I''ve omitted some documentation comments for brevity purposes, but you can
+    find the open-source code at the following GitHub link: [https://github.com/aspnet/Extensions/../StackExchangeRedisCacheServiceCollectionExtensions.cs](https://github.com/aspnet/Extensions/blob/master/src/Caching/StackExchangeRedis/src/StackExchangeRedisCacheServiceCollectionExtensions.cs).'
+  prefs: []
+  type: TYPE_NORMAL
+- en: As you can see from the preceding code, the extension methods configure and
+    bind the `RedisCacheOptions` class. Secondly, the preceding snippet adds a new
+    `IDistributedCache` interface to the built-in dependency injection of ASP.NET
+    Core. This interface gives us some useful ways to interact with the `Redis` instance
+    and store the caching information there. Furthermore, the instance is defined
+    as a singleton, which means that all of the components inside the application
+    will use the same instance.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let''s have a look at the `IDistributedCache` interface:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE13]'
+  prefs: []
+  type: TYPE_PRE
+- en: In this case, I've omitted the documentation comments for brevity purposes.
+    You can find the complete version at [https://github.com/aspnet/Extensions/../IDistributedCache.cs](https://github.com/aspnet/Extensions/blob/master/src/Caching/Abstractions/src/IDistributedCache.cs).
+    The interface provides a utility method that we can use to read and write information
+    into the `Redis` instance.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Furthermore, the interface exposes both synchronous and asynchronous methods
+    to do this. Since the interface is part of the dependency injection engine, we
+    can use it in any component, such as the `ItemController` class:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE14]'
+  prefs: []
+  type: TYPE_PRE
+- en: The `ItemController` class and any other components in the application can now
+    be resolved and use the `IDistributedCache` singleton instance by including it
+    in the constructor and action injection.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'ASP.NET Core also provides `AddDistributedMemoryCache()`, which is part of
+    the `Microsoft.Extensions.DependencyInjection` namespace. Despite its name, it
+    doesn''t initialize any distributed cache. Let''s have an in-depth look at its
+    implementation:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE15]'
+  prefs: []
+  type: TYPE_PRE
+- en: The extension method uses the memory of the webserver to store information.
+    More specifically, the `AddDistributedMemoryCache` extension method is designed
+    for development/testing environments, and it isn't a real distributed cache.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Finally, we can optimize and refactor the `Startup` class by creating a new
+    configuration class dedicated to the cache. First of all, let''s create the following
+    class in the `Configurations` folder of the catalog''s domain project:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE16]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The class definition contains the `ConnectionString` field of the `Redis` instance.
+    We can proceed by adding the `DistributedCacheExtensions` class to the `Catalog.Infrastructure`
+    project, which can be found inside the `Extensions` folder:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE17]'
+  prefs: []
+  type: TYPE_PRE
+- en: The preceding code declares a new `AddDistributedCache` extension method. The
+    method configures the `CacheSettings` node of the `appsettings.json` file by reading
+    and registering the node to the dependency injection engine. Next, it calls the
+    `AddDistributedCache` method to configure the distributed cache so that it can
+    use the provided connection string.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let''s proceed by adding the new `CacheSettings` node to the `appsettings.json`
+    file:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE18]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Next, we need to call the `AddDistributedCache` extension method in the `Startup`
+    class:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE19]'
+  prefs: []
+  type: TYPE_PRE
+- en: Now, our application initializes a new `IDistributedCache` instance in the dependency
+    injection engine using the connection string provided by the `appsettings.json`
+    file. In the next section, we will examine an additional level of customization
+    for distributed caches.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Implementing the IDistributedCache interface
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: It is possible to extend the behavior of the `IDistributedCache` interface by
+    overloading the extension methods. Furthermore, we need to store complex information
+    and not bytes. For example, in the case of the `ItemController` class, we want
+    to pass the `ItemResponse` type to the `Set` method of the `IDistributedCache`
+    interface.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let''s proceed by modifying the `DistributedCacheExtensions` class in the `Catalog.API`
+    project:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE20]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The preceding class defines the generic extension methods to get and set a
+    complex object in the `Redis` cache. It uses the `Newtonsoft.Json` methods to
+    store objects in JSON format. The class also defines two `SetObject<T>` methods
+    with different signatures. One provides a default configuration of `DistributedCacheEntryOptions`,
+    while the other one allows us to override the options inside this configuration.
+    Furthermore, it is possible to use these extension methods in the `ItemController`
+    class, like so:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE21]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The `GetById` action method uses the `IDistributedCache` interface to save
+    information about `ItemResponse`: it defines a key that''s composed in the following
+    way:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE22]'
+  prefs: []
+  type: TYPE_PRE
+- en: The action method tries to retrieve this information from the cache; if this
+    information is not present, it performs the request by using the `IItemService`
+    interface, and it stores the result using the `SetObjectAsync` method of the `IDistributedCache`
+    interface.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Although this approach requires a discrete overhead in terms of implementation
+    compared to the `ResponseCache` attribute, the `IDistributedCache` interface relies
+    on an external caching system. Furthermore, it is possible to implement this kind
+    of caching logic by using the filter pipeline stack. Therefore, it is possible
+    to move the caching logic that''s implemented in the `ItemController` class into
+    a custom action filter:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE23]'
+  prefs: []
+  type: TYPE_PRE
+- en: '`RedisCacheFilter` encapsulates the cache logic to avoid replicating it in
+    every action method. It implements the following logic: before the action is executed,
+    it tries to get `ItemResponse` from the cache by composing the key using the controller
+    name, the action name, and the requested `id` value. If the cache key is not populated,
+    it proceeds with the execution of the action method, and if the resulting `StatusCode`
+    is `200`, it continues by storing the result in the `Redis` cache. The next request
+    with the same `id` value will have the cache populated, and the action filter
+    will return the cached object.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'It is possible to use the action filter in the following way:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE24]'
+  prefs: []
+  type: TYPE_PRE
+- en: The action method uses the `TypeFilter` attribute to resolve `RedisCacheFilter`,
+    and it passes the number that represents the cache expiration in seconds as an
+    argument. This implementation strategy is more readable and allows us to avoid
+    code replication between different action methods.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Inject memory cache into the tests
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: If we try to execute unit tests using `RedisCacheFilter`, we will notice that
+    `get_by_id_should_return_right_data` will fail. This is because the Redis instance
+    is not available in the development environment. Furthermore, we can use the `MemoryDistributedCache`
+    implementation to perform our tests. The `MemoryDistributedCache` implementation
+    is done in the same class that's used by the `AddDistributedMemoryCache` extension
+    method. As we mentioned in the previous chapter, the class doesn't provide a real
+    distributed cache, and it is used for testing purposes.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'For that reason, we can add the following line to the `InMemoryApplicationFactory<TStartup>`
+    class, which is contained in the `Catalog.Fixtures` project:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE25]'
+  prefs: []
+  type: TYPE_PRE
+- en: The preceding code replaces the implementation of `IDistributedCache` with an
+    instance of `MemoryDistributedCache`. Therefore, every time our implementation
+    calls the `IDistributedCache` interface, the data is saved in the memory of the
+    testing server.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Summary
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In this chapter, we covered some of the main caching scenarios in ASP.NET Core
+    so that you know how the HTTP cache works and how it can be implemented. Furthermore,
+    we learned how to implement a distributed cache using the `IDistributedCache`
+    interface and how to connect the web service to a Redis instance. In the next
+    chapter, we will look at how to deal with logging management and how to perform
+    health checks on the dependencies of the catalog web service.
+  prefs: []
+  type: TYPE_NORMAL

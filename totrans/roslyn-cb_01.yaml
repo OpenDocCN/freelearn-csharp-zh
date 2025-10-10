@@ -1,0 +1,1491 @@
+- en: Writing Diagnostic Analyzers
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'In this chapter, we will cover the following recipes:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Creating, debugging, and executing an analyzer project in Visual Studio
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Creating a symbol analyzer to report issues about symbol declarations
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Creating a syntax node analyzer to report issues about language syntax
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Creating a syntax tree analyzer to analyze source file and report syntax issues
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Creating a method body analyzer to analyze whole method and report issues
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Creating a compilation analyzer to analyze whole compilation and report issues
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Writing unit tests for an analyzer project
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Publishing the NuGet package and VSIX for an analyzer project
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Introduction
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Diagnostic analyzers are extensions to the Roslyn C# compiler and Visual Studio
+    IDE to analyze user code and report diagnostics. Users will see these diagnostics
+    in the error list after building the project from Visual Studio, and even when
+    building the project on the command line. They will also see the diagnostics live
+    while editing the source code in the Visual Studio IDE. Analyzers can report diagnostics
+    to enforce specific code styles, improve code quality and maintenance, recommend
+    design guidelines, or even report very domain-specific issues which cannot be
+    covered by the core compiler. This chapter enables C# developers to write, debug,
+    test, and publish analyzers that perform different kinds of analyses.
+  prefs: []
+  type: TYPE_NORMAL
+- en: If you are not familiar with the Roslyn's architecture and API layers, it is
+    recommended that, before reading this chapter further, you read the Preface of
+    this book to gain a basic understanding of Roslyn APIs.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Diagnostic analyzers are built on top of the Roslyn's **CodeAnalysis**/**Compiler
+    layer** API. Analyzers can analyze specific code units, such as a symbol, syntax
+    node, code block, compilation, and so on, by registering one or more analyzer
+    actions. The compiler layer makes a callback into the analyzer whenever it compiles
+    a code unit of interest. The analyzer can report diagnostics on code units, which
+    are added to the list of the compiler diagnostics and reported back to the end
+    user.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Analyzers can be broadly categorized into the following two buckets based on
+    the kind of analysis performed:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**Stateless analyzers**: Analyzers that report diagnostics about a specific
+    code unit by registering one or more analyzer actions that:'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Do not require maintaining any state across analyzer actions.
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Independent of the order of execution of individual analyzer actions.
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: For example, an analyzer that looks at every single class declaration independently
+    and reports issues about the declaration is a stateless analyzer. We will show
+    you how to write a stateless symbol, syntax node, and syntax tree analyzer, later
+    in this chapter.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**Stateful analyzers**: Analyzers that report diagnostics about a specific
+    code unit, but in the context of an enclosing code unit, such as a code block
+    or a compilation. These are more complicated analyzers that require powerful and
+    wider analysis, hence, need careful design to achieve efficient analyzer execution
+    without memory leaks. These analyzers require at least one of the following kinds
+    of state manipulation for analysis:'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Access to immutable state objects for the enclosing code unit, such as a compilation
+    or the code block. For example, access to certain well-known types defined in
+    a compilation.
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Perform analysis over the enclosing code unit, with mutable state defined and
+    initialized in a start action for the enclosing code unit, intermediate nested
+    actions that access and/or update this state, and an end action to report diagnostic
+    on the individual code units.
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: For example, an analyzer that looks at all class declarations in a compilation,
+    gathering and updating a common state when analyzing each class declaration, and
+    then finally, after it has analyzed all declarations, reports issues about those
+    declarations is a stateful analyzer. We will show you how to write a stateful
+    method body and compilation analyzer in this chapter.
+  prefs: []
+  type: TYPE_NORMAL
+- en: By default, analyzers can analyze and report diagnostics on source files in
+    a project. However, we can also write an analyzer that analyzes additional files,
+    that is, non-source text files included in the project, and also report diagnostics
+    in additional files. Non-source files could be files, such as Web.config files
+    in a web project, cshtml files in a Razor project, XAML files in a WPF project,
+    and so on. You can read more about how to write and consume additional file analyzers
+    at [https://github.com/dotnet/roslyn/blob/master/docs/analyzers/Using%20Additional%20Files.md.](https://github.com/dotnet/roslyn/blob/master/docs/analyzers/Using%20Additional%20Files.md)
+  prefs: []
+  type: TYPE_NORMAL
+- en: Creating, debugging, and executing an analyzer project in Visual Studio
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: We will show you how to install the .NET Compiler Platform SDK, create an analyzer
+    project from a template, and then debug and execute the default analyzer.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The analyzer project that you create in this recipe can be used in the subsequent
+    recipes in this chapter to add new analyzers and write unit tests.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Getting ready
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: You will need to have Visual Studio 2017 installed on your machine to execute
+    the recipes in this chapter. You can install a free community version of Visual
+    Studio 2017 from [https://www.visualstudio.com/thank-you-downloading-visual-studio/?sku=Community&rel=15](https://www.visualstudio.com/thank-you-downloading-visual-studio/?sku=Community&rel=15).
+  prefs: []
+  type: TYPE_NORMAL
+- en: How to do it...
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Start Visual Studio and click on File | New | Project.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Search for `Analyzer` templates in the textbox at the top right corner of the
+    New Project dialog, select Download the .NET Compiler Platform SDK, and click
+    on OK:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '![](img/b8e145ad-e7b0-4e57-b64f-49b179c96b71.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: The new project will have an `index.html` file opened by default. Click on Download
+    .NET Compiler Platform SDK Templates >> button to install the analyzer SDK templates.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '![](img/b7dad759-4dcc-49b0-b7ed-e4efe64b0d2d.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: In the subsequent File Download dialog, click on Open.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '![](img/b1755f2f-8bbc-4e5d-823c-f1334ba66654.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'Click Install on the next VSIX Installer dialog and End Tasks on the subsequent
+    prompt to install the SDK:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '![](img/2d961daa-1c5a-432d-ac44-073cae33659d.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: Start a new instance of Visual Studio and click on File | New | Project... to
+    get the New Project dialog.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Change the project target framework combo box to .NET Framework 4.6 (or above).
+    Under Visual C# | Extensibility, choose Analyzer with Code Fix (NuGet + VSIX),
+    name your project `CSharpAnalyzers`, and click on OK.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '***![](img/c236cecc-9323-4f98-8b76-5f4c3efe80cd.png)***'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'You should now have an analyzers solution with 3 projects: `CSharpAnalyzers
+    (Portable)`, `CSharpAnalyzers.Test` , and `CSharpAnalyzer.Vsix`**:**'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '![](img/80081d9c-64db-4850-9fa1-a91a00ef78d6.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'Open source file `DiagnosticAnalyzer.cs` in `CSharpAnalyzers` project and set
+    breakpoints (press *F9*) at the start of the `Initialize` and `AnalyzeSymbol`
+    methods, as shown here:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '![](img/9803a238-34f8-4fe6-b161-5b3729c02efb.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: Set `CSharpAnalyzers.Vsix` as the start-up project and click on *F5* to build
+    the analyzer and start debugging a new instance of Visual Studio with the analyzer
+    enabled.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: In the new Visual Studio instance, create a new C# class library project, say
+    `ClassLibrary`.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Verify that we hit both the preceding breakpoints in our analyzer code in the
+    first VS instance. You can step through the analyzer code using *F10* or click
+    on *F5* to continue debugging.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'We should now see the analyzer diagnostic in the error list and a squiggle
+    in the editor:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '![](img/ada9a9c5-b73c-4514-ba72-bdb5615cc51a.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: Edit the name of the class from `Class1` to `CLASS1`.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: We should hit the breakpoint in the `AnalyzeSymbol` method again. Continue debugging
+    with *F5* and the diagnostic and squiggle should go away immediately, demonstrating
+    the powerful live and extensible analysis.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: How it works...
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: '.NET Compiler Platform SDK is a wrapper project that redirects us to fetch
+    the project templates for analyzer + CodeFix projects for C# and Visual Basic.
+    Creating a new project from these templates creates a fully functional analyzer
+    project which has a default analyzer, unit tests, and a VSIX project:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`CSharpAnalyzers`: Core analyzer project that contains the default analyzer
+    implementation that reports a diagnostic for all type names that contain any lowercase
+    letters.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`CSharpAnalyzers.Test`: Analyzer unit test project that contains a couple of
+    analyzer and code fixer unit tests and test helpers.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`CSharpAnalyzers.Vsix`: The VSIX project that packages the analyzer into a
+    VSIX. This is the start-up project in the solution.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Clicking on *F5* to start debugging the solution builds and deploys the analyzer
+    to the Visual Studio extension hive and then starts a new Visual Studio instance
+    from this hive. Our analyzer is enabled by default for all C# projects created
+    in this VS instance.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let''s expand a bit more on the diagnostic analyzer source code defined in
+    `DiagnosticAnalyzers.cs`. It contains a type named `CSharpAnalyzersAnalyzer`,
+    which derives from `DiagnosticAnalyzer`. `DiagnosticAnalyzer` is an abstract type
+    with the following two abstract members:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`SupportedDiagnostics` property: Analyzer must define one or more supported
+    diagnostic descriptors. Descriptors describe the metadata for the diagnostics
+    that an analyzer can report in analyzer actions. It contains fields such as the
+    diagnostic ID, message format, title, description, hyperlink to documentation
+    for the diagnostic, and so on. Can be used to create and report diagnostics:'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[PRE0]'
+  prefs: []
+  type: TYPE_PRE
+- en: '`Initialize` method: Diagnostic analyzers must implement the `Initialize` method
+    to register analyzer action callbacks for a specific code entity kind of interest,
+    which is named type symbols for the default analyzer. The initialize method is
+    invoked once for the analyzer lifetime to allow analyzer initialization and registration
+    of actions.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[PRE1]'
+  prefs: []
+  type: TYPE_PRE
+- en: Invoke `AnalysisContext.EnableConcurrentExecution()` in the `Initialize` method
+    if your analyzer can handle action callbacks from multiple threads simultaneously
+    -- this enables the analyzer driver to execute the analyzer more efficiently on
+    a machine with multiple cores. Additionally, also invoke `AnalysisContext.ConfigureGeneratedCodeAnalysis()`
+    in the`Initialize` method to configure whether or not the analyzer wants to analyze
+    and/or report diagnostics in generated code.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Analyzer actions are invoked for every code entity of interest in a user s source
+    code. Additionally, as the user edits code and a new compilation is created, action
+    callbacks are continuously invoked for entities defined in the new compilation
+    during code editing. The error list makes sure that it only reports the diagnostics
+    from the active compilation.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Use [http://source.roslyn.io](http://source.roslyn.io) for rich semantic search
+    and navigation of Roslyn source code, which is open sourced at [https://github.com/dotnet/roslyn.git](https://github.com/dotnet/roslyn.git).
+    For example, you can look at the definition and references for `DiagnosticAnalyzer`
+    using the query URL [http://source.roslyn.io/#q=DiagnosticAnalyzer](http://source.roslyn.io/#q=DiagnosticAnalyzer).
+  prefs: []
+  type: TYPE_NORMAL
+- en: Creating a symbol analyzer to report issues about symbol declarations
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: A symbol analyzer registers action callbacks to analyze one or more kinds of
+    symbol declarations, such as types, methods, fields, properties, events, and so
+    on, reports semantic issues about declarations.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In this section, we will create a symbol analyzer that extends the compiler
+    diagnostic *CS0542* (member names cannot be the same as their enclosing type)
+    to report a diagnostic if member names are the same as any of the outer parent
+    type. For example, the analyzer will report a diagnostic for the innermost type
+    `NestedClass` here:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE2]'
+  prefs: []
+  type: TYPE_PRE
+- en: Getting ready
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: You will need to have created and opened an analyzer project, say `CSharpAnalyzers`
+    in Visual Studio 2017\. Refer to the first recipe in this chapter to create this
+    project.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How to do it...
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In Solution Explorer, double-click on `Resources.resx` file in `CSharpAnalyzers`
+    project to open the resource file in the resource editor.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Replace the existing resource strings for `AnalyzerDescription`, `AnalyzerMessageFormat`
+    and `AnalyzerTitle` with new strings:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '![](img/fb520471-e9c9-4c9f-b339-2b600de5d40c.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'Replace the `Initialize` method implementation with the following:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE3]'
+  prefs: []
+  type: TYPE_PRE
+- en: Click on *Ctrl* + *F5* to start a new Visual Studio instance with the analyzer
+    enabled.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'In the new Visual Studio instance, create a new C# class library with the following
+    code:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE4]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Verify the compiler reported diagnostic *CS0542* in the error list: `''NestedClass'':
+    member names cannot be the same as their enclosing type`.'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Change the class library code to following:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE5]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Verify that *CS0542* isn t reported anymore, but the error list has our analyzer
+    diagnostic:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '![](img/1d7b4dc1-787d-4528-ad6d-cf93ea8d292d.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'Replace the innermost type declaration for `NestedClass` with a field: `public
+    int NestedClass`, and verify the same analyzer diagnostic is reported. You should
+    get the same diagnostic for other member kinds such as method, property, and events
+    with the same name.'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: How it works...
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Symbol analyzers register one or more symbol action callbacks to analyze symbol
+    kinds of interest. Note that, unlike the default implementation that registered
+    a delegate method named `AnalyzeSymbol`, we registered a lambda callback.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We specified interest in analyzing all the top-level symbol kinds that can
+    have an enclosing type, namely types, methods, fields, properties, and events
+    in the `RegisterSymbolAction` invocation:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE6]'
+  prefs: []
+  type: TYPE_PRE
+- en: The analyzer driver ensures that the registered lambda is invoked for all symbols
+    of the registered interest kinds in the compilation.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Analysis skips the immediate enclosing type, as C# compiler already reports
+    error *CS0542,* if a member has the same name as its enclosing type.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE7]'
+  prefs: []
+  type: TYPE_PRE
+- en: Core analysis works by looping over the outer types and comparing the name of
+    the symbol in a symbol analysis context with the relevant outer types, until it
+    finds a match, in which case, it reports a diagnostic; if the outer type has no
+    containing type, it doesn t report a diagnostic.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE8]'
+  prefs: []
+  type: TYPE_PRE
+- en: It is recommended that symbol actions only analyze and report diagnostics about
+    declarations, not the executable code within it. If you need to analyze executable
+    code within a symbol, you should try to register other action kinds discussed
+    later in this chapter.
+  prefs: []
+  type: TYPE_NORMAL
+- en: There s more...
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: '**Trivia**: The preceding implementation of the symbol analyzer does not have
+    optimal performance. For example, if you have *n* levels of type nesting, and
+    *m* fields in the inner innermost nested type, the analysis we implemented will
+    be *O(m*n)* algorithmic complexity. Can you implement an alternate implementation
+    where the analysis can be implemented with a much superior *O(m + n)* complexity?'
+  prefs: []
+  type: TYPE_NORMAL
+- en: See also
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Our current analyzer implementation is completely stateless because it doesn
+    t require analysis that is dependent upon more than one symbol at a time. We analyze
+    each symbol individually and report diagnostics for it. However, if you need to
+    do more complex analysis that requires collecting state from multiple symbols
+    and then doing a compilation-wide analysis, you should write a stateful compilation
+    analyzer with symbol and compilation actions. This is covered later in this chapter
+    in the recipe *Creating a compilation analyzer to analyze a whole compilation
+    and report issues.*
+  prefs: []
+  type: TYPE_NORMAL
+- en: Creating a syntax node analyzer to report issues about language syntax
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: A syntax node analyzer registers action callbacks to analyze one or more kinds
+    of syntax nodes, such as operators, identifiers, expressions, declarations, and
+    so on, and reports semantic issues about syntax. These analyzers generally need
+    to fetch semantic information about different syntax nodes being analyzed and
+    use the compiler semantic model APIs to get this information.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In this section, we will create a syntax analyzer that analyzes `VariableDeclarationSyntax`
+    nodes for local declarations and reports a diagnostic recommending use of the
+    explicit type instead of an implicitly typed declaration, that is, variables defined
+    with the keyword `var`, such as `var i = new X();`*.* Analyzer will not report
+    diagnostics if there is a compiler syntax error (implicitly typed declarations
+    cannot define more than one variable), or the right side of the assignment has
+    an error type or special System type such as int, char, string, and so on. For
+    example, the analyzer will not flag locals `local1`, `local2`, and `local3` here,
+    but will flag `local4`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE9]'
+  prefs: []
+  type: TYPE_PRE
+- en: Getting ready
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: You will need to have created and opened an analyzer project, say `CSharpAnalyzers`
+    in Visual Studio 2017\. Refer to the first recipe in this chapter to create this
+    project.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How to do it...
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In Solution Explorer, double-click on `Resources.resx` file in `CSharpAnalyzers`
+    project to open the resource file in the resource editor.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Replace the existing resource strings for `AnalyzerDescription`, `AnalyzerMessageFormat`
+    and `AnalyzerTitle` with new strings:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '![](img/41de0b15-eb6f-442a-bb06-508abe40df8f.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'Replace the `Initialize` method implementation with the following:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE10]'
+  prefs: []
+  type: TYPE_PRE
+- en: Click on *Ctrl* + *F5* to start a new Visual Studio instance with the analyzer
+    enabled.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'In the new Visual Studio instance, create a new C# class library with the following
+    code:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE11]'
+  prefs: []
+  type: TYPE_PRE
+- en: Verify the analyzer diagnostic is not reported in the error list for explicitly
+    typed variables.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Now, add the following implicitly typed variable declarations to the method:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE12]'
+  prefs: []
+  type: TYPE_PRE
+- en: Verify the analyzer diagnostic is not reported in the error list for implicitly
+    typed variables with error type or special type.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Add the violating implicitly typed variable declaration to the method:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE13]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Verify the analyzer diagnostic is reported for this implicitly typed variable:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '![](img/546651f4-032c-4497-ae9a-10e69500c726.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: How it works...
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Syntax node analyzers register one or more syntax node action callbacks to analyse
+    syntax kinds of interest. We specified interest in analyzing `VariableDeclaration`
+    syntax kind in the `RegisterSyntaxNodeAction` invocation.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE14]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Analysis works by operating on the syntax node and semantic model exposed off
+    the syntax node analysis context in the callback. We first do syntactic checks
+    to verify that we are operating on a valid implicitly typed declaration:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE15]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'We then perform semantic checks using the semantic model APIs to get semantic
+    type information about the type declaration syntax node and verify it is not an
+    error type or primitive system type:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE16]'
+  prefs: []
+  type: TYPE_PRE
+- en: You can perform many powerful semantic operations on the syntax node exposed
+    from the `SyntaxNodeAnalysisContext` using the public semantic model APIs, for
+    reference see [https://github.com/dotnet/roslyn/blob/master/src/Compilers/Core/Portable/Compilation/SemanticModel.cs](https://github.com/dotnet/roslyn/blob/master/src/Compilers/Core/Portable/Compilation/SemanticModel.cs).
+  prefs: []
+  type: TYPE_NORMAL
+- en: If both the syntactic and semantics check succeed, then we report a diagnostic
+    about recommending explicit type instead of var.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Creating a syntax tree analyzer to analyze the source file and report syntax
+    issues
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: A syntax tree analyzer registers action callbacks to analyze the syntax/grammar
+    for the source file and reports pure syntactic issues. For example, a missing
+    semicolon at the end of a statement is a syntactic error, while assigning an incompatible
+    type to a symbol with no possible type conversion is a semantic error.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In this section, we will write a syntax tree analyzer that analyzes all the
+    statements in a source file and generates a syntax warning for any statement that
+    is not enclosed in a block, that is curly braces `{` and `}`. For example, the
+    following code will generate a warning for both the `if` statement and the `System.Console.WriteLine`
+    invocation statement, but the `while` statement is not flagged:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE17]'
+  prefs: []
+  type: TYPE_PRE
+- en: Getting ready
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: You will need to have created and opened an analyzer project, say `CSharpAnalyzers`
+    in Visual Studio 2017\. Refer to the first recipe in this chapter to create this
+    project.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How to do it...
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In Solution Explorer, double-click on the `Resources.resx` file in `CSharpAnalyzers`
+    project to open the resource file in the resource editor.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Replace the existing resource strings for `AnalyzerDescription`, `AnalyzerMessageFormat`
+    and `AnalyzerTitle` with new strings.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '![](img/50ca5379-4258-4a4b-9d62-a066f1470a0b.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'Replace the `Initialize` method implementation with the following:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE18]'
+  prefs: []
+  type: TYPE_PRE
+- en: Click on *Ctrl* + *F5* to start a new Visual Studio instance with the analyzer
+    enabled.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'In the new Visual Studio instance, create a new C# class library with the following
+    code:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE19]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Verify the analyzer diagnostic is neither reported for the method block for
+    `Method` nor the `while` statement, but is reported for the `if` statement and
+    `System.Console.WriteLine` invocation statement:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '![](img/19a037fe-9bdb-4204-9dcf-5b2476d657c2.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'Now, add curly braces around the `System.Console.WriteLine` invocation statement
+    and verify the only single warning is now reported for the `if` statement:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '![](img/d48ccb86-abd2-49be-b373-b48cd26e2574.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: How it works...
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Syntax tree analyzers register callbacks to analyze syntax of all source files
+    in the compilation. Our analysis works by getting the roots of the syntax tree
+    and then operating on all the descendant syntax nodes of the roots which are of
+    type `StatementSyntax`. First, we note that a block statement is itself an aggregate
+    statement, and by definition has curly braces, so we skip past these.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE20]'
+  prefs: []
+  type: TYPE_PRE
+- en: We then perform syntactic checks for the parent of statement syntax. If the
+    parent of the statement is also a statement, but not a block with curly braces,
+    then we report a diagnostic on the first syntax token of the statement recommending
+    usage of curly braces.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE21]'
+  prefs: []
+  type: TYPE_PRE
+- en: '`SyntaxTreeAnalysisContext` provided to syntax tree actions does not expose
+    the semantic model for the source file, hence no semantic analysis can be performed
+    within a syntax tree action.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Creating a method body analyzer to analyze whole method and report issues
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: A stateful method body or code block analyzer registers action callbacks that
+    require whole method body analysis to report issues about the method declaration
+    or executable code. These analyzers generally need to initialize some mutable
+    state at the start of the analysis, which is updated while analyzing the method
+    body, and the final state is used to report diagnostics.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In this section, we will create a code block analyzer that flags unused method
+    parameters. For example, it will not flag `param1` and `param2` as unused, but
+    will flag `param3` and `param4`*.*
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE22]'
+  prefs: []
+  type: TYPE_PRE
+- en: Getting ready
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: You will need to have created and opened an analyzer project, say `CSharpAnalyzers`
+    in Visual Studio 2017\. Refer to the first recipe in this chapter to create this
+    project.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How to do it...
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In Solution Explorer, double-click on `Resources.resx` file in `CSharpAnalyzers`
+    project to open the resource file in the resource editor.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Replace the existing resource strings for `AnalyzerDescription`, `AnalyzerMessageFormat`
+    and `AnalyzerTitle` with new strings.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '![](img/8e00bba6-4e68-4384-b87c-fb70231c1fc5.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: Replace the `Initialize` method implementation with the code from `CSharpAnalyzers/CSharpAnalyzers/CSharpAnalyzers/DiagnosticAnalyzer.cs/`
+    method named `Initialize`*.*
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Add private class `UnusedParametersAnalyzer` from `CSharpAnalyzers/CSharpAnalyzers/CSharpAnalyzers/DiagnosticAnalyzer.cs/`
+    type named `UnusedParametersAnalyzer` in your analyzer to perform the core method
+    body analysis for a given method.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Click on *Ctrl* + *F5* to start a new Visual Studio instance with the analyzer
+    enabled.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'In the new Visual Studio instance, create a new C# class library with the following
+    code:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE23]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Verify the analyzer diagnostic is not reported for `param1` and `param2`, but
+    is reported for `param3` and `param4`:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '![](img/13cb91bb-0028-4ff8-aaf8-0d5b4031ada9.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'Now, add code to use `param3` in the local declaration statement, delete `param4`,
+    and verify the diagnostics go away:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '![](img/bfac07c2-a169-420c-bf00-312f99b4b1ae.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: How it works...
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Code block analyzers register code block actions to analyze executable code
+    blocks in the compilation. You can register either a stateless `CodeBlockAction`
+    or a stateful `CodeBlockStartAction` with nested actions to analyze syntax nodes
+    within a code block. Our analyzer registers a `CodeBlockStartAction` to perform
+    stateful analysis.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE24]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Analysis begins with a couple of early bail out checks: we are only interested
+    in analyzing executable code within a method body and methods that have at least
+    one parameter.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE25]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'We allocate a new `UnusedParametersAnalyzer` instance for every method to be
+    analyzed. A constructor of this type initializes the mutable state tracked for
+    analysis (explained later):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE26]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'We then register a nested syntax node action, `UnusedParametersAnalyzer.AnalyzeSyntaxNode`*,*
+    on the given code block context for the given method. We register interest in
+    analyzing `IdentifierName` syntax nodes within the code block:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE27]'
+  prefs: []
+  type: TYPE_PRE
+- en: Finally, we register a nested `CodeBlockEndAction` to be executed on the instance
+    of `UnusedParametersAnalyzer` at the end of the code block analysis.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE28]'
+  prefs: []
+  type: TYPE_PRE
+- en: Nested end actions are always guaranteed to be executed *after* all the nested
+    non-end actions registered on the same analysis context have finished executing.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let''s now understand the working of the core `UnusedParametersAnalyzer` type
+    to analyze a specific code block. This analyzer defines mutable state fields to
+    track parameters (and their names) that are considered to be unused:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE29]'
+  prefs: []
+  type: TYPE_PRE
+- en: We initialize this mutable state in the constructor of the analyzer. At the
+    start of the analysis, we filter out implicitly declared parameters and parameters
+    with no source locations - these are never considered to be redundant. We mark
+    the remaining parameters as unused.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE30]'
+  prefs: []
+  type: TYPE_PRE
+- en: '`AnalyzeSyntaxNode` has been registered as a nested syntax node action to analyze
+    all `IdentifierName` nodes within the code block. We perform a couple of quick
+    checks at the start of the method and bail out of analysis if (a) We have no unused
+    parameters in our current analysis state, or (b) The identifier name doesn''t
+    match any of the unused parameter names. The latter check is done to avoid the
+    performance hit of attempting to compute symbol info for the identifier.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE31]'
+  prefs: []
+  type: TYPE_PRE
+- en: Then, we use the semantic model APIs to get semantic symbol info for the identifier
+    name and check if it binds to one of the parameters that is currently considered
+    unused. If so, we remove this parameter (and it's name) from the unused set.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE32]'
+  prefs: []
+  type: TYPE_PRE
+- en: Finally, the registered code block end action walks through all the remaining
+    parameters in the unused set and flags them as unused parameters.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE33]'
+  prefs: []
+  type: TYPE_PRE
+- en: Creating a compilation analyzer to analyze whole compilation and report issues
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: A stateful compilation analyzer registers action callbacks that require compilation-wide
+    analysis of symbols and/or syntax to report issues about declarations or executable
+    code in the compilation. These analyzers generally need to initialize some mutable
+    state at the start of the analysis, which is updated while analyzing the compilation,
+    and the final state is used to report diagnostics.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In this section, we will create an analyzer that performs compilation-wide
+    analysis and reports. Diagnostic secure types must not implement interfaces with
+    insecure methods for the following scenarios:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Assume we have an interface, say `MyNamespace.ISecureType`, which is a well-known
+    secure interface, i.e. it is a marker for all secure types in an assembly*.*
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Assume we have a method attribute, say `MyNamespace.InsecureMethodAttribute`*,*
+    which marks the method on which the attribute is applied as insecure. An interface
+    which has any member with such an attribute, must be considered insecure.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: We want to report diagnostics for types implementing the well-known secure interface
+    that also implements any insecure interfaces.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Analyzer performs compilation-wide analysis to detect such violating types and
+    reports diagnostics for them in the compilation end action.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Getting ready
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: You will need to have created and opened an analyzer project, say `CSharpAnalyzers`
+    in Visual Studio 2017\. Refer to the first recipe in this chapter to create this
+    project.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How to do it...
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In Solution Explorer, double click on `Resources.resx` file in `CSharpAnalyzers`
+    project to open the resource file in the resource editor.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Replace the existing resource strings for `AnalyzerDescription`, `AnalyzerMessageFormat`
+    and `AnalyzerTitle` with new strings.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '![](img/4fbcc7c0-2864-459d-939d-460b9fc28ae0.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: Replace the `Initialize` method implementation with the code from `CSharpAnalyzers/CSharpAnalyzers/CSharpAnalyzers/DiagnosticAnalyzer.cs/`
+    method named `Initialize`**.**
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Add a private class `CompilationAnalyzer` from `CSharpAnalyzers/CSharpAnalyzers/CSharpAnalyzers/DiagnosticAnalyzer.cs/`
+    type named `CompilationAnalyzer` in your analyzer to perform the core method body
+    analysis for a given method.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Click on *Ctrl* + *F5* to start a new Visual Studio instance with the analyzer
+    enabled.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'In the new Visual Studio instance, enable full solution analysis for C# projects
+    by following the steps here: [https://msdn.microsoft.com/en-us/library/mt709421.aspx](https://msdn.microsoft.com/en-us/library/mt709421.aspx)'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '![](img/ddcca190-41a4-4447-a097-de7de89802d6.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'In the new Visual Studio instance, create a new C# class library with the following
+    code:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE34]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Verify the analyzer diagnostic is not reported for `MyInterfaceImpl1` and `MyInterfaceImpl`*3*,
+    but is reported for `MyInterfaceImpl2`:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '![](img/532fc9dd-d8c3-4f1b-94dd-b02f5ee9170a.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: Now, change `MyInterfaceImpl2` so that it no longer implements `IInsecureInterface`
+    and verify that the diagnostic is no longer reported.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE35]'
+  prefs: []
+  type: TYPE_PRE
+- en: How it works...
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Compilation analyzers register compilation actions to analyze symbols and/or
+    syntax nodes in the compilation. You can register either a stateless `CompilationAction`
+    or a stateful `CompilationStartAction` with nested actions to analyze symbols
+    and/or syntax nodes within a compilation. Our analyzer registers a `CompilationStartAction`
+    to perform stateful analysis.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE36]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Analysis begins with a couple of early bail out checks: we are only interested
+    in analyzing compilations which have source or metadata types by name `MyNamespace.ISecureType`
+    and `MyNamespace.InsecureMethodAttribute`.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE37]'
+  prefs: []
+  type: TYPE_PRE
+- en: We allocate a new `CompilationAnalyzer` instance for compilations to be analyzed.
+    A constructor of this type initializes the mutable and immutable state tracked
+    for analysis (explained later).
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE38]'
+  prefs: []
+  type: TYPE_PRE
+- en: We then register a nested symbol action, `CompilationAnalyzer.AnalyzeSymbol`,
+    on the given compilation start context for the given compilation. We register
+    interest in analyzing type and method symbols within the compilation.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE39]'
+  prefs: []
+  type: TYPE_PRE
+- en: Finally, we register a nested `CompilationEndAction` to be executed on the instance
+    of `CompilationAnalyzer` at the end of the compilation analysis.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE40]'
+  prefs: []
+  type: TYPE_PRE
+- en: Nested compilation end actions are always guaranteed to be executed *after*
+    all the nested non-end actions registered on the same analysis context have finished
+    executing.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Let's now understand the working of the core `CompilationAnalyzer` type to analyze
+    a specific compilation. This analyzer defines an immutable state for type symbols
+    corresponding to the secure interface and insecure method attribute. It also defines
+    mutable state fields to track the set of types defined in the compilation that
+    implement the secure interface and a set of interfaces defined in the compilation
+    that have methods with an insecure method attribute.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE41]'
+  prefs: []
+  type: TYPE_PRE
+- en: At the start of the analysis, we initialize the set of secure types and interfaces
+    with insecure methods to be empty.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE42]'
+  prefs: []
+  type: TYPE_PRE
+- en: '`AnalyzeSymbol` is registered as a nested symbol action to analyze all types
+    and methods within the compilation. For every type declaration in the compilation,
+    we check whether it implements the secure interface, and if so, add it to our
+    set of secure types. For every method declaration in the compilation, we check
+    whether its containing type is an interface and the method has the insecure method
+    attribute, and if so, add the containing interface type to our set of interface
+    types with insecure methods.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE43]'
+  prefs: []
+  type: TYPE_PRE
+- en: Finally, the registered the compilation end action uses the final state at the
+    end of compilation analysis to report diagnostics. Analysis in this action starts
+    by bailing out early if we either have no secure types or no interfaces with insecure
+    methods. Then, we walk through all secure types and all interfaces with insecure
+    methods, and for every pair. check whether the secure type or any of its base
+    types implements the insecure interface. If so, we report a diagnostic on the
+    secure type.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE44]'
+  prefs: []
+  type: TYPE_PRE
+- en: Writing unit tests for an analyzer project
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In this section, we will show you how to write and execute unit tests for an
+    analyzer project.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Getting ready
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: You will need to have created and opened an analyzer project, say `CSharpAnalyzers`
+    in Visual Studio 2017\. Refer to the first recipe in this chapter to create this
+    project.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How to do it...
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Open UnitTests.cs in the `CSharpAnalyzers.Test` project in the Solution Explorer
+    solution to view the default unit tests created for the default symbol analyzer
+    (type names should not contain lowercase letters) for the template analyzer project.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '![](img/7968ef6e-c4f5-4f16-81ec-759165b887d2.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'Navigate to Test | Windows | Test Window to open the Test Explorer window to
+    view the unit tests in the project. Default analyzer project has two unit tests:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '`TestMethod1`: This tests the scenario where analyzer diagnostic does not fire
+    on the test code and'
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`TestMethod2`: This tests the scenario where analyzer diagnostic does fire
+    on the test code.'
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '![](img/0a6370b3-cdf3-459a-b787-ca1674514e1f.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: Note that the unit test project contains unit tests for both the DiagnosticAnalyzer
+    and CodeFixProvider. This chapter deals with analyzer testing only. We will expand
+    on the unit tests for the CodeFixProvider later in this book.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Run all the unit tests for the project by right-clicking Not Run tests node
+    in the Test Explorer, executing the Run selected tests context menu command, and
+    verify that the tests pass.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Edit `TestMethod1` so that the test code now has a type with lower-case letters:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE45]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Right-click on `TestMethod1` in the editor, execute the Run tests context menu
+    command, and verify that the test now fails with the diagnostic mismatch assert
+    - `expected "0" actual "1"`:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '![](img/b151333e-80c8-45c6-b17e-908bbcaef64e.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'Edit `TestMethod1` to now add an excepted diagnostic for the new test code:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE46]'
+  prefs: []
+  type: TYPE_PRE
+- en: Run the unit test again and note that the test still fails, but now it fails
+    due to a difference in the location (column number) at which the diagnostic was
+    reported.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '![](img/d6d79d20-cf18-40ab-9f0a-1d6dfacbac8a.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: Edit the diagnostic location to use the correct expected column number and rerun
+    the test - verify that the test passes now.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE47]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Edit `TestMethod1` and change the test code to rename `Class1` to `CLASS1`:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE48]'
+  prefs: []
+  type: TYPE_PRE
+- en: Run the unit test again and verify that the test fails now due to a diagnostic
+    mismatch assert - `expected "1" actual "0"`.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '![](img/364e25f7-e9c6-4ef6-bcf3-65e7d9e6c899.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'Edit `TestMethod1` to remove the expected diagnostic and verify the test passes:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE49]'
+  prefs: []
+  type: TYPE_PRE
+- en: How it works...
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The analyzer unit test project allows us to write unit tests for the execution
+    of our analyzer on different code samples. Each unit test is marked with a `TestMethod`
+    attribute and defines sample test code, expected diagnostic(s) reported by the
+    analyzer on that code (if any), and invocation of test helper method(s), here
+    `VerifyCSharpDiagnostic`*,* to verify diagnostics.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE50]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Unit tests can define expected diagnostics using the `DiagnosticResult` type,
+    which must specify the diagnostic `Id`, `Message`, `Severity` and `Locations`
+    for the diagnostic:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE51]'
+  prefs: []
+  type: TYPE_PRE
+- en: Computing the correct line number and column number for an expected diagnostic,
+    for example (11, 15), can be a bit tricky. The approach that normally works is
+    to start with a default location of (0, 0), execute the test once, and look at
+    the failure text in the Test Explorer window to get the expected and actual line
+    number. Then, replace the expected line number in the test code with the actual
+    line number. Re-execute the test and repeat the process to get the correct column
+    number.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`UnitTest` type containing all the unit tests also overrides the following
+    methods to return the `DiagnosticAnalyzer` (and optionally a `CodeFixProvider`)
+    to be tested:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE52]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Now, let us expand a bit more on the test framework helpers for the unit tests.
+    The analyzer unit test project contains two primary helper abstract types to write
+    unit tests for analyzers and code fixes:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`DiagnosticVerifier`**:** Contains helper methods to run `DiagnosticAnalyzer`
+    unit tests that verify the analyzer diagnostics for a given set of test sources.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`CodeFixVerifier`: Contains helper methods to run `DiagnosticAnalyzer` and
+    `CodeFixProvider` unit tests that verify the analyzer diagnostics for a given
+    set of test sources before and after applying a code fix. This type derives from
+    `DiagnosticVerifier`.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: In the default analyzer project, `UnitTest` type derives from `CodeFixVerifier`,
+    but could also be changed to derive from `DiagnosticVerifier`*,* if you are only
+    interested in writing analyzer unit tests. We will just focus on the `DiagnosticVerifier`
+    here; `CodeFixVerifier` is covered later in chapter***.***
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`DiagnosticVerifier` type is split into 2 source files `DiagnosticVerifier.cs`
+    and `DiagnosticVerifier.Helper.cs`*.*'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![](img/b642ab13-ec95-410a-bde9-7cc2d0cf7a52.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: '`DiagnosticVerifier.Helper.cs` contains the following core functionality:'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Helper methods to create a compilation with source files based on given C# or
+    VisualBasic source code (Set up compilation and documents region in the preceding
+    screenshot).
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Helper methods to invoke the preceding functionality to create a compilation
+    with the given C# or VisualBasic source code, and execute the given `DiagnosticAnalyzer`
+    on the compilation to produce analyzer diagnostics and return sorted diagnostics
+    for verification (Get Diagnostics region in the preceding screenshot).
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`DiagnosticVerifier.cs` contains the following core functionality:'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Method(s) to get the `DiagnosticAnalyzer` type to be tested (To be implemented
+    by Test classes region in the preceding screenshot).
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Private helpers to perform actual diagnostic comparison and verification and
+    formatting of diagnostics to get a string representation of actual/expected diagnostics
+    when a unit test fails (Actual comparisons and verifications region and Formatting
+    Diagnostics region in the preceding screenshot).
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Diagnostic verification methods `VerifyCSharpDiagnostic` and `VerifyBasicDiagnostic`
+    that can be invoked by the unit tests to verify analyzer diagnostics generated
+    on the given C# or Visual Basic source code (Verifier wrappers section in the
+    preceding screenshot). These methods invoke the Get Diagnostics helpers to create
+    a compilation and get sorted analyzer diagnostics and then invoke the preceding
+    private helpers to compare and verify diagnostics.
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: See also
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Live Unit testing is a new feature in *Visual Studio 2017* Enterprise Edition,
+    which automatically runs the impacted unit tests in the background as you edit
+    code, and visualizes the results and code coverage live, in the editor, in real-time.
+    Refer to [Chapter 6](eb1b605b-117f-4adf-a111-cfb686799929.xhtml)*, Live Unit Testing
+    in Visual Studio Enterprise*, to enable live unit testing for the project and
+    visualize unit tests automatically executing after you edit the code in the steps
+    in this recipe.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Publishing NuGet package and VSIX for an analyzer project
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: We will show you how to configure, build, and publish a NuGet package and a
+    VSIX package for an analyzer project created in Visual Studio 2017 using the .NET
+    Compiler platform SDK.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Before we start digging into these topics, let's understand the difference between
+    NuGet-based analyzer packages and VSIX-based analyzer packages. NuGet and VSIX
+    are basically two different packaging schemes for the Microsoft development platform
+    to package files such as assemblies, resources, build targets, tools, and so on,
+    into a single installable package.
+  prefs: []
+  type: TYPE_NORMAL
+- en: NuGet is a more generic packaging scheme. NuGet packages (`.nupkg` files) can
+    be directly referenced in .NET projects and installed to a specific project or
+    solution using the NuGet package manager in Visual Studio. Analyzer NuGet packages
+    based on the analyzer template project get installed as AnalyzerReferences in
+    the project file, and then get passed onto the compiler command line to be executed
+    during build. Additionally, AnalyzerReferences are resolved at design time by
+    the Visual Studio IDE and executed while code editing to generate live diagnostics.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: A VSIX package is a `.vsix` file that contains one or more Visual Studio extensions,
+    together with the metadata Visual Studio uses to classify and install the extensions.
+    An analyzer VSIX package can be installed machine-wide or to a specific extension
+    hive, and is enabled for all projects/solutions opened from the Visual Studio
+    hive. Unlike a `NuGet` package, it cannot be installed specifically to a project/solution
+    and does not travel along with the project sources.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'As of Visual Studio 2017, analyzers installed as `AnalyzerReferences` via NuGet
+    packages execute during both: command line builds and live code editing in Visual
+    Studio. Analyzers installed via Analyzer VSIX packages execute only during live
+    code editing in Visual Studio and not during project build. Hence, only analyzer
+    NuGet packages can be configured to execute in continuous integration (CI) build
+    systems and break the build.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Getting ready
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: You will need to have created and opened an analyzer project, say `CSharpAnalyzers`
+    in Visual Studio 2017\. Refer to the first recipe in this chapter to create this
+    project.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How to do it...
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Build `CSharpAnalyzers` solution in Visual Studio by executing the Build | Build
+    Solution command.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Open the binary output folder for the `CSharpAnalyzers` project (`<%SolutionFolder%>\CSharpAnalyzers\bin\debug`)
+    in Windows Explorer and verify that the NuGet package for the analyzer named,
+    `CSharpAnalyzers.1.0.X.Y.nupkg`, is generated in the folder.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Double*-*click on the `Diagnostic.nuspec` file in the `CSharpAnalyzers` project
+    in Solution Explorer to view and configure the properties of the nupkg.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '![](img/4e45c11e-5f9e-4379-b39a-50e9a0c0af40.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: Rebuild the project to regenerate the nupkg with new properties.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Publish the nupkg as a public or private package by following the steps listed
+    here: [https://docs.microsoft.com/en-us/nuget/create-packages/publish-a-package](https://docs.microsoft.com/en-us/nuget/create-packages/publish-a-package).'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Open the binary output folder for the `CSharpAnalyzers.Vsix` project (`<%SolutionFolder%\CSharpAnalyzers.Vsix\bin\debug`)
+    in Windows Explorer and verify that VSIX for the analyzer named, `CSharpAnalyzers.Vsix.vsix`,
+    is present in the folder.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Double-click on the `source.extension.vsixmanifest` file in the `CSharpAnalyzers.Vsix`
+    project in the Solution Explorer to view and configure the properties of the VSIX
+    package.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '![](img/a078be13-99a0-4e17-ae52-6d3f77675ed4.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: Rebuild the VSIX project to regerate the VSIX.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Publish it to the Visual Studio Extension Gallery by following the steps listed
+    here: [https://msdn.microsoft.com/en-us/library/ff728613.aspx](https://msdn.microsoft.com/en-us/library/ff728613.aspx).'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL

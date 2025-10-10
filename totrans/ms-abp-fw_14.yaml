@@ -1,0 +1,657 @@
+- en: '*Chapter 11*: DDD – The Application Layer'
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The previous chapter explained the domain-layer building blocks with details.
+    The domain layer is used to implement the core, application-independent domain
+    logic of the solution. However, we also need some applications to interact with
+    that domain logic, such as a web or mobile application. The application layer
+    is responsible for implementing the business logic of such applications without
+    depending on the **user interface** (**UI**) technology used in the presentation
+    layer. We keep the domain layer isolated from the presentation technology by encapsulating
+    it with the application services.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In this chapter, we will learn how to design and implement the application services
+    and **data transfer objects** (**DTOs**) with ABP Framework. We will also understand
+    the differences between domain-layer and application-layer responsibilities.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'This chapter covers the following topics:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Implementing application services
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Designing DTOs
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Understanding the responsibilities of the layers
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Technical requirements
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'You can clone or download the source code of the *EventHub* project from GitHub:
+    [https://github.com/volosoft/eventhub](https://github.com/volosoft/eventhub).'
+  prefs: []
+  type: TYPE_NORMAL
+- en: If you want to run the solution in your local development environment, you need
+    an **integrated development environment** (**IDE**)/editor (such as Visual Studio)
+    to build and run ASP.NET Core solutions. Also, if you want to create ABP solutions,
+    you need to have the ABP **command-line interface** (**CLI**) installed, as explained
+    in [*Chapter 2*](B17287_02_Epub_AM.xhtml#_idTextAnchor026), *Getting Started with
+    ABP Framework*.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Implementing application services
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: An application service is a stateless class used by the presentation layer to
+    perform use cases of the application. It orchestrates the domain objects to achieve
+    the business operation. Application services get and return DTOs instead of entities.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'An application service method is considered a work unit (meaning all database
+    operations—all succeed or all fail as a group, as covered in [*Chapter 6*](B17287_06_Epub_AM.xhtml#_idTextAnchor177),
+    *Working with the Data Access Infrastructure*), which ABP Framework automatically
+    does. A typical flow of an application service method includes the following steps:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Get the necessary aggregates from the repositories using the input parameters
+    and the current context.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Implement the use case by coordinating the aggregates, domain services, and
+    other domain objects, and delegating the work to them.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Update the changed aggregates in the database using the repositories.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Optionally, return a resulting DTO to the client (typically, to the presentation
+    layer).
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: About Updating Changed Objects
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: In fact, *Step 3* is not necessary if you use **Entity Framework Core** (**EF
+    Core**), since EF Core has a change-tracking system that can automatically determine
+    changed objects and update them in the database at the end of the **unit of work**
+    (**UoW**). So, if you have no problem relying on EF Core features, you can skip
+    *Step 3*.
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: 'Let’s see the `AddSessionAsync` application service method in the following
+    example:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE0]'
+  prefs: []
+  type: TYPE_PRE
+- en: This method is a simple application service method. It is used to add a new
+    session to an event. It first gets the related `Event` aggregate from the database.
+    Then, it uses the `AddSession` method of the `Event` class to delegate the actual
+    business operation to the domain layer. It finally updates the changed `Event`
+    object in the database. We will see the `AddSessionDto` class in the *Designing
+    DTOs* section of this chapter.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let’s see a more complex example that creates a new event, as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE1]'
+  prefs: []
+  type: TYPE_PRE
+- en: The `CreateAsync` method gets a `CreateEventDto` object from the UI layer that
+    carries the new event data and is a good example of creating new entities. Let’s
+    investigate how it was implemented.
+  prefs: []
+  type: TYPE_NORMAL
+- en: It first gets the `organization` object from the database and compares its owner’s
+    `AbpAuthorizationException` exception if the user doesn’t meet the condition.
+    Authorization is an application-layer responsibility, and the authorization rules
+    can be different in different applications. For example, in the admin application,
+    an admin user can create events on behalf of any user without checking the organization’s
+    ownership.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The `CreateAsync` method then uses the `eventManager` domain service to create
+    a new `Event` object with the minimum required properties.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We’ve created an `Event` object, but our work hasn’t been completed yet. `CreateEventDto`
+    has some optional properties that the user may set. We are again using the `eventManager`
+    domain service to set the location of the event. We are then directly setting
+    the `Language` property of `Event` because there is no business rule to set it;
+    it has a public setter, and the value can even be `null`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The `CreateAsync` method continues using the `eventManager` class to set the
+    event capacity by checking the core domain rules. It also saves the event’s cover
+    image if it was provided.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Until that point, the `Event` object hasn’t been saved to the database. All
+    the operations are performed on an in-memory object. The domain service doesn’t
+    save changes to the database since it is the application layer’s responsibility
+    to do this. If the domain service methods saved their changes, we would end up
+    with one insert and three update operations in the database. With the current
+    implementation, the `CreateAsync` method uses the `InsertAsync` method of the
+    repository and saves the object at the end of the method with a single database
+    operation.
+  prefs: []
+  type: TYPE_NORMAL
+- en: As you see in the example application service definitions, application service
+    methods use DTO classes to get data from the upper layer (typically, the presentation
+    layer) and return data to the upper layer. The next section introduces DTO design
+    considerations and best practices.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Designing DTOs
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: A DTO is a simple object used to transfer data between the presentation and
+    the application layers. Let’s start by seeing the basic principles of designing
+    DTO classes.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Designing DTO classes
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'There are some fundamental principles to follow while defining DTO classes,
+    as outlined here:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: DTOs should not contain any business logic; they are just for data transfer.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: DTO objects should be serializable because most of the time, they are transferred
+    over the wire. Typically, they have a parameterless constructor, and all of their
+    properties have public getters and setters.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: DTO classes should not inherit from the entities or use entity types as their
+    properties.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'The following DTO class is used to store the data while adding a new session
+    to an existing track of an event:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE2]'
+  prefs: []
+  type: TYPE_PRE
+- en: The `AddSessionDto` class has no method, so it has no business logic. All its
+    properties have public getters and setters. The `AddSessionDto` class does not
+    define any constructor, so it has an implicit public parameterless constructor.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The `Title` and `Description` properties of the `AddSessionDto` class have validation
+    attributes, such as `Required` and `StringLength`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The next section discusses validating input DTOs.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Validating input DTOs
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'There are a few ways to validate a DTO object when it is used as a parameter
+    to an application service method, as outlined here:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: We can use data annotation attributes, such as `Required`, `StringLength`, and
+    `Range`.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: We can implement an `IValidatableObject` interface for the DTO class and perform
+    additional validation logic in the `Validate` method.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: We can use third-party libraries to validate a DTO object. For example, ABP
+    integrates to the `FluentValidation` library to separate the validation logic
+    from the DTO class and perform advanced validation logic.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Whichever approach you follow (you can use all together for a DTO class), ABP
+    automatically checks these validation rules and throws a validation exception
+    in case of an invalid value. So, your application service method is always executed
+    with a valid DTO object. See the *Validating user inputs* section of [*Chapter
+    7*](B17287_07_Epub_AM.xhtml#_idTextAnchor213), *Exploring Cross-Cutting Concerns,*
+    for all the details of ABP’s validation infrastructure.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The validation logic on the DTO class (or in the `FluentValidation` validator
+    class) should only be a formal validation. That means you can check if the given
+    input is supplied and well formatted. However, it should not contain a domain
+    validation. For example, do not try to check if the given start and end dates
+    conflict with another session on the same track. Such validation logic should
+    be implemented in the domain layer, typically in the entity or a domain service
+    class.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Another common task with DTOs is mapping them to other objects.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Object-to-object mapping
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: We use entities inside the domain and application layers and use DTOs to communicate
+    with the upper layers. This approach leads us to create DTO classes similar to
+    entity classes and convert entity objects to DTO objects. If the entity class
+    has a few properties, then creating a corresponding DTO object can be manually
+    done by copying properties one by one. However, entity classes grow over time,
+    and writing and maintaining a manual mapping code becomes tedious and error-prone.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'ABP Framework provides an `IObjectMapper` service that is used to convert similar
+    objects to each other. See the following application service method:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE3]'
+  prefs: []
+  type: TYPE_PRE
+- en: This method simply returns an `EventDto` object by converting it from the `Event`
+    object using the `IObjectMapper` service. `EventDto` has a lot of properties,
+    and manually creating it would result in a long code block. `IObjectMapper` is
+    an abstraction and is implemented using the `AutoMapper` library when you create
+    a new ABP solution. If you want to use the preceding code, you should first define
+    the `AutoMapper` mapping configuration.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Object-to-Object Mapping Documentation
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The topic of object-to-object mapping is not included in this book. However,
+    we did use it in [*Chapter 3*](B17287_03_Epub_AM.xhtml#_idTextAnchor044), *Step-By-Step
+    Application Development,* while creating an example application. Please refer
+    to ABP’s documentation to fully understand the object-to-object mapping system:
+    [https://docs.abp.io/en/abp/latest/Object-To-Object-Mapping](https://docs.abp.io/en/abp/latest/Object-To-Object-Mapping).'
+  prefs: []
+  type: TYPE_NORMAL
+- en: While using the object mapper is pretty simple, we should use it carefully.
+    Object mapping libraries mostly rely on naming conventions. They automatically
+    map same-named properties, while we can configure the mappings manually.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'One possible problem may occur when you refactor entities but do not update
+    the corresponding DTOs or the mapping code. The `AutoMapper` library has a concept
+    named configuration validation. It validates the mapping configuration on the
+    application startup and throws an exception if it detects a mapping configuration
+    problem. I suggest enabling it for your application. See the `AutoMapper` documentation
+    to learn about configuration validation: [https://docs.automapper.org/en/stable/Configuration-validation.html](https://docs.automapper.org/en/stable/Configuration-validation.html).'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Object-to-object mapping is really useful when you map your entities to DTOs.
+    However, do not map input DTOs to entities. There are some technical and design
+    reasons behind this suggestion, as outlined here:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Do you remember the *Implementing entity constructors* section of the previous
+    chapter? Entity classes typically have primary constructors to get the required
+    properties and create a valid entity. Auto-mapping operations generally need an
+    empty constructor on the target class, so the mapping fails.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Some properties on the entities are designed with private setters. You should
+    use entity methods to change these property values to apply some business rules.
+    Directly copying their values from a DTO object may violate the business rules.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: You should carefully validate and process the user input instead of blindly
+    mapping to the entities.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The `CreateAsync` method explained in the *Implementing application services*
+    section was a good example of creating an entity using an input DTO. It doesn’t
+    map the DTO to the entity but uses a domain service to create a valid entity and
+    set optional properties.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In the next section, we will discuss some design practices for DTOs.
+  prefs: []
+  type: TYPE_NORMAL
+- en: DTO design best practices
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Creating DTOs seems simple at first—they are simple, indeed. However, once the
+    application grows, you will have many DTO classes, and it becomes important to
+    understand how to organize these classes. In the next sections, I will provide
+    a few suggestions about DTOs to make your code base more maintainable and bug-free.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Do not define unused properties in input DTOs
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: No one defines an unused property in an input DTO, right? Unfortunately, this
+    isn’t true. I have seen a lot of code bases with this problem.
+  prefs: []
+  type: TYPE_NORMAL
+- en: A property in a DTO class that is not used in the application service method
+    is a perfect way to confuse the developers using that application service method
+    and lead to building a buggy code base.
+  prefs: []
+  type: TYPE_NORMAL
+- en: A probable reason for an unused property in a DTO class is that it was used
+    before, but the application service method was changed and the developer has forgotten
+    to remove it. We should care about that and always remove unused properties. If
+    you care about backward compatibility because you are not the one building the
+    client application, then declare an `[Obsolete]` attribute on that property, document
+    the breaking change, and try to preserve the old behavior if the value is provided.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Having unused properties can be unavoidable if you violate the rule in the next
+    section.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Do not reuse input DTOs
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: When you have too many application service methods, you may think that using
+    some DTOs for multiple application service methods is a good idea to reduce the
+    number of DTOs. However, if you do that, some properties will be used in some
+    methods but not used in others.
+  prefs: []
+  type: TYPE_NORMAL
+- en: It is a good practice to define a specialized input DTO for each application
+    service method. Sometimes, it seems practical to reuse the same DTO class for
+    two methods since they are almost the same. However, the application service methods
+    will change over time, and the requirements will be different. Inheriting a DTO
+    from another DTO is another way of reusing DTOs, but the problem is the same.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Code duplication is a better practice than coupling use cases in many scenarios.
+    See the following example:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE4]'
+  prefs: []
+  type: TYPE_PRE
+- en: In this example, the `GetAsync` method returns an `EventDto` object that stores
+    almost all of the event properties. The `CreateAsync` method reuses the same `EventDto`
+    class. In general, reusing an output DTO as an input DTO is not good since some
+    `EventDto` properties (such as `Id`, `UrlCode`, `RegisteredUserCount`, and `CreationTime`)
+    are not expected to be sent by the client application on event creation but calculated
+    on the server side. Finally, reusing the same `EventDto` class in the `UpdateEventTimeAsync`
+    method is much worse since this method only uses the `Id`, `StartTime`, and `EndTime`
+    properties.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'A true DTO design is shown in the following example:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE5]'
+  prefs: []
+  type: TYPE_PRE
+- en: We’ve defined a separate DTO class for the `CreateAsync` and `UpdateEventTimeAsync`
+    methods. In this way, any change in one DTO won’t affect the other methods.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The design suggestions in the last two sections were for input DTOs. The next
+    section explains the case for output DTOs.
+  prefs: []
+  type: TYPE_NORMAL
+- en: About output DTOs
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: In practice, output DTOs are different than input DTOs. The *unused property*
+    problem (of input DTOs) does not exist for output DTOs. Let’s try to understand
+    why an unused property is a problem for an input DTO. Imagine that we are calling
+    a method and setting a property on the input DTO. We expect that it is being processed
+    by the method and change the behavior. We get confused if the method doesn’t use
+    the property, and we don’t see any behavior difference, whatever we set for that
+    property. If a method parameter (or property of the parameter) is there, it should
+    work just as expected.
+  prefs: []
+  type: TYPE_NORMAL
+- en: However, for output DTOs, that’s not the case. An application service may return
+    more properties than the client currently needs. Thus, I mean that the application
+    service method fills all the properties of an output DTO; if a property does exist
+    in the DTO, it should always be filled regardless of whether it is being used
+    by the client or not.
+  prefs: []
+  type: TYPE_NORMAL
+- en: This approach has an advantage—when the client later needs those properties,
+    we don’t need to change the service class, making it easier to extend the UI.
+    This is especially useful if the client is not your application or you want to
+    open your **application programming interface** (**API**) to third-party clients
+    whose needs can be different.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Since an output DTO may contain some properties that are not used by the client
+    yet, we can reduce the number of output DTOs and reuse some DTO classes in multiple
+    cases.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'See the following example application service definition:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE6]'
+  prefs: []
+  type: TYPE_PRE
+- en: All the methods on this example use the same output DTO class to represent an
+    event, `EventDto`, while they get different input DTO objects.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Performance Considerations
+  prefs: []
+  type: TYPE_NORMAL
+- en: Returning fine-tuned and minimal-output DTO objects can be needed for performance
+    requirements, especially when returning large result sets. In such cases, you
+    can define different DTO classes with the properties only needed for the related
+    use cases.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We’ve covered the fundamental building blocks for implementing DDD with ABP
+    Framework. The next section demonstrates some examples to understand the roles
+    and responsibilities of the layers.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Understanding the responsibilities of the layers
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Separating your business logic into application and domain layers allows you
+    to create multiple applications on the same domain, as explained in the *Dealing
+    with multiple applications* section of [*Chapter 9*](B17287_09_Epub_AM.xhtml#_idTextAnchor300),
+    *Understanding Domain-Driven Design*. Large systems typically have multiple applications
+    and isolating the core domain from application-specific logic is a key principle
+    to not mix the logic of different applications. Creating a separate application
+    layer for each application makes it possible to design our application service
+    methods best suited to different application requirements.
+  prefs: []
+  type: TYPE_NORMAL
+- en: To successfully separate the application and domain layers, we should have a
+    good understanding of each layer’s responsibilities. In the last three chapters,
+    I have already mentioned these responsibilities while explaining the DDD building
+    blocks. In the next sections, I will summarize these responsibilities to understand
+    them better.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Authorizing users
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Authorization is used to allow or prevent using a certain application functionality
+    by a user (on a UI) or a client application (on a machine-to-machine communication).
+  prefs: []
+  type: TYPE_NORMAL
+- en: ABP provides a declarative way of checking user permissions with the `[Authorize]`
+    attribute and an imperative way with the `IAuthorizationService` service. You
+    can use these features to restrict access to desired functionalities in your application.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Authorization is the responsibility of the application layer and the upper layers
+    (such as the presentation layer) because it highly depends on the clients and
+    the users of the application.
+  prefs: []
+  type: TYPE_NORMAL
+- en: For example, in the *EventHub* project, a user in the public web application
+    can edit only their own events. However, an admin user in the admin application
+    can edit any event without the ownership checking if they have the required permission.
+    On the other hand, a background service may change an event’s state without any
+    authorization rule. These applications use the same domain layer, hence the same
+    domain rules, but implement different authorization rules. So, it is good not
+    to include the authorization logic in the domain layer to make it reusable in
+    different cases.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Controlling the transaction
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: The UoW system’s responsibility is to create a transaction scope for a use case
+    (typically, a web request) and ensure that all the changes done in that use case
+    are committed together. The UoW system was covered in the *Understanding the UoW
+    system* section of [*Chapter 6*](B17287_06_Epub_AM.xhtml#_idTextAnchor177), *Working
+    with the Data Access Infrastructure*.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The scope of a use case is an application service method. An application service
+    method may work with multiple domain services and aggregates and may make changes
+    on the aggregates. The only way to ensure that all changes are committed together
+    is to control the UoW system at the application service level, in the application
+    layer. So, a UoW is an application-layer concept.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Validating the user input
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'As stated in the *Validating user inputs* section of [*Chapter 7*](B17287_07_Epub_AM.xhtml#_idTextAnchor213),
+    *Exploring Cross-Cutting Concerns*, a typical application has three levels of
+    validation, as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '*Client-side validation* is used to pre-validate the user input before sending
+    data to the server. This type of validation is the responsibility of the presentation
+    layer.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '*Server-side validation* is performed by the server to prevent incomplete,
+    badly formatted, or malicious requests. We generally use data annotation attributes
+    and other functionalities to validate DTO objects. Such validation is the responsibility
+    of the application layer.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '*Business validation* is also performed in the server, implements your business
+    rules, and keeps your business data consistent. Business validation is mostly
+    done in the domain layer to force the same business rules in every application.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: ABP provides good infrastructure and gracefully integrates to ASP.NET Core services
+    to easily perform formal validation logic. You can implement business validation
+    rules and constraints in the aggregate constructors, methods, and domain services,
+    as explained in [*Chapter 10*](B17287_10_Epub_AM.xhtml#_idTextAnchor316), *DDD
+    – The Domain Layer*.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Working with the current user
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: ABP’s `ICurrentUser` service is used to get information about the current user.
+    The current user logic requires a stateful session system that stores user information
+    and makes it available in every web request.
+  prefs: []
+  type: TYPE_NORMAL
+- en: For ASP.NET Core applications, ABP uses the current principle that is based
+    on the authentication ticket. An authentication ticket is created when the user
+    logs in to the application. It is saved in a cookie to read in subsequent requests.
+    It can be stored in local storage for a **single-page application** (**SPA**)
+    and sent to the server in the **HyperText Transfer Protocol** (**HTTP**) header
+    for every request.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The session/current user is a concept that is typically implemented in the presentation
+    layer. It is usable in the application layer since the application layer is designed
+    to be used by the presentation layer, so it can assume that there is a *current
+    user* in the current context. However, the domain layer should be designed as
+    independent from any application, so it should not work with the current user.
+    In some applications, such as a background service or an integration application,
+    there may not be a user at all.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following application service method, from the *EventHub* project, is used
+    to join a given organization by the current user:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE7]'
+  prefs: []
+  type: TYPE_PRE
+- en: First of all, this method is authorized. So, it is guaranteed that the method
+    is called by a user that has already logged in to the application and `CurrentUser.GetId()`
+    returns a valid user ID.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We are not accepting the user’s ID as a method parameter; otherwise, any authenticated
+    user could make any user a member of any organization. But we want every user
+    to be able to join the organization themselves.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We get the organization and user aggregates from the repositories and delegate
+    the work to the domain service (`organizationMembershipManager`). The domain service,
+    in this way, is independent of the current user concept and also more reusable:
+    it can work with any user, not only with the current one.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Summary
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In this chapter, you’ve learned how to properly implement the application services
+    and design the DTOs. I’ve covered DTO design in detail, such as validating input
+    DTOs and mapping entities to DTOs, and provided suggestions based on best practices
+    and my experience.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We’ve learned that mixing the responsibilities of the layers makes layering
+    meaningless. We’ve investigated some fundamental responsibilities to understand
+    at which layer we should implement these responsibilities.
+  prefs: []
+  type: TYPE_NORMAL
+- en: As we’re at the end of this chapter, we’ve completed the third part of the book.
+    The purpose of this part was to demonstrate how you can implement **domain-driven
+    design** (**DDD**) building blocks with ABP Framework. I’ve provided rules, best
+    practices, and suggestions to make your code base more maintainable when you follow
+    them.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The next part of the book will explore the UI and API development with ABP Framework.
+    In the next chapter, we will learn the architectural structure and the fundamental
+    features of the ABP Framework MVC/Razor Pages UI.
+  prefs: []
+  type: TYPE_NORMAL

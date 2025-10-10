@@ -1,0 +1,1113 @@
+- en: CQRS - The Read Side
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In the previous chapter, we learned about persisting aggregates to different
+    types of databases. However, we haven't looked at the topic of retrieving data
+    from a database, except using the repository `Load` method to retrieve a single
+    aggregate.
+  prefs: []
+  type: TYPE_NORMAL
+- en: It is now time to get a hold on the data we managed to store in the database
+    and add some `GET` endpoints to the API. For this book, I had no plans to show
+    you how to build repositories with numerous `GetByThat` methods or, even worse,
+    a generic repository that returns `IQueryable<T>`. That kind of approach, while
+    it might seem attractive, removes the Ubiquitous Language from queries, since
+    developers start to retrieve aggregates by filtering properties. For example,
+    a query such as `_repository.Query(x => x.State == State.IsActive && x.Price.Amount
+    > 100)` tells us very little about the intention of the query consumer. What does
+    this filter mean for the business? We would never know unless we study every line
+    of code that calls this query, and probably only then can we figure out its purpose.
+    Also, free-filter queries open the Pandora's box of hitting the database server
+    without any optimization. For relational databases, we end up with numerous heavy
+    joins and unindexed queries. With document databases, we might even get failures
+    if there are no automatic indexes supported by the database engine itself. RavenDB
+    is clever enough to create automatic indexes when we execute a query for which
+    the server has not built an index yet. While that is not a big issue during development,
+    it will have a severe impact on production systems where the server deals with
+    a significant number of documents.
+  prefs: []
+  type: TYPE_NORMAL
+- en: So, in this book, we will be applying CQRS principles and separate commands
+    from queries. Our repository is good enough to persist new aggregates and perform
+    updates on existing aggregates when we execute commands. This means that our command
+    side is fine. Now, we need to implement the query side, and we'll do it in a different
+    way, without using repositories.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In this chapter, you will learn about the following topics:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The read side of CQRS
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: What are the read models?
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Using Ubiquitous Language for queries
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Implementing CQRS with one database
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Technical requirements
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The code for this chapter can be found in the `Chapter09` folder of the book
+    repository on GitHub. There are two subfolders there, `ravendb` and `ef-core`,
+    containing the final code that implements the aggregate persistence and queries
+    using the RavenDB document database, Entity Framework Core, and PostgreSQL. As
+    a starting point, we'll be using the final code from [Chapter 8](4eea9289-d77e-4568-a9c0-c5e1265e3b4e.xhtml),
+    *Aggregate Persistence*.
+  prefs: []
+  type: TYPE_NORMAL
+- en: You will need to use `docker-compose` to run the infrastructure. Check the requirements
+    for the previous chapter if you have not completed the installation previously.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Adding user profiles
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Before we start our journey to the read side of our application, we would benefit
+    from adding some more concerns to the domain itself. So far, we have been concentrating
+    on the core domain of classified ads. The core domain is what we should focus
+    on when we create a new system. In our scenario so far, we have already made some
+    progress implementing the core domain, and the team is now discussing what would
+    be an absolute *must-have* to add to the system before they start creating the
+    prototypes.
+  prefs: []
+  type: TYPE_NORMAL
+- en: You might remember that we have already partially addressed the concern of who
+    owns the ad. We have the `OwnerId` property of the `UserId` type in the `ClassifiedAd`
+    aggregate, but so far we haven't got the location where `OwnerId` comes from.
+    Apparently, our system needs to have users that must register themselves before
+    creating new ads. We need to know who they are and how to get in touch with them.
+    So, as the bare minimum, we need to have their name and contact information, such
+    as an email address and phone number. Most of the time, people don't like to show
+    their real names in classified ads and prefer using nicknames instead, something
+    that we call a **display name**. We must address this concern too.
+  prefs: []
+  type: TYPE_NORMAL
+- en: After a short discussion on the EventStorming board, the team came up with something
+    very basic to support these requirements. We don't care about the user registration
+    process for the whole store; that is a complex topic by itself. It could potentially
+    involve social media login, email and phone number confirmations, password requirements,
+    and two-phase authentication. It is never a good idea to start implementing those
+    features when you are building a new system. Oftentimes, developers fall into
+    the **user registration** trap and spend weeks and months polishing the registration/login
+    screen experience without any work being done on the core domain. Remember that
+    the authentication domain is a generic supportive subdomain, and in most cases,
+    it can be very useful to consider using a third-party system to handle these concerns.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Right now, all we need to do is to implement some basic functionality that will
+    allow us to show the user information alongside the classified ad itself, both
+    when we show a single ad on a page or a list of ads.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following diagram shows what the team generated after a quick modeling
+    session:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![](img/911c5dc5-dc7f-4fbb-b99a-55fb83f51e12.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: We can easily see that there is very little connection between the users and
+    classified ads. In fact, we only need to have the user ID so that we can use it
+    as the owner ID. Bearing that in mind, we can try implementing `UserProfile` as
+    a new aggregate in our domain project. I'd urge you not to call this object `User`
+    since it implies that the same object is used for authentication, and must, therefore,
+    contain things such as password and social media login information. But we've
+    already decided to keep it aside and resolve it later.
+  prefs: []
+  type: TYPE_NORMAL
+- en: User profile domain concerns
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: First things first. The only thing we know for sure right now is that we have
+    four different events to implement. We also know that we are adding a new aggregate
+    to the same domain project that we already have. Since our aggregate will have
+    a state, we'll probably need to create new value objects too.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Before adding new objects to the project, it would be a good idea to organize
+    the project so that we get better visibility of its parts.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Domain project organization
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'We start by creating a new project folder called `ClassifiedAd` and moving
+    existing relevant files over there. After that, we need to fix the namespace for
+    all the files that we moved. The automatic refactoring feature of the IDE makes
+    it quite easy. With ReSharper or Rider, you can just press *Alt* + *Enter* on
+    the namespace name in the class and tell it to adjust the namespace accordingly.
+    Then, we add a new folder for the `UserProfile` objects. It also makes sense to
+    move all shared domain concerns, such as the `Exception` class, the `Money` class,
+    and others, to the `Shared` folder. Now, the project structure changes to this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![](img/de78c917-f0ce-4c8b-9924-03d0cab337e3.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'Now we can start implementing those four new events. Let''s add a new `Events`
+    class to the `UserProfile` folder and write some code for those events, as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE0]'
+  prefs: []
+  type: TYPE_PRE
+- en: We consciously keep other things, such as email addresses and telephone numbers,
+    out of the version, since we don't need that information for anything that our
+    application needs right now, but nothing will stop us from adding more events
+    and more details to the domain model in the future.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Adding new value objects
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: For the next step, we add a new small aggregate called `UserProfile` to execute
+    commands that will emit these events and perform the state transition for the
+    aggregate. For the aggregate state, it is a good idea to implement value objects
+    for the `DisplayName` and `FullName` state properties, so we will start with that.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The `FullName` class is rather trivial, and mostly repeats the code for the
+    `ClassifiedAdTitle` class, as shown in the following code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE1]'
+  prefs: []
+  type: TYPE_PRE
+- en: I have added a small static class to hold extension methods for the `string`
+    class, and currently, there is only one method there, called `IsEmpty`, which
+    I use instead of `string.IsNullOrWhitespace`, so you can see that it is being
+    used in the code for the `value` object.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Then we can implement the `DisplayName` class. It is not as straightforward,
+    because, unlike the full name, the display name will be shown on public pages.
+    We can definitely expect some malicious users to write things that we don't want
+    to show on our website. While our ads will go through a review stage before getting
+    published, user profiles will not be moderated. Normally, a user profile is shown
+    in different places, such as discussions, review systems, and so on. Although
+    we haven't started modeling these features just yet, we know our roadmap and the
+    fact that we need to prevent users from putting malicious content in their public
+    profiles.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'One easy thing we can do is to automatically check whether the display name
+    contains obscene words. There are openly accessible services out there that can
+    help us. The implementation details won''t be a part of the `Domain` project,
+    since it is an infrastructural concern. Instead, we will create some abstractions
+    for such a service so that we can check the text for profanity without coupling
+    with the implementation. We already used a similar technique using the currency
+    lookup domain service. Domain services, however, don''t necessarily need to be
+    implemented as interfaces. Another way of making a one-method domain service is
+    by using delegates. The following code shows the profanity check domain service,
+    which is declared as a delegate:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE2]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'I put the code in the `Shared/ContentModeration.cs` file. Now we need to implement
+    the `DisplayName` value object and make use of the new domain service, as shown
+    in the following code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE3]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Here, you can see that the code will throw an exception of the `ProfanityFound` type if
+    the delegate returns `true`, which would mean that the user is using bad language
+    in the display name. I have moved all domain exceptions to one place in the `Shared`
+    folder. The new code is located in the `DomainExceptions.cs` file and the code
+    for this file is shown in the following code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE4]'
+  prefs: []
+  type: TYPE_PRE
+- en: We will be adding more exceptions to this file when necessary.
+  prefs: []
+  type: TYPE_NORMAL
+- en: User profile aggregate root
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'It is now time to write the code for the `UserProfile` aggregate. We have built
+    one aggregate before, so creating a new one will not be a big issue, especially
+    considering that the user profile is a relatively simple object. The following
+    is the code for the new `UserProfile.cs` file:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE5]'
+  prefs: []
+  type: TYPE_PRE
+- en: The preceding code does nothing new compared to the `ClassifiedAd` aggregate
+    root class code. We also use the same workaround to satisfy the database requirements
+    for the identity property. Since we start with a RavenDB implementation, we need
+    a string property to hold the document's identity.
+  prefs: []
+  type: TYPE_NORMAL
+- en: As you can see, I used the `UserId` value object for the aggregate root ID.
+    That's because, essentially, the profile identity must be the ID of the user.
+    It required me to change the implementation of the `UserId` class by inheriting
+    it from the `Value<UserId>` base class for value objects.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Finally, we need a repository interface so that our application service will
+    know how to retrieve and persist the new entity. The interface is identical to
+    the one we made for the `ClassifiedAd` entity, as you can see from the following
+    code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE6]'
+  prefs: []
+  type: TYPE_PRE
+- en: Now we are done with the changes in our domain project. Let's continue by adding
+    the user profile application service and the command API.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Application side for the user profile
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: It is time to look at our application project and check what we need to do to
+    support the user profile feature. Before we start adding new classes, let's perform
+    a similar project restructuring, making different core features differ visually
+    in **Solution Explorer**. I don't want the application project to be structured
+    according to infrastructure concerns either, but the current organization of the
+    project implies just that, since we use the `Api`, `Contracts`, and `Infrastructure`
+    folders. To do this, I have moved the `ClassifiedAd` concerns to a separate folder
+    in the `Marketplace` project and created a new folder called `UserProfile`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The project now looks different in the solution explorer, as you can see in
+    the following screenshot:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![](img/ade9a27b-013b-406b-8d49-fc2c672170a0.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'Now we have a place to add everything we need to support the new domain functionality.
+    We start by adding commands to a new `UserProfile/Contracts.cs` file. We can understand
+    what commands are needed by looking at the events since all those events, are
+    user-driven. Look at the following code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE7]'
+  prefs: []
+  type: TYPE_PRE
+- en: By now, you might have noticed there is a mismatch between the name of the `ProfilePhotoUploaded` event, and
+    our `UpdateUserProfilePhoto` command.  We must keep the semantics clear as our
+    application service will not handle the upload itself. Instead, it will receive
+    a URL to a file that has already been uploaded. That is usually the case if we
+    have a sophisticated UI that is able to perform file upload and additional operations,
+    such as resizing and cropping in the browser. Alternatively, we can let the Web
+    API controller deal with uploads. So, in fact, our command needs to represent
+    what will happen in the domain—it will update the photograph URL rather than uploading
+    the photograph itself. However, if you decide that your user profile application
+    service needs to handle the upload too, the command name (and the corresponding
+    event name) needs to be changed to reflect the nature of the action.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let''s start writing the new application service. This work is rather trivial
+    if we use the `ClassifiedAdApplicationService` class as an example. I have ended
+    up with the following code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE8]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'In this class, I have one dependency—`IUserProfileRepository`. You might already
+    suspect that the repository implementation for the `UserProfile` entity would
+    be almost the same as for `ClassifiedAd`, except that it will operate with another
+    class type. You might think that you can use a generic repository. But we have
+    already touched upon this topic, and you can either revisit it or read some articles
+    on the internet that will invariably discourage you from using generic repositories;
+    however, we can still either use the generic type as a dependency for our specific
+    repository or we can inherit specific repositories from a generic one. Let''s
+    try the latter option and see what it looks like. I will add a new class to the
+    `Infrastructure` folder for the application project, called `RavenDbRepository`,
+    as shown in the following code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE9]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'We still want to use specific repository interfaces and classes, but now we
+    can implement `UserProfileRepository` (the file that needs to be added to the
+    `UserProfile` folder of the `Marketplace` project) using the following code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE10]'
+  prefs: []
+  type: TYPE_PRE
+- en: The same can be done to implement `ClassifiedAdRepository`, although the unchanged
+    version will work as before. The final code for this chapter includes the simplified
+    code.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'It is time to implement the API controller class. If you look at the `ClassifiedAdsCommandApi`
+    class, you can see that we have a private method called `HandleRequest` that helps
+    us to simplify the request handling by calling the application service using one
+    line of code. The code for the new controller will be almost identical, so we
+    can reuse the request handler by creating a new static class in the `Infrastructure`
+    folder called `RequestHandler` with the following simple code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE11]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'This generic method can now be used in both controllers. Let''s look at what
+    the new controller would look like. I created a new `UserProfileCommandApi` class in
+    the `UserProfile` folder of the application project, as shown in the following
+    code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE12]'
+  prefs: []
+  type: TYPE_PRE
+- en: The classified ad controller can use `RequestHandler` in a similar fashion;
+    the new implementation can be found in the chapter code.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We are almost done with all the changes, but one thing is still missing, and
+    that is an implementation for the profanity check function. I will use PurgoMalum,
+    a free web service to filter content and remove profanity, obscenity, and other
+    things that we don't want to see on our public website.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The implementation is very simple, since all I need to do is call an HTTP endpoint
+    with one argument. For that, I add one more class to the `Infrastructure` folder,
+    called `PurgomalumClient`, as shown in the following code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE13]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'For the final step, we need to do the wiring in the `Startup` class code. The
+    only method we need to change is the `ConfigureServices` method. Here is the new
+    code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE14]'
+  prefs: []
+  type: TYPE_PRE
+- en: The registration of `UserProfileApplicationService` is a bit more complicated
+    than `ClassifiedAdApplicationService`, since we are using a function, not an interface.
+    In general, it is easier and cleaner to use delegates instead of interfaces with
+    one method, but you'll need to deal with a bit more code when wiring things up.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Finally, you can run the app and try creating a new user profile, then change
+    the full name or display name for the user. Try using some bad words for the display
+    name to see the `ProfanityFound` exception in action. Remember to call `docker-compose
+    up` from the `Chapter09/ravendb` folder of the chapter code repository before
+    starting the app; otherwise, you won't have access to RavenDB.
+  prefs: []
+  type: TYPE_NORMAL
+- en: And now that all these new things are in place and we have two nice aggregates
+    in our system instead of just one, we can look at the query side of things.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The query side
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'So far, we have focused on state transitions in the system that are represented
+    as events. When our domain model emits a new event, by definition, it means that
+    we have put the system in a new state. State transitions are triggered by commands—that''s
+    why we have two APIs that are purposefully named `ClassifiedAdCommandApi` and
+    `UserProfileCommandApi`. That shouldn''t come as a surprise, since I have mentioned
+    CQS and CQRS several times before in this book. Commands trigger methods of the
+    aggregates, and following the CQS principle, none of those methods return anything,
+    but instead change the system state. But no system can have only commands. Our
+    users want to see something on the screen and it can''t just be static texts and
+    pictures. For our marketplace, the main purpose of the application is not that
+    people can place classified ads in it; quite the opposite: we expect people to
+    browse these ads, choose what they like, and make deals. This means that our system
+    needs to deliver the information it possesses to the outside world so that it
+    can be shown on the screen. Right at this moment, we can only see classified ads
+    and user profiles that are stored in the database by looking at the database itself.
+    Logically, what we need to do now is make this information available via some
+    APIs.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: CQRS and read-to-write mismatch
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: If you've studied other books about **Domain-Driven Design** (**DDD**) and done some
+    work using DDD tactical patterns, including aggregate and repository, you might
+    be wondering why I have not just included a couple of query methods in `ClassifiedAdRepository`
+    and called it a day. Of course, I could have done that, but then I wouldn't have
+    even started to write this book if I didn't have something else to discuss.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The point of repositories is that they are always dealing with aggregate state.
+    As you might remember from the quote by Eric Evans in [Chapter 8](4eea9289-d77e-4568-a9c0-c5e1265e3b4e.xhtml), *Aggregate
+    Persistence*, the role of a repository is to represent aggregates that exist in
+    the system in a way that looks like an in-memory collection of objects, hence
+    the name of our two repositories so far—`ClassifiedAdRepository` and `UserProfileRepository`.
+    This implies that the only details we can ever get from the repository are things
+    that we have added to it. Since one repository handles the state of one aggregate—`ClassifiedAd`,
+    for example—we can only query and retrieve classified ad details from the repository
+    and nothing else. The issue here is that having only one aggregate in a bounded
+    context (more about this in [Chapter 12](01e2a3de-465b-48aa-b297-e75269799cbb.xhtml),
+    *Bounded Context*) is a rare occurrence, and we are already dealing with two.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The information that we need to show is currently not represented on the EventStorming
+    model. Again, that's because our big-picture model is more interested in how the
+    system behaves, and what we show on the screen is not considered as behavior.
+    However, as I just mentioned, that's still our core business, and we could think
+    of something very obvious. If we go live and someone places an ad, they need to
+    see how the ad appears to other users. The same screen is also needed when another
+    user looks for something to buy and wants to check all the details—the ad title,
+    description, and all available pictures, as well as the seller's information.
+    Even if we haven't thought of the buying process just yet, that's the bare minimum
+    that we definitely need. Also, people want to see all published ads. When the
+    system gets more users and more ads are being published, we might consider showing
+    ads per category. But when we are in the initial phase, showing all the ads with
+    some search possibilities might be just fine.
+  prefs: []
+  type: TYPE_NORMAL
+- en: All those screens that I have described are read models. These models might
+    represent the state of a single aggregate, but in many cases, or in most cases,
+    the information from several aggregates might be combined on one screen. For example,
+    the screen for a single ad needs to have the information from both aggregate types
+    that we currently have in the system. The screen that shows a list of published
+    ads needs to display short versions of multiple aggregates, although just of a
+    single type. While the latter case might be solved by adding a query method to
+    the `IClassifiedAdRepository` interface, the first case would require something
+    else. Oftentimes, when we have queries as part of repositories, we need to have
+    some aggregation on the client side. Yet, returning a list of large object graphs
+    (which is what repositories are supposed to do) too often is a far from optimal
+    solution when we just need to show a couple of properties from each aggregate.
+    Even worse, we might find ourselves in a situation when the object graph is too
+    large and we start using those awkward ORM features of lazy loading that might
+    work well in tests, but fail in the stateless world of the web simply because
+    the session that we wanted to access in order to lazily load more data from is
+    already gone by the time we try to ask it for more data.
+  prefs: []
+  type: TYPE_NORMAL
+- en: All of these issues are effectively addressed by CQRS. The pattern postulates
+    that there are almost no systems with an equal number of reads and writes. Most
+    user-facing systems have a larger number of reads than writes. Think about the
+    number of classified ads being created on Craigslist compared to the number of
+    requests to retrieve and show them on someone's screen. The difference between
+    them could be two orders of magnitude. Even so, most systems out there today struggle
+    with scaling issues just because they ignore this simple fact. No database can
+    be preoptimized for both reads and writes—you need to choose one. In the beginning,
+    we all deal only with writes and try to optimize for them alone. RDBMS third-level
+    normalization addresses exactly that—it shows the least amount of information
+    that needs to be written to save space and avoid data duplication. When it comes
+    to reads, though, third-level normalization doesn't work quite so well. We keep
+    adding joins, one after another, to combine the information that we deliberately
+    split when writing back together again. Soon, the number of reads overtakes the
+    number of writes. Shortly after that, we see tens and hundreds of times more reads
+    than writes, and this is where the trouble starts. There are, of course, other
+    types of systems, such the world of the **internet of things** (**IoT**), high-frequency
+    trading, and other business domains. In these cases, the amount of information
+    that is being written to the database is by far greater than the amount of information
+    that would ever need to be shown to anyone. Developers start to optimize for writes,
+    decreasing the transaction time. This usually comes at the expense of removing
+    indices and making the data flat. When it comes to reading, we start to see slow
+    response times just because of this.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In essence, I am trying to make the point that when a developer is trying to
+    address the concerns of either writes or reads to make them more efficient on
+    the command side, the query side begins to suffer. It's also true the other way
+    around. That's why CQRS was born. In this chapter, we will only look at the query
+    side of things when using a single database. That might sound like a contradiction
+    given what you just read, because, again, a database can rarely be optimized for
+    both. But we need to start somewhere, and since optimization is the source of
+    all evil, we'll start slowly. We will look at splitting read and writes into different
+    types of storage when we get to Event Sourcing and projections in particular in
+    [Chapter 11](c4156d9d-9130-4225-b205-ef76cb4bcca3.xhtml), *Projections and Queries*.
+    But for now, let's look at how we can perform more efficient reads from our existing
+    storage without using repositories at all.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Queries and read models
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'When we were building our domain model, we needed to be careful taking dependencies
+    so that the domain model stayed pure, free of any infrastructural concerns. Our
+    goal was to provide a certain degree of freedom to implement the domain logic
+    in a way that made sense from the point of view of the business, using Ubiquitous
+    Language. We also defined repository interfaces as part of the domain model so
+    that the application layer was able to implement these interfaces in order to
+    enable aggregate persistence. Then, we defined commands as contracts that our
+    application services could accept in order to perform operations on domain objects
+    and potentially execute state transitions. Overall, the isolation and separation
+    of concerns between the different parts of the command processing sequence are
+    implemented according to the following diagram:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![](img/9944f9e2-5abb-4d20-ad70-6edf87d2129c.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: The typical command flow
+  prefs: []
+  type: TYPE_NORMAL
+- en: When we need to query the data store where we put the state of our domain model
+    using the repository, our goal changes. We don't need any business rules in queries;
+    queries don't change the domain model state. But we definitely need to know how
+    the repository implementation, which is implemented by our application, represents
+    the state of our aggregate in the database. That makes queries a purely application-side
+    concern. When we add an API to get something from our system, we need the API
+    to only deal with persistence. The model that an API `GET` endpoint returns becomes
+    our contract for the outside world. We don't need any other model either, such
+    as the data model, to fetch the data; we can instead return what we got from the
+    database directly as a response.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The flow for querying then becomes much simpler, and we can visualize it as
+    shown in the following diagram:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![](img/563565b7-ceb0-406a-88cd-1a01f2774277.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: The typical query flow
+  prefs: []
+  type: TYPE_NORMAL
+- en: What we see being returned by the API is the read model. We need to make our
+    queries in a way that the read model can be retrieved from the database without
+    any translation between different models—we return it as is. This allows us to
+    simplify the way in which we obtain the data and return it to those who either
+    need to show it on the screen or need it for any other imaginable purpose. That
+    is, essentially, the whole idea behind the read side of CQRS. It is now time to
+    write some code and show how it works.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Implementing queries
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: When implementing the read side, we don't need to touch anything in the domain
+    model. We will concentrate our efforts on the application side. However, this
+    doesn't mean that we need to forget about Ubiquitous Language. In the end, read
+    models are part of the whole model anyway; we saw them during the EventStorming
+    sessions as green sticky notes. Read models help people and other systems make
+    decisions, based on the data they receive by executing our queries. Just as commands
+    indicate the intent of external parties to run some operations on our domain,
+    read models and queries express their intent to get something in return.
+  prefs: []
+  type: TYPE_NORMAL
+- en: For example, for our `Marketplace` application, we would expect shoppers to
+    browse through published ads. Ad owners need to see a list of their ads. Everyone
+    needs to be able to open a single ad and see everything in it that is public,
+    plus the owner's public details, such as their photo and display name. These are
+    obvious queries and read models that we can start implementing. We already have
+    all the data in the form of the state of multiple aggregates, and we just need
+    to get it from the database in a form that is usable for those purposes I've listed.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Query API
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: We can start implementing queries by specifying read models and the API. We
+    already have folders in our `Marketplace` project for different application features.
+    It might seem logical to add queries there as well, until we remember that some
+    read models combine data from different aggregates, such as classified ad details
+    and the owner's profile information. Where do we place that kind of model and
+    query? Well, there are some options, but I'd try to concentrate on the essence
+    of the requested information. If we need to see a single ad, that's what we want
+    to look at, mainly. Although we might also provide some owner details, the owner
+    details are not the main things that we want to show. In the end, we query one
+    single ad by its ID, and the user's profile information is derived from the ad
+    details, such as the owner ID, so we can still quite clearly identify where to
+    place those queries.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Since we have found several things that we want to return via the API, and all
+    of those things are related to ads, we put the stuff there. Now we need to add
+    two files to the `ClassifiedAd` folder of the `Marketplace` project—one is `ReadModels.cs`
+    and the other one is `ClassifiedAdsQueryApi.cs`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Based on the query requirements, let''s define the read models first using
+    the following code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE15]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'One way of implementing queries is to create a query service interface that
+    will be used by the API. Then, we wire it to the database-specific implementation
+    during startup. For our purposes, it could look like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE16]'
+  prefs: []
+  type: TYPE_PRE
+- en: This approach has one disadvantage—all parameters are separated, and when we
+    implement the API, we need to add all those parameters to the API method. If you
+    decide to use something else for your edges, such as ServiceStack or a messaging
+    framework, you will have to use typed requests and then expand the request properties
+    to the query service method parameters. Should you need to change the parameters
+    for some reason, you'd need to change the code in multiple places. This could
+    also affect the UI. For example, if you use a **single-page application** (**SPA**) and
+    the API is being called from the frontend JavaScript code, you'd probably abstract
+    the API call in some kind of service that will need to change to add new parameters
+    to the call.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The ServiceStack framework advocates a message-driven approach for the HTTP
+    API for a reason. It makes the request typed and removes the need to have a long
+    list of parameters for the API methods and all layers that communicate with the
+    API. So, further on in the code, we''ll use typed requests too, and therefore,
+    typed queries. If we wanted to implement the query service with typed requests,
+    it would look like this instead:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE17]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Here, we have several overloads of the `Query` method that all accept typed
+    query requests. The type of query request defines what we expect to get back.
+    We can also use the same types for the API. Let''s implement these query contracts
+    and the `ClassifiedAdQueryApi` class without using the query service just yet,
+    as shown in the following code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE18]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Here comes the API:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE19]'
+  prefs: []
+  type: TYPE_PRE
+- en: That looks pretty clean. We used both types of request and typed response. When
+    we get one ad by its ID, we can return a `200 OK` or a `404 Not Found` response.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Now, let's get back to the query service. The big question that you might get
+    about this is *why do I need an interface if I only have one implementation?* And
+    this question is completely valid. Interfaces aren't meant to be used just to
+    make it possible to mock dependencies for tests. Basically, if all you use an
+    interface for is a test, you'll need to reconsider having that interface at all.
+    Queries are especially relevant in this context because it makes little sense
+    to test the API with a mocked query.
+  prefs: []
+  type: TYPE_NORMAL
+- en: If you want to test your queries, and you know that they belong to the infrastructure
+    and application, then what is the point of testing them without using the infrastructure?
+    You end up only testing the serialization, and while this might be not that bad
+    an idea, the main function of the queries will remain untested. Query tests really
+    need to use the database they talk to.
+  prefs: []
+  type: TYPE_NORMAL
+- en: After this important issue has been clarified, we can think about implementing
+    queries closer to the database-level API. One way of doing this is by using extension
+    methods. In the next two sections, we'll be using this approach to implement queries
+    for RavenDB and Entity Framework and complete the API accordingly.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Queries with RavenDB
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: As we already know, the RavenDB client library allows us to store documents
+    in the database using the document session interface. The document session interface
+    represents a single, short-lived connection to the database. Usually, it is scoped
+    per request, since the single request is our scope for the unit of work. It is
+    not only valid for commands; we can also use the document session that is registered
+    in the `Startup` class of our application in query endpoints.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In the following code, I try to implement one query to the database using extension
+    methods for the `IAsyncDocumentSession` interface, which we register in the services
+    container for the API:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE20]'
+  prefs: []
+  type: TYPE_PRE
+- en: The latest version of RavenDB supports inline projections, so all we need to
+    do here is to run a normal query with `Where` and then project the complex `ClassifiedAd`
+    aggregate state document to the read model object. Then, we need to apply the
+    paging and call `ToListAsync` so that the query gets executed on the server.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'With this one query ready to be used, we can call it from the API. I will comment
+    out the API methods that currently have no queries that we can use. So, the API
+    class would have one method, as shown in the following code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE21]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Since I already have some data in the database (one ad), I can now execute
+    it using Swagger. I leave the page number as `0` and set the page size to `10`,
+    but the query returns nothing. That''s because my classified ad is not published
+    yet, so the query condition filters it out. I need to send the ad for review and
+    then approve it using a new `Guid` for `ApproverId`. After doing this, I can see
+    the read model that is returned from the API. The API can also be called directly
+    in the browser by going to `http://localhost:5000/ad/list?Page=0&PageSize=10`,
+    and the browser should show the following JSON:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE22]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'We want to add other queries now, but this would mean that we need to wrap
+    all queries to this `try/catch` block. Let''s see if we can follow the **DRY**
+    (short for **don''t repeat yourself**) principle and create a useful function
+    to handle all queries. We already did this for commands that use the static `RequestHandler`
+    class. I will add a new function here to handle queries too, as shown in the following
+    code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE23]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Adding the next query that will allow us to get all classified ads for an owner
+    by owner ID is quite trivial; we just need to change the condition and keep the
+    read model projection from the document to the read model. To make methods a bit
+    shorter, I''ve added the `PagedList` extension method, so the whole class now
+    looks like the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE24]'
+  prefs: []
+  type: TYPE_PRE
+- en: If we wanted to use LINQ-to-objects, we could also move the projection to a
+    separate function. However, the query here is being sent to the server, and the
+    server has no idea about our client-side code. Therefore, we need to repeat the
+    projection code in each method.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Now I can add the API call and use the new `HandleQuery` function. Here is
+    the code for the whole `ClassifiedAdQueryApi` class, which uses both queries:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE25]'
+  prefs: []
+  type: TYPE_PRE
+- en: You can see that the methods for the API endpoint become just as concise as
+    the command API methods, and all query logic is moved to the extension methods.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Finally, we get to the point where we need to create a query that will combine
+    data from two different documents in one read model. To handle this scenario,
+    RavenDB offers a feature of projections using a loaded document. Using this feature,
+    we can load another document (`UserProfile`) using an ID that comes from the document
+    that we query (`ClassifiedAd`).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The query looks a bit more complicated, but not much. Here we go (I only list
+    the new function in the following code):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE26]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Now, we can complete the query API by adding one more method, just as short
+    as the previous two, as shown in the following code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE27]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The difference here is that we have no route because we want to get the resource
+    by ID from the `ad` route itself. Now, I can start the application and go to `http://localhost:5000/ad?ClassifiedAdId=d338696a-342e-45cf-a02e-178dcb8e95f8`
+    to see the following result:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE28]'
+  prefs: []
+  type: TYPE_PRE
+- en: Please note that this GUID is the ad ID in my database; you might need to check
+    the database to find out what you have used yourself. Some readers might also
+    not be happy that the URL is not fully REST compliant, since it uses a query parameter
+    instead of the route. I believe this would be an easy fix, but then you'd need
+    to remove the query object and use parameters in the API method that map to the
+    route parameter instead.
+  prefs: []
+  type: TYPE_NORMAL
+- en: As you can see, we managed to make all the queries we wanted and keep them close
+    to the underlying persistence. These queries can be called directly from the API,
+    and our domain will remain untouched. We are also able to combine the data from
+    two different aggregates in one read model, which we couldn't do using a repository
+    because repositories always deal with the aggregate root only.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Our queries use the database features directly, without bringing any abstractions
+    on top of `IAsyncDocumentSession`. Using extension methods also allows us to remove
+    the need for interfaces, and our queries don't become any less testable because
+    of that. We can quite easily write integrated tests that will directly use the
+    database, so we can check how our queries work.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We also used query objects as our API contracts and as parameters for query
+    methods. Similarly, by using read models, we were able to use the same objects
+    as the query result and as the API call response, so we didn't need to make any
+    useless mappings between models that live in different layers.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Queries with Entity Framework
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Let's now see how we can do the same thing using SQL. You might be wondering
+    if I really meant Entity Framework rather than SQL. In fact, I am not going to
+    use any features of the Entity Framework itself, since the best way to implement
+    the query side of CQRS with relational databases is to use SQL directly. We will
+    get to one more issue that arises from using Entity Framework in a moment.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We did a lot of work in the previous section, where we created queries, read
+    models, and API endpoints that used RavenDB. I won''t go over all the steps that
+    are the same. The following is a brief description of the stages that are exactly
+    the same between these two implementations; you can use this list to just copy
+    the relevant files over from one implementation to the other:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The `UserProfile` aggregate and related value objects
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The command API and the application service for user profiles and classified
+    ads
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The `ContentModeration` delegate
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Restructuring with feature folders
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Read models
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Query classes
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Both query APIs
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Of course, we also need to copy a small change in the `ClassifiedAd` aggregate
+    to handle the `Publish` command.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'One more thing that I need to add to the Entity Framework-style project is `UserProfileRepository`.
+    The interface it needs to implement is exactly the same as before. The repository
+    implementation itself is the same as `ClassifiedAdRepository`, which we made in
+    the previous chapter. Here we go:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE29]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'It looks like the only thing we need to do is to rename the existing `ClassifiedAdDbContext`
+    to `MarketPlaceDbContext`, extend it with all the required configuration for the
+    value objects, and then do the wiring. That was my first thought too. I added
+    a new entity type configuration, as shown in the following code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE30]'
+  prefs: []
+  type: TYPE_PRE
+- en: Note that, here, I have to use an extra property to hold the primitive value
+    of the ID, just like we did for `ClassifiedAd` in [Chapter 8](4eea9289-d77e-4568-a9c0-c5e1265e3b4e.xhtml),
+    *Aggregate Persistence*.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Then, I could just add one more `DbSet`, as shown in the following code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE31]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Once that''s done, I can change the `OnModelCreating` override, as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE32]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Now, we need to make use of it to change the wiring, as shown in the following
+    code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE33]'
+  prefs: []
+  type: TYPE_PRE
+- en: The preceding code uses the `AddPostgresDbContext` extension method; it just
+    wraps what we had before. You can find the code in the chapter repository.
+  prefs: []
+  type: TYPE_NORMAL
+- en: At this point, we can execute the application and create a new user profile,
+    then use the same user ID to create a couple of classified ads, all using the
+    command API.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The next step is to start implementing queries. As planned, we go for pure
+    SQL. However, using SQL would require us to create additional contexts and have `DbSet`
+    for each read model. That seems like overkill. Because of this, I will be using
+    Dapper, a lightweight SQL to the object helper library. It adds a number of helpful
+    extensions to the `SqlConnection` class, and we will be adding even more extensions,
+    so that should be fine. So I added the Dapper package to the `Marketplace` project
+    and did the wiring in the `Startup.ConfigureServices` method by adding this code. Now,
+    the first query seems to be quite obvious, as you can see from the following code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE34]'
+  prefs: []
+  type: TYPE_PRE
+- en: The reason why I am not closing the connection is `DbConnection` is registered
+    in the container as scoped, so it gets instantiated per request. Since we are
+    using the connection once, it will be automatically disposed and, therefore, closed.
+    You could, of course, close it explicitly.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'However, if we try that, we get an empty result. If we check the database table
+    to see what data is stored for an active classified ad, we can see that the `State`
+    column for an active ad has a value of `2`. At the same time, the `ClassifiedAdState`
+    enum has the `Active` value on a second position. A weird thing in Entity Framework
+    is, that it counts enum values from `1`, while the `(int)` type case always counts
+    from `0`. We could, of course, use the static `2` value in the query, but it won''t
+    deliver any safety if we need to change the enum and reorder values. Reordering
+    this enum would also be dangerous for the write side, since Entity Framework won''t
+    keep the right counter either. To fix this, let''s add explicit `int` values to
+    the enum instead of using the following code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE35]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'After this change is made, we get a proper result. I have one active ad in
+    the database, so I get one element in the JSON array, as shown in the following
+    code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE36]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'So far, so good. Next, we can implement the `myads` route, which queries all
+    classified ads for a specific user who owns those ads. The query is almost identical
+    to the previous one; we just need to change the `WHERE` condition using the following
+    code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE37]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'If I use the proper owner ID for an ad that I previously added to the system,
+    I get exactly the same result as before. To demonstrate things a bit better, I
+    added a new classified ad for the same owner ID and changed its title, but haven''t
+    published it. So, when I execute the `list` query, I still get the same result
+    with a single ad. When I execute the `myads` query, I get the following two results
+    instead:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE38]'
+  prefs: []
+  type: TYPE_PRE
+- en: Here, we can see that the price property has `-1` as a value, and that represents
+    the `Price.NoPrice` value, which we can render in the UI accordingly when we have
+    one.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The last query is a bit more complicated, since it requires a join. But since
+    joins are very common SQL operations, it won''t be hard to implement this query
+    as well; we simply use the following code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE39]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Then, I can call the API using an existing classified ad ID and get the following
+    result:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE40]'
+  prefs: []
+  type: TYPE_PRE
+- en: Well, that's it! Queries seem to be much easier to implement than commands.
+    By using direct access to the database engine itself without much of an abstraction,
+    we can fully utilize the full power of the database. We need, however, to be aware
+    of some quirks that the write-side persistence has created, such as enumeration
+    issues and somewhat weird column titles for value objects, but in the end, it
+    wasn't all that bad.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Interestingly enough, we didn't need to change anything at all in the query
+    API classes between the two different implementations, except for using a different
+    type for the database connection.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Summary
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In this chapter, we finally got hold of the data that we put in the database.
+    Now, our project contains several `GET` endpoints to retrieve the content of the
+    underlying database. We used CQRS to create queries, which are completely separate
+    from the models that we have in our domain. Certainly, we had to use aggregate
+    types to query RavenDB, since these are the document types as well. This could
+    be avoided by splitting the state model from the aggregate, but this is something
+    you can explore yourself.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We embraced the power of native access to the database engine to do things that
+    would otherwise be impossible or cumbersome to do if we'd just used repositories.
+    That's because a repository type represents a collection of aggregates of a single
+    type, and we would get in trouble if we needed to combine data from different
+    aggregates in a single read model.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Read models allowed us to create objects that we can map to the database query
+    result and return as is via the API without any additional mapping. Query objects
+    nicely encapsulate all the parameters that we need to pass to the query itself.
+    By using query objects, it is also easier to avoid signature conflicts if we need
+    to send the same parameters to two different queries.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Using extension methods to build queries is a powerful pattern. You won't need
+    interfaces and additional registrations just to get dependencies to the controller.
+    If you are concerned about testing, bear in mind that queries should always be
+    tested against the actual database. Therefore, there is no real need to use interfaces
+    there; you can use these extension methods in your tests just like we used them
+    in the controllers.
+  prefs: []
+  type: TYPE_NORMAL
+- en: By adding a couple of helpful generic static methods, such as `HandleCommand`
+    and `HandleQuery`, we decreased the number of lines in our controllers and removed
+    all duplicated code. It is always a good idea to look for a helpful abstraction
+    if you see repetition in your code; that would make your code cleaner and shorter,
+    and the chance of making a mistake when copy-pasting the same code again and again
+    would virtually disappear.
+  prefs: []
+  type: TYPE_NORMAL
+- en: This is the last chapter in which we use traditional persistence on the write
+    side of CQRS. All of the subsequent chapters will use Event Sourcing to persist
+    aggregates, but we will still be using a variety of methods for read models by
+    using projections.
+  prefs: []
+  type: TYPE_NORMAL

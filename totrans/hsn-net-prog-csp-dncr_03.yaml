@@ -1,0 +1,773 @@
+- en: DNS and Resource Location
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The last chapter was spent dissecting networks to such a degree that most readers
+    will likely never think about them again. In this chapter, we'll take those concepts
+    and look at their real-world implementations. We'll start with a look at how the
+    problem of resource allocation is solved at the scale of the internet. Distributing
+    resources is useless without being able to access them from across your network,
+    and this chapter will introduce you to the systems and standards that make doing
+    so possible. As we investigate these topics, we'll finally get our hands dirty
+    with some code. Throughout this chapter, we'll look at software examples to get
+    you familiar with leveraging the tools available with the .NET Core framework.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following topics will be covered in this chapter:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: How data and services are exposed and made available on everything from your
+    home Wi-Fi network to the internet
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The specific standards used to identify resources at different levels of your
+    network, from URLs and domain names, to devices names and local directory access
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Using the DNS class in .NET Core to access external resources and resolve requests
+    for data within your network
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Technical requirements
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: To follow this chapter, you'll need to have either Visual Studio Code, or Visual
+    Studio Community Edition. Both are free downloads available at the Visual Studio
+    website, at [https://visualstudio.microsoft.com/](https://visualstudio.microsoft.com/).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Check out the following video to see the code in action: [http://bit.ly/2HVSHad](http://bit.ly/2HVSHad)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: We'll also be using the .NET Core **command-line interface** (**CLI**). This
+    will give us access to a series of programs we can call directly from the command
+    prompt. To follow along, you'll need to make sure you have the .NET Core SDK installed
+    locally, which can be downloaded from [https://www.microsoft.com/net/download](https://www.microsoft.com/net/download).
+  prefs: []
+  type: TYPE_NORMAL
+- en: The source code is available at [https://github.com/PacktPublishing/Hands-On-Network-Programming-with-C-and-.NET-Core](https://github.com/PacktPublishing/Hands-On-Network-Programming-with-C-and-.NET-Core).
+  prefs: []
+  type: TYPE_NORMAL
+- en: Needles in a haystack – data on the internet
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The first step to using the resources exposed on a network is finding them.
+    While this problem is easily solved on a LAN with only four computers, you can
+    imagine how daunting a challenge it becomes when your context grows to the several
+    billion devices actively connected to the internet. To ensure reliable delivery
+    of requests broadcast on a network, each device on that network must be uniquely
+    addressed, and any software that wants to communicate with a device must know
+    the address of the target device. With this in mind, let's look at how the problem
+    has been solved at scale and consider how we can apply that solution to our more
+    locally-relevant use cases with .NET Core.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The first network addresses
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: As I mentioned, every device on a network must be uniquely identifiable so that,
+    at any given time, requests intended for a specific device can be delivered. Likewise,
+    unique addressing means that any responses can be reliably returned to the originating
+    device, no matter how many network nodes lie between the two. If someone has written
+    a service that solves a problem you have, it's only useful to you if you can actually
+    use that service. This means either knowing the address of the device hosting
+    that service, or, at the very least, knowing who to ask for the address.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Thankfully, this is a problem that was solved long before even the earliest
+    incarnations of the modern internet. I am, of course, referring to telecommunication
+    networks, and their well-established system for addressing and address look-ups.
+    With early telecom networks, engineers needed to solve problems for a large set
+    of devices that needed to be uniquely addressed. Whatever system they came up
+    with, though, would need to exhibit the following characteristics in order to
+    remain viable in the long term:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Usability: The system would be used by anyone who wanted to communicate over
+    the telecom network, and so the system could not have been prohibitively complex.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Scalability: The ultimate goal was to connect every home in the nation with
+    a single, unified network. The solution for adding nodes to that network would
+    need to grow with the population and the geographic region that it would ultimately
+    support.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Performance: If a telephone call took as long as the postal service to deliver
+    messages back and forth, no one would use it. And, while that was never going
+    to be the case, there would certainly be a limit to what customers would tolerate
+    in terms of speed and reliability.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Thankfully, what they came up with was a sustainable solution that has scaled
+    and functioned for decades.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The system that telecom engineers devised was that of phone numbers. By assigning
+    10-digit addresses to each phone on a telecom network, engineers guaranteed a
+    network capable of uniquely addressing up to 9,999,999,999 devices. Add two digit
+    country codes to that, and you've got a network that can theoretically support
+    up to a trillion devices, or over 100 unique addresses for each human on the planet,
+    with approximately another 240 billion to spare.
+  prefs: []
+  type: TYPE_NORMAL
+- en: You might have noticed that I specified that the phone numbering system only
+    theoretically supports up to a trillion devices. However, there are certain limitations
+    of the addressing system of telecoms that make reaching the theoretical maximum
+    difficult. As most of you will be well aware, the first three digits of a US telephone
+    number are known as the **area code**. Those digits were originally determined
+    by the specific geographic location in which the phone was located. This helped
+    route numbers quickly, but means that the total number of possible devices supportable
+    by telecom networks is limited by the distribution of those devices across geographic
+    regions. Within an area code, there is only a theoretical maximum of 9,999,999
+    possible devices; barely more than the total population of New York.
+  prefs: []
+  type: TYPE_NORMAL
+- en: I'm over-simplifying the solution here, but what this trade-off provided for
+    telecom engineers was a simple mechanism for narrowing down the possible field
+    of physical phones to which an address would resolve as quickly as was reasonably
+    possible. Calls could be routed to a substantially restricted region by examining
+    only the first three numbers. This provided an obvious performance benefit by
+    applying semantic meaning to a syntactic standard. The telephone numbering system
+    simply specifies that a physical phone is addressed by a 10-digit address. That
+    is a syntax requirement. However, the geographic information conveyed by the first
+    three digits of that address is a semantic standard. There is an underlying meaning
+    baked into those first three numbers that conveys how the entire address should
+    be handled.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The scalability of this numeric addressing system helps network devices direct
+    traffic accurately. For a human user, though, an arbitrary series of seven to
+    ten numbers can be difficult to remember, and are error-prone to use. Those who
+    grew up in the time before smartphones and built-in contacts lists may remember
+    the need to have a Rolodex, or contact book, to keep frequently needed, but difficult
+    to remember, phone numbers organized and on-hand at all times. However, it was
+    often the case that you'd need to call someone whose number you didn't have conveniently
+    stored. This is where the phone book comes in. It served as a simple way of mapping
+    easily-remembered unique identifiers for a person (specifically, a full name and
+    street address) to their corresponding network-friendly address (their phone number).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'All of these features, taken together, provided telecoms with the hallmarks
+    of a successful network implementation: usability (through the simplicity of phone
+    books), scalability (with the extensive range of valid addresses), and performance
+    (with improved routing speeds achieved by embedding semantic meaning into the
+    syntactic standards of the address). By now, though, you''ve likely correctly
+    guessed that we won''t be programming for telephone networks in C#. So, let''s
+    see how the design decisions made by telecom engineers translate to modern computer
+    networks.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: DNS – the modern phone book
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'As I have alluded to, engineers designing modern computer networks faced the
+    same problem as telecom engineers: defining a standardized syntax with which they
+    could create unique addresses for each device on their network. Thankfully, though,
+    there were already giants on whose shoulders those computer network engineers
+    could stand (to paraphrase Sir Isaac Newton).'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The phone numbering system demonstrated that a simple system of fixed-length
+    numeric addresses could be quickly parsed and routed. Moreover, strictly numerical
+    addresses can be represented in binary. This meant no additional standards needed
+    to be applied for consistently representing non-numeric characters. However, this
+    was a trade-off in usability. The software written to use those addresses would
+    still need to be written by humans. As is often the case, the easier (and more
+    performant) solution for computers to use was the more difficult solution for
+    humans. This meant that computer network engineers would need to devise a phone
+    book of their own. Thankfully, they rose to the occasion.
+  prefs: []
+  type: TYPE_NORMAL
+- en: On all modern computational networks, the fixed-length numerical address by
+    which you can reliably locate an external device is the **Internet Protocol (IP)**
+    address. Meanwhile, the system from which you can reliably ask for the address
+    of a given device is the **Domain Name System (DNS).** This, the DNS, is the computer
+    network's phone book. It's essentially an elaborate, distributed mapping of human-readable
+    domain names to their underlying IP addresses.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Every device on the internet (or any local networks) will have their own IP
+    address. However, the specifics of how that IP address is determined, and the
+    strengths and limitations of the syntax for those addresses, will be discussed
+    later in this book. For now, what we're concerned with is specifically how those
+    addresses are resolved by their more meaningful, human-readable domain names.
+    In this next section, we'll explore fully how that happens every time you look
+    up a resource by its URL.
+  prefs: []
+  type: TYPE_NORMAL
+- en: URLs, domain names, and device addresses
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: With a solid understanding of the primary concerns that must be addressed for
+    resource location on networks, let's look at how they've been addressed in more
+    detail. First, let's consider how the much less error-prone URL naming convention
+    allows easier access to remote resources. Then we'll look at how the DNS provides
+    a bridge between the usability of URLs or domain names, and the speed and reliability
+    of IP addressing.
+  prefs: []
+  type: TYPE_NORMAL
+- en: URLs – user-friendly addressing
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: I've been taking a very basic approach to explaining the nature of locating
+    resources so far. I'm certainly aware, though, that most of you probably have
+    at least some idea of how that happens in, at the very least, a high-level context.
+    Hell, you likely used a web browser to find this book in the first place, and
+    had a pretty solid idea that the long string of seemingly random words and letters
+    strung together in your browsers address bar was, in fact, a URL. However, I have
+    certainly met my fair share of developers who were surprised to learn exactly
+    how URLs are constructed and used. So, much as we've done so far, we're going
+    to start with a very basic explanation of what exactly URLs are, and how we can
+    use them to find what we need.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**Uniform Resource Locator** (**URL**) is a universally agreed-upon standard
+    for (unsurprisingly) locating resources on the web. It does so by specifying the
+    mechanism by which to retrieve the resource, as well as the specific route over
+    which to retrieve it. It does so by specifying the order of, and delimiters between,
+    specific components that collectively define the specific physical location of
+    any resource. The specification will initially seem complicated, but will become
+    more intuitive as we elaborate on the components and the responsibilities they
+    hold.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: URL components
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Every URL begins with the scheme by which a resource should be located. This
+    specifies the transport mechanism, or location type, that should be used to find
+    what you're looking for. There is a finite list of universally valid schemes that
+    you can specify, including http, ftp, and even file for locally hosted resources.
+    The scheme is always followed by a colon (`:`) delimiter. After the scheme specification,
+    a URL could contain an optional authority specification, which itself contains
+    a small handful of sub-components.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The authority component
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'The authority has a designated prefix: the special delimiter of two consecutive
+    forward slash (`//`) characters, whose presence indicates that characters that
+    follow should be parsed according to the specification for a URL authority. This
+    prefix is optionally followed by access credentials, or user information, which
+    transmits an optional user ID and/or password to the destination host. These values,
+    if included, will always be separated from one another with a colon (`:`) as a
+    delimiter, and will be separated from the rest of the authority component with
+    an at sign (`@`) delimiter.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Whether access credentials are included as part of the authority or not, it
+    will always include a host domain. This always follows either the double forward
+    slash (`//`) prefix, or, in the event of access credentials, the (`@`) delimiter.
+    The host domain specifies the physical address of the hardware hosting the resource
+    being located. It can be specified as either a registered domain name, or the
+    underlying IP address for the hardware.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Finally, an authority might specify a listening port on the host. This is delimited
+    from the host domain name or IP address by the colon (`:`) character, and indicates
+    the only ports on the hardware to which requests for the specified resource should
+    be sent.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The path component
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The path component specifies a series of path segments over which requests must
+    travel to arrive at the searched for resource. Each segment of the path is individually
+    delimited with a forward slash (`/`) character. It's technically valid to have
+    an empty segment as part of your path, resulting in two consecutive forward slash
+    characters (`//`).
+  prefs: []
+  type: TYPE_NORMAL
+- en: The query component
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: After the final segment of the path, the URL may contain an optional query component,
+    indicated by the presence of the question mark character (`?`) delimiter. The
+    query component allows users to specify additional parameters for more specific
+    results from the requested resource. Each different query comes in the form of
+    a parameter, the equals sign (`=`) delimiter, and the requested value of the query
+    parameter. Finally, each parameter is delimited by either a semi-colon (`;`) or
+    ampersand (`&`) delimiter between any two query parameters and their values.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The fragment component
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The final piece of a URL, at least ordinarily, is the fragment component. It's
+    an optional piece of the URL string, and its presence is indicated by the reserved
+    pound, or hash (`#`) prefix. The fragment component is often used to identify
+    a sub-component of the eventually-returned resource, and is typically used by
+    web browsers to navigate to a specific fragment of the HTML document that was
+    searched for.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Putting it all together
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'Having clearly enumerated all the relevant components of a URL, we can simplify
+    things with a basic syntax specification. Every URL ultimately breaks down to
+    the following structure, where optional components are designated with square
+    brackets `[]`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE0]'
+  prefs: []
+  type: TYPE_PRE
+- en: So here, we see plainly that the only required components of a URL are the scheme
+    and subsequent colon delimiter, and a path. Everything else is optional, and you'll
+    note that each optional component has its presence in the URL indicated by its
+    unique prefix character. And we can, of course, expand on the following components.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Authority specification
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'The authority, as we already specified, can be broken down as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE1]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'So, if an authority component is present, it will always be prefixed with a
+    (`//`) delimiter, and will always contain the host domain. Meanwhile, the access
+    credentials component is also broken down as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE2]'
+  prefs: []
+  type: TYPE_PRE
+- en: Here, only one component is required. However, if either component is present,
+    then the (`@`) character separating access credentials from the host domain becomes
+    a requirement. And, if both the `user_id` and the `password` functions are present,
+    then the colon (`:`) delimiter between the two components will be required.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Query specification
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'Finally, the last component that has a well-defined specification for how it
+    can be composed is the query component. It can be broken down as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE3]'
+  prefs: []
+  type: TYPE_PRE
+- en: The sequence of additional delimiters and key-value pairs can extend all the
+    way to the maximum allowable length of a valid URL.
+  prefs: []
+  type: TYPE_NORMAL
+- en: By following these syntax specifications, you can decompose any URL you are
+    presented with into its component parts, and meaningfully leverage it to access
+    the resource it identifies.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The URL as a sub-type of the URI
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: We've spent the bulk of this section discussing URLs specifically. What you
+    may not have realized, however, is that a URL is actually a single, specific kind
+    of something known as a **Uniform Resource Identifier** (**URI**), which is a
+    string of characters adhering to a well-defined syntax that universally and uniquely
+    identifies a resource on a network.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The distinction between a URL and a URI is subtle, and almost entirely conceptual.
+    The simplest way to characterize that distinction is to note that, by using a
+    URL, we are guaranteed to be able to identify and locate a requested resource.
+    The only thing we are guaranteed, given a simple URI, is an ability to identify
+    it that is to distinguish the resource from any other arbitrary resource.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In practice, however, the terms URL and URI are frequently used interchangeably.
+    This is because, since URL is a specific kind of URI, it's always valid to characterize
+    a URL as a URI. Meanwhile, it is often sufficient to characterize a URI as a URL
+    since knowing the specific identity of a resource within the context of a network
+    is usually enough to then locate that resource.
+  prefs: []
+  type: TYPE_NORMAL
+- en: If you're wondering why I brought up a subject of such apparent triviality,
+    it's for clarity's sake. Over the course of this book, I'll consistently talk
+    about resources as being identified by their URL. However, the class exposed by
+    .NET Core for constructing, decomposing, and leveraging these addresses is named
+    for the more generic URI specification. In fact, let's take a quick look at that
+    class now.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The System.Net.UriBuilder class
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: If you've made it all the way through this elaborate definition of the URL specification,
+    you might be wondering how on earth you can leverage this in your code to access
+    a resource, when you already know specifically where to look for it. Enter, dear
+    readers, the `UriBuilder` class!
+  prefs: []
+  type: TYPE_NORMAL
+- en: Living in the `System.Net` namespace, the `UriBuilder` class is a factory class
+    for generating instances of the `Uri` class. It provides users with several overloaded
+    constructors to allow the specification of more of the components of a valid URL
+    progressively. It also provides accessors to properties representing each of those
+    components individually. Finally, it provides a function to produce the well-formed
+    instance of the `Uri` class from the component parts.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let''s start with a very simple example. We''ll use `UriBuilder` to compose
+    an instance of `Uri` with only the `Scheme` and `Host` components as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE4]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'With this method, we can see how the `UriBuilder` class composes a well-formed
+    and syntactically correct `Uri` out of the component parts we specify, as demonstrated
+    in the following code snippet:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE5]'
+  prefs: []
+  type: TYPE_PRE
+- en: By running this program, you should see the `http://packt.com` output while
+    your console is open for ten seconds, before it closes and the application terminates.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Here, we didn't need to specify that the `http` component of the URL should
+    be followed by a colon character. We didn't say anything about the host we specified
+    being prefixed with the `//` prefix characters. The `UriBuilder` class did that
+    for us. This factory class gives us a clean way to incrementally construct a more
+    specific desired location, without us, as the developers, having to keep the nitty-gritty
+    details of delimiters, prefixes, and suffixes in our heads all the time.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In this example, we leveraged the fact that the `UriBuilder` class provides
+    public `get` access to all of the properties that it has to encapsulate each component
+    of a `Uri`. However, you can also apply many of those properties through a series
+    of overloaded constructors, if you know their values at the time of construction.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The `UriBuilder` class has seven overloaded constructors. We''ve seen the default
+    constructor, taking no parameters, but now let''s look at a program that leverages
+    each of the constructors and see what they provide. Given that we know the transport
+    scheme and domain name we intend to look up, we can simplify our initial method
+    for a simple `Uri` as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE6]'
+  prefs: []
+  type: TYPE_PRE
+- en: With that change, the output from our `TestUriProgram` will print the exact
+    same string we saw before, but the code to produce that output is one-third of
+    the size. Whenever possible, I recommend using the constructor overloads to instantiate
+    the `UriBuilder` class. Doing so shrinks our code height and makes our intentions
+    explicit when instantiating the class. Always be more explicit in your code when
+    possible.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Hosts – domain names and IPs
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In my description of the host component of a URL, I specified that the host
+    domain could be either a domain name, or an IP address. As I mentioned before,
+    an IP address is the underlying numeric address used by routing hardware and software
+    to navigate to a resource on a network. It's the unique ID, specific to a piece
+    of hardware at a specific location. A domain name, however, is the human-readable
+    string of words and alpha-numeric characters used to make addressing easier and
+    more consistent. It is more consistent, easily remembered, and less prone to error
+    than a raw IP address. What's interesting, however, is that domain names and their
+    IP addresses are actually functionally interchangeable. In any context in which
+    you can use one, you can always safely substitute the other.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Given that IP addresses can be resolved directly by the network transport layer,
+    and don't need to be resolved before they can be serviced by any node in the routing
+    process, we'll ignore them for now. We'll explore the syntax, limitations, and
+    advantages gained by using the IP address of a device later on in this book. For
+    now, though, we're more concerned with how we can find the IP address in the first
+    place. That's why, for this chapter at least, we're only concerning ourselves
+    with domain names and how they're resolved by the DNS.
+  prefs: []
+  type: TYPE_NORMAL
+- en: I'd bet that among everyone reading this book, there isn't a single person who
+    knows a single other person who hasn't typed [google.com](http://google.com) or
+    [en.wikipedia.org](https://en.wikipedia.org/wiki/Main_Page) into their browser's
+    address bar. Our use of domain names is ubiquitous, and yet most of us have no
+    idea how, exactly, they are created or used. Even for me, it wasn't until I was
+    explicitly tasked with writing software for resolving those domain names on an
+    internal network that I finally took the time to understand what made that system
+    work. At that time, I learned how the web of DNS servers facilitated network usage
+    by human users. While I only mentioned it previously, it's time to consider just
+    what the DNS is more deeply, and how we can use it.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The DNS is a distributed, decentralized network of authoritative servers that
+    hosts a directory of all sub-domain servers, as well as any domain names that
+    can be resolved by that authoritative server. Any domain name that has been registered
+    with a certified domain name registrar**,** and which meets the syntax standards
+    of a domain name (and which hasn't already been registered), is considered valid.
+    Valid domain names are added to the distributed registry hosted by authoritative
+    servers. Between your computer and any other network node you hope to interact
+    with using a valid, registered domain name, your request will have to interact
+    with one or more of these name servers.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Each server will inspect the domain name given, and look up the domain in its
+    own directory of names and IP address mappings. Naturally, the server will first
+    determine if the given name can be resolved by that server, or at least by one
+    of its subordinate servers. If so, the authoritative server simply replaces the
+    domain name in the request with the IP address to which it maps, and forwards
+    the request along accordingly. If the current server cannot resolve the domain
+    name, however, it will forward it along up the hierarchy of name servers to a
+    more general, parent domain. This process continues up to the root name server,
+    or until the name is resolved.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The DNS in C#
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: It is occasionally necessary to identify the underlying IP address for a domain
+    name from within the context of our software. For that, .NET Core provides the
+    static `Dns` class as part of the `System.Net` namespace. With the `Dns` class,
+    we can access directory information as returned by the nearest downstream name
+    server capable of resolving the given name. We can request an instance of the
+    `IPHostEntry` class, containing all of the relevant directory information of a
+    DNS entry, or simply an array of IP addresses registered to resolve requests against
+    the domain name.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'To see this in action, simply invoke any of the methods exposed by the static
+    `Dns` class in a sample program as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE7]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'With this program, we should see the following output:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE8]'
+  prefs: []
+  type: TYPE_PRE
+- en: Of course, the IP address that is resolved when you look for a host entry that
+    resolves the `google.com` domain name will likely be different. Google's servers
+    are widely distributed, and the specific server slice (and its associated IP address)
+    that is nearest your network location will be what resolves a lookup of that domain
+    name.
+  prefs: []
+  type: TYPE_NORMAL
+- en: If you want to validate that the IP address returned is in fact what is registered
+    for that domain name, you can actually intercept the host entry lookup locally
+    by modifying your computer's hosts file. On a Windows OS, that file will live
+    at the `C:\Windows\System32\drivers\etc\hosts` directory, and will have no file
+    extension. On macOS and *nix systems, it simply lives at `\etc\hosts`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'This file serves as the first stop on any outbound requests for a network resource
+    addressed by a host name. It is, technically, your computer''s internal name server,
+    and you can use it to direct traffic any way you''d like. To demonstrate this,
+    add an entry to your hosts file as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE9]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Now, opening your command prompt, navigate to an empty folder, and spin up
+    a new .NET Core Web API project with the following CLI command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE10]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Your console should print information about .NET Core, telemetry, ASP.NET Core,
+    and finally, finish execution with the following line:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE11]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Assuming that this worked, you can immediately run the application by executing
+    the following command from within the same directory that you created the project:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE12]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'After this, you should see that your application is running and listening,
+    as seen in the following screenshot:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![](img/07246658-3674-4d45-96bf-e0e89da8e0af.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: Pay attention to the specific port your application is listening on.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'If we look inside the blank Web API application, we can see that .NET Core
+    stood up a single controller, named `ValuesController`, and that it exposes a
+    number of REST endpoints. The only things that we''re concerned with for now is
+    the route specified for the API, and the endpoint listening for HTTP GET requests,
+    listed as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE13]'
+  prefs: []
+  type: TYPE_PRE
+- en: This tells us that we should expect to see the `"value"` result if we navigate
+    to the `/api/values/{id}` path on the listening port of our local machine.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Sure enough, if you open your browser of choice and type the application''s
+    URL into your address bar, appending the path specified in the controller, you
+    should see the value string displayed in your browser, as shown in the following
+    screenshot:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![](img/a1aebff3-3c6a-4132-b7d4-76aed2098e0d.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: What's interesting, though, is that localhost is itself an alias for the `127.0.0.1`
+    IP address. By convention, that address always resolves to the current local machine.
+    Since we modified our hosts file, however, we should be able to replace `localhost`
+    in our URL with the `fun.with.dns.com` as new domain name. Make the change in
+    your browser, and you'll see the same response!
+  prefs: []
+  type: TYPE_NORMAL
+- en: Now that we've seen how to set up our own domain name entries locally, we can
+    use our hosts file to explore the `Dns` class in more detail, and validate the
+    responses.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'First, add an additional entry to the hosts file with a new IP address, but
+    the same fake domain name as before. Your new hosts file should read as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE14]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Here, it doesn''t actually matter what the addresses are, since we won''t be
+    looking for resources at those locations. What matters is that there are two.
+    With those entries in place, you can see more concretely how the `Dns` class in
+    .NET exposes a host entry from the nearest domain name server that can resolve
+    it. We can modify our program from before as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE15]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'We can now see the following output:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE16]'
+  prefs: []
+  type: TYPE_PRE
+- en: This demonstrates how we can access host information for a given domain name
+    or IP address using the `Dns` class. Note that the instance of the `HostEntry`
+    class returned by the methods of the `Dns` class always contain all of the IP
+    addresses for which there is a record in the naming server. Even when we looked
+    up the `HostEntry` class by a specific IP address, the `Dns` class still resolved
+    and returned every other IP address registered for the domain name that matched
+    the IP address of the original lookup. This provides the flexibility of being
+    able to access and leverage alternative hardware resources for a given request
+    in the event that one of the registered addresses is unresponsive. The extent
+    to which you'll leverage this class in your work may vary, but I hope you see
+    now that it can be a useful tool to keep in your belt.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Summary
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In this chapter, we examined the primary characteristics network engineers identified
+    as necessary to make networks viable. We considered the trade-off of usability
+    for routing hardware versus readability for humans when defining a standard syntax
+    for network addressing. With that consideration in mind, we looked at how the
+    work of the telecom engineers of previous generations contributed hugely to the
+    solutions that were ultimately standardized on all modern networks today.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Within that context, we looked at how IP addresses are used by network hardware
+    to locate resources, and how the DNS facilitates the more memorable, human-readable
+    addressing schemes of URLs and URIs. We learned how those domain names are explicitly
+    mapped to their underlying IP addresses by implementing a domain name server of
+    our own, using the hosts file of our operating system. Using the sandbox of our
+    self-contained DNS server, we explored the C# classes provided by the System.Net
+    namespace to facilitate building syntactically correct URLs, and leveraging the
+    DNS to lookup the underlying IP addresses of a given URL, or resolve requests
+    to do the same.
+  prefs: []
+  type: TYPE_NORMAL
+- en: With this foundation in place, we'll use the next chapter to explore the communication
+    protocols that allow for data transmission from one host to another. We'll look
+    at how a standardized model facilitates communication between entities, and take
+    a close look at some of the most common protocols used in that communication.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Questions
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: What are the three characteristics network engineers seek to achieve for long-term
+    viability of a network addressing standard?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: How did telecom engineers sacrifice the maximum possible scale of telecom networks
+    to achieve higher routing performance?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: What are the phone number and phone book of the modern internet?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: How does a URL locate resources on the web?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: What are the valid components of a URL? Which of them are optional?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: What is a fully qualified domain name?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: How is a device given a domain name?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Further reading
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: For more information on URLs, domains, and resource location on networks, consider
+    *Managing Mission-Critical Domains and DNS* by *Mark E. Jeftovic*. It provides
+    a deeper and more considered analysis of working with the DNS, and strategies
+    for leveraging that system to your advantage when constructing networks of your
+    own.
+  prefs: []
+  type: TYPE_NORMAL

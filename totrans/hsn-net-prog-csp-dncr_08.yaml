@@ -1,0 +1,952 @@
+- en: Streams, Threads, and Asynchronous Data
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: With the resources available to us to start working with sending network requests,
+    we need to look at how we can best incorporate those requests into our applications.
+    We'll need to work with those resources in a way that won't impact the performance
+    of our application's business logic or our user's experience. So, in this chapter,
+    we'll look at how we can process data streams in such a way as to be resilient
+    and non-blocking to the rest of our application's performance.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following topics will be covered in this chapter:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Understanding the nature of I/O streams in C#, and how to write to, read from,
+    and manage open streams
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: How different I/O streams expose access to different types of data, and how
+    the parent `Stream` class simplifies the use of those distinct stream types
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The potential performance cost of processing large, or poorly performing data
+    streams and how to mitigate that cost
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Leveraging C#'s asynchronous programming feature set to maximize the performance
+    and reliability of your software
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Technical requirements
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: This chapter will have a number of samples and driver programs to demonstrate
+    the concepts discussed, all of which are available at [https://github.com/PacktPublishing/Hands-On-Network-Programming-with-CSharp-and-.NET-Core/tree/master/Chapter
+    6](https://github.com/PacktPublishing/Hands-On-Network-Programming-with-CSharp-and-.NET-Core/tree/master/Chapter%206).
+  prefs: []
+  type: TYPE_NORMAL
+- en: As always, you're encouraged to clone this repository locally and begin playing
+    with the source code, or writing your own in order to get comfortable with some
+    of the topics in this chapter.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Check out the following video to see the code in action: [http://bit.ly/2HYmhf7](http://bit.ly/2HYmhf7)
+  prefs: []
+  type: TYPE_NORMAL
+- en: Going with the flow – data streams in C#
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: We looked briefly at accessing data streams in the last chapter when we talked
+    about the request stream property of the `WebRequest` class. I glossed over that
+    subject then, but now we should really understand how our data is prepared for
+    transmission as a request payload. We'll look at the common interface for data
+    streams in C#, and give special consideration for some of the trickier or less
+    obvious aspects of streams that can introduce some difficult-to-find bugs into
+    your code. So, let's start with the `Stream` class and go from there.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Initializing a data stream
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Just like with network requests, writing to and reading from data streams is
+    a common and straightforward task in software engineering. So much so, in fact,
+    that Microsoft provided an extremely well-designed common specification for doing
+    this in C#. The methods defined by the base class are the same ones you'll use
+    for any kind of data transmission that you would reasonably have to execute, so
+    with that as our starting point, let's take a look at what the class provides.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The objective of the `Stream` class is, quite simply, to provide direct access
+    to an ordered sequence of bytes. There is no additional context around this information,
+    so the sequence of bytes could be anything from a file on your local disk storage,
+    to the bytes of a packet from an incoming request stream, or to an open communication
+    pipe between two co-located application processes and existing entirely in memory.
+  prefs: []
+  type: TYPE_NORMAL
+- en: What this simple definition provides is an easy way to define generic environment
+    and context-agnostic methods for working with the ordered list of zeros and ones.
+    What it doesn't provide, however, is any useful way to parse, process, and convert
+    those bytes to and from meaningful in-memory objects that make sense to the rest
+    of your application. As a programming task, this can be a bit tedious, but thankfully,
+    some of the specific implementations provide some reliable utility methods for
+    more common parsing situations. This is especially nice because that's where most
+    of the work of streams lie.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Once you''ve got your information ready to pass over a binary data stream,
+    or ingest bytes from a data stream, there are only three primary operations that
+    you''ll care about. The first two are obvious: reading and writing, collecting
+    bytes, in order, from the data stream, or pushing your own bytes onto it. The
+    third is less obvious but just as important. Because the data stream is an ordered
+    array of arbitrary bytes, reading from and writing to it are unidirectional operations.
+    They are always processed in order. However, we don''t always need or want the
+    information from a data stream in order, so the ability to seek out a specific
+    index in the stream is key, and will be the primary mechanism for traversing your
+    data stream out of order.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'So, with that in mind, let''s take a look at it in action. First, create a
+    basic application to take advantage of a data stream. To do so, you can use the
+    .NET Core CLI, and create a new console app, as shown in the following screenshot:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![](img/65ea8a27-8d27-4152-a31b-5a38e18d2d35.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: Similarly to how we created our sample project in [Chapter 2](ec4ace03-62c3-4f7f-be9e-6a54f0438e57.xhtml), *DNS
+    and Resource Location,* in the, *The DNS in C#* section*, *we used the `dotnet
+    new` command to stand up a basic console application as our test bed. This time
+    the difference is that we'll specifically create a new console app with the `dotnet
+    new console` command. I'll keep making a note of this as we work with new projects
+    to highlight the speed and value of the .NET Core CLI; its speed and utility really
+    cannot be overstated.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Now, we want to establish a stream to work with, so we'll start by adding a
+    using directive to include the `System.IO` namespace since I/O streams live in
+    the I/O namespace. Then, for the sake of demonstration, we'll read from the file,
+    and write to a file on disk with `FileStream`. We'll declare our variable to be
+    of type `Stream`, so that the compiler's type checking doesn't allow us to use
+    the `FileStream` specific methods or properties. The point is to understand how
+    to use the abstraction that's provided by the `Stream` class. It doesn't actually
+    matter what we're reading from; by the time it gets to our application code, it's
+    all just incoming bytes, anyway. Using the local filesystem just gives us more
+    direct access to the results of our actions without having to go through the process
+    of setting up a local API and posting data to it.
+  prefs: []
+  type: TYPE_NORMAL
+- en: To the extent that you can, it's usually wise to use as generic a type as possible
+    when declaring your variables. This allows you a lot more flexibility if you need
+    to change your implementation strategy down the line. What might be a locally
+    stored filesystem access today could become a remote API call tomorrow. If your
+    code is only concerned with the generic concept of a `Stream` class, it's a lot
+    easier to change it later for different sources later.
+  prefs: []
+  type: TYPE_NORMAL
+- en: To write this demo, the first thing you'll want to understand is that a Stream
+    is an active connection to a data source. That means it needs to be opened before
+    it can be used, and it should be closed, and then disposed of before you're done
+    with it. Failing to do so can result in memory leaks, thread starvation, and other
+    performance or reliability issues with your code. Thankfully, .NET Core provides
+    a built-in pattern for each of these life cycle tasks. The constructors for most
+    `Stream` classes will return an already-opened instance of the class you're creating,
+    so you can start reading from and writing to your streams right away. As for guaranteeing
+    the disposal of your streams, we have the eternally useful `using` statement.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'If you haven''t seen it before, a `using` statement is different from the `using`
+    directives at the top of your file that allows you to reference classes and data
+    structures outside of your current namespace. In the context of a method, in C#,
+    the `using` statement is used to instantiate a disposable class (which is to say,
+    any class that implements the `IDisposable` interface), and define the scope within
+    which the instance should be kept alive. The syntax for using this is as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE0]'
+  prefs: []
+  type: TYPE_PRE
+- en: We'll see this in action momentarily. But just like declaring variables within
+    the scope of a `for` loop or an `if` statement, the variable you create inside
+    the signature of the `using` statement ceases to exist outside of the scope of
+    the open and close curly brackets of the code block.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Alternatively, with C# 8, you can avoid the deep nesting created by the `using`
+    statement by choosing instead to leverage the `using` declaration. This functions
+    the exact same as the `using` statement, but it declares the variable to the scope
+    of the encapsulating method instead of establishing an inner-scope for the lifetime
+    of the instance. So, instead of defining the scope with the `using` statement
+    and its opening and closing curly braces, you would simply create your variable
+    and declare it with the `using` keyword, as seen here:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE1]'
+  prefs: []
+  type: TYPE_PRE
+- en: The only major distinction between the two is the scope to which the instance
+    is bound. With a `using` statement, the scope of the instance is defined by the
+    curly braces of the statement block. Meanwhile, with the `using` declaration,
+    the scope is defined by the code block in which the disposable instance was declared.
+    In most cases, the `using` declaration should be sufficient, and will help reduce
+    deep nesting within your methods. However, you should always take care to consider
+    how the disposable instance will be used and bind it to the appropriate scope
+    for its use case.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Once the flow of program control exits the scope to which your instance is bound,
+    the .NET runtime will take all the necessary steps to call the `Dispose()` method,
+    which is responsible for ensuring that the state of the object is valid for disposal.
+    In doing so, the `using` statement implicitly assumes the responsibility of cleaning
+    up any unmanaged resources and any connection pools set up for the object it created.
+    This well-defined scope means that anytime you step out of the scope of the `using`
+    directive, you lose your resource handle and will have to instantiate a new one.
+  prefs: []
+  type: TYPE_NORMAL
+- en: This well-defined scope means that any time you close your `using` statement,
+    you lose your resource handle. This means that accessing the resource later will
+    require you to create a new handle for it and then dispose of it accordingly.
+    This can incur a performance cost over the lifetime of the application, and so
+    you should take care to dispose of a resource handle when you are certain you
+    no longer need it.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Interestingly, while the object declared within the scope of the `using` statement
+    will always be properly disposed of, the `using` statement does notguarantee the
+    disposal of any disposable instances that theobject creates. The assumption is
+    that if any `A` class creates an instance of a disposable `B` class as a member
+    of itself, the owning instance of the `A` class should also be responsible for
+    cleaning up the member instance of the `B` class whenever the owning instance
+    of the `A` class is, itself, disposed of. The rule is, if you create it, you dispose
+    of it.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Now that we know how to create an instance of `Stream`, let's get our hands
+    dirty and start working with one.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Writing to and reading from a data stream
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'Now that we know how the life cycle of the `Stream` class is managed, let''s
+    use it to write a message to a local file. First, we''ll write a string to the
+    stream, and then inspect the destination of the stream to confirm that it was
+    written properly:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE2]'
+  prefs: []
+  type: TYPE_PRE
+- en: Just like in [Chapter 5](b2bbfe0e-f0de-49ca-a3c8-b8ced18e42bf.xhtml), *Generating
+    Web Requests in C#,* we couldn't write our string directly to the stream. It's
+    not the job of a stream of bytes to figure out how more complicated objects should
+    be represented as bytes. It's just the road over which they travel. So, we're
+    responsible for first getting the byte representation of the string that we want
+    to send. For this, we use the `System.Text.Encoding` class to get the byte representation
+    for the specific string encoding that we want to use.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Once we have this, we can write it to the stream. Or, at least, we assume we
+    can. It's always wise to check first, though. That's why the `Write` operation
+    is wrapped in the conditional block that checks the `CanWrite` property of our
+    stream. This is a wonderful convenience provided by the `Stream `class that allows
+    you to confirm a valid state in your stream for the operation you're about to
+    perform beforeyou try to perform it. This puts error handling and correction in
+    our control without having to use clunky `try`/`catch` blocks around everything.
+  prefs: []
+  type: TYPE_NORMAL
+- en: So, we declared our `Stream` object in our `using` block and initialized it
+    to open or create a file called `stream_demo_file.txt` in the root of the application
+    executable's directory. Then, once we checked on it, we passed it our byte array
+    and instructed the stream to write that array to its destination resource. But
+    what were those two additional parameters in the `Write` method? Well, in the
+    same way that a stream wouldn't reasonably have any knowledge of what is passing
+    over it, it doesn't know what bytes should be read from the byte array when. It
+    needs the array of bytes, then instructions on where to start reading from, and
+    precisely how many of those bytes it should write. The second parameter in the
+    `Write` method signature is your starting index. It starts at zero, just like
+    the array does. The third parameter is the total number of bytes you want to send
+    in this `Write` operation. There is a runtime error checking on this and if you
+    try to send more bytes than there are left in the array (starting from whatever
+    index you designate), you'll get an index out-of-bounds error.
+  prefs: []
+  type: TYPE_NORMAL
+- en: So, if you navigate to the folder from which the application was run, you should
+    find a new text file. Opening it, you should discover our message; it's as easy
+    as that. But what happens if we run the file again? Will the message be concatenated
+    to the first message that we wrote? Will it overwrite the existing message?
+  prefs: []
+  type: TYPE_NORMAL
+- en: The seek operation
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Run your application again, and then reload the file in a text editor. Whatever
+    you were expecting to happen, you should see no change to the file. However, assuming
+    your application ran successfully, and you saw the Done! message on your console
+    for 10 seconds instead of our error message, you should have confidence that the
+    write operation was executed a second time. So, this should tell you that the
+    operation was successful and it did, in fact, overwrite the value of the original
+    message. It might not be initially obvious, because we used the same message the
+    second time around, but if you want to confirm this behavior, just change the
+    `testMessage` variable in your program to read *Testing writing a different string
+    to a stream* and run it again. You should see the new message and, hopefully,
+    it's a little more obvious what's happening.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Every time we open a stream connected to a data source, we're getting the complete
+    ordered list of bytes stored at that source, along with a pointer to the start
+    of that array. Every operation we execute on the stream moves our pointer in one
+    direction. If we write 10 bytes, we find ourselves 10 positions further down the
+    array than when we started. The same happens if we read 10 bytes. So, each of
+    our primary operators can only ever move in one direction from whatever point
+    along the stream we happen to be at when we start executing them. How, then, do
+    we set those operations up to read or write what we want, where we want? The answer
+    is, with the `Seek()` method.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The `Seek` method gives us arbitrary access to any index in our byte array through
+    the specification of a few simple parameters. Simply specify where you want to
+    start relative to a designated starting position, and then designate the starting
+    position with one of the three values of the `SeekOrigin` enum.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'So, if I wanted to start on the last byte of the current array, and append
+    my current message onto the end of my last message, that would look like the following
+    code block:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE3]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Modify your `using` statement accordingly, and run the program again. Looking
+    into your output file, you should see the following message:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE4]'
+  prefs: []
+  type: TYPE_PRE
+- en: We started with our original byte array, navigated to the end of the stream
+    of written bytes, and then wrote our message from there; easy as that.
+  prefs: []
+  type: TYPE_NORMAL
+- en: This might seem like a trivial thing, but imagine that you're unpacking a message
+    payload whose data is of a variable size. Typically, you'd have a series of headers
+    or a map of your byte array designating the starting index and the total length
+    of the different components of the payload. Using only those two pieces of information,
+    you can navigate directly to the relevant components of the message and read only
+    and exactly as much as you need to. Reducing this kind of data manipulation in
+    the way that the `Stream` class does is incredibly powerful in its simplicity.
+  prefs: []
+  type: TYPE_NORMAL
+- en: But maybe you don't want to write your data to a request stream. Maybe you've
+    written the server code to read from requests and respond to them accordingly.
+    Let's take a brief moment to look at how that's done.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Reading from streams
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'As I said, reading is a one-way operation. Whatever your current index, you
+    will always read from the stream one byte at a time, and in doing so, move your
+    cursor forward by one in the index. So, your next `Read` operation always starts
+    one byte after wherever you last read. The trick here is that every time you want
+    to read anything more than a single byte (which you can simply assign to a variable
+    of the byte type), you have to read it into a destination array. So, you''ll need
+    to declare and assign a target destination array before you can read it. Let''s
+    see this in action; first, though, remove the `Seek` operation so that every time
+    you run your app, you don''t grow your text file:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE5]'
+  prefs: []
+  type: TYPE_PRE
+- en: So, like we did before, we check whether it's even valid to try to read from
+    our stream. Then, we designate a new byte array into which we'll be reading our
+    bytes, and then `Read`, starting at index zero, and reading for 10 bytes.
+  prefs: []
+  type: TYPE_NORMAL
+- en: I'm sure at this point you're seeing a lot of the issues that this approach
+    poses for developers. Even just the use of old-style square-bracket arrays instead
+    of the more flexible and easy-to-work with List classes introduces a number of
+    pain points for developers. In order to use an old-style array as the target of
+    a `Read` operation, you must know the exact size of the array beforehand. This
+    means that you'll either need to explicitly set a predetermined length for your
+    array (and the subsequent `Read` operation), or you'll need to have an assigned
+    variable from which you can determine the initial length of the array (since you
+    can't initialize square-bracket arrays without specifying their length).
+  prefs: []
+  type: TYPE_NORMAL
+- en: This is rigid and tedious to use. It makes your deserialization code brittle.
+    The alternative is to designate a reasonable maximum length and use that value
+    to initialize any byte arrays that will be read to from your data stream. Of course,
+    this approach fixes your software to currently known limitations and makes it
+    inflexible and difficult to extend in the future. All of these are challenges
+    posed by the otherwise elegant simplicity of the `Stream` class definition. Thankfully,
+    though, along with the power of the `Stream` class, comes the simplicity of a
+    number of utility classes .NET Core provides out of the box.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The right stream for the job
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Working with the lowest-level data streams representing your network connections
+    does give you a lot of power and control over exactly how incoming messages are
+    parsed and handled. When performance or security is an issue, that byte-level
+    control is invaluable in providing a skilled developer the tools they need to
+    produce the most optimal solution for the task at hand.
+  prefs: []
+  type: TYPE_NORMAL
+- en: However, most of us won't be writing network code with such high demands for
+    performance or security. In fact, most of the code we write will all follow the
+    same series of simple and straightforward patterns of serialization and message
+    generation. That's where the additional `Stream` classes really come in handy.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Stream readers and writers
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: While it is immeasurably useful to understand how to work directly with data
+    streams and bend their use to your specific purposes when you need to, the simple
+    fact is that most of the time, you won't need to. In fact, over my many years
+    as a software engineer, I can count on two hands the total number of times I've
+    needed to devise my own serialization strategies and implement them with lower-level
+    classes for the sake of performance or security. In my professional career, it's
+    much more common to use simpler, well-established serialization strategies that
+    leverage the utility classes provided by the .NET core library.
+  prefs: []
+  type: TYPE_NORMAL
+- en: On the modern web, the common language for communication is, irrefutably, **Javascript
+    Object Notation** (**JSON**). This simple specification for composing and parsing
+    hierarchical data translates so elegantly to almost every data structure you could
+    possibly devise in almost any language that, at this point, it is the transport
+    format of choice for almost every API or web service being written today.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Like everything we've talked about so far, its power comes from its simplicity.
+    It's a string representation of data with simple rules for delimiting and nesting
+    different objects and their respective properties. And while the hierarchy of
+    a JSON object is rigidly defined, the order of properties within that object is
+    entirely arbitrary, giving users a high degree of flexibility and reliability.
+  prefs: []
+  type: TYPE_NORMAL
+- en: With such a ubiquitous standard for serialization, it should come as no surprise
+    that there are widely supported and easy-to-use tools for working with objects
+    in JSON notation. Not only that, but since simple strings account for so much
+    of what we read and write between data sources on a network, there are `System.IO`
+    classes designed explicitly for working with them over streams.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Newtonsoft.Json
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Let's familiarize ourselves with a non-Microsoft library that was so reliably
+    popular it was ultimately adopted by Microsoft as the official library for parsing
+    JSON in C# and .NET. The more you work with network transactions, the more you
+    will come to appreciate the powerful simplicity of the `Newtonsoft.Json` library.
+    There's not a whole lot to it, so let's take a moment now to take a peek under
+    the hood, since we'll be relying on it quite a bit going forward.
+  prefs: []
+  type: TYPE_NORMAL
+- en: It's important to know that while `Newtonsoft.Json` remains the library of choice
+    for JSON parsing in C#, Microsoft has actually developed an alternative approach
+    for .NET Core 3.0\. The new library has been added as the `System.Text.Json` namespace.
+    However, where `Netwonsoft.Json` is written for user-friendliness, providing a
+    rich set of easy to leverage features, the focus of this new JSON library is on
+    performance and fine-grained control over the serialization process. As a result,
+    the feature set of the `System.Text.Json` library is severely limited when compared
+    to `Newtonsoft.Json`. Since we're more concerned with the fundamental concepts
+    behind JSON serialization than with performance, we'll be using `Newtonsoft.Json` as
+    our library of choice throughout this book.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'To get started with it, you''ll need to include the library into your project.
+    If you''re using Visual Studio Code, it''s as simple as entering the following
+    command into the Terminal window of the editor:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE6]'
+  prefs: []
+  type: TYPE_PRE
+- en: If you're using Visual Studio, you can simply right click on your project's
+    Dependencies in your Solution Explorer, and select Manage NuGet Packages. From
+    there, search for `Newtonsoft.Json` and install the package.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Once you have it available, we''ll want an object with a little bit of complexity
+    to it to really show off what `Newtonsoft` can do. So, let''s add a model definition
+    to our project by adding a new file named `ComplexModels.cs` and define a few
+    classes inside:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE7]'
+  prefs: []
+  type: TYPE_PRE
+- en: Here, we have one type with properties that are instances of another type and
+    lists of instances of another type. Notice that I'm using the inline property
+    initialization feature that was added with C# 6\. This allows us to ensure the
+    initialization of each member of our class without having to define the default
+    constructor to do so. So, just by adding up an instance of our `ComplexModel`,
+    we will have one fully initialized.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Now, I'm sure you can imagine the pain of trying to traverse that nested structure
+    on your own and then parsing it into a well-formed serialized string. And that's
+    for an object that we got to define ourselves! Consider the added complexity of
+    writing a generic serialization code for any object that you might need to travel
+    over your own network stream classes. It would be a mess of recursion or reflection
+    and a whole bunch of other tedious and time-consuming tasks that few developers
+    enjoy doing.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Thankfully, we often won''t have to. If we wanted to take an instance of the
+    class we just defined and write it to our data stream, it''s as simple as a single
+    line of code to generate the output string. Let''s re-work our sample program
+    to start with an instance of our new `ComplexModel` class, and then use `Newtonsoft.Json`
+    to serialize it into something more stream-friendly:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE8]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'In that simple declaration in the second line of our method, we convert our
+    model into a complete string representation fit for serialized transport. Run
+    the program and then inspect your destination file once again. You should find
+    yourself with a nest of double-quote-delimited property names and their values,
+    and curly and square braces galore. Going the other direction is as simple as
+    passing in your JSON string to the `Deserialize<T>()` method, as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE9]'
+  prefs: []
+  type: TYPE_PRE
+- en: And just like that, you can cleanly and reliably serialize and deserialize your
+    data into a well-understood and widely-used format for network messaging.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The specification of the JSON notation isn't outside the scope of this book,
+    but it should look pretty familiar to you if you have any experience programming
+    JavaScript. Otherwise, I'd recommend checking out the MDN article on the subject
+    here: [https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/JSON](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/JSON).
+  prefs: []
+  type: TYPE_NORMAL
+- en: And if you ever need help organizing a JSON string into something a little more
+    well-structured, you can paste it into [http://jsonlint.com](https://jsonlint.com/) to
+    validate that the structure is well-formed, and get a prettified version of the
+    string.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The StreamReader and StreamWriter classes
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: So, if we can easily and efficiently serialize almost any object we can conceive
+    of to a string, surely (you must be thinking) there is an easier way to write
+    to and read from streams, directly with strings.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Of course, there is; you knew it when you started this section. Enter the ever-versatile
+    `StreamReader` and `StreamWriter` classes. Each of these classes is explicitly
+    designed to read/write strings specifically. In fact, they both sub-class the
+    `TextReader` class from the `System.IO` namespace, and extend its functionality
+    to interface directly with byte streams. They are tailor-made to work with strings,
+    and each of them, combined with the simplicity of `Newtonsoft.Json`, can make
+    short work of transporting even the most complex data structures over the wire.
+    So, let's see how to use them for the purposes of our network streams.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'First, we want to get our stream, just as before, with the `using` statement,
+    as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE10]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'However, before we do anything else, we also want to initialize our `StreamWriter`
+    instance, providing our stream as its initialization parameter:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE11]'
+  prefs: []
+  type: TYPE_PRE
+- en: There are a number of constructors for `StreamReader`/`StreamWriter` that accept
+    encoding specifications, byte order mark detection, and buffer size for buffered
+    streams. However, for network programming, we'll always be using the constructors
+    that accept a `Stream` as their first parameter. The constructors that accept
+    strings only ever create `FileStream` instances pointing to a local file path.
+    Even though we're using a `FileStream` here for demonstration purposes, for real
+    network programming, we'll want to connect directly to a data stream to a remote
+    resource. To do so, we'll have to initialize the stream (likely an instance of
+    the `NetworkStream` class) first, and then provide that to our writer/reader instances.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Once the `StreamWriter` is initialized, writing is as simple as calling `Write(string)`
+    or `WriteLine(string)`. Since the class assumes it will be working with strings,
+    our example method is simplified as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE12]'
+  prefs: []
+  type: TYPE_PRE
+- en: And in only five lines of code, we're successfully serializing a complex, nested
+    object instance, and writing it to our output stream.
+  prefs: []
+  type: TYPE_NORMAL
+- en: When working with strings from remote resources, knowing the specific encoding
+    with which to translate the incoming bytes is key. If a character is encoded as
+    UTF32, and decoded using ASCII, the result wouldn't match the input, rendering
+    your output string a garbled mess. If you ever find a message that you've parsed
+    to be indecipherable, make sure you're using the right encoding.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Since these classes are designed to work exclusively with string content, they
+    even provide useful extensions, such as a `WriteLine(string)` method that will
+    terminate the string you've passed in with a line terminator character (in C#,
+    this defaults to a carriage-return followed by a line feed, or `\r\n`, though
+    you can override this value based on your environment). Meanwhile, the `ReadLine()`
+    method will return characters from your current index up to and including the
+    next line terminator in the buffer. This isn't terribly useful with a serialized
+    object, since you don't want to read a line of a JSON string. However, if you're
+    working with a plain-text response, it can make reading and writing that response
+    a breeze.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Seek versus Peek
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'One caveat that may not be obvious, however, is the difference in changing
+    your current index with a `StreamWriter` or `StreamReader` instance. With the
+    `Stream` class and its sub-classes, we simply applied the `Seek` operation to
+    move through our byte array by a given number of positions forward from a given
+    starting point. However, when you''re working with the writer/reader utility classes,
+    you''ll notice that you don''t have that option. The wrapper classes can only
+    move forward with their base operations using the current index on the stream.
+    If you want to change that index, though, you can do so simply by accessing the
+    underlying stream directly. It''s exposed by the wrapper classes through the `BaseStream`
+    property. So, if you want to change your position in the stream without performing
+    the operations of the wrapper, you''d use the `BaseStream`''s `Seek` operation,
+    as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE13]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Modifying the `Stream` class that is underlying the wrapper class will directly
+    change the position to which the wrapper class can write. After running this code,
+    our output file should look like the following screenshot:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![](img/7cc5e128-8c9b-4c5f-bb7e-bc803f86b255.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: The first 10 characters of our output are `null` because the underlying `Stream`
+    class had its write index shifted forward by 10 characters!
+  prefs: []
+  type: TYPE_NORMAL
+- en: It's not uncommon to forward search through a string until arriving at a terminating
+    character or flag value. Doing so with the `StreamReader.Read()` operation will
+    result in moving the index past the terminating character and popping the terminating
+    character off the array. If you want to simply read the last character before
+    the terminating character, though, you have the `Peek()` operation. `Peek()` will
+    return the next character in the array without advancing the current index of
+    the `StreamReader`. This little tidbit can provide a fair bit of flexibility when
+    you're determining when to stop reading a segment from a string whose length is
+    indeterminable.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The NetworkStream class
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: While we're looking at the right streams for the right job, we should take a
+    moment to look at the `NetworkStream` class. Operating much the same as the `FileStream`
+    class that we've been using in our sample code thus far, its underlying data source
+    is an instance of the `Socket` class connected to an external resource. Other
+    than designating the underlying `Socket` connection for the stream to read from
+    and write to, however, it functions almost entirely the same as the `FileStream`
+    class. The various `Read`, `Write`, and `Seek` methods behave exactly as you've
+    seen with our local file samples. And, just as importantly, an instance of `NetworkStream`
+    can be used as `BaseStream` of an instance of the `StreamReader` and `StreamWriter`
+    classes, so sending raw text messages over the wire is as easy as it is to write
+    to a local text file. We'll use this class heavily when we start implementing
+    our own socket connections in later chapters, but those will only build on the
+    foundations that we've laid out in this chapter.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Picking up the pace – multithreading data processing
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: So far, we've only looked at trivial examples of read and write operations on
+    our data streams, and we've only done so with the synchronous `Read()` and `Write()`
+    methods. This hasn't been an issue for our 50 or 500 character-long messages and
+    single-purpose test applications. However, it isn't hard to imagine scenarios
+    where the data stream is large enough to take a considerable amount of time just
+    to be read through from start to finish. Imagine requesting a file over FTP that
+    is 200 MB large, or imagine requesting 2 million records from a database table
+    hosted on a remote server. If the process that had to perform those operations
+    was also responsible for responding to user behavior through a graphical interface,
+    the long-running data processing task would render the GUI completely unresponsive. Such
+    behavior would be absolutely unacceptable. To that end, .NET Core provides programmers
+    with the concept of **threads**.
+  prefs: []
+  type: TYPE_NORMAL
+- en: With threads, certain operations can be relegated to background tasks that are
+    executed as soon as is feasible for the host process to do so, but won't block
+    the operations of the main thread of your application. So, with this simple, powerful
+    concept, we can assign our potentially long-running, or processor-intensive operations
+    to a background thread, and mitigates the impact of that operation on the performance
+    of the rest of our application. This performance improvement is the single biggest
+    benefit of working with threads.
+  prefs: []
+  type: TYPE_NORMAL
+- en: This aspect of .NET Core applications is accessed through the `System.Threading`
+    namespace, which provides everything from `ThreadPool` classes to **semaphores**
+    for protecting resources from concurrent access or mutation, to `Timer` classes
+    and `WaitHandles` classes for more granular control over when and how your background
+    threads are provisioned.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Because of the volatile nature of network connections and the unreliable availability
+    of remote resources, any attempt to access data or services from a remote resource
+    should be handled on a background thread. Fortunately, assigning those tasks to
+    a background thread for parallel processing is actually fairly simple to do. All
+    we have to do is start leveraging those asynchronous methods that we've been glossing
+    over until now.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Asynchronous programming for asynchronous data sources
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: If you're not familiar with asynchronous programming then what we're about to
+    talk about may seem a little confusing at first, but I promise that in practice,
+    it's actually quite simple. All it means is performing individual computational
+    tasks out of order, or out of sync. It allows engineers to defer blocking the
+    execution of their program to wait for a long-running task until they absolutely
+    have to. To make this clear, let's look at an example.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let''s imagine we have a method that must have step **A** send a request for
+    a massive amount of data, with step **B** performing long-running calculations
+    locally, and finally, **C** returns the two results as a single response. If we
+    were to read the response from our network request synchronously, then the time
+    it takes to complete our method would be the total of the time for each step, **A** +
+    **B** + **C**. The processing time would look like the following diagram:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![](img/f49cab49-4542-4285-9ef5-1af4af07c091.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'But if we run our web request asynchronously*, *we can let this run in a background
+    task simultaneously with our long-running local process. In doing so, we reduce
+    the processing time down to only the longer of the two tasks between **A** and
+    **B**, plus **C**. Our processing time now looks like the following diagram:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![](img/97e1b9d3-6633-4f70-b879-2360978d1adb.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'Since **C** is the only step that is dependent on **A** to complete processing,
+    we can defer blocking our application code on the completion of **A** until we''re
+    ready to execute **C**. To see what that looks like in code, let''s first say
+    that we have a `ResultObject` class that holds the local and remote information
+    that we want to return to our users. Next, let''s assume that the long-running
+    work being done in part **B** of this method is done in the private local method
+    named (appropriately) `LongRunningSlowMethod()`. So, with those simple assumptions,
+    let''s look at an asynchronous method for processing long-running network requests,
+    as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE14]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'There''s quite a lot going on here, but hopefully, now it''s obvious why we
+    approached these last couple chapters the way we did. Let''s look at this a little
+    at a time; first, notice the method signature, as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE15]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Any method you write that takes advantage of asynchronous operations must be
+    flagged with the `async` keyword in its signature. This tells users of the method
+    that the operations in this method may take a while, and will run on background
+    threads. And you might have noticed, the return type isn''t simply `ResultObject`,
+    even though our return value, `result`, is declared as such at the start of the
+    method. This is because there are only three valid return types for an asynchronous
+    method: `void`, `Task`, and `Task<T>`.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: If your method returns a result, you must wrap that result's type in `Task<>`
+    in your method signature. You do not, however, have to wrap the actual returned
+    value in a `Task<>` object. This is done for you by the compiler when you have
+    an asynchronous method signature. That's how we're able to declare a return type
+    in our method signature that seems to mismatch the declared type of our returned
+    value in the body of our method.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Moving on in our method, we create a `WebRequest` class pointing to our test
+    domain, and then use `StreamWriter` to write our data query directly onto the
+    `WebRequest`''s request stream. What happens next is where it gets interesting,
+    though, that is, we get to call this following line in our code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE16]'
+  prefs: []
+  type: TYPE_PRE
+- en: The result of the `GetResponseAsync()` method that is assigned to our `responseTask`
+    variable is actually notthe `WebResponse` class. Instead, it's a handle to the
+    task that is started in a background thread by the `GetResponseAsync()` method.
+    So, instead of waiting around for the response to come back from our server, `GetResponseAsync`
+    just gives us a handle to the thread that is fetching that response, and then
+    immediately returns the flow of control to the next operation in our method. This
+    allows us to start our `LongRunningSlowMethod()` almost immediately.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Now, since our `LongRunningSlowMethod()` is not asynchronous, the flow of control
+    blocks until it completes executing, and its output is assigned to `result.LocalResult`.
+    Once that''s complete, we can''t actually proceed with the function until we''ve
+    finished getting the result from our web request. Thus, the next line in our program
+    is as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE17]'
+  prefs: []
+  type: TYPE_PRE
+- en: By calling the `await` keyword, we're telling our program that we cannot meaningfully
+    proceed until the awaited operation is complete. So, if the task isn't done yet,
+    the program should now block further execution until it is. This is what I meant
+    by defer blocking the execution of their program. We were able to proceed with
+    executing other, unrelated code while this task was finishing up. It's only when
+    there is no more work that can be done without the result of the asynchronous
+    task that you must block, and await the result. That's what we're doing here with
+    the `await` call.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The result of awaiting this `async` task is whatever was wrapped by the `Task<T>`
+    return type in the `async` method. So in this case, what gets assigned to the
+    `webResponse` variable is the instance of the `WebResponse` class we were expecting
+    earlier.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Now that we have our response, we can read from it. In our next few lines,
+    we instantiate `StreamReader`, and provided it the response stream from the `WebResponse`
+    instance we got back. Finally, we read from the response stream and assign it
+    to our result object:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE18]'
+  prefs: []
+  type: TYPE_PRE
+- en: Note that even though we have no additional code to execute in this function,
+    we still use the `ReadToEndAsync()` method and await the result. The reason for
+    this is because while we don't have anything further to execute in our method,
+    someone invoking our method may be able to defer processing the result we pass
+    back. Using the `await` operator tells the compiler that this is another opportunity
+    for deferred execution, and so when this point is reached in our method, control
+    may well return to the calling method until the result of our method is awaited
+    again. For this reason, it's important to always use async methods wherever available,
+    and use them all the way up the call chain. The performance gains will add up
+    substantially over time.
+  prefs: []
+  type: TYPE_NORMAL
+- en: A final note on blocking code
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: You might notice that there is a `Result` property on the task instance returned
+    whenever you call an asynchronous method. While it may seem tempting to simply
+    use `GetResponseAsync().Result` to avoid having to await your asynchronous operations,
+    as well as avoid having to apply asynchronous patterns all the way up the stack,
+    this is a terrible practice.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Never use `.Result` to access the result of an asynchronous task.
+  prefs: []
+  type: TYPE_NORMAL
+- en: It not only blocks your code by forcing synchronous execution, but it also prevents
+    anyone who is calling your methods from being able to defer execution either.
+    Unfortunately, this is one of the most common mistakes that new developers make
+    when they first start working with asynchronous programming. However, you should
+    almost never mix async and blocking code together. As a very simple rule, if any of
+    your code requires async processing, all of it does.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Summary
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In this chapter, we further built on the foundations from which all network
+    programming in C# is supported. We learned about how .NET encapsulates the basic
+    physical concept of a physical stream of incoming or outgoing bits into an elegantly
+    simple and broadly useful `Stream` class. Then we looked at the best patterns
+    for working with `Stream` through the `StreamWriter` and `StreamReader` wrapper
+    classes. To facilitate the ease with which we could transmit data through those
+    classes, we got our first look at the incredible power of JSON, and the `Newtonsoft.Json`
+    library.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Once we got data streams firmly under our belt, we looked at how to optimize
+    working with them. We talked about the power of multithreading, and what that
+    can mean for performance improvements with long-running tasks and operations.
+    Finally, we took a crash course in asynchronous programming. Learning about how
+    to leverage background tasks and the power of asynchronous method definitions,
+    we saw how we could fully leverage multithreading and background tasks to mitigate
+    the operation latency of potentially long-running operations. Now that we're more
+    comfortably positioned to be working with remote data sources, we'll take the
+    next chapter to learn how to respond to errors from remote data sources.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Questions
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: What does JSON stand for and why is it useful?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: What are the three primary operations available to you through the `Stream`
+    class?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: What is the purpose of a `using` statement?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: What is the most important factor in working with strings through the `StreamReader`
+    and `StreamWriter` classes?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: What is the biggest single benefit of leveraging background threads in your
+    programs?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: What is the most common mistake programmers make when using asynchronous methods?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: What are the only three valid return types of an asynchronous method?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Further reading
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: For more information about these subjects, I'd recommend taking a look at *Multithreading
+    with C# Cookbook,* *Eugene Agafonov,* *Packt Publishing,* at [https://www.packtpub.com/application-development/multithreading-c-cookbook-second-edition](https://www.packtpub.com/application-development/multithreading-c-cookbook-second-edition).
+  prefs: []
+  type: TYPE_NORMAL
+- en: For a deeper dive into modern asynchronous programming practices, you should
+    check out *C# 7.1 and .NET Core 2.0 - Modern Cross-Platform Development,* *Mark
+    J. Price, Packt Publishing*. You can find this at [https://www.packtpub.com/application-development/c-71-and-net-core-20-modern-cross-platform-development-third-edition](https://www.packtpub.com/application-development/c-71-and-net-core-20-modern-cross-platform-development-third-edition).
+  prefs: []
+  type: TYPE_NORMAL

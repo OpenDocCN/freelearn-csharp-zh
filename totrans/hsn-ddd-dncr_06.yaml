@@ -1,0 +1,726 @@
+- en: Acting with Commands
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In the previous chapter, we went through the implementation process for a simple
+    domain model. This model has one entity, and several value objects and domain
+    services. The model represents just one area of our system, and we deliberately
+    kept everything else out of scope. We discussed how the domain model project needs
+    to be isolated from anything else, and how domain services can be part of the
+    model although their implementation can be done in the application layer. Now,
+    we are going to learn about putting our domain model in action. Hitherto, we have
+    not been referencing the domain model from anywhere, which makes it rather useless.
+    To start using the model in our application, we need to be able to call the model.
+    In addition, we need to be able to persist all changes that happen in the model,
+    so we do not lose the system state.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following topics will be covered in this chapter:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Application layer—the outer edge of the onion architecture
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Calling the domain model from the web API
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Persisting the domain model changes
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Technical requirements
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In addition to the technical requirements from [Chapter 5](034423e8-8080-4073-bd08-b98a129384a4.xhtml), *Implementing
+    the Model*, you need to install Docker, because we will be using containers to
+    run necessary infrastructure components, such as databases. Docker is supported
+    on all popular platforms, including Windows, macOS, and Linux. Please refer to
+    the Docker installation documentation ([https://docs.docker.com/install/](https://docs.docker.com/install/))
+    if you need to know more about how to install it.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Outside the domain model
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: We strive to keep our domain model intact from anything that is related to infrastructure,
+    persistence, execution, and communication. This makes the domain model pure and
+    keeps it focused on the business. However, we still need to create the whole system
+    around it, keeping the domain model as the system core.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The whole world of runtime surrounds our domain model, and in this section,
+    we are going to dissect all necessary components that are required to build a
+    proper system and look at how these components need to be bound together, with
+    each other and with the domain model.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Exposing the web API
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Our system needs to have some visibility to users, and therefore, at some point,
+    we will need to build a user interface. This topic is covered as we move on further,
+    but right now we need to be able to expose our application in a way that the future
+    UI can be built on top of it. We expect our system to have more than one UI potentially.
+    Think about a **single-page web application** (**SPA**) and a mobile app. As a
+    backend for both types of frontends, we need to build a web API. I would avoid
+    the term REST API since it is much more than a simple web API and we aren't going
+    to explore this topic in depth. Instead, we will concentrate on making some calls
+    to our domain model via HTTP, to do something useful.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Let's start by creating an ASP.NET Web API controller, where we will put handlers
+    for some of the HTTP endpoints. To do this, we need to add a class to our `Marketplace`
+    project, because right now we will not be working inside the domain model, but
+    outside it.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Before we add a controller, let's create a project folder called `Api`, to put
+    all controllers and related services in one place. We will add different types
+    of components to the application project later on, so it is better to keep things
+    tidy from the beginning.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Public API contracts
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: To serve HTTP requests, we need more than just a controller. The controller
+    needs to accept strongly typed requests, and the collection of those requests
+    will be our public API and the models for those requests will be our contracts.
+    Let's prepare a place where we'll put these models and create a folder called
+    `Contracts`, in the application project.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Contracts are **data-transfer objects** (**DTOs**) and **plain-old** **C# objects**
+    (**POCOs**). It means that they have no logic, they only contain primitive types
+    and do not require any tricks to be serialized and deserialized. Practically,
+    you can add complex types to your DTOs just because some complex types are used
+    in many contracts. An example of such a type could be the `Address` type.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Imagine we have the following contract class:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE0]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'It is very convenient to use the complex type instead of listing all properties
+    for two addresses separately. After we add a new type called `Address`, our contract
+    will be much more compact:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE1]'
+  prefs: []
+  type: TYPE_PRE
+- en: Be aware that complex types add compatibility issues since when you change the
+    type, all contracts that use it will also change and this change will be implicit.
+    Since you have no internal consumers of this contract, you will not be able to
+    see whether the clients that use this contract will be affected. Such information
+    can only be obtained by tests.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Speaking about changes, remember that everything you publish outside of your
+    development machine is considered public. The public API is something that anyone
+    who has appropriate permissions can use. Effectively, this means that you are
+    not in control of who is using your API anymore. Therefore, any change in the
+    published API can potentially break other parts of the system or other systems.
+    Changes in public contracts need to be crafted with care since there are both
+    non-breaking changes and breaking changes.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Some changes in POCO types are considered non-breaking, such as the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Changing property type so any value of the type that was used before can be
+    serialized to the new type. For example, we can change a property from being an
+    integer to string, and it will be compatible.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Adding a new property is also considered a non-breaking change. This is because
+    when we try to deserialize an XML or JSON object that does not have this new property
+    because the sender hasn't updated their contracts yet, most popular serializers
+    will accept it and will use a default value if the value is not supplied.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Our software evolves, and of course, it is not always possible to make non-breaking
+    changes. This means that we should be prepared to make breaking changes. We already
+    discussed how the public API is something that is shared by default as soon as
+    it is made public. Therefore, we need to ensure that when we make a breaking change,
+    everyone who is using the old API will not get exceptions and will be able to
+    work as before, at least for some time. This is done by **API versioning**. You
+    probably have encountered different API versions for popular services such as
+    GitHub or Twitter. For example, while I am writing this, the Twitter API documentation
+    tells me to use this call to get the timeline of the tweet: `GET https://api.twitter.com/1.1/statuses/home_timeline.json`.
+    As you can see, they have `1.1` as part of the URI, and it is their current stable
+    API version. We could assume that they also have other versions and some of those
+    older versions might still be operational and in use. So, in our API, we will
+    also use versioned contracts although we don't expect many changes in the beginning.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We already know what operations we can do with our domain, so we can add some
+    contracts to call these operations from the outside world. Let''s create a file
+    where we put our first contracts. We already have the `Contracts` folder, so we
+    can create a new C# class file called `ClassifiedAds.cs` in this folder. After
+    the file is in place, we can add our first contract there:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE2]'
+  prefs: []
+  type: TYPE_PRE
+- en: Here, we use nested static classes, `ClassifiedAds` and `V1`, as a replacement
+    for namespaces, so we can have more versions in one file when necessary. This
+    method allows us to use static members import to keep code more concise.
+  prefs: []
+  type: TYPE_NORMAL
+- en: What we have here is a *command*. I first mentioned *commands* in [Chapter 1](948b7834-c47c-4321-a91c-2ba58068c52e.xhtml), *Why
+    Domain-Driven Design?*, when we discussed CQRS. Commands allow users and other
+    systems to execute actions in our domain model. When a command is successfully
+    processed, the domain model state changes and new domain events are emitted. Now,
+    when we have one command implemented in code, we need to accept this command coming
+    from the outside world, and we'll use an HTTP endpoint for this.
+  prefs: []
+  type: TYPE_NORMAL
+- en: HTTP endpoints
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'Since the most obvious communication method for APIs nowadays is using synchronous
+    HTTP calls, we will start with this. We will be using the ASP.NET Web API. Therefore,
+    we need to add a controller that will accept our commands. Let''s add a file called
+    `ClassifiedAdsCommandsApi.cs` to the `Api` folder of our executable project, make
+    the class inherit from `Controller`, and add one `Post` method to handle the command
+    that we added in the previous section:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE3]'
+  prefs: []
+  type: TYPE_PRE
+- en: We are not doing anything there yet. Instead, we are creating a web API that
+    will accept commands from the outside world. We will add code that handles these
+    commands later. Remember, this is our adapter for the HTTP infrastructure, which
+    finds its place in the outermost layer of the onion architecture. That's we call
+    this layer** the edge** because there is nothing outside of it, which we can consider
+    a part of our app. The application can have multiple ways to communicate with
+    the outside world, so if we added some other edge, such as messaging, we would
+    expect for this new communication adapter to process the same commands.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Now, we need to add more code to the application startup to make the web API
+    work. There are a few things we need to do to the `Program` class:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Build the configuration.
+  prefs:
+  - PREF_OL
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Configure the web host.
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Execute the web host.
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'To do these operations, we need the `Program` class to look like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE4]'
+  prefs: []
+  type: TYPE_PRE
+- en: There is not much going on here. We ensure that our current directory is where
+    the executable is located because this is where we also can find the configuration
+    file. We then read the configuration, and from the configuration, we create the
+    web host and start it. Right now, we have no configuration file and therefore
+    no configuration, but we will be adding some later.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Now, we are using the `Startup` class to configure services, and it needs some
+    attention as well. In the `Startup` class, we need to configure the web API so
+    it can use our controller. In addition, we need an easy way to interact with the
+    API without having any user interface yet. One nice and easy way is to use Swagger
+    ([https://swagger.io/](https://swagger.io/)) integration with the Web API. Before
+    we can start using it, we need to add a Swagger Web API integration NuGet package, `Swashbuckle.AspNetCore`.
+    With the new `.csproj` file format, the easiest way to do add the integration
+    is probably by adding the package reference directly to the project file. Here,
+    you can see the new content for the `Marketplace.csproj` file, and the changes
+    are highlighted:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE5]'
+  prefs: []
+  type: TYPE_PRE
+- en: The `Swashbuckle.AspNetCore` package might have a different version at the moment
+    you are reading this book. Use the latest available version.
+  prefs: []
+  type: TYPE_NORMAL
+- en: When you save the project file, your IDE will install the package and add the
+    reference to your project.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Now, we can change the `Startup` class, so it registers web API internals,
+    our controller, and all necessary Swagger generation. Also, we add an embedded
+    version of the Swagger UI so we can test our API directly from the browser, without
+    any additional software:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE6]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'With everything in place now, we are ready to start the application for the
+    first time. After pressing *F5*, you should see the following at the console:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![](img/3323e3c0-cb60-4cda-8bb5-71846121e722.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: The application finally runs
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Now, let''s open the Swagger UI by going to `http://localhost:5000/swagger` in
+    the browser. We should see one operation (POST), and when we expand it, the following
+    should appear:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![](img/0cb25b4e-48ce-4930-9a4d-8d82bcfcd8ff.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: Swagger user interface for testing the API
+  prefs: []
+  type: TYPE_NORMAL
+- en: You can click on the Try it out button and send some requests to the API, but
+    it won't do anything because we always return the `200 OK` response.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We completed all the necessary steps to expose a primitive web API endpoint,
+    and have the bootstrap code to support it. We also created one API contract that
+    represents the command to create a classified ad. It is time to make this command
+    work.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Application layer
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The edge—in our case, it is a simple web API—accepts requests from the outside
+    world. The main job for our edge component is to accept some request, sent as
+    a JSON document, XML document, message via RabbitMQ, or any other communication
+    channel and serialization type; convert it to a command; and then ensure this
+    command gets handled.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The edge can, of course, work directly with the domain model, but this would
+    mean we accept the fact that we will always be working with one edge type only,
+    with one communication protocol. Also, edge components are usually heavily dependent
+    on the communication infrastructure—while this is fine for integration tests,
+    creating unit tests for such components might be challenging.
+  prefs: []
+  type: TYPE_NORMAL
+- en: To isolate the communication infrastructure from the actual request handling,
+    we can introduce the application layer. In this layer, we need a component that
+    will accept commands from the edge and use our domain model to handle these commands.
+    Such a component is called** application service**.
+  prefs: []
+  type: TYPE_NORMAL
+- en: If you refer to [Chapter 4](bea6a7db-f270-4c0b-a3c3-bedb4182cafb.xhtml), *Designing
+    the Model*, and look at the picture of the onion architecture, you will find application
+    services between the infrastructure and the domain model. Application services
+    have no dependency on the transport that is used to send commands from the outside.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'However, the services need to have a way to load and store entities, because
+    a typical operation of an application service would be to execute a command like
+    this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![](img/b62dfcda-7863-4220-bcbc-248f4aa5ff68.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: Typical interaction flow
+  prefs: []
+  type: TYPE_NORMAL
+- en: There are a couple of exceptions in this flow. When the application service
+    receives a command that requires creating a new entity, it won't load anything
+    from the entity storage, since there is nothing to load yet. It will create the
+    entity and save it to the entity store. Also, when handling a command requires
+    deleting an entity, the application service will load the entity, but not necessarily
+    save it back. It might just delete this entity from the store instead, but this
+    very much depends on a model. For example, if the business requires keeping all
+    the data, we might just mark the entity as deleted and then persist changes to
+    the entity store.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let''s add a new application service class to our project and write some code.
+    First, we need a new file in the `Api` folder of our executable web API project.
+    Some might argue that application services aren''t part of the API, but for now,
+    we have only one edge and there is no real reason to separate them. The new filename
+    would be `ClassifiedAdApplicationService.cs`, and it has the following code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE7]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Now, we need to call the application service from our API. We need to add the
+    application serves as a dependency to our controller, and in the startup, we will
+    register the dependency in the ASP.NET Core service locator. First, we do the
+    registration. Since our application service class has no dependencies yet, we
+    can use a singleton, so we add one line to the `ConfigureServices` method of the
+    `Startup` class:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE8]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'When this is done, we can add the `ClassifiedAdsApplicationService` class as
+    a dependency to the `ClassifiedAdsCommandsApi` controller and call the `Handle`
+    method from our `Post` method:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE9]'
+  prefs: []
+  type: TYPE_PRE
+- en: In the next section, we will dive into command handling, including saving entities
+    to an entity store and retrieving them. We will add more commands and handlers
+    for those commands too.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Handling commands
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In the previous section, we created a simple web API and learned that the API
+    is the *edge* of our application. The edge talks with the outside world and accepts
+    requests via HTTP or another communication protocol. To execute these requests,
+    we need an *application service* that works as an intermediary between edge components
+    and the domain model. The application service is also responsible for persisting
+    entities.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Going forward, we will learn more about handling commands and persistence. Also,
+    we will discuss handling exceptions and checking whether incoming requests are
+    valid.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The command handler pattern
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'There are several ways to handle commands in CQRS. One established pattern
+    is to use command handlers. It is not specific to CQRS but it is being widely
+    used because it is a very good fit. The command handler is a class that has one
+    method to handle a single command type. For example, we might have a command handler
+    such as this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE10]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Two interfaces are used by the command handler earlier. The interfaces look
+    like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE11]'
+  prefs: []
+  type: TYPE_PRE
+- en: Bear in mind that the `IEntityStore` interface is simplified and not all persistence
+    methods can be represented by such an interface.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Make no mistake, I am not trying to seed the idea of generic repositories in
+    your head. In fact, the entity store is not the exact math of the repository pattern.
+    When the purpose of repositories is to mimic a collection of objects and hide
+    the persistence, the entity store is a complete opposite. It does not represent
+    a collection. It does exactly what it tells you about - persist one single object
+    and retrieves it back. And while generic repositories are often considered as
+    an anti-pattern, I wouldn't apply the same for the entity store interface.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We then can use this command handler in the API:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE12]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'You can see here that we reference the command handler via the `IHandleCommand`
+    interface. It gives us some freedom in choosing the implementation we want to
+    use. To start with, we can register the implementation we already have:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE13]'
+  prefs: []
+  type: TYPE_PRE
+- en: Here, we register the `RavenDbEntityStore` class, which implements `IEntityStore`.
+    We aren't going to look at the actual implementation here, but since `RavenDb`
+    is the document database, such a class could be trivial to implement.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'What we have done so far is very straightforward, but since we are using the
+    `IHandleCommand<T>` interface in our API, we can do something more interesting.
+    For example, we can create a generic command handler that retries failures:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE14]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'We just need to change the service registration to look like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE15]'
+  prefs: []
+  type: TYPE_PRE
+- en: Here, we wrap the actual command handler inside the generic retry handler. Since
+    they both implement the same interface, we can build a pipeline using a composition
+    of these classes. We can continue adding more elements to the chain, such as using
+    a circuit breaker or a logger.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We can add more properties to the command class (remember the weak schema),
+    but the only handler that we might want to change because of this would be the
+    actual command handler. All transient handlers will remain unchanged because we
+    are using the command type, which is a complex type, as a parameter, so the interface
+    definition itself doesn't change.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The command handler pattern is compelling, and it adheres to the **Single Responsibility
+    Principle** (**SRP**). At the same time, each HTTP method in our API would require
+    a separate command handler as a dependency. It is not a big deal if we have two
+    or three methods, but we might have a little more than that. We might predict
+    that we will have more than 10 methods in our classified ad web API, and an adequate
+    number of command handlers, just by looking at the result of our EventStorming
+    session. Command handlers need the entity store as a dependency, and since all
+    web API controllers are instantiated per scope, all command handlers will be instantiated
+    and injected as well, with all their dependencies. It is possible to mitigate
+    the instantiation of a vast dependency tree by using factory delegates instead
+    of dependencies per request, so each method would be able to instantiate its handler:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE16]'
+  prefs: []
+  type: TYPE_PRE
+- en: This approach would require more advanced registration since we aren't using
+    the actual type, but a delegate. Another solution might be to use `Lazy<IHandleCommand<T>>`
+    as a dependency. Again, it will require more complex registration. The registration
+    challenge might be resolved by using another dependency-injection container, such
+    as Autofac, which supports automatic factory delegates and `Lazy<T>` out of the
+    box.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In this book, we will not be using the command handler pattern, but instead,
+    we will implement command handling using the application service. We already started
+    to implement a simple service in this section and will continue in the next section.
+    The command handler detour exists to bring a better overview of useful patterns
+    since no pattern is good enough for all use cases.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Application service
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'In fact, how our application service will look and behave is very similar to
+    a bunch of command handlers. A *classic* application service exposes some methods
+    with multiple parameters, like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE17]'
+  prefs: []
+  type: TYPE_PRE
+- en: Using this kind of declaration is perfectly fine, except it doesn't play that
+    well with the composition. It is not easy to add such an application service to
+    a pipeline, where we have logging, retry policies, and so on. To make a pipeline,
+    we need all our handlers to have compatible parameters, but these methods of `IPaymentApplicationService`
+    just don't allow us to go that way. Every other call in the pipeline must have
+    the same set of parameters, and as soon as we want to add one more parameter to
+    any method, we are doomed to make numerous changes in multiple classes that form
+    our pipeline. This is not something we'd like to do.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Alternatively, we can have one application service class that implements multiple
+    `IHandle<T>` interfaces. This would work, but each command will then require a
+    separate bootstrapping code, although we are adding the same elements to our pipeline:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE18]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Alternatively, we can generalize our application service to handle any type
+    of command, and use the C# 7 advanced pattern-matching feature again (like we
+    did with event handling). In this case, the application service signature would
+    look like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE19]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'All our previous filters for the pipeline, such as the retry filter or the
+    logging filter, can implement this simple interface. Since those classes don''t
+    need to get a hold of the command''s content, everything will work just fine.
+    Our classified ad service would then look like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE20]'
+  prefs: []
+  type: TYPE_PRE
+- en: By implementing our application service like this, we will have a single dependency
+    to handle for all of our API calls, and we keep the door open to compose a more
+    complex command processing pipeline, just as we were able to do with individual
+    command handlers.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Of course, the tradeoff here is that we have one class that handles several
+    commands and some might see it as an SRP violation. At the same time, the level
+    of cohesion for this class is high, and we will see more of it later in this chapter
+    when we will adequately handle several commands and make calls to our application
+    service from the edge.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Let's now add more commands and extend our application service and the HTTP
+    edge accordingly.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'First, we need to get back to our entity and check what actions we can command
+    it to perform. These actions are as following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Set the title.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Update the text.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Update the price.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Request to publish.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: We can add four commands to execute these actions, since we could expect, based
+    on our EventStorming sessions, that this is what our users would like to do.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The expanded commands list would look like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE21]'
+  prefs: []
+  type: TYPE_PRE
+- en: Each command needs to have the ID of the entity it is going to operate on. Other
+    properties are command-specific.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Second, we can extend our edge to accept these commands as HTTP requests. The
+    code for the new API version is as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE22]'
+  prefs: []
+  type: TYPE_PRE
+- en: You might already see some candidates for creating a useful abstraction or routine.
+    You can probably also predict some issues with this code when it will run in production.
+    The preceding edge code also violates an important principle that the API client
+    needs to only sends valid commands to the command handler. In our code, there
+    is nothing that does such checks. Don't worry; we will get back to the API code
+    and solve some of those issues. For now, let's concentrate on the essential bits.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'As you can see, our application service is expected to handle five commands.
+    We need to take care that it does that. The new code for our application service
+    would be the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE23]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Here, we again use the `IEntityStore` abstraction. This interface is very simple:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE24]'
+  prefs: []
+  type: TYPE_PRE
+- en: We will be implementing this interface for different persistence types.
+  prefs: []
+  type: TYPE_NORMAL
+- en: As you can see, handling the `Create` command looks different from handling
+    all other commands. This is natural since when we create a new entity, we need
+    to ensure it does not exist yet. When we handle operations on the existing entity,
+    it works the other way around. In this case, we need to ensure that the entity
+    exists, otherwise, we cannot perform the operation and must throw an exception.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Another thing worth mentioning is that the application service is responsible
+    for translating primitive types, such as string or decimal, to value objects.
+    The edge always uses serializable types that have no dependencies on the domain
+    model. The application service, however, operates with domain concerns; it needs
+    to tell our domain model what to do, and since our domain model prefers to receive
+    data as value objects, the application service is then responsible for the conversion.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The code for handling commands for an existing entity looks very similar to handling
+    updates for existing entities. In fact, only the line where we call the entity
+    method is different. Therefore, we can significantly simplify the `Handle` method
+    by using a straightforward generalization and replace the `switch` pattern-matching
+    operator with the switch expression:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE25]'
+  prefs: []
+  type: TYPE_PRE
+- en: From the application service code, it becomes clear that the application service
+    itself plays the vital role of an intermediary between the application edge and
+    the domain model. An edge could be anything that communicates with the outside
+    world. We used the HTTP API as an example, but it could also be a messaging interface
+    or something entirely different. The important requirement for the edge would
+    be the ability to accept commands, check them, and engage the application service
+    to handle those commands.
+  prefs: []
+  type: TYPE_NORMAL
+- en: When we handle a command, no matter whether we use multiple command handlers
+    or single application service, the sequence of operations is usually very similar.
+    A command handler needs to fetch a persisted entity from the entity store, call
+    the domain model to do the work, and then persist changes. In our example, we
+    only called one method of the entity, but this is not always the case. We will
+    look deeper into this when we discuss the consistency and transactional boundaries
+    in the next chapter.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Summary
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In this chapter, we looked at how the intent of our users can be represented
+    as commands that those users send to our system. We learned how these commands
+    can be handled, looked at several examples of the command handler pattern, and
+    then got to the application service.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We looked at API versioning; although it is not directly related to the book
+    topic, the practice is too important to ignore. We will touch upon the versioning
+    topic in [Chapter 10](75bc64ae-a642-42b2-a44a-05ae0cb2b750.xhtml), *Event Sourcing*.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Our application service grew throughout this chapter, and we used one of the
+    latest features of C#, a gift from the functional world, called **advanced pattern
+    matching**. We used this feature to simplify the application service interface,
+    which ended up having just a single method. By doing this, we also enabled using
+    a composition, yet another functional-style approach, to chain command handling
+    with operational concerns, such as logging and retries. We will also look at how
+    this can help us check the validity of commands.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In the next chapter, we will take a closer look at entity persistence. We will
+    learn what types of consistency we need to deal with and how important it is to
+    understand the consistency boundaries.
+  prefs: []
+  type: TYPE_NORMAL

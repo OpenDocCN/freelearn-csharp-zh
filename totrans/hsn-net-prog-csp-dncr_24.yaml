@@ -1,0 +1,721 @@
+- en: Remote Logins and SSH
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In this final chapter, we'll look at how we can implement remote host access
+    and control in .NET Core. Here, we'll create a **S****ecure Shell** (**SSH**) client
+    for remotely accessing computing resources over a network. We'll look at how the
+    SSH.NET library supports making calls to known external resources and explore
+    the underlying source code for the SSH.NET library to understand how it supports
+    SSH in .NET Core. Finally, we'll look at how we can leverage it to perform a variety
+    of operations on external machines over a network.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following topics will be covered in this chapter:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The Secure Shell protocol for remote device access and process execution
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Establishing SSH connections using .NET Core
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Executing remote commands on external machines through the SSH connections
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Technical requirements
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In this final chapter, we'll be using our trusty source code editor, whether
+    that's Visual Studio or Visual Studio Code, and we'll be developing and discussing
+    the source code found in this book's GitHub repository, here: [https://github.com/PacktPublishing/Hands-On-Network-Programming-with-C-and-.NET-Core/tree/master/Chapter
+    19](https://github.com/PacktPublishing/Hands-On-Network-Programming-with-C-and-.NET-Core/tree/master/Chapter%2019).
+  prefs: []
+  type: TYPE_NORMAL
+- en: We'll also be using the free (as in gratis) virtual machine host VirtualBox
+    to set up a false remote host for us to interact with through our SSH software.
+    You can use whatever virtualization software you may already have on your own
+    machine if you want to follow along with the demonstrations in this chapter, though.
+    The important thing is just to have a virtual host to interact with. The installer
+    for VirtualBox can be found here: [https://www.virtualbox.org/wiki/Downloads](https://www.virtualbox.org/wiki/Downloads).
+  prefs: []
+  type: TYPE_NORMAL
+- en: Finally, we'll be using an installation of the Ubuntu operating system to load
+    onto our virtual machine. Ubuntu is free and open source, and a disk image for
+    the OS can be found here: [https://www.ubuntu.com/download/desktop](https://www.ubuntu.com/download/desktop).
+  prefs: []
+  type: TYPE_NORMAL
+- en: Check out the following video to see the code in action: [http://bit.ly/2HYQMSu](http://bit.ly/2HYQMSu)
+  prefs: []
+  type: TYPE_NORMAL
+- en: What is SSH?
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Starting from the beginning, the first step to understanding how we can leverage
+    SSH in our software is to understand what SSH is, and how it works. Put simply,
+    SSH is a network protocol for securely logging into a remote host. Once that remote
+    login has been established, the protocol supports executing and operating remote
+    resources over an otherwise unsecured network. As with all of the protocols we've
+    explored throughout this book, its design is intentionally generalized for use
+    in a wide variety of contexts. So, how did it begin, and how, specifically, does
+    it work?
+  prefs: []
+  type: TYPE_NORMAL
+- en: The origin of SSH
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Originally created in 1995 by Finnish researcher Tatu Ylönen, SSH was created
+    to provide a secure channel over which remote terminal access could be established.
+    Ylönen was motivated by a recent password-sniffing attack that struck the network
+    of the Helsinki University of Technology, where he was working at the time. Recognizing
+    the inherent insecurity of more common (or at least, more common at the time)
+    text-based remote terminal protocols, such as Telnet, rlogin, and FTP, his primary
+    objective was to create sufficiently strong authentication and encryption to ensure
+    the privacy of network communications. Through his work, users could remotely
+    log into machines, and access and operate the remote machine's terminal through
+    their own SSH interface.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The original version, and subsequent minor releases of version 1, was developed
+    by the SSH Communications Security, a privately held cybersecurity company founded
+    by Ylönen. However, as of version 2.0, an IETF working group known as **Secsh**
+    has been responsible for defining and refining the protocol. The Secsh team's
+    work was formalized and accepted as a standard, dubbed **SSH-2**, in 2006.
+  prefs: []
+  type: TYPE_NORMAL
+- en: With the release of SSH-2, the team improved the security and feature set of
+    SSH-1 through the use of improved key-exchange algorithms for establishing symmetric
+    keys for communication. The new version also introduced securely hashed message
+    authentication codes (HMAC codes, not to be confused with the MAC address we discussed
+    in [Chapter 18](80e475d9-e75c-4b52-918f-026ff6aed613.xhtml), *Network Analysis
+    and Packet Inspection*). Among the features that were introduced with SSH-2 was
+    support for multiple parallel terminal sessions over a single SSH connection.
+  prefs: []
+  type: TYPE_NORMAL
+- en: While it was originally built on top of, and released as, free software throughout
+    its earliest releases, the protocol has since fragmented and exists in various
+    open and proprietary implementations and versions. However, developers across
+    the globe continued to have a need for open sourced implementations of the protocol.
+    To solve this, new, open source implementations have been developed and established
+    a strong foothold. This includes the OpenSSH implementation, which was developed
+    by the community of developers behind OpenBSD, and first released in 1999\. Today,
+    OpenSSH is the most widely used implementation of the suite of protocols and features,
+    and it is the only implementation used by modern Windows machines.
+  prefs: []
+  type: TYPE_NORMAL
+- en: If you've ever used GitHub or BitBucket as a remote Git repository, you've likely
+    used OpenSSH already and may not have even realized it. Many Git clients, including
+    Atlassian's source tree, and even the default client, leverage SSH to establish
+    and maintain access credentials between your machine and the remote repository
+    for your code base. The single-sign on mechanism supported by something such as
+    SourceTree is built entirely on OpenSSH. In fact, whenever you start SourceTree,
+    the startup process also starts an instance of the PuTTY SSH client, which SourceTree
+    uses to establish its own connections with your remote repositories. But now that
+    you know what SSH is, we should take a moment to look at how it works.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The SSH protocol design
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'The SSH protocol leverages a client-server architecture, not entirely dissimilar
+    from the application-layer protocols we''ve examined all throughout this book,
+    such as FTP and HTTP. The basic interaction mechanism actually looks very similar
+    to the handshake and security negotiation that takes place in a TLS handshake.
+    The basic interactions are as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The client establishes a connection with the server, notifying the server of
+    a desire to communicate via SSH
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The server acknowledges the request, and responds with public encryption key
+    information with which the client can secure its own subsequent responses until
+    a symmetric encryption scheme can be established
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The server and the client negotiate the security structure for the connection,
+    transmit any necessary keys, and establish a secure, symmetric encryption mechanism
+    for use over the lifetime of the SSH session
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The client is free to securely log on to the remote host, transmitting and executing
+    commands for which their credentials have permissions
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The primary distinction between SSH and something such as TLS is that SSH is
+    explicitly designed to be general purpose and connection agnostic.
+  prefs: []
+  type: TYPE_NORMAL
+- en: This interaction scheme is supported by an architecture, defined by a series
+    of RFCs by the IETF (4251-4256, if you're interested), as a three-tiered system
+    of components with distinct responsibilities. Each tier supports a specific task
+    in the process of establishing and maintaining an SSH session between a client
+    and a server, and they're all well-documented by their respective standards.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The transport tier
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The first of these tiers is the transport layer protocol, or **SSH-TRANS**,
+    which provides secure delivery of messages with all of the functionality you've
+    come to expect from TLS. Since SSH is all about secure communication, it's important
+    that the transport layer provides a strong authentication and encryption mechanism.
+    This should include server authentication (usually through an X.509, or similar
+    certificate validation mechanism), public key encryption, and message verification.
+  prefs: []
+  type: TYPE_NORMAL
+- en: While RFC 4251 notes that the transport layer is likely to be implemented over
+    TCP/IP in most cases, it does leave room for new or alternative protocols. The
+    only aspect of a transport layer protocol that must be in place for SSH is reliability
+    of transport. This rules out UDP and other connectionless protocols as viable
+    transport mechanisms, since connectionless datagram delivery is considered inherently
+    unreliable.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The user authentication tier
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The next, and perhaps most critical, tier of the SSH-2 architecture is the **authentication
+    protocol layer**, or **SSH-USERAUTH**. This is the layer that's responsible for
+    establishing and maintaining a validated identity for any client seeking to connect
+    to an SSH server. According to RFC 4252, the server is responsible for establishing
+    the valid set of authentication methods that the client may use to authenticate
+    themselves. From that set of authentication methods, the client is free to use
+    any available method, and is free to attempt them in any order. According to the
+    RFC, there are three valid authentication methods that a server might list for
+    a client to attempt to authenticate by.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The public key authentication mode
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The first of these and the only one that an SSH-2 server is actually required to
+    support, according to the standard is the `publickey` authentication scheme. However,
+    while there is a requirement that all servers support the ability to use public
+    key authentication, there is no requirement that all clients actually have public
+    keys. The public key scheme behaves very similarly to what we saw in [Chapter
+    13](2b8a5eae-9085-43d1-9e48-5c21513e8339.xhtml), *Transport Layer Security*. When
+    the `publickey` method is specified, the SSH client will send a signature, which
+    has been generated from a private key, to the server. Once received, the server
+    validates the signature as being generated with the user's private key, and upon
+    successful validation, the authentication succeeds for the client.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Client software will typically store a registered private key as an encrypted
+    value on the local system, and restrict access to it from external processes.
+    The SSH client will also, typically, use some form of password authentication
+    prior to generate a public key signature to transmit over the server, though this
+    is not always a requirement.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The password authentication mode
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The next valid authentication mechanism that a server might specify for use
+    by a client is the **password authentication scheme**. While support for the password
+    scheme is not explicitly required by the standard, it is strongly recommended
+    that implementations should support password authentication*.* In this authentication
+    mechanism, much as the name suggests, the connecting client provides a plain text
+    password to the server over a series of packet negotiations.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Since the user authentication layer of the SSH-2 architecture rests on top of
+    the transport layer, the fact that the password is transmitted as plain-text should
+    be mitigated by the secure encryption of the underlying transport protocol. However,
+    RFC 4252 does specify that it is the responsibility of both the server and the
+    client to confirm the confidentiality of the transport layer's encryption mechanism
+    prior to sending the password in plain-text. If either the client or the server
+    determines that there is no encryption, or insufficient encryption, being used
+    by the transport protocol, the password authentication mode should be disabled
+    by both the client and the server.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Whenever a server implements the password authentication scheme, it should also
+    provide a mechanism whereby a user can change or update their password through
+    the SSH connection establishment mechanism, in the event that a user's password
+    has expired. This enables users who would be prompted to enter and update their
+    passage upon authentication to do so through the remote terminal. However, in
+    much the same way that the client and server should validate that the transport
+    layer provides sufficient security prior to allowing the password authentication
+    mode, they must also determine whether there is sufficient support for data integrity
+    prior to supporting a password update mechanism. This is because, if the data
+    was mutated or modified in transit, neither the server nor the client would have
+    knowledge of the discrepancy without some form of integrity check.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Thus, the server would assign the new, mutated password for the user's future
+    authentication attempts, but the client would have no knowledge of the mutation,
+    and would subsequently fail to authenticate with the original, unmodified password.
+    Therefore, if there is no assurance of data integrity provided by either a MAC
+    or HMAC as part of the packets delivered by the transport layer, then the server
+    must disable any password update functionality.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The host-based authentication mode
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The final authentication mode is the `hostbased` mode. This is the only mode
+    that's explicitly noted in the standard as being optional, and it allows users
+    to be authenticated based on the host machine they are connecting from (hence
+    the name). This mode relies on a designated host machine having a private key
+    that's provisioned for a specific individual host machine. The host then generates
+    a signature from that private key, which can be validated by the server using
+    the host's public key. This signature is then validated against the public key and the
+    specific host name. As long as the host name provided with the signature matches
+    the origin of the request, and the server's registry of valid hosts, the authentication
+    succeeds.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The connection tier
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Designed and intended to run on top of both the transport tier and the user
+    authentication tier, the connection tier of the SSH-2 architecture defines the
+    systems that support the various operations and interactions that are available
+    over an SSH connection. Defined in RFC 4254, the connection tier of the stack
+    is described as providing **connection ****channels** over which SSH features
+    can be executed. This includes any remote terminal sessions over which the client
+    can execute remote commands, and port-forwarding sessions, which allow a client
+    to directly access a network connection port on the remote host and listen for
+    incoming requests, and any remote login sessions for navigating within and interacting
+    with the remote host.
+  prefs: []
+  type: TYPE_NORMAL
+- en: According to the RFC, a single SSH connection should implement support for multiplexing
+    multiple channels over the course of a session. These channels are uniquely identified
+    on both ends of the connection, though the identifiers may be different from server
+    to client. Once a channel is opened, though, data can flow between hosts in what's
+    known as a **window**. A window is simply a designated maximum number of bytes
+    that one host can transmit to the other before further data is blocked. Once the
+    window-size is reached, the transmitting host must wait for the window to be adjusted
+    by the recipient host. In this way, windows are used to control the flow of traffic
+    over a given SSH connection channel.
+  prefs: []
+  type: TYPE_NORMAL
+- en: A series of channels provisioned over a given SSH connection establish what
+    is known as an **interactive session**. According to the standard, an interactive
+    session is simply any remote execution of a program by the client, on the server.
+    This can include port or authentication forwarding, session data transfer, or
+    any number of other jobs, tasks, and activities.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The versatility of SSH
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Since SSH is primarily concerned with establishing secure connections over insecure
+    networks, the range of applications for it is quite extensive. It can, of course,
+    provide the remote terminal interaction mechanisms that were part and parcel of
+    the protocols it was designed to replace. It can be used as a passwordless authentication
+    mechanism when established with public/private keys between a client and a server,
+    as is the case with OpenSSH in GitHub and BitBucket.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Use with FTP
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: While FTP can provide a reliable client-server interaction mechanism for transferring
+    files between hosts, it doesn't typically do so in a secure way. To that end,
+    SSH is leveraged heavily whenever security is required for securely copying or
+    transferring files between hosts. In fact, the secure protocol specification for
+    FTP relies on SSH, and is explicitly entitled **SSH File Transfer Protocol,**
+    or **SFTP**. The shells provided by SSH can even allow the **secure copy** (**scp**)
+    Linux program to execute over a remote connection.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'As you may recall from [Chapter 10](ec99753c-1004-4a9f-b651-8d4bb467a879.xhtml),
+    *FTP and SMTP*, FTP leverages two separate and distinct connections for its file
+    transfer interactions: the control connection and the data transfer connection.
+    Interestingly, since FTP leverages these two separate connections, you can optionally
+    apply SSH to either of the two connections, independent of whether or not you''ve
+    also leveraged SSH on the other connection. This exact interaction mechanism is
+    used by the **Fast and Secure Protocol** (**FASP**).'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Use as a network tunnel
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: When properly configured for it, a remote SSH server could provide a number
+    of network security features and functions for the client's interactions with
+    the wider internet, with the ability to facilitate port forwarding, where a client
+    establishes a listening network port and then connects it directly to the input
+    stream for a listening network port on the remote host. In this mechanism, any
+    traffic sent to the port on the remote host will be received and processed by
+    the listening port on the client host. This could allow a client device that is
+    hosted behind a firewall or restricted gateway to establish an SSH connection
+    with a remote device hosted outside the restriction boundaries, and begin listening
+    for unrestricted network access.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Taking that idea further, **OpenSSH** even offers support for a fully encrypted
+    VPN service to operate between the client and the server. This provides fully
+    encrypted interactions between the two hosts by bypassing any gateways, switches,
+    or bridges between the two hosts, thus creating a logical "local" network with
+    secure interactions and restricted access.
+  prefs: []
+  type: TYPE_NORMAL
+- en: While it would be hyperbolic to describe the possible applications of SSH as
+    being endless, they are certainly extensive. So much so as to be worth your curiosity
+    and exploration. With that in mind, let's look at how we can start taking advantage
+    of SSH within our software.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Establishing SSH connections
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: While .NET Core lacks native support for establishing SSH sessions in its own
+    libraries, there are a number of third-party libraries and NuGet packages that
+    can fill that gap. We'll be looking at one of the most popular of those packages,
+    SSH.NET, and seeing how we can use it to connect to a remote machine and start
+    interacting with it through a virtual terminal.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Setting up a remote host
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'For the purposes of this demonstration, we''ll need to set up a remote host
+    for us to SSH into. For this, we''ll be using an Ubuntu virtual machine, configured
+    on our system with **VirtualBox**. We''ll be installing and operating on an Ubuntu
+    image within our machine. To set this up, you''ll want to create a new VM within
+    VirtualBox by clicking the New button and following the wizard. Within the wizard,
+    you''ll be given the option to name your machine and select the OS type (Windows,
+    Linux, macOS X, and so on) and the specific version. For this, we''ll want to
+    select Linux as our type, and Ubuntu 64-bit as our version, as shown here:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![](img/8f55e5ef-2e5a-40bf-97a4-0135153c69a8.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: While setting up your VM, make sure to provision at least enough resources to
+    meet the minimum installation requirements for Ubuntu, including 8 GB of virtual
+    disk space and 2 GB of memory. Once we've got our machine set up, we'll need to
+    install Ubuntu on it. Using the image I referenced in the technical requirements,
+    install Ubuntu on your newly provisioned virtual machine. While you're installing
+    the operating system, make sure that when you're prompted to create a user account,
+    you require a password to login. This will allow us to demonstrate the use of
+    SSH for remote logins.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Once you''ve installed Ubuntu on to the virtual machine you''ve provisioned,
+    you''ll need to enable SSH on the box. To do that, open up the machine''s Terminal
+    and run the following commands:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![](img/9d40a466-3ae6-47e7-ac65-29d8de34f526.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'Once you run that, you should see a long run of installation scripts, after
+    which your SSH server will have been installed. You can check the status of the
+    SSH server by running following commands:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![](img/31e38fd3-f128-4c62-a36b-4e54aed421a1.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: With that done, there are a couple things I want to note about our setup. First,
+    notice that the virtual box is wholly distinct from my own machine, with a unique
+    user and a unique host name. Second, note that the port is listening on port `22`.
+    This is the default port for SSH servers to listen on, and we'll be using this
+    detail when we establish our connection with the remote machine in our C# project.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Finally, we''ll need to know how to interact with our virtual host from our
+    own machine. For that, we''ll be setting up port-forwarding on our virtual machine,
+    so that requests that target the designated port on our host will be forwarded
+    along as requests targeting the designated host in our VM. This will make our
+    lives easier when we want to establish a connection. To do that, you''ll open
+    up the Network settings on your running instance and under the Advanced options,
+    open the PortForwarding dialog. From there, we''ll forward along all of our SSH
+    connection attempts, which will always go to port `22`, to the listening SSH port
+    on our guest host (the virtual machine):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![](img/e5bb45d6-270a-4295-8013-25d916767576.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: Once we have that configured, we'll be able to connect to our virtual machine
+    just by sending a request to our localhost IP address of `127.0.0.1`, and because
+    it's an SSH request targeting port `22`, the request will be forwarded. And, with
+    that, it's time for us to wire up SSH.NET and connect.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Connecting to an SSH server with SSH.NET
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'As with all of our projects, our first order of business is to create it with
+    the CLI. We''ll be using another console app for this demonstration, so navigate
+    to your target directory and run the following in your command prompt:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE0]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Since SSH.NET is not an out-of-the-box library with .NET Core, we''ll need
+    to add the package. You can do this with either the NuGet package manager from
+    within Visual Studio, or by using the .NET Core CLI to install the desired package
+    from within your project file''s directory folder. The CLI command for the latter
+    approach will be as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE1]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Now, when you open up your `Program.cs` file, you can include the reference
+    by adding the following `using` directive:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE2]'
+  prefs: []
+  type: TYPE_PRE
+- en: And, with that, we're ready to establish our connection. The SSH.NET library
+    provides a wealth of abstractions for interacting with your SSH server according
+    to the standard. This includes classes that encapsulate authentication modes,
+    connection information, and, of course, an `SshClient` that we can work with just
+    as simply as the `TcpClient` and `HttpClient` classes.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'For this initial demo, we just want to establish an SSH connection using the
+    login credentials for our remote machine. The purpose is to show you how you can
+    establish remote access to a host using your credentials for that host. We''ll
+    be using the password authentication mode, and passing in the username and password
+    we created for our Ubuntu instance when we installed it on VirtualBox. Then, we''ll
+    create a new `SshClient` and attempt to connect. The code for that is as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE3]'
+  prefs: []
+  type: TYPE_PRE
+- en: In our first line, you can see we're creating an instance of the `PasswordAuthenticationMethod`
+    class, providing our username and password. There are classes for each of the
+    authentication modes we've discussed, including one that we didn't, called the
+    `KeyboardInteractiveAuthenticationMode` class. This class simply provides a way
+    for users to directly authenticate through an open connection terminal, as opposed
+    to passing the credentials back and forth between the client and server.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Once we have our `AuthenticationMethod` class created, we pass it into an instance
+    of the `ConnectionInfo` class. This class simply encapsulates the host, username,
+    authentication method, and optional port specification (defaulting to `22`, of
+    course) to be used when establishing an SSH connection. Finally, that connection
+    information is passed to our `SshClient`. The `SshClient` instance is only initialized
+    with the connection information as an instance property, however. Thus, we still
+    have to explicitly connect to our remote server.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'If you''ve configured your virtual machine as I showed you, and you run the
+    application, you should see the We''ve connected! message in your application''s
+    output. The question, though, is how can we verify that we actually did connect?
+    By looking at the status of our listening SSH server in our Linux VM, we should
+    see that the authentication credentials were accepted:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![](img/d755204a-1681-4632-ab0c-312d0918d701.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: And, just like that, we've remotely logged on to a host over an SSH connection.
+    So, now that we know we can establish a connection, what can we actually do once
+    we're logged on?
+  prefs: []
+  type: TYPE_NORMAL
+- en: Remote execution with SSH
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The SSH.NET library exposes operations on its `SshClient` class to perform everything
+    from a simple command to opening up a shell terminal linked to the remote host.
+    One of the core aspects of SSH, though, is that it is only intended to serve as
+    a communication tunnel to a remote host. Therefore, the connections you can execute
+    and the resources you can take advantage of will always be constrained by the
+    remote host you're interacting with. In our example, we're working with an Ubuntu
+    Linux host, so we're restricted to the commands and features supported by `OpenSSH`
+    servers hosted on Ubuntu. With that in mind, let's look at how we can execute
+    the operations available to us using SSH.NET.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Creating commands in SSH.NET
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'Now that we''ve successfully connected with our remote host using the `SshClient`
+    class, we can use that client to start executing commands on that host. The pattern
+    for this, as defined by SSH.NET, is to create a command, invoke its execution,
+    and then observe its results. Alternatively, if you are executing exceptionally
+    simple commands (as we''ll be doing in this demo), you can create and invoke your
+    command in a single step. The result of invoking a command will always be an instance
+    of the command, which will contain a handle to any output streams returned by
+    the client, as well as the result you obtained when the command was executed.
+    To see what that looks like in code, we''ll be using the Linux `uname` command,
+    which simply returns information about the hardware and operating system kernel
+    for the current host. I chose this because there''s no `uname` command in Windows,
+    so by viewing our result, we can be sure we''re executing the calls against our
+    remote host:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE4]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'It''s relatively straightforward, but it demonstrates the pattern of executing
+    a command, and then using the returned instance of the `Command` class to view
+    the result. By applying those lines of code to our program and then running it,
+    we should see the following result returned from our VM:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![](img/b26e544c-5b0b-4cc2-87ef-4fe9063c2efc.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: As if it wasn't clear from the operating system listed in our result, we are
+    definitely connecting to our Ubuntu VM.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Modifying our remote host
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'To validate that we have the full permissions we should expect when logged
+    in with our administrator accounts, let''s add an additional command to modify
+    the directories on our VM. Then, we can confirm our full user access by confirming
+    the presence of our new directory in our Ubuntu instance. To do this, we''ll add
+    the following line of code to our project:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE5]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'If you''re not familiar with the Linux filesystem standards, the `/home/tuxbox`
+    root directory is the same as navigating to the `C:\Users\tuxbox\` directory in
+    a Windows system. You can see that with this line of code, I intend to create
+    a new directory on my remote machine, directly on the desktop, called `ssh_output`.
+    After running it, I can open up my desktop directly in my VM, and I see the following
+    result:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![](img/a701cebe-5420-4ff2-aaf0-e712634aa7fe.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: And, just like that, we've established a channel of secure communication from
+    our software to a designated remote host.
+  prefs: []
+  type: TYPE_NORMAL
+- en: If you take a little bit of time to explore the documentation, or even just
+    the IntelliSense code suggestions for the SSH.NET library, you'll quickly see
+    that it offers substantially more than we've looked at here. You can quickly and
+    easily designate a port to forward to your remote host's listening ports, or create
+    an entire shell, within a single line of code. The full breadth of features for
+    it are certainly outside the scope of this book, but I'd strongly encourage you
+    to take the features for a spin as you continue to learn and grow in the network
+    programming space. I truly cannot overstate the value of simple, secure access
+    to any remote resource you have configured to provide that kind of access.
+  prefs: []
+  type: TYPE_NORMAL
+- en: For our purposes, though, I'm certain that your newfound understanding of the
+    foundations of SSH, its design principles, and its implementation standards will
+    give you all the tools you need to continue with your own learning. Ultimately,
+    I hope that's what I've done throughout this whole book. My objective was to cover
+    the foundational concepts of network programming and present them in an approachable
+    and engaging way, viewed through the scope of C# development using the .NET Core
+    framework. I sincerely hope I succeeded.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Summary
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: For our final chapter, we took another extremely deep dive into an extremely
+    focused topic. We learned just about everything there is to know about SSH and
+    its use. We spent a fair bit of time learning about the origins and development
+    history of the protocol, as well as some of the features and applications it allows.
+    Next, we took a tour of the various RFCs that define the architecture of SSH.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We learned about each of the three tiers in the architectural design of the
+    protocol, starting with the transport tier and the requirements for security and
+    data integrity that are demanded by the standard. After that, we saw how user
+    authentication was accomplished, looking at how each of the standard authentication
+    modes are defined and typically implemented. Finally, we learned about the connection
+    tier, and how the SSH standard characterizes the multiple, distinct interactions
+    that can be happening simultaneously between two hosts connected over SSH.
+  prefs: []
+  type: TYPE_NORMAL
+- en: With that perspective in place, we were able to explore how we could leverage
+    and interact with SSH in our C# projects. We discovered the SSH.NET library and
+    took it for a spin, interacting with our own remote host. We saw how the library
+    provides clean and intuitively defined abstractions for each of the architectural
+    concepts we discussed earlier in this chapter. Finally, we looked at how we could
+    act on behalf of our users, over SSH, to execute commands on a remote host.
+  prefs: []
+  type: TYPE_NORMAL
+- en: And, with that, we have completed our comprehensive overview of the world of
+    network programming, as seen through the lens of C# and the .NET Core framework.
+    I sincerely hope it was as illuminating and informative and enjoyable for you
+    to read as it was for me to research and write.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Questions
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Why was SSH originally created? What problems did it seek to solve?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: What are some of the more broadly used applications of SSH?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: What are the three tiers of the SSH application architecture?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: What are the three standard authentication modes that are supported by SSH?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: What is a connection channel in the context of SSH?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: What is a window? How is it used?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: What is an interactive session?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Further reading
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: As we wrap up this book, hopefully you've taken many of my suggestions for further
+    reading. This chapter focused, once again, on an advanced and extremely niche
+    topic, for which there isn't much in the way of additional resources. However,
+    if you are still interested in the subject of secure network tunneling, I would
+    recommend the book *Understanding SSL VPN,* by Joseph Steinberg and Tim Speed.
+    It gives a comprehensive look at the ins and outs of how secured VPNs work, and
+    how they are administered. It's certainly something that will be of interest as
+    you carry your new knowledge forward and plumb the depths of network programming.
+    The book is available through Packt Publishing Ltd., and you can find a copy here: [https://www.packtpub.com/networking-and-servers/ssl-vpn-understanding-evaluating-and-planning-secure-web-based-remote-access](https://www.packtpub.com/networking-and-servers/ssl-vpn-understanding-evaluating-and-planning-secure-web-based-remote-access).
+  prefs: []
+  type: TYPE_NORMAL

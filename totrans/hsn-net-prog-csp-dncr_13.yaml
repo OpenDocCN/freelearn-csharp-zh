@@ -1,0 +1,879 @@
+- en: FTP and SMTP
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Having explored the heavy-hitter of application-layer protocols with a chapter
+    on HTTP, it will serve us well to look at some of the other less common protocols.
+    That's what we'll be looking at in this chapter. While HTTP is a general-purpose,
+    workhorse protocol, there are a number of reasons why you might consider using
+    **File Transfer Protocol** (**FTP**) or **Simple Mail Transfer Protocol** (**SMTP**)
+    for specific tasks in your own software, or why those protocols might be leveraged
+    by .NET Core under the hood of some of their more common abstractions. So, in
+    this chapter, we'll see what those reasons might be and learn how to implement
+    those protocols when the situation arises.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following topics will be covered in this chapter:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: How the FTP standard is defined and how C# implements the protocol in .NET Core
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Understanding the processes for securing file transport
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Understanding the nature of SMTP and the role it fulfills
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Technical requirements
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'In this chapter, we''ll be using sample applications available in the GitHub
+    repository for the book here: [https://github.com/PacktPublishing/Hands-On-Network-Programming-with-CSharp-and-.NET-Core/tree/master/Chapter
+    10](https://github.com/PacktPublishing/Hands-On-Network-Programming-with-CSharp-and-.NET-Core/tree/master/Chapter%2010).'
+  prefs: []
+  type: TYPE_NORMAL
+- en: We'll be working mostly with console applications, so you won't need any sort
+    of REST or web client specifically for this chapter.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Also, in this chapter, we'll be writing a client to engage with an FTP server.
+    To that end, we'll need an FTP server we can administer ourselves. I will be using
+    FileZilla for this and recommend you do the same. It's lightweight, stable, and
+    open source. It can be found here: [https://filezilla-project.org/download.php?type=server](https://filezilla-project.org/download.php?type=server). If
+    your development environment doesn't support FileZilla, don't worry. The goal
+    is simply to have a server available and listening for our application to interact
+    with. The demonstrations should be easy enough to follow along with using any
+    FTP server with support for your OS.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Check out the following video to see the code in action: [http://bit.ly/2HYmsHj](http://bit.ly/2HYmsHj)
+  prefs: []
+  type: TYPE_NORMAL
+- en: File transfer over the web
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The first thing to note about FTP and file transfer is that, as an application-layer
+    protocol on the **Open Systems Interconnection** (**OSI**) stack, the primary
+    concern of its design is in optimizing a specific common business task for execution
+    over a network. However, just because a task is optimally done over a given protocol,
+    it doesn't mean it *must *be done over that protocol. Indeed, almost anything
+    done at the application-layer could, in theory, be accomplished by any application-layer
+    protocol. So, what is it that makes FTP useful for us as engineers?
+  prefs: []
+  type: TYPE_NORMAL
+- en: The intent of FTP
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: While FTP is optimized for a file transfer between hosts, I'd wager every dollar
+    I have that there isn't a single reader of this book who hasn't transferred files
+    over a network as an attachment of their email. The same task is accomplished,
+    namely, a file was transferred from one host on a network to another, over that
+    network, but it was accomplished using a different application-layer protocol
+    (SMTP instead of FTP). Indeed, the versatility of the specification for HTTP has
+    allowed it to grow well beyond the task for which it was optimized (transferring
+    hypertext documents) and into a general-purpose workhorse of web communication.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In fact, there are countless applications that transfer files directly over
+    HTTP. There's even a well-known and broadly supported media type for precisely
+    that kind of interaction with `multipart/form-data`. So, what advantages are there
+    to be gained by using FTP for file transfer instead of other more general-purpose
+    application-layer protocols?
+  prefs: []
+  type: TYPE_NORMAL
+- en: Built on a client-server model architecture, FTP is designed and implemented
+    to leverage two separate connections for establishing the state of the target
+    filesystem and transferring files. The first of these connections is what's called
+    a control connection, and it is used to hold various details about the state of
+    the remote host, such as the current working directory exposed to the FTP client.
+    Meanwhile, for each transfer of data, a second data connection is established
+    using information maintained by the control connection. When the data connection
+    is engaged and transferring data, the control connection is idled.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In most implementations, establishing a control connection can be a bit of a
+    pain, and often slow-performing. This is because each connection requires multiple
+    round trips, sending various commands to the remote host establishing the target
+    directory, negotiating any authentication, and determining and storing the remote
+    state for use by the data connection. This high performance cost, as well as the
+    statefulness of the control connection, is what made FTP ill-suited for use in
+    transferring simple, brief hypertext web pages, thus necessitating HTTP. However,
+    that stateful connection and the information it provides a client regarding the
+    current state of the directory is essential to some operations FTP is used to
+    support (such as detecting the presence of a file on a remote host or bulk downloads
+    of all files in a directory).
+  prefs: []
+  type: TYPE_NORMAL
+- en: Active and passive connections
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Once a control connection is established, the data connection can be made using
+    one of two possible modes. The server can establish an active connection, which
+    is the default state for most FTP servers, or a passive connection. These different
+    types of connection refer specifically to how the dataconnection is established
+    and handled. In either case, the client initiates a control connection with a
+    message using the underlying transport protocol (usually **Transmission Control
+    Protocol** (**TCP**)).
+  prefs: []
+  type: TYPE_NORMAL
+- en: In an active connection, once the control connection is established and the
+    data transfer can begin, it's the server that establishes a data connection to
+    transmit the file over the wire. The client transmits information during the command
+    connection phase, notifying the server about which port is actively listening
+    for the data connection. Then the server attempts to establish a connection with
+    the client on the designated port, which is used for the server to push out the
+    file data. The server is said to be *actively transmitting* the data to the client.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In a passive connection, the client uses the control connection to notify the
+    server that the connection should be passive. The server then responds with an
+    IP address and port designation for the client to establish a connection with.
+    At that point, it's the client that establishes the data connection to the server's
+    designated IP address and port. Once this connection is established, the client
+    can transmit the file data.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Transfer modes and data representations
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Once the actual data connection has been established as either active or passive,
+    and the file transfer is ready, there are a number of ways to transmit the file
+    in such a way as to have it readable on the target machine. Keep in mind that
+    a text file written on a Unix system will have different character encodings or
+    line terminals from a text file written on a Windows machine. If you've ever opened
+    up a text editor or source control interface and been prompted to normalize the
+    line endings of your files, this is why. It's a way of accounting for the subtle
+    discrepancies between different native environments.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Since FTP is a platform-agnostic network transmission protocol, it must account
+    for the possible disparities between binary representations of a file''s content
+    on different systems. To that end, FTP provides three different common data representation
+    mechanisms for files being transferred over a connection:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**ASCII mode:** This should only ever be used for text files. The character
+    and bytes are converted from the source machine''s native character representation
+    to an 8-bit ASCII encoding prior to transmission, and then converted, again, to
+    the target machine''s native character representation from that 8-bit ASCII encoding.
+    Of course, if either machine''s native character encoding already is 8-bit ASCII,
+    no conversion happens between that machine and the data connection.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Image (or binary) mode:** In this mode, the underlying binary data of the
+    file on the source machine is sent over, unchanged, in a sequential byte stream.
+    The target machine then stores that stream at the target file location on its
+    local system, byte by byte, as it receives packets from the source.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Local mode:** This is for two computers with a shared local configuration
+    to transfer data in any proprietary representation without a need to convert it
+    to ASCII. It''s not entirely dissimilar to the image mode, except that, where
+    the proprietary format allows, data could be transferred non-sequentially.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Once you''ve determined the best way to represent your data for transmission,
+    though, FTP will also provide three mechanisms for actually executing that transmission.
+    They are as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**Stream mode:** Datagrams are sent as a continuous stream. This has a number
+    of performance advantages, as there''s no need to encapsulate discrete packets
+    in any headers or metadata to enable the parsing. Bytes are simply sent out as
+    they are read until the end of the file is reached on the source system.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Block mode:** This mechanism will chunk the file data into discrete application-layer
+    packets and transfer them one block at a time to the source system, which is then
+    responsible for reconstructing the original file structure based on the information
+    in the packet metadata.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Compressed mode:** This mode simply enables a simple data compression algorithm
+    to minimize the total volume of data sent between hosts.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Exposing directories for FTP
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: All of the features I've described in this section serve the specific purpose
+    of negotiating the efficient transfer of files between two remote hosts. While
+    the protocol obviously would not be well suited for a task such as transferring
+    web pages to be rendered by a remote web browser, it does leverage a number of
+    advantages over other application protocols such as HTTP. This includes giving
+    engineers the flexibility to determine precisely how, and in what format, they
+    can transfer large files.
+  prefs: []
+  type: TYPE_NORMAL
+- en: So, now that we understand how and why FTP is used, let's look at how we can
+    use it in our own programs. We'll be writing a simple client using the .NET library
+    classes. The end state will be a client that can upload and download files, as
+    well as request directory information from the remote host.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Our application will be a console application this time, so navigate via your
+    terminal of choice to your working directory and create a new project:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE0]'
+  prefs: []
+  type: TYPE_PRE
+- en: Next, you'll want to make sure your fileserver is up and running locally. When
+    you install the software, you should have see a window prompting you to choose
+    a port that the server will be listening on for administration connections.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Configuring your FTP server
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: If you read that prompt carefully, you will have noticed that it was very explicit
+    that the port you were choosing was for administrative connections to your FTP
+    server, and not active FTP connections. This is because (if you remember back
+    to the *Reserved ports* section in [Chapter 8](a0c3481a-daca-484d-95f8-f08867c8c7b8.xhtml),
+    *Sockets and Ports*) there is already a default port configured to listen for
+    incoming FTP command connections. Just like how the `80` port is the default listening
+    port for HTTP, the `21` port is the default port for FTP command connections.
+    That means that, in general, connections sent to a URI with a schema of `ftp://...`
+    and no port specification will automatically connect to the `21` port.
+  prefs: []
+  type: TYPE_NORMAL
+- en: This is why the port you configure on FileZilla is explicitly designated as
+    being for administration only. You're not connecting to the FTP command connection.
+    You're connecting to the FileZilla server that is managing that FTP command connection.
+    So, with that in mind, start the server and configure it to point to the localhost
+    and the port you specified at the time of installation.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Once the application starts running, you'll see a notification that FTP over
+    **Transport Layer Security** (**TLS**) is not enabled. Even though this message
+    is written in alarming red text, you can ignore it for now. We'll look at it further
+    when we explore TLS in a later chapter. For now, the lack of security keys will
+    just make our lives a bit easier as we try to understand FTP, specifically. The
+    fewer variables we introduce at once, the easier it is to understand new information
+    as we receive it.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Finally, we need to register a user for our application in the FTP Administration
+    UI, and set a working directory for the user. To do so, click on Edit | Users
+    in the menu on the FileZilla administrator console. Then navigate to the Shared
+    folders configuration page to set which specific directory you want to allow for
+    which specific user:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![](img/9e88207c-72d6-4a40-88a0-c3a2d6b989ce.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: For the purposes of this demo, I'm going to create a new user named `s_burns`,
+    and we'll give that user permissions to access the source code directory of [Chapter
+    9](https://cdp.packtpub.com/hands_on_network_programming_with_c__and__net_core/wp-admin/post.php?post=33&action=edit#post_32), *HTTP
+    in .NET*. Note that the user I created for the FTP server is distinct from my
+    local machine username. When you're writing an FTP client to log in and access
+    a remote directory, you need the credentials for a user that is registered with
+    the FTP server software, not with the host machine. If I were to try to download
+    a file from my local server using my operating system username, I would get an
+    unauthorized exception in response, even with the correct password. The user credentials
+    should always for a user as registered with the server itself, and in general,
+    unless you've written an FTP server to allow open and anonymous connection, you
+    should always be connecting with credentials.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The FTP server itself will have whatever permissions for a given directory are
+    granted to it by the host machine. So, if you run the server in a process where
+    the system identity has limited read-only permissions, that will be the extent
+    of operations it can provide to a client. By default, however, FileZilla is installed
+    with the same privileges granted to the user who initiated the installation. Since
+    I'm a local admin, FileZilla was installed with local admin privileges for my
+    system. However, just because those are the permissions granted to the FileZilla,
+    that doesn't mean that any client connecting to the server with valid credentials
+    will also have local admin privileges. That would be a huge security hole! Instead,
+    when registering a new user for your server, the administrator (you, in this case)
+    grants that new user individual permissions for writing, reading, and deleting
+    files in the shared directory. For the purposes of this chapter, just create yourself
+    a new user with full permissions.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Writing an FTP client
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Now we'll want to set up our application for interacting with our running FTP
+    server. Some of you may remember from [Chapter 5](b2bbfe0e-f0de-49ca-a3c8-b8ced18e42bf.xhtml),
+    *Generating Network Requests in C#*, that I mentioned the `FtpWebRequest`/`FtpWebResponse`
+    subclasses of the `WebRequest` utility class. If you do, you're already well ahead
+    of me now. These are the primary mechanisms through which .NET Core apps interact
+    with FTP servers, and they are what we'll be leveraging to satisfy the requirements
+    for this program.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Fetching a directory listing
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'We''ll request an instance of the `FtpWebRequest` class and then use its methods
+    to view directory information about our listening FTP server. The instance will
+    be pointing to `ftp://localhost`, which, as I mentioned, defaults to port `21` without
+    actually specifying it, thanks to the `ftp://` schema. Just as HTTP has methods
+    for interacting with the server, FTP has its own methods for determining how it
+    intends to interact with the server. In code, that is set with a series of static
+    constant properties that are used by the `FtpWebRequest` class to determine how
+    to initiate the desired behavior:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE1]'
+  prefs: []
+  type: TYPE_PRE
+- en: The difference between HTTP methods or verbs and the `.Method` property you
+    can set for `FtpWebRequest` is how they operate under the hood. As we saw in [Chapter
+    9](e93c024e-3366-46f3-b565-adc20317e6ec.xhtml), *HTTP in .NET*, an HTTP method
+    is specified as a header on the request itself. If the method is permitted for
+    the address specified, then the rest of the request is simply parsed and processed
+    right away, and a response generated. In an FTP connection, however, the `Method` property
+    you set on the `FtpWebRequest` instance is actually an abstraction for a sequence
+    of commands sent to the server over the FTP command connection. The `FtpWebRequest`
+    client will actually send the appropriate commands over its underlying TCP connection,
+    and only proceed if it gets the expected responses from the server throughout
+    the entire exchange.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Now, before we can request the information we asked for with the server, we
+    need to authenticate our application as acting on behave of a registered user
+    of the server. For that, we''ll use the helpful utility class, `NetworkCredential`.
+    This class encapsulates the basic concept of a username and password, and maps
+    it to the underlying representation necessary for an authenticated network request.
+    So, instead of having to worry about whether your authentication mechanism is
+    a basic authentication or digest authentication, this class just lets you think
+    of it in terms of your login information. Simply instantiate a new instance of
+    it with the login credentials of the FTP user you created in FileZilla''s administration
+    application, and apply those credentials to your request:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE2]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'And once we''re logged in, we can interact with the request object the same
+    as we did back in [Chapter 5](b2bbfe0e-f0de-49ca-a3c8-b8ced18e42bf.xhtml), *Generating
+    Network Requests in C#. *We''ll request the response for our request, and then
+    read the response data stream with `StreamReader`, writing the results to our
+    output to confirm our expected results:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE3]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Now simply await a call to this method in your `Main` method, and observe the
+    results. Since the user I registered in my FTP server only has permissions for
+    the root of the source code directory of [Chapter 9](e93c024e-3366-46f3-b565-adc20317e6ec.xhtml), *HTTP
+    in .NET*, I see the following output in my console when I run my application:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![](img/ed84409e-a37b-4943-bc91-42d54493fc62.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'If you''ve never seen the string of characters at the start of each of those
+    lines before, those are codes that define the permissions you have for each file
+    in the directory listing. If there is a letter present, it means the permission
+    or status is true for that folder. The structure is as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE4]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The directory flag indicates whether the entry listed is, itself, a directory
+    that can be navigated to and have files pulled from it. If `d` is present at the
+    start of the entry, it''s a folder containing files, not a file itself. Next is
+    the permission sets for each kind of user that might want to interact with it.
+    These are groupings of three characters indicating which permissions members of
+    the set have for the file listed. In the order they are displayed, those characters
+    are as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`r`: read'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`w`: write'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`x`: execute'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: So, for each set, there are three characters that are either set or null (represented
+    here as a `-` character) indicating whether that set has the permission.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Using this, we can see that, for the files in our directory, `FitnessApp` and
+    `FitnessDataStore` are both directories (they have `d` at the start of their permissions
+    record), and both of them have the following permissions for each group:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Owner: Read, write, and execute permissions'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Group: Read and execute permissions'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Other: Read and execute permissions'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Meanwhile, we can see that the `fitness_data.txt` file is not a directory,
+    and the permissions for each group for that listing are as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Owner: Read and write permissions'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Group: Read-only access'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Other: Read-only access'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: After the permissions, you see the current owner and group for the file (in
+    this case, FTP) then the file size in bytes (0 for a directory), the last modified
+    date, and the name of the file or sub-directory. So, here we can see that our
+    FTP server is listed as the owner of our files and thus the permissions `rwx`
+    are available for it to grant to users.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Now that we''re successfully connected to our FTP server and able to access
+    the directory information for the directory we have access to with our credentials,
+    let''s look back at how the server responded to that request. If you have your
+    FileZilla server administration console open, you would have seen all of the interactions
+    between our running application and the server show up in the server console:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![](img/d05d00e4-787b-4a84-a035-1865d1833051.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: Note that the first line indicates that the TCP connection was initiated on
+    `21`, even though we never specified the port in our URI. That first line beginning
+    with a timestamp is the initiation of the command connection. From there, every
+    blue line in the console indicates a signal sent from our application to the server,
+    and each green line represents the response from the server. The upper-case four-letter
+    words and abbreviations sent from our application are all FTP commands from the
+    FTP standard for interactions, and they were all sent by our application code
+    without us even realizing it. This all happened under the hood of our application
+    software just because we set our request method to `WebRequestMethods.Ftp.ListDirectoryDetails`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Transferring a file
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: So, now that we understand how the command connection to an FTP server is initiated
+    under the hood, and how that allows us to open a data connection, let's use that
+    to actually request a file. We'll use the same request processing structure we
+    saw for building a request and then fetching the response back in [Chapter 5](b2bbfe0e-f0de-49ca-a3c8-b8ced18e42bf.xhtml),
+    *Generating Network Requests in C#*. This should all feel pretty familiar at this
+    point, but I will take advantage of a few of the `FtpWebRequest` class's specific
+    properties to highlight some of the options at your disposal. So, let's write
+    the method to download a file.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The first thing we''ll do differently will be specifying the sub-directory
+    path for the file we want to look up. We''ll just use the `Startup.cs` file from
+    FitnessApp, so it''s easy enough to confirm that we transferred it correctly.
+    Then, we want to set the request `Method` property to the value of `WebRequestMethods.Ftp.DownloadFile`.
+    Finally, we''ll explicitly notify our server to operate in passive mode, which
+    means our application will, behind the scenes, establish its own connection to
+    the remote server on `20` (the default connection port for data connections to
+    an FTP server) and then request the file once the connection is open. So, the
+    initialization code for our download method will look like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE5]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Now, to copy the file, we''ll be reading directly out of the response stream,
+    and writing it into `StreamWriter` for our destination file. This will look complicated
+    because of the nested scope, but all those tabs are only there to handle contexts
+    for each disposable `Stream` object and its respective `Reader` or `Writer` helper
+    class:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE6]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Now let''s add a call to this method to our `Main` method, which should look
+    like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE7]'
+  prefs: []
+  type: TYPE_PRE
+- en: If you run this project from your terminal, your output should list the directory
+    structure, and when navigating to the root of the project, we should find our
+    `Copy_Startup.cs` file, looking exactly as we expect it to!
+  prefs: []
+  type: TYPE_NORMAL
+- en: Uploading a file via FTP
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: To complete this sample client, let's look at uploading to the server. Remember,
+    it's the FTP, not the file download protocol. File transmission can go both ways.
+    For this method, we'll be converting our file to a byte stream to upload to pass
+    along with our request once the connection is established.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We''ll also be pointing our `WebRequest` URI to the new yet-to-be-created file.
+    We''ll just be copying the `Program.cs` file from our current project to the root
+    of the remote directory. So, let''s see how the initialization code looks:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE8]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'So far, so good. Now we''ll need to create a byte array and write our `Program.cs`
+    file to it. Then, write that byte array to the request stream. This should be
+    pretty familiar territory for you after [Chapter 6](b5d28c0a-6e7c-4547-855d-e6c6d1842bd6.xhtml),
+    *Streams, Threads, and Asynchronous Data Transfer*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE9]'
+  prefs: []
+  type: TYPE_PRE
+- en: Finally, to actually transmit the request to upload our file and the data stream
+    with that file's contents, we just have to request a response from the server.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE10]'
+  prefs: []
+  type: TYPE_PRE
+- en: And with that, we're uploading a file to our remote FTP server. Simply add a
+    line to our `Main` method, and run the application. If you've configured your
+    server the same way I did, you should now see a copy of the program we just wrote
+    sitting in the root directory for the [Chapter 9](e93c024e-3366-46f3-b565-adc20317e6ec.xhtml), *HTTP
+    in .NET*,  source code, right next to the `FitnessApp` and the `FitnessDataStore`
+    project folders.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Securing FTP requests
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: While you may suspect that the act of providing user credentials to our server
+    meant there was some measure of security involved in our file access, we were
+    actually interacting with our server in an entirely unsecure manner. Those credentials
+    were only of value the moment they were received by the server and our command
+    connection was established. After that though, they provided no more security
+    of the data we were transmitting than if we had allowed entirely anonymous access
+    to our directory. So, let's look at why that is, and how to fix it.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The risks of FTP
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: With our example software, there isn't any real concern for security because
+    our data is never transmitted over an actual network connection. Our requests
+    are never making it past our `hosts` file, because we are always pointing to `localhost`.
+    However, if that wasn't the case, and we needed to authenticate with a remote
+    server, and we did so using the standard FTP connection we set up for this demo,
+    we'd be in trouble. Those credentials we used to log in to the server were sent
+    entirely in plain text. Furthermore, the data connection that was eventually established
+    was also sent over the wire in an entirely unsecured fashion.
+  prefs: []
+  type: TYPE_NORMAL
+- en: If we attempted to communicate with a remote server using only the server credentials
+    we provided, we would have been at risk of falling prey to a variety of different
+    malicious attacks. Imagine a simple man-in-the-middle attacker reading the byte
+    stream for a file containing **Personally Identifiable Information** (**PII**),
+    such as a social security number, medical information, or bank account details.
+    The FTP standard isn't actually designed to account for that kind of risk. What's
+    more, since the file transfer mechanisms are negotiated ahead of time via the
+    command connection, the actual file data is usually sent as an uninterrupted stream
+    of bytes, easily re-assembled and read by a malicious party. Simply accept the
+    underlying packet stream in order, remove the standard transport layer headers,
+    and concatenate the bytes as they are received. For this reason, it's generally
+    pretty risky to use standard FTP connections outside of the context of a well-protected
+    private network.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Securing FTP with SFTP and FTPS
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: While there are security concerns inherent to FTP, there are, fortunately, a
+    couple of approaches that you can take to mitigate your exposure to those risks.
+    The two we'll be looking at both seek to make it substantially more difficult
+    for a malicious actor to interfere with or read the content of your files in transit.
+    So what are they?
+  prefs: []
+  type: TYPE_NORMAL
+- en: SFTP
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Our old friends the **Internet Engineering Task Force** (**IETF**) designed
+    a new standard for file transfer interactions that leveraged the **Secure Shell**
+    (**SSH**) protocol for authentication and secure tunneling. Dubbed **SSH File
+    Transfer Protocol**, or **Secure File Transfer Protocol** (**SFTP**), it was built
+    as an extension to SSH that provisioned file transfer capabilities where they
+    didn't previously exist.
+  prefs: []
+  type: TYPE_NORMAL
+- en: This application protocol provides security by establishing a secure tunnel
+    between the two host machines. All data is sent that via tunnel once the client
+    host has been authenticated by the server host machine (as opposed to the simple
+    server-user authentication of our example in the previous section). This is not
+    entirely dissimilar to simply transferring files over a VPN. It simply uses a
+    different security protocol. This mechanism is less an implementation of FTP with
+    security, though, and more an extension to SSH to also provide FTP functionality.
+    As such, the out-of-the-box support for it in .NET Core is almost non-existent.
+  prefs: []
+  type: TYPE_NORMAL
+- en: FTPS
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: While SFTP exists as a file transfer subsystem added as an extension to SSH,
+    the alternative approach for encrypting traffic sent over an open connection (one
+    that hasn't established a secure tunnel between hosts) is to use what's called
+    FTPS. An abbreviation of FTP over SSL, or FTP Secure, FTPS leverages the encryption
+    mechanisms of the underlying transport layer to provide encryption for data transferred
+    between hosts. This is almost exactly the same mechanism that underlies the HTTPS
+    protocol we looked at in [Chapter 9](e93c024e-3366-46f3-b565-adc20317e6ec.xhtml),
+    *HTTP in .NET*.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In modern implementations, this will use the secure transport mechanism of whatever
+    underlying transport-layer protocol is being used by the FTP client. Today, that
+    means that it's often leveraging TLS, but historically the encryption mechanism
+    of choice has been SSL. Thus, when you want to configure your FTP clients to leverage
+    FTPS, you simply set the `EnableSsl` property on your `FtpWebRequest` object to
+    true. Then, provided your server supports FTP over TLS (or SSL), you'll be taking
+    advantage of it every time you connect.
+  prefs: []
+  type: TYPE_NORMAL
+- en: While there is a fair bit more to say on the subject of SSL and TLS and the
+    security they provide, that's the subject of a later chapter. So, for now, just
+    follow the simple rule of always using FTPS in your code where possible. The risks
+    are just not worth it.
+  prefs: []
+  type: TYPE_NORMAL
+- en: SMTP and MIME
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Finally, we'll round out our exploration of the application-layer protocols
+    with what is probably the second most common protocol (behind HTTP). And yet,
+    as commonplace as it is, I would guess that a staggering number of people who
+    benefit from SMTP don't even know it exists. So, what is it? How would we use
+    it, and why would we use it?
+  prefs: []
+  type: TYPE_NORMAL
+- en: The email protocol
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'First defined all the way back in 1982, the **Simple Mail Transfer Protocol**
+    (**SMTP**) is the de-facto protocol for transmitting electronic messages. It''s
+    a connection-oriented protocol using the client-server architecture we''ve become
+    so familiar with over the course of this book. Similar to FTP, SMTP transactions
+    happen over a sequence of commands and responses transmitted over a dedicated
+    SMTP session. Those commands notify the server of what the addressing information
+    is for a message (the To: and From: components of an email), transmit the message
+    itself, and finally confirm receipt of the message.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Unlike FTP, though, these interactions all happen over the same single connection
+    to the server. Once a connection is established to the server (usually on the
+    default SMTP port, `25`, for those who were curious), that connection constitutes
+    a session*.* Once that session has begun, the commands sent by the server are
+    received and responded to until all of the components of the message have been
+    transmitted and the session is terminated.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The important thing to note about SMTP is that it is entirely about the *outbound*
+    transmission of a new message. There is no mechanism in the protocol itself to
+    request messages back from a server. Applications that maintain a mailbox for
+    users to access are doing so by leveraging entirely different messaging protocols,
+    such as the **Internet Message Access Protocol** (**IMAP**) or the **Post Office
+    Protocol** (**POP**). However, while those protocols are useful to update your
+    phone's mail app, the application will still depend on SMTP to transmit any new
+    messages you want to send to a remote address.
+  prefs: []
+  type: TYPE_NORMAL
+- en: This outbound-only property and the need for software implementing various distinct
+    protocols to meet the expectations of users of an email app means that the full
+    process of managing the receipt and delivery of email can be a painful one. It
+    typically involves multiple subsystems working in tandem to process every step
+    of the transaction reliably.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Extending SMTP with MIME
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Having been defined in 1982, there are a number of limitations to SMTP when
+    implemented strictly according to the standard. This includes the range of valid
+    character encodings and alternative representations of certain content, such as
+    images or sounds, directly in the message body of an email. To that end, IETF
+    extended the protocol with the **Multipurpose Internet Mail Extensions** (**MIME**).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'MIME provides users with the following: non-ASCII character representation;
+    audio, image, video, and application attachments; multipart message bodies; and
+    additional context and metadata in the message headers. Interestingly, this is
+    where SMTP overlaps the most with HTTP. Even though MIME was originally designed
+    and implemented as an SMTP extension, the ability to specify the character encoding
+    and data structure of an incoming message was quickly identified as a useful feature
+    for other application protocols transmitting text content. Naturally, it was adopted
+    into use by HTTP in no time. `MIME-type` is the name of the value of the `ContentType`
+    header sent with HTTP messages that contain a message body, and this is exactly
+    how the extension is used by SMTP.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Hopefully, these commonalities between SMTP, FTP, and HTTP highlight for you
+    just how much of the core application-layer protocol implementations are similar
+    to one another.
+  prefs: []
+  type: TYPE_NORMAL
+- en: SMTP in .NET Core
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: There are a lot of reasons why you might want to incorporate SMTP into your
+    software. Maybe you want to give users a feedback mechanism for emailing the development
+    team directly, and you want to do that with an SMTP client behind the scenes.
+    Or maybe you want to wire up your error-handling infrastructure to send out emails
+    to the support staff whenever exceptions of an unacceptable nature start getting
+    thrown by your application. Whatever the case, you'll likely need a client for
+    building those mail messages and sending them out to the target recipient.
+  prefs: []
+  type: TYPE_NORMAL
+- en: While there are solutions for just such a problem available to you, they are
+    not currently provided by Microsoft or the .NET Core framework. While the .NET
+    Framework contained a `SmtpClient` class which, along with a `MailMessage` class,
+    and could be used to generate and send automated emails to a valid SMTP server,
+    those classes didn't make it into the spec for the .NET Core 1.0 release. They
+    did make it into the initial .NET Core 2.0 release, but almost as soon as they
+    arrived, they were deprecated by Microsoft for insufficient support for modern
+    features of the protocol. What's more, in their deprecation notes, they explicitly
+    state that they deprecated the libraries because they were "poorly designed."
+    I took this to mean "not designed well enough to grow with the protocol."
+  prefs: []
+  type: TYPE_NORMAL
+- en: So, now, instead of their internal libraries, Microsoft recommends using a third
+    party called MailKit, the source control and documentation for which can be found
+    here: [https://github.com/jstedfast/MailKit](https://github.com/jstedfast/MailKit).
+  prefs: []
+  type: TYPE_NORMAL
+- en: So, while there is support for robust message generation for SMTP, the nature
+    of the interactions is such that we won't be covering them here. Instead, I'll
+    just allow this to serve as an example as to why you should always check on the
+    status of any libraries you've used in the past before you incorporate them into
+    a new project. Even if they were excellent when you last used them, the march
+    of progress might have rendered them obsolete and deprecated before you managed
+    to use them in a new project. And with that, we can move on from the application-layer
+    protocols and start looking at the lower-level transport layer that makes it all
+    possible.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Summary
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In this chapter, we covered a lot of ground on some of the most common application-layer
+    protocols still in use today. We looked at how different protocols were designed
+    and optimized to perform different distinct tasks. Then we looked at exactly how
+    FTP is optimized to perform its task of remote file transfer and directory lookup.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We learned how FTP uses two separate connections to communicate between clients.
+    We saw how the command connection is set up to initialize the transfer of files,
+    negotiate authentication, and determine the mechanism for the subsequent data
+    connection. We looked at the variety of ways FTP can format the file for data
+    transmission, and the various transmission techniques an FTP connection can be
+    configured for. We also leveraged our FTP server admin console to observe the
+    under-the-hood interactions going on between our application and the remote server
+    when we were leveraging the high-level abstractions of the .NET `FtpWebRequest`
+    and `FtpWebResponse` classes.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Once we were able to programmatically interact with our server, we looked at
+    what sort of security considerations need to be made for FTP and got a general
+    sense for how that was accomplished.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We wrapped up this chapter by looking at another common application-layer protocol
+    with SMTP. We compared and contrasted its implementation with that of FTP and
+    HTTP to understand what it does well, and then looked at its future on the .NET
+    Core platform with the deprecation of the .NET libraries and the endorsement of
+    third-party open source solutions. With that topic rounding out our exploration
+    of the application layer of the OSI stack, we're well positioned to finally take
+    a deep dive into the lower-level software components that enable all of this.
+    In the next chapter, we'll finally be looking at the transport-layer protocols
+    that make HTTP, FTP, and SMTP possible in the first place.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Questions
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: What are the primary differences between FTP and HTTP?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: What are the two phases of FTP connections? How do they work?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: What are the two modes for data transfer in FTP and how are they different from
+    one another? When should you use one over the other?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: What are the three modes of FTP data transfer?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: What are the three ways to encode data in transit in FTP? When should they be
+    used?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: What are the definitions of SMTP and MIME? How do they relate to one another?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: How is SMTP distinct from HTTP or FTP?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Further reading
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: If you're interested in some of the ways others have used FTP and SMTP libraries,
+    you can check out *.NET Standard** 2.0 Cookbook,* by* Fiqri Ismai**l*. There's
+    a chapter dedicated to networking applications that includes an SMTP implementation.
+    You can find it here: [https://www.packtpub.com/application-development/net-standard-20-cookbook.](https://www.packtpub.com/application-development/net-standard-20-cookbook)
+  prefs: []
+  type: TYPE_NORMAL

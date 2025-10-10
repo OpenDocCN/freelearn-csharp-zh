@@ -1,0 +1,2851 @@
+- en: '9'
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Caching, Queuing, and Resilient Background Services
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In this chapter, you will be introduced to multiple technologies and techniques
+    that will improve the scalability and reliability of your services, no matter
+    what service technology you choose to implement them with.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'This chapter will cover the following topics:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Understanding service architecture
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Caching with ASP.NET Core
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Fault tolerance with Polly
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Queuing with RabbitMQ
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Implementing long-running background services
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Understanding service architecture
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In *Chapter 8*, *Building and Securing Web Services Using Minimal APIs*, you
+    learned how to build a web service using ASP.NET Core Minimal APIs. Before looking
+    at alternative technologies to build services, it is worth taking a step back
+    and reviewing service architecture and what causes bottlenecks in service performance
+    and scalability.
+  prefs: []
+  type: TYPE_NORMAL
+- en: What parts of a system are slowest?
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Traditionally, the slowest parts of a system are:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The network (slowest)
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The disk
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Memory
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: CPU cache memory (fastest)
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Each step can be 5 to 10 times slower than the next.
+  prefs: []
+  type: TYPE_NORMAL
+- en: However, networks are much faster than they used to be, and systems often run
+    within remote data centers. Imagine your service needs some data. Is it faster
+    to read from the local server disk or to make a call to another server?
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Server-to-server call within the same data center: 500,000 nanoseconds (ns)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Disk seek: 10,000,000 ns'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Numbers every (developer) should know
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Jeff Dean, a Google Fellow, quotes in his presentations the actual times in
+    nanoseconds (ns) for various technologies to access or read data. They are shown
+    in *Table 9.1*, and I have added a column to scale the numbers to be more comprehensible
+    to a human:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '| **Technology** | **Actual** | **Humanized** |'
+  prefs: []
+  type: TYPE_TB
+- en: '| CPU cycle | 0.1 ns | 1 second |'
+  prefs: []
+  type: TYPE_TB
+- en: '| L1 cache reference | ½ ns | 5 seconds |'
+  prefs: []
+  type: TYPE_TB
+- en: '| L2 cache reference | 5 ns | 1 minute |'
+  prefs: []
+  type: TYPE_TB
+- en: '| Mutex lock/unlock | 25 ns | 4 minutes |'
+  prefs: []
+  type: TYPE_TB
+- en: '| Main memory reference | 100 ns | ¼ hour |'
+  prefs: []
+  type: TYPE_TB
+- en: '| Send 1K byte over 1 Gbps network | 10,000 ns | 28 hours |'
+  prefs: []
+  type: TYPE_TB
+- en: '| Read 1 MB sequentially from memory | 250,000 ns | 29 days |'
+  prefs: []
+  type: TYPE_TB
+- en: '| Round trip within same datacenter | 500,000 ns | 2 months |'
+  prefs: []
+  type: TYPE_TB
+- en: '| Read 1 MB sequentially from SSD | 1,000,000 ns | 4 months |'
+  prefs: []
+  type: TYPE_TB
+- en: '| Disk seek | 10,000,000 ns | 3¼ years |'
+  prefs: []
+  type: TYPE_TB
+- en: '| Read 1 MB sequentially from disk | 20,000,000 ns | 6¼ years |'
+  prefs: []
+  type: TYPE_TB
+- en: '| Send packet CA->Netherlands->CA | 150,000,000 ns | 47½ years |'
+  prefs: []
+  type: TYPE_TB
+- en: 'Table 9.1: Nanosecond times for various technologies to access or read data'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**More Information**: *Designs, Lessons, and Advice from Building Large Distributed
+    Systems*, by Jeff Dean, [http://www.cs.cornell.edu/projects/ladis2009/talks/dean-keynote-ladis2009.pdf](http://www.cs.cornell.edu/projects/ladis2009/talks/dean-keynote-ladis2009.pdf).'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The point is not to debate if reading from drives or SSDs is faster or not than
+    network calls. It is more about being aware of the differences between getting
+    data that’s close and data that’s far away. The orders of magnitude are comparatively
+    massive.
+  prefs: []
+  type: TYPE_NORMAL
+- en: For example, if a CPU needs to process some data and it is already in the L1
+    cache, then it takes the equivalent of 1 second. If it needs to read the data
+    from memory, it takes the equivalent of a quarter of an hour. If it needs to fetch
+    that data from a server in the same data center, it takes the equivalent of 2
+    months. And if it is in California and the data is in the Netherlands, it takes
+    the equivalent of 47½ years!
+  prefs: []
+  type: TYPE_NORMAL
+- en: This is why caching is so important. Caching is about temporarily storing data
+    as close to where it will be needed as possible.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Caching with ASP.NET Core
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Caching can enable our systems to copy some data from a remote data center to
+    a local data center, or from a server or disk to memory. Caches store data as
+    key-value pairs.
+  prefs: []
+  type: TYPE_NORMAL
+- en: However, one of the hardest parts of caching is getting the balance right between
+    storing enough data and keeping it fresh. The more data we copy, the more resources
+    we use. And we need to consider how we will keep the copies synchronized with
+    the original data.
+  prefs: []
+  type: TYPE_NORMAL
+- en: General caching guidelines
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Caching works best with data that costs a lot to generate and does not change
+    often.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Follow these guidelines when caching:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Your code should never depend on cached data. It should always be able to get
+    the data from the original source when the data is not found in the cache.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Wherever you cache data (in-memory or in a database) it is a limited resource,
+    so deliberately limit the amount of data cached and for how long by implementing
+    expirations and size limits. You should monitor cache hits (when data is successfully
+    found in the cache) to obtain the right balance for your specific scenarios.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: In the coding tasks in this section, you will implement all of these guidelines.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Let’s start by reviewing the caching technologies built-in to ASP.NET Core.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Building a controller-based Web API service
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'To explore various caching technologies, let’s build a basic web service:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Use your preferred code editor to create a new Web API controller-based project,
+    as defined in the following list:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Project template: **ASP.NET Core Web API** / `webapi --use-controllers`
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Solution file and folder: `Chapter09`
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Project file and folder: `Northwind.WebApi.Service`
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Authentication type**: **None**'
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Configure for HTTPS**: Selected'
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Enable Docker**: Cleared'
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Use controllers**: Selected'
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Enable OpenAPI support**: Selected'
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Do not use top-level statements**: Cleared'
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Make sure to select the **Use controllers** checkbox or specify the `--use-controllers`
+    or `-controllers` switch. We will not use minimal APIs, which is the default way
+    a Web API is implemented using the .NET 8 project templates. If you use JetBrains
+    Rider, you might want to use the `dotnet new` command until Rider supports a **Use
+    controllers** option.
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: 'Add a project reference to the Northwind database context project for the SQL
+    Server that you created in *Chapter 3*, *Building Entity Models for SQL Server
+    Using EF Core*, as shown in the following markup:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE0]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: The path cannot have a line break. If you did not complete the task of creating
+    the class libraries in *Chapter 3*, then download the solution projects from the
+    GitHub repository.
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: 'In the project file, change invariant globalization to `false`, and treat warnings
+    as errors, as shown in the following markup:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE1]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Explicitly setting invariant globalization to `true` is new in the ASP.NET
+    Core Web API project template with .NET 8\. It is designed to make a web service
+    non-culture-specific so that it can be deployed anywhere in the world and have
+    the same behavior. By setting this property to `false`, the web service will default
+    to the culture of the current computer it is hosted on. You can read more about
+    invariant globalization mode at the following link: [https://github.com/dotnet/runtime/blob/main/docs/design/features/globalization-invariant-mode.md](https://github.com/dotnet/runtime/blob/main/docs/design/features/globalization-invariant-mode.md).'
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: 'At the command prompt or terminal, build the `Northwind.WebApi.Service` project
+    to make sure the entity model class library projects outside the current solution
+    are properly compiled, as shown in the following command:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE2]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'In the `Properties` folder, in `launchSettings.json`, modify the `applicationUrl`
+    of the profile named `https` to use port `5091` for `https` and port `5092` for
+    `http`, as highlighted in the following configuration:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE3]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: Visual Studio 2022 and JetBrains Rider will read this settings file and automatically
+    run a web browser if `launchBrowser` is `true`, and then navigate to the `applicationUrl`
+    and `launchUrl`. Visual Studio Code and `dotnet run` will not, so you will need
+    to run a web browser and navigate manually to [https://localhost:5091/swagger](https://localhost:5091/swagger).
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: Delete the file named `WeatherForecast.cs`.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: In the `Controllers` folder, delete the file named `WeatherForecastController.cs`.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'In `Program.cs`, import the namespace to add the `NorthwindContext` to configured
+    services, as highlighted in the following code:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE4]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: In the `Controllers` folder, add a new class file named `ProductsController.cs`.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'In `ProductsController.cs`, modify its contents to define a controller-based
+    Web API to work with products in the Northwind database, as we did for minimal
+    APIs, as shown in the following code:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE5]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: If your database server is not running, for example, because you are hosting
+    it in Docker, a virtual machine, or the cloud, then make sure to start it.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Start the web service project using the `https` profile without debugging.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: If you are using Visual Studio 2022, then select the **https** profile in the
+    drop-down list, and then navigate to **Debug** | **Start Without Debugging** or
+    press *Ctrl* + *F5*. A web browser should navigate to the Swagger documentation
+    web page automatically.
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'If you are using Visual Studio Code, then enter the command `dotnet run --launch-profile
+    https`, manually start a web browser, and navigate to the Swagger documentation
+    web page: [https://localhost:5091/swagger](https://localhost:5091/swagger).'
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: On Windows, if prompted to do so, you will have to set the Windows Defender
+    Firewall to allow access to your local web service.
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: 'Use Swagger to test the various endpoints, and note the SQL statements logged
+    to the output as you do so, for example:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Get the first page of 10 products.
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Get the 6th page of 10 products.
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Get the product with an ID of 77.
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Get the single out-of-stock product.
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Get the seven discontinued products.
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Get products whose names start with `cha`.
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Create (`POST`), update (`PUT`), and delete a product. For hints about how
+    to perform these tests, read the following link: [https://github.com/markjprice/apps-services-net8/blob/main/docs/ch09-swagger-tests.md](https://github.com/markjprice/apps-services-net8/blob/main/docs/ch09-swagger-tests.md).'
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: If you completed *Chapter 8*, *Building and Securing Web Services Using Minimal
+    APIs*, then instead of manually using Swagger, you can use the `.http` files we
+    created to test the minimal API web service. Just change the port from `5081`
+    to `5091`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Now that we have a basic web service, we can start activating caching in it.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Caching objects using in-memory caching
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: The `IMemoryCache` interface represents a cache that uses local server memory.
+    If you have multiple servers hosting your service or website, then you must enable
+    “sticky sessions.” This means that an incoming request from a client or visitor
+    will be directed to the same server as previous requests from that client or visitor,
+    allowing the request to find the correct cached data in that server’s memory.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The `Microsoft.Extensions.Caching.Memory` package has a modern implementation
+    of `IMemoryCache`. Avoid the older `System.Runtime.Caching`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Sizes are defined using custom units. If you store simple `string` values, then
+    you could use the length of the string. If you don’t know the size, you could
+    just use 1 unit for each entry to simply limit the number of entries.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'When you add an object to a cache, you should set an expiration. There are
+    two types, absolute and sliding, and you can set one or the other, both, or neither:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**Absolute expiration**: This is a fixed date/time, for example, 1am on December
+    24, 2023\. When the date/time is reached, the object is evicted. To use this,
+    set the `AbsoluteExpiration` property of a cache entry to a `DateTime` value.
+    Choose this if you need to guarantee that at some point the data in the cache
+    will be refreshed.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Sliding expiration**: This is a time span, for example, 20 seconds. When
+    the time span expires, the object is evicted. However, whenever an object is read
+    from the cache, its expiration is reset for another 20 seconds. This is why it
+    is described as *sliding*. A common duration for a **Content Management System**
+    (**CMS**), where content like a web page is loaded from a database, is 12 hours.
+    Content frequently viewed by visitors, like the home page, is then likely to remain
+    in memory. To use this, set the `SlidingExpiration` property of a cache entry
+    to a `TimeSpan` value. Choose this if it is acceptable for data to potentially
+    never be refreshed. A good CMS will have an additional mechanism to reliably force
+    a refresh when new content is published, but this functionality is not built into
+    .NET caching.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Both expirations**: If you only set a sliding expiration, an object may stay
+    in the cache forever, so you might also want to set the `AbsoluteExpirationRelativeToNow`
+    property to a `TimeSpan` further in the future, after which the object should
+    definitely be evicted. Choose this if you want the best of both worlds.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Never**: You can set a cache entry to have a priority of `CacheItemPriority.NeverRemove`.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: You can also configure a method to call back to when an object is evicted from
+    the cache. This allows you to execute some business logic to decide if you want
+    to add the object back into the cache, perhaps after refreshing it from the original
+    data source. You do this by calling the `RegisterPostEvictionCallback` method.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let’s explore the in-memory cache:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In the `Northwind.WebApi.Service` project, in `Program.cs`, import the namespace
+    to work with the in-memory cache, as shown in the following code:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE6]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'In `Program.cs`, after the call to `CreateBuilder`, in the section for configuring
+    services, register an implementation for the in-memory cache, configured to store
+    a maximum of 50 products, as shown in the following code:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE7]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'In `ProductsController.cs`, import the namespace to work with the in-memory
+    cache, as shown in the following code:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE8]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'In `ProductsController.cs`, declare some fields to store the in-memory cache
+    and a key for the out-of-stock products, as shown in the following code:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE9]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'In `ProductsController.cs`, in the `GetOutOfStockProducts` action method, add
+    statements to try to get the cached out-of-stock products, and if they are not
+    cached, get them from the database and set them in the cache, using a sliding
+    expiration of five seconds, as highlighted in the following code:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE10]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: Start the web service project using the `https` profile without debugging.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Arrange the windows so that you can see the command prompt or terminal at the
+    same time as the web page.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: On the Swagger web page, click **GET /api/product/outofstock** to expand that
+    section.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Click the **Try it out** button.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Click the **Execute** button, and note in the output that EF Core executes
+    a SQL statement to get the products, the total hit counter is zero, and one product
+    has now been cached, as shown in the following output:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE11]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Click **Execute** within five seconds, and continue to click it a few more
+    times:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Note that EF Core does not need to re-execute the SQL statement because the
+    products are cached, and if something reads them within a five-second sliding
+    expiration, they will stay in memory forever.
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Note the total hit counter for the cache increments each time the out-of-stock
+    products are found in the cache, as shown in the following output:'
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[PRE12]'
+  prefs:
+  - PREF_IND
+  - PREF_IND
+  type: TYPE_PRE
+- en: Wait at least five seconds.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Click **Execute**, and note in the output that EF Core executes a SQL statement
+    to get the products because they have not been read within the five-second sliding
+    expiration window.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Close the browser and shut down the web server.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Caching objects using distributed caching
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Distributed caches have benefits over in-memory caches. Cached objects:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Are consistent across requests to multiple servers.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Survive server restarts and service deployments.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Do not waste local server memory.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Are stored in a shared area, so in a server farm scenario with multiple servers,
+    you do not need to enable sticky sessions.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Warning!** A disadvantage of distributed caches is that in-memory caches
+    can store any object, but a distributed cache can only store `byte` arrays. Your
+    object needs to be serialized and sent across a network to the remote cache.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Microsoft provides the `IDistributedCache` interface with pre-defined methods
+    to manipulate items in any distributed cache implementation. The methods are:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`Set` or `SetAsync`: To store an object in the cache.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`Get` or `GetAsync`: To retrieve an object from the cache.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`Remove` or `RemoveAsync`: To remove an object from the cache.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`Refresh` or `RefreshAsync`: To reset the sliding expiration for an object
+    in the cache.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'There are many implementations of distributed caching to choose from, including
+    the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'SQL Server: [https://learn.microsoft.com/en-us/aspnet/core/performance/caching/distributed#distributed-sql-server-cache](https://learn.microsoft.com/en-us/aspnet/core/performance/caching/distributed#distributed-sql-server-cache)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Redis: [https://learn.microsoft.com/en-us/aspnet/core/performance/caching/distributed#distributed-redis-cache](https://learn.microsoft.com/en-us/aspnet/core/performance/caching/distributed#distributed-redis-cache)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'NCache: [http://www.alachisoft.com/ncache/aspnet-core-idistributedcache-ncache.html](http://www.alachisoft.com/ncache/aspnet-core-idistributedcache-ncache.html)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: We will use the **Distributed Memory Cache**, which is a Microsoft built-in
+    implementation of `IDistributedCache` that stores items in memory on the server
+    where the service runs.
+  prefs: []
+  type: TYPE_NORMAL
+- en: It is not an actual distributed cache, but it is useful for scenarios like unit
+    testing, where you want to remove the dependency on yet another external service,
+    or while learning, as we are doing in this book.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Later, you only need to change the configured distributed cache, not the service
+    implementation code that uses it, because all interactions go through the registered
+    `IDistributedCache` implementation.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Let’s go!
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In the `Northwind.WebApi.Service` project, in `Program.cs`, after the call
+    to `CreateBuilder`, in the section for configuring services, register the implementation
+    for the distributed memory cache, as shown in the following code:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE13]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'In `ProductsController.cs`, import the namespace for working with a distributed
+    cache implementation and serialized JSON, as shown in the following code:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE14]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'In `ProductsController.cs`, declare some fields to store the distributed cache
+    implementation and an item key for discontinued products, as highlighted in the
+    following code:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE15]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'In `ProductsController.cs`, define a `private` method to get the discontinued
+    products from the database, and set them in the distributed cache, using a sliding
+    expiration of 5 seconds and an absolute expiration of 20 seconds, as shown in
+    the following code:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE16]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'In `ProductsController.cs`, in the `GetDiscontinuedProducts` action method,
+    add statements to try to get the cached discontinued products, and if not cached,
+    get them from the database. If a `byte` array is found in the cache, try to deserialize
+    it into products, but if that fails too, get the products from the database, as
+    highlighted in the following code:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE17]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: Unlike the in-memory cache that can store any live object, objects stored in
+    distributed cache implementations must be serialized into `byte` arrays because
+    they need to be transmittable across networks.
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: Start the web service project, using the `https` profile without debugging.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Arrange the windows so that you can see the command prompt or terminal at the
+    same time as the web page.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: On the Swagger web page, click **GET /api/product/discontinued** to expand that
+    section.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Click the **Try it out** button.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Click the **Execute** button, and note in the output that EF Core executes a
+    SQL statement to get the products.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Click **Execute** within five seconds, continue to click it a few more times,
+    and note that EF Core does not need to re-execute the SQL statement because the
+    products are cached. If something reads them within a five-second sliding expiration,
+    they will stay in memory forever.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Wait at least five seconds.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Click **Execute**, and note in the output that EF Core executes a SQL statement
+    to get the products because they have not been read within the five-second sliding
+    expiration window.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Continue to click **Execute** repeatedly, and note that after 20 seconds, EF
+    Core must execute a SQL statement to refresh the products.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Close the browser and shut down the web server.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: A new abstraction for distributed caching
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: The ASP.NET Core team is working on adding a new abstraction for distributed
+    caching to make it easier to use. It is not expected to be ready for .NET 8\.
+    It might be included in a point release, like 8.1, but more likely will be built-in
+    with .NET 9.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Some `GetAsync` extension methods and supporting methods have been written by
+    Marc Gravell. He maintains the most popular package to integrate .NET with Redis,
+    so he has a lot of experience with distributed caching.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'While we wait for an official implementation, you can read or download the
+    source code to his extensions at the following link: [https://github.com/mgravell/DistributedCacheDemo/blob/main/DistributedCacheExtensions.cs](https://github.com/mgravell/DistributedCacheDemo/blob/main/DistributedCacheExtensions.cs).
+    The file is only 137 lines long, so it is easy to add to your own projects straight
+    away.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The main difference in the new extension methods is that you do not need to
+    call the `Set` or `SetAsync` methods anymore because they are abstracted away
+    inside the new `GetAsync` methods, as shown in the following code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE18]'
+  prefs: []
+  type: TYPE_PRE
+- en: Also, note that the new extension methods are all asynchronous and generic,
+    with a type `T` that will be serialized as JSON by default, but this can be overridden
+    to use alternatives like the binary format protobuf.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**More Information**: You can learn more about the plans for these new extension
+    methods at the following link: [https://devblogs.microsoft.com/dotnet/caching-abstraction-improvements-in-aspnetcore/](https://devblogs.microsoft.com/dotnet/caching-abstraction-improvements-in-aspnetcore/).'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Caching web responses using HTTP caching
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: In-memory and distributed caching work with any type of app or service, using
+    any transport technology, because all the magic happens on the server.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Response aka HTTP caching is tied to HTTP GET requests and responses because
+    it is based on HTTP headers. Therefore, it only works with apps and services that
+    use HTTP as their transport technology, like web services built using Web APIs,
+    minimal APIs, and OData.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**More Information**: You can read the official standard for HTTP caching at
+    the following link: [https://www.rfc-editor.org/rfc/rfc9111](https://www.rfc-editor.org/rfc/rfc9111).'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Requirements for HTTP aka response caching include the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The request must be a `GET` or `HEAD` one. `POST`, `PUT`, and `DELETE` requests,
+    and so on, are never cached by HTTP caching.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The response must have a `200 OK` status code.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: If the request has an `Authorization` header, then the response is not cached.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: If the request has a `Vary` header, then the response is not cached when the
+    values are not valid or `*`.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The web server sets response caching headers, and then intermediate proxies
+    and clients should respect the headers to tell them how they should cache the
+    responses.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**Good Practice**: Response aka HTTP caching is not typically useful for web
+    user interfaces because web browsers often set request headers that prevent HTTP
+    caching. For web user interfaces, output caching is better suited, and we will
+    cover that in *Chapter 14*, *Building Web User Interfaces Using ASP.NET Core*.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The `Cache-Control` HTTP header for requests and responses has some common
+    directives, as shown in *Table 9.2*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '| **Directive** | **Description** |'
+  prefs: []
+  type: TYPE_TB
+- en: '| `public` | Clients and intermediaries can cache this response. |'
+  prefs: []
+  type: TYPE_TB
+- en: '| `private` | Only a client should cache this response. |'
+  prefs: []
+  type: TYPE_TB
+- en: '| `max-age` | The client does not accept responses older than the specified
+    number of seconds. |'
+  prefs: []
+  type: TYPE_TB
+- en: '| `no-cache` | A client request is asking for a non-cached response. A server
+    is telling the client and intermediaries not the cache the response. |'
+  prefs: []
+  type: TYPE_TB
+- en: '| `no-store` | A cache must not store the request or response. |'
+  prefs: []
+  type: TYPE_TB
+- en: 'Table 9.2: Common Cache-Control HTTP header directives'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'As well as `Cache-Control`, there are other headers that might affect caching,
+    as shown in *Table 9.3*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '| **Header** | **Description** |'
+  prefs: []
+  type: TYPE_TB
+- en: '| `Age` | Estimated number of seconds old the response is. |'
+  prefs: []
+  type: TYPE_TB
+- en: '| `Expires` | An absolute date/time after which the response should be considered
+    expired. |'
+  prefs: []
+  type: TYPE_TB
+- en: '| `Vary` | All fields must match for a cached response to be sent. Otherwise,
+    a fresh response is sent. For example, a query string of `color`. |'
+  prefs: []
+  type: TYPE_TB
+- en: 'Table 9.3: Common HTTP headers for caching'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'For example, a client could ask for a fresh list of discontinued products,
+    and the service should not use any cached version, as shown in the following HTTP
+    response:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE19]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'A service could return some products as a JSON array, with a header to say
+    that intermediaries should not cache the response but clients can, as shown in
+    the following HTTP response:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE20]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Decorate a controller or method with the `[ResponseCache]` attribute to control
+    caching responses from the server (code to control caching requests has to go
+    in the client code). This attribute has common parameters, as shown in *Table
+    9.4*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '| **Property** | **Description** |'
+  prefs: []
+  type: TYPE_TB
+- en: '| `Duration` | How long to cache in seconds. |'
+  prefs: []
+  type: TYPE_TB
+- en: '| `Location` | Where the response can be cached. `Any` (`cache-control:` `public`),
+    `Client` (`cache-control:` `private`), `None` (`cache-control:` `no-cache`). |'
+  prefs: []
+  type: TYPE_TB
+- en: '| `NoStore` | Sets `cache-control:` `no-store`. |'
+  prefs: []
+  type: TYPE_TB
+- en: '| `VaryByHeader` | Sets the `Vary` header. |'
+  prefs: []
+  type: TYPE_TB
+- en: '| `VaryByQueryKeys` | Query keys to vary by. |'
+  prefs: []
+  type: TYPE_TB
+- en: 'Table 9.4: Common parameters of the [ResponseCache] attribute'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let’s apply response caching to the web service:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In the `Northwind.WebApi.Service` project, in `Program.cs`, after the call
+    to add the distributed memory cache, add a statement to add response caching middleware
+    as a dependency service, as shown in the following code:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE21]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'In `Program.cs`, after the call to use HTTPS redirection, add a statement to
+    use response caching middleware, as shown in the following code:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE22]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: '**Good Practice**: If using CORS middleware, then `UseCors` must be called
+    before `UseResponseCaching`.'
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: 'In `ProductsController.cs`, decorate the `Get` method with an `int id` parameter
+    with the `[ResponseCache]` attribute, as highlighted in the following code:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE23]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: The `[ResponseCache]` attribute can be applied to Razor Pages, MVC controller
+    classes, and MVC action methods for both web services and websites.
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: Start the web service project, using the `https` profile without debugging.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: In the `HttpRequests` folder, open the `webapi-get-products.http` file.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Modify the base address to use port `5091`, and then send the request for a
+    specific product, like `77`, as shown in the following code:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE24]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Note that the response includes headers to control caching, as highlighted
+    in the following output:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE25]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: Close the browser and shut down the web server.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '**Good Practice**: Response caching should only be enabled for anonymous requests.
+    Authenticated requests and responses should not be cached.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Caching is one of the best ways to improve the performance and scalability of
+    your services. Next, we will learn how to improve a service’s resilience when
+    inevitable failures occur.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Fault tolerance with Polly
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'Polly is *“a .NET resilience and transient-fault-handling library that allows
+    developers to express policies such as Retry, Circuit Breaker, Timeout, Bulkhead
+    Isolation, and Fallback in a fluent and thread-safe manner,”* as stated on the
+    official Polly GitHub repository, which can be found at the following link: [https://github.com/App-vNext/Polly](https://github.com/App-vNext/Polly).'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Transient faults are errors caused by temporary conditions, such as temporary
+    service unavailability or network connectivity issues. It is essential to handle
+    transient faults in distributed systems, or they can become almost unusable.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Understanding retry and circuit breaker patterns
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: The **Retry** pattern enables clients to automatically retry a failed action
+    with the expectation that the fault will succeed if retried after a short delay.
+    Be careful, because if you implement the Retry pattern naively, then it can make
+    the problem worse!
+  prefs: []
+  type: TYPE_NORMAL
+- en: For example, if you set a fixed time between retries, then all the clients who
+    received a fault will attempt to retry at the same time, overloading the service.
+    To avoid this issue, retries are often set with an exponentially increasing time
+    between retries, or they might use jitter (aka randomizer) algorithms.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The **Circuit Breaker** pattern prevents calls when a threshold of faults is
+    reached. In effect, it is a way for a service to detect if a fault is *not* transient,
+    or not transient enough to keep retrying.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**More Information**: There is a nice summary table of resilience policies
+    for Polly on its GitHub repository: [https://github.com/App-vNext/Polly#resilience-policies](https://github.com/App-vNext/Polly#resilience-policies).'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Defining and executing policies
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: In any type of .NET project that calls any unreliable code, you can reference
+    the Polly package and then define a policy using the `Policy` class. Polly is
+    not used in the unreliable code or service itself. It is used by any clients that
+    call the code or service.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'For example, you might need to call two methods that might throw arithmetic
+    or custom exceptions, and you want to automatically retry up to three times, so
+    you define a policy to handle this, as shown in the following code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE26]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Then, you can use that policy to execute the methods, as shown in the following
+    code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE27]'
+  prefs: []
+  type: TYPE_PRE
+- en: Each call to `Execute` gets its own counter for retries, so if the call to `GetProducts`
+    needs two retries, the call to `GetCustomers` still has a full three retries of
+    its own.
+  prefs: []
+  type: TYPE_NORMAL
+- en: For unlimited retries, you can call the `RetryForever` method, but this is not
+    recommended.
+  prefs: []
+  type: TYPE_NORMAL
+- en: For asynchronous methods, there are matching asynchronous methods; for example,
+    instead of `Retry`, use `RetryAsync`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'To execute some statements when a retry occurs, for example, to log information,
+    the `Retry` method can have a callback, as shown in the following code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE28]'
+  prefs: []
+  type: TYPE_PRE
+- en: Defining wait intervals between retries
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Instead of immediately retrying after a fault, it is good practice to wait a
+    moment before retrying.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'For example, to wait and retry, as shown in the following code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE29]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Instead of hardcoded delay values, you can also define a function to generate
+    them, as shown in the following code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE30]'
+  prefs: []
+  type: TYPE_PRE
+- en: However, if we pass an array of fixed delays, even if they are calculated, imagine
+    what happens when a fault occurs in a busy web service. All the clients receive
+    an exception, they all wait for the first second, and they all attempt to recall
+    the web service one second later. This causes floods that could make the situation
+    worse!
+  prefs: []
+  type: TYPE_NORMAL
+- en: Jittering is the idea of adding small amounts of randomization to time delays.
+    There are many implementations that you can find online, and the best is built-in
+    with an extra Polly package. We will use it to generate time delays in our example
+    project.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Applying policies to HTTP clients
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: When calling a web service, it’s a good practice to define an HTTP client factory
+    and register it in a dependency services collection.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In this scenario, you will not call the methods that might throw an exception
+    yourself. Instead, you must define a policy and then attach it to a registered
+    HTTP client, so that it automatically follows that policy.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'To do so, we will use an extension class named `HttpPolicyExtensions` to create
+    policies specifically for common HTTP requests and failures, as shown in the following
+    code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE31]'
+  prefs: []
+  type: TYPE_PRE
+- en: To attach the policy to an HTTP client, call the `AddPolicyHandler` extension
+    method after defining the factory. You will see how to do this in practice later
+    in this section.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Adding random faults to the web service
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'First, let’s add random faults to the web service:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In the `Northwind.WebApi.Service` project, in `ProductsController.cs`, in the
+    `Get` action method that has a `name` parameter, add statements to randomly throw
+    an exception two-thirds of the time, as highlighted in the following code:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE32]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: Build the project.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Building an MVC project to call the faulty web service
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Next, let’s create an ASP.NET Core MVC client that calls the randomly faulty
+    web service endpoint. Initially, it will just receive the exception if the web
+    service throws an exception. Later, we will add transient fault handling using
+    Polly:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Use your preferred code editor to add a new project, as defined in the following
+    list:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Project template: **ASP.NET Core Web App (Model-View-Controller)** / `mvc`'
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Solution file and folder: `Chapter09`'
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Project file and folder: `Northwind.WebApi.Client.Mvc`'
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Other Visual Studio 2022 options:'
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Authentication Type**: **None**.'
+  prefs:
+  - PREF_IND
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Configure for HTTPS**: Selected.'
+  prefs:
+  - PREF_IND
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Enable Docker**: Cleared.'
+  prefs:
+  - PREF_IND
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Do not use top-level statements**: Cleared.'
+  prefs:
+  - PREF_IND
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'In the `Northwind.WebApi.Client.Mvc` project, in the `Properties` folder, in
+    `launchSettings.json`, change the `applicationUrl` for the `https` profile to
+    use port `5093` for `https` and `5094` for `http`, as shown in the following markup:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE33]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'In the `Northwind.WebApi.Client.Mvc` project file, treat warnings as errors,
+    and add a reference to the entity models project so that we can use the `Product`
+    class, as shown in the following markup:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE34]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Build the `Northwind.WebApi.Client.Mvc` project at the command prompt or terminal
+    by entering the following command: `dotnet build`.'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'In the `Northwind.WebApi.Client.Mvc` project, in `Program.cs`, import the namespace
+    to work with HTTP headers, as shown in the following code:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE35]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'In `Program.cs`, before calling the `builder.Build()`, add statements to configure
+    an HTTP client factory to call the web service, as shown in the following code:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE36]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: In the `Models` folder, add a new class file named `HomeProductsViewModel.cs`.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'In `HomeProductsViewModel.cs`, define a class to store information needed in
+    the view, like the partial product name the visitor wants to search for, a sequence
+    of products, and an error message, as shown in the following code:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE37]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'In the `Controllers` folder, in `HomeController.cs`, import the namespace for
+    the entity models, as shown in the following code:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE38]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'In `HomeController.cs`, add statements to store the registered HTTP client
+    factory in a private `readonly` field, as shown highlighted in the following code:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE39]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'In `HomeController.cs`, add an asynchronous action method named `Products`,
+    which will use the HTTP factory to request products whose name contains a value
+    entered as an optional `name` parameter, in a custom MVC route, as shown in the
+    following code:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE40]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: In the `Views/Home` folder, add a new file named `Products.cshtml`. (The Visual
+    Studio 2022 project item template is named **Razor View - Empty**. The JetBrains
+    Rider project item template is named **Razor MVC View**.)
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'In `Products.cshtml`, modify its contents to output a table of products that
+    match part of a product name entered in a textbox, as shown in the following markup:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE41]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'In `Views/Home`, in `Index.cshtml`, add code to define a link to the products
+    page, as shown in the following markup:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE42]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: Start the `Northwind.WebApi.Service` project, using the `https` profile without
+    debugging.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Start the `Northwind.WebApi.Client.Mvc` project, using the `https` profile without
+    debugging.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: If you are using Visual Studio Code, then the web browser will not start automatically.
+    Start Chrome, and then navigate to `https://localhost:5093`.
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: On the home page, click **Search for products by name**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'If the search works, you will see the successful results shown in *Figure 9.1*:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '![](img/B19587_09_01.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'Figure 9.1: A successful call to the faulty random web service'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'fails, you will see an error message, as shown in *Figure 9.2*:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '![](img/B19587_09_02.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'Figure 9.2: A successful call to the faulty random web service'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In the command prompt or terminal, when a fault occurs you will see the exception,
+    as shown in the following partial output:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE43]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: Enter different partial names and click **Get Products** until you have seen
+    both a successful search and a failed search.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Close the browsers and shut down the web servers.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Implementing the Retry pattern for transient fault handling
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Now that we have a web service and MVC client with random faults, let’s add
+    transient fault handling by using the Retry pattern:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In the `Northwind.WebApi.Client.Mvc` project file, globally and statically
+    import the `System.Console` class, and add a package reference for the Microsoft
+    package to integrate Polly with ASP.NET Core (which has a dependency on the `Polly`
+    package), and for a library to add jittering to retry time spans, as shown in
+    the following markup:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE44]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: Build the `Northwind.WebApi.Client.Mvc` project to restore packages.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'In `Program.cs`, import common Polly namespaces to work with ASP.NET Core,
+    as shown in the following code:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE45]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'In `Program.cs`, before the statement to add an HTTP client to services, add
+    statements to generate five jittered and exponentially increasing time-span values,
+    output them to the console, use them to define an asynchronous wait and retry
+    policy, and then add the retry policy to the HTTP client factory, as highlighted
+    in the following code:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE46]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: If your database server is not running (for example, because you are hosting
+    it in Docker, a virtual machine, or in the cloud), then make sure to start it.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Start the `Northwind.WebApi.Service` project, using the `https` profile without
+    debugging.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Start the `Northwind.WebApi.Client.Mvc` project, using the `https` profile without
+    debugging.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'In the command prompt or terminal for the MVC project, note the jittered time
+    spans, as shown in the following output:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE47]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: Your five delays will be different, but they should start at about 1 second
+    and increase from that.
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: Arrange the web service command prompt or terminal and the MVC website browser
+    so that you can see both side by side.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: On the home page, click **Search for products by name**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Note that the MVC website might have to make multiple requests before showing
+    the page, which will take up to about 15 seconds. For example, when I ran my projects,
+    the MVC web site made four requests that failed before succeeding on the fifth
+    attempt. You will see the exceptions logged in the web service output.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Enter a partial product name, click **Get Products**, and note that the web
+    page will likely appear successfully again, even if one or more requests must
+    be made beforehand.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: It is possible that you could exceed the maximum of five requests, in which
+    case you will see the error message as before.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Microsoft has created their own packages that wrap Polly to make it even easier
+    to use. They are the `Microsoft.Extensions.Http.Resilience` and `Microsoft.Extensions.Resilience`
+    packages. You can learn about this at the following link: [https://devblogs.microsoft.com/dotnet/building-resilient-cloud-services-with-dotnet-8/](https://devblogs.microsoft.com/dotnet/building-resilient-cloud-services-with-dotnet-8/)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Now that you’ve seen two techniques that improve services, caching, and handling
+    transient faults, let’s look a third powerful technique, queuing.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Queuing with RabbitMQ
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Queuing can improve the scalability of your service, just as it can in the physical
+    world. When too many clients all need to call a service at once, we can use a
+    queue to smooth out the load.
+  prefs: []
+  type: TYPE_NORMAL
+- en: There are many queuing systems available for all the major development platforms.
+    One of the most popular is RabbitMQ. It implements the **Advanced Message Queuing
+    Protocol** (**AMQP**).
+  prefs: []
+  type: TYPE_NORMAL
+- en: With AMQP, messages are published to exchanges, which then distribute message
+    copies to queues using rules named bindings. Then a broker can deliver the messages
+    to consumers subscribed to a queue (sometimes called a topic) or a consumer can
+    read from a queue when they want.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Since networks and systems often fail, AMQP uses message acknowledgments to
+    tell the broker when a consumer has successfully processed a message, and only
+    then does the broker remove the message from the queue.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'RabbitMQ supports four types of exchange:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**Direct**: A direct exchange delivers messages based on a message routing
+    key. Multiple queues can be bound to the exchange, but messages are only delivered
+    to a queue if they have a matching routing key. They are mostly used for unicast
+    messages. The default (empty name) exchange is a direct exchange. It is pre-bound
+    with a routing key that is the same name as the queue. This is the type we will
+    use in this book.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Fanout**: A fanout exchange delivers messages to all queues that are bound
+    to it, and the routing key is ignored. These are good for broadcasting messages.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Topic**: A topic exchange delivers messages based on a routing key and criteria
+    defined in the binding between the exchange and a queue. They are used for the
+    publish/subscribe pattern, where there are many consumers but they want to receive
+    different messages, based on factors like geographic location, registered interests,
+    and so on.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Headers**: A headers exchange delivers messages based on multiple attributes
+    in a message header instead of a routing key.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'The RabbitMQ API uses the following types:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`IConnection`: This represents an AMQP connection.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`ConnectionFactory`: This creates `IConnection` instances. It has default values
+    for common properties designed to work with the Docker image. For example, `UserName`
+    is `guest`, `Password` is `guest`, `VirtualHost` is `/`, `HostName` is `localhost`,
+    and `Port` is `5672`.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`IModel`: This represents the AMQP channel and has methods to perform common
+    tasks, like declaring a queue with `QueueDeclare` or sending a message using `BasicPublish`.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`IBasicConsumer`: This represents a message consumer.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`EventBasicConsumer`: This is an implementation of a message consumer that
+    integrates with the .NET event system, making it easy for a client app to process
+    a message as soon as it is sent and received.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Good Practice**: Queuing systems can get complicated fast. In this book,
+    we will cover the basics, but if you decide to implement any queuing system in
+    production, then you will want to learn much more about how to implement them
+    deeply.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: You can install RabbitMQ locally on your computer, but for maximum ease of use,
+    I recommend using a Docker image.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'To install RabbitMQ on your computer, read the instructions at the following
+    link for your operating system: [https://www.rabbitmq.com/download.html](https://www.rabbitmq.com/download.html).'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Setting up RabbitMQ using Docker
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: The Docker image we will use has RabbitMQ version 3.12.0 and is designed to
+    be used as a throwaway container, where you simply start the container and your
+    project can start using it with the default configuration.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**More Information**: You can read more about the Docker image at the following
+    link: [https://registry.hub.docker.com/_/rabbitmq/](https://registry.hub.docker.com/_/rabbitmq/).'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let’s get started with RabbitMQ in a Docker container:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Install **Docker** from the following link: [https://docs.docker.com/engine/install/](https://docs.docker.com/engine/install/).'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Start **Docker**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'At the command prompt or terminal, pull down the latest container image for
+    RabbitMQ on Docker and run it, opening ports `5672` and `15672` to the container,
+    which are used by default by AMQP, as shown in the following command:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE48]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Note that the first time you run this command, the RabbitMQ image will not
+    be found on your local computer, as shown in the following output:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE49]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Note that the image will then be downloaded automatically, as shown in the
+    following output:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE50]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Note that RabbitMQ runs on Erlang, and its copyright and license information
+    is displayed when the container starts up, as shown in the following output:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE51]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Note the RabbitMQ service listens on port `5672` and has started four plugins,
+    as shown in the following output:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE52]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: Leave the command prompt or terminal running.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Optionally, in **Docker Desktop**, note that a container for RabbitMQ runs
+    and listens on ports `5672` (the actual queue service) and `15672` (its management
+    service), as shown in *Figure 9.3*:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '![](img/B19587_09_03.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'Figure 9.3: RabbitMQ running in a Docker container'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Sending messages to a queue using an MVC website
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Now that we have the RabbitMQ system running, we can add the RabbitMQ client
+    package to the MVC website project so that it can send messages to a queue.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'But first, let’s create a class library to define models we will use with the
+    queue:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Use your preferred code editor to create a new class library project, as defined
+    in the following list:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Project template: **Class Library** / `classlib`
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Solution file and folder: `Chapter09`
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Project file and folder: `Northwind.Queue.Models`
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Add a project reference to the Northwind entity models project for SQL Server
+    that you created in *Chapter 3*, *Building Entity Models for SQL Server Using
+    EF Core*, as shown in the following markup:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE53]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'At the command prompt or terminal, build the project to make sure the entity
+    model class library projects outside the current solution are properly compiled,
+    as shown in the following command:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE54]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: Delete the file named `Class1.cs`.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Add a new file named `ProductQueueMessage.cs`.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'In `ProductQueueMessage.cs`, define a class that will represent a message in
+    a queue with a simple plain text property and a complex `Product` entity model
+    type as a second property, as shown in the following code:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE55]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'In the `Northwind.WebApi.Client.Mvc` project file, add a reference to the queue
+    models project so that we can use the `ProductQueueMessage` class, as shown in
+    the following markup:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE56]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'In the `Northwind.WebApi.Client.Mvc` project file, add a package reference
+    for RabbitMQ clients, as shown in the following markup:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE57]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'You can check the latest package version at the following link: [https://www.nuget.org/packages/RabbitMQ.Client/](https://www.nuget.org/packages/RabbitMQ.Client/)'
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: Build the `Northwind.WebApi.Client.Mvc` project.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: In the `Models` folder, add a new class file named `HomeSendMessageViewModel.cs`.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Define a class to represent the information that needs to be displayed in a
+    view for sending a message including a couple of properties for showing message
+    to the visitor when a message is successfully sent and when an error occurs, as
+    shown in the following code:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE58]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'In `Views\Home`, in `Index.cshtml`, add a link to a page that will let the
+    visitor send a message to a queue, as shown in the following markup:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE59]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'In `HomeControllers.cs`, import namespaces to work with RabbitMQ and serialize
+    JSON, as shown in the following code:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE60]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'In `HomeControllers.cs`, add statements to define an action method that responds
+    to a `GET` request by showing a web form to send a message, as shown in the following
+    code:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE61]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'In `HomeControllers.cs`, add statements to define an action method that responds
+    to a `POST` request by sending a message from information in the form, as shown
+    in the following code:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE62]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: In `Views\Home`, add a new empty Razor View named `SendMessage.cshtml`.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Define a web page with a form to send a message, as shown in the following
+    markup:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE63]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: Consuming message from a queue using a console app
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Finally, we can create a console app that will process messages from the queue:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Use your preferred code editor to create a new console app project, as defined
+    in the following list:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Project template: **Console App** / `console`
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Solution file and folder: `Chapter09`
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Project file and folder: `Northwind.Queue.Consumer`
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Treat warnings as errors, add a package reference for RabbitMQ, add project
+    references to the Northwind entity models project and the queue message models
+    project, and statically and globally import the `System.Console` class, as shown
+    in the following markup:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE64]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'At the command prompt or terminal, build the project, as shown in the following
+    command:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE65]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'In `Program.cs`, delete any existing statements, and then add statements to
+    read messages from the `product` queue, as shown in the following code:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE66]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: If your database server is not running (for example, because you are hosting
+    it in Docker, a virtual machine, or in the cloud), then make sure to start it.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Start the `Northwind.WebApi.Service` project, using the `https` profile without
+    debugging.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Start the `Northwind.WebApi.Client.Mvc` project, using the `https` profile without
+    debugging.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Start the `Northwind.Queue.Consumer` console app project with or without debugging:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Optionally, you can configure your solution to start up all three projects at
+    once, as shown for Visual Studio 2022 in *Figure 9.4*:![](img/B19587_09_04.png)
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Figure 9.4: Configuring three startup projects to test message queues'
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: 'Arrange the console app and the MVC web page so that you can see both, then
+    click **Send a message**, and enter a simple text message and a valid product
+    ID (1 to 77), as shown in *Figure 9.5*:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '![](img/B19587_09_05.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'Figure 9.5: An ASP.NET Core MVC website sending a message to a queue'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Click **Send**, and note the message that appears in the console app, as shown
+    in *Figure 9.6*:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '![](img/B19587_09_06.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'Figure 9.6: A console app consuming a message from the queue'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In the command prompt or terminal for Docker, press *Ctrl* + *C* to shut down
+    the container, and note the result, as shown in the following output:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE67]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: In **Docker Desktop**, note the container is gone from the list, but the image
+    remains for quicker use next time.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '**More Information**: You can read more about using RabbitMQ with .NET at the
+    following link: [https://www.rabbitmq.com/dotnet-api-guide.html](https://www.rabbitmq.com/dotnet-api-guide.html).'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The combination of caching, queuing, and handling transient faults goes a long
+    way to making your services more resilient, scalable, and performant. In the last
+    section of this chapter, we will look at long-running background services.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Implementing long-running background services
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'It is common to need long-running background services to perform operations
+    like:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Performing a task on a regular timed schedule.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Processing queued messages.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Performing intense work like building AI and ML models or processing video and
+    images.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: In the distant past, on the Windows operating system, to have some code running
+    in the background meant building a **Windows Service**. For example, the database
+    engine of SQL Server is implemented as a Windows Service. With the move to cross-platform,
+    .NET needs a cross-platform solution to run code in the background.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Background services often do not have a user interface, although they might
+    provide one for the configuration and management of the service.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Building a worker service
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Now, let’s build a worker service project so that we can see how we would host
+    a long-running background service:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Use your preferred code editor to add a new project, as defined in the following
+    list:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Project template: **Worker Service** / `worker`'
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Solution file and folder: `Chapter09`'
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Project file and folder: `Northwind.Background.Workers`'
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Enable Docker**: Cleared'
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Do not use top-level statements**: Cleared'
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Enable native AOT publish**: Cleared'
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'In the `Northwind.Background.Workers` project file, note that the .NET SDK
+    is `Microsoft.NET.Sdk.Worker`, and then make the following changes, as highlighted
+    in the following markup:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Treat warnings as errors.
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Add a package reference for RabbitMQ.
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Add references to the entity models and queue models projects:'
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[PRE68]'
+  prefs:
+  - PREF_IND
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Build the `Northwind.Background.Workers` project at the command prompt or terminal
+    by entering the following command: `dotnet build`.'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'In `Program.cs`, note that the initialization statements are like an ASP.NET
+    Core project, and that it registers a hosted service named `Worker` and then runs
+    the host, as shown in the following code:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE69]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'In `Worker.cs`, note that the `Worker` class inherits from `BackgroundService`
+    and implements its `ExecuteAsync` method by looping until a cancellation is requested,
+    logging the current date/time, and then pausing for one second, as shown in the
+    following code:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE70]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Start the project without debugging, note the current time is output once per
+    second, and then press *Ctrl* + *C* to shut down the worker service, as shown
+    in the following output:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE71]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: Processing queued message using a worker service
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Now, we can do some useful work, like reading messages from a RabbitMQ queue:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Rename `Worker.cs` to `QueueWorker.cs` and the `Worker` class to `QueueWorker`.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'In `Program.cs`, change the hosted service class name from `Worker` to `QueueWorker`,
+    as shown in the following code:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE72]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'In `QueueWorker.cs`, import namespaces to work with RabbitMQ queues and implement
+    a queue processor, as highlighted in the following code:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE73]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Start the RabbitMQ container, as shown in the following command:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE74]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Wait for the messages to say it is ready for clients to connect on port `5672`,
+    as shown in the following output:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE75]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: Leave the command prompt or terminal running.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: If your database server is not running (for example, because you are hosting
+    it in Docker, a virtual machine, or in the cloud), then make sure to start it.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Start the `Northwind.WebApi.Service` project without debugging so that we can
+    query for products in the Northwind database.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Start the `Northwind.WebApi.Client.Mvc` project without debugging so that we
+    can send messages to the RabbitMQ queue.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: In the MVC website, click **Send a message**, and then enter a message of `apples`
+    and a product ID of `1`.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Repeat for `bananas` and `2`, and `cherries` and `3`.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Start the `Northwind.Background.Workers` project without debugging, and note
+    the three messages are processed from the queue, as shown in the following output:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE76]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: Executing code on a timed schedule
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Another common use of worker services is to implement timed events. A timer-based
+    background service can use the `System.Threading.Timer` class that triggers the
+    `DoWork` method.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let’s add another service to the background worker project:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: In the `Northwind.Background.Workers` project, add a new class named `TimerWorker.cs`.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Modify the class, as shown in the following code:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE77]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'In `Program.cs`, add a statement to register the timer worker service, as shown
+    in the following code:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE78]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Start the `Northwind.Background.Workers` project without debugging, and note
+    the initialization of both workers, as shown in the following output:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE79]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Leave the background workers running for at least 10 seconds, and note the
+    queue worker writes to the log every second and the timer worker writes to the
+    log every five seconds, as shown in the following output:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE80]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Press *Ctrl* + *C* to shut down the background workers, and note the clean
+    shutdown of the timer worker, as shown in the following output:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE81]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: If we wanted to use the timer background service to have more flexibility, instead
+    of running it at a regular interval like five seconds, we could have it run a
+    scheduled task check every second, and only if a task has reached its scheduled
+    time does it then run that task. We need somewhere to define tasks and when they
+    are scheduled to run. Although you can build this infrastructure yourself, it
+    is easier to use a third-party library like **Hangfire**.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Building a website to host Hangfire
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Hangfire is open source and free for commercial use. It supports the following
+    patterns of use:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**Fire-and-forget**: Jobs that are executed once and started immediately.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Delayed**: Jobs that are executed once but at a date and time in the future.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Recurring**: Jobs that are executed repeatedly at a regular CRON schedule.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Continuation**: Jobs that are executed on completion of a parent job.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Batches**: Jobs that are transactional. These are only available in the paid
+    version.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Hangfire has persistent storage and can be configured to use:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: SQL Server
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Redis
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: In-memory
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Community-developed storage
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Let’s set up an empty ASP.NET Core project to host Hangfire:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Use your preferred code editor to create a new Web API controller-based project,
+    as defined in the following list:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Project template: **ASP.NET Core Empty** / `web`
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Solution file and folder: `Chapter09`
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Project file and folder: `Northwind.Background.Hangfire`
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Configure for HTTPS**: Selected.'
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Enable Docker**: Cleared.'
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Do not use top-level statements**: Cleared.'
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'In the project file, treat warnings as errors, and add package references to
+    work with Hangfire and persist its data to SQL Server, as shown in the following
+    markup:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE82]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: Build the project to restore packages.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'In the `Properties` folder, in `launchSettings.json`, modify the `applicationUrl`
+    of the profile named `https` to use port `5095` for `https` and port `5096` for
+    `http`, as highlighted in the following configuration:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE83]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'In `appsettings.Development.json`, add an entry to set the Hangfire log level
+    to `Information`, as highlighted in the following JSON:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE84]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Create a SQL Server database named `Northwind.HangfireDb`:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: If you are using Visual Studio 2022, navigate to **View** | **Server Explorer**,
+    right-click **Data Connections**, choose **Create New SQL Server database…**,
+    enter connection information and the database name, and then click **OK**.
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'If you are using Visual Studio Code, navigate to **SQL** **Server**, right-click
+    and choose **New Query**, enter connection information, and then in the query
+    window, enter the following SQL command and execute it:'
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[PRE85]'
+  prefs:
+  - PREF_IND
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'In `Program.cs`, delete the existing statements, and then add statements to
+    configure Hangfire to use SQL Server and to enable Hangfire Dashboard, as shown
+    in the following code:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE86]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Start the `Northwind.Background.Hangfire` project without debugging, and note
+    the messages written to the console, as shown in the following output:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE87]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'In the browser, note the plain text message, and then in the address bar, append
+    `hangfire`, and note the **Hangfire Dashboard** user interface, as shown in *Figure
+    9.7*:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '![](img/B19587_09_07.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'Figure 9.7: Hangfire Dashboard user interface'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Close the browser window, and at the command prompt or terminal for the Hangfire
+    service, press *Ctrl* + *C* to cleanly shut down the server, and note the messages,
+    as shown in the following output:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE88]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: Scheduling jobs using Hangfire
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Next, we will allow a client to schedule a job (in this case, just writing
+    a message to the console a specified number of seconds in the future) by `POST`ing
+    to the web service:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: In the `Northwind.Background.Hangfire` project, add a new class file named `WriteMessageJobDetail.cs`.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'In `WriteMessageJobDetail.cs`, define a class to represent a scheduled job,
+    as shown in the following code:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE89]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: In the `Northwind.Background.Hangfire` project, add a new class file named `Program.Methods.cs`.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'In `Program.Methods.cs`, extend the partial `Program` class with a method to
+    write a message to the console in green color, as shown in the following code:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE90]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'In `Program.cs`, import namespaces to work with the job, as shown in the following
+    code:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE91]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'In `Program.cs`, after the statement to map a `GET` request, map a `POST` request
+    to the relative path `/schedulejob`, get the job details from the body of the
+    `POST` request, and use it to schedule a background job, using Hangfire to run
+    at the specified time in seconds in the future, as shown in the following code:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE92]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: Start the `Northwind.Background.Hangfire` project without debugging.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'In the command prompt or terminal, confirm that all the dispatchers started,
+    as shown in the following output:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE93]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: In the browser, navigate to `/hangfire` to view Hangfire Dashboard.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: In your code editor, in the `HttpRequests` folder, create a file named `hangfire-schedule-job.http`.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'In `hangfire-schedule-job.http`, add statements to make a `POST` request to
+    the Hangfire service, as shown in the following code:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE94]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Send the request, and note the successful response, as shown in the following
+    output:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE95]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'In the browser, in **Hangfire Dashboard**, click **Jobs** in the top menu click
+    **Jobs**, in the left side menu, and then note there is one scheduled job, as
+    shown in *Figure 9.8*:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '![](img/B19587_09_08.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'Figure 9.8: Scheduled jobs in Hangfire'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Wait until 30 seconds have passed, and then in the left -side menu, click **Succeeded**,
+    and note the job has succeeded, as shown in *Figure 9.9*:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '![](img/B19587_09_09.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'Figure 9.9: Succeeded jobs in Hangfire'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'At the command prompt or terminal, note the message that was written to the
+    console, as shown in the following output:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE96]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: Close the browser and shut down the server.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '**More Information**: You can read more about Hangfire at the following link:
+    [https://www.hangfire.io/](https://www.hangfire.io/).'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Practicing and exploring
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Test your knowledge and understanding by answering some questions, getting some
+    hands-on practice, and exploring this chapter’s topics with deeper research.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Exercise 9.1 – Test your knowledge
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Answer the following questions:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: How much longer does it take to read 1 MB of data from SSD compared to memory?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: What is the difference between absolute and sliding expirations?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: What unit of measurement is used by `Size` for the in-memory cache?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: You have written the following statement to get information about in-memory
+    caching but `stats` is `null`. What must you do to fix this issue?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE97]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: What data types can be stored in (a) an in-memory cache, and (b) a distributed
+    cache?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: What are the differences between the Retry and Circuit Breaker patterns?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: When using the RabbitMQ default direct exchange, what must the routing key be
+    for a queue named `product`?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: What is the difference between a fanout and a topic exchange?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: What port does RabbitMQ listen on by default?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: When inheriting from the `BackgroundService` class, what method must you override
+    that is called automatically by the host to run your service?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Exercise 9.2 – Explore topics
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Use the links on the following page to learn more details about the topics
+    covered in this chapter:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[https://github.com/markjprice/apps-services-net8/blob/main/docs/book-links.md#chapter-9---caching-queuing-and-resilient-background-services](https://github.com/markjprice/apps-services-net8/blob/main/docs/book-links.md#chapter-9---caching-queuing-and-resilient-background-services)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Exercise 9.3 – Replace the Distributed Memory Cache with another distributed
+    cache implementation
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: In this chapter, we used the Distributed Memory Cache implementation to explore
+    how to use a distributed cache.
+  prefs: []
+  type: TYPE_NORMAL
+- en: As an optional exercise, register for an Azure account if you have not already,
+    create an **Azure Cache for Redis** resource, and change your web service project
+    configuration to use it.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In the `Northwind.WebApi.Service`, you will need to reference the Redis package,
+    comment out the previously registered distributed cache implementation, and then
+    call the extension method to register Redis as the distributed cache implementation:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE98]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Read more at the following links:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Azure Cache for Redis: [https://azure.microsoft.com/en-us/products/cache/](https://azure.microsoft.com/en-us/products/cache/).'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Redis NuGet package: [https://www.nuget.org/packages/Microsoft.Extensions.Caching.StackExchangeRedis](https://www.nuget.org/packages/Microsoft.Extensions.Caching.StackExchangeRedis).'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Redis with .NET: [https://docs.redis.com/latest/rs/references/client_references/client_csharp](https://docs.redis.com/latest/rs/references/client_references/client_csharp).'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Exercise 9.4 – Replace Hangfire with Quartz.NET
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: '**Quartz.NET** is a similar library to Hangfire. Read the official documentation,
+    and then create a project named `Northwind.Background.Quartz` that implements
+    the same functionality as `Northwind.Background.Hangfire`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[https://www.quartz-scheduler.net/](https://www.quartz-scheduler.net/)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Exercise 9.5 – Review the Reliable Web App pattern
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'The **Reliable Web App** (**RWA**) pattern is a set of best practices with
+    prescriptive guidance that helps developers successfully migrate an on-premises
+    web project to the cloud. It includes a reference implementation and shows how
+    to make the most of Azure cloud services to modernize mission-critical workloads
+    in a reliable, secure, high-performance, cost-efficient manner using modern design,
+    development, and operational practices:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[https://learn.microsoft.com/en-us/azure/architecture/web-apps/guides/reliable-web-app/dotnet/plan-implementation](https://learn.microsoft.com/en-us/azure/architecture/web-apps/guides/reliable-web-app/dotnet/plan-implementation)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'A collection of videos about the RWA pattern for .NET are at the following
+    link:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[https://www.youtube.com/playlist?list=PLI7iePan8aH54gIDJquV61dE3ENyaDi3Q](https://www.youtube.com/playlist?list=PLI7iePan8aH54gIDJquV61dE3ENyaDi3Q)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Summary
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'In this chapter, you learned:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: About service architecture and how different parts of a system can affect performance.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: How to cache data closer to the action, using in-memory and distributed caching.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: How to control HTTP caching for clients and intermediaries.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: How to implement fault tolerance using Polly.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: How to implement queuing using RabbitMQ.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: How to implement long-running background services using `BackgroundService`
+    and Hangfire.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: In the next chapter, you will learn how to use Azure Functions to implement
+    nano services, aka serverless services.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Learn more on Discord
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'To join the Discord community for this book – where you can share feedback,
+    ask questions to the author, and learn about new releases – follow the QR code
+    below:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[https://packt.link/apps_and_services_dotnet8](https://packt.link/apps_and_services_dotnet8)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![](img/QR_Code3048220001028652625.png)'
+  prefs: []
+  type: TYPE_IMG

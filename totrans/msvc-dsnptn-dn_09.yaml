@@ -1,0 +1,528 @@
+- en: '9'
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Building Resilient Microservices
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Coming off the heels of the Saga pattern, we can appreciate the value of having
+    fail-safes built into our microservices application. We need to ensure that we
+    adequately handle inevitable failures.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We can’t assume that our distributed microservices will always be up and running.
+    We also can’t assume that our supporting infrastructure will be reliable. These
+    considerations lead us down a path where we must anticipate the occurrence of
+    failures, whether prolonged or transient.
+  prefs: []
+  type: TYPE_NORMAL
+- en: A prolonged outage can be due to a downed server or service, some generally
+    important part of the infrastructure. These tend to be easier to detect and mitigate
+    since they have a more obvious impact on the runtime of the application. Transient
+    failures are far more difficult to detect since they can last a few seconds to
+    a few minutes at a time and aren’t usually tied to any obvious issue in the infrastructure.
+    Something as simple as a service taking 5 seconds extra to respond can be seen
+    as a transient failure.
+  prefs: []
+  type: TYPE_NORMAL
+- en: It is very important that we not only write code that doesn’t break the application
+    because of a transient issue but also know when to break that application when
+    we have a more serious failure. This is an important part of gauging the user’s
+    experience with our application.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In this chapter, we will look at various scenarios and countermeasures that
+    we can implement when navigating possible failures in our microservices architecture.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'After reading this chapter, we will understand how to do the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Build resilient microservice communication
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Implement a caching layer
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Implement retry and circuit breaker policies
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Technical requirements
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'Code references used in this chapter can be found in the project repository,
+    which is hosted on GitHub at this URL: [https://github.com/PacktPublishing/Microservices-Design-Patterns-in-.NET/tree/master/Ch09](https://github.com/PacktPublishing/Microservices-Design-Patterns-in-.NET/tree/master/Ch09).'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The importance of service resiliency
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Before we get into technical explanations, let us try to understand what it
+    means to be resilient. The word *resilient* is the base word for *resiliency*,
+    and it refers to how impervious an entity is to negative factors. It refers to
+    how well an entity reacts to an inevitable failure and how well an entity can
+    resist future failures.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In the context of our microservices architecture, our entities are our services,
+    and we know that failures will happen. A failure can be as simple as a timeout
+    during an internal operation, a loss of communication, or an unexpected outage
+    of an important resource for the service.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Possible failure scenarios and how to handle them
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Using the example of our healthcare booking system, let us say that our appointments
+    service needs to retrieve the details of the related patient. The *appointments
+    service* will make a synchronous HTTP call to the *patients service*. The steps
+    in this communication step may look like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The *appointments service* makes an HTTP request to the *patients service*,
+    passing the patient ID (`AppointmentsController.cs`).
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: The *patients service* receives the HTTP request and executes a query to look
+    up the patient’s record (`PatientsController.cs`).
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: The *patients service* responds to the *appointment booking service* with the
+    appropriate data.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: So far, we have come to expect this from our *synchronous service* communication
+    flow. This, however, is the ideal flow where everything works as expected, and
+    based on your infrastructure, you can guarantee a certain degree of success each
+    time. What we need to account for is the balance—the few times that the flow might
+    get interrupted and not complete the chain of operations successfully. It could
+    be because of a failure, or maybe we just need a little more time. It could also
+    be that we need to cut the call short because it is taking too long.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Now, let us review the same kind of service call where something fails along
+    the way:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The *patients service* makes an HTTP request to the *appointment booking service*,
+    passing the patient ID.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: The *appointment booking service* responds with a `BAD GATEWAY (502)` error
+    code.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: The *patients service* throws an exception immediately when given the `BAD GATEWAY`
+    response.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: The user receives an error message.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: In this situation, we received a premature termination of the appointment booking
+    service call. HTTP responses in the `5xx` range indicate that there is an issue
+    with the resource or server associated with the appointment booking service. These
+    `5xx` errors may be temporary, and an immediate follow-up request would work.
+    A `BAD GATEWAY` error, specifically, can be due to poor server configuration,
+    proxy server outage, or a simple response to one too many requests at that moment.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In addressing these issues, sometimes we can retry the requests, or have an
+    alternative data source on standby. While we will be discussing retry logic later
+    in the book, we explore using some form of caching layer that allows us to maintain
+    a stable data layer from which we can pull the information we require.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Let us review how we can implement a caching layer to assist with this.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Implementing resiliency with caching and message brokers
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: We will be diving into how we can make our services resilient using **retry
+    policies** and the **circuit breaker pattern**, but we are not limited to these
+    methods in our microservices architecture. We can help to support service resiliency
+    using **caching** and **message broker** mechanisms. Adding a caching layer allows
+    us to create a temporary intermediary data store, which becomes useful when we
+    are attempting to retrieve data from a service that is offline at the moment.
+    Our message brokers help to ensure that messages will get delivered, which is
+    mostly useful for write operations.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Let us discuss message brokers and how they help us with our resiliency.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Using a message broker
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: '**Message brokers** have a higher guarantee of data delivery, which increases
+    resiliency. This is built on the foundation that the message broker will not be
+    unavailable for an extended period, but once a message is placed on the message
+    bus, it will not matter if the listening service(s) is not online. As we discussed
+    earlier, we can almost guarantee that data will be posted successfully through
+    asynchronous communication, since message brokers are designed to retain the information
+    until it is consumed.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Message brokers also support retry logic where if a message is not processed
+    successfully for whatever reason, it is returned to the queue for processing later.
+    We want to manage the number of message delivery retries, so we should configure
+    our message broker to transfer a message to a *dead-letter* queue, where we store
+    *poisoned* messages.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We also need to consider how we handle message duplications. This could happen
+    if we send a message to the queue that does not get processed immediately for
+    some reason, and then the message gets sent to the queue again from a retry. This
+    would result in the same message in the queue twice and not necessarily in the
+    correct order, or one behind the other. We must ensure that our messages contain
+    enough information to allow us to adequately develop redundancy checks in our
+    message consumers.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We explored integrating with message brokers in earlier chapters as we discussed
+    asynchronous communication between services. Now, let us explore implementing
+    a caching layer.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Using a caching layer
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: '**Caching** can be a valuable part of the resiliency strategy. We can incorporate
+    a caching strategy where we fall back on this cache if a service is offline. This
+    means that we can use the caching layer as a fallback data source and create an
+    illusion to the end user that all services are up and running. This cache would
+    get periodically updated and maintained each time data is modified in the database
+    of the source service. This will help with keeping the cached data fresh.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Of course, with this strategy, we need to accept the implications of having
+    potentially stale data. If the source service is offline and the supporting database
+    is being updated (possibly by other jobs), then the cache will eventually become
+    a stale data source. The more measures we put in place to ensure its freshness,
+    the more complexity we introduce to our application.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Notwithstanding the potential pros and cons of adding a caching layer, we can
+    see where it will be a great addition to our microservices application and reduce
+    the number of errors that a user might see, stemming from transient and even longer-term
+    failures.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The most effective way to implement a caching layer is as a distributed cache.
+    This means that all systems in the architecture will be able to access the central
+    cache, which exists as an external and standalone service. This implementation
+    can increase speed and support scaling. We can use Redis Cache as our distributed
+    cache technology, and we will investigate how we can integrate this into an ASP.NET
+    Core application.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Using Redis Cache
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: '**Redis Cache** is a popular caching database technology. It is an open source
+    in-memory data store that can also be used as a message broker. It can be implemented
+    on a local machine for local development efforts but is also at times deployed
+    on a central server for more distributed systems. Redis Cache is a key-value store
+    that uses a unique key to index a value, and no two values can have the same key.
+    This makes it very easy to store and retrieve data from this type of data store.
+    In addition to that, values may be stored in very simple data types such as strings,
+    numbers, and lists, but JSON format is popularly used for more complex object
+    types. This way, we can serialize and deserialize this string in our code and
+    proceed as needed.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'There is also extensive support for Redis Cache on cloud providers such as
+    Microsoft Azure and **Amazon Web Services** (**AWS**). For this exercise, you
+    may install the Redis Cache locally, or use a **Docker** container. To start using
+    Redis Cache in our project, we need to run the following command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE0]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'We then need to register our cache in our `Program.cs` file, like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE1]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'You may configure your connection string in either the `appsettings.json` file
+    or in application secrets. It will look something like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE2]'
+  prefs: []
+  type: TYPE_PRE
+- en: These steps add caching support to our application. Now, we can read from and
+    write to the cache as needed in our application. Generally, we want to write to
+    the cache when data is augmented. New data should be written to the cache—we can
+    remove the old version and create a new version for modified data; for deleted
+    data, we also delete the data from the cache.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We can create a singular `CacheProvider` interface and implementation as a
+    wrapper around our desired cache operations. Our interface will look like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE3]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Our implementation looks like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE4]'
+  prefs: []
+  type: TYPE_PRE
+- en: This code allows us to interact with our distributed caching service and retrieve,
+    set, or remove values based on their associated key. This service can be registered
+    in our **inversion of control** (**IoC**) container and injected into our controllers
+    and repositories as needed.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The idea here is that we can use the `GetFromCache` method when we need to read
+    the values from the cache. The key allows us to narrow down to the entry we are
+    interested in, and the `T` generic parameter allows us to define the desired data
+    type. If we need to update the data in the cache, we can clear the cache record
+    associated with the appropriate key and then use `SetCache` to place new data
+    with an associated key. We will parse the new data to JSON to ensure that we do
+    not violate the supported data types while maintaining the ability to store complex
+    data. When we are adding new data, we simply need to call `SetCache` and add the
+    new data.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We also want to ensure that we maintain the freshness of the data as much as
+    possible. A popular pattern involves clearing the cache and making a fresh entry
+    each time data is entered or updated.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We can use these bits of code in our application and implement a caching layer
+    to improve not only performance but resiliency and stability. We still have the
+    issue of retrying operations when they fail the initial call. In the next section,
+    we will look at how we can implement our retry logic.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Implementing retry and circuit breaker policies
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Services fail for various reasons. A typical response to a service failure is
+    an HTTP response in the *5xx* range. These typically highlight an issue with the
+    hosting server or a temporary outage in the network hosting the service. Without
+    trying to pinpoint the exact cause of the failure at the time it happens, we need
+    to add some fail-safes to ensure the continuity of the application when these
+    types of errors occur.
+  prefs: []
+  type: TYPE_NORMAL
+- en: For this reason, we should use retry logic in our service calls. These will
+    automatically resubmit the initial request if an error code is returned, which
+    might be enough time for a transient error to resolve itself and reduce the effects
+    that the initial error might have on the entire system and operation. In this
+    policy, we generally allow for some time to pass between each request attempt.
+    This sums up our retry policy.
+  prefs: []
+  type: TYPE_NORMAL
+- en: What we don’t want to do with our retries is to continue to execute them without
+    some form of exit condition. This would be like implementing an infinite loop
+    if the target service remains unresponsive and inadvertently executing a **denial-of-service**
+    (**DoS**) attack on our own service. For this reason, we implement the circuit
+    breaker pattern, which acts as an orchestrator for our service calls.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We will need to implement a **retry policy** to at least make the call several
+    times before concluding a definite failure. This will make our service more resilient
+    to a potentially fleeting error and allow the application to ensure that the user’s
+    experience isn’t directly affected by such an issue. Now, retries are not always
+    the answer. A retry here makes sense since the service is responding with a clear-cut
+    failure, and we are deciding to try again. We need to decide how many retries
+    are too many and stop accordingly.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We can use the **circuit breaker pattern** to control the number of retries
+    and set parameters that will govern how long a connection should stay open and
+    listen for a response. This simple technique helps to reduce the number of retries
+    and provides better control over how retries occur.
+  prefs: []
+  type: TYPE_NORMAL
+- en: A *circuit breaker* sits in between the client and the server. In our microservices
+    application, the service making the call is the client, and the target service
+    is the server receiving the request. Initially, it allows all calls to go through.
+    We call this the *closed state*. If an error is detected, which can be in the
+    form of an error response or a delayed response, the *circuit breaker opens*.
+    Once the circuit breaker is open, subsequent calls will fail faster. This will
+    shorten the time spent waiting for a response. It will wait for a configured timeout
+    period and then allow the calls again, in case the target service has recovered.
+    If there is no improvement, then the circuit breaker will break the transmission.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Using these two techniques, we can both counter transient failures and ensure
+    that longer-term failures do not surface in the form of a poor user experience.
+    In .NET Core, we have the benefit of **Polly**, which is a package that allows
+    us to almost support natively both retry and circuit break policies and implement
+    resilient web service calls. We will explore integrating Polly into our app next.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Retry policy with Polly
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Polly is a framework that allows us to add a new layer of resilience to our
+    applications. It acts as a layer between two services that stores the details
+    of an initiated request and monitors the response time and/or the response code.
+    It can be configured with parameters that it uses to determine what a failure
+    looks like, and we can further configure the type of action we would like to take.
+    This action can be in the form of a retry or a cancellation of the request.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Polly is conveniently available in .NET Core and is widely used and trusted
+    around the world. Let us review the steps needed to implement this framework in
+    our application and monitor the calls the *Patients API* will make to the *Documents
+    API*.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'To add it to our .NET Core application and allow us to write extension code
+    for our `HttpClient` objects, we start by adding these packages via NuGet:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE5]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Now, in our `Program.cs` file, we can configure our typed HTTP client for our
+    *Documents API* to use our extension code for its Polly-defined policies. In the
+    `Program.cs` file, we can define the registration of our typed client like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE6]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'We have added a policy handler to our HTTP client, so it will automatically
+    be invoked for all calls made using this client. We now need to define a method
+    called `GetRetryPolicy()` that will build our policy:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE7]'
+  prefs: []
+  type: TYPE_PRE
+- en: It may seem complicated because of the use of the builder pattern, but it is
+    simple to understand and flexible enough to customize to your needs. Firstly,
+    we define the return type or the method to be `IAsyncPolicy<HttpResponseMessage>`,
+    which corresponds with the return type of our calls from our HTTP client. We then
+    allow the policy to observe for transient HTTP errors, which the framework can
+    determine by default, and we can extend that logic with more conditions such as
+    observing the value of `IsSuccessStatusCode`, which returns `true` or `false`
+    for the success of an operation, or even if `HttpRequestException` has been returned.
+  prefs: []
+  type: TYPE_NORMAL
+- en: These few parameters cover the general worst-case scenarios of an HTTP response.
+    We then set the parameters for our retries. We want to retry at most 5 more times,
+    and each retry should be done at a rolling interval starting at 2 seconds from
+    the previous call. This way, we allow a little time between each retry. This is
+    the concept of a *backoff*.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Finally, we can define what action would like to take between each retry. This
+    could include some error handling or reauthentication logic.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Retry policies can have negative effects on your system where we might have
+    high concurrency and high contention for resources. We need to ensure that we
+    have a solid policy and define our delays and retries efficiently. Recall that
+    a carelessly configured retry policy may well result in a DoS attack on your own
+    service, opening the application to significant performance issues.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Given the possibility of implementing something that could have negative effects
+    in this manner, we now need a defense barrier that will mitigate this risk and
+    break the retry cycle if the errors never stop. The best defense strategy comes
+    in the form of the circuit breaker, which we will configure using Polly next.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Circuit breaker policy with Polly
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: As we have discussed for this chapter, we should handle faults that take a bit
+    longer to resolve and define a policy that abandons retry calls to a service when
+    we have concluded that it is unresponsive for a longer term than hoped for.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We can continue from our code that added the retry policy using Polly by defining
+    a circuit breaker policy and adding it as an HTTP handler to our client. We modify
+    the client’s registration in the `Program.cs` file, like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE8]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Now, we can add the `GetCircuitBreakerPolicy()` method as this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE9]'
+  prefs: []
+  type: TYPE_PRE
+- en: This policy defines a circuit breaker that opens the circuit when there have
+    been `5` consecutive retry failures. Once that threshold is reached, the circuit
+    will break for 30 seconds and automatically fail all subsequent calls, which will
+    be interpreted as HTTP failure responses.
+  prefs: []
+  type: TYPE_NORMAL
+- en: With these two policies in place, you can orchestrate your service retries and
+    significantly reduce the effects that unplanned outages might have on your application
+    and the end user’s experience. The circuit breaker policy also adds a layer of
+    protection from any potential adverse effects of the retry policy.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Now, let us summarize what we have learned about implementing resilient web
+    services.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Summary
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The contents of this chapter help us to be more mindful of the potential for
+    failures in our microservices application. These concepts help us not only construct
+    powerful and stable web services but also supercharge the communication mechanisms
+    that exist between them.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We see that service outages are not always due to faulty code or the database
+    and server of the initial web service, but we are facilitating inter-service communication
+    as well, which leads to greater dependence on the network, third-party service,
+    and general infrastructure uptime. This leads down a path where we implement contingencies
+    that assist in ensuring that our application gives our users as good an experience
+    as possible.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We looked at several techniques for increasing service reliability, such as
+    using a caching layer with technology such as Redis Cache for our `GET` operations,
+    a message broker for our write operations, and writing more foolproof code using
+    frameworks such as Polly. With Polly, we looked at how we can automatically retry
+    service calls and use a circuit breaker to prevent these retries from being too
+    liberal and causing other problems.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Since services fail and we need a retry method, we also need a way to monitor
+    the health of the services so that we can be aware of why the retries are not
+    effective. This means that we need to introduce *health checks* that alert us
+    to outages in a service’s infrastructure. We will explore this in the next chapter.
+  prefs: []
+  type: TYPE_NORMAL

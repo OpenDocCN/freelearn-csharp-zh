@@ -1,0 +1,3666 @@
+- en: '*Chapter 4*: Threading and Asynchronous Operations'
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: So far, we have looked at various design principles, patterns, what is new in
+    .NET 6, and architecture guidelines that we are going to use during this book.
+    In this chapter, we will see how we can take advantage of asynchronous programming
+    while building enterprise applications.
+  prefs: []
+  type: TYPE_NORMAL
+- en: One of the key measures for any web application is *scalability* – that is,
+    scaling to reduce the time taken to serve a request, increase the number of requests
+    that a server can process, and increase the number of users an application can
+    simultaneously serve without increasing the load time. For mobile/desktop apps,
+    scaling can improve the responsiveness of the app, allowing users to perform various
+    actions without freezing the screen.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The proper use of asynchronous programming techniques and parallel constructs
+    can do wonders in improving these metrics, and the best thing for this in C# is
+    the simplified syntax of the **Task Parallel Library** (**TPL**), async-await,
+    with which we can write clean asynchronous code.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In this chapter, we will cover the following topics:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Understanding the jargon
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Demystifying threads, lazy initialization, and `ThreadPool`
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Understanding locks, semaphores, and `SemaphoreSlim`
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Introducing tasks and parallels
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Introducing async-await
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Using concurrent collections for parallelism
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Technical requirements
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'You will need a basic understanding of .NET Core, C#, and the basics of LINQ.
+    The code examples for this chapter can be found here: [https://github.com/PacktPublishing/Enterprise-Application-Development-with-C-10-and-.NET-6-Second-Edition/tree/main/Chapter04](https://github.com/PacktPublishing/Enterprise-Application-Development-with-C-10-and-.NET-6-Second-Edition/tree/main/Chapter04).'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'A few instructions for the code can be found here: [https://github.com/PacktPublishing/Enterprise-Application-Development-with-C-10-and-.NET-6-Second-Edition/tree/main/Enterprise%20Application](https://github.com/PacktPublishing/Enterprise-Application-Development-with-C-10-and-.NET-6-Second-Edition/tree/main/Enterprise%20Application).'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Understanding the jargon
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Before we dive into the technicalities of threading and asynchronous operations,
+    let's take a real-world example and build an analogy between multitasking in real
+    life and parallel programming. Imagine that you are waiting in a queue in a restaurant
+    to order food, and while waiting in the queue, you reply to an email. Then, having
+    ordered the food and while waiting for it to arrive, you answered a phone call.
+    In the restaurant, there are multiple counters where orders are being taken, and
+    food is prepared by the chef while orders are being placed.
+  prefs: []
+  type: TYPE_NORMAL
+- en: While you were waiting in line, you concurrently replied to an email. Similarly,
+    while you were ordering, the restaurant was parallelly taking orders at many other
+    counters. The chef is cooking parallelly while orders are being placed. Also,
+    you were given a token to pick up your food from the pickup counter; however,
+    depending upon the preparation time of your food, an order placed after yours
+    may arrive at the pickup counter before yours.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'When talking about parallel programming, some key terms will appear multiple
+    times. This jargon is represented in the following figure:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 4.1 – Concurrency versus parallelism versus asynchronous'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '](img/Figure_4.1_B18507.jpg)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Figure 4.1 – Concurrency versus parallelism versus asynchronous
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let''s cover each term:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**Parallelism**: This entails multiple tasks being performed independently
+    at the same time, as in the example of multiple restaurant orders being placed
+    from different counters. In terms of enterprise applications, parallelism would
+    be multiple threads/tasks being executed at the same time in a multicore CPU.
+    However, a single-core CPU also supports parallelism through hyper-threading,
+    which usually involves the logical division of a single core into more than one
+    core, such as a hyper-threading-enabled dual-core CPU, which acts like a quad-core
+    – that is, four cores.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Concurrency**: This entails doing many tasks at the same time, such as in
+    our previous example of replying to an email while queuing for a restaurant counter,
+    or the chef seasoning one dish and heating the pan for a second dish. In terms
+    of enterprise applications, concurrency involves multiple threads sharing a core
+    and, based on their time slicing, executing tasks and performing context switching.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Asynchronous**: Asynchronous programming is a technique that relies on executing
+    tasks asynchronously instead of blocking the current thread while it is waiting.
+    In our example, asynchronicity is waiting for your token to be called for you
+    to go to the pickup counter while the chef is working on preparing your food.
+    But while you''re waiting, you have moved away from the ordering counter, thereby
+    allowing other orders to be placed. This is like a task that executes asynchronously
+    and frees up resources while waiting on an I/O task (for instance, while waiting
+    on data from a database call). The beauty of asynchronicity is that tasks are
+    executed either parallelly or concurrently, which is completely abstracted from
+    developers by the framework. This lets the developer focus their development efforts
+    on the business logic of the application rather than on managing tasks. We will
+    see this in the *Tasks and parallels* section.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`CLR ThreadPool`. In a multicore/multiprocessor system, multithreading helps
+    to achieve parallelism by executing newly created threads in different cores.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Now that we understand the key terms in parallel programming, let's move on
+    to look at how to create threads and the role of `ThreadPool` in .NET Core.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Demystifying threads, lazy initialization, and ThreadPool
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: A thread is the smallest unit in an operating system, and it executes instructions
+    in the processor. A process is a bigger executing container, and the thread inside
+    the process is the smallest unit to use processor time and execute instructions.
+    The key thing to remember is that whenever your code needs to be executed in a
+    process, it should be assigned to a thread. Each processor can only execute one
+    instruction at a time; that's why, in a single-core system, at any point time,
+    only one thread is being executed. There are scheduling algorithms that are used
+    to allocate processor time to a thread. A thread typically has a stack (which
+    keeps track of execution history), registers in which to store various variables,
+    and counters to hold instructions that need to be executed.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'A quick look at **Task Manager** will give us details regarding the number
+    of physical and logical cores, and navigating to **Resource Monitor** will tell
+    us about the CPU usage in each core. The following figure shows the details of
+    a hyper-threading-enabled quad-core CPU that can execute eight threads in parallel
+    at any point in time:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 4.2 – Task Manager and Resource Monitor'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '](img/Figure_4.2_B18507.jpg)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Figure 4.2 – Task Manager and Resource Monitor
+  prefs: []
+  type: TYPE_NORMAL
+- en: A typical application in .NET Core has one single thread when it is started
+    and can add more threads by manually creating them. A quick refresher on how this
+    is done will be covered in the following sections.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Working with System.Threading.Thread
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'We can create new threads by creating an instance of `System.Threading.Thread`
+    and passing a method delegate. Here is a simple example that simulates retrieving
+    data from an API and loading a file from a disk:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE0]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE1]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE2]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE3]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE4]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE5]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE6]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE7]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE8]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE9]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE10]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE11]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE12]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE13]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE14]'
+  prefs: []
+  type: TYPE_PRE
+- en: In the previous code, `FetchDataFromAPI` and `LoadFileFromDisk` are the methods
+    that would run on the new thread.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Tip
+  prefs: []
+  type: TYPE_NORMAL
+- en: At any point in time, only one thread will be executing on each core – that
+    is, only one thread is allotted CPU time. So, to achieve concurrency, the **Operating
+    System** (**OS**) does a context switch when a thread that's been allocated CPU
+    time is idle or if a high-priority thread arrives in the queue (there may be other
+    reasons too, such as if a thread is waiting on a synchronization object or the
+    allotted CPU time is reached).
+  prefs: []
+  type: TYPE_NORMAL
+- en: Since a thread that is switched out won't have completed its work, at some point,
+    it will be assigned CPU time again. As such, the OS needs to save the state of
+    the thread (its stack, its registers, and so on) and retrieve it again when the
+    thread is allotted CPU time. Context switching is usually very expensive and one
+    of the key areas of performance improvement.
+  prefs: []
+  type: TYPE_NORMAL
+- en: All the properties and methods of the `Thread` class can be further reviewed
+    at [https://docs.microsoft.com/en-us/dotnet/api/system.threading.thread?view=net-6.0](https://docs.microsoft.com/en-us/dotnet/api/system.threading.thread?view=net-6.0).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Although managing threads come with the advantage of having more control over
+    how they are executed, it also comes with overheads in the form of the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Managing the life cycle of threads, such as creating threads, recycling them,
+    and context switching.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Implementing concepts such as progress tracking/reporting for thread execution.
+    Also, cancellation is quite complex and has limited support.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Exceptions on threads need to be handled appropriately; otherwise, they may
+    lead to the application crashing.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Debugging, testing, and code maintenance can become a bit complex and, at times,
+    can lead to performance issues if not handled correctly.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: This is where the `ThreadPool` comes into play, which is discussed in the next
+    section.
+  prefs: []
+  type: TYPE_NORMAL
+- en: ThreadPool
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Threads can be created by making use of pools of threads managed by .NET Core,
+    more commonly known as the CLR `ThreadPool`. The CLR `ThreadPool` is a set of
+    worker threads that are loaded into your application along with the CLR and take
+    care of the thread life cycle, including recycling threads, creating threads,
+    and supporting better context switching. The CLR `ThreadPool` can be consumed
+    by various APIs available in the `System.Threading.ThreadPool` class. Specifically,
+    for scheduling an operation on a thread, there is the `QueueUserWorkItem` method,
+    which takes a delegate of the method that needs to be scheduled. In the previous
+    code, let''s replace the code for creating a new thread with the following code,
+    meaning the application will use `ThreadPool`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE15]'
+  prefs: []
+  type: TYPE_PRE
+- en: As the name suggests, `QueueUserWorkItem` of the `ThreadPool` class does make
+    use of queues, whereby any code that is supposed to be executed on the `ThreadPool`
+    thread would be queued and then dequeued – that is, assigned to a worker thread
+    in a **First-In, First-Out** (**FIFO**) manner.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The way `ThreadPool` is designed is that it has a global queue, and items are
+    queued in it when we do the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Call `QueueUserWorkItem` or a similar method of the `ThreadPool` class using
+    a thread that is not part of the `ThreadPool` threads
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Call through the TPL
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: When a new thread is created in `ThreadPool`, it maintains its own local queue
+    that checks the global queue and dequeues the work item in a FIFO manner; however,
+    if the code executing on this thread creates another thread, such as a child thread,
+    then that gets queued in the local queue as opposed to the global queue.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The order of execution for operations in the local queue of the worker thread
+    is always `ThreadPool`, where *n* is the number of threads in `ThreadPool` – that
+    is, *n* local queues – and *1* refers to the global queue.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'A high-level representation of `ThreadPool` is shown in the following figure:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 4.3 – ThreadPool high-level representation'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '](img/Figure_4.3_B18507.jpg)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Figure 4.3 – ThreadPool high-level representation
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Apart from `QueueUserWorkItem`, there are a lot of other properties/methods
+    available for the `ThreadPool` class, such as these:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`SetMinThreads`: Used to set the minimum worker and asynchronous I/O threads
+    that `ThreadPool` will have when the program is started'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`SetMaxThreads`: Used to set the maximum worker and asynchronous I/O threads
+    that `ThreadPool` will have, after which, new requests are queued'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: All the properties and methods of the `ThreadPool` class can be further reviewed
+    at [https://docs.microsoft.com/en-us/dotnet/api/system.threading.threadpool?view=net-6.0](https://docs.microsoft.com/en-us/dotnet/api/system.threading.threadpool?view=net-6.0).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Although writing multithreaded code via `QueueUserWorkItem` of the `ThreadPool`
+    thread simplifies life cycle management for threads, it has its own limitations:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: We cannot get a response from the work that is scheduled on the `ThreadPool`
+    thread, hence the return type of the delegate is void.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: It is not easy to track the progress of the work that is scheduled on the `ThreadPool`
+    thread, so something such as progress reporting isn't easy to achieve.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: It's not meant for long-running requests.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`ThreadPool` threads are always background threads; so, unlike foreground threads,
+    if a process is shut down, it will not wait for the `ThreadPool` threads to complete
+    their work.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: As there are limitations with `QueueUserWorkItem`, the `ThreadPool` threads
+    can also be consumed through the TPL, which we will use in our enterprise application
+    and is covered later in this chapter. In .NET Core, the TPL is the preferred approach
+    to achieve concurrency/parallelism, as it overcomes all the limitations we have
+    seen so far and eventually helps to achieve the goal of allowing your application
+    to scale and be responsive.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Lazy initialization
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: The lazy initialization of a class is a pattern where the creation of an object
+    is deferred until it is used for the first time. This pattern is based on the
+    premise that as long as a class's properties are not being used, there is no advantage
+    to initializing an object. Hence, this delays object creation and ultimately reduces
+    the memory footprint of the application, improving performance. An example of
+    this would be creating a database connection object only when you are about to
+    retrieve data from a database. Lazy initialization is a good fit for classes that
+    hold a lot of data and are potentially expensive to create. For instance, a class
+    for loading all the products in an e-commerce application can be lazily initialized
+    only when there is a need to list the products.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'A typical implementation of such a class, as presented next, restricts the
+    initialization of properties in constructors and has one or more methods that
+    populate the properties of the class:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE16]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE17]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE18]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE19]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE20]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE21]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE22]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE23]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE24]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE25]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE26]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE27]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE28]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE29]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE30]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE31]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE32]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Assuming this is a class used to load an image from a disk, there is no use
+    in loading the image in the constructor because it cannot be consumed until the
+    `GetImage` method is called. So, the lazy initialization pattern suggests that
+    instead of initializing the `loadImage` object in the constructor, it should be
+    initialized in `GetImage`, which means that the image is loaded into memory only
+    when it is needed. This can also be achieved through properties, as shown here:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE33]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE34]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE35]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE36]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE37]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE38]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE39]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE40]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE41]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE42]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE43]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE44]'
+  prefs: []
+  type: TYPE_PRE
+- en: As you can see, this is something that's typically done with cache objects and
+    is also known as the `LoadImage` method or property, it will lead to making a
+    call to disk multiple times. So, there is a need for synchronization here through
+    locks or some other mechanism, which obviously will add to the maintenance overhead,
+    and the class implementation might become even more complex.
+  prefs: []
+  type: TYPE_NORMAL
+- en: So, even though we can implement our own lazy load pattern, in C#, we have the
+    `System.Lazy` class to handle such an implementation. One of the key advantages
+    of using the `System.Lazy` class is that it is thread-safe.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The `System.Lazy` class provides multiple constructors to implement lazy initialization.
+    Here are the two most common ways that we can make use of:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Wrapping the class around `Lazy` and using the `Value` method of that object
+    to retrieve data. This is typically used for classes that have initialization
+    logic in constructors. Some sample code follows:'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[PRE45]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'While initializing this class, we will use the generic type of the `System.Lazy`
+    class and pass the `ImageFile` class as its type and the object of `ImageFile`
+    as a delegate:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE46]'
+  prefs: []
+  type: TYPE_PRE
+- en: Here, if you put a breakpoint in the `ImageFile` class's constructor, it would
+    be hit only when the `Value` method of the `System.Lazy` class is called.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'For classes that have a method to load various parameters, we can pass the
+    method to the `Lazy` class as a delegate. Taking the previous sample code and
+    moving the file-retrieving logic to a separate method is shown here:'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[PRE47]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'And while initializing this class, we pass a Lambda to the generic delegate,
+    and that generic delegate is passed to initialize an object of the `System.Lazy`
+    class, as shown in the following code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE48]'
+  prefs: []
+  type: TYPE_PRE
+- en: Note
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'A func in C# is a type of delegate that takes zero or more parameters and returns
+    a value. More details can be found here: [https://docs.microsoft.com/en-us/dotnet/api/system.func-1?view=net-6.0](https://docs.microsoft.com/en-us/dotnet/api/system.func-1?view=net-6.0).'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Both ways will delay the initializing of the object until the call to the `Value`
+    method is made.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs: []
+  type: TYPE_NORMAL
+- en: One important thing that we need to note is that although `Lazy` objects are
+    thread-safe, objects created through values aren't thread-safe. So, in this case,
+    `lazyImage` is thread-safe, but `image` isn't. Hence, it needs to be synchronized
+    in a multithreaded environment.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In general, lazy initialization is a good fit for caching classes and singleton
+    classes and can be further extended for objects that are expensive to initialize.
+  prefs: []
+  type: TYPE_NORMAL
+- en: All the properties of the `Lazy` class can be further reviewed at [https://docs.microsoft.com/en-us/dotnet/api/system.lazy-1?view=net-6.0](https://docs.microsoft.com/en-us/dotnet/api/system.lazy-1?view=net-6.0).
+  prefs: []
+  type: TYPE_NORMAL
+- en: Although lazy initialization can be achieved by wrapping the underlying object
+    with the `System.Lazy` class, there is also the `LazyInitializer` static class
+    available in .NET that can be used for lazy initialization through its `EnsureInitialized`
+    method.
+  prefs: []
+  type: TYPE_NORMAL
+- en: It has a couple of constructors as mentioned in the MSDN documentation at [https://docs.microsoft.com/en-us/dotnet/api/system.threading.lazyinitializer.ensureinitialized?view=net-6.0](https://docs.microsoft.com/en-us/dotnet/api/system.threading.lazyinitializer.ensureinitialized?view=net-6.0).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'However, the idea is the same, in that it expects an object and a function
+    to populate the object. Taking the previous example, if we had to use `LazyInitializer.EnsureInitialized`
+    for lazy initialization, we would need to pass the instance of the object and
+    the Lambda that creates the actual object to `LazyInitializer.EnsureInitialized`,
+    as shown in the following code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE49]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE50]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE51]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE52]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE53]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE54]'
+  prefs: []
+  type: TYPE_PRE
+- en: Here, we are passing two parameters – one is the object that holds the value
+    of the property of the `image` class, and the other is the function that creates
+    an object of the `image` class and returns the image. So, this is as simple as
+    calling the `Value` property of the `System.Lazy` property without having the
+    overhead of initializing the object.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Clearly, a small added advantage of lazy initializing using `LazyInitializer`
+    is that there aren't additional objects that aren't created, meaning a smaller
+    memory footprint. On the other hand, `System.Lazy` provides much more readable
+    code. So, if there are clear *space optimizations*, go with `LazyInitializer`;
+    otherwise, use `System.Lazy` for much cleaner and more readable code.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Understanding locks, semaphores, and SemaphoreSlim
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In the previous sections, we saw how we can use various APIs in .NET to achieve
+    parallelism. However, when we are doing that, we need to take additional care
+    with shared variables. Let's take the enterprise e-commerce application that we
+    are building in this book. Think about the workflow of purchasing an item. Say
+    that two users are planning to buy a product and only one item is available. Let's
+    say that both users add the item to the cart and the first user places their order,
+    and while the order is being processed through the payment gateway, the second
+    user also tries to place their order.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In such cases, the second order should fail (assuming that the first order succeeded)
+    because the quantity for the book is now zero; that would happen only if there
+    was proper synchronization being applied to the quantity across threads. Also,
+    if the first order fails in the payment gateway or the first user cancels their
+    transaction, the second order should go through. So, what we are saying here is
+    that the quantity should be locked while the first order is being processed and
+    should be released only when the order is completed (ending in success or failure).
+    Before we get into the handling mechanism, let's quickly recap what the critical
+    section is.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The critical section and thread safety
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: The critical section is the part of an application that reads/writes variables
+    that are used by multiple threads. We can think of these as the global variables
+    that are used across the application and are modified in different places at different
+    times or at the same time. In a multithreaded scenario, at any point in time,
+    only one thread should be allowed to modify such variables, and only one thread
+    should be allowed to enter the critical section.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'If there are no such variables/sections in your application, it can be considered
+    thread-safe. So, it''s always advisable to identify variables in the application
+    that are not thread-safe and handle them accordingly. To protect access to the
+    critical section from non-thread-safe variables, there are various constructs
+    available, known as **synchronization primitives** or **synchronization constructs**,
+    which primarily fall into two categories:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**Locking constructs**: These allow a thread to enter the critical section
+    to protect access to the shared resources, and all other threads wait until the
+    lock is freed by the acquired thread.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Signaling constructs**: These allow a thread to enter the critical section
+    by signaling the availability of resources, as in a producer-consumer model, where
+    a producer locks a resource and the consumer waits for a signal rather than polling.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Let's discuss a few synchronization primitives in the next section.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Introducing locks
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'A **lock** is a basic class that allows you to achieve synchronization in multithreaded
+    code where any variable inside the lock block can be accessed by only one thread.
+    In locks, the thread acquiring the lock needs to release the lock, and until then,
+    any other thread trying to enter the lock goes into a wait state. A simple lock
+    can be created, as shown in the following code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE55]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE56]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE57]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE58]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE59]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The thread that is the first to execute this code will acquire the lock and
+    release it after the completion of the code block. Locks can also be acquired
+    using `Monitor.Enter` and `Monitor.Exit`, and in fact, using a lock compiler internally
+    converts the thread to `Monitor.Enter` and `Monitor.Exit`. A few important points
+    about locks follow:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: They should always be used on the reference type due to their thread affinity.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: They are very expensive in terms of performance, as they pause the threads that
+    want to enter the critical section before allowing them to resume, which adds
+    some lag.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Double-checking the acquiring lock is also a good practice, similar to how it
+    is done in the singleton implementation.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Locks do have some problems:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: You need to lock the shared data/object wherever it's being modified or enumerated.
+    It's easy to miss critical sections in the application as *critical section* is
+    more of a logical term. Compilers will not flag it if there aren't any locks around
+    a critical section.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: If not handled correctly, you might end up in a deadlock.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Scalability is a problem, as only one thread can access a lock at a time, while
+    all other threads must wait.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Note
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: There is another important concept known as **atomicity**. An operation is atomic
+    only if there isn't any way to read the intermediate state of a variable or to
+    write the intermediate state to a variable. For example, if an integer's value
+    is being modified from two to six, any thread reading this integer value will
+    only see two or six; none of the threads will see the thread's intermediate state
+    where the integer was only partially updated. Any code that is thread-safe automatically
+    guarantees atomicity.
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: Use concurrent collections, described in a later section, instead of locks,
+    as concurrent collections internally handle locking critical sections.
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: Mutex (Windows only)
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'A `System.Threading.Mutex` class, and any thread that wants to enter the critical
+    section needs to call the `WaitOne` method. Releasing a mutex happens through
+    the `ReleaseMutex` method; so, we basically create an instance of the `System.Threading.Mutex`
+    class and call `WaitOne`/`ReleaseMutex` to enter/exit the critical section, respectively.
+    A couple of important points about mutexes follow:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Mutexes have thread affinity, so a thread that calls `WaitOne` needs to call
+    `ReleaseMutex`.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: A constructor of the `System.Threading.Mutex` class is available that accepts
+    the name of a mutex, which allows sharing across processes using the name passed
+    to the constructor.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Introducing semaphores and SemaphoreSlim
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: A **semaphore** is a non-exclusive lock that supports synchronization by allowing
+    multiple threads to enter a critical section. However, unlike exclusive locks,
+    a semaphore is used in scenarios where there is a need to restrict access to a
+    pool of resources – for example, a database connection pool that allows a fixed
+    number of connections between an application and a database.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Going back to our example of shopping for a product in an e-commerce application,
+    if the available quantity of a product is 10, that means that 10 people can add
+    this item to their shopping carts and place orders. If 11 orders are placed concurrently,
+    10 users should be allowed to place orders, and the 11th should be put on hold
+    until the first 10 orders are completed.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In .NET, a semaphore can be created by creating an instance of the `System.Threading.Semaphore`
+    class and passing two parameters:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The initial number of active requests
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The total number of concurrently allowed requests
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Here is a simple code snippet that creates a semaphore:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE60]'
+  prefs: []
+  type: TYPE_PRE
+- en: In this case, `0` means none of the requests has acquired the shared resource
+    and a maximum of 10 concurrent requests are allowed. To acquire a shared resource,
+    we need to call `WaitOne()`, and to release a resource, we need to call the `Release()`
+    method.
+  prefs: []
+  type: TYPE_NORMAL
+- en: To create semaphores, there is another lightweight class available in .NET,
+    and that is `SemaphoreSlim`, the slim version, which usually relies on a concept
+    called `SemaphoreSlim` uses a small loop that runs for a few microseconds so that
+    it doesn't have to go through the costly process of blocking, context switching,
+    and internal kernel transition (semaphores use Windows kernel semaphores to lock
+    a resource). Eventually, `SemaphoreSlim` falls back to locking if the shared resource
+    still needs to be locked.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Creating a `SemaphoreSlim` instance is almost the same as for semaphores; the
+    only difference is that for locking, it has `WaitAsync` instead of `WaitOne`.
+    There is also `CurrentCount` available, which tells us the number of locks acquired.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Some key facts about semaphores and `SemaphoreSlim` follow:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: As a semaphore is used to access a pool of resources, semaphores and `SemaphoreSlim`
+    don't have thread affinity, and any thread can release a resource.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The `Semaphore` class in .NET Core supports named semaphores. Named semaphores
+    can be used to lock resources across processes; however, the `SemaphoreSlim` class
+    does not support named semaphores.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The `SemaphoreSlim` class, unlike `Semaphore`, supports asynchronous methods
+    and cancellation, which means it can be used well with async-await methods. The
+    async-await keyword helps in writing non-blocking asynchronous methods and is
+    covered in the *Introducing async-await* section in this chapter.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Choosing the right synchronization constructs
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'There are other signaling constructs to cover; the following table gives you
+    a high-level view of their usage and real-life examples of them:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Table 4.1 – A synchronization constructs comparison'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '](img/Table_4.1_a.jpg)![Table 4.1 – A synchronization constructs comparison'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '](img/Table_4.1_b.jpg)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Table 4.1 – A synchronization constructs comparison
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'So far, we have covered the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Various ways of multithreading using the `Thread` and `ThreadPool` classes and
+    their limitations
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The importance of lazy initialization and how it helps in multithreaded environments
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The various synchronization constructs that are available in .NET
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: We will use these concepts in later chapters when we create some cross-cutting
+    components.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In the next section, we will see how to overcome the limitations of `Thread`
+    and `ThreadPool` through tasks and the use of the TPL.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Introducing tasks and parallels
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: We know that asynchronous programming helps our applications to scale and respond
+    better, so implementing asynchronous applications should not be overhead for developers.
+    `Thread` and `ThreadPool`, while helping to achieve asynchronicity, add a lot
+    of overhead and come with limitations.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Hence, Microsoft came up with tasks that make it easier to develop asynchronous
+    applications. In fact, most of the newer APIs in .NET 6 only support the asynchronous
+    way of programming – for example, the **Universal Windows Platform** (**UWP**)
+    doesn't even expose APIs to create threads without tasks. As such, understanding
+    tasks and the TPL is fundamental to being able to write asynchronous programs
+    using C#.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We will dive deep into these topics in this section, and later, we will see
+    how the C# async-await keywords combined with the TPL simplify asynchronous programming.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Introduction to Task and the TPL
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: The idea behind asynchronous programming is that none of the threads should
+    be waiting on an operation – that is, the framework should have the capability
+    to wrap an operation into some abstraction and then resume once the operation
+    is completed without blocking any threads. This abstraction is nothing but the
+    `Task` class, which is exposed through `System.Threading.Tasks` and helps in writing
+    asynchronous code in .NET.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The `Task` class simplifies wrapping any wait operation, whether it is data
+    retrieved from a database, a file being loaded into memory from disk, or any highly
+    CPU-intensive operation, and simplifies running it on a separate thread if needs
+    be. It has the following important features:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`Task` supports returning values from an operation once it is completed through
+    its generic type, `Task<T>`.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`Task` takes care of scheduling threads on `ThreadPool`, partitioning operations,
+    and scheduling more than one thread from `ThreadPool` accordingly, all while abstracting
+    the complexity of doing it.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Reports completion supports cancellation through `CancellationToken` and progress
+    reporting through `IProgress`.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`Task` supports creating child tasks and manages relationships between child
+    and parent tasks.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Exceptions are propagated to the calling application, even for multi-hierarchical
+    parent/child tasks.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Most importantly, `Task` supports async-await, which helps in resuming the processing
+    in a calling application/method once the operation in the task is completed.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'The TPL is a group of APIs provided by .NET in `System.Threading.Tasks` and
+    `System.Threading`, and it provides ways to create and manage tasks. Tasks can
+    be created by creating an object of the `System.Threading.Tasks.Task` class and
+    passing a block of code that needs to be executed on the task. We can create a
+    task in multiple ways:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'You can create an object of the `Task` class and pass a Lambda expression.
+    In this method, it needs to be started explicitly, as shown in the following code:'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[PRE61]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'A task can also be created using `Task.Run`, as shown in the following code,
+    which supports creating and starting the task without explicitly calling `Start()`:'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[PRE62]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Another way to create a task is by using `Task.Factory.StartNew`:'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[PRE63]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: In all these methods, a `ThreadPool` thread is used to run the `FetchDataFromAPI`
+    method and is referenced via the `dataTask` object, which is returned to the caller
+    to track the completion of the operation/exception.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'As this task would asynchronously execute on a `ThreadPool` thread, and as
+    all `ThreadPool` threads are background threads, the application wouldn''t wait
+    for the `FetchDataFromAPI` method to complete. The TPL exposes a `Wait` method
+    to wait on the completion of the task, such as `dataTask.Wait()`. Here is a code
+    snippet from a small console application that uses a task:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE64]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE65]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE66]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE67]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE68]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE69]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE70]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE71]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'In this snippet, we used a Lambda expression. However, it could be a delegate
+    or action delegate (in the case of a parameter-less method), so something such
+    as the following can also be used to create a task:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE72]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Either way, you receive a reference to the `Task` object and handle it accordingly.
+    If a method is returning a value, then we can use a generic version of the `Task`
+    class and use the `Result` method to retrieve data from `Task`. For example, if
+    `FetchDataFromAPI` returns a string, we can use `Task<String>`, as shown in the
+    following snippet:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE73]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE74]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE75]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE76]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE77]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'There are various additional parameters that each of these methods accepts,
+    and a few important ones are as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Cancellation using an object of the `CancellationToken` class, generated using
+    the `CancellationTokenSource` class.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Control the behavior of task creation and execution through the `TaskCreationOptions`
+    enum.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Custom implementation of `TaskScheduler` to control how tasks are queued.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`TaskCreationOptions` is an enum in the TPL that tells `TaskScheduler` what
+    kind of task we are creating. For example, we can create a long-running task,
+    as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE78]'
+  prefs: []
+  type: TYPE_PRE
+- en: Although this doesn't guarantee any faster output, it acts more like a hint
+    to the scheduler to optimize itself. For example, the scheduler can spin up more
+    threads if it sees a long-running task being scheduled. All the options for this
+    enum can be found at [https://docs.microsoft.com/en-us/dotnet/api/system.threading.tasks.taskcreationoptions?view=net-6.0](https://docs.microsoft.com/en-us/dotnet/api/system.threading.tasks.taskcreationoptions?view=net-6.0).
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`Task` also supports waiting on multiple tasks at the same time by creating
+    and passing all the tasks as parameters to the following methods:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`WaitAll`: Wait for the completion of all tasks and block the current thread.
+    Not recommended for application development.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`WhenAll`: Wait for the completion of all tasks without blocking the current
+    thread. Usually used with async-await. Recommended for application development.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`WaitAny`: Wait for the completion of one of the tasks and block the current
+    thread until then. Not recommended for application development.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`WhenAny`: Wait for the completion of one of the tasks without blocking the
+    current thread. Usually used with async-await. Not recommended for application
+    development.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Tasks, unlike threads, have comprehensive exception handling support. Let's
+    see that in the next section.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Handling task exceptions
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Exception handling in tasks is as simple as writing a `try` block around the
+    task and then catching the exceptions, which are usually wrapped in `AggregateException`,
+    as shown in the following code snippet:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE79]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE80]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE81]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE82]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE83]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE84]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE85]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE86]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE87]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE88]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE89]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE90]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE91]'
+  prefs: []
+  type: TYPE_PRE
+- en: In the preceding code, `agex.InnerException` will give you the actual exception,
+    as we are waiting on a single task. However, if we are waiting on multiple tasks,
+    it would be the `InnerExceptions` collection that we could loop through. Also,
+    it comes with a `Handle` callback method, which can be subscribed in a `catch`
+    block, and the callback once triggered will have information about the exception.
+  prefs: []
+  type: TYPE_NORMAL
+- en: As shown in the preceding code, for a task to propagate an exception, we need
+    to call the `Wait` method or some other blocking construct such as `WhenAll` to
+    trigger the `catch` block. However, under the hood, any exception to `Task` is
+    actually held in the `Exception` property of the `Task` class, which is of the
+    `AggregateException` type and can be observed for any underlying exceptions in
+    the task.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Also, if a task is the parent of attached child tasks or nested tasks, or if
+    you are waiting on multiple tasks, multiple exceptions can be thrown. To propagate
+    all the exceptions back to the calling thread, the `Task` infrastructure wraps
+    them in an `AggregateException` instance.
+  prefs: []
+  type: TYPE_NORMAL
+- en: More details about handling exceptions can be found at [https://docs.microsoft.com/en-us/dotnet/standard/parallel-programming/exception-handling-task-parallel-library](https://docs.microsoft.com/en-us/dotnet/standard/parallel-programming/exception-handling-task-parallel-library).
+  prefs: []
+  type: TYPE_NORMAL
+- en: Implementing task cancellation
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: '.NET provides two primary classes to support the cancellation of a task:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`CancellationTokenSource`: A class that creates a cancellation token and supports
+    the cancellation of a token through the `Cancel` method'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`CancellationToken`: A structure that listens to cancellation and triggers
+    a notification if a task is canceled'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'For canceling a task, there are two types of cancellation:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: One where a task is executed by mistake and needs to be canceled immediately
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Another where a task has started and needs to be stopped (aborted) midway
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'For the former, we can create a task that supports cancellation. We use the
+    TPL APIs and pass the cancellation token to the constructor and call the `Cancel`
+    method of the `CancellationTokenSource` class if the task needs to be canceled,
+    as shown in the following code snippet:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE92]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE93]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE94]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE95]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE96]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE97]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE98]'
+  prefs: []
+  type: TYPE_PRE
+- en: All the .NET Core APIs that support asynchronous calling, such as `GetAsync`
+    and `PostAsync` of the `HttpClient` class, have overloads to accept cancellation
+    tokens. For the latter case (aborting a task), the decision is based on whether
+    the operation that would be running supports cancellation or not. Assuming it
+    supports cancellation, we can pass the cancellation token to the method and, inside
+    the method call, check the `IsCancellationRequested` property of the cancellation
+    token and handle it accordingly.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let''s create a simple console application that creates a task that does support
+    cancellation. Here, we are creating a `FetchDataFromAPI` method that accepts a
+    list of URLs and retrieves data from those URLs. This method also supports cancellation
+    using `CancellationToken`. In the implementation, we loop through the list of
+    URLs and continue until cancellation is requested or the loop completes all iterations:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE99]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE100]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE101]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE102]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE103]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE104]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE105]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE106]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE107]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE108]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE109]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE110]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE111]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE112]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE113]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE114]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE115]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE116]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE117]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE118]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE119]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE120]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE121]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE122]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE123]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE124]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE125]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Now, call `FetchDataFromAPI` with a list of four URLs from the main method,
+    as shown in the following code. Here, we are creating `CancellationToken` using
+    the `Token` property of the `CancellationTokenSource` class and passing it to
+    the `FetchDataFromAPI` method. We are simulating a cancellation after 3 seconds
+    so that `FetchDataFromAPI` will be canceled before the fourth URL is retrieved:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE126]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE127]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE128]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE129]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE130]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE131]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE132]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE133]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE134]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE135]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE136]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE137]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE138]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE139]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE140]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE141]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE142]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE143]'
+  prefs: []
+  type: TYPE_PRE
+- en: Once we run this code, we can see output for three URLs and then an exception/break
+    (based on whichever line is commented out in the `FetchDataFromAPI` method).
+  prefs: []
+  type: TYPE_NORMAL
+- en: In the preceding sample, we have simulated a long-running code block using a
+    `for` loop and `Thread.Sleep`, canceled the task, and handled the code accordingly.
+    However, there could be a scenario where the long-running code block may not support
+    cancellation.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In those cases, we must write a wrapper method that accepts a cancellation
+    token and have the wrapper internally call the long-running operation; then, in
+    the main method, we call the wrapper code. The following snippet shows a wrapper
+    method that makes use of `TaskCompletionSource`, which is another class in the
+    TPL. It is used to convert non-task-based asynchronous methods (including even
+    the ones based on asynchronous methods) to tasks through the `Task` property available
+    in the class. In this case, we will pass the cancellation token to `TaskCompletionSource`
+    so that its `Task` is updated accordingly:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE144]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE145]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE146]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE147]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE148]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE149]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE150]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE151]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE152]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE153]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE154]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE155]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE156]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE157]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE158]'
+  prefs: []
+  type: TYPE_PRE
+- en: In this case, `CancellationToken` is tracked through the `Task` property of
+    `TaskCompletionSource`, and we created another task to call our long-running operation
+    (the one without cancellation token support), and whichever task finishes first
+    is the one we return.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Of course, the `Main` method needs to be updated to call the wrapper, as shown
+    here (the rest of the code remains the same):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE159]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE160]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE161]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE162]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE163]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE164]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE165]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE166]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE167]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE168]'
+  prefs: []
+  type: TYPE_PRE
+- en: This doesn't cancel the underlying method but still allows the application to
+    exit before the underlying operation is completed.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Task cancellation is a very useful mechanism that helps in reducing unwanted
+    processing, either in tasks that haven't started yet or ones that have started
+    but need to be stopped/aborted. Hence, all the asynchronous APIs in .NET do support
+    cancellation.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Implementing continuations
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: In enterprise applications, most of the time, there will be a need to create
+    multiple tasks, build a hierarchy of tasks, create dependent tasks, or create
+    child/parent relationships between tasks. Task continuation can be used to define
+    such child tasks/sub-tasks. It works like JavaScript promises and supports chaining
+    tasks up to multiple levels. Just like promises, the subsequent task in a hierarchy
+    executes after the first task, and this can be further chained to multiple levels.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'There are various ways to achieve task continuation, but the most common way
+    is to use the `ContinueWith` method of the `Task` class, as shown in the following
+    example:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE169]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE170]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE171]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE172]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE173]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE174]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE175]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE176]'
+  prefs: []
+  type: TYPE_PRE
+- en: As you might have guessed, here the output would be `4`, and each task executes
+    once the preceding task's execution is completed.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`ContinueWith` accepts one important enum called `TaskContinuationOptions`,
+    which supports continuation for different conditions. For example, we can pass
+    `TaskContinuationOptions.OnlyOnFaulted` as a parameter to create a continuation
+    task that executes when there is an exception in the preceding task or pass `TaskContinuationOptions.AttachedToParent`
+    to create a continuation task that enforces a parent-child relationship and forces
+    a parent task to complete execution only after the child task.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'As with `WhenAll` and `WhenAny`, `ContinueWith` also comes with similar siblings,
+    as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`Task.Factory.ContinueWhenAll`: This accepts multiple task references as parameters
+    and creates a continuation when all the tasks are completed.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`Task.Factory.ContinueWhenAny`: This accepts multiple task references as parameters
+    and creates a continuation when one of the referenced tasks is completed.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Grasping task continuation is critical to understanding the under-the-hood workings
+    of async-await, which we will discuss later in this chapter.
+  prefs: []
+  type: TYPE_NORMAL
+- en: SynchronizationContext
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: '`SynchronizationContext` is an abstract class available in `System.Threading`
+    that helps in communication between threads. For example, updating a UI element
+    from a parallel task requires the thread to rejoin the UI thread and resume execution.
+    `SynchronizationContext` provides this abstraction primarily through the `Post`
+    method of this class, which accepts a delegate to execute at a later stage. So,
+    in the preceding example, if I need to update a UI element, I need to take `SynchronizationContext`
+    of the UI thread, call its `Post` method, and pass the necessary data to update
+    the UI element.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: As `SynchronizationContext` is an abstract class, there are various derived
+    types of it – for instance, Windows Forms has `WindowsFormsSynchronizationContext`
+    and WPF has `DispatcherSynchronizationContext`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The primary advantage of `SynchronizationContext` being an abstraction is that
+    it can be helpful to queue a delegate, irrespective of the overridden implementation
+    of the `Post` method.
+  prefs: []
+  type: TYPE_NORMAL
+- en: TaskScheduler
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: When we created tasks using the various methods described earlier, we saw that
+    a task gets *scheduled* on a `ThreadPool` thread, but the question arises of who
+    or what does that. `System.Threading.Tasks.TaskScheduler` is the class available
+    in the TPL that takes care of queueing and executing task delegates on a `ThreadPool`
+    thread.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Of course, this is an abstract class, and the framework comes with two derived
+    classes:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`ThreadPoolTaskScheduler`'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`SynchronizationContextScheduler`'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`TaskScheduler` exposes a `Default` property, which is by default set to `ThreadPoolTaskScheduler`.
+    Hence, by default, all tasks are scheduled to `ThreadPool` threads; however, a
+    GUI application typically uses `SynchronizationContextScheduler` so that tasks
+    can successfully go back and update UI elements.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: .NET Core comes with sophisticated derived types of the `TaskScheduler` and
+    `SynchronizationContext` classes. However, they play a major role in async-await,
+    and they help in debugging any deadlock-related issues quickly.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note that looking at the internal workings of `TaskScheduler` and `SynchronizationContext`
+    is beyond the scope of this book and is left to you to explore as an exercise.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Implementing data parallelism
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Data parallelism is all about partitioning a source collection into multiple
+    parallel executable tasks that perform the same operation parallelly. With the
+    TPL, this is available in the `Parallel` static class, which exposes methods such
+    as `For` and `ForEach` with multiple overloads to handle such execution.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Say you have a collection of a million numbers and you need to find the prime
+    numbers. Data parallelism can come in handy here, as the collection can be split
+    into ranges and evaluated for prime numbers. A typically parallel `for` loop is
+    written, as shown in the following snippet:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE177]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE178]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE179]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE180]'
+  prefs: []
+  type: TYPE_PRE
+- en: However, a more realistic example would be something like an image processing
+    application that needs to process each pixel in an image and reduce the brightness
+    of each pixel by five points. Such operations can be hugely benefited by data
+    parallelism, as each pixel is independent of the others and hence can be processed
+    parallelly.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Similarly, there is a `ForEach` method in the `Parallel` static class, which
+    can be used as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE181]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Some of the key advantages of data parallelism using `Parallel.For` and `Parallel.ForEach`
+    are listed here:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Good for canceling loops; they work similarly to `break` in a regular `for`
+    loop. In `Parallel.For`, this is supported by passing `ParallelStateOptions` to
+    the delegate and then calling `ParallelStateOptions.Break`. When `Break` is encountered
+    by one of the tasks, the `LowestBreakIteration` property of the `ParallelStateOptions`
+    class is set, and all the parallel tasks will iterate until this number is reached.
+    `ParallelLoopResult`, which is the return type of `Parallel.For` and `Parallel.ForEach`,
+    has the `IsCompleted` property, which states whether the loop executed prematurely.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: They also support stopping the loop immediately through `ParallelStateOptions.Stop`.
+    Also, some of the constructors of `Parallel.For` and `Parallel.ForEach` accept
+    cancellation tokens, which can also be used to simulate `ParallelStateOptions.Stop`;
+    however, a loop should be wrapped within a `try…catch` block, as `OperationCanceledException`
+    would be thrown.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: If one of the tasks throws an exception, all the tasks will complete their current
+    iteration and then stop processing. As with tasks, `AggregateException` is thrown
+    back.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Degrees of parallelism are supported by passing `ParallelOptions` and setting
+    `MaxDegreeOfParallelism`, which will control the number of cores that tasks can
+    parallelly execute on.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The custom partitioning of a source collection is supported through range partitioning
+    or chunk partitioning.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Supports thread-safe local variables that are scoped to a thread or partition.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Nested `Parallel.For` loops are supported, and their synchronization is automatically
+    handled without introducing any manual synchronization.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: If each iteration uses a shared variable, synchronization needs to be implemented
+    explicitly. So, to get the most out of data parallelism, use it for operations
+    that can execute independently for each iteration without depending on shared
+    resources.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Tip
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: Data parallelism should be used carefully, as at times it is misused. It's like
+    splitting 40 tasks among 4 people. If organizing this work (splitting and consolidating
+    it) among 4 people represents much more work than just performing the overall
+    work of the 40 tasks, then data parallelism isn't the right choice. For further
+    reading, refer to [https://docs.microsoft.com/en-us/dotnet/standard/parallel-programming/data-parallelism-task-parallel-library](https://docs.microsoft.com/en-us/dotnet/standard/parallel-programming/data-parallelism-task-parallel-library).
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: Using Parallel LINQ (PLINQ)
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'PLINQ is a parallel implementation of LINQ; this is a set of APIs available
+    in the `ParallelEnumerable` class that enables the parallel execution of LINQ
+    queries. The simplest way of making a LINQ query run parallelly is to embed the
+    `AsParallel` method in the LINQ query. See the following code snippet, which calls
+    a method that calculates the prime numbers between 1 and 1,000:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE182]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE183]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE184]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Using LINQ query syntax, this would be as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE185]'
+  prefs: []
+  type: TYPE_PRE
+- en: Internally, this query is split into multiple smaller queries that are parallelly
+    executed on each processor, hence speeding up the query. The partitioned source
+    needs to be merged back on the main thread so that the result (output collection)
+    can be looped through for further processing/display.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let''s create a console application that prints all prime numbers between a
+    given range, using PLINQ combined with `Parallel.For`. Add the following method,
+    which takes a number and returns `true` if it''s a prime number and `false` otherwise:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE186]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE187]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE188]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE189]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE190]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE191]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE192]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE193]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE194]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE195]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE196]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE197]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE198]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE199]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE200]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE201]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Now, in the main method, add the following code, which creates a list of the
+    first 100 numbers that we will loop through using PLINQ before passing it to the
+    `CalculatePrime` method; then, we''ll finally display the list of prime numbers
+    using `Parallel.ForEach`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE202]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE203]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE204]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE205]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE206]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE207]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE208]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE209]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE210]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE211]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE212]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE213]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE214]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE215]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE216]'
+  prefs: []
+  type: TYPE_PRE
+- en: The output for this sample would be a list of prime numbers; however, you can
+    see that the output will not be prime numbers in ascending order but in a random
+    order, as the `CalculatePrime` method is called with multiple numbers parallelly.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'A diagram of the internal working of the preceding code follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 4.4 – PLINQ and Parallel.ForEach'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '](img/Figure_4.4_B18507.jpg)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Figure 4.4 – PLINQ and Parallel.ForEach
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'PLINQ further provides a method to process the result of each partition/thread
+    without the overhead of merging the result into a calling thread using `ForAll`,
+    and the preceding code can be further optimized as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE217]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE218]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE219]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE220]'
+  prefs: []
+  type: TYPE_PRE
+- en: Tip
+  prefs: []
+  type: TYPE_NORMAL
+- en: One of the best tools for playing around with LINQ/PLINQ is LINQPad; I recommend
+    that you download it from [https://www.linqpad.net/Download.aspx](https://www.linqpad.net/Download.aspx).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Some of the important things to remember for PLINQ are as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Merging results to the main thread can be configured by using the `WithMergeOption`
+    method and passing the appropriate value through the `ParallelMergeOperation`
+    enum.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: As with other parallel extensions, any exception is returned as `AggregateException`,
+    and the execution of all the iterations stops immediately. Of course, if exceptions
+    are swallowed within the delegate instead of them being thrown back, the execution
+    can continue.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: There are various other extension methods, such as `AsSequential` and `AsOrdered`,
+    and these can be combined in one single LINQ query. For example, based on that,
+    `AsSequential` can be combined with `AsParallel` so that some partitions can be
+    run sequentially and other partitions can be executed parallelly.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Supports cancellation using the `WithCancellation` method.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Degrees of parallelism are supported through `WithDegreeOfParallelism`.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Data parallelism and PLINQ provide a lot of APIs that can be used to quickly
+    enable the parallel execution of code without adding any additional overhead to
+    the application logic. However, there is a subtle difference between them, as
+    explained in the preceding section, and they should be used differently accordingly.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Tip
+  prefs: []
+  type: TYPE_NORMAL
+- en: PLINQ and the TPL together comprise parallel extensions.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In this section, we have used `Thread.Sleep` in many places, but that has primarily
+    been to simulate long-running operations; however, it is never recommended that
+    you use this in production.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In the next section, we will see how we can club tasks with async-await and
+    use async-await in enterprise applications.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Introducing async-await
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: So far, we have discussed writing asynchronous code using tasks and how the
+    TPL simplifies creating and managing tasks. However, tasks primarily rely on continuation,
+    callbacks, or events to continue execution after the completion of a task.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In enterprise applications, managing such code would be difficult; any runtime
+    exceptions would be difficult to debug if too many tasks were chained. That's
+    where C# comes in with async-await, a language feature introduced in C# 5.0 that
+    simplifies the writing of asynchronous code, makes it more readable and maintainable,
+    improves exception handling, and makes things easy to debug. So, let's dive into
+    async-await.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`async` is a keyword in C# that is used as a modifier and, when prefixed to
+    any method (or Lambda), converts a method into a state machine, enabling the method
+    to use the `await` keyword in its body.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`await` is a keyword in C# that is used as an operator and is followed by an
+    expression that returns an awaitable object (usually a task). `await` can be used
+    only inside a method that has an `async` modifier, and as soon as a caller encounters
+    an `await` statement, control is returned and things are resumed; after `await`,
+    the task is completed using continuations.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The task-based asynchronous pattern
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'The `async` modifier and then use `await` on an asynchronous operation that
+    is wrapped in a task (or any custom awaitable type that exposes `GetAwaiter()`).
+    To put it simply, this pattern involves representing an asynchronous operation
+    using a single method that has an `async` modifier and returns a task; any asynchronous
+    operation is further awaited using `await`. The following is a sample code snippet
+    that downloads a file asynchronously, which is implemented using the TAP:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 4.5 – A sample asynchronous method using async-await'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '](img/Figure_4.5_B18507.jpg)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Figure 4.5 – A sample asynchronous method using async-await
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In the preceding figure, control flows as follows (using the number labels
+    in the figure):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The application starts execution with the `Main` method. Since `Main` is prefixed
+    with the `async` method, it gets transformed into a type that implements a state
+    machine. Execution continues until `await` is encountered at `await` `DownloadFileAsync`,
+    and the thread is returned to the caller.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Before returning to the caller, a call to the `DownloadFileAsync` method is
+    stored in a `Task` object, and a reference to the `Task` object is also preserved.
+    The remaining code of the `Main` method is wrapped inside the continuation of
+    this task.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: A `ThreadPool` thread will start executing a `DownloadFileAsync` method, and
+    it repeats the same steps – that is, it converts a method into a type that implements
+    a state machine, continues execution until `await` is encountered, and then the
+    task that is referenced is passed back; the remaining code is moved to the continuation
+    of this task.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: At some point, when the `DownloadDataTaskAsync` method is completed, the task
+    continuation gets triggered and will execute the remaining code.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: The process repeats until the task that has the reference of `DownloadFileAsync`
+    completes and its continuation is executed, which is `Console.WriteLine("File
+    downloaded!!")` in this case, and then the application exits.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'At an approximate high level, the code would be transformed as shown here:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 4.6 – A transformed sample asynchronous method'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '](img/Figure_4.6_B18507.jpg)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Figure 4.6 – A transformed sample asynchronous method
+  prefs: []
+  type: TYPE_NORMAL
+- en: Although this is an oversimplification of the under-the-hood workings of async-await,
+    we can see the compiler doing a lot of heavy lifting, including generating a type
+    that implements a state machine and continuing the execution using the state of
+    the callback.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We have seen how simple it is to write async methods, and we will be writing
+    many such methods in our enterprise application throughout the course of the book.
+    However, async-await is not a silver bullet; it is not an answer to every application
+    issue. We need to verify certain factors to make use of async-await. Let's see
+    what the principles are for using async-await.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs: []
+  type: TYPE_NORMAL
+- en: The preceding code would change slightly if there was `SynchronizationContext`.
+    For instance, in Windows Forms or WPF apps, continuation is posted on the current
+    `SynchronizationContext` using the `Post` method of `SynchronizationContext` or
+    `TaskScheduler.FromCurrentSynchronizationContext`. As per the standard naming
+    convention, asynchronous methods are suffixed with the word `async` for readability
+    purposes, but syntactically, it is not needed.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Principles of using async-await
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: As we start using async-await, there are certain practices that are recommended
+    that will enable an application to take advantage of asynchronous principles.
+    For example, for nested calls, we should use async-await all the way; do not use
+    `.Result` and so on. Here are a few guidelines to help you use async-await effectively.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Chain async-await all the way
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: An asynchronous method implemented using async-await should be triggered from
+    an async-await method so that it is properly awaited. If we try to call an asynchronous
+    method from a synchronous method using the `Result` method or the `Wait` method
+    of a task, it could lead to a deadlock.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let''s look at the following code snippet from a WPF application that downloads
+    files from the network upon a button click. However, instead of awaiting a call
+    to the asynchronous method, we are using the `Result` method of `Task`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE221]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE222]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE223]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE224]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE225]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE226]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE227]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE228]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE229]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE230]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE231]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE232]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE233]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE234]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE235]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE236]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE237]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE238]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE239]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE240]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE241]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE242]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE243]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE244]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE245]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE246]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE247]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE248]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE249]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE250]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE251]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE252]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'In this method, the code after `await` `webClient.DownloadDataTaskAsync(url);`
+    will never execute, for the following reasons:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: As soon as await is encountered, the `Task` reference object captures `SynchronizationContext`
+    in `TaskAwaitable` through the `GetAwaiter` method.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Once the `async` operation is completed, the continuation of that `await` needs
+    to execute on `SynchronizationContext` (through `SynchronizationContext.Post`).
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: However, `SynchronizationContext` is already blocked because the call to `task.Result`
+    on the click of a button is on the same `SynchronizationContext` and is waiting
+    for `DownloadDataTaskAsync` to complete, hence it is causing a deadlock.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: So, never block `async` methods; the best way to do `async` is all the way.
+    So, in the preceding code, you would change the call to `await` `DownloadFileAsync`
+    (and `async void` for button click – `await` needs a method to have an `async`
+    modifier).
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs: []
+  type: TYPE_NORMAL
+- en: The same code works fine in ASP.NET Core 6 applications without causing a deadlock
+    because ASP.NET Core 6 doesn't have `SynchronizationContext`, and continuation
+    executes on a `ThreadPool` thread without any involvement of a request context;
+    however, blocking asynchronous calls is still not recommended, even in ASP.NET
+    Core 6.
+  prefs: []
+  type: TYPE_NORMAL
+- en: ConfigureAwait
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: In the preceding discussion, since we had the end-to-end application code, it
+    was easier to find the cause of the deadlock. However, if we are developing a
+    library with asynchronous methods that can be used in WPF, ASP.NET Core 6, or
+    .NET Framework applications, we need to ensure that the asynchronous code within
+    the library does not cause a deadlock, even though the caller may be consuming
+    library methods through synchronous methods (`GetAwaiter().GetResult()`).
+  prefs: []
+  type: TYPE_NORMAL
+- en: In such cases, `Task` provides a method called `ConfigureAwait` that accepts
+    a Boolean value, which, when `true`, will use the original context of the caller
+    and, when `false`, will resume operation after `await` without depending on the
+    original context. In layman's terms, any code after `await` will execute independently,
+    irrespective of the state of the context that initiated the request.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Use `ConfigureAwait(false)`, especially if you are implementing a library method,
+    as it will avoid running a continuation on the original context. For library methods,
+    it is a must to use `ConfigureAwait(false)`, as they should never depend on the
+    calling/original context for the continuation. For example, the following code
+    won''t cause a deadlock:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE253]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE254]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE255]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE256]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE257]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE258]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE259]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE260]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE261]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE262]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE263]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE264]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE265]'
+  prefs: []
+  type: TYPE_PRE
+- en: By default, every `await` expression has `ConfigureAwait(true)`, so it's recommended
+    to call `ConfigureAwait(false)` explicitly as much as possible. Apart from avoiding
+    deadlocks, `ConfigureAwait(false)` also improves performance, as there is no marshaling
+    of the original context.
+  prefs: []
+  type: TYPE_NORMAL
+- en: This brings us to the question of whether there is a scenario that needs to
+    use `ConfigureAwait(true)`. The answer is that there are scenarios where a custom
+    `SynchronizationContext` is being built that needs to be used by a callback, and
+    it is then recommended to use `ConfigureAwait(true)`, or at least not use `ConfigureAwait(false)`,
+    as the default behavior of any task is the same as `ConfigureAwait(true)`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: CPU-bound versus I/O-bound
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: Always use async-await for I/O-bound work and the TPL for CPU-bound work to
+    achieve asynchrony. I/O operations such as database calls, network calls, and
+    filesystem calls can be wrapped in async-await asynchronous methods. However,
+    a CPU-intensive operation such as calculating pi is better handled using the TPL.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Going back to our earlier discussion, the idea of asynchronous programming is
+    to release `ThreadPool` threads instead of waiting on the completion of an operation.
+    This can very easily be achieved when we represent outbound calls as tasks and
+    use async-await.
+  prefs: []
+  type: TYPE_NORMAL
+- en: However, for a CPU-intensive operation, a `ThreadPool` thread will continue
+    to execute instructions on the worker thread (as it is a CPU-intensive operation
+    and needs CPU time) and obviously cannot release that thread. This means that
+    wrapping a CPU-intensive operation in async-await is not going to yield any benefit
+    and is the same as running it synchronously. So, a better way to handle CPU-intensive
+    operations is by using the TPL.
+  prefs: []
+  type: TYPE_NORMAL
+- en: This does not mean we will stop using async-await the moment we encounter a
+    CPU-intensive method. The recommended way is to still use async-await to manage
+    CPU-bound operations along with the TPL and not break our first principle of using
+    async-await all the way.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Here is a simple code snippet using async-await to manage CPU-bound work:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE266]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE267]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE268]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE269]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE270]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE271]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE272]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE273]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE274]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE275]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE276]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE277]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE278]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE279]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE280]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE281]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE282]'
+  prefs: []
+  type: TYPE_PRE
+- en: As seen in the preceding code, it's still possible to manage CPU-bound work
+    with a mix of async-await and the TPL; it's up to the developer to assess all
+    the possible options and write their code accordingly.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Avoid async void
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: Always make sure to have `Task` or `Task<T>` as the return type for an asynchronous
+    method implemented using async-await instead of `void` if a method is not expected
+    to return anything. The reason for this is that `Task` is a complex abstraction
+    that handles many things for us, such as exception handling and task completion
+    status. However, if an asynchronous method has an `async` `void` return type,
+    it is like a fire-and-forget method, and any caller to this method won't be able
+    to know the status of the operation, even if there is an exception.
+  prefs: []
+  type: TYPE_NORMAL
+- en: That is because inside an `async` `void` method, as soon as an `await` expression
+    is encountered, the call is returned to the caller without any reference to `Task`,
+    so there is no reference to raise an exception for. For a UI application such
+    as WPF, any exceptions on the `async` `void` method will crash the application;
+    however, an exception for this is `async` `void` event handlers.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Another disadvantage with `async` `void` methods is the inability to write unit
+    tests and assert them correctly. So, it's always recommended to use async `Task`
+    exceptions as top-level event handlers (top-level is key here) because top-level
+    events such as a button click or a mouse click are more of a one-way signal and
+    are not used any differently in asynchronous code compared to their synchronous
+    counterparts.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The same consideration needs to be taken in the case of `async` Lambdas, where
+    we need to avoid passing them as an argument to a method that takes the `Action`
+    type as its parameters. See the following example:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE283]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE284]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE285]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE286]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE287]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE288]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE289]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE290]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE291]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE292]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE293]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE294]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE295]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE296]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE297]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE298]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Here, it''s expected that the value of `elapsedTime` will be somewhere around
+    10,000\. However, it''s close to 100 for the same reason – that is, with `Action`
+    being a delegate of the `void` return type, the call to `AsyncLambda` is returned
+    immediately to the `Main` method (as with any `async` `void` method). This can
+    be fixed by changing `AsyncLambda` as follows (or just by changing the parameter
+    to `Func<Task>` and handling the wait on `a()` accordingly) and then forcing the
+    caller to use `async` all the way:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE299]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE300]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE301]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE302]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE303]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE304]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE305]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE306]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE307]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE308]'
+  prefs: []
+  type: TYPE_PRE
+- en: A word of caution – if there are methods in your application that accept the
+    `Action` type parameters, it's recommended that you have an overload that accepts
+    `Func<Task>` or `Func<Task<T>>`. Fortunately, the C# compiler automatically handles
+    this and always calls the overload with `Func<Task>` as a parameter.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Tip
+  prefs: []
+  type: TYPE_NORMAL
+- en: Use the Visual Studio 2022 Exception Helper feature to debug `async` exceptions
+    that are rethrown by framework code.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Async streams with IAsyncEnumerable
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'We all know that `foreach` is used to loop over `IEnumerable<T>` or `IEnumerator<T>`.
+    Let''s look at the following code, in which we retrieve all employee IDs from
+    a database and loop through each employee to print their ID:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE309]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE310]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE311]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE312]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE313]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE314]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE315]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE316]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE317]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The `GetEmployeeIDAsync` implementation is as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE318]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE319]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE320]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE321]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE322]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE323]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE324]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE325]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE326]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE327]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE328]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE329]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE330]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE331]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Here, you can see that we must use a temporary list until we have received
+    all the records from the database, and finally, we return the list. However, if
+    there is an iterator in our method, `yield` in C# is an obvious choice, as that
+    helps in returning the results immediately and avoiding temporary variables. Now,
+    say you used `yield`, as shown in the following code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE332]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'You would receive the following error upon compilation:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE333]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Hence, there is a need to be able to use `yield` with an `async` method and
+    also loop through a collection to call an application asynchronously. That''s
+    where C# 8.0 came up with asynchronous streams through `IAsyncEnumerable`, which
+    primarily enables you to return data immediately and asynchronously consume a
+    collection. So, the preceding code can be changed as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE334]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE335]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE336]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE337]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE338]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE339]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE340]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE341]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE342]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE343]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE344]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE345]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE346]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE347]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE348]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE349]'
+  prefs: []
+  type: TYPE_PRE
+- en: So, here you can see that once a method starts returning, `IAsyncEnumerable`
+    loops can be iterated asynchronously, and this is helpful in many situations to
+    write cleaner code.
+  prefs: []
+  type: TYPE_NORMAL
+- en: ThreadPool starvation
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Say you have an application with asynchronous code. However, you have noticed
+    that periodically, during high loads, the response time for requests drastically
+    increases. You research it further, but neither is the CPU of your server fully
+    utilized nor is the memory of your process high, and it isn't a case of your database
+    becoming a bottleneck either. In this case, your application is possibly causing
+    what is known as `ThreadPool` starvation.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`ThreadPool` starvation is a state in which new threads keep being added to
+    serve concurrent requests, and eventually, a point is reached where `ThreadPool`
+    is unable to add more threads, and requests start seeing delayed response times
+    or even start failing in the worst-case scenario. Even if `ThreadPool` can add
+    threads at a rate of one or two per second, new requests may be coming at a higher
+    rate (as in a burst load on a web application during the holiday season). Hence,
+    there is a significant increase in the response time. There are multiple reasons
+    why this can happen; a few of them are listed here:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The consumption of more threads to speed up long-running CPU-bound work
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The calling of an `async` method in a `sync` method using `GetAwaiter().GetResult()`
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The incorrect use of synchronization primitives, such as a thread holding a
+    lock for a long time and other threads waiting to acquire it
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: In all the preceding points, the common thing is blocking code; so, the use
+    of blocking code such as `Thread.Sleep` even for a short duration, something such
+    as `GetAwaiter().GetResult()`, or trying to allocate more threads for a CPU-bound
+    item increases the number of threads in `ThreadPool` and eventually leads to starvation.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`ThreadPool` starvation can be further diagnosed using tools such as **PerfView**,
+    where you capture a trace for, say, 200 seconds, and verify the growth of threads
+    in your process. If you see that your threads are growing at a rapid pace during
+    peak load, then there is a possibility of starvation.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The best way to prevent `ThreadPool` starvation is to use async-await throughout
+    the application and never block any `async` calls. Also, the throttling of newly
+    created operations can help, as it restricts the number of items that can be queued
+    at a time.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In this section, we discussed two important constructs, async-await and the
+    TPL, which when combined make writing asynchronous code simpler. In the next section,
+    we will learn about various data structures that are available in .NET 6 to support
+    synchronization/thread safety without writing any additional code.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Using concurrent collections for parallelism
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Collections classes are one of the most used types to encapsulate, retrieve,
+    and modify enumerated sets of related data. `Dictionary`, `list`, `queue`, and
+    `array` are some of the frequently used collection types, but they are not thread-safe.
+    These collections are good if you access them from just one thread at a time.
+  prefs: []
+  type: TYPE_NORMAL
+- en: A real-world environment would be multithreaded, and to make it thread-safe,
+    you will have to implement various synchronization constructs, as described in
+    an earlier section. To solve this problem, Microsoft came up with concurrent collection
+    classes, such as `ConcurrentQueue`, `ConcurrentBag`, `ConcurrentDictionary`, and
+    `ConcurrentStack`, which are thread-safe, as they internally implement synchronization.
+    Let's look at them in detail in the following sections.
+  prefs: []
+  type: TYPE_NORMAL
+- en: ConcurrentDictionary
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Let's stimulate a multithreaded environment using a dictionary. Consider the
+    `t1` task as one operation from a client who is adding to the dictionary and the
+    `t2` task as a second operation from another client who is reading from the dictionary.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We add `Thread.Sleep` in each task to mimic a real-world scenario to ensure
+    that one task doesn''t complete before the other in this example. Let''s consider
+    an example console application with the following code snippet:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE350]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE351]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE352]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE353]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE354]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE355]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE356]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE357]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE358]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE359]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE360]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'This is `Task` `t2` as a second operation from another client who is reading
+    from the dictionary:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE361]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE362]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE363]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE364]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE365]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE366]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE367]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE368]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE369]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE370]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Now, both tasks are executed at the same time, as shown in the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE371]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE372]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE373]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE374]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE375]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE376]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE377]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE378]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE379]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE380]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'When you run this program, you will get the following exception, which states
+    that you cannot modify and enumerate the collection at the same time:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Table 4.2 – The ConcurrentDictionary sample output'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '](img/Table_4.2.jpg)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Table 4.2 – The ConcurrentDictionary sample output
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'You may think now that we can add a lock to manage thread synchronization and
+    avoid this exception in multithreaded scenarios for thread safety. I added a lock
+    to the code wherever the dictionary is modified and enumerated to synchronize
+    the threads. Here are the updated code snippets:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'First, we have `Task` `t1` as one operation from a client who is adding to
+    the dictionary:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE381]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Then, we have `Task` `t2` as a second operation from another client who is
+    reading from the dictionary:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE382]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Now, we have both tasks executed at the same time:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE383]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: When you run this code, you will not see any exceptions. However, locks have
+    some issues, as mentioned earlier, so this code can be rewritten using concurrent
+    collections. They internally use a multiple-thread synchronization technique that
+    helps to scale well, prevent data corruption, and avoid all the problems with
+    locks.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We can rewrite our code using `ConcurrentDictionary`, which is available in
+    the `System.Collections.Concurrent` namespace. Replace `Dictionary` with `ConcurrentDictionary`
+    in the sample code. You can also remove the reference to the `System.Collections.Generic`
+    namespace, as `Dictionary` is not used now. Also, remove all the locks. The updated
+    code is as follows, where we replace `Dictionary` with `ConcurrentDictionary`
+    and remove the lock:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We have `Task t1` as one operation from a client who is adding to the dictionary,
+    and an explicit lock is not needed with concurrent collections:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE384]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Then, we have `Task t2` as a second operation from another client who is reading
+    from the dictionary, and an explicit lock is not needed with concurrent collections:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE385]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Now, both tasks are executed at the same time:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE386]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'When you run the program now, you will not get any exceptions, as all operations
+    are thread-safe and atomic in `ConcurrentDictionary`. There is no overhead for
+    the developer in implementing the locks and maintaining them as the project grows
+    bigger. Here are some caveats with concurrent collections such as `ConcurrentDictionary`
+    that you need to bear in mind:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: If two threads call `AddOrUpdate`, there's no guarantee which of the factory
+    delegates will be called and even no guarantee that if a factory delegate produces
+    an item, the item will be stored in the dictionary.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The enumerator obtained by the `GetEnumerator` call is not a snapshot and may
+    be modified during enumeration (which doesn't cause any exceptions).
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Key and value properties are snapshots of corresponding collections and may
+    not correspond to the actual dictionary state.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: We've looked at `ConcurrentDictionary` in detail; let's look at other concurrent
+    collections in the next section.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Producer-consumer concurrent collections
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: In producer-consumer concurrent collections, one or more threads can produce
+    tasks (adding to a queue, stack, or bag, for instance), and one or more other
+    threads can consume tasks from the same collection (the queue, stack, or bag).
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`ConcurrentDictionary`, which we saw in the previous section, is a general-purpose
+    collection class where you add an item that you want and specify which item you
+    want to read. Other concurrent collections are designed for specific problems:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`ConcurrentQueue` is for scenarios where you want FIFO.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`ConcurrentStack` is for scenarios where you want LIFO.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`ConcurrentBag` is for scenarios where you want the same thread producing and
+    consuming data stored in the bag and the order doesn''t matter.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'These three collections are also known as **producer-consumer collections**,
+    where one or more threads can produce tasks and consume tasks from the same collection,
+    as shown in the following figure:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 4.7 – A producer-consumer concurrent collection'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '](img/Figure_4.7_B18507.jpg)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Figure 4.7 – A producer-consumer concurrent collection
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'All these three collections implement the `IProducerConsumerCollection<T>`
+    interface, and the most important methods are `TryAdd` and `TryTake`, as shown
+    here:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE387]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE388]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE389]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE390]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Let''s take an example of a producer-consumer and simulate it using `ConcurrentQueue`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**Producer**: A client sending a request to a web service and the server storing
+    a request in a queue'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Consumer**: A worker thread pulling the request from the queue and processing
+    it'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'The implementation is shown in the following code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE391]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE392]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE393]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE394]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE395]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE396]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE397]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE398]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE399]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE400]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE401]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE402]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE403]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Now, we have `Consumer`, where a `Worker` thread pulls the request from the
+    queue and processes it:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE404]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE405]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE406]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE407]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE408]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE409]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE410]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE411]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE412]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE413]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE414]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE415]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE416]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE417]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE418]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE419]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Both producer and consumer tasks are executed at the same time successfully.
+    Wait for all provided tasks to complete execution within the specified number
+    of milliseconds. Refer to the following code snippet:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE420]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE421]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE422]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE423]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE424]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE425]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE426]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE427]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'This is according to the method definition from Microsoft:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`concurrentQueue.Enqueue`: This adds an object to the end of `ConcurrentQueue<T>`.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`concurrentQueue.TryDequeue`: This tries to remove and return the object at
+    the beginning of `ConcurrentQueue`.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'When you run the program, you can see `task` `t1` producing requests and `task`
+    `t2` polling and then consuming requests. We''ll get into the details in a short
+    while. We also said that these classes implement `IProducerConsumerCollection<T>`,
+    so we are going to make three changes to the previous code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Replace `ConcurrentQueue<string>` with `IProducerConsumerCollection<string>`.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Replace `concurrentQueue.Enqueue` with `concurrentQueue.TryAdd`.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Replace `concurrentQueue.TryDequeue` with `concurrentQueue.TryTake`.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'This is how the code looks now:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE428]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE429]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE430]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE431]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE432]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE433]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE434]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE435]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE436]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE437]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE438]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE439]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE440]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE441]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE442]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE443]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Now, go ahead and run the program. You can see `task` `t1` producing requests
+    and `task` `t2` polling and then consuming requests. You can see all 10 requests
+    produced by `task` `t1` and consumed by `task` `t2`. But there are two problems:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The producer is producing at its own rate, the consumer is consuming at its
+    own rate, and there is no synchronization.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: There is continuous indefinite polling from the consumer in `task` `t2`, which
+    is not good for performance and CPU usage, as we can see by `concurrentQueue.TryTake`.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: This is where `BlockingCollection<T>` comes in handy.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The BlockingCollection<T> class
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: '`BlockingCollection<T>` supports bounding and blocking. Bounding allows you
+    to specify a maximum capacity for a collection. Controlling the maximum size of
+    a collection helps to prevent producing threads from moving too far ahead of consuming
+    threads. Multiple producing threads can add items to `BlockingCollection<T>` concurrently
+    until the collection reaches its maximum size, after which they will be blocked
+    until an item is removed by consumers.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Similarly, multiple consuming threads can remove items from a blocking collection
+    concurrently till the collection becomes empty, after which they will be blocked
+    until an item is added by producers. A producing thread can invoke the `CompleteAdding`
+    method when no more items will be added and indicate that it has completed adding.
+    This will help consumers to monitor the `IsCompleted` property to know that no
+    more items will be added when the collection is empty.
+  prefs: []
+  type: TYPE_NORMAL
+- en: When you create a `BlockingCollection<T>` class, along with the bounding capacity,
+    you can also specify the type of concurrent collection to use depending upon the
+    scenario. By default, the collection type is `ConcurrentQueue<T>` for `BlockingCollection<T>`
+    when you don't specify the type.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Here is a sample code snippet:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE444]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE445]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE446]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE447]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE448]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE449]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE450]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE451]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE452]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE453]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE454]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE455]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE456]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Then, the consumer with the `Worker` thread pulls the item from the queue and
+    processes it:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE457]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE458]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE459]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE460]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE461]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE462]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE463]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE464]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE465]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE466]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE467]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE468]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE469]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE470]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE471]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE472]'
+  prefs: []
+  type: TYPE_PRE
+- en: Now, the producer and consumer thread are accessed concurrently.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'There are a few points to consider in the code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The specified bounding of `5`: `BlockingCollection<string> blockingCollection
+    = new BlockingCollection<string>(new ConcurrentQueue<string>(),5);`.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'The producing thread invokes the `CompleteAdding` method when no more items
+    will be added to indicate that it has completed adding: `blockingCollection.CompleteAdding();`.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Consumers monitor the `IsCompleted` property to find out that no more items
+    will be added when the collection is empty: `while (!blockingCollection.IsCompleted)`.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Try to remove an item from `BlockingCollection<T>` in the specified time –
+    for example, I have gone with 100 milliseconds: `if (blockingCollection.TryTake(out
+    string request, 100))`.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: This is the power of a blocking collection. Both the producer and consumer are
+    decoupled, they can be coded independently by different teams, and at runtime,
+    they use a blocking concurrent collection to share data with each other. Plus,
+    at the same time, flow is controlled with the bounding capacity so that the producer
+    doesn't move too far ahead of consumers.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In addition to the `TryTake` method that we''ve seen, you can also use a `foreach`
+    loop to remove items from a blocking collection. You can read about it here:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[https://docs.microsoft.com/en-us/dotnet/standard/collections/thread-safe/how-to-use-foreach-to-remove](https://docs.microsoft.com/en-us/dotnet/standard/collections/thread-safe/how-to-use-foreach-to-remove)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'With blocking collections, there will be scenarios where the consumer will
+    have to work with multiple collections and take or add items. The `TakeFromAny`
+    and `AddToAny` methods will help you in this scenario. You can read further about
+    these two methods here:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[https://docs.microsoft.com/en-us/dotnet/api/system.collections.concurrent.blockingcollection-1.takefromany?view=net-6.0](https://docs.microsoft.com/en-us/dotnet/api/system.collections.concurrent.blockingcollection-1.takefromany?view=net-6.0)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[https://docs.microsoft.com/en-us/dotnet/api/system.collections.concurrent.blockingcollection-1.addtoany?view=net-6.0](https://docs.microsoft.com/en-us/dotnet/api/system.collections.concurrent.blockingcollection-1.addtoany?view=net-6.0)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Summary
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Wrapping up, writing, and maintaining clean asynchronous code is difficult.
+    However, with the various constructs available in .NET and C#, developers can
+    now write asynchronous code with less framework overhead and focus more on the
+    business requirements.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In this chapter, we covered various ways to write scalable asynchronous code
+    using the TPL, async-await, and concurrent collections, and we also covered the
+    fundamentals of threads and `ThreadPool` in .NET to understand the framework internals
+    and write cleaner code for enterprise applications. Now, we have a deeper understanding
+    of multithreading and how to protect shared data in a multithreaded environment.
+    We learned about creating tasks and implementing asynchronous functions using
+    async-await, and finally, we learned about the concurrent collections available
+    in .NET Core and their implementation in various concurrent scenarios.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In the next chapter, we will look into dependency injection in .NET 6 and how
+    it plays a significant role in loosely coupling various low-level classes in enterprise
+    applications.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Questions
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In a multithreaded environment, which of the following data structures should
+    you use to protect data from getting overwritten/corrupted?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: a. `async`-`await`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: b. Tasks.
+  prefs: []
+  type: TYPE_NORMAL
+- en: c. Synchronization constructs such as locks.
+  prefs: []
+  type: TYPE_NORMAL
+- en: d. Data never gets corrupted.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**Answer : a**'
+  prefs: []
+  type: TYPE_NORMAL
+- en: If you have a WPF application that retrieves data from a REST API, which of
+    the following should you implement for better responsiveness?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: a. A concurrent collection
+  prefs: []
+  type: TYPE_NORMAL
+- en: b. `Parallel.For`
+  prefs: []
+  type: TYPE_NORMAL
+- en: c. `async`-`await` for the REST API calls
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**Answer: c**'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Which of the following should be passed to cancel a task?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: a. `CancellationToken`
+  prefs: []
+  type: TYPE_NORMAL
+- en: b. `ConcurrentDictionary`
+  prefs: []
+  type: TYPE_NORMAL
+- en: c. `SemaphoreSlim`
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**Answer: a**'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Which of the following is the recommended return type for an asynchronous method
+    that uses async-await and does not return anything?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: a. `async void`
+  prefs: []
+  type: TYPE_NORMAL
+- en: b. `async Task`
+  prefs: []
+  type: TYPE_NORMAL
+- en: c. `async book`
+  prefs: []
+  type: TYPE_NORMAL
+- en: d. `async Task<bool>`
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**Answer: b**'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Further reading
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: '[https://www.packtpub.com/product/hands-on-parallel-programming-with-c-8-and-net-core-3/9781789132410](https://www.packtpub.com/product/hands-on-parallel-programming-with-c-8-and-net-core-3/9781789132410)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[https://devblogs.microsoft.com/dotnet/configureawait-faq/](https://devblogs.microsoft.com/dotnet/configureawait-faq/)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[http://www.albahari.com/threading/](http://www.albahari.com/threading/)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '*Dataflow (Task Parallel Library) | Microsoft Docs*: [https://docs.microsoft.com/en-us/dotnet/standard/parallel-programming/dataflow-task-parallel-library](https://docs.microsoft.com/en-us/dotnet/standard/parallel-programming/dataflow-task-parallel-library)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL

@@ -1,7 +1,9 @@
 - en: Aggregate Persistence
+  id: totrans-0
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 聚合持久化
 - en: We have spent enough time discussing how to ensure domain model consistency
     with explicitly defined business rules. In this chapter, we will go further with
     persisting our aggregates to the database. Since our model is not being designed
@@ -16,54 +18,81 @@
     All these differences between having a domain object to persist on one side and
     a database engine with all its quirks and tweaks on the other side, will create
     challenges for developers.
+  id: totrans-1
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们已经花费足够的时间讨论了如何通过显式定义的业务规则来确保领域模型的一致性。在本章中，我们将进一步讨论将我们的聚合持久化到数据库中。由于我们的模型不是围绕任何数据库设计的，我们在尝试使用数据库引擎存储复杂对象图时可能会遇到问题。这是因为数据库不与对象协同工作。相反，关系型数据库被优化为存储可能使用主键和外键进行关系操作的数据表。文档数据库以机器可读的格式（如
+    JSON）存储对象，并且根据定义能够以原样持久化复杂对象图；然而，我们不应该自欺欺人，因为这些对象的组织方式仍然存在严重的限制，以便数据库客户端库可以将我们的对象转换为
+    JSON 并返回。所有这些差异，一方面是具有要持久化的领域对象，另一方面是具有所有怪癖和调整的数据库引擎，将为开发者带来挑战。
 - en: 'In this chapter, we will cover the following topics:'
+  id: totrans-2
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本章中，我们将涵盖以下主题：
 - en: The repository pattern
+  id: totrans-3
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 仓储模式
 - en: Impedance mismatch
+  id: totrans-4
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 阻抗不匹配
 - en: Using a document database for persistence
+  id: totrans-5
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 使用文档数据库进行持久化
 - en: Using a relational database for persistence
+  id: totrans-6
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 使用关系型数据库进行持久化
 - en: Technical requirements
+  id: totrans-7
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 技术要求
 - en: The code for this chapter can be found in the `Chapter08` folder of the book
     repository on GitHub. There are three subfolders there. One is called `before`,
     and the code there can be used to follow the course of this chapter as it goes
     further with the persistence implementation. Two other folders, `ravendb` and
     `ef-core`, contain the final code that implements the aggregate persistence using
     the RavenDB document database and the Entity Framework Core and PostgreSQL.
+  id: totrans-8
   prefs: []
   type: TYPE_NORMAL
+  zh: 本章的代码可以在 GitHub 上书籍仓库的 `Chapter08` 文件夹中找到。那里有三个子文件夹。其中一个叫做 `before`，其中的代码可以用来跟随本章的进度，随着持久化实现的深入。另外两个文件夹，`ravendb`
+    和 `ef-core`，包含使用 RavenDB 文档数据库和 Entity Framework Core 以及 PostgreSQL 实现聚合持久化的最终代码。
 - en: You will need to use `docker-compose` to run the infrastructure. This implies
     that you need to have Docker installed, as well. Follow the Docker CE installation
     guidelines at [https://docs.docker.com/install/](https://docs.docker.com/install/)
     and the Docker Compose installation guidelines at [https://docs.docker.com/compose/install/](https://docs.docker.com/compose/install/).
+  id: totrans-9
   prefs: []
   type: TYPE_NORMAL
+  zh: 您需要使用 `docker-compose` 来运行基础设施。这意味着您也需要安装 Docker。请遵循 Docker CE 安装指南，网址为 [https://docs.docker.com/install/](https://docs.docker.com/install/)，以及
+    Docker Compose 安装指南，网址为 [https://docs.docker.com/compose/install/](https://docs.docker.com/compose/install/)。
 - en: If you have not run Docker on your machine before, or if you did it a while
     ago, you might need to log in using the `docker login` command. For that command,
     you need to have an account on Docker Hub, which you can create for free at [https://hub.docker.com](https://hub.docker.com).
+  id: totrans-10
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果您之前从未在您的机器上运行过 Docker，或者您是在一段时间前运行的，您可能需要使用 `docker login` 命令进行登录。执行该命令需要您在
+    Docker Hub 上有一个账户，您可以在 [https://hub.docker.com](https://hub.docker.com) 上免费创建。
 - en: Aggregate persistence
+  id: totrans-11
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 聚合持久化
 - en: Now that we have discussed in detail how complex object graphs with complex
     business rules can be implemented using the **a****ggregate** pattern, we need
     to look at how to enable persistence for the aggregates that we use in our system.
@@ -74,46 +103,64 @@
     that we will most likely face impedance mismatch when trying to comply with the
     requirements that a chosen persistence method might have for our objects, so that
     we can both save them to the database and retrieve them back.
+  id: totrans-12
   prefs: []
   type: TYPE_NORMAL
+  zh: 既然我们已经详细讨论了如何使用**聚合**模式实现具有复杂业务规则的对象图，我们就需要看看如何为我们在系统中使用的聚合启用持久化。在上一章中，我们简要地介绍了**存储库**模式，它允许我们将持久化从领域抽象出来。我们还开始通过使用RavenDB文档数据库来实现持久化层的实现，因为它更容易将复杂对象保存为文档。然而，我们也了解到，当我们试图满足所选持久化方法对我们对象的要求时，我们很可能会遇到阻抗不匹配的问题，这样我们就可以将它们保存到数据库中并检索回来。
 - en: Repository and units of work
+  id: totrans-13
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 存储库和工作单元
 - en: 'Let''s go back to the point where we used the repository pattern to persist
     our aggregates. As you will remember, the purpose of the repository pattern is
     to abstract aggregate persistence. That is exactly what we are going to do now.
     We still have the repository interface, and it looks like this:'
+  id: totrans-14
   prefs: []
   type: TYPE_NORMAL
+  zh: 让我们回到我们使用存储库模式来持久化聚合的地方。正如你将记得的那样，存储库模式的目的就是抽象聚合的持久化。这正是我们现在要做的。我们仍然有存储库接口，它看起来是这样的：
 - en: '[PRE0]'
+  id: totrans-15
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE0]'
 - en: The repository pattern is one of the most debated patterns that exists, and
     to understand why that is, we need to get back to the definition. For example,
     this is how this pattern is defined in the *Patterns of Enterprise Application
     Architecture* book by Martin Fowler (extract taken from [https://martinfowler.com/eaaCatalog/repository.html](https://martinfowler.com/eaaCatalog/repository.html)). 
     It's recommended that you have a look at the definition given on that page.
+  id: totrans-16
   prefs: []
   type: TYPE_NORMAL
+  zh: 存储库模式是存在的一些最具争议的模式之一，要理解为什么会这样，我们需要回到定义本身。例如，这是在Martin Fowler的《企业应用架构模式》一书中对这种模式是如何定义的（摘自[https://martinfowler.com/eaaCatalog/repository.html](https://martinfowler.com/eaaCatalog/repository.html)）。建议你查看该页面上给出的定义。
 - en: The diagram that you can find on the web page that we mentioned earlier shows
     that a client can ask a repository to retrieve a set of objects that satisfy certain
     criteria. The client can also add and remove objects from the repository.
+  id: totrans-17
   prefs: []
   type: TYPE_NORMAL
+  zh: 你可以在我们之前提到的网页上找到的图表显示，客户端可以要求存储库检索满足某些条件的对象集。客户端还可以从存储库中添加和删除对象。
 - en: 'The debate about repositories generally involves the fact that in many cases,
     developers also implement a repository as a unit of work. In addition, it is quite
     common to see *generic repositories*, like this:'
+  id: totrans-18
   prefs: []
   type: TYPE_NORMAL
+  zh: 关于存储库的辩论通常涉及这样一个事实，在许多情况下，开发人员也将存储库实现为一个工作单元。此外，看到*通用存储库*相当普遍，如下所示：
 - en: '[PRE1]'
+  id: totrans-19
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE1]'
 - en: The `Query` method allows for sending a lambda expression to a typed repository,
     and the generic repository implementation will then send the query to the underlying
     ORM framework or document database API, without much thinking.
+  id: totrans-20
   prefs: []
   type: TYPE_NORMAL
+  zh: '`Query`方法允许向类型化存储库发送一个lambda表达式，然后通用的存储库实现将查询发送到底层的ORM框架或文档数据库API，而不需要太多思考。'
 - en: This approach makes people think that repositories are just unnecessary abstractions
     on top of ORM frameworks. Many argue that when developers send a free-form query
     and leave it to the ORM framework to translate this query to an SQL statement,
@@ -126,20 +173,26 @@
     For relational databases, using LINQ query translators via ORMs can lead to suboptimal
     queries that can severely impact not only the application performance, but the
     performance of the database server itself.
+  id: totrans-21
   prefs: []
   type: TYPE_NORMAL
+  zh: 这种方法让人们认为存储库只是ORM框架上不必要的抽象。许多人认为，当开发者发送一个自由形式的查询并将其留给ORM框架将其转换为SQL语句时，这会给开发者一种对数据库技术的无知感，而且很少会有好结果。我们不能只是忽略数据库并向其发送任何查询，因为这可能导致性能问题，由于缺乏查询优化。对于某些文档数据库，这种方法甚至可能不起作用，因为数据库需要有一个预定义的索引来执行查询。RavenDB可以根据任何查询创建自动索引，但出于性能原因，不推荐这样做。对于关系数据库，通过ORM使用LINQ查询转换器可能会导致次优查询，这不仅会严重影响应用程序性能，还会严重影响数据库服务器的性能。
 - en: At the same time, if we decide not to have repositories, we might end up dealing
     with persistence when designing our domain model, and that should not be the case.
     A domain model exists on its own, and it is designed to deal with business rules
     and invariants, and not to deal with the database.
+  id: totrans-22
   prefs: []
   type: TYPE_NORMAL
+  zh: 同时，如果我们决定不使用存储库，我们可能会在设计领域模型时处理持久化问题，而这不应该发生。领域模型是独立存在的，它被设计用来处理业务规则和不变性，而不是处理数据库。
 - en: Eric Evans insists that querying repositories must happen by using predefined
     specifications and not by sending any queries. These specifications need to use
     the Ubiquitous Language to express the intent of a client to retrieve a set of
     objects from the repository.
+  id: totrans-23
   prefs: []
   type: TYPE_NORMAL
+  zh: 艾瑞克·埃文斯坚持认为，查询存储库必须通过使用预定义的规范来进行，而不是发送任何查询。这些规范需要使用通用语言来表达客户端从存储库检索一组对象的目的。
 - en: For example, we must prefer using `IEnumerable<ClassifiedAd> GetAdsPendingReview()`
     or `IEnumerable<ClassifiedAd> Query(Specifications.GetAdsPendingReview)` over
     a generic call, like `IEnumerable<ClassifiedAd> Query(x => x.State == ClassifiedAdState.PendingReview)`.
@@ -149,36 +202,50 @@
     The last reason is that we put the query conditions inside the specification,
     or inside the repository method, so we are free to change those rules if needed,
     and those rules are only defined in one place.
+  id: totrans-24
   prefs: []
   type: TYPE_NORMAL
+  zh: 例如，我们应优先使用`IEnumerable<ClassifiedAd> GetAdsPendingReview()`或`IEnumerable<ClassifiedAd>
+    Query(Specifications.GetAdsPendingReview)`而不是一个通用的调用，如`IEnumerable<ClassifiedAd>
+    Query(x => x.State == ClassifiedAdState.PendingReview)`。这样做的一个原因是使查询更具表达性并使用领域语言。另一个原因是让存储库决定如何执行特定的查询，因为我们控制着客户端可以使用的所有查询。最后一个原因是我们将查询条件放在规范内部或存储库方法内部，这样我们就可以在需要时自由地更改这些规则，而这些规则只在一个地方定义。
 - en: So, if we spend less time arguing about repositories and more time understanding
     the original definitions, we'll see that executing queries using a specification
     is not equal to shoving queries to ORMs, but involves executing specific queries
     that are named following the Ubiquitous Language and are optimized to work with
     the database that our application intends to use.
+  id: totrans-25
   prefs: []
   type: TYPE_NORMAL
+  zh: 因此，如果我们花更少的时间争论存储库，更多的时间去理解原始定义，我们会发现使用规范执行查询并不等同于将查询推送到对象关系映射（ORM），而是涉及执行特定的查询，这些查询遵循通用语言命名，并且针对我们的应用程序打算使用的数据库进行了优化。
 - en: 'Let''s see how we can change our repository to be closer to the original definition.
     First, we need to get rid of the `Save` method, since it is the repository client
     (our application service) that will control the unit of work and will have a final
     say on whether changes need to be committed to the database. Then, we add at least
     one query that we will need in the application service when we check if an object
     already exists in the database:'
+  id: totrans-26
   prefs: []
   type: TYPE_NORMAL
+  zh: 让我们看看我们如何改变我们的仓库以更接近原始定义。首先，我们需要去掉`Save`方法，因为仓库客户端（我们的应用服务）将控制工作单元，并将最终决定是否需要将更改提交到数据库。然后，我们添加至少一个查询，当我们在数据库中检查对象是否已存在时，我们将在应用服务中使用这个查询：
 - en: '[PRE2]'
+  id: totrans-27
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE2]'
 - en: With this interface, we have no ability for the repository implementation to
     control transactions, and that will become the responsibility of our application
     layer. We don't still want our application service to be directly coupled to the
     persistence layer, following the ports and adapters architecture.
+  id: totrans-28
   prefs: []
   type: TYPE_NORMAL
+  zh: 通过这个接口，我们无法控制仓库实现的交易，这将成为我们应用层的责任。我们仍然不希望我们的应用服务直接耦合到持久化层，遵循端口和适配器架构。
 - en: Implementation for RavenDB
+  id: totrans-29
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: RavenDB的实现
 - en: Now, let's start doing stuff with a real database; our first exercise will be
     using the RavenDB document database. This database was created with the NHibernate
     API in mind, but without the burden of object-relational mapping. It stores objects
@@ -186,8 +253,10 @@
     using quite complex filters. RavenDB is a commercial product, but it has a free
     license option, which is perfectly suitable to build a small application and put
     it into production.
+  id: totrans-30
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在，让我们开始使用真实数据库做一些事情；我们的第一个练习将是使用RavenDB文档数据库。这个数据库是考虑到NHibernate API创建的，但没有对象关系映射的负担。它以JSON文档的形式存储对象，支持事务，并且可以使用相当复杂的过滤器处理存储文档的查询。RavenDB是一个商业产品，但它有一个免费许可选项，非常适合构建小型应用程序并将其投入生产。
 - en: The choice of RavenDB for this book may not be obvious for some readers. Apparently,
     MongoDB would be a better choice in terms of popularity. Also, Azure Cosmos DB
     has the Mongo API and it makes the MongoDB driver more attractive to use in the
@@ -195,33 +264,46 @@
     community, and it also has a best-in-class web user interface that will be really
     helpful for seeing what is going on in the database as we move along with this
     chapter.
+  id: totrans-31
   prefs: []
   type: TYPE_NORMAL
+  zh: 对于一些读者来说，选择RavenDB作为本书的数据库可能并不明显。显然，在流行度方面，MongoDB可能是一个更好的选择。同样，Azure Cosmos
+    DB具有Mongo API，这使得MongoDB驱动程序在示例应用程序中使用更具吸引力。同时，RavenDB在.NET社区中拥有相当多的吸引力，它还拥有业界最佳的Web用户界面，这将对我们随着本章的进展查看数据库中的情况非常有帮助。
 - en: The choice of a document database is based on the fact that a document database
     has much less impedance mismatch as compared with relational databases, since
     document databases manipulate with objects, unlike relational databases, which
     deal with tables and relations.
+  id: totrans-32
   prefs: []
   type: TYPE_NORMAL
+  zh: 选择文档数据库的原因是基于这样一个事实，与关系数据库相比，文档数据库具有更少的阻抗不匹配，因为文档数据库操作对象，而关系数据库处理表和关系。
 - en: We will start by implementing the repository interface with RavenDB persistence,
     in order to save and load individual aggregates.
+  id: totrans-33
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们将首先通过使用RavenDB持久化实现仓库接口，以便保存和加载单个聚合。
 - en: To make things a bit more explicit, we can move the infrastructural parts, like
     database-specific classes, to a new folder in the `Marketplace` project, called
     `Infrastructure`.
+  id: totrans-34
   prefs: []
   type: TYPE_NORMAL
+  zh: 为了使事情更加明确，我们可以将基础设施部分，如特定数据库的类，移动到`Marketplace`项目中的新文件夹，称为`Infrastructure`。
 - en: 'Since we have already implemented our repository for RavenDB, we can start
     there. But now, we want to remove the `Save` method, because we want to remove
     the commit responsibility to the unit of work. Also, we can now move this file
     to the new `Infrastructure` folder. To implement the new repository interface,
     we need to make minor changes, so our code will look like this:'
+  id: totrans-35
   prefs: []
   type: TYPE_NORMAL
+  zh: 由于我们已经在RavenDB上实现了我们的仓库，我们可以从这里开始。但现在，我们想要去掉`Save`方法，因为我们想要将提交责任移除到工作单元。此外，我们现在可以将这个文件移动到新的`Infrastructure`文件夹。为了实现新的仓库接口，我们需要做一些小的修改，所以我们的代码将看起来像这样：
 - en: '[PRE3]'
+  id: totrans-36
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE3]'
 - en: Here, we removed the `Save` method, and we now have the `Add` method that will
     only be used when we add new aggregates to the database. RavenDB uses the *session*
     not only to control the connection to the database, but also to track changes
@@ -232,8 +314,12 @@
     fact, the session itself represents the unit of work, since all changes that happened
     for all objects that are attached to the session will be committed to the database
     when we tell the session to commit changes as one transaction.
+  id: totrans-37
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这里，我们移除了 `Save` 方法，现在我们有了 `Add` 方法，它只会在我们将新的聚合添加到数据库时使用。RavenDB 不仅使用会话来控制与数据库的连接，还用于跟踪通过调用新对象的
+    `Store` 或 `StoreAsync` 方法或通过使用会话从数据库加载现有对象来添加到会话中的对象的更改。因此，一旦我们使用存储库的 `Load` 或
+    `Add` 方法，底层的会话将跟踪这些对象中发生的所有更改。实际上，会话本身代表工作单元，因为当我们将更改作为单个事务提交给会话时，所有附加到会话的对象发生的所有更改都将提交到数据库。
 - en: The ability to track and commit changes as a transaction is not an exclusive
     property of the RavenDB client library. For relational databases, **Entity Framework**
     (**EF**) and NHibernate allow for using the same technique. In particular, NHibernate
@@ -243,31 +329,49 @@
     open source library that uses the native ability of PostgreSQL to work with document-like
     structures in JSONB fields has an implementation of a session that tracks changes
     in connected objects.
+  id: totrans-38
   prefs: []
   type: TYPE_NORMAL
+  zh: 跟踪和提交更改作为事务的能力并不是 RavenDB 客户端库的专属属性。对于关系数据库，**Entity Framework**（**EF**）和 NHibernate
+    允许使用相同的技巧。特别是，NHibernate 也有一个 `ISession` 接口，具有完全相同的性能，因为 RavenDB API 最初设计得非常接近
+    NHibernate API。此外，使用 PostgreSQL 的原生能力在 JSONB 字段中处理类似文档的结构的开源库 Marten ([http://jasperfx.github.io/marten/](http://jasperfx.github.io/marten/))
+    也有一个会话实现，该会话跟踪连接对象的更改。
 - en: 'To complete the abstraction, we need to have an interface for the unit of work.
     We can start with something like this:'
+  id: totrans-39
   prefs: []
   type: TYPE_NORMAL
+  zh: 为了完成抽象，我们需要为工作单元提供一个接口。我们可以从类似以下的内容开始：
 - en: '[PRE4]'
+  id: totrans-40
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE4]'
 - en: 'The implementation of this interface will be quite trivial, since we are using
     the power of the RavenDB session to track changes in objects:'
+  id: totrans-41
   prefs: []
   type: TYPE_NORMAL
+  zh: 由于我们正在使用 RavenDB 会话跟踪对象的更改，因此该接口的实现将非常简单：
 - en: '[PRE5]'
+  id: totrans-42
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE5]'
 - en: 'In order to make it work with our application service, we need to make sure
     that the service gets both the repository and the unit of work interfaces in its
     constructor as parameters. The new code for `ClassifiedAdAplicationService` looks
     like this:'
+  id: totrans-43
   prefs: []
   type: TYPE_NORMAL
+  zh: 为了使它与我们的应用程序服务一起工作，我们需要确保服务在其构造函数中将存储库和工作单元接口作为参数。`ClassifiedAdAplicationService`
+    的新代码如下：
 - en: '[PRE6]'
+  id: totrans-44
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE6]'
 - en: You can see that our application service gets three dependencies, instead of
     the two that it had before. We added the unit of work interface so that the service
     can decide when to commit changes to the database. It creates the challenge of
@@ -279,18 +383,25 @@
     what the repository does. But we do the commit in our unit of work, and it means
     that the repository and the unit of work that is used in the same instance of
     the application service must have *the same* document session.
+  id: totrans-45
   prefs: []
   type: TYPE_NORMAL
+  zh: 你可以看到，我们的应用程序服务现在获得了三个依赖项，而不是之前的那两个。我们添加了工作单元接口，以便服务可以决定何时将更改提交到数据库。这给重写我们的应用程序启动代码带来了挑战，因此我们添加了缺失的依赖项。在那里还有一个问题等待着我们，因为我们的工作单元使用它作为依赖项的文档会话进行提交。存储库也依赖于文档会话。你可能还记得，文档会话跟踪所有加载到会话或显式添加到会话中的对象的更改；这就是存储库所做的工作。但我们在工作单元中执行提交，这意味着在应用程序服务的同一实例中使用的存储库和工作单元必须具有*相同的*文档会话。
 - en: 'That part is quite tricky if we decide to instantiate the dependency graph
     ourselves. For our application, we will use the ASP.NET ([https://www.asp.net/](https://www.asp.net/))
     Core service collection to define dependencies. The service collection also works
     as a **dependency injection** container, so if we configure it properly, we get
     the dependencies right. The following startup code serves the purpose:'
+  id: totrans-46
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果我们决定自己实例化依赖关系图，那么这部分会相当棘手。对于我们的应用程序，我们将使用 ASP.NET ([https://www.asp.net/](https://www.asp.net/))
+    Core 服务集合来定义依赖关系。服务集合也充当 **依赖注入** 容器，因此如果我们正确配置它，我们就能得到正确的依赖关系。以下启动代码就起到了这个作用：
 - en: '[PRE7]'
+  id: totrans-47
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE7]'
 - en: This code is for the `Startup.cs` file in the `Marketplace` project. There,
     we register the document session using a factory delegate, `RavenDbUnitOfWork`,
     and `ClassifiedAdRepository` as scoped dependencies. Our application service is
@@ -301,8 +412,12 @@
     to handle the request. As a result, we will get one application service instance,
     one repository, and one unit of work. The last two will also get the same instance
     of the document session, and this is exactly what we want.
+  id: totrans-48
   prefs: []
   type: TYPE_NORMAL
+  zh: 这段代码是为 `Marketplace` 项目的 `Startup.cs` 文件。在那里，我们使用工厂委托 `RavenDbUnitOfWork` 和
+    `ClassifiedAdRepository` 将文档会话注册为作用域依赖项。我们的应用程序服务也被注册为作用域服务。当我们注册任何依赖项为 *作用域*
+    时，其生命周期将限制为单个 HTTP 请求的生命周期。对于我们的代码来说，这意味着只为请求实例化一个文档会话，它将被用作处理请求的所有其他实例化的对象的依赖项。因此，我们将得到一个应用程序服务实例、一个存储库和一个工作单元。最后两个也将获得相同的文档会话实例，这正是我们想要的。
 - en: As a side note, I have to make it clear that the moment we encounter a strong
     need to have a dependency injection container to manage our dependencies and we
     cannot configure our dependencies manually, we need to notice that something is
@@ -313,8 +428,11 @@
     we are forced to use the container. However, we will try to make the list of dependencies
     smaller to avoid injection hell and take back control of the request handling
     scope.
+  id: totrans-49
   prefs: []
   type: TYPE_NORMAL
+  zh: 作为旁注，我必须明确指出，当我们遇到强烈的需求，需要依赖注入容器来管理我们的依赖关系，而我们无法手动配置依赖关系时，我们需要注意到我们的代码中可能存在问题。在这种情况下，我们需要重新考虑依赖关系图，并尝试简化它，以便我们减少或不需要使用容器。在这个特定的情况下，我们无法控制
+    ASP.NET Core 如何实例化它用来处理 HTTP 请求的控制器。因此，我们被迫使用容器。然而，我们将尝试缩小依赖项列表，以避免注入地狱并重新控制请求处理范围。
 - en: 'In the code for this chapter, you can also see that we have one helper method
     in the `ClassifiedAdCommandsApi` class, to handle HTTP requests by sending them
     to the application service and wrapping any exceptions that it might throw. We
@@ -323,25 +441,38 @@
     show the HTML source instead. It makes diagnostics harder, because we''d need
     to dig into a bunch of HTML tags to find the exception information and the stack
     trace. The method that is added is as follows:'
+  id: totrans-50
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本章的代码中，你还可以看到我们在 `ClassifiedAdCommandsApi` 类中有一个辅助方法，用于通过将请求发送到应用程序服务并包装它可能抛出的任何异常来处理
+    HTTP 请求。我们本可以使用由 Web API 提供的开发者错误页面；然而，它包含大量的 HTML，而我们正在使用 Swagger，它不会渲染它，而是显示
+    HTML 源代码。这使得诊断变得更加困难，因为我们需要深入到大量的 HTML 标签中才能找到异常信息和堆栈跟踪。添加的方法如下：
 - en: '[PRE8]'
+  id: totrans-51
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE8]'
 - en: 'Since we use the generic type argument here, we can send any request to this
     method, along with the application service `Handle` method as a delegate to handle
     the request. For example, the `Post` method in our controller now looks like this:'
+  id: totrans-52
   prefs: []
   type: TYPE_NORMAL
+  zh: 由于我们在这里使用的是泛型类型参数，因此我们可以向此方法发送任何请求，同时将应用程序服务 `Handle` 方法作为一个委托来处理请求。例如，我们控制器中的
+    `Post` 方法现在看起来是这样的：
 - en: '[PRE9]'
+  id: totrans-53
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE9]'
 - en: You probably noticed that the `HandleRequest` method uses logging, as well.
     In this book, we use the `Serilog` open source logging library, which was the
     first library that provided structured logging to the .NET space and quickly became
     the most popular logging library for the .NET space.
+  id: totrans-54
   prefs: []
   type: TYPE_NORMAL
+  zh: 你可能已经注意到，`HandleRequest`方法也使用了日志记录。在这本书中，我们使用了开源的`Serilog`日志库，这是第一个为.NET空间提供结构化日志的库，并迅速成为.NET空间最受欢迎的日志库。
 - en: Our initial stage of preparing to save our aggregate to RavenDB is complete.
     For the next step, we need to get RavenDB running, and the easiest way to do it
     is to use Docker Compose with the configuration file that is provided in the book
@@ -349,22 +480,33 @@
     for Docker Compose to start two containers—one is RavenDB, and another one is
     PostgreSQL, which we will use later in this chapter, when we explore using relational
     databases to persist aggregates.
+  id: totrans-55
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们将聚合保存到RavenDB的初始准备阶段已完成。对于下一步，我们需要启动RavenDB，最简单的方法是使用Docker Compose与本书库中提供的配置文件。`docker-compose.yml`文件包含了Docker
+    Compose启动两个容器的指令——一个是RavenDB，另一个是PostgreSQL，我们将在本章后面探索使用关系数据库持久化聚合时使用。
 - en: 'You should be able to run the `docker-compose up` command from the chapter
     folder in the Terminal window, and you will see something like this:'
+  id: totrans-56
   prefs: []
   type: TYPE_NORMAL
+  zh: 您应该能够在终端窗口中从章节文件夹运行`docker-compose up`命令，您将看到类似以下内容：
 - en: '![](img/3f931305-f508-4a91-aa7e-761481004004.png)'
+  id: totrans-57
   prefs: []
   type: TYPE_IMG
+  zh: '![](img/3f931305-f508-4a91-aa7e-761481004004.png)'
 - en: The Terminal output of the docker-compose command
+  id: totrans-58
   prefs: []
   type: TYPE_NORMAL
+  zh: docker-compose命令的终端输出
 - en: If you have any issues when executing the command, please check the *Technical
     requirements* section for this chapter.
+  id: totrans-59
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果在执行命令时遇到任何问题，请检查本章的*技术要求*部分。
 - en: Remember that you can stop your `docker-compose` session by pressing *Ctrl *+
     *C* in the Terminal window where it runs, and in that case, the containers will
     be stopped. All data inside the containers will be kept, so when you use `docker-compose
@@ -372,89 +514,136 @@
     the containers will be removed, and when you start them again, you will need to
     create the databases again. If you want to keep the data no matter what, consider
     specifying volumes in the `docker-compose.yml` file.
+  id: totrans-60
   prefs: []
   type: TYPE_NORMAL
+  zh: 请记住，您可以通过在运行它的终端窗口中按*Ctrl* + *C*来停止您的`docker-compose`会话，在这种情况下，容器将被停止。容器内的所有数据都将保留，因此当您下次使用`docker-compose
+    up`时，您将再次看到您的数据库。如果您使用`docker-compose down`，容器将被删除，当您再次启动它们时，您需要再次创建数据库。如果您无论如何都想保留数据，请考虑在`docker-compose.yml`文件中指定卷。
 - en: 'When you have RavenDB up and running for the first time, or any time the container
     gets recreated, you need to visit the database web UI by going to `http://localhost:8080`
     and accepting the license agreement. RavenDB is free to use for development and
     in small-scale production systems. When you accept the agreement, you will be
     redirected to the RavenDB Studio page:'
+  id: totrans-61
   prefs: []
   type: TYPE_NORMAL
+  zh: 当您第一次运行RavenDB或容器被重新创建时，您需要通过访问`http://localhost:8080`来访问数据库Web UI并接受许可协议。RavenDB可以免费用于开发和小型生产系统。当您接受协议后，您将被重定向到RavenDB
+    Studio页面：
 - en: '![](img/7fa93254-2121-4311-93dc-1fe340c7aa65.png)'
+  id: totrans-62
   prefs: []
   type: TYPE_IMG
+  zh: '![](img/7fa93254-2121-4311-93dc-1fe340c7aa65.png)'
 - en: RavenDB user interface
+  id: totrans-63
   prefs: []
   type: TYPE_NORMAL
+  zh: RavenDB用户界面
 - en: 'Before we can save anything to RavenDB, we need to create a database. For this
     chapter, the database name in the sample application code is hardcoded to `Marketplace_Chapter8`.
     To create a new database, you can use the CREATE DATABASE button on the RavenDB
     Studio home page:'
+  id: totrans-64
   prefs: []
   type: TYPE_NORMAL
+  zh: 在我们能够将任何内容保存到RavenDB之前，我们需要创建一个数据库。对于本章的示例应用程序代码，数据库名称被硬编码为`Marketplace_Chapter8`。要创建一个新的数据库，您可以使用RavenDB
+    Studio主页上的创建数据库按钮：
 - en: '![](img/09e6b198-25aa-426d-b387-5f9f57275f9c.png)'
+  id: totrans-65
   prefs: []
   type: TYPE_IMG
+  zh: '![](img/09e6b198-25aa-426d-b387-5f9f57275f9c.png)'
 - en: This button lets you create a new database
+  id: totrans-66
   prefs: []
   type: TYPE_NORMAL
+  zh: 此按钮允许您创建一个新的数据库
 - en: 'When you click on this button, you will get a popup where you can enter the
     database name and click on Create:'
+  id: totrans-67
   prefs: []
   type: TYPE_NORMAL
+  zh: 当你点击此按钮时，你会弹出一个窗口，你可以输入数据库名称并点击创建：
 - en: '![](img/4b2af2ef-cc81-4973-b99a-249c8314fe00.png)'
+  id: totrans-68
   prefs: []
   type: TYPE_IMG
+  zh: '![](img/4b2af2ef-cc81-4973-b99a-249c8314fe00.png)'
 - en: New database creation screen
+  id: totrans-69
   prefs: []
   type: TYPE_NORMAL
+  zh: 新数据库创建屏幕
 - en: 'Now, we can start our sample application. After the application starts, it
     produces output similar to this:'
+  id: totrans-70
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在，我们可以开始我们的示例应用程序。应用程序启动后，它产生的输出类似于以下内容：
 - en: '[PRE10]'
+  id: totrans-71
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE10]'
 - en: 'By default, any ASP.NET Core application would start listening on `http://localhost:5000`.
     There is no user interface in our app, but we have the Swagger UI to send requests
     to the API added to the application configuration. Therefore, if you visit the
     `http://localhost:5000/swagger/index.html` page, you will see all the API endpoints
     that we have created so far:'
+  id: totrans-72
   prefs: []
   type: TYPE_NORMAL
+  zh: 默认情况下，任何ASP.NET Core应用程序都会在`http://localhost:5000`上开始监听。我们的应用程序中没有用户界面，但我们有Swagger
+    UI来向应用程序配置中添加的API发送请求。因此，如果您访问`http://localhost:5000/swagger/index.html`页面，您将看到我们迄今为止创建的所有API端点：
 - en: '![](img/61c9dd34-d8d8-402a-bbf4-e7a7b28b7a8d.png)'
+  id: totrans-73
   prefs: []
   type: TYPE_IMG
+  zh: '![图片](img/61c9dd34-d8d8-402a-bbf4-e7a7b28b7a8d.png)'
 - en: Command API of the Swagger UI
+  id: totrans-74
   prefs: []
   type: TYPE_NORMAL
+  zh: Swagger UI的命令API
 - en: Finally, we get very close to send commands to our application and see how it
     will work. First things first; before doing any updates, we need to create our
     first aggregate. So, we can click on the POST and then the Try it out button.
     We will get two fields to fill out with new GUIDs, which can easily be generated
     by an online GUID generator, or a similar tool that is available in JetBrains
     Rider or Visual Studio.
+  id: totrans-75
   prefs: []
   type: TYPE_NORMAL
+  zh: 最后，我们非常接近向我们的应用程序发送命令并查看它的工作方式。首先的事情是；在进行任何更新之前，我们需要创建我们的第一个聚合。因此，我们可以点击POST，然后点击“尝试一下”按钮。我们将得到两个字段需要填写新GUID，这些GUID可以很容易地通过在线GUID生成器生成，或者通过在JetBrains
+    Rider或Visual Studio中可用的类似工具生成。
 - en: 'After entering two newly generated GUIDs into the parameter fields for a new
     `POST` request, you can press the Execute button, and after a short while, you
     will get a response:'
+  id: totrans-76
   prefs: []
   type: TYPE_NORMAL
+  zh: 在将两个新生成的GUID输入到新`POST`请求的参数字段后，您可以按下执行按钮，片刻之后，您将得到一个响应：
 - en: '![](img/f38ffdbd-921f-49d7-9147-ce1310d63733.png)'
+  id: totrans-77
   prefs: []
   type: TYPE_IMG
+  zh: '![图片](img/f38ffdbd-921f-49d7-9147-ce1310d63733.png)'
 - en: An exception is thrown when we try executing the command
+  id: totrans-78
   prefs: []
   type: TYPE_NORMAL
+  zh: 当我们尝试执行命令时，会抛出异常
 - en: 'But wait; we have an error! Let''s look at what the error message tells us
     about what happened:'
+  id: totrans-79
   prefs: []
   type: TYPE_NORMAL
+  zh: 但是等等；我们有一个错误！让我们看看错误消息告诉我们发生了什么：
 - en: '[PRE11]'
+  id: totrans-80
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE11]'
 - en: Here, we have our first example of impedance mismatch. We have been modeling
     our domain classes without considering persistence and we have based all decisions
     on the structure of our classes only on the requirements for the domain. As soon
@@ -463,8 +652,10 @@
     Now, we are forced to start adapting our domain classes in a way that they can
     be persisted. That is quite unfortunate, because ideally, we should keep our domain
     model implementation clean of any persistence concerns.
+  id: totrans-81
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这里，我们有我们的第一个阻抗不匹配的例子。我们一直在没有考虑持久性的情况下建模我们的领域类，并且所有决策都是基于我们类结构对领域需求的考虑。当我们开始与数据库一起工作时，尽管这个数据库是基于文档的，并且在理论上应该持久化我们给出的任何对象，但现实情况略有不同。现在，我们被迫开始调整我们的领域类，以便它们可以被持久化。这相当不幸，因为理想情况下，我们应该保持我们的领域模型实现不受任何持久性问题的干扰。
 - en: But, let's look at what we can do now. RavenDB requires any document that is
     being saved there to have an identity property or field of the type string. We
     are using the `ClassifiedAdId` value object type for the identity property. We
@@ -474,93 +665,137 @@
     by adding a new property or field with the type string to our aggregate class.
     RavenDB uses the name `Id` for the identity property, but we can configure conventions
     so that the database client API will use something else, instead.
+  id: totrans-82
   prefs: []
   type: TYPE_NORMAL
+  zh: 但是，让我们看看我们现在能做什么。RavenDB要求任何要保存到其中的文档都必须有一个字符串类型的身份属性或字段。我们使用`ClassifiedAdId`值对象类型作为身份属性。我们明确地告诉RavenDB在我们的存储库`Add`方法中的对象身份，因此它不会使用`Id`属性。然而，它未能将字符串值写回`Id`字段，因为它不是字符串。这只能通过向我们的聚合类中添加一个新的字符串类型属性或字段来修复。RavenDB使用`Id`作为身份属性的名字，但我们可以配置约定，使数据库客户端API使用其他名称。
 - en: 'We can start fixing the issue by adding a new `private` field to the `ClassifiedAd`
     class:'
+  id: totrans-83
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们可以通过向`ClassifiedAd`类添加一个新的`private`字段来开始修复这个问题：
 - en: '[PRE12]'
+  id: totrans-84
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE12]'
 - en: It might seem weird that we don't use the property setter, but the database
     will read the `Id` property as an object, and we will get the value back. So,
     we can safely use the `Id` property for the `get` part, and `set` will only be
     used to keep the database happy.
+  id: totrans-85
   prefs: []
   type: TYPE_NORMAL
+  zh: 看起来我们不用属性设置器可能有些奇怪，但数据库会将`Id`属性读取为一个对象，并且我们会得到返回的值。因此，我们可以安全地使用`Id`属性进行`get`操作，而`set`操作将仅用于使数据库满意。
 - en: 'We also need to explain to the database API that it needs to use this new property
     as the document identity. It is done by using conventions when we create the `DocumentStore`
     instance in `Startup.cs`:'
+  id: totrans-86
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们还需要向数据库 API 解释，它需要使用这个新属性作为文档标识符。这是通过在“Startup.cs”中创建“DocumentStore”实例时使用约定来完成的：
 - en: '[PRE13]'
+  id: totrans-87
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE13]'
 - en: 'Now, let''s start the application again and repeat the call from Swagger. We
     can use the same values, so if you kept the browser window open while changing
     the code, you can just execute the same request that previously generated an error.
     Now, the response is different:'
+  id: totrans-88
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在，让我们重新启动应用程序并再次从 Swagger 中调用该调用。我们可以使用相同的值，所以如果你在更改代码时保留了浏览器窗口，你只需执行之前生成错误的相同请求。现在，响应不同：
 - en: '![](img/84c0bd6e-2209-4960-ace7-a7fa5e9e2ae8.png)'
+  id: totrans-89
   prefs: []
   type: TYPE_IMG
+  zh: '![图片](img/84c0bd6e-2209-4960-ace7-a7fa5e9e2ae8.png)'
 - en: Getting 200 OK means everything worked
+  id: totrans-90
   prefs: []
   type: TYPE_NORMAL
+  zh: 获取 200 OK 表示一切正常
 - en: 'To confirm that our persistence code worked, we need to turn to the RavenDB
     Studio again, and if we open the database there, we will have one document that
     represents the state of the new aggregate:'
+  id: totrans-91
   prefs: []
   type: TYPE_NORMAL
+  zh: 为了确认我们的持久化代码是否工作，我们需要再次转向 RavenDB Studio，如果我们那里打开数据库，我们将有一个代表新聚合状态的文档：
 - en: '![](img/d1b43618-6612-4e89-8da7-eafdf4ae3aac.png)'
+  id: totrans-92
   prefs: []
   type: TYPE_IMG
+  zh: '![图片](img/d1b43618-6612-4e89-8da7-eafdf4ae3aac.png)'
 - en: The document is successfully stored
+  id: totrans-93
   prefs: []
   type: TYPE_NORMAL
+  zh: 文档已成功存储
 - en: 'For the next step, we can execute one of the commands that perform state changes
     on an existing aggregate. To start, we can set the ad title by calling the `/ad/name/`
     API endpoint with `PUT`. We need to use the same aggregate ID that we used for
     the `POST` call, since that''s the only object we currently have in the system.
     In the following screenshot, you can see when the action has already been executed
     and the API has returned a `200 OK` status:'
+  id: totrans-94
   prefs: []
   type: TYPE_NORMAL
+  zh: 对于下一步，我们可以执行对现有聚合执行状态更改的命令之一。首先，我们可以通过调用 `/ad/name/` API 端点并使用 `PUT` 来设置广告标题。我们需要使用与
+    `POST` 调用相同的聚合 ID，因为这是我们当前系统中唯一拥有的对象。在下面的屏幕截图中，你可以看到操作已经执行，API 返回了 `200 OK` 状态：
 - en: '![](img/79986107-368e-4676-9272-d11f3fe32de0.png)'
+  id: totrans-95
   prefs: []
   type: TYPE_IMG
+  zh: '![图片](img/79986107-368e-4676-9272-d11f3fe32de0.png)'
 - en: Successful execution of the update command
+  id: totrans-96
   prefs: []
   type: TYPE_NORMAL
+  zh: 更新命令执行成功
 - en: 'Let''s check what happened with the document in RavenDB. If the document was
     still open in the Studio, you will see a small popup saying, This document has
     been modified outside of the studio. Click here to refresh. You can go on and
     click on the link so that the document gets refreshed and the new version shows
     up. Now, we can see that the document content has changed and the `Title` property
     has a proper value (further, I will only use the document content as JSON):'
+  id: totrans-97
   prefs: []
   type: TYPE_NORMAL
+  zh: 让我们检查在 RavenDB 中的文档发生了什么。如果文档在 Studio 中仍然打开，你会看到一个小的弹出窗口说：“此文档在 Studio 外已被修改。点击此处刷新。”你可以继续点击链接，这样文档就会刷新，并显示新版本。现在，我们可以看到文档内容已更改，并且“标题”属性具有适当的值（进一步，我将在“Startup.cs”中创建“DocumentStore”实例时只使用文档内容作为
+    JSON）：
 - en: '[PRE14]'
+  id: totrans-98
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE14]'
 - en: 'Now, let''s try to call other endpoints. You can even try calling the same
     endpoint again, so that it tries to set the title to some other value. Surprisingly,
     this won''t work. We can see the following error message:'
+  id: totrans-99
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在，让我们尝试调用其他端点。你甚至可以尝试再次调用相同的端点，这样它会尝试将标题设置为其他值。令人惊讶的是，这不会工作。我们可以看到以下错误消息：
 - en: '[PRE15]'
+  id: totrans-100
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE15]'
 - en: 'This message is not very informative, but what RavenDB is trying to tell us
     is that we have a serialization issue. Let''s look at what the inner exception
     could tell us. The message here is as follows:'
+  id: totrans-101
   prefs: []
   type: TYPE_NORMAL
+  zh: 这条消息不是很 informative，但 RavenDB 正在试图告诉我们我们有一个序列化问题。让我们看看内部异常可以告诉我们什么。信息如下：
 - en: '[PRE16]'
+  id: totrans-102
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE16]'
 - en: The issue here is that since we are only allowing our value objects to be created
     using factory methods in order to prevent the creation of value objects with invalid
     content. When we bypass the validation the serializer will not use it unless we
@@ -571,28 +806,40 @@
     private constructor. It will allow us to keep the encapsulation and satisfy the
     serializer at the same time. This is yet another issue with a mismatch between
     the persistence layer and the domain layer.
+  id: totrans-103
   prefs: []
   type: TYPE_NORMAL
+  zh: 这里的问题在于，我们只允许通过工厂方法创建值对象，以防止创建具有无效内容的值对象。当我们绕过验证时，序列化器将不会使用它，除非我们在它上面放置一个 `[JsonConstructor]`
+    属性。我们绝对不希望这样做，因为这样做会使我们的领域模型依赖于 `Newtonsoft.Json` 库，这是一个纯粹的基础设施问题。为了避免这种情况而不损害我们领域项目的纯洁性，唯一的方法是创建一个无参数的私有构造函数。这将允许我们保持封装并满足序列化器的需求。这是持久层和领域层之间不匹配的另一个问题。
 - en: 'Let''s solve the issue by adding this line of code to the `ClassifiedAdTitle`
     class:'
+  id: totrans-104
   prefs: []
   type: TYPE_NORMAL
+  zh: 让我们在 `ClassifiedAdTitle` 类中添加这一行代码来解决该问题：
 - en: '[PRE17]'
+  id: totrans-105
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE17]'
 - en: Similar lines need to be added to all value object types, except for the identity
     types, because they already have public constructors with one parameter of `Guid`,
     and the serializer is happy to use it. After all these changes are done, all of
     the HTTP endpoints will start to work.
+  id: totrans-106
   prefs: []
   type: TYPE_NORMAL
+  zh: 除了身份类型之外，需要将类似的行添加到所有值对象类型中，因为它们已经具有一个参数为 `Guid` 的公共构造函数，序列化器也乐于使用它。完成所有这些更改后，所有的
+    HTTP 端点都将开始工作。
 - en: So, we can now conclude that the small changes that we made to overcome the
     impedance mismatch worked fine. You may have already noticed that all properties
     that have value object types are stored as a JSON object. This is a nice feature
     of any document database that can store and retrieve complex object graphs as
     one document.
+  id: totrans-107
   prefs: []
   type: TYPE_NORMAL
+  zh: 因此，我们可以得出结论，我们为了克服阻抗不匹配所做的微小更改是有效的。你可能已经注意到，所有具有值对象类型的属性都存储为 JSON 对象。这是任何可以存储和检索复杂对象图作为单个文档的文档数据库的一个很好的特性。
 - en: It is possible to take a similar approach to implementing the persistence by
     using other types of document storage that support sessions and change tracking
     within a session. I already mentioned Marten earlier in this chapter. However,
@@ -612,12 +859,17 @@
     as it calls `_unitOfWork.Commit()` in our code. We will look more closely at the
     repository pattern and its usefulness when we start discussing event-based persistence,
     in [Chapter 10](75bc64ae-a642-42b2-a44a-05ae0cb2b750.xhtml), *Event Sourcing*.
+  id: totrans-108
   prefs: []
   type: TYPE_NORMAL
+  zh: 可以采用类似的方法通过使用支持会话和会话内变更跟踪的其他类型的文档存储来实现持久化。我在本章前面已经提到了Marten。然而，对于其他文档数据库，如MongoDB或Cosmos
+    DB，您需要从集合式存储库中退出，并开始从存储库内部提交更新，而不是使用工作单元。这种做法可能看起来有些不符合常规，因此开发者们在实施时有时会感到内疚。然而，如果我们记住聚合必须被视为事务边界，那么在单个事务中更新多个对象的可能性几乎为零。如果违反了这一规则，那么您可能面临的问题将不仅仅是存储库接口中存在一个`Save`方法那么简单。但是，当我们只在对应用程序服务中的一个聚合进行操作时，使用单独的工作单元的整个故事开始显得多余。当我们的应用程序服务符合`load-act-save`模式时，可能没有实际的理由将存储库从工作单元中分离出来。应用程序服务仍然负责提交更改，但它可以通过调用`_repository.Save()`来实现，就像在我们的代码中调用`_unitOfWork.Commit()`一样。当我们开始讨论基于事件的持久化时，即第10章的*事件溯源*，我们将更详细地探讨存储库模式和它的有用性。
 - en: Implementation of Entity Framework Core
+  id: totrans-109
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 实现Entity Framework Core
 - en: Although nowadays, developers have a wide choice of databases, in many cases,
     a relational database is still preferred. The reasons for this can be different,
     but the most popular ones include that some RDBMS databases, like Oracle or Microsoft
@@ -626,15 +878,20 @@
     with relational databases. Of course, it often creates issues, due to the risk
     for domain models to quickly become data models, and the whole application would
     be built around the persistence.
+  id: totrans-110
   prefs: []
   type: TYPE_NORMAL
+  zh: 尽管如今开发者有多种数据库可供选择，但在许多情况下，关系型数据库仍然更受欢迎。这种选择的原因可能各不相同，但最常见的原因包括某些关系型数据库管理系统（RDBMS），如Oracle或Microsoft
+    SQL Server，已经在组织中使用，并且有人员可以维护它们，或者开发团队本身在处理关系型数据库方面拥有丰富的经验。当然，这通常会导致问题，因为领域模型可能会迅速变成数据模型，整个应用程序都会围绕持久化构建。
 - en: Relational databases are also notorious for having a significant impedance mismatch.
     Although developers often tend to think that classes can be perfectly stored in
     tables, and relations between classes can be represented as foreign keys, that's
     not the whole picture. We will see this very soon, after the first iteration of
     the persistence implementation for our single aggregate is complete.
+  id: totrans-111
   prefs: []
   type: TYPE_NORMAL
+  zh: 关系型数据库也因存在显著的阻抗不匹配而臭名昭著。尽管开发者们往往倾向于认为类可以完美地存储在表中，并且类之间的关系可以用外键表示，但这并不是全部。在我们完成对单个聚合的持久化实现的第一轮迭代之后，我们将很快看到这一点。
 - en: To overcome the impedance mismatch and make the persistence for relational databases
     more transparent for developers that work with objects, our industry invented
     a solution. Most of us are familiar with the **object-relational mappers** (**ORM**)
@@ -657,8 +914,17 @@
     Core. This version is now being actively developed, and it is also included in
     the umbrella `Microsoft.AspNet.Core` NuGet package group, so it is directly available
     for all .NET Core applications.
+  id: totrans-112
   prefs: []
   type: TYPE_NORMAL
+  zh: 为了克服阻抗不匹配，使关系型数据库的持久化对使用对象的开发者更加透明，我们的行业发明了一种解决方案。我们大多数人熟悉**对象关系映射器**（**ORM**），它承诺可以透明地将对象放入数据库并检索它们。在
+    .NET 领域，特别是，我们有两大 ORM 框架被广泛使用。这些框架是 NHibernate 和 Entity Framework。NHibernate 拥有悠久的历史，它最初是一个流行的
+    Java ORM 框架（Hibernate）的克隆。在几年时间里，NHibernate 是 .NET 领域唯一的 ORM 工具。然后，在微软尝试进入 ORM
+    领域的 LINQ2SQL 失败之后，Entity Framework 诞生了。尽管许多人批评它速度慢、僵化且设计不佳，但它仍然迅速成为许多 .NET 开发者的首选工具，唯一的理由是它得到了微软的支持。Entity
+    Framework 还推出了第一个可视化设计工具，允许通过拖放创建与持久化层映射的类模型。经过几年的框架持续改进，Entity Framework 获得了大量采用，在某个时刻，许多人认为
+    NHibernate 已经死亡。然而，在过去的几年里，NHibernate 社区发布了带有 async/await 支持的版本 4，然后是带有 .NET Core
+    支持的版本 5。Entity Framework 团队决定退后一步重新思考设计，推出了 Entity Framework Core。这个版本现在正在积极开发中，并且也包含在
+    `Microsoft.AspNet.Core` NuGet 包组中，因此它可以直接用于所有 .NET Core 应用程序。
 - en: Thanks to many members of the community that have an influence at Microsoft,
     like Julie Lerman, who dove deeply into DDD and its principles, and then provides
     a lot of valuable input for the Entity Framework team to improve their product
@@ -666,12 +932,16 @@
     value objects, out of the box. Therefore, I decided to include an example of how
     this framework can be used as a domain model persistence for relational databases,
     although this book is more oriented toward Event Sourcing.
+  id: totrans-113
   prefs: []
   type: TYPE_NORMAL
+  zh: 多亏了像 Julie Lerman 这样的社区成员在微软的影响力，她深入研究了领域驱动设计（DDD）及其原则，并为 Entity Framework 团队提供了大量宝贵的输入，以改善他们的产品，减轻阻抗不匹配，并支持诸如不可变值对象等概念。因此，我决定包括一个示例，说明如何将此框架用作关系型数据库的领域模型持久化，尽管这本书更倾向于事件溯源。
 - en: The code for this part is available in the book's GitHub repository, in the
     folder `Chapter08/ef-core`.
+  id: totrans-114
   prefs: []
   type: TYPE_NORMAL
+  zh: 本部分的代码可在本书的 GitHub 仓库中找到，位于 `Chapter08/ef-core` 文件夹中。
 - en: We will be using the PostgreSQL database for this example, but the code can
     easily be converted for Microsoft SQL Server, since we won't be using any features
     that are specific to PostgreSQL. The `docker-compose.yml` file in the `ef-core`
@@ -680,40 +950,55 @@
     executed when the container is created. The script takes care of creating a database
     user and a new database called `Marketplace_Chapter8`, so you don't need to do
     anything before starting the application.
+  id: totrans-115
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本例中，我们将使用 PostgreSQL 数据库，但代码可以轻松转换为 Microsoft SQL Server，因为我们不会使用任何特定于 PostgreSQL
+    的功能。本章 `ef-core` 文件夹中的 `docker-compose.yml` 文件将帮助您在容器内启动数据库，就像我们使用 RavenDB 一样。初始化脚本将在容器创建时自动执行。该脚本负责创建一个数据库用户和一个名为
+    `Marketplace_Chapter8` 的新数据库，因此您在启动应用程序之前无需做任何事情。
 - en: Now, let's see what we need to do to use a relational database to persist our
     aggregate. Since we already have the reference to the `Microsoft.AspNetCore.App`
     set of packages in our project, the Entity Framework Core itself is available
     to use straight away. We need to add a PostgreSQL driver package, called `Npgsql.EntityFrameworkCore.PostgreSQL`,
     to our project.
+  id: totrans-116
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在，让我们看看为了使用关系数据库来持久化我们的聚合，我们需要做什么。由于我们已经在项目中有了对`Microsoft.AspNetCore.App`包集的引用，因此Entity
+    Framework Core本身可以直接使用。我们需要向我们的项目中添加一个名为`Npgsql.EntityFrameworkCore.PostgreSQL`的PostgreSQL驱动程序包。
 - en: 'We need to tell the framework that it needs to map our `ClassifiedAd` class
     to the database. To do that, we need to create a new class, `ClassifiedAdDbContext`,
     in the `Infrastructure` folder of our `Marketplace` project. We will use the code-first
     approach and let the framework decide how the table will look and how to map the
     class `ClassifiedAd` properties to the table columns. Here is the first version
     of the class:'
+  id: totrans-117
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们需要告诉框架它需要将我们的`ClassifiedAd`类映射到数据库。为此，我们需要在`Marketplace`项目的`Infrastructure`文件夹中创建一个新的类`ClassifiedAdDbContext`。我们将使用代码优先的方法，让框架决定表的结构以及如何将`ClassifiedAd`类的属性映射到表列。以下是类的第一个版本：
 - en: '[PRE18]'
+  id: totrans-118
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE18]'
 - en: We don't do a lot here. By adding a property with the type `DbSet<ClassifiedAd>`,
     we tell the framework that it needs to map that class. Then, we also explain that
     the property `ClassifiedAd.ClassifiedAdId` should be used as the primary key.
     We didn't have this property before, but we already used something similar in
     the previous section for RavenDB, since the database needs to know what value
     is used as the entity identity, and it cannot be a value object.
+  id: totrans-119
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这里我们并没有做很多。通过添加一个类型为`DbSet<ClassifiedAd>`的属性，我们告诉框架它需要映射这个类。然后，我们还解释了应该使用`ClassifiedAd.ClassifiedAdId`属性作为主键。我们之前没有这个属性，但在之前的RavenDB部分中我们已经使用了类似的东西，因为数据库需要知道用作实体标识的值是什么，而且它不能是一个值对象。
 - en: Therefore, we also need to add this property to our aggregate. We want to encapsulate
     as much as we can, but since we need to have access to the property from the infrastructure
     configuration, we are forced to make it public, at least for getting its value.
     Unlike with RavenDB, we cannot specify the property by its name.
+  id: totrans-120
   prefs: []
   type: TYPE_NORMAL
+  zh: 因此，我们还需要将这个属性添加到我们的聚合中。我们希望封装尽可能多的内容，但由于我们需要从基础设施配置中访问这个属性，我们被迫至少将其设置为公共的，以便获取其值。与RavenDB不同，我们无法通过名称指定属性。
 - en: One more thing that we do in our `DbContext` implementation is tell Entity Framework
     Core to do logging, and also, to log sensitive data. It will be useful for debugging
     purposes, as it allows us to see what Entity Framework Core does behind the scenes,
@@ -721,80 +1006,118 @@
     `EnableSensitiveDataLogging` in production, since it exposes all data, and it
     might result in some sensitive data becoming exposed via log files or the logging
     server.
+  id: totrans-121
   prefs: []
   type: TYPE_NORMAL
+  zh: 在我们的`DbContext`实现中，我们还要做的一件事是告诉Entity Framework Core进行日志记录，并且记录敏感数据。这对于调试很有用，因为它允许我们看到Entity
+    Framework Core在幕后做了什么，包括所有SQL语句和参数。请记住，在生产环境中不应使用`EnableSensitiveDataLogging`，因为它会暴露所有数据，可能会导致一些敏感数据通过日志文件或日志服务器暴露出来。
 - en: There is one more class in the preceding code that implements an extension for
     the `IApplicationBuilder`. We will use this extension to create or migrate the
     necessary tables. This approach also isn't good for production, since you will
     probably want to do the migration separately.
+  id: totrans-122
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前面的代码中还有一个类实现了对`IApplicationBuilder`的扩展。我们将使用这个扩展来创建或迁移必要的表。这种方法也不适合生产环境，因为你可能希望单独进行迁移。
 - en: 'So, we need to make the following changes in our aggregate class:'
+  id: totrans-123
   prefs: []
   type: TYPE_NORMAL
+  zh: 因此，我们需要在我们的聚合类中进行以下更改：
 - en: '[PRE19]'
+  id: totrans-124
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE19]'
 - en: This would count as our first chance to address the impedance mismatch and to
     add one property, just to satisfy the persistence. For RavenDB, that was all we
     needed to do to get things rolling. Let's see if that's enough for EF Core.
+  id: totrans-125
   prefs: []
   type: TYPE_NORMAL
+  zh: 这将算作我们第一次解决阻抗不匹配问题，并添加一个属性，只是为了满足持久化的需求。对于RavenDB来说，这就是我们开始所需做的全部。让我们看看这对EF
+    Core是否足够。
 - en: 'As the next step, we need to have a new implementation of the unit of work.
     We will add a new class `EfUnitOfWork` to the `Infrastructure` namespace:'
+  id: totrans-126
   prefs: []
   type: TYPE_NORMAL
+  zh: 作为下一步，我们需要对工作单元进行新的实现。我们将在`Infrastructure`命名空间中添加一个新的类`EfUnitOfWork`：
 - en: '[PRE20]'
+  id: totrans-127
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE20]'
 - en: 'Then, we will make the necessary changes in the repository class, `ClassifiedAdRepository`:'
+  id: totrans-128
   prefs: []
   type: TYPE_NORMAL
+  zh: 然后，我们将在仓库类`ClassifiedAdRepository`中进行必要的更改：
 - en: '[PRE21]'
+  id: totrans-129
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE21]'
 - en: As you can see, we are relying on `DbContext` to be instantiated per scope.
     In fact, `DbContext` is the Entity Framework implementation of the unit of work
     pattern, because it tracks all changes in objects that are attached to it during
     its lifetime and creates all necessary SQL statements to commit those changes
     to the database when we call `_dbContext.SaveChangesAsync()`.
+  id: totrans-130
   prefs: []
   type: TYPE_NORMAL
+  zh: 如您所见，我们依赖于`DbContext`在每个作用域中实例化。实际上，`DbContext`是Entity Framework对工作单元模式的实现，因为它在其生命周期内跟踪所有附加到它的对象的变化，并在我们调用`_dbContext.SaveChangesAsync()`时创建所有必要的SQL语句以将那些更改提交到数据库。
 - en: 'The last part is the wiring. We need to change the `Startup.cs` file to tell
     the ASP.NET Core to use our context and register the database context in its IoC
     container. Certainly, we also need to register the new implementation of the unit
     of work. We do all of this in the `ConfigureServices` method, as follows:'
+  id: totrans-131
   prefs: []
   type: TYPE_NORMAL
+  zh: 最后部分是连接。我们需要更改`Startup.cs`文件，告诉ASP.NET Core使用我们的上下文并在其IoC容器中注册数据库上下文。当然，我们还需要注册工作单元的新实现。我们都在`ConfigureServices`方法中完成所有这些操作，如下所示：
 - en: '[PRE22]'
+  id: totrans-132
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE22]'
 - en: Here, we also instructed Entity Framework Core to use PostgreSQL as the database
     and to use the hardcoded connection string. Remember that you should avoid hardcoding
     connection strings, as they must be part of the configuration. We use the simplified
     approach to have the connection string visible.
+  id: totrans-133
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这里，我们还指示Entity Framework Core使用PostgreSQL作为数据库，并使用硬编码的连接字符串。请记住，你应该避免硬编码连接字符串，因为它们必须是配置的一部分。我们使用简化的方法使连接字符串可见。
 - en: 'The last thing we need to do before starting the app is call our extension
     method to create or migrate the database objects. We do it in the `Configure`
     method of the `Startup` class:'
+  id: totrans-134
   prefs: []
   type: TYPE_NORMAL
+  zh: 在启动应用程序之前，我们需要做的最后一件事是调用我们的扩展方法来创建或迁移数据库对象。我们在`Startup`类的`Configure`方法中执行此操作：
 - en: '[PRE23]'
+  id: totrans-135
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE23]'
 - en: The changes that we have made more or less represent all the changes that we
     needed to do to use RavenDB for persistence. Ideally, everything should work now.
     Let's start the application and see what happens.
+  id: totrans-136
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们所做的更改或多或少代表了我们需要对使用RavenDB进行持久化所做的所有更改。理想情况下，现在一切应该都能正常工作。让我们启动应用程序并看看会发生什么。
 - en: 'After pressing *F5*, we will see that the application doesn''t start. Instead,
     it throws an exception immediately:'
+  id: totrans-137
   prefs: []
   type: TYPE_NORMAL
+  zh: 在按下*F5*后，我们会看到应用程序无法启动。相反，它会立即抛出一个异常：
 - en: The entity type `ClassifiedAdId` requires a primary key to be defined.
+  id: totrans-138
   prefs: []
   type: TYPE_NORMAL
+  zh: 实体类型`ClassifiedAdId`需要定义一个主键。
 - en: That sounds weird, because `ClassifiedAdId` is not an entity. Here comes trouble.
     Entity Framework Core considers all object-to-object relations to be relationships
     between different entities. It wants to create a separate table to store the `ClassifiedAdId`
@@ -805,8 +1128,10 @@
     it is referred to as **undo rollback**, but that is just a narrow use case for
     this pattern. Essentially, every object persistence method uses some implementation
     of the memento pattern.
+  id: totrans-139
   prefs: []
   type: TYPE_NORMAL
+  zh: 这听起来很奇怪，因为`ClassifiedAdId`不是一个实体。接下来就是麻烦。Entity Framework Core认为所有对象到对象的关系都是不同实体之间的关系。它想要创建一个单独的表来存储`ClassifiedAdId`对象，但作为一个实体，它必须有一个标识符。大约两年前，我们就会在这里卡住，克服这种限制的唯一方法就是使用**备忘录**模式。这种模式的本质是能够持久化对象状态，并能够在以后恢复它。有时，它被称为**撤销回滚**，但这只是这种模式的一个狭窄用例。本质上，每种对象持久化方法都使用memento模式的某种实现。
 - en: 'In order to implement memento, we need to have a way to convert our complex
     object to something that can be persisted, like a text file, relational table,
     or JSON object. Upon any save operation, we''d need to manually convert the state
@@ -816,63 +1141,90 @@
     work entities. In fact, the EF Core has implemented all of the pieces of the pattern
     for us. To use this feature, we need to add more code to the `ClassifiedAdEntityTypeConfiguration`
     class:'
+  id: totrans-140
   prefs: []
   type: TYPE_NORMAL
+  zh: 为了实现备忘录模式，我们需要有一种方法将我们的复杂对象转换为可以持久化的东西，比如文本文件、关系表或JSON对象。在任何保存操作之后，我们需要手动将我们的聚合状态转换为备忘录，当我们需要恢复状态时，需要执行反向操作。然而，今天，我们可以通过告诉Entity
+    Framework Core我们实际上正在处理值对象而不是工作实体来解决这个问题。实际上，EF Core已经为我们实现了模式的所有部分。要使用此功能，我们需要向`ClassifiedAdEntityTypeConfiguration`类添加更多代码：
 - en: '[PRE24]'
+  id: totrans-141
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE24]'
 - en: 'The `OwnsOne` method tells EF Core that it needs to persist the given property
     not as a separate entity in a separate table, but as a part of the same table.
     Since EF Core would only save the content of public properties, we need to expose
     the properties of our value objects for the `get` part. We still want encapsulation,
     so the setter remains private. This is what we need to add to the `PictureSize`
     value object code:'
+  id: totrans-142
   prefs: []
   type: TYPE_NORMAL
+  zh: '`OwnsOne`方法告诉EF Core，它需要将给定的属性持久化为同一表的一部分，而不是作为单独的实体保存在单独的表中。由于EF Core只会保存公共属性的内容，我们需要公开我们的值对象属性以供`get`部分使用。我们仍然想要封装，所以设置器保持为私有。这就是我们需要添加到`PictureSize`值对象代码中的内容：'
 - en: '[PRE25]'
+  id: totrans-143
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE25]'
 - en: EF Core also requires all objects that it persists to have either a constructor
     that accepts values for all properties, or a parameterless constructor. We use
     the second option, but we make the constructor internal, so no one can use it
     from outside of the `Domain` project.
+  id: totrans-144
   prefs: []
   type: TYPE_NORMAL
+  zh: EF Core还要求它持久化的所有对象要么有一个接受所有属性值的构造函数，要么有一个无参构造函数。我们使用第二种选择，但我们将构造函数设置为内部，这样就没有人可以从`Domain`项目外部使用它。
 - en: 'Now, we also know that EF Core wants to know more about how to map objects
     to tables; it has also become clear that we need to map the `Picture` entity,
     as well. There, we want to keep objects persisted in a separate table. To do that,
     we need to add a new class `PictureEntityTypeConfiguration`. It can be added to
     the same `ClassifiedAdDbContext.cs` file:'
+  id: totrans-145
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在，我们也知道EF Core想要了解如何将对象映射到表上；这也已经变得很清楚，我们还需要映射`Picture`实体。在那里，我们希望将持久化的对象保存在一个单独的表中。为了做到这一点，我们需要添加一个新的类`PictureEntityTypeConfiguration`。它可以添加到同一个`ClassifiedAdDbContext.cs`文件中：
 - en: '[PRE26]'
+  id: totrans-146
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE26]'
 - en: Notice that we need to do the same trick with the picture ID that we did with
     the classified ad ID. I am not putting the code changes in the text for the sake
     of brevity, since all of the code can be found in the book repository for this
     chapter.
+  id: totrans-147
   prefs: []
   type: TYPE_NORMAL
+  zh: 注意，我们需要对图片ID执行与分类广告ID相同的技巧。由于为了简洁起见，我没有在文本中放入代码更改，因为所有代码都可以在本书的代码库中找到。
 - en: 'The `ClassifiedAdDbContext.OnModelCreating` now needs to include this additional
     mapping configuration, as well:'
+  id: totrans-148
   prefs: []
   type: TYPE_NORMAL
+  zh: '`ClassifiedAdDbContext.OnModelCreating`现在需要包含这个额外的映射配置：'
 - en: '[PRE27]'
+  id: totrans-149
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE27]'
 - en: 'Now let''s run the application again. This time, it start just fine; at first
     glance, all mappings seem to be correct. If we also look at the database (use
     the tool of your choice, like Database Explorer in Visual Studio or the Database
     tool window in Rider) we will see that two tables were created:'
+  id: totrans-150
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在让我们再次运行应用程序。这次，它启动得很好；乍一看，所有映射似乎都是正确的。如果我们还查看数据库（使用您选择的工具，如Visual Studio中的数据库资源管理器或Rider中的数据库工具窗口），我们会看到创建了两个表：
 - en: '![](img/9c00a144-0f67-4acf-8171-5f6a990e8daa.png)'
+  id: totrans-151
   prefs: []
   type: TYPE_IMG
+  zh: '![图片](img/9c00a144-0f67-4acf-8171-5f6a990e8daa.png)'
 - en: The database structure in the Visual Studio database explorer
+  id: totrans-152
   prefs: []
   type: TYPE_NORMAL
+  zh: Visual Studio数据库资源管理器中的数据库结构
 - en: As you can see, there are two tables for each entity type. Since the `Picture`
     entity is a part of the `ClassifiedAd` aggregate, we use the object-to-object
     relationship, and it was mapped as a foreign key in the database. For each value
@@ -883,23 +1235,33 @@
     is implicit, and it is being called when we try to do anything with `DbContext`
     for the first time. Subsequent calls are processed faster, since the initialized
     model will be cached.
+  id: totrans-153
   prefs: []
   type: TYPE_NORMAL
+  zh: 如你所见，对于每个实体类型都有两个表。由于`Picture`实体是`ClassifiedAd`聚合的一部分，我们使用对象到对象的关系，并在数据库中将其映射为外键。对于每个值对象，EF
+    Core已经创建了一组列来存储与父实体相同的表中的每个值对象的全部属性。到目前为止，一切顺利；现在，我们可以尝试调用我们的API。你需要在Swagger中填写两个GUID，然后点击执行，我们会有一段相当长的等待时间。这是因为EF
+    Core初始化是隐式的，并且在我们第一次尝试使用`DbContext`做任何事情时被调用。后续调用处理得更快，因为初始化后的模型将被缓存。
 - en: 'Let''s look at what we got back from the HTTP call. This is not really surprising,
     it is an exception again. We are getting all the issues associated with the impedance
     mismatch, one by one! The new error message is as follows:'
+  id: totrans-154
   prefs: []
   type: TYPE_NORMAL
+  zh: 让我们看看我们从HTTP调用中得到了什么。这并不令人惊讶，它又是一个异常。我们正在逐个获取与阻抗不匹配相关的问题！新的错误信息如下：
 - en: '[PRE28]'
+  id: totrans-155
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE28]'
 - en: This time, the error message is not really clear. In reality, what EF Core is
     telling us now is that it cannot handle value object properties of the `ClassifiedAd`
     object that are null. When we apply the `ClassifiedAdCreated` event in the `When`
     method, we only assign values to the properties that we have—the ID, and the owner
     ID.
+  id: totrans-156
   prefs: []
   type: TYPE_NORMAL
+  zh: 这次，错误信息并不十分清晰。实际上，EF Core现在告诉我们它无法处理`ClassifiedAd`对象的值为null的值对象属性。当我们应用`ClassifiedAdCreated`事件在`When`方法中时，我们只分配我们拥有的属性值——ID和所有者ID。
 - en: 'There are a few ways to work around this limitation, and the most prominent
     one is to use instances of value objects that represent *no value*. In fact, this
     method also allows us to mitigate the risk of getting the null reference exception.
@@ -908,43 +1270,65 @@
     types that are commonly used in functional languages. In the following, you can
     see the code to implement such a value for the `ClassifiedAdTitle` class by adding
     a static property to it:'
+  id: totrans-157
   prefs: []
   type: TYPE_NORMAL
+  zh: 有几种方法可以绕过这个限制，最突出的一种是使用表示*无值*的值对象实例。实际上，这种方法也允许我们减轻获取空引用异常的风险。在这本书的早期我们已经提到了null的问题。为所有我们的值对象提供特定的*无值*实例将类似于在函数式语言中常用到的可选类型。在下面的代码中，你可以看到如何通过向其中添加静态属性来实现`ClassifiedAdTitle`类的这样一个值：
 - en: '[PRE29]'
+  id: totrans-158
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE29]'
 - en: 'When we have such properties in all value object types that can be empty (for
     example, `PictureSize` or `ClassifiedAdId` are always assigned, so we can skip
     these types), we need to assign empty values in the `When` method of the `ClassifiedAd`
     class for the `ClassifiedAdCreated` event handler:'
+  id: totrans-159
   prefs: []
   type: TYPE_NORMAL
+  zh: 当我们在所有可能为空的值对象类型中都有这样的属性（例如，`PictureSize`或`ClassifiedAdId`总是被分配，因此我们可以跳过这些类型），我们需要在`ClassifiedAd`类的`When`方法中为`ClassifiedAdCreated`事件处理器分配空值：
 - en: '[PRE30]'
+  id: totrans-160
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE30]'
 - en: 'With these changes complete, we can do the API call again, and now, it should
     work. On the console, we can see the following debug output:'
+  id: totrans-161
   prefs: []
   type: TYPE_NORMAL
+  zh: 经过这些更改完成后，我们可以再次进行API调用，现在，它应该可以正常工作。在控制台，我们可以看到以下调试输出：
 - en: '[PRE31]'
+  id: totrans-162
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE31]'
 - en: 'We can also call the `PUT` method for `/ad/title` and get this debug output:'
+  id: totrans-163
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们还可以调用`/ad/title`的`PUT`方法，并得到以下调试输出：
 - en: '[PRE32]'
+  id: totrans-164
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE32]'
 - en: 'We can also look at the content of the `ClassifiedAd` table and see that the
     values are indeed being assigned:'
+  id: totrans-165
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们还可以查看`ClassifiedAd`表的内容，并看到值确实被分配了：
 - en: '![](img/a57984ff-6c46-4662-b559-dac02120e979.png)'
+  id: totrans-166
   prefs: []
   type: TYPE_IMG
+  zh: '![](img/a57984ff-6c46-4662-b559-dac02120e979.png)'
 - en: Updated data in the ClassifiedAd table
+  id: totrans-167
   prefs: []
   type: TYPE_NORMAL
+  zh: 已更新“分类广告”表中的数据
 - en: By now, we have managed to handle all the challenges that come from the mismatch
     between our domain model and the data model. This is not the only way to handle
     aggregate persistence using relational databases. Many developers prefer having
@@ -962,12 +1346,17 @@
     So far, we have been able to fix most of the issues by applying a more advanced
     configuration in the infrastructure configuration classes, and the changes in
     the domain model itself have not been that significant.
+  id: totrans-168
   prefs: []
   type: TYPE_NORMAL
+  zh: 到目前为止，我们已经成功处理了来自我们的领域模型和数据模型之间不匹配的所有挑战。这不是使用关系数据库处理聚合持久化的唯一方法。许多开发者更喜欢将领域模型和数据模型完全分离。通过这样做，他们在不需要始终关注持久化问题时，获得了更多的灵活性来更改领域模型。然而，这种灵活性伴随着持久化层复杂性过度增加的相关成本，因为需要在领域对象和数据对象之间手动处理映射。对于大型应用程序，这种方法可能更受欢迎，因为它还允许调整数据模型以满足底层数据库的性能需求。当我们使用ORM框架来处理我们的领域对象并将它们直接持久化时，我们非常信任框架的能力来正确处理数据方面。同时，EF
+    Core不断改进，以使数据库调用更加优化，并更透明地减轻开发者的阻抗不匹配。到目前为止，我们通过在基础设施配置类中应用更高级的配置，已经能够解决大多数问题，而领域模型本身的变更并不那么显著。
 - en: Summary
+  id: totrans-169
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 摘要
 - en: In this chapter, we dove deeply into the topic of aggregate persistence. You
     have seen many challenges that are associated with what is known as **impedance
     mismatch**, when we can clearly see that databases aren't exactly happy to persist
@@ -975,14 +1364,18 @@
     of databases have. Also, you learned about using the repository pattern to abstract
     the persistence and keep both our domain model and the application service away
     from the database-related concerns.
+  id: totrans-170
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本章中，我们深入探讨了聚合持久化的主题。您已经看到了许多与所谓的**阻抗不匹配**相关联的挑战，当我们清楚地看到，由于不同类型的数据库具有特定的要求，数据库并不完全愿意以这种方式持久化复杂的对象图。此外，您还学习了如何使用仓储模式来抽象持久化，并使我们的领域模型和应用服务远离数据库相关的问题。
 - en: You learned how to use RavenDB to persist our aggregate as a document, and what
     challenges we might encounter on this road. It became clear that document databases
     are, in general, more suitable for persisting complex objects, but some concerns
     still need to be addressed, like handling identities and exposing properties.
+  id: totrans-171
   prefs: []
   type: TYPE_NORMAL
+  zh: 您学习了如何使用RavenDB将我们的聚合作为文档进行持久化，以及我们可能会在这条路上遇到哪些挑战。很明显，文档数据库通常更适合持久化复杂对象，但仍然需要解决一些问题，例如处理标识符和公开属性。
 - en: This chapter also covered the topic of persisting aggregates in a relational
     database. We used the Entity Framework Core with a PostgreSQL database to represent
     our aggregate as a set of tables with relations between them. Despite the significant
@@ -991,8 +1384,11 @@
     lot of configuration changes to make it work. However, the changes that we had
     to make in the domain model were not that dramatic, and we were still able to
     use value objects as-is, including the important characteristic of their immutability.
+  id: totrans-172
   prefs: []
   type: TYPE_NORMAL
+  zh: 本章还涵盖了在关系数据库中持久化聚合的主题。我们使用Entity Framework Core和PostgreSQL数据库，将我们的聚合表示为一系列具有相互关系的表。尽管EF
+    Core团队在过去几年中取得了显著的改进，但持久化值对象是一个特别具有挑战性的主题，我们不得不进行相当多的配置更改才能使其工作。然而，我们必须在领域模型中进行的更改并不那么剧烈，我们仍然能够直接使用值对象，包括它们的重要特性——不可变性。
 - en: However, we haven't touched the topic of retrieving data from the database.
     Our API still only has endpoints to create new domain objects and perform state
     transitions in the existing object. In fact, we can only handle commands. You
@@ -1002,5 +1398,7 @@
     trying to apply the principles of DDD. That's why I have dedicated the next chapter
     exclusively to queries. As you will see, it is not as straightforward, and there
     are some interesting things to discover ahead.
+  id: totrans-173
   prefs: []
   type: TYPE_NORMAL
+  zh: 然而，我们还没有涉及到从数据库中检索数据的话题。我们的API仍然只有创建新的领域对象和在现有对象中执行状态转换的端点。实际上，我们只能处理命令。你可能想知道为什么我们不开始向我们的存储库添加更多方法来根据某些标准或规范检索聚合集合。这就是我们在尝试应用领域驱动设计（DDD）原则时，在许多系统中看到的持久化实现中的一个谬误。这就是为什么我将下一章专门用于查询。正如你将看到的，这并不简单，前方还有许多有趣的事情等待发现。

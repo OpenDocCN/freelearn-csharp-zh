@@ -1,48 +1,68 @@
 - en: Service Ecosystem Patterns
+  id: totrans-0
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 服务生态系统模式
 - en: In the previous chapter, we provided an overview of the containerization process
     and how to use containers to run a service. We also learned how to host the catalog
     service on containers using Docker and how to use the multistage build approach
     to create and run our container images.
+  id: totrans-1
   prefs: []
   type: TYPE_NORMAL
+  zh: 在上一章中，我们提供了容器化过程的概述以及如何使用容器来运行服务。我们还学习了如何使用 Docker 在容器上托管目录服务，以及如何使用多阶段构建方法创建和运行我们的容器镜像。
 - en: This chapter focuses on some patterns that are used when multiple services are
     part of the same ecosystem. Then, we will look at the implementation of the communication
     between those services. We will also learn how to build a resilient connection
     between various web services that are part of the same system in order to avoid
     some of the common pitfalls related to data exchange.
+  id: totrans-2
   prefs: []
   type: TYPE_NORMAL
+  zh: 本章重点介绍在多个服务属于同一生态系统时使用的某些模式。然后，我们将查看这些服务之间的实现。我们还将学习如何构建属于同一系统的各种 Web 服务之间的弹性连接，以避免与数据交换相关的某些常见陷阱。
 - en: 'In this chapter, we will cover the following topics:'
+  id: totrans-3
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本章中，我们将涵盖以下主题：
 - en: An introduction to the cart service
+  id: totrans-4
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 购物车服务简介
 - en: Implementing resilient communication using an HTTP client
+  id: totrans-5
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 使用 HTTP 客户端实现弹性通信
 - en: An introduction to event buses
+  id: totrans-6
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 事件总线简介
 - en: How to perform event bus communication using RabbitMQ
+  id: totrans-7
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 如何使用 RabbitMQ 执行事件总线通信
 - en: By the end of this chapter, you will have a general understanding of how to
     improve resilience using `Polly` and how to use an event bus to exchange information
     between two systems.
+  id: totrans-8
   prefs: []
   type: TYPE_NORMAL
+  zh: 到本章结束时，您将了解如何使用 `Polly` 提高弹性，以及如何使用事件总线在两个系统之间交换信息。
 - en: An introduction to the cart service
+  id: totrans-9
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 购物车服务简介
 - en: 'While the `Catalog.API` project handles the catalog items of our store, we
     don''t have anything that handles the cart features. In this section, we will
     discover a new .NET Core solution that implements a cart service to do this for
@@ -50,11 +70,15 @@
     pattern**. Before we walk through the implementation of this new service, let''s
     take a look at an overview of the project structure, which provides the catalog
     service and cart service solutions:'
+  id: totrans-10
   prefs: []
   type: TYPE_NORMAL
+  zh: 虽然 `Catalog.API` 项目处理我们商店的商品目录，但我们没有处理购物车功能的东西。在本节中，我们将发现一个新的 .NET Core 解决方案，该方案实现了一个购物车服务来完成这项工作。此外，我们还将介绍一种新的实现方法：**中介者模式**。在我们深入了解这个新服务的实现之前，让我们先看看项目结构概述，它提供了目录服务和购物车服务解决方案：
 - en: '![](img/c779dff6-90f2-4501-8699-c53546ea00fd.png)'
+  id: totrans-11
   prefs: []
   type: TYPE_IMG
+  zh: '![](img/c779dff6-90f2-4501-8699-c53546ea00fd.png)'
 - en: The preceding schema describes the project structure of the catalog service
     andthe cart service*.* As we already know, the catalog service implements the
     `API`, `Domain`, and `Infrastructure` projects in order to separate the different
@@ -64,28 +88,40 @@
     and stores cart data in Redis. Therefore, Redis, which is mainly used for caching
     purposes, offers a very lightweight/high-performance key-value data store that
     can be also used as a database.
+  id: totrans-12
   prefs: []
   type: TYPE_NORMAL
+  zh: 上述架构描述了目录服务和购物车服务的项目结构*.* 如我们所知，目录服务通过实现 `API`、`Domain` 和 `Infrastructure` 项目来分离实现的各个层，并且它使用
+    SQL Server，结合 Entity Framework Core 作为主要的数据源。然而，尽管购物车服务遵循类似的项目结构，但它使用了一种略微不同的实现模式，并将购物车数据存储在
+    Redis 中。因此，主要用于缓存目的的 Redis 提供了一个非常轻量级/高性能的键值数据存储，也可以用作数据库。
 - en: 'The cart service solution has the following structure:'
+  id: totrans-13
   prefs: []
   type: TYPE_NORMAL
+  zh: 购物车服务解决方案具有以下结构：
 - en: The `Cart.API` project contains the controller, which handles the incoming HTTP
     request from the client. It also includes the error processing aggregation point
     and the `Startup` class, which initializes the dependency injection engine.
+  id: totrans-14
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`Cart.API` 项目包含控制器，该控制器处理来自客户端的传入 HTTP 请求。它还包括错误处理聚合点和 `Startup` 类，该类初始化依赖注入引擎。'
 - en: The `Cart.Domain` project contains the mediator logic and the handlers that
     dispatch the operations to the underlying layers. Furthermore, it also includes
     the entities that are used by the application.
+  id: totrans-15
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`Cart.Domain` 项目包含中介逻辑和处理程序，它们将操作调度到底层层。此外，它还包括应用程序使用的实体。'
 - en: The `Cart.Infrastructure` project is the bridge between the web services and
     their dependencies, such as the data store and other third-party services.
+  id: totrans-16
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`Cart.Infrastructure` 项目是 Web 服务及其依赖项（如数据存储和其他第三方服务）之间的桥梁。'
 - en: 'This chapter won''t look at the development process of the cart service in
     detail: some of the technical aspects have already been discussed, namely, in
     [Chapter 8](84b281bd-11a2-4703-81ae-ca080e2a267a.xhtml), *Building the Data Access
@@ -96,20 +132,31 @@
     multiple web services. Although this chapter will cover some of the key parts
     of the implementation, such as the handlers, in order to proceed, you need to
     download the cart service source code from [https://github.com/PacktPublishing/Hands-On-RESTful-Web-Services-with-ASP.NET-Core-3](https://github.com/PacktPublishing/Hands-On-RESTful-Web-Services-with-ASP.NET-Core-3).'
+  id: totrans-17
   prefs: []
   type: TYPE_NORMAL
+  zh: 本章不会详细探讨购物车服务的发展过程：一些技术方面已经在 [第 8 章](84b281bd-11a2-4703-81ae-ca080e2a267a.xhtml)，*构建数据访问层*，[第
+    9 章](f8ac60e1-e948-4435-b804-e3e4ff305510.xhtml)，*实现领域逻辑*，和 [第 10 章](266d98e8-df54-4024-aefb-b5871b3b35fa.xhtml)，*实现
+    RESTful HTTP 层* 中进行了讨论。购物车服务的介绍将有助于你确定多个 Web 服务之间的不同通信技术。尽管本章将涵盖实现的一些关键部分，例如处理器，但为了继续前进，你需要从
+    [https://github.com/PacktPublishing/Hands-On-RESTful-Web-Services-with-ASP.NET-Core-3](https://github.com/PacktPublishing/Hands-On-RESTful-Web-Services-with-ASP.NET-Core-3)
+    下载购物车服务的源代码。
 - en: The theory behind the mediator pattern
+  id: totrans-18
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 中介模式背后的理论
 - en: The mediator pattern is a way to encapsulate logic behind a unique entry point.
     It uses the concept of requests, responses, commands, or events to abstract the
     implementations behind a single entry point. This way of implementing the application
     logic helps the developers in your team keep the logic separated from the web
     part of the application. To understand how the mediator pattern works, let's take
     a look at its components.
+  id: totrans-19
   prefs: []
   type: TYPE_NORMAL
+  zh: 中介模式是一种封装逻辑在唯一入口点的方法。它使用请求、响应、命令或事件的概念来抽象单个入口点背后的实现。这种实现应用程序逻辑的方式有助于你的团队中的开发者将逻辑与应用程序的
+    Web 部分分离。为了了解中介模式是如何工作的，让我们看看它的组件。
 - en: The preceding schema describes a simple implementation of the mediator pattern.
     The consumer of the mediator calls the `Send` method by referring to the `IMediator`
     interface. The mediator implementation passes a specific type of the `IRequest`
@@ -117,95 +164,141 @@
     handler, which is represented by the `IMessageHandler` implementation, using the
     concrete implementation of the `IRequest` interface. In the next chapter, we will
     learn how to use an `IMediator` interface to dispatch messages to specific handlers.
+  id: totrans-20
   prefs: []
   type: TYPE_NORMAL
+  zh: 上述架构描述了中介模式的一个简单实现。中介模式的消费者通过引用 `IMediator` 接口调用 `Send` 方法。中介实现传递一个特定的 `IRequest`
+    接口类型。因此，`Mediator` 实例使用 `IRequest` 接口的具体实现将消息派发到目标处理器，该处理器由 `IMessageHandler`
+    实现表示。在下一章中，我们将学习如何使用 `IMediator` 接口将消息派发到特定的处理器。
 - en: 'Furthermore, we will use the mediator pattern with the command approach. There
     are slightly different ways to implement the mediator pattern. The project that
     we''ll be covering in this chapter uses a very popular mediator NuGet packaged
     called **MediatR**. MediatR is an all-in-one implementation of the mediator pattern
     that covers in-process messaging. You can find more information about the MediatR
     project on GitHub: [https://github.com/jbogard/MediatR](https://github.com/jbogard/MediatR).'
+  id: totrans-21
   prefs: []
   type: TYPE_NORMAL
+  zh: 此外，我们将使用命令方法来应用中介模式。实现中介模式的方法略有不同。在本章中，我们将介绍一个非常流行的中介 NuGet 包，称为 **MediatR**。MediatR
+    是一个全功能的中介模式实现，涵盖了进程内消息传递。你可以在 GitHub 上找到有关 MediatR 项目的更多信息：[https://github.com/jbogard/MediatR](https://github.com/jbogard/MediatR)。
 - en: 'For the purpose of the *cart service* implementation, we''re going to use the
     following components, all of which have been exposed by the MediatR library:'
+  id: totrans-22
   prefs: []
   type: TYPE_NORMAL
+  zh: 为了实现 *购物车服务*，我们将使用以下组件，所有这些组件都由 MediatR 库公开：
 - en: The `IMediator` interface is the main entry point of the mediator pattern. It
     exposes a `Send` method, which is used to dispatch a command or a request to a
     specific handler in order to obtain a result.
+  id: totrans-23
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`IMediator` 接口是中介模式的入口点。它公开了一个 `Send` 方法，用于将命令或请求派发到特定的处理器以获取结果。'
 - en: The `IRequestHandler` interface is a generic interface that's used to define
     the implementation of a handler. Each `IRequestHandler` type requires an `IRequest`
     type, which represents the request that's sent through the `IMediator` interface.
+  id: totrans-24
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`IRequestHandler` 接口是一个通用接口，用于定义处理器的实现。每个 `IRequestHandler` 类型都需要一个 `IRequest`
+    类型，该类型代表通过 `IMediator` 接口发送的请求。'
 - en: The `IRequest` interface defines the request or the command type that's used
     to execute a specific handler.
+  id: totrans-25
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`IRequest` 接口定义了用于执行特定处理器的请求或命令类型。'
 - en: Now that we have more information about how the mediator pattern works, we can
     continue with the concrete implementation of the cart service solution. In the
     next section, we will look at how we can define the domain model of the service
     and implement the data access layer abstraction over the Redis data store.
+  id: totrans-26
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在我们对中介者模式的工作方式有了更多的了解，我们可以继续进行购物车服务解决方案的具体实现。在下一节中，我们将查看如何定义服务的领域模型并实现数据访问层抽象，该抽象覆盖
+    Redis 数据存储。
 - en: The domain model and the data access layer
+  id: totrans-27
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 领域模型和数据访问层
 - en: 'The domain model of the cart service represents the entities that we require
     to describe the cart session of a user. Specifically, the domain model of the
     cart service implements three different entity classes: `Cart`, `CartItem`, and
     `CartUser`. Like the catalog service, all the entities are stored in the `Cart.Domain`
     project, which will be referred to by the `Cart.Infrastructure` and `Cart.API`
     projects.'
+  id: totrans-28
   prefs: []
   type: TYPE_NORMAL
+  zh: 购物车服务的领域模型代表了我们需要描述用户购物车会话的实体。具体来说，购物车服务的领域模型实现了三个不同的实体类：`Cart`、`CartItem` 和
+    `CartUser`。与目录服务一样，所有实体都存储在 `Cart.Domain` 项目中，该项目将由 `Cart.Infrastructure` 和 `Cart.API`
+    项目引用。
 - en: 'Let''s start with the `CartSession` class, which represents a single cart session:'
+  id: totrans-29
   prefs: []
   type: TYPE_NORMAL
+  zh: 让我们从代表单个购物车会话的 `CartSession` 类开始：
 - en: '[PRE0]'
+  id: totrans-30
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE0]'
 - en: 'The `CartSession` entity represents a single cart instance that''s been created
     by a user. Therefore, it refers to the `CartUser` class, which contains the user''s
     information. Besides, the `CartSession` entity also provides the `IList<CartItems>`
     field, which represents the items in the cart and the quantity associated with
     each item. Let''s proceed by also defining the `CartItem` class:'
+  id: totrans-31
   prefs: []
   type: TYPE_NORMAL
+  zh: '`CartSession` 实体代表一个由用户创建的单个购物车实例。因此，它引用了包含用户信息的 `CartUser` 类。此外，`CartSession`
+    实体还提供了 `IList<CartItems>` 字段，该字段表示购物车中的项目及其各自的数量。让我们继续定义 `CartItem` 类：'
 - en: '[PRE1]'
+  id: totrans-32
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE1]'
 - en: 'The `CartItem` class implements a `CartItemId` field and a `Quantity` field.
     Furthermore, it also provides the `IncreaseQuantity` and `DecreaseQuantity` fields,
     which are used to increment and decrement the quantity of a specific item, respectively.
     Finally, it is possible to determine the `CartUser` class, which represents the
     user related to the cart:'
+  id: totrans-33
   prefs: []
   type: TYPE_NORMAL
+  zh: '`CartItem` 类实现了 `CartItemId` 字段和 `Quantity` 字段。此外，它还提供了 `IncreaseQuantity`
+    和 `DecreaseQuantity` 字段，分别用于增加和减少特定项目的数量。最后，我们可以确定 `CartUser` 类，该类代表与购物车相关的用户：'
 - en: '[PRE2]'
+  id: totrans-34
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE2]'
 - en: For demonstration purposes, we are representing `CartUser` with only one property;
     this will contain the email of the user. The preceding entities are stored in
     the `Entities` folder, inside the `Cart.Domain` project.
+  id: totrans-35
   prefs: []
   type: TYPE_NORMAL
+  zh: 为了演示目的，我们用只有一个属性来表示 `CartUser`；这将包含用户的电子邮件。前面的实体存储在 `Entities` 文件夹中，位于 `Cart.Domain`
+    项目内。
 - en: 'Once we have defined the domain model, we can proceed with the implementation
     of the data access abstraction. Specifically, the cart service will use the same
     access pattern we defined previously for the catalog service in order to get information
     about the cart sessions:'
+  id: totrans-36
   prefs: []
   type: TYPE_NORMAL
+  zh: 一旦我们定义了领域模型，我们就可以继续实现数据访问抽象。具体来说，购物车服务将使用我们之前为目录服务定义的相同访问模式来获取有关购物车会话的信息：
 - en: '[PRE3]'
+  id: totrans-37
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE3]'
 - en: The `ICartRepository` method implements methods that retrieve and update our
     data, the `GetCarts` method retrieves the IDs of the current carts, and the `GetAsync`
     method gathers information about a specific cart. Finally, the `AddOrUpdateAsync`
@@ -213,24 +306,36 @@
     while `ICartRepository` defines the operations that are performed by our data
     store. In the next subsection, we will look at a concrete implementation of the
     `CartRepository` class.
+  id: totrans-38
   prefs: []
   type: TYPE_NORMAL
+  zh: '`ICartRepository` 方法实现了检索和更新我们数据的方法，`GetCarts` 方法检索当前购物车的 ID，而 `GetAsync` 方法收集有关特定购物车的信息。最后，`AddOrUpdateAsync`
+    方法允许我们在数据存储中不存在时更新或添加一个新的购物车，而 `ICartRepository` 定义了我们的数据存储执行的操作。在下一小节中，我们将查看
+    `CartRepository` 类的具体实现。'
 - en: This domain model has been simplified to provide an example of a possible implementation
     of the cart. In a real-world application, we should consider other essential information
     about the state of a cart.
+  id: totrans-39
   prefs: []
   type: TYPE_NORMAL
+  zh: 这个领域模型已被简化，以提供一个购物车可能的实现示例。在实际应用中，我们应该考虑购物车状态的其他重要信息。
 - en: The ICartRepository Redis implementation
+  id: totrans-40
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: ICartRepository Redis 实现
 - en: The cart service uses Redis ([https://redis.io/](https://redis.io/)) to store
     the cart's data. The actual implementation of the `CartRepository` class of the
     cart service uses a NuGet package powered by Stack Exchange called `StackExchange.Redis`.
     Furthermore, we will use the `Newtonsoft.Json` package to serialize the objects
     into Redis using JSON format.
+  id: totrans-41
   prefs: []
   type: TYPE_NORMAL
+  zh: 购物车服务使用 Redis ([https://redis.io/](https://redis.io/)) 来存储购物车数据。购物车服务中 `CartRepository`
+    类的实际实现使用由 Stack Exchange 提供的 NuGet 包 `StackExchange.Redis`。此外，我们将使用 `Newtonsoft.Json`
+    包将对象序列化为 Redis，使用 JSON 格式。
 - en: 'The concrete implementation of the `CartRepository` class will be located in
     the `Cart.Infrastructure` project, while the `ICartRepository` interface type
     will be located in the `Cart.Domain` project. Furthermore, the `Cart.Infrastructure`
@@ -238,11 +343,18 @@
     The `StackExchange.Redis` library provides a low-level abstraction of Redis, so
     that our .NET applications can read or write data on a Redis instance. Let''s
     take a look at the implementation of the `CartRepository` class:'
+  id: totrans-42
   prefs: []
   type: TYPE_NORMAL
+  zh: '`CartRepository` 类的具体实现将位于 `Cart.Infrastructure` 项目中，而 `ICartRepository` 接口类型将位于
+    `Cart.Domain` 项目中。此外，`Cart.Infrastructure` 项目还将依赖于 `StackExchange.Redis` 和 `Newtonsoft.Json`
+    包。`StackExchange.Redis` 库提供了对 Redis 的低级抽象，以便我们的 .NET 应用程序可以在 Redis 实例上读取或写入数据。让我们看一下
+    `CartRepository` 类的实现：'
 - en: '[PRE4]'
+  id: totrans-43
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE4]'
 - en: 'The `CartRepository` class uses the `StackExchange.Redis` library to interact
     with a Redis instance. It declares an `IDatabase` property, which represents a
     connection with the Redis instance, and it uses a custom settings class that defines
@@ -250,11 +362,17 @@
     of the class, the constructor calls the `ConnectionMultiplexer` static instance
     to create a new database connection. Let''s proceed by having a look at the `ICartRepository`
     interface method''s implementations:'
+  id: totrans-44
   prefs: []
   type: TYPE_NORMAL
+  zh: '`CartRepository` 类使用 `StackExchange.Redis` 库与 Redis 实例交互。它声明了一个 `IDatabase`
+    属性，它代表与 Redis 实例的连接，并使用一个自定义设置类来定义与 Redis 实例关联的连接字符串。在类的初始化过程中，构造函数调用 `ConnectionMultiplexer`
+    静态实例来创建一个新的数据库连接。让我们继续查看 `ICartRepository` 接口方法实现的细节：'
 - en: '[PRE5]'
+  id: totrans-45
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE5]'
 - en: 'The preceding code defines the core methods of the `ICartRepository` interface.
     The `GetCarts` method gathers all the keys that represent all the cart IDs stored
     in the Redis instance. The `GetAsync` method retrieves the details of a card by
@@ -268,8 +386,13 @@
     the best system to prevent data loss, however. All the data is processed in memory
     and it can only be saved by making a snapshot of the current state of memory.
     For more information, visit the following website: [https://redis.io/topics/persistence](https://redis.io/topics/persistence).'
+  id: totrans-46
   prefs: []
   type: TYPE_NORMAL
+  zh: 上述代码定义了 `ICartRepository` 接口的核心方法。`GetCarts` 方法收集表示存储在 Redis 实例中的所有购物车 ID 的键。`GetAsync`
+    方法通过传递特定购物车的 ID 并在 `CartSession` 实体中反序列化结果内容来检索卡片详情。最后，`AddOrUpdateAsync` 方法通过序列化其内容并使用库提供的
+    `StringSetAsync` 方法更新数据源来添加或更新与购物车 ID 相关的信息。我们使用 Redis 是因为它作为一个内存数据结构存储，可以非常快速地检索信息。通常，Redis
+    的主要目的是作为缓存系统，但它也可以用来临时存储信息。然而，Redis 并不是防止数据丢失的最佳系统。所有数据都在内存中处理，并且只能通过创建内存当前状态的快照来保存。有关更多信息，请访问以下网站：[https://redis.io/topics/persistence](https://redis.io/topics/persistence)。
 - en: The preceding implementation of `CartRepository` produces two main pitfalls.
     First of all, Redis is not a database that's designed to scan and retrieve multiple
     keys. Furthermore, this kind of data store is designed to perform O(1) operations,
@@ -280,32 +403,49 @@
     `CartRepository` class calls the `ConnectionMultiplexer` static class every time
     the class is initialized, it is strongly suggested that you initialize the `IConnectionMultiplexer`
     interface as a singleton instance in order to avoid performance pitfalls.
+  id: totrans-47
   prefs: []
   type: TYPE_NORMAL
+  zh: 之前 `CartRepository` 的实现产生了两个主要问题。首先，Redis 不是一个设计用于扫描和检索多个键的数据库。此外，这种类型的数据存储设计用于执行
+    O(1) 操作，就像哈希表或字典一样。因此，`GetCarts` 方法非常低效。一个替代且更有效的方法是将列表 ID 存储在特定且唯一的字段中，并在我们添加/删除新的购物车记录时保持它们更新。其次，尽管
+    `CartRepository` 类的构造函数在每次类初始化时都调用 `ConnectionMultiplexer` 静态类，但强烈建议您将 `IConnectionMultiplexer`
+    接口初始化为单例实例，以避免性能问题。
 - en: The next subsection describes the implementation of the handlers that expose
     the cart operations through the mediator logic. Furthermore, the handlers will
     call the underlying `ICartRepository` interface in order to perform the I/O process
     on Redis.
+  id: totrans-48
   prefs: []
   type: TYPE_NORMAL
+  zh: 下一个子节描述了通过中介逻辑公开购物车操作的处理器实现。此外，处理器将调用底层的 `ICartRepository` 接口以在 Redis 上执行 I/O
+    过程。
 - en: Handlers and routes implementation
+  id: totrans-49
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 处理器和路由实现
 - en: The *cart service* implements the handlers that reflect the different actions
     that occur on cart data in the domain part of our service. As we will see later
     in this chapter, the handlers are associated with a specific request and are executed
     by the `IMediator` interface, which is provided by the MediatR library. Also,
     in this case, these classes are located in the `Cart.Domain` project.
+  id: totrans-50
   prefs: []
   type: TYPE_NORMAL
+  zh: '*购物车服务* 实现了处理器，这些处理器反映了在服务域部分发生的不同购物车数据操作。正如我们将在本章后面看到的那样，处理器与特定请求相关联，并由 MediatR
+    库提供的 `IMediator` 接口执行。此外，在这种情况下，这些类位于 `Cart.Domain` 项目中。'
 - en: 'Let''s start by taking a look at the implementation of the `CreateCartHandler`
     class:'
+  id: totrans-51
   prefs: []
   type: TYPE_NORMAL
+  zh: 让我们从查看 `CreateCartHandler` 类的实现开始：
 - en: '[PRE6]'
+  id: totrans-52
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE6]'
 - en: 'The preceding code is the definition of the `CreateCartHandler` class, which
     performs the creation cart process. The class uses the constructor injection technique
     to resolve the dependencies through the dependency injection engine of ASP.NET
@@ -314,95 +454,142 @@
     with the `CartExtendedResponse` response class, while the `ICartRepository` interface
     is used to store the cart data on Redis through the use of the `AddOrUpdateAsync`
     method.'
+  id: totrans-53
   prefs: []
   type: TYPE_NORMAL
+  zh: 上述代码是 `CreateCartHandler` 类的定义，该类执行创建购物车的过程。该类使用构造函数注入技术通过 ASP.NET Core 的依赖注入引擎解决依赖关系。此外，处理器类依赖于
+    `IMapper` 和 `ICartRepository` 接口：`IMapper` 接口用于将 `CartSession` 实例映射到 `CartExtendedResponse`
+    响应类，而 `ICartRepository` 接口用于通过使用 `AddOrUpdateAsync` 方法在 Redis 上存储购物车数据。
 - en: 'The handler assigns a new `Guid` to the entity and it adds a `ValidityDate`
     of 2 months. Furthermore, it also assigns the new cart items list to the cart
     session by setting a default quantity of 1 for each item. In a similar manner,
     the `GetCartHandler` class implements the reading operations based on the `Id`
     of the cart:'
+  id: totrans-54
   prefs: []
   type: TYPE_NORMAL
+  zh: 处理器为实体分配一个新的 `Guid`，并为每个项目分配 2 个月的 `ValidityDate`。此外，它还通过为每个项目设置默认数量 1 来将新的购物车项目列表添加到购物车会话中。以类似的方式，`GetCartHandler`
+    类根据购物车的 `Id` 实现读取操作：
 - en: '[PRE7]'
+  id: totrans-55
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE7]'
 - en: 'In this case, the `Handle` method executes the `GetAsync(Guid id)` method that''s
     provided by the underlying repository interface and it maps the response to the
     `CartExtendedResponse` type. The last handler that''s implemented by the `Cart.Domain`
     project increases or decreases the quantity of an item in a specific cart:'
+  id: totrans-56
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这种情况下，`Handle` 方法执行由底层存储库接口提供的 `GetAsync(Guid id)` 方法，并将响应映射到 `CartExtendedResponse`
+    类型。由 `Cart.Domain` 项目实现的最后一个处理器增加了特定购物车中项目的数量或减少了数量：
 - en: '[PRE8]'
+  id: totrans-57
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE8]'
 - en: The handler accepts `UpdateCartItemQuantityRequest`, which defines the `CartId`,
     `CartItemId`, and a Boolean that denotes whether the request is to increase or
     decrease the quantity of the specified item.
+  id: totrans-58
   prefs: []
   type: TYPE_NORMAL
+  zh: 处理器接受`UpdateCartItemQuantityRequest`，它定义了`CartId`、`CartItemId`以及一个表示是否请求增加或减少指定项目数量的布尔值。
 - en: The handler uses the same dependencies that the other handlers do and it performs
     some additional checks about the removal of the item if the amount is equal to
     zero. If the quantity associated with `CartItemId` reaches `0`, then the item
     is removed from the cart session; otherwise, the quantity is updated and the cart
     proceeds by updating the Redis store and retrieving `cartDetail`.
+  id: totrans-59
   prefs: []
   type: TYPE_NORMAL
+  zh: 处理器使用与其他处理器相同的依赖项，并在数量等于零的情况下执行一些关于移除项目的额外检查。如果与`CartItemId`关联的数量达到`0`，则该项目将从购物车会话中移除；否则，数量将被更新，并通过更新Redis存储和检索`cartDetail`来继续购物车流程。
 - en: Now that our handlers are in place, we will define the controller classes that
     will expose the HTTP routes for the web service.
+  id: totrans-60
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在我们已经设置了处理器，我们将定义将公开Web服务HTTP路由的控制器类。
 - en: Exposing functionalities using CartController
+  id: totrans-61
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 使用`CartController`公开功能
 - en: 'As we''ve already mentioned, the cart service takes care of the operations
     that are performed on the cart page of the e-commerce store. Moreover, the service
     exposes the following route table:'
+  id: totrans-62
   prefs: []
   type: TYPE_NORMAL
+  zh: 正如我们已经提到的，购物车服务负责电子商务店铺购物页面上执行的操作。此外，该服务公开以下路由表：
 - en: '| **HttpVerb** | **URL** | **Description** |'
+  id: totrans-63
   prefs: []
   type: TYPE_TB
+  zh: '| **HttpVerb** | **URL** | **描述** |'
 - en: '| `GET` | `api/cart/{cartId}` | This action retrieves information about a specific
     cart and its inner products. |'
+  id: totrans-64
   prefs: []
   type: TYPE_TB
+  zh: '| `GET` | `api/cart/{cartId}` | 此操作检索有关特定购物车及其内部产品的信息。 |'
 - en: '| `POST` | `api/cart` | This action creates a new cart with a list of products
     specified in the body payload of the request. |'
+  id: totrans-65
   prefs: []
   type: TYPE_TB
+  zh: '| `POST` | `api/cart` | 此操作通过请求体中的产品列表创建一个新的购物车。 |'
 - en: '| `PUT` | `api/cart/{cartId}/items/{id}` | This action increases the quantity
     of the specified item in the specified `cartId` by adding one unit. |'
+  id: totrans-66
   prefs: []
   type: TYPE_TB
+  zh: '| `PUT` | `api/cart/{cartId}/items/{id}` | 此操作通过添加一个单位来增加指定`cartId`中指定项目的数量。
+    |'
 - en: '| `DELETE` | `api/cart/{cartId}/items/{id}` | This action decreases the quantity
     of the specified item in the specified `cartId` by removing one unit. |'
+  id: totrans-67
   prefs: []
   type: TYPE_TB
+  zh: '| `DELETE` | `api/cart/{cartId}/items/{id}` | 此操作通过移除一个单位来减少指定`cartId`中指定项目的数量。
+    |'
 - en: 'The preceding table provides some details about the routes we need to define
     in our controller. Therefore, the following code snippet shows the implementation
     of this route table while using the `CartController` class in the `Cart.API` project:'
+  id: totrans-68
   prefs: []
   type: TYPE_NORMAL
+  zh: 上述表格提供了我们需要在控制器中定义的路由的一些详细信息。因此，以下代码片段显示了在`Cart.API`项目中使用`CartController`类实现此路由表的实现：
 - en: '[PRE9]'
+  id: totrans-69
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE9]'
 - en: 'As you can see, in a similar way to the previously implemented controllers,
     `CartController` uses dependency injection to resolve its dependencies by initializing
     the `IMediator` interface. Let''s proceed by having a look at the implementation
     of the `Put` and `Delete` action methods:'
+  id: totrans-70
   prefs: []
   type: TYPE_NORMAL
+  zh: 正如你所见，与之前实现的控制器类似，`CartController`使用依赖注入来通过初始化`IMediator`接口来解析其依赖项。让我们继续查看`Put`和`Delete`操作方法的实现：
 - en: '[PRE10]'
+  id: totrans-71
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE10]'
 - en: The `DELETE` and `PUT` methods use the `IsAddOperation` flag to inform the handler
     of whether the requested operation is being used to increase or decrease the quantity.
     Therefore, every time we call the routes using the `DELETE` HTTP verb and the
     `UPDATE` HTTP verb, the service will increase and reduce the amount of the item
     ID specified in the URL.
+  id: totrans-72
   prefs: []
   type: TYPE_NORMAL
+  zh: '`DELETE`和`PUT`方法使用`IsAddOperation`标志来通知处理器请求的操作是用于增加还是减少数量。因此，每次我们使用`DELETE`
+    HTTP动词和`UPDATE` HTTP动词调用路由时，服务将增加和减少URL中指定的项目ID的数量。'
 - en: This chapter skips a lot of the validation and REST-compliant features that
     we covered in [Chapter 8](84b281bd-11a2-4703-81ae-ca080e2a267a.xhtml), *Building
     the Data Access Layer*, [Chapter 9](f8ac60e1-e948-4435-b804-e3e4ff305510.xhtml),
@@ -412,45 +599,64 @@
     you how to share information and events between independent services. Therefore,
     the cart service will gather information related to the item by calling the catalog
     service.
+  id: totrans-73
   prefs: []
   type: TYPE_NORMAL
+  zh: 本章跳过了我们在[第8章](84b281bd-11a2-4703-81ae-ca080e2a267a.xhtml)“构建数据访问层”、[第9章](f8ac60e1-e948-4435-b804-e3e4ff305510.xhtml)“实现领域逻辑”和[第10章](266d98e8-df54-4024-aefb-b5871b3b35fa.xhtml)“实现RESTful
+    HTTP层”中涵盖的大量验证和REST兼容特性，然后在`Catalog.API`项目中实现。从下一节开始，本章旨在向您展示如何在独立服务之间共享信息和事件。因此，购物车服务将通过调用目录服务来收集与项目相关的信息。
 - en: Now that we've looked at the implementation stack, we can proceed by implementing
     the communication between the catalog service and the cart service*.*
+  id: totrans-74
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在我们已经了解了实现栈，我们可以通过实现目录服务与购物车服务之间的通信来继续前进*.*
 - en: Implementing resilient communication using an HTTP client
+  id: totrans-75
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 使用HTTP客户端实现弹性通信
 - en: In the previous section, we looked at an overview of the cart service's project
     structure. We learned how the cart service stores information inside a Redis instance
     and how it retrieves cart-related data for the client.
+  id: totrans-76
   prefs: []
   type: TYPE_NORMAL
+  zh: 在上一节中，我们查看了一个购物车服务项目的概述。我们学习了购物车服务如何在Redis实例中存储信息以及如何为客户检索与购物车相关的数据。
 - en: 'It is necessary to note that there is a gap between the information stored
     in the Redis data source and the data that''s exposed by the service. Furthermore,
     by examining the `CartItem` entity, we can see that it only implements and retrieves
     `CartItemId` and `Quantity` information for the item:'
+  id: totrans-77
   prefs: []
   type: TYPE_NORMAL
+  zh: 必须注意的是，Redis数据源中存储的信息与服务公开的数据之间存在差距。此外，通过检查`CartItem`实体，我们可以看到它仅实现了检索项目的`CartItemId`和`Quantity`信息：
 - en: '[PRE11]'
+  id: totrans-78
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE11]'
 - en: 'On the other hand, we can see that `CartItemResponse` provides a lot of fields
     related to the item''s data:'
+  id: totrans-79
   prefs: []
   type: TYPE_NORMAL
+  zh: 另一方面，我们可以看到`CartItemResponse`提供了许多与项目数据相关的字段：
 - en: '[PRE12]'
+  id: totrans-80
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE12]'
 - en: The additional information that's presented by the `CartItemResponse` class
     is fetched by calling the catalog services. Therefore, the cart service owns the
     data about the item ID and it can perform a `GET /api/items/{itemId}` request
     in order to retrieve the item's information. In this section, we will focus on
     the implementation of an HTTP client to expose the information that's owned by
     the catalog service.
+  id: totrans-81
   prefs: []
   type: TYPE_NORMAL
+  zh: '`CartItemResponse`类所提供的附加信息是通过调用目录服务获取的。因此，购物车服务拥有关于项目ID的数据，并且它可以执行`GET /api/items/{itemId}`请求以检索项目信息。在本节中，我们将专注于实现一个HTTP客户端，以公开目录服务拥有的信息。'
 - en: It is important that you don't replicate information across web services. We
     need to be able to keep the data sources of web services as separated as possible.
     Each service owns a single data source and its appropriate information. It is
@@ -459,125 +665,187 @@
     catalog service directly to retrieve item information. In a real-world application,
     all the HTTP calls between services are made by passing through a proxy to guarantee
     the reliability of the service.
+  id: totrans-82
   prefs: []
   type: TYPE_NORMAL
+  zh: 重要的是不要在Web服务之间复制信息。我们需要尽可能地将Web服务的数据源分开。每个服务拥有一个单一的数据源及其适当的信息。使用HTTP调用进行服务间通信是一种常见的做法。在下面的示例中，我们将看到购物车服务如何直接调用目录服务以检索项目信息。在实际应用中，所有服务之间的HTTP调用都通过代理进行，以确保服务的可靠性。
 - en: Implementing the catalog HTTP client
+  id: totrans-83
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 实现目录HTTP客户端
 - en: 'It is common practice to implement client libraries along with web services.
     Furthermore, it is the responsibility of a web service to provide a way to communicate
     with it. For that reason, we can represent the client''s implementation using
     the following schema:'
+  id: totrans-84
   prefs: []
   type: TYPE_NORMAL
+  zh: 实现客户端库与Web服务一起是常见的做法。此外，提供与服务通信的方式是Web服务的责任。因此，我们可以使用以下方案来表示客户端的实现：
 - en: '![](img/01d7bb66-9842-4ab0-9b42-71226466f10f.png)'
+  id: totrans-85
   prefs: []
   type: TYPE_IMG
+  zh: '![图片](img/01d7bb66-9842-4ab0-9b42-71226466f10f.png)'
 - en: 'This allows us to publish the catalog service client library in an internal
     NuGet repository so that we can spread the client to other services. Moreover,
     the team that owns a specific service should know how it can be implemented and
     how to expose information in the right way. Let''s start by creating two new `classlib`
     projects in the `Catalog.API` solution, which can be found in the `src` folder:'
+  id: totrans-86
   prefs: []
   type: TYPE_NORMAL
+  zh: 这使我们能够将目录服务客户端库发布到内部 NuGet 仓库，以便我们可以将客户端传播到其他服务。此外，拥有特定服务的团队应该知道如何实现它以及如何正确地公开信息。让我们从在
+    `Catalog.API` 解决方案中创建两个新的 `classlib` 项目开始，该解决方案位于 `src` 文件夹中：
 - en: '[PRE13]'
+  id: totrans-87
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE13]'
 - en: 'The `Catalog.API.Client` project will contain all the methods we need to query
     the catalog service. `Catalog.API.Contract` includes the requests and responses
     that are used by the client to transfer the data, so we can proceed by copying
     the classes contained in the `Responses` folder of the `Catalog.Domain` project
     into the `Catalog.API.Contract` project we created previously. The resulting folder
     structure will look as follows:'
+  id: totrans-88
   prefs: []
   type: TYPE_NORMAL
+  zh: '`Catalog.API.Client` 项目将包含我们查询目录服务所需的所有方法。`Catalog.API.Contract` 包含客户端用于传输数据的请求和响应，因此我们可以通过将
+    `Catalog.Domain` 项目的 `Responses` 文件夹中的类复制到之前创建的 `Catalog.API.Contract` 项目中来进行操作。结果文件夹结构将如下所示：'
 - en: '[PRE14]'
+  id: totrans-89
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE14]'
 - en: 'In order to use the response models in a project, it is necessary to refer
     to `Catalog.API.Contract`. This practice is usually applied to the request and
     response classes. By doing this, it is possible to keep the contract of the API
     in a separate, continuous integration pipeline. As a second step, we need to create
     a new base client in the `Catalog.API.Client` project. The following `IBaseClient`
     interface defines the methods that are exposed by the client:'
+  id: totrans-90
   prefs: []
   type: TYPE_NORMAL
+  zh: 为了在项目中使用响应模型，必须引用 `Catalog.API.Contract`。这种做法通常应用于请求和响应类。通过这样做，可以将 API 的契约保存在一个单独的、持续集成管道中。作为第二步，我们需要在
+    `Catalog.API.Client` 项目中创建一个新的基础客户端。以下 `IBaseClient` 接口定义了客户端暴露的方法：
 - en: '[PRE15]'
+  id: totrans-91
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE15]'
 - en: 'The `IBaseClient` interface establishes the interface of the client. It exposes
     two main methods: `GetAsync` and `BuildUri`. Both of these methods are implemented
     in the `BaseClient` concrete class. The `BaseClient` class depends on the `HttpClient`
     and the `string Url` of our APIs. The `GetAsync` method calls the `HttpClient`
     and uses the `Newtonsoft.Json` package to deserialize the response of the client
     in a generic model, `T`.'
+  id: totrans-92
   prefs: []
   type: TYPE_NORMAL
+  zh: '`IBaseClient` 接口建立了客户端的接口。它暴露了两个主要方法：`GetAsync` 和 `BuildUri`。这两个方法都在 `BaseClient`
+    具体类中实现。`BaseClient` 类依赖于框架提供的 `HttpClient` 和我们 API 的 `string Url`。`GetAsync` 方法调用
+    `HttpClient` 并使用 `Newtonsoft.Json` 包将客户端的响应反序列化为一个通用的模型 `T`。'
 - en: 'Let''s continue by defining the `ICatalogItemResource` interface and the `CatalogItemResource`
     classes. These classes represent the `Item` resource:'
+  id: totrans-93
   prefs: []
   type: TYPE_NORMAL
+  zh: 让我们继续定义 `ICatalogItemResource` 接口和 `CatalogItemResource` 类。这些类代表 `Item` 资源：
 - en: '[PRE16]'
+  id: totrans-94
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE16]'
 - en: '`ICatalogItemResource` exposes the `Get` method by accepting the `id` and `cancellationToken`.
     It returns a `Task<ItemResponse>` type. Therefore, the `CatalogItemResource` model
     is defined in the `Catalog.API.Client.Resources` project as follows:'
+  id: totrans-95
   prefs: []
   type: TYPE_NORMAL
+  zh: '`ICatalogItemResource` 通过接受 `id` 和 `cancellationToken` 来暴露 `Get` 方法。它返回一个 `Task<ItemResponse>`
+    类型的值。因此，`CatalogItemResource` 模型在 `Catalog.API.Client.Resources` 项目中定义如下：'
 - en: '[PRE17]'
+  id: totrans-96
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE17]'
 - en: '`CatalogItemResource` refers to the `IBaseClient` interface and it implements
     the `Get` method by using the `IBaseClient` interface. In the same way, `CatalogItemResource`
     is also in charge of providing the paths of the items'' resources by building
     the `Uri` of the web service. Besides this, `CatalogItemResource` uses the `IBaseClient`
     wrapper to perform HTTP operations. Let''s dig into the implementation of the
     `IBaseClass` interface:'
+  id: totrans-97
   prefs: []
   type: TYPE_NORMAL
+  zh: '`CatalogItemResource` 指向 `IBaseClient` 接口，并通过使用 `IBaseClient` 接口实现 `Get` 方法。同样，`CatalogItemResource`
+    也负责通过构建 Web 服务的 `Uri` 来提供项目的路径。除此之外，`CatalogItemResource` 使用 `IBaseClient` 包装器来执行
+    HTTP 操作。让我们深入了解 `IBaseClass` 接口的实现：'
 - en: '[PRE18]'
+  id: totrans-98
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE18]'
 - en: The preceding code uses the `HttpClient` class that's provided by the framework
     to implement the `GetAsync<T>` generic method. Therefore, using this generic pattern
     allows us to deserialize the response using a custom model.
+  id: totrans-99
   prefs: []
   type: TYPE_NORMAL
+  zh: 上述代码使用框架提供的 `HttpClient` 类来实现 `GetAsync<T>` 泛型方法。因此，使用这种泛型模式允许我们使用自定义模型反序列化响应。
 - en: 'Finally, we can implement the actual client of the service by adding the following
     components:'
+  id: totrans-100
   prefs: []
   type: TYPE_NORMAL
+  zh: 最后，我们可以通过添加以下组件来实现服务的实际客户端：
 - en: '[PRE19]'
+  id: totrans-101
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE19]'
 - en: 'Finally, it is possible to use `Catalog.API.Client` to instantiate a new HTTP
     client instance and call the catalog service using a unique and universal contract:'
+  id: totrans-102
   prefs: []
   type: TYPE_NORMAL
+  zh: 最后，可以使用 `Catalog.API.Client` 实例化一个新的 HTTP 客户端实例，并使用独特且通用的合约调用目录服务：
 - en: '[PRE20]'
+  id: totrans-103
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE20]'
 - en: Now, we have some standalone DLLs that provide everything we need, so that we
     can query the catalog web service. In the next section, we will learn how to perform
     HTTP calls to the catalog service using the client we implemented in this section.
+  id: totrans-104
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在，我们有一些独立的 DLL，它们提供了我们所需要的一切，因此我们可以查询目录 Web 服务。在下一节中，我们将学习如何使用本节中实现的客户端对目录服务执行
+    HTTP 调用。
 - en: Integrating an HTTP client into the cart service
+  id: totrans-105
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 将 HTTP 客户端集成到购物车服务中
 - en: 'The next step is to incorporate the HTTP client provided by the catalog service
     into the cart service. Therefore, we will add a new class whose ownership is to
     call the catalog service and retrieve the information that''s required for the
     specific cart. Let''s start by creating an interface in the `Cart.Domain` project
     called `ICatalogService`:'
+  id: totrans-106
   prefs: []
   type: TYPE_NORMAL
+  zh: 下一步是将目录服务提供的 HTTP 客户端集成到购物车服务中。因此，我们将添加一个新的类，其职责是调用目录服务并检索特定购物车所需的信息。让我们从在 `Cart.Domain`
+    项目中创建一个名为 `ICatalogService` 的接口开始：
 - en: '[PRE21]'
+  id: totrans-107
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE21]'
 - en: 'The `ICatalogService` interface is contained in the `Services` folder of the
     `Cart.Domain` project. It exposes an asynchronous method called `EnrichCartItem`,
     which accepts `CartItemResponse` and returns the same type. Like we did for the
@@ -588,37 +856,58 @@
     DLLs are usually managed as NuGet packages in the internal repository of the company.
     In our case, we will copy them and include them in the `Cart.Infrastructure` project,
     as follows:'
+  id: totrans-108
   prefs: []
   type: TYPE_NORMAL
+  zh: '`ICatalogService` 接口位于 `Cart.Domain` 项目的 `Services` 文件夹中。它公开了一个名为 `EnrichCartItem`
+    的异步方法，该方法接受 `CartItemResponse` 并返回相同类型。就像我们对 `ICartRepository` 接口所做的那样，我们可以在 `Cart.Infrastructure`
+    项目中创建 `ICatalogService` 接口的具体实现。因此，我们可以使用之前在 *目录服务* 中实现的 `ICatalogClient` 接口来检索目录信息。在实际应用中，这些
+    DLL 通常作为公司内部存储库中的 NuGet 包进行管理。在我们的情况下，我们将复制它们并将它们包含在 `Cart.Infrastructure` 项目中，如下所示：'
 - en: '[PRE22]'
+  id: totrans-109
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE22]'
 - en: 'Let''s proceed by creating the `CatalogService` class in the `Cart.Infrastructure`
     project:'
+  id: totrans-110
   prefs: []
   type: TYPE_NORMAL
+  zh: 让我们通过在 `Cart.Infrastructure` 项目中创建 `CatalogService` 类来继续操作：
 - en: '[PRE23]'
+  id: totrans-111
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE23]'
 - en: '`CatalogService` resolves the `ICatalogClient` dependency using constructor
     injection. The class implements the `EnrichCartItem` function by calling the catalog
     service client in the following way:'
+  id: totrans-112
   prefs: []
   type: TYPE_NORMAL
+  zh: '`CatalogService` 使用构造函数注入解决 `ICatalogClient` 依赖关系。该类通过以下方式调用目录服务客户端来实现 `EnrichCartItem`
+    函数：'
 - en: '[PRE24]'
+  id: totrans-113
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE24]'
 - en: 'Now, the method retrieves information related to the catalog item and it maps
     that data into `CartItemResponse` using the `Map` method. As a result, we will
     have information about each item that''s been populated with the new data. It
     is possible to proceed by referring to the `ICatalogService` interface in the
     handlers that have been implemented in `Cart.Domain`. Let''s take `GetCartHandler`
     as an example of this:'
+  id: totrans-114
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在，该方法检索与目录项相关的信息，并使用 `Map` 方法将这些数据映射到 `CartItemResponse`。因此，我们将拥有每个已填充新数据的项目的信息。可以通过在
+    `Cart.Domain` 中实现的处理器中引用 `ICatalogService` 接口来继续操作。以下以 `GetCartHandler` 作为此示例：
 - en: '[PRE25]'
+  id: totrans-115
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE25]'
 - en: 'We can execute the `_catalogService.EnrichCartItem` method to retrieve the
     populated data for each `Item` in the `extendedResponse` object. In addition,
     `GetCartHandler` uses the `Task.WhenAll` method to wait for the tasks to complete
@@ -626,48 +915,72 @@
     it is necessary to declare the following extension method, which will initialize
     the dependency and execute it in the `Startup` class of the `Cart.API` project
     by passing the endpoints of the APIs:'
+  id: totrans-116
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们可以执行 `_catalogService.EnrichCartItem` 方法来检索 `extendedResponse` 对象中每个 `Item`
+    的填充数据。此外，`GetCartHandler` 使用 `Task.WhenAll` 方法等待任务完成并返回其数据。为了在运行时执行此过程，有必要声明以下扩展方法，该方法将在
+    `Cart.API` 项目的 `Startup` 类中初始化依赖关系并在其中执行，通过传递 API 的端点：
 - en: '[PRE26]'
+  id: totrans-117
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE26]'
 - en: '`AddCatalogService` will be called in the `CofigureService` method of the `Startup`
     class. It adds `ICatalogClient` and `ICatlogService` to the dependency injection
     services by using a scoped life cycle.'
+  id: totrans-118
   prefs: []
   type: TYPE_NORMAL
+  zh: '`AddCatalogService` 将在 `Startup` 类的 `CofigureService` 方法中被调用。它通过使用作用域生命周期将
+    `ICatalogClient` 和 `ICatlogService` 添加到依赖注入服务中。'
 - en: Implementing resilience using Polly.NET
+  id: totrans-119
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 使用 Polly.NET 实现弹性
 - en: 'In the previous sections, we described how to achieve communication between
     the catalog service and the cart service. Now, we should be asking ourselves the
     following questions about the runtime execution and the communication between
     our services: what happens if the catalog service is down? What happens if the
     catalog service has a slow response time? The **Polly.NET** package comes in handy
     for these kinds of issues ([https://github.com/App-vNext/Polly](https://github.com/App-vNext/Polly)).'
+  id: totrans-120
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前面的章节中，我们描述了如何实现目录服务和购物车服务之间的通信。现在，我们应该问自己关于服务运行时执行和通信的以下问题：如果目录服务宕机了会怎样？如果目录服务响应时间变慢了会怎样？**Polly.NET**
+    包对于这类问题非常有用 ([https://github.com/App-vNext/Polly](https://github.com/App-vNext/Polly))。
 - en: 'Polly.NET is based on *policies,* where each *policy* can be used individually
     or combined with others to provide resilience to the client. Out of the box, the
     library offers some standard resilience policies, such as retry, circuit breaker,
     and timeout*.* Let''s have a quick look at a sample policy so that we understand
     how to use them:'
+  id: totrans-121
   prefs: []
   type: TYPE_NORMAL
+  zh: Polly.NET 基于 *策略*，其中每个 *策略* 都可以单独使用或与其他策略结合使用，以向客户端提供弹性。开箱即用，该库提供了一些标准的弹性策略，例如重试、断路器和超时*.*
+    让我们快速看一下一个示例策略，以便我们了解如何使用它们：
 - en: '[PRE27]'
+  id: totrans-122
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE27]'
 - en: The previous code injects an `HttpClient` instance into `IMyService`. The `HttpClient`
     instance combines `RetryPolicy` with the `Polly` package. Furthermore, if the
     HTTP call returns a `404 NotFound` message, it triggers `RetryPolicy`, which retries
     the request after a specified amount of time that increases exponentially.
+  id: totrans-123
   prefs: []
   type: TYPE_NORMAL
+  zh: 之前的代码将一个 `HttpClient` 实例注入到 `IMyService` 中。该 `HttpClient` 实例结合了 `RetryPolicy`
+    和 `Polly` 包。此外，如果 HTTP 调用返回 `404 NotFound` 消息，它将触发 `RetryPolicy`，该策略会在指定的时间后指数级增加的间隔内重试请求。
 - en: Integrating Polly into ICatalogService
+  id: totrans-124
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 将 Polly 集成到 ICatalogService 中
 - en: Let's look at how we can incorporate Polly.NET into the cart service*.* As we
     saw previously,our use case uses the catalog service to gather detailed information
     about the items in the user's cart and return them to the client. Furthermore,
@@ -675,48 +988,73 @@
     follows the failing fast approach, which means that, even if the response of the
     catalog service doesn't arrive, the runtime continues with the execution of the
     application*.*
+  id: totrans-125
   prefs: []
   type: TYPE_NORMAL
+  zh: 让我们看看如何将 Polly.NET 集成到购物车服务中*.* 如我们之前所看到的，我们的用例使用目录服务来收集用户购物车中项目的详细信息并将其返回给客户端。此外，我们将在
+    `ICatalogClient` 上实现 `CircuitBreakerPolicy`。`CircuitBreakerPolicy` 采用快速失败的方法，这意味着即使目录服务的响应没有到达，运行时也会继续执行应用程序*.*
 - en: 'Before starting, let''s add some Polly.NET packages to the `Cart.Infrastructure`
     project by using the `add package` command in the project folder:'
+  id: totrans-126
   prefs: []
   type: TYPE_NORMAL
+  zh: 在开始之前，让我们通过在项目文件夹中使用 `add package` 命令将一些 Polly.NET 包添加到 `Cart.Infrastructure`
+    项目中：
 - en: '[PRE28]'
+  id: totrans-127
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE28]'
 - en: 'Let''s proceed by creating some policies for `ICatalogClient` by creating a
     new `CatalogServicePolicies` static class in `Cart.Infrastructure`:'
+  id: totrans-128
   prefs: []
   type: TYPE_NORMAL
+  zh: 让我们通过在 `Cart.Infrastructure` 中创建一个新的 `CatalogServicePolicies` 静态类来为 `ICatalogClient`
+    创建一些策略：
 - en: '[PRE29]'
+  id: totrans-129
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE29]'
 - en: 'The preceding code defines two policies:'
+  id: totrans-130
   prefs: []
   type: TYPE_NORMAL
+  zh: 上述代码定义了两个策略：
 - en: The `RetryPolicy` static method defines the number of retries to carry out before
     proceeding with the other policies. It uses the `.HandleTransientHttpError` and
     `.OrResult` methods to detect all the failed conditions that have been returned
     by the client. Furthermore, it calls the `WaitAndRetryAsync` method, which restricts
     the `RetryPolicy` to a maximum of three retries. With each retry, it increases
     the sleep duration.
+  id: totrans-131
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`RetryPolicy` 静态方法定义在执行其他策略之前要进行的重试次数。它使用 `.HandleTransientHttpError` 和 `.OrResult`
+    方法来检测客户端返回的所有失败条件。此外，它调用 `WaitAndRetryAsync` 方法，该方法将 `RetryPolicy` 限制在最多三次重试。每次重试都会增加睡眠时间。'
 - en: The `CircuitBreaker` static method catches all the error conditions by using
     `.HandleTransientHttpError`. It calls the `.CircuitBreakerAsync` method to define
     `CircuitBreakerPolicy`. `CircuitBreakerPolicy` will be triggered after three attempts
     and will be active for 1 minute.
+  id: totrans-132
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`CircuitBreaker` 静态方法通过使用 `.HandleTransientHttpError` 捕获所有错误条件。它调用 `.CircuitBreakerAsync`
+    方法来定义 `CircuitBreakerPolicy`。`CircuitBreakerPolicy` 在三次尝试后会触发，并保持活跃状态 1 分钟。'
 - en: 'Now, we can inject the definitions of these policies into our `HttpClient`
     instances, as follows:'
+  id: totrans-133
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在，我们可以将这些策略的定义注入到我们的 `HttpClient` 实例中，如下所示：
 - en: '[PRE30]'
+  id: totrans-134
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE30]'
 - en: As you can see, we are injecting these policies using the `AddPolicyHandler`
     method, and we are calling the `CatalogServicePolicies` static class to get them.
     It is also essential to notice that, before defining the policies, we use the
@@ -725,12 +1063,16 @@
     service. Furthermore, note that `Polly` policies can be applied to any third-party
     dependency call, which means that every time we rely on a third-party service,
     we need to anticipate this kind of approach in order to gracefully handle errors.
+  id: totrans-135
   prefs: []
   type: TYPE_NORMAL
+  zh: 如您所见，我们使用`AddPolicyHandler`方法注入这些策略，并调用`CatalogServicePolicies`静态类来获取它们。同样重要的是要注意，在定义策略之前，我们使用`SetHandlerLifetime`方法来确定`HttpClient`的生存期。这种方法保证了购物车服务与目录服务之间更健壮的通信。此外，请注意，`Polly`策略可以应用于任何第三方依赖调用，这意味着每次我们依赖第三方服务时，我们都需要预见这种类型的做法，以便优雅地处理错误。
 - en: Sharing events using an event bus
+  id: totrans-136
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 使用事件总线共享事件
 - en: So far in this chapter, we've seen how we can share information over HTTP by
     calling other web services. As we've already mentioned, it is important to not
     replicate information between services and, more importantly, that each service
@@ -738,32 +1080,44 @@
     Another technique we can use to share information is pushing data using events.
     In this section, we will begin by examining one use case that is suitable for
     an event bus.
+  id: totrans-137
   prefs: []
   type: TYPE_NORMAL
+  zh: 到目前为止，在本章中，我们看到了如何通过调用其他Web服务通过HTTP共享信息。正如我们已经提到的，避免在服务之间复制信息非常重要，更重要的是，每个服务必须是单个数据源的所有者，该数据源需要尽可能隔离。我们可以用来共享信息的另一种技术是使用事件推送数据。在本节中，我们将首先检查一个适合事件总线的用例。
 - en: Let's suppose that one of the catalog items reaches an available stock amount
     of zero and enters the sold-out state. We need to propagate this information and
     tell the cart service that this specific item is sold out. This use case can be
     implemented using an event bus.
+  id: totrans-138
   prefs: []
   type: TYPE_NORMAL
+  zh: 假设目录中的一个商品达到零的可用库存量并进入售罄状态。我们需要传播这个信息并告诉购物车服务这个特定商品已售罄。这个用例可以使用事件总线来实现。
 - en: 'To understand this architecture, take a look at the following schema:'
+  id: totrans-139
   prefs: []
   type: TYPE_NORMAL
+  zh: 要理解这个架构，请看以下图示：
 - en: '![](img/a923daf3-cd8e-4170-8127-60d1e6e849af.png)'
+  id: totrans-140
   prefs: []
   type: TYPE_IMG
+  zh: '![图片](img/a923daf3-cd8e-4170-8127-60d1e6e849af.png)'
 - en: 'The catalog service triggers an event each time the available stock of an item
     reaches zero. The cart service listens for this event and then triggers the update
     of the cart that''s stored in the Redis data source. For this purpose, we will
     use RabbitMQ, which is one of the most common event buses. RabbitMQ provides a
     .NET package that can be used to implement the communication between two solutions:
     [https://github.com/rabbitmq/rabbitmq-dotnet-client](https://github.com/rabbitmq/rabbitmq-dotnet-client).'
+  id: totrans-141
   prefs: []
   type: TYPE_NORMAL
+  zh: 目录服务在某个商品的可用库存达到零时触发一个事件。购物车服务监听此事件，然后触发更新存储在Redis数据源中的购物车。为此，我们将使用RabbitMQ，这是最常见的消息总线之一。RabbitMQ提供了一个.NET包，可用于实现两个解决方案之间的通信：[https://github.com/rabbitmq/rabbitmq-dotnet-client](https://github.com/rabbitmq/rabbitmq-dotnet-client)。
 - en: Setting up a RabbitMQ instance and publishing an event
+  id: totrans-142
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 设置RabbitMQ实例并发布事件
 - en: 'Event bus communication is composed of two parts: the sender and the receiver.
     In the case of an event, the actors'' names are publishers and subscribers. The
     previous section described the implementation of the subscriber part. In this
@@ -771,81 +1125,121 @@
     subscriber. Before we look at how to implement the publisher part, we need to
     create a RabbitMQ instance using a Docker container by adding a `docker-compose.yml`
     file to the catalog service:'
+  id: totrans-143
   prefs: []
   type: TYPE_NORMAL
+  zh: 事件总线通信由两部分组成：发送者和接收者。在事件的情况下，参与者的名称是发布者和订阅者。上一节描述了订阅者部分的实现。在这种情况下，目录服务将是发布者，而购物车服务将是订阅者。在我们查看如何实现发布者部分之前，我们需要创建一个RabbitMQ实例，使用Docker容器，通过向目录服务添加`docker-compose.yml`文件来实现：
 - en: '[PRE31]'
+  id: totrans-144
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE31]'
 - en: 'The `docker-compose.yml` file defines a new container called `catalog_esb`
     using the `rabbitmq:3-management-alpine` image. It also determines how two ports
     are mapped within the localhost network: `5672:5672` and `15672:15672`. The first
     port mapping is used to expose the RabbitMQ instance, while the second one is
     used to reveal the management console.'
+  id: totrans-145
   prefs: []
   type: TYPE_NORMAL
+  zh: '`docker-compose.yml`文件使用`rabbitmq:3-management-alpine`镜像定义了一个名为`catalog_esb`的新容器。它还确定了在本地主机网络中映射的两个端口：`5672:5672`和`15672:15672`。第一个端口映射用于暴露RabbitMQ实例，而第二个则用于显示管理控制台。'
 - en: 'Furthermore, we need to define an extension method that configures RabbitMQ
     in the catalog web service. We can add the `RabbitMQ.Client` package to the `Catalog.Infrastructure`
     project using the following command:'
+  id: totrans-146
   prefs: []
   type: TYPE_NORMAL
+  zh: 此外，我们还需要在目录网络服务中定义一个配置 RabbitMQ 的扩展方法。我们可以使用以下命令将 `RabbitMQ.Client` 包添加到 `Catalog.Infrastructure`
+    项目中：
 - en: '[PRE32]'
+  id: totrans-147
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE32]'
 - en: 'Furthermore, we will also need to implement the `ItemSoldOutEvent` type in
     the `Catalog.Domain` project, under the `Events` folder:'
+  id: totrans-148
   prefs: []
   type: TYPE_NORMAL
+  zh: 此外，我们还需要在 `Catalog.Domain` 项目的 `Events` 文件夹中实现 `ItemSoldOutEvent` 类型：
 - en: '[PRE33]'
+  id: totrans-149
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE33]'
 - en: 'The preceding class reflects the event that we''ve already implemented in the
     cart project, and it will be used to send the messages through the event bus.
     The event bus also requires a configuration class that represents the connection
     parameters to the RabbitMQ instance. The class will be stored in the `Configuration`
     folder of the `Catalog.Domain` project:'
+  id: totrans-150
   prefs: []
   type: TYPE_NORMAL
+  zh: 上述类反映了我们在购物车项目中已经实现的事件，它将通过事件总线发送消息。事件总线还需要一个配置类，该类表示与 RabbitMQ 实例的连接参数。该类将存储在
+    `Catalog.Domain` 项目的 `Configuration` 文件夹中：
 - en: '[PRE34]'
+  id: totrans-151
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE34]'
 - en: 'The `EventBusSettings` type describes the `HostName` of the RabbitMQ instance,
     the `User` and `Password` of the user, and the `EventQueue` name to use to push
     messages. Therefore, we can proceed by implementing the extension method that
     will set up and start the event bus in the `Catalog.Infrastructure` project:'
+  id: totrans-152
   prefs: []
   type: TYPE_NORMAL
+  zh: '`EventBusSettings` 类型描述了 RabbitMQ 实例的 `HostName`、用户的 `User` 和 `Password` 以及用于推送消息的
+    `EventQueue` 名称。因此，我们可以通过在 `Catalog.Infrastructure` 项目中实现扩展方法来设置并启动事件总线：'
 - en: '[PRE35]'
+  id: totrans-153
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE35]'
 - en: 'The preceding code defines how we can publish events to RabbitMQ. The extension
     method performs the following operations:'
+  id: totrans-154
   prefs: []
   type: TYPE_NORMAL
+  zh: 上述代码定义了如何将事件发布到 RabbitMQ。扩展方法执行以下操作：
 - en: It initializes a new `EventBusSettings` with the `EventBus` string section passed
     as a parameter and adds the configuration as a singleton instance to the dependency
     injection engine of ASP.NET Core.
+  id: totrans-155
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 它使用 `EventBus` 字符串部分作为参数初始化一个新的 `EventBusSettings`，并将配置作为一个单例实例添加到 ASP.NET Core
+    的依赖注入引擎中。
 - en: It initializes the transport protocol using the RabbitMQ type by initializing
     a new `ConnectionFactory` type. `ConnectionFactory` will provide all the tools
     related to the publication of messages through RabbitMQ.
+  id: totrans-156
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 它使用 RabbitMQ 类型初始化传输协议，通过初始化一个新的 `ConnectionFactory` 类型。`ConnectionFactory`
+    将提供所有与通过 RabbitMQ 发布消息相关的工具。
 - en: It adds the new `ConnectionFactory` type into the dependency injection services
     as a singleton type.
+  id: totrans-157
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 它将新的 `ConnectionFactory` 类型添加到依赖注入服务中作为一个单例类型。
 - en: 'Moreover, it is possible to resolve the `ConnectionFactory`and `EventBusSettings`
     typesusing the out-of-the-box dependency injection of .NET Core, and proceed by
     publishing the events using the methods provided by the `RabbitMQ.Client` packages:'
+  id: totrans-158
   prefs: []
   type: TYPE_NORMAL
+  zh: 此外，可以使用 .NET Core 的开箱即用的依赖注入来解析 `ConnectionFactory` 和 `EventBusSettings` 类型，并使用
+    `RabbitMQ.Client` 包提供的方法发布事件：
 - en: '[PRE36]'
+  id: totrans-159
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE36]'
 - en: 'Here, the `ItemService` class uses dependency injection to inject a new `ConnectionFactory`
     instance and the `EventBusSettings` into the class. As you may have noticed, the
     `DeleteItemAsync` method also calls the `SendDeleteMessage` we defined. Furthermore,
@@ -859,19 +1253,33 @@
     catalog service and the queue. Now that we have set up the sender, we can call
     the previously defined `AddEventBus` extension method in the `Startup` class of
     `Catalog.API` in the following way:'
+  id: totrans-160
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这里，`ItemService` 类使用依赖注入将新的 `ConnectionFactory` 实例和 `EventBusSettings` 注入到类中。正如你可能已经注意到的，`DeleteItemAsync`
+    方法也调用了我们定义的 `SendDeleteMessage`。此外，`SendDeleteMessage` 方法使用 `CreateConnection`
+    方法来与 RabbitMQ 创建新的连接。然后，它继续使用 `CreateModel` 方法创建一个新的通道，并定义一个与 `EventBusSettings`
+    配置中定义的队列同名的新队列。最后，它通过使用 `EventQueue` 字段序列化 `ItemSoldOut` 事件并发布消息。整个流程被封装在一个 try-catch
+    块中，以便在目录服务和队列之间出现通信错误时忽略。现在我们已经设置了发送者，我们可以在 `Catalog.API` 的 `Startup` 类中以下方式调用之前定义的
+    `AddEventBus` 扩展方法：
 - en: '[PRE37]'
+  id: totrans-161
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE37]'
 - en: 'The `AddEventBus` method now uses the `EventBus` section to provide the necessary
     configuration to the new instance of the `ConnectionFactory` type. Now, we can
     add the configuration to the `appsettings.json` file:'
+  id: totrans-162
   prefs: []
   type: TYPE_NORMAL
+  zh: '`AddEventBus` 方法现在使用 `EventBus` 部分为新实例的 `ConnectionFactory` 类型提供必要的配置。现在，我们可以将配置添加到
+    `appsettings.json` 文件中：'
 - en: '[PRE38]'
+  id: totrans-163
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE38]'
 - en: '`ConnectionString` specifies the `catalog_esb` instance as the name of the
     host and the default `username` and `password` provided by RabbitMQ. Furthermore,
     it also specifies the `ItemSoldOut` endpoint name. Now, every time we delete an
@@ -879,22 +1287,34 @@
     In the next chapter, we will see how to consume these messages in the cart service.
     In the next section, we will continue by learning how to set up and configure
     the cart service Docker image.'
+  id: totrans-164
   prefs: []
   type: TYPE_NORMAL
+  zh: '`ConnectionString` 指定了 `catalog_esb` 实例作为主机名，以及 RabbitMQ 提供的默认 `username` 和
+    `password`。此外，它还指定了 `ItemSoldOut` 端点名称。现在，每次我们在目录服务中删除一个项目时，它都会将一个新的 ItemSoldOut
+    事件排队到 RabbitMQ。在下一章中，我们将看到如何在购物车服务中消费这些消息。在下一节中，我们将继续学习如何设置和配置购物车服务 Docker 镜像。'
 - en: Running the cart service using Docker
+  id: totrans-165
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 使用 Docker 运行购物车服务
 - en: 'Let''s learn how to run the previously implemented cart service using Docker.
     As we described in the previous chapter, we are going to define the `docker-compose.yml`
     file and the Dockerfile in the root of the cart service project. The `docker-compose`
     file will define two containers: the first hosts the cart service ASP.NET Core
     instance, while the other represents the Redis instance:'
+  id: totrans-166
   prefs: []
   type: TYPE_NORMAL
+  zh: 让我们学习如何使用 Docker 运行之前实现的购物车服务。正如我们在上一章中描述的，我们将在购物车服务项目的根目录中定义 `docker-compose.yml`
+    文件和 Dockerfile。`docker-compose` 文件将定义两个容器：第一个托管购物车服务 ASP.NET Core 实例，而另一个代表 Redis
+    实例：
 - en: '[PRE39]'
+  id: totrans-167
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE39]'
 - en: First, the preceding code defines the `cart_api` container. It is part of `my_network`,
     which is defined in the same file, and it exposes ports `5002` (HTTP) and `5003`
     (HTTPS). It also refers to the Dockerfile that's located at the root of the project.
@@ -902,8 +1322,12 @@
     exposes the default port of Redis (`6378`). The `cart_db` container uses the Alpine
     version of Redis so that it can save on the container size. The container shares
     `my_network`.
+  id: totrans-168
   prefs: []
   type: TYPE_NORMAL
+  zh: 首先，前面的代码定义了 `cart_api` 容器。它是 `my_network` 的一部分，该网络在同一个文件中定义，并暴露端口 `5002`（HTTP）和
+    `5003`（HTTPS）。它还引用了位于项目根目录的 Dockerfile。其次，`docker-compose.yml` 文件定义了 `cart_db`
+    容器，它暴露了 Redis 的默认端口（`6378`）。`cart_db` 容器使用 Alpine 版本的 Redis，以便可以节省容器大小。该容器共享 `my_network`。
 - en: In this case, we are using a storage system running on a container. Note that
     this information is not persistent, for two reasons. The first reason is that
     Redis stores information using a TTL. The default TTL is 24 hours; after that
@@ -911,14 +1335,22 @@
     when you add a new key to the Redis instance. The second reason is that, once
     the `cart_db` container is killed, we will lose the information inside it. We
     are using a Redis instance in the form of a container just for demonstration purposes.
+  id: totrans-169
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这种情况下，我们使用运行在容器上的存储系统。请注意，这个信息不是持久的，有两个原因。第一个原因是 Redis 使用 TTL 存储信息。默认的 TTL
+    是 24 小时；在此之后，购物车信息将被清除。在向 Redis 实例添加新键时，可以指定另一个 TTL。第二个原因是，一旦 `cart_db` 容器被终止，我们将丢失其中的信息。我们使用
+    Redis 实例仅作为演示目的。
 - en: 'Now, let''s look at an overview of the definition of the Dockerfile:'
+  id: totrans-170
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在，让我们看一下 Dockerfile 定义的概述：
 - en: '[PRE40]'
+  id: totrans-171
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE40]'
 - en: 'The Dockerfile fulfills the same instructions as the ones defined for the `Catalog.API`
     project: it uses the `microsoft/dotnet:sdk` image to build the project and publish
     it and then it uses the `microsoft/dotnet:3.0-aspnetcore` image to run it. To
@@ -926,11 +1358,17 @@
     project and the `Cart.API` project containers. Moreover, it is necessary to initialize
     the containers in the same project by adding the following `.env` file to the
     same level that the `docker-compose.yml` file is at:'
+  id: totrans-172
   prefs: []
   type: TYPE_NORMAL
+  zh: Dockerfile 完成了与为 `Catalog.API` 项目定义的相同指令：它使用 `microsoft/dotnet:sdk` 镜像来构建项目并发布它，然后使用
+    `microsoft/dotnet:3.0-aspnetcore` 镜像来运行它。为了使容器正常工作，我们需要在 `Catalog.API` 项目和 `Cart.API`
+    项目容器之间共享信息。此外，还需要在同一个项目中初始化容器，通过将以下 `.env` 文件添加到与 `docker-compose.yml` 文件相同级别的位置来实现：
 - en: '[PRE41]'
+  id: totrans-173
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE41]'
 - en: 'The `COMPOSE_PROJECT_NAME` variables set the project name. This value is prepended,
     along with the service name, to the container upon startup. Finally, it is possible
     to run both projects by executing the `docker-compose up --build` command in the
@@ -939,61 +1377,94 @@
     the `catalog_esb` containers. On the other side, the execution of the `docker-compose`
     command in the `Cart.API` folder will initialize the `cart_api` and `cart_db`
     containers.'
+  id: totrans-174
   prefs: []
   type: TYPE_NORMAL
+  zh: '`COMPOSE_PROJECT_NAME` 变量设置项目名称。此值在启动时附加到容器名称之前，以及服务名称一起。最后，可以通过在 `Catalog.API`
+    和 `Cart.API` 项目文件夹中执行 `docker-compose up --build` 命令来运行两个项目：`Catalog.API` 文件夹中的
+    `docker-compose` 命令将初始化 `catalog_api`、`catalog_db` 和 `catalog_esb` 容器。另一方面，`Cart.API`
+    文件夹中的 `docker-compose` 命令将初始化 `cart_api` 和 `cart_db` 容器。'
 - en: 'Furthermore, it is possible to create a new catalog item by executing the following
     sequence of HTTP calls:'
+  id: totrans-175
   prefs: []
   type: TYPE_NORMAL
+  zh: 此外，通过以下一系列 HTTP 调用来创建一个新的目录项目也是可能的：
 - en: '[PRE42]'
+  id: totrans-176
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE42]'
 - en: 'These two requests are direct to the `localhost:5000` URL, which represents
     the catalog web service. They return a `201 Created` HTTP status code with the
     ID of each created artist and genre entity. Furthermore, we can proceed by creating
     a new item in the catalog using the following HTTP request:'
+  id: totrans-177
   prefs: []
   type: TYPE_NORMAL
+  zh: 这两个请求直接发送到 `localhost:5000` URL，代表目录网络服务。它们返回一个包含每个创建的艺术家和流派实体 ID 的 `201 Created`
+    HTTP 状态码。此外，我们可以通过以下 HTTP 请求在目录中创建一个新的项目：
 - en: '[PRE43]'
+  id: totrans-178
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE43]'
 - en: 'Now, we can proceed by calling the cart API service in order to create a new
     cart session with the item we just created:'
+  id: totrans-179
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在，我们可以通过调用购物车 API 服务来创建一个新的购物车会话，并使用我们刚刚创建的项目：
 - en: '[PRE44]'
+  id: totrans-180
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE44]'
 - en: 'Finally, we can verify the communication between the catalog service and the
     cart service by calling the detail of the cart session:'
+  id: totrans-181
   prefs: []
   type: TYPE_NORMAL
+  zh: 最后，我们可以通过调用购物车会话的详细信息来验证目录服务与购物车服务之间的通信：
 - en: '[PRE45]'
+  id: totrans-182
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE45]'
 - en: The cart service should respond with the details related to the item in the
     cart by fetching the information that was exposed by the catalog web service.
     If the catalog web service is down, the cart service will omit all the details
     of the items by returning only the corresponding ID.
+  id: totrans-183
   prefs: []
   type: TYPE_NORMAL
+  zh: 购物车服务应该通过检索目录网络服务暴露的信息来响应与购物车中项目相关的详细信息。如果目录网络服务出现故障，购物车服务将仅返回相应的 ID，省略所有项目的详细信息。
 - en: Summary
+  id: totrans-184
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 摘要
 - en: In this chapter, you have learned how to implement different types of communication
     in service ecosystems. We looked closely at how to use an HTTP client to share
     information between services. We also looked at how we can use resilience techniques
     with `Polly`.
+  id: totrans-185
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本章中，你学习了如何在服务生态系统中实现不同类型的通信。我们详细探讨了如何使用 HTTP 客户端在服务之间共享信息。我们还探讨了如何使用 `Polly`
+    结合弹性技术。
 - en: Then, we described how to use an event bus to fire events to a RabbitMQ queue;
     we used `RabbitMQ.Client` combined with RabbitMQ for this. The topics that were
     covered in this chapter will be useful when you need to transfer data or perform
     actions across two or more web services or systems.
+  id: totrans-186
   prefs: []
   type: TYPE_NORMAL
+  zh: 然后，我们描述了如何使用事件总线向 RabbitMQ 队列发送事件；我们使用了 `RabbitMQ.Client` 和 RabbitMQ 来完成这个任务。本章中涵盖的主题在你需要在不同或多个网络服务或系统之间传输数据或执行操作时将非常有用。
 - en: In the next chapter, we will learn how to consume `ItemSoldOut` events through
     the use of the worker services capabilities of ASP.NET Core.
+  id: totrans-187
   prefs: []
   type: TYPE_NORMAL
+  zh: 在下一章中，我们将学习如何通过使用 ASP.NET Core 的工作服务功能来消费 `ItemSoldOut` 事件。

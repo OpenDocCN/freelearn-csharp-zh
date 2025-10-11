@@ -1,4 +1,4 @@
-# 6
+
 
 # TDD 的 FIRSTHAND 指导原则
 

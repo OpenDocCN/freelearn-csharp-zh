@@ -1,6 +1,6 @@
-# Python 机器学习算法交易实用指南
+# Unity 2019 游戏开发模式实用指南
 
-> 原文：[`zh.annas-archive.org/md5/fcb09c483bdb21866eb6782158d1f8d5`](https://zh.annas-archive.org/md5/fcb09c483bdb21866eb6782158d1f8d5)
+> 原文：[`zh.annas-archive.org/md5/0d8069504d523342a2a766d28f0c7801`](https://zh.annas-archive.org/md5/0d8069504d523342a2a766d28f0c7801)
 > 
 > 译者：[飞龙](https://github.com/wizardforcel)
 > 

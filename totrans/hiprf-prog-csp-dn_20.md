@@ -1,0 +1,265 @@
+# 评估
+
+本节用于回答所有章节的问题。
+
+# [*第一章*](B16617_01_Final_SB_Epub.xhtml#_idTextAnchor014)，介绍C# 10.0和.NET 6
+
+1.  垃圾收集器和JIT编译器的性能改进，基于文本处理的性能改进，正则表达式处理速度加快，以及线程和异步操作的性能得到提升。集合、LINQ、网络和Blazor的性能也得到了改进；此外，.NET 6还引入了基于性能的API和分析器。
+
+1.  你现在可以编写顶层程序并使用仅`init`属性和记录。有新的模式匹配功能和针对特定类型的表达式。你可以使用协变返回并进行原生编译。
+
+1.  `dotnet`和`ngen`。
+
+1.  运行Microsoft Store应用性能评估。根据评估结果遵循Microsoft的建议来提高你的应用性能，并解决应用中发现的每个突出显示的问题。
+
+1.  进行基线测量，通过执行具有最大整体影响的重构开始优化，启用HTTP压缩，减少TCP/IP连接开销，并使用SSL上的HTTP/2。
+
+1.  读者自行决定的阅读任务。
+
+1.  读者自行决定的编码任务。
+
+1.  读者自行决定的基准测试任务。
+
+# [*第二章*](B16617_02_Final_SB_Epub.xhtml#_idTextAnchor040)，实现C#互操作性
+
+1.  平台调用。
+
+1.  解释`P/Invoke`是什么。
+
+1.  它提醒程序员他们有责任确保其代码的安全性，因为.NET框架不对其进行管理。
+
+1.  有三代对象：零代、一代和二代。通常，对象被添加到零代，并执行垃圾回收。但如果它们在零代中存活下来，它们将被提升到一代。在一代中存活下来的对象将被提升到二代。如果零代、一代和二代完全填满且添加了新对象，那么你将遇到`OutOfMemoryException`，你的应用程序将崩溃。
+
+1.  `fixed`关键字用于确保指针引用的对象不会被垃圾收集器提升。否则，指针将指向错误的对象，导致软件中的错误。
+
+1.  BSTR。
+
+1.  IronPython，尽管也存在其他包。
+
+1.  实现可处置的设计模式。
+
+1.  在对象被处置时将大字段设置为`null`。这使得它们无法访问，并且它们比非确定性回收时释放得更快。你将在`conditional`块之外执行此操作。参见[https://docs.microsoft.com/en-us/dotnet/standard/garbage-collection/implementing-dispose](https://docs.microsoft.com/en-us/dotnet/standard/garbage-collection/implementing-dispose)。
+
+# [*第三章*](B16617_03_Final_SB_Epub.xhtml#_idTextAnchor053)，预定义数据类型和内存分配
+
+1.  `bool`、`byte`、`char`、`DateTime`、`decimal`、`double`、`enum`、`float`、`int`、`long`、`sbyte`、`short`、`struct`、`value tuple`、`uint` 和 `ulong`。
+
+1.  `object`、`string`、`delegate` 和 `dynamic`。
+
+1.  创建一个 `static` 类型的实例。
+
+1.  不。栈和堆都使用相同的物理内存。
+
+1.  当项目在使用时，它们简单地被推入栈中，当它们不再需要时，立即从栈中弹出。添加到堆中的对象需要被管理和维护对象引用计数。放置在栈上的项目同时使用栈和堆，因为堆上的项目在栈上有指针变量。因此，与栈相比，使用堆有更多的开销。
+
+1.  字符串被放置在堆上。变量被放置在栈上，带有字符串的内存地址。当另一个变量被分配相同的字符串时，它将获得字符串的地址。因此，栈上的多个项目将指向相同的字符串。然而，如果你向字符串中添加任何内容，那么将在堆上创建一个新的字符串，并带有新的内存地址。分配新字符串的变量将具有指向堆上新字符串的内存地址，因此原始字符串永远不会更新。
+
+1.  小于 80,000 字节。
+
+1.  80,000 字节或更高。
+
+# [*第 4 章*](B16617_04_Final_SB_Epub.xhtml#_idTextAnchor072)，内存管理
+
+1.  三：0 代、1 代和 2 代。
+
+1.  小于 80,000 字节的对象被放置在 SOH 上。
+
+1.  80,000 字节或更大的对象被放置在 LOH 上。
+
+1.  强引用是一种不会被垃圾回收的引用。
+
+1.  弱引用是一种会被垃圾回收的引用。
+
+1.  实现 `IDisposable` 模式。
+
+1.  当不再使用时取消订阅事件监听器。不再使用时处置事件发布者或将它们设置为 null。
+
+1.  `Marshal.ReleaseComObject(object)`。
+
+1.  确保任何分配的内存都被释放。使用 `IDisposable` 模式确保在对象被处置时清理内存。
+
+# [*第 5 章*](B16617_05_Final_SB_Epub.xhtml#_idTextAnchor085)，应用程序分析和跟踪
+
+1.  应用程序、程序集、命名空间、类型、方法和字段。
+
+1.  可维护性指数、循环复杂度、继承深度、类耦合、源代码行数和可执行代码行数。
+
+1.  记录位置和时间、进程名称、处理器架构、异常信息、操作系统和 CLR 版本以及加载模块的名称、版本和物理路径。
+
+1.  名称、路径、优化后的用户代码、符号状态、O（顺序）、版本、进程和 AppDomain。
+
+1.  Microsoft Visual Studio 2022 和 JetBrains dotTrace、dotMemory 和 dotnet-counters。
+
+1.  我们能够列出可监控的 .NET 进程和可用于收集数据的计数器。我们获取了 .NET 进程标识符并对其进行了监控，并收集、保存和查看我们从运行中的 .NET 进程中收集的数据。
+
+# [*第6章*](B16617_06_Final_SB_Epub.xhtml#_idTextAnchor117)，.NET集合
+
+1.  `System.Collections`、`System.Collections.Generic`、`System.Collections.Concurrent`和`System.Collections.Specialized`。
+
+1.  使用大O符号来确定算法效率。
+
+1.  算法效率决定了时间如何随输入量而变化。
+
+1.  基准测试表明，使用`IList<T>`比使用`List<T>`更快，因此优先使用`IList<T>`而不是`List<T>`。
+
+1.  你可以使用任一方法。你的选择取决于你的性能需求和你要实现的目标。使用集合和数组之间存在权衡。理解这些权衡将帮助你选择应该应用到你的代码中的选项。
+
+1.  索引器使得类中的对象可以像访问数组中的项一样被访问。
+
+1.  `IEnumerator<T>`在遍历内存集合时比`IEnumerable<T>`更快。
+
+1.  根据基准测试，在内存和速度性能方面，查询数据库并获取枚举器是查询数据库和遍历结果最快的方式。
+
+1.  使用`yield`关键字。
+
+# [*第7章*](B16617_07_Final_SB_Epub.xhtml#_idTextAnchor139)，LINQ性能
+
+1.  使用索引而不是`Last()`调用直接访问集合中的最后一个元素。在LINQ查询中避免使用`let`关键字。将列表转换为数组以执行分组，然后返回枚举器。
+
+1.  编译器生成的代码行数更多，运行时间更长，并且当不使用`let`关键字时，运行时分配的内存更多。
+
+1.  从具有最少项的对象开始过滤项，然后是具有递增项数的对象。此外，避免使用`let`关键字。
+
+1.  带参数的闭包比不带参数的闭包性能更好。
+
+# [*第8章*](B16617_08_Final_SB_Epub.xhtml#_idTextAnchor152)，文件和流I/O
+
+1.  绝对路径、相对路径、UNC路径和DOS设备。
+
+1.  在注册表编辑器中，将`HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\FileSystem\LongPathsEnabled`设置为`1`。
+
+1.  最有效计算目录大小的方法是获取目录的`DirectoryInfo`，然后调用`GetFileSystemInfos()`。然后遍历结果，将每个`FileInfo`对象的长度添加到获取目录的大小。
+
+1.  移动文件最高效的方法是从内存缓存中获取`FileInfo`对象，然后使用`FileInfo.MoveTo(string destination)`方法移动文件。
+
+1.  在退出应用程序之前遇到不可恢复的异常。
+
+1.  `IOException`。
+
+1.  本地、本地缓存、漫游、临时和C:\ProgramData。
+
+1.  当被提示时，用户只能为自己安装软件。这将导致每个登录的人使用软件时都有自己的数据副本，数据位于他们的登录账户下的Microsoft VirtualStore中。
+
+1.  当多个用户登录到同一台计算机，并且只安装了一个用户的应用程序而不是所有用户时，应用程序数据将存储在Microsoft虚拟存储中，而不是存储在`C:\ProgramData`的集中位置。
+
+1.  `C:\Users\%USERNAME%\AppData\Local\VirtualStore`。
+
+# [*第9章*](B16617_09_Final_SB_Epub.xhtml#_idTextAnchor168)，增强网络应用程序的性能
+
+1.  应用层、表示层、会话层、传输层、网络层、数据链路层和物理层。
+
+1.  HTTP、HTTPS、SSH、SSL、DHCP、DNS、FTP、TFTP、Telnet、SMTP、IMAP4、POP3、TCP、IP、UDP、以太网和PPP。
+
+1.  TCP使数据传输和接收得到保证。UDP只允许传输无法保证接收的数据。
+
+1.  使用浏览器内置的开发者工具。
+
+1.  gRPC是一个跨平台、跨语言和跨设备的框架，用于在应用程序之间进行远程过程调用。gRPC-Web是浏览器基于RCP调用的代理，因为浏览器应用程序无法直接使用gRPC。
+
+1.  减少页面执行的操作数量和页面调用的服务数量。减小图像大小。使用文件压缩减小通过网络传输的文件大小。缓存网络资源。在服务器上过滤数据，将其分成页面，并只返回请求的数据页面。
+
+# [*第10章*](B16617_10_Final_SB_Epub.xhtml#_idTextAnchor189)，设置我们的数据库项目
+
+N/A。
+
+# [*第11章*](B16617_11_Final_SB_Epub.xhtml#_idTextAnchor205)，基准测试关系型数据访问框架
+
+1.  使用Dapper.NET执行存储过程。
+
+1.  使用Dapper.NET执行原始SQL语句。
+
+1.  使用ADO.NET执行存储过程。
+
+1.  使用ADO.NET执行存储过程。
+
+1.  使用ADO.NET执行存储过程。
+
+1.  不一定。混合方法可能更好，因为您可以通过使用您选择的框架中最高效的方法来最大化您所涉及的数据操作的性能。
+
+# [*第12章*](B16617_12_Final_SB_Epub.xhtml#_idTextAnchor215)，响应式用户界面
+
+1.  配置应用程序以支持高DPI。
+
+1.  配置应用程序以支持长文件路径。
+
+1.  在应用程序的开始处添加启动画面。
+
+1.  将长时间运行的任务作为后台任务运行。
+
+1.  内存缓存和分布式缓存。
+
+1.  使用AJAX。
+
+1.  `WebSockets`和SignalR。
+
+1.  `SetSemanticFocus`、`Announce`和`字体缩放`。
+
+1.  将`BlazorWebView`组件添加到页面中，并将其指向Blazor应用程序的根目录。
+
+1.  `ProgressRing`和`ProgressBar`。
+
+# [*第13章*](B16617_13_Final_SB_Epub.xhtml#_idTextAnchor239)，分布式系统
+
+1.  命令查询责任分离。
+
+1.  我们可能希望为命令使用一个模型，为查询使用另一个模型。
+
+1.  事件驱动编程。
+
+1.  我们使用事件来触发无服务器函数的执行，例如Azure Durable Function。
+
+1.  一种用于打包应用程序及其依赖项的软件，可以在云或本地部署和执行。
+
+1.  用于部署第三方依赖项和遗留代码。
+
+1.  以函数形式存在的微服务，仅在需要时运行，并且通常在事件触发器响应下运行。
+
+1.  无服务器函数可以快速扩展，并且您只需为函数运行的时间付费。与需要大部分时间运行容器的相比，这可以节省金钱。
+
+1.  Azure Functions的扩展，使您能够在无服务器环境中编写有状态函数。我们还可以使用它们来定义工作流程。
+
+1.  活动、编排器、实体和客户端。
+
+1.  聚合器（有状态实体）、扇出/扇入、函数链、人工交互和监控（演员）。
+
+1.  用于管理微服务的基础设施即代码平台。
+
+1.  您可以使用C#管理微服务和它们资源，从创建到运行、停止和删除。
+
+# [*第14章*](B16617_14_Final_SB_Epub.xhtml#_idTextAnchor254)，多线程编程
+
+1.  `运行`、`挂起`、`等待`、`睡眠`、`加入`和`停止`。
+
+1.  您不需要 – 这个API现在已过时。
+
+1.  前台和后台。
+
+1.  使用`CancellationToken`在`CancellationTokenSource`操作超时时引发`TaskCanceledException`。
+
+1.  `Thread.Start()`或`Thread.Start(object)`。
+
+# [*第15章*](B16617_15_Final_SB_Epub.xhtml#_idTextAnchor266)，并行编程
+
+1.  任务并行库。
+
+1.  并行LINQ库。
+
+1.  性能监控器即`perfmon`。
+
+1.  不。
+
+1.  使用`BenchmarkDotNet`测试各种方法的性能。
+
+# [*第16章*](B16617_16_Final_SB_Epub.xhtml#_idTextAnchor280)，异步编程
+
+1.  基于任务的异步模式。
+
+1.  `CancellationToken`。
+
+1.  `IProgress<T>`。
+
+1.  声明了一个异步方法，`async`关键字位于方法名之前。`await`关键字位于异步操作之前，并阻止任何进一步代码的继续执行，直到异步操作完成。`Task`是异步方法返回的内容。对于`void`方法，返回类型是`Task`，而对于返回值的函数，返回类型是`Task<T>`。
+
+1.  创建一个新的`CancelationTokenSource`，然后设置取消方法，例如`CancelAfter(3000)`。
+
+1.  将`IProgress<T>`类型作为参数传递给异步方法，并为`ProgressChanged`事件添加事件处理器。或者，您也可以将单个处理器传递给`Progress<T>`构造函数。

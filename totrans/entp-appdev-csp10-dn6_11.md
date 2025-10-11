@@ -1,0 +1,11 @@
+# 第3部分：开发企业应用程序
+
+在本部分中，我们将开发应用程序的不同层。我们将从数据层开始，然后开发 API 和 Web 层。在开发过程中，我们将集成在第 2 部分中开发的用于跨领域关注的库。
+
+本部分包括以下章节：
+
++   [*第9章*](B18507_09_Epub.xhtml#_idTextAnchor860)*，在 .NET 6 中处理数据*
+
++   [*第10章*](B18507_10_Epub.xhtml#_idTextAnchor1040)*，创建 ASP.NET Core 6 Web API*
+
++   [*第11章*](B18507_11_Epub.xhtml#_idTextAnchor1228)*，创建 ASP.NET Core 6 Web 应用程序*

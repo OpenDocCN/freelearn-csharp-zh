@@ -1,0 +1,1052 @@
+<html><head></head><body>
+<div class="chapter" title="Chapter&#xA0;7.&#xA0; Advanced Techniques: Functions Revisited">
+<div class="titlepage">
+<div>
+<div>
+<h1 class="title"><a id="ch07"/>
+ Chapter 7.  Advanced Techniques: Functions Revisited</h1>
+</div>
+</div>
+</div>
+<p>This chapter builds upon the basic F# idioms in functions, pattern matching, and data sequences that we have observed in the previous chapters. Here, I turn to the advanced patterns of data transformations, in other words, the repeated use of functions over data. The goal of this chapter is to familiarize you with the major patterns where combined basic F# idioms work in synergy. This chapter covers the following topics:</p>
+<div class="itemizedlist">
+<ul class="itemizedlist">
+<li class="listitem">Advanced <span class="strong">
+<strong>recursion</strong>
+</span>
+ patterns, including tail recursion and the mutual recursion of functions and sequences</li>
+<li class="listitem">
+<span class="strong">
+<strong>Folding</strong>
+</span>
+ as a universal pattern of aggregation</li>
+<li class="listitem">
+<span class="strong">
+<strong>Memoization</strong>
+</span>
+ and <span class="strong">
+<strong>lazy evaluation</strong>
+</span>
+ as complementary patterns of the <span class="strong">
+<strong>just-in-time principle</strong>
+</span>
+ applied to data</li>
+<li class="listitem">The <span class="strong">
+<strong>continuation passing</strong>
+</span>
+ pattern extending the core <span class="strong">
+<strong>call-return</strong>
+</span>
+ principle of function interaction</li>
+<li class="listitem">Advanced pattern matching by generalizing matching with <span class="strong">
+<strong>active patterns</strong>
+</span>
+</li>
+</ul>
+</div>
+<p>These synergies often manifest themselves in clean, concise, and efficient F# code.</p>
+<div class="section" title="A deep dive into recursion">
+<div class="titlepage">
+<div>
+<div>
+<h1 class="title" id="toc_1"><a id="ch07lvl1sec50"/>
+ A deep dive into recursion</h1>
+</div>
+</div>
+</div>
+<p>I've already scratched the surface of <span class="strong">
+<strong>recursion</strong>
+</span>
+ in <a class="link" title="Chapter 3.  Basic Functions" href="text00030.html#ch03">Chapter 3</a>
+ , <span class="emphasis">
+<em>Basic Functions</em>
+</span>
+ , showing how the <code class="literal">rec</code>
+ modifier changes the scoping of the function definition. This explicit indication allows the function to reference itself before the function body is fully defined. Now I'll show you how recursion can be employed in the right or wrong way so that you can learn to follow the right recursion pattern.</p>
+<div class="section" title="Tail recursion">
+<div class="titlepage">
+<div>
+<div>
+<h2 class="title" id="toc_2"><a id="ch07lvl2sec84"/>
+ Tail recursion</h2>
+</div>
+</div>
+</div>
+<p>I would not be breaking new ground by pointing out that a function, recursive or not, as it is implemented these days, consumes a certain amount of resources for local values, argument values, and so forth. A non-recursive function consumes these resources upon being called and releases them upon returning the result. So far, so good.</p>
+<p>But what happens when the function calls itself? Each nested call can stash local resources to be released when this particular level of recursion is done. Hence, a deep recursion may temporarily increase resource consumption. Quite frequently, run-time implementations of the function call and return semantics (including the F# one) use the application <span class="emphasis">
+<em>stack space</em>
+</span>
+ of a limited volume to temporarily stash the local resources. If a recursive function aggressively consumes this space by deeply nesting self-calls without unwinding the stack, this reserved volume can be exhausted, ending the chain of nested self-calls with the notorious .NET <code class="literal">StackOverflowException</code>
+ . Even when stack overflow is not the case, the stack space hungry implementation puts a strain on resources and the performance, as the allocations and releases of stack frames keeping the function call local context take time.</p>
+<p>A classic (although severely worn out) example of a poorly arranged recursion aiming at the calculation of the <span class="strong">
+<strong>factorial</strong>
+</span>
+ (<a class="ulink" href="https://en.wikipedia.org/wiki/Factorial">https://en.wikipedia.org/wiki/Factorial</a>
+ ) function is as follows (<code class="literal">Ch7_1.fsx</code>
+ ):</p>
+<pre class="programlisting">let rec ``naive factorial`` = function 
+| n when n = 0I -&gt; 1I 
+| _ as n -&gt; n * ``naive factorial`` (n - 1I) 
+</pre>
+<p>(I retreat to the <code class="literal">BigInteger</code>
+ type here, as in order to cause the stack overflow the argument should be in such a range that the result of the factorial function may easily consist of thousands of digits). Now, with the help of FSI, let's look at what would be the values of <code class="literal">``naive factorial`` 1000</code>
+ and <code class="literal">``naive factorial`` 10000</code>
+  . The following screenshot shows a number of quite a high magnitude for the first call, but the second call fails exactly as was predicted with <code class="literal">StackOverflowException</code>
+ :</p>
+<div class="mediaobject"><img src="Image00027.jpg" alt="Tail recursion"/>
+<div class="caption">
+<p>The failure of a non-tail recursive function call</p>
+</div>
+</div>
+<p style="clear: both; height: 1em;"/>
+<p>What happens here is that this implementation continuously nests calls to <code class="literal">``naive factorial``</code>
+ , with the decreasing argument value piling stack frames until it reaches <code class="literal">``naive factorial`` 0</code>
+ . Then, it begins to unwind the stack performing deferred multiplications, ending up with an empty stack and sought function value. It is easy to notice that the amount of consumed stack frames coincides with the function argument value. It is enough stack space to accommodate 1000 frames, but 10 times more than overwhelms the application.</p>
+<p>What can be done here? We may grasp that all partial multiplications can be done immediately as the recursion unwinds and the interim result may be passed as an extra argument. Such a wise twist to the previous naive approach is shown in the following snippet (<code class="literal">Ch7_1.fsx</code>
+ ):</p>
+<pre class="programlisting">let ``wise factorial`` n = 
+  let rec factorial_tail_call acc = function   | n when n = 0I -&gt; acc 
+  | _ as n -&gt; factorial_tail_call (acc * n) (n - 1I) 
+  factorial_tail_call 1I n 
+</pre>
+<p>In the preceding <code class="literal">``wise factorial``</code>
+ definition, recursion is delegated to the inner <code class="literal">factorial_tail_call</code>
+ function, which has two arguments instead of one:</p>
+<div class="itemizedlist">
+<ul class="itemizedlist">
+<li class="listitem">One is the <span class="strong">
+<strong>factorial</strong>
+</span>
+ argument for any calculation step (it is hidden by the use of <code class="literal">function</code>
+ in place of more descriptive <code class="literal">match</code>
+ construction)</li>
+<li class="listitem">The other is <span class="strong">
+<strong>accumulator </strong>
+</span>
+ <code class="literal">acc</code>
+ , carrying the interim product for the already performed recursion steps</li>
+</ul>
+</div>
+<p>It is easy to spot now that the recursive call to <code class="literal">factorial_tail_call</code>
+ does not constitute any sort of subexpression of any other expression involving other values from the context; also, evaluating this self-contained expression is the last action the self-calling function performs. That's why it is called a <span class="strong">
+<strong>tail call</strong>
+</span>
+ , and thereafter, the function having all the recursive calls as tail calls is called <span class="strong">
+<strong>tail recursive</strong>
+</span>
+ .</p>
+<p>Let's take a look at how the <code class="literal">``wise factorial``</code>
+ implementation will do after being exercised with arguments of a substantial magnitude. In order to save space, let's output the number of digits in the function's result string presentation with an elegant <code class="literal">let howLong = (string &gt;&gt; String.length)</code>
+ combinator instead of the actual result factorial number as the following screenshot shows:</p>
+<div class="mediaobject"><img src="Image00028.jpg" alt="Tail recursion"/>
+<div class="caption">
+<p>Pushing factorial limits with the tail-recursive implementation</p>
+</div>
+</div>
+<p style="clear: both; height: 1em;"/>
+<p>After tail recursion's invigorating refactoring, our <code class="literal">``wise factorial``</code>
+ implementation does not have any problem calculating even the factorial of 100,000, or in traditional math notation, <span class="emphasis">
+<em>100,000!</em>
+</span>
+ . It's time to get excited indeed, as this number requires almost half a million digits to be recorded, <code class="literal">456574</code>
+ to be exact!</p>
+<p>Careful readers may observe that the implementation of <code class="literal">``wise factorial``</code>
+ that's free of subexpressions and context-carried values very closely resembles the good old imperative cycle. Surprisingly, this is exactly what the F# optimizing compiler does in such cases. I refer those of you interested in the inner workings of the tail recursion compilation to this blog from the Microsoft Visual F# team: <span class="strong">
+<strong>Tail calls in F#</strong>
+</span>
+ (<a class="ulink" href="https://blogs.msdn.microsoft.com/fsharpteam/2011/07/08/tail-calls-in-f/">https://blogs.msdn.microsoft.com/fsharpteam/2011/07/08/tail-calls-in-f/</a>
+ ).</p>
+</div>
+<div class="section" title="Mutual recursion">
+<div class="titlepage">
+<div>
+<div>
+<h2 class="title" id="toc_3"><a id="ch07lvl2sec85"/>
+ Mutual recursion</h2>
+</div>
+</div>
+</div>
+<p>So far, all the considered use cases related to recursion were dealing with <span class="strong">
+<strong>self-recursion</strong>
+</span>
+ , where the recursive function calls itself. However, it is not hard to extrapolate that recursive function abstraction allows a natural generalization, where the group of two or more functions dispatch to each other in definitions, allowing circular dependencies. This generalization brings the <span class="strong">
+<strong>mutual recursion</strong>
+</span>
+ pattern to the table.</p>
+<p>To express this kind of mutual dependency, F# introduces a special kind of <code class="literal">let rec</code>
+ binding, where definitions of two or more constituent functions are grouped together with the <code class="literal">and</code>
+ keyword as shown here:</p>
+<pre class="programlisting">let rec fname_a arguments = 
+  &lt; fname_a definition&gt; 
+and fname _b arguments = 
+  &lt; fname_b definition&gt; 
+........................... 
+</pre>
+<p>As outlined in <span class="strong">
+<strong>recursive functions</strong>
+</span>
+ (<a class="ulink" href="https://msdn.microsoft.com/en-us/library/dd233232.aspx">https://msdn.microsoft.com/en-us/library/dd233232.aspx</a>
+ ), I have already covered the inner workings of the single function binding that has the <code class="literal">rec</code>
+ modifier in <a class="link" title="Chapter 3.  Basic Functions" href="text00030.html#ch03">Chapter 3</a>
+ , <span class="emphasis">
+<em>Basic Functions</em>
+</span>
+ . Mutual recursion binding simply extends the same principle: one or more <code class="literal">and</code>
+ parts just throw in additional bindings, making the bound function names available for forward referral immediately.</p>
+<p>Conceptually, the mutual recursion is quite a simple generalization. However, the growing number of moving parts may make the reasoning about mutually recursive function behavior quite complicated, allowing bugs to sneak in. A good illustration of the above observation can be the example definition of the mutually recursive functions pair <code class="literal">Even</code>
+ and <code class="literal">Odd</code>
+ provided on MSDN at the reference given above. The following code shows the following two mutually recursive functions definition taken from there (<code class="literal">Ch7_2.fsx</code>
+ ):</p>
+<pre class="programlisting">// Beware, does not work as expected! 
+let rec Even x = if x = 0 then true else Odd (x - 1) 
+and Odd x = if x = 1 then true else Even (x - 1) 
+</pre>
+<p>The definition looks very succinct and elegant, right? Unfortunately, this impression is superficial, and the preceding definition does not work as expected in certain cases, allowing recursion to run away without stopping. Just check for yourself how the preceding code works for the <code class="literal">Even(1)</code>
+ test case: it runs away! I refer those of you interested in the fixing of this mutually recursive definition to my blog post <span class="strong">
+<strong>A Tale of Two Functions</strong>
+</span>
+ (<a class="ulink" href="https://infsharpmajor.wordpress.com/2013/04/21/a-tale-of-two-functions/">https://infsharpmajor.wordpress.com/2013/04/21/a-tale-of-two-functions/</a>
+ ) published in April 2013, where I covered the bases of the issue, its history, and the suggested fix.</p>
+<p>It seems to me that a certain similarity exists between the definition of mutually recursive functions and the piece of imperative code peppered with many <code class="literal">goto</code>
+ . operators. In both cases it is similarly hard to mentally track the flow of control, which in turn creates the opportunity for bugs to sneak in.</p>
+<p>Let me now turn to a sample of a good application of a mutual recursion pattern, demonstrating the bits and pieces of reasoning behind taming its power. I'm going to use my own <span class="strong">
+<strong>Stack Overflow answer</strong>
+</span>
+ (<a class="ulink" href="http://stackoverflow.com/a/9772027/917053">http://stackoverflow.com/a/9772027/917053</a>
+ ) to the question there <span class="strong">
+<strong>Using Functional Programming to compute prime numbers efficiently</strong>
+</span>
+ (<a class="ulink" href="http://stackoverflow.com/questions/9766613/using-functional-programming-to-compute-prime-numbers-efficiently">http://stackoverflow.com/questions/9766613/using-functional-programming-to-compute-prime-numbers-efficiently</a>
+ ). I approach this challenge with the arsenal of patterns already uncovered until this point in the narrative as shown here (<code class="literal">Ch7_2.fsx</code>
+ ):</p>
+<pre class="programlisting">let rec primes =  
+  Seq.cache &lt;| seq { yield 2; yield! Seq.unfold nextPrime 3 } 
+and nextPrime n = 
+  let next = n + if n%6 = 1 then 4 else 2 in 
+  if isPrime n then Some(n, next) else nextPrime next 
+and isPrime n = 
+  f n &gt;= 2 then 
+    primes 
+    |&gt; Seq.tryFind (fun x -&gt; n % x = 0 || x * x &gt; n) 
+    |&gt; fun x -&gt; x.Value * x.Value &gt; n 
+  else false 
+</pre>
+<p>The first piece is the definition of the <code class="literal">primes</code>
+ sequence of an indefinite length (in fact, limited by the manner of the preceding implementation to <code class="literal">int</code>
+ prime numbers only but this matter can be easily generalized). The surprising part here is that a sequence binding <code class="literal">seq {...}</code>
+ can be a part of mutually recursive function bindings. Nevertheless, the <code class="literal">primes</code>
+ binding uses the <code class="literal">seq { yield 2; yield! Seq.unfold nextPrime 3 }</code>
+ sequence expression, which yields the first prime number 2, followed by <code class="literal">yield!</code>
+ of the <code class="literal">Seq.unfold</code>
+ generator function relying on the assumption that there is a <code class="literal">nextPrime</code>
+ function around that, being given a prime number argument can generate the next prime number of the greater value. Please take into account how I use a forward reference to <code class="literal">nextPrime</code>
+ granted by the <code class="literal">rec</code>
+ modifier of the <code class="literal">let</code>
+ binding. It's very convenient and it allows you to postpone the definition of <code class="literal">nextPrime</code>
+ , concentrating only on the sequence generation at the moment.</p>
+<p>So far, so good. Now, I turn directly to the definition of <code class="literal">nextPrime</code>
+ . I do that with an assumption that there is a function <code class="literal">isPrime</code>
+ around that, being given an <code class="literal">int</code>
+ argument, can find out whether it's a prime number or not. Again, as discussed earlier, I will make a forward reference to <code class="literal">isPrime</code>
+ without bothering about its implementation at the moment thanks to the <code class="literal">let rec ...</code>
+ <code class="literal">and</code>
+ <code class="literal">...</code>
+ binding that allows me such freedom.</p>
+<p>The <code class="literal">nextPrime</code>
+ function is built by the rules of the <code class="literal">Seq.unfold</code>
+ higher-order function. The first thing it calculates is the next candidate for primeness regardless of the primeness of the argument at the moment with a slightly obscure binding, <code class="literal">let next = n + if n%6 = 1 then 4 else 2</code>
+ . In fact, there is nothing exciting here, apparently, potential candidates are odd numbers and I begin unfolding with the smallest odd prime, <code class="literal">3</code>
+ . For each candidate of value <code class="literal">n</code>
+ , if <code class="literal">n</code>
+ is greater by 1 than a multiple of <code class="literal">6</code>
+ , then the next candidate would be <code class="literal">n + 4</code>
+ (as <code class="literal">n + 2</code>
+ is apparently; the multiple of <code class="literal">3</code>
+ ); otherwise, it's just <code class="literal">n + 2</code>
+ , you know, just a small optimization. Next, having a prime candidate <code class="literal">n</code>
+ and the following <code class="literal">n</code>
+ prime candidate <code class="literal">next</code>
+ at hand, I check whether value <code class="literal">n</code>
+ is prime with the help of the (not yet defined) <code class="literal">isPrime</code>
+ function. If affirmative, it returns the <code class="literal">Some(n, next)option</code>
+ ; otherwise, it recursively calls itself with <code class="literal">next</code>
+ as the argument.</p>
+<p>Great! The last piece of the puzzle is to define <code class="literal">isPrime</code>
+ . The first thing is that it sifts out integers of less than 2 (an additional useful property of <code class="literal">isPrime</code>
+ is that it can be used just as a primeness detector to be called from elsewhere). Now pay attention: for argument values greater than or equal to <code class="literal">2</code>
+ , it actively uses the members of the already generated <code class="literal">primes</code>
+ sequence of lesser than or equal to the square root of the argument values with the help of the <code class="literal">Seq.tryFind</code>
+ higher-order function for the checking! That's why I cached the output of the sequence expression with <code class="literal">Seq.cache</code>
+ in the definition of <code class="literal">primes</code>
+ ; otherwise, <code class="literal">isPrime</code>
+ would be slow. We trade here the memory space for the execution speed. So, <code class="literal">Seq.tryFind</code>
+ traverses the cache until it either finds the factor of the argument value or it reaches the point where the <code class="literal">primes</code>
+ member multiplied by itself gets greater than the argument. The first outcome means that the argument is not a prime number, and the second means that it is a prime number. This statement wraps up the lengthy and slightly annoying comments about the implementation of <code class="literal">primes</code>
+ .</p>
+<p>I wrap up this section by checking how performant the <code class="literal">primes</code>
+ implementation is. For this purpose, let me turn to the familiar <span class="strong">
+<strong>Project Euler</strong>
+</span>
+ (<a class="ulink" href="https://projecteuler.net/">https://projecteuler.net/</a>
+ ), particularly to the <span class="strong">
+<strong>Problem 10 - Summation of Primes</strong>
+</span>
+ (<a class="ulink" href="https://projecteuler.net/problem=10">https://projecteuler.net/problem=10</a>
+ ):</p>
+<pre class="programlisting">let problem010 () = 
+  primes 
+  |&gt; Seq.takeWhile ((&gt;) 2000000) 
+  |&gt; (Seq.map int64 &gt;&gt; Seq.sum) 
+</pre>
+<p>Applying the <code class="literal">primes</code>
+ definition to the summation of prime numbers not exceeding 2,000,000 is shown in the upcoming figure. It takes just less than 1.5 seconds on my computer. Also, consider that the repeated run yields the result in just 10 milliseconds, thanks to the sequence caching:</p>
+<div class="mediaobject"><img src="Image00029.jpg" alt="Mutual recursion"/>
+<div class="caption">
+<p>Using mutual recursion for primes generation</p>
+</div>
+</div>
+<p style="clear: both; height: 1em;"/>
+<p>Personally, I find a lot of aesthetic value in the <code class="literal">primes</code>
+ code, in how it uses forward references twice, finally closing in on the self-computed data. And each of three circularly dependent parts of the definition is a pure function (well, kind of, as caching definitely represents a hidden state but in a very clean form). This is the power of functional programming!</p>
+</div>
+</div>
+</div>
+
+
+<div class="section" title="Folding">
+<div class="titlepage">
+<div>
+<div>
+<h1 class="title"><a id="ch07lvl1sec51"/>
+ Folding</h1>
+</div>
+</div>
+</div>
+<p>Now is the perfect time to revisit the <code class="literal">factorial</code>
+ function that I used at the beginning of this chapter when covering tail recursion. Let's take a sequence of <code class="literal">bigint</code>
+ numbers from <code class="literal">1I</code>
+ to a value <code class="literal">n</code>
+ represented by the following expression:</p>
+<pre class="programlisting">Seq.init (n + 1) bigint.op_Implicit |&gt; Seq.skip 1 
+</pre>
+<p>Does the <code class="literal">factorial(n)</code>
+ function represent nothing else but a product of the factors, each being a member of the preceding sequence? Sure, it can be seen (and implemented) as such. Let me create this implementation in the best traditions of the imperative programming style as shown here (<code class="literal">Ch7_3.fsx</code>
+ ):</p>
+<pre class="programlisting">let ``folding factorial (seq)`` n = 
+  let fs = Seq.init (n + 1) bigint.op_Implicit |&gt; Seq.skip 1 
+  use er = fs.GetEnumerator() 
+  let mutable acc = 1I 
+  while er.MoveNext() do 
+    acc &lt;- acc * er.Current 
+  acc 
+</pre>
+<p>Expressed in plain words, this implementation can be laid out in the following manner:</p>
+<div class="itemizedlist">
+<ul class="itemizedlist">
+<li class="listitem">Take a mutable value that will serve as a result accumulator</li>
+<li class="listitem">Enumerate the sequence of factors</li>
+<li class="listitem">For each factor in the sequence, get a new value of the accumulator by multiplying the current accumulator value by the current factor</li>
+<li class="listitem">Return the final accumulator value as a function result</li>
+</ul>
+</div>
+<p>Some of you with experience in object-oriented design may perhaps have already spotted the signs of the <span class="strong">
+<strong>visitor</strong>
+</span>
+ (<a class="ulink" href="https://en.wikipedia.org/wiki/Visitor_pattern">https://en.wikipedia.org/wiki/Visitor_pattern</a>
+ ) pattern in the preceding implementation. Indeed, the operation (multiplication in this case) is applied to the sequence data without in any way changing this data, eventually deriving the result as the aggregate of these repeated operations.</p>
+<p>Generalizing this in the form of a higher-order function signature, the following can be derived:</p>
+<pre class="programlisting">fold: ('State -&gt; 'T -&gt; 'State) -&gt; 'State -&gt; 'T seq -&gt; 'State 
+</pre>
+<p>Here, the function of type <code class="literal">('State -&gt; 'T -&gt; 'State)</code>
+ named <code class="literal">folder</code>
+ applies to the pair of arguments:</p>
+<div class="itemizedlist">
+<ul class="itemizedlist">
+<li class="listitem">The first of type <code class="literal">'State</code>
+ representing the accumulator</li>
+<li class="listitem">The second of type <code class="literal">seq 'T</code>
+ representing the sequence of elements that have the type <code class="literal">'T</code>
+</li>
+</ul>
+</div>
+<p>The <code class="literal">folder</code>
+ function returns the final value of the accumulator. This function, named <code class="literal">fold</code>
+ , represents the ubiquitous pattern of data processing by name <code class="literal">folding</code>
+ .</p>
+<p>As can be expected, the generic folding of the preceding form is indeed a member of the F# core library: <span class="strong">
+<strong>Seq.fold&lt;'T,'State&gt; function </strong>
+</span>
+ (<a class="ulink" href="https://msdn.microsoft.com/en-us/library/ee353471.aspx">https://msdn.microsoft.com/en-us/library/ee353471.aspx</a>
+ ). Rewriting <code class="literal">``folding factorial (seq)``</code>
+ with the help of the <code class="literal">Seq.fold</code>
+ library function, which hides all these pesky moving parts involved (the enumerator, state holder, and traversing enumeration), gives the following, much more terse version (<code class="literal">Ch7_3.fsx</code>
+ ):</p>
+<pre class="programlisting">let ``folding factorial (lib)`` n = 
+  Seq.init (n + 1) bigint.op_Implicit 
+  |&gt; Seq.skip 1 
+  |&gt; Seq.fold (*) 1I 
+</pre>
+<p>Let's compare both implementations from a performance standpoint. The results of running both versions side by side are given in the following screenshot:</p>
+<div class="mediaobject"><img src="Image00030.jpg" alt="Folding"/>
+<div class="caption">
+<p>Hand-coded folding versus the library fold function performance</p>
+</div>
+</div>
+<p style="clear: both; height: 1em;"/>
+<p>It should not be surprising to observe that the <code class="literal">library</code>
+ function shows slightly better performance than the hand coded imperative version. The <code class="literal">library</code>
+ function implementation is highly optimized. For those who are curious, the current library implementation of the <code class="literal">fold</code>
+ function taken from GitHub looks like what is shown in the following snippet (<code class="literal">Ch3_7.fsx</code>
+ ):</p>
+<pre class="programlisting">// Excerpt from seq.fs of FSharp.Core.Collections: 
+[&lt;CompiledName("Fold")&gt;] 
+let fold&lt;'T,'State&gt; f (x:'State) (source : seq&lt;'T&gt;)  =  
+  checkNonNull "source" source 
+  use e = source.GetEnumerator()  
+  let f = OptimizedClosures.FSharpFunc&lt;_,_,_&gt;.Adapt(f) 
+  let mutable state = x  
+  while e.MoveNext() do 
+    state &lt;- f.Invoke(state, e.Current) 
+  state 
+</pre>
+<p>You may have already noticed how closely folding resembles tail recursion with the accumulator. This resemblance is not accidental. Both thread the state through the sequence of function calls, although the <code class="literal">recursive</code>
+ function materializes these calls when it is executed, while the <code class="literal">fold</code>
+ function applies the <code class="literal">folder</code>
+ function to the explicit to-be-folded data sequence.</p>
+<div class="note" title="Note">
+<h3 class="title" id="toc_1"><a id="note8"/>
+ Note</h3>
+<p>It can be formally proven that in a language with first-order tuples and functions, which F# is, any function can be expressed as <code class="literal">fold</code>
+ . I refer those of you who are interested to the classic paper on this subject: Graham Hutton's <span class="strong">
+<strong>A Tutorial on the Expressiveness and Universality of Fold</strong>
+</span>
+ (<a class="ulink" href="http://www.cs.nott.ac.uk/~pszgmh/fold.pdf">www.cs.nott.ac.uk/~pszgmh/fold.pdf</a>
+ ).</p>
+</div>
+</div>
+
+
+<div class="section" title="Memoization">
+<div class="titlepage">
+<div>
+<div>
+<h1 class="title"><a id="ch07lvl1sec52"/>
+ Memoization</h1>
+</div>
+</div>
+</div>
+<p>The next two relatively advanced topics I will cover somehow resemble the <span class="strong">
+<strong>Just </strong>
+</span>
+ <span class="strong">
+<strong>in </strong>
+</span>
+ <span class="strong">
+<strong>Time</strong>
+</span>
+ approach taken outside of the compilation context. With <span class="strong">
+<strong>Just in Time</strong>
+</span>
+ (<a class="ulink" href="https://en.wikipedia.org/wiki/Just_in_Time">https://en.wikipedia.org/wiki/Just_in_Time</a>
+ ), Wikipedia comes up first with a production strategy in manufacturing, where components are delivered immediately before being utilized as a way of being <span class="emphasis">
+<em>lean</em>
+</span>
+ on inventory costs.</p>
+<p>As a matter of fact, <span class="strong">
+<strong>memoization</strong>
+</span>
+ and <span class="strong">
+<strong>lazy evaluation</strong>
+</span>
+ complement each other in this <span class="emphasis">
+<em>lean</em>
+</span>
+ calculation sense. While laziness allows you not to perform calculations until the result is absolutely required, memoization makes the results of the already performed <span class="emphasis">
+<em>fat</em>
+</span>
+ resource expensive calculations reusable by not allowing them to be wasted.</p>
+<p>I have already used memoization somewhat when implementing prime number generation earlier in this chapter for covering mutual recursion. An expensively generated sequence was cached there in order to use the already generated elements to find the next ones, which are not generated yet. Now, I want to concentrate on memoization in general, allowing any function to be memoized. Prior to doing this, it is important that you realize the following:</p>
+<div class="itemizedlist">
+<ul class="itemizedlist">
+<li class="listitem">Memoization may work for <span class="emphasis">
+<em>pure functions only</em>
+</span>
+ . This is almost obvious; if a function is not referentially transparent, it cannot be memoized as memoization captures solely arguments, not arguments, <span class="emphasis">
+<em>and</em>
+</span>
+ state</li>
+<li class="listitem">Memoization exploits a precalculated state</li>
+</ul>
+</div>
+<p>With this in mind, let's mimic implementations presented elsewhere on the Internet (<a class="ulink" href="https://blogs.msdn.microsoft.com/dsyme/2007/05/31/a-sample-of-the-memoization-pattern-in-f/">https://blogs.msdn.microsoft.com/dsyme/2007/05/31/a-sample-of-the-memoization-pattern-in-f/</a>
+ and <a class="ulink" href="http://www.fssnip.net/8P">http://www.fssnip.net/8P</a>
+ ) in order to investigate related limitations and gotchas as shown here (<code class="literal">Ch7_4.fsx</code>
+ ):</p>
+<pre class="programlisting">// Memoization (F# 4.0 is required) 
+let memoize f = 
+  let mutable cache = Map.empty 
+  fun x -&gt; 
+    match cache.TryFind(x) with 
+    | Some res -&gt; printfn "returned memoized";res 
+    | None -&gt; let res = f x in 
+    cache &lt;- cache.Add(x,res) 
+    printfn "memoized, then returned"; res 
+</pre>
+<p>The type inferred for memoization by the F# compiler is shown here:</p>
+<pre class="programlisting">memoize : f:('a -&gt; 'b) -&gt; ('a -&gt; 'b) when 'a : comparison 
+</pre>
+<p>Here, <code class="literal">f</code>
+ represents a function to be memoized, <code class="literal">cache</code>
+ serves as a state repository using the immutable <span class="strong">
+<strong>Map F# collection</strong>
+</span>
+ (<a class="ulink" href="https://msdn.microsoft.com/en-us/library/ee353880.aspx">https://msdn.microsoft.com/en-us/library/ee353880.aspx</a>
+ ) under the hood. <code class="literal">memoize</code>
+ itself represents a full-fledged high-order function that takes a function as an argument and also returns a function. This closes over mutable <code class="literal">cache</code>
+ (an F# 4.0 feature) and does the following:</p>
+<div class="itemizedlist">
+<ul class="itemizedlist">
+<li class="listitem">If its argument <code class="literal">x</code>
+ , which is used as a key against the closed <code class="literal">Map</code>
+ <code class="literal">cache</code>
+ can be found, then it logs the indication that the precached value is to be used and returns this <code class="literal">res</code>
+ value.</li>
+<li class="listitem">Otherwise, it mutates the closed <code class="literal">cache</code>
+ to a new <code class="literal">Map</code>
+ that has, in addition to the existed entries, the entry represented by the newly calculated tuple (<code class="literal">x, f(x)</code>
+ ), then it logs the fact that memoization took place and returns <code class="literal">f(x)</code>
+ .</li>
+</ul>
+</div>
+<p>Let's see for now how this works in FSI, which the following screenshot captures:</p>
+<div class="mediaobject"><img src="Image00031.jpg" alt="Memoization"/>
+<div class="caption">
+<p>Memoization with F# Map</p>
+</div>
+</div>
+<p style="clear: both; height: 1em;"/>
+<p>First, I memoized the <code class="literal">fun</code>
+ <code class="literal">x -&gt; x*x</code>
+ function, which is supposed to represent a "fat" resource hungry calculation into the <code class="literal">fm:(int -&gt; int)</code>
+ function. Then, I used <code class="literal">fm</code>
+ a couple of times with different arguments as shown here:</p>
+<div class="itemizedlist">
+<ul class="itemizedlist">
+<li class="listitem">
+<code class="literal">fm 10</code>
+ : The result <code class="literal">100</code>
+ was memoized for argument 10 and then returned</li>
+<li class="listitem">
+<code class="literal">fm 42</code>
+ : The result <code class="literal">1764</code>
+ was also memoized and then returned</li>
+<li class="listitem">
+<code class="literal">fm 10</code>
+ : As this argument value has already occurred, the result <code class="literal">100</code>
+ is returned without any recalculation</li>
+</ul>
+</div>
+<p>This pattern seems quite straightforward; however, it carries a few gotchas.</p>
+<p>For example, the signature of <code class="literal">memoize</code>
+ indicates that <code class="literal">'a</code>
+ is required in order to represent comparison; what gives? Digging down the <code class="literal">memoize</code>
+ implementation allows you to conclude that this constraint is a mere corollary of using F# <code class="literal">Map</code>
+ to back the state persistence.</p>
+<p>As the implementation behind <code class="literal">Map</code>
+ is likely to be a <span class="strong">
+<strong>balanced tree</strong>
+</span>
+ , it requires its keys to be <span class="emphasis">
+<em>comparable</em>
+</span>
+ for rebalancing. Oops! Sounds like a <span class="strong">
+<strong>leaky abstraction</strong>
+</span>
+ (<a class="ulink" href="https://en.wikipedia.org/wiki/Leaky_abstraction">https://en.wikipedia.org/wiki/Leaky_abstraction</a>
+ ) takes place here. Also, this may be a limiting factor for the application of memoization generically, as comparability is not a universal property of a generic type <code class="literal">'a</code>
+ .</p>
+<p>Let's change the persistence implementation mechanism to a generic <span class="strong">
+<strong>Dictionary</strong>
+</span>
+ (<a class="ulink" href="https://msdn.microsoft.com/en-us/library/xfhwa508(v=vs.100).aspx">https://msdn.microsoft.com/en-us/library/xfhwa508(v=vs.100).aspx</a>
+ ), as shown in the following code (<code class="literal">Ch7_4.fsx</code>
+ ):</p>
+<pre class="programlisting">let memoize' f = 
+  let cache = System.Collections.Generic.Dictionary() 
+  fun x -&gt; 
+    match cache.TryGetValue(x) with 
+    | true,res -&gt; printfn "returned memoized";res 
+    | _ -&gt; let res = f x 
+    cache.Add(x,res) 
+    printfn "memoized, then returned" 
+    res 
+</pre>
+<p>This changes the memoized argument constraint from comparison to equality as shown here:</p>
+<pre class="programlisting">memoize' : f:('a -&gt; 'b) -&gt; ('a -&gt; 'b) when 'a : equality 
+</pre>
+<p>This can be considered more universal, only until some innocuous usage like this occurs:</p>
+<pre class="programlisting">let disaster = memoize' (fun () -&gt; 5) 
+...... 
+disaster() 
+</pre>
+<p>Executing this code will end up with the following exception:</p>
+<pre class="programlisting">System.ArgumentNullException: Value cannot be null 
+</pre>
+<p>What the heck? Turns out nothing special happened, just another leaky abstraction has taken place, and consequently, the gotcha occurred. This time, the gotcha stems from the underlying persistence mechanism that does not allow you to have the <code class="literal">null</code>
+ value as a <code class="literal">Dictionary</code>
+ key (on the contrary, <code class="literal">Map</code>
+ happily allows this)!</p>
+<p>Finally, I want to touch the matter of combining memoization with recursion, as quite frequently, recursion is the tool to solve problems with the <span class="strong">
+<strong>divide and conquer</strong>
+</span>
+ strategy, where memoization fits naturally and may really shine.</p>
+<p>Let's take some use case more appropriate for the purpose, for example, the simple calculation of <span class="emphasis">
+<em>binomial coefficients</em>
+</span>
+ with the help of <span class="strong">
+<strong>Pascal's triangle</strong>
+</span>
+ (<a class="ulink" href="https://en.wikipedia.org/wiki/Pascal%27s_triangle">https://en.wikipedia.org/wiki/Pascal%27s_triangle</a>
+ ) as shown here (<code class="literal">Ch7_4.fsx</code>
+ ):</p>
+<pre class="programlisting">let rec binomial n k =  
+  if k = 0 || k = n then 1 
+  else 
+    binomial (n - 1) k + binomial (n - 1) (k - 1) 
+</pre>
+<p>The easily noticeable recurrent relationship between elements of Pascal's triangle rows allows you to expect a serious benefit from memoization.</p>
+<p>The memoized implementation of <code class="literal">binomial</code>
+ is also straightforward; <code class="literal">memoize</code>
+ is turned into an internal function in order to strip the logging introduced within its initial version. The only other problem left is that the memoized function has one argument. However, applying uncurrying helps with this trouble nicely as shown here (<code class="literal">Ch7_4.fsx</code>
+ ):</p>
+<pre class="programlisting">let rec memoizedBinomial = 
+  let memoize f = 
+    let cache = System.Collections.Generic.Dictionary() 
+    fun x -&gt; 
+    match cache.TryGetValue(x) with 
+    | true,res -&gt; res 
+    | _ -&gt; let res = f x 
+    cache.Add(x,res) 
+    res 
+  memoize 
+  (fun (n,k) -&gt; 
+    if k = 0 || k = n then 1 
+    else 
+      memoizedBinomial (n - 1, k) + 
+      memoizedBinomial (n - 1, k - 1)) 
+</pre>
+<p>Now it's time to measure the gain achieved from the memoization. The code in the upcoming figure measures the duration of repeating <code class="literal">binomial 500 2</code>
+ 10,000 times compared to the duration of repeating it 10,000 times as <code class="literal">memoizedBinomial (500,2)</code>
+ :</p>
+<div class="mediaobject"><img src="Image00032.jpg" alt="Memoization"/>
+<div class="caption">
+<p>Memoizing of the "divide and conquer" solution</p>
+</div>
+</div>
+<p style="clear: both; height: 1em;"/>
+<p>The results of the comparison are absolutely stunning, that is, <code class="literal">23781 / 15 = 1585</code>
+ , which means that memoization has improved the performance by 1585 times!</p>
+</div>
+
+
+<div class="section" title="Lazy evaluation">
+<div class="titlepage">
+<div>
+<div>
+<h1 class="title"><a id="ch07lvl1sec53"/>
+ Lazy evaluation</h1>
+</div>
+</div>
+</div>
+<p>This concept is very simple. By default, F# follows the <span class="strong">
+<strong>eager evaluation</strong>
+</span>
+ (<a class="ulink" href="https://en.wikipedia.org/wiki/Eager_evaluation">https://en.wikipedia.org/wiki/Eager_evaluation</a>
+ ) strategy, or an expression is evaluated as soon as it is bound. The alternative strategy available in other functional programming languages is to postpone the calculations until their result is absolutely necessary. F# can be explicitly told where to use lazy evaluation; by default, it uses lazy evaluations only for sequences. Expressing lazy evaluation if F# is not complicated syntactically, the following binding serves the purpose as shown:</p>
+<pre class="programlisting">let name = lazy ( expression ) 
+</pre>
+<p>Here, <code class="literal">name</code>
+ is bound to the result of calculating <code class="literal">expression</code>
+ , but the calculation itself is postponed. The type of value <code class="literal">name</code>
+ is a special one, that is, <code class="literal">Lazy&lt;'T&gt;;</code>
+ it represents a wrapper over <code class="literal">'T</code>
+ , which is the type of the expression per se. The computation gets performed by calling the <code class="literal">Force</code>
+ method of type <code class="literal">Lazy&lt;'T&gt;</code>
+ , like this <code class="literal">name.Force()</code>
+ . This action also unwraps the underlying type of <code class="literal">Lazy</code>
+ , so the type of the <code class="literal">name.Force()</code>
+ expression is <code class="literal">'T</code>
+ .</p>
+<p>Take into account that this feature is not specific to F#; the <code class="literal">Lazy&lt;T&gt;</code>
+ class is a part of the .NET framework class library of the System namespace.</p>
+<p>It is important to understand that the expression is calculated only once, so if the expression wrapped into the <code class="literal">lazy</code>
+ method has a side effect, it is performed only once on the expression calculation. Even if the calculation is forced another time, nothing will happen on the side; only the cached result will be returned.</p>
+<p>Let's demonstrate this with the following snippet (<code class="literal">Ch7_5.fsx</code>
+ ):</p>
+<pre class="programlisting">let twoByTwo  = lazy (let r = 2*2 in 
+  printfn "Everybody knows that 2*2=%d" r; r)  
+twoByTwo.Force() 
+twoByTwo.Force() 
+</pre>
+<p>The following screenshot shows how this code behaves in FSI:</p>
+<div class="mediaobject"><img src="Image00033.jpg" alt="Lazy evaluation"/>
+<div class="caption">
+<p>Lazy evaluation and side-effects</p>
+</div>
+</div>
+<p style="clear: both; height: 1em;"/>
+<p>Note that the binding for <code class="literal">twoByTwo</code>
+ did not bring any calculations to life, but it wrapped the future calculation into the <code class="literal">Lazy</code>
+ type. Then, the first <code class="literal">twoByTwo.Force()</code>
+ function performed the wrapped calculation, so the side-effect popped up. Finally, any consequent <code class="literal">twoByTwo.Force()</code>
+ function will just repeatedly bring the result of the very first calculation without any side-effects.</p>
+<p>The lazy evaluation pattern has its own niche in enterprise F# development. I often use it when in need of a resource that's probably being initialized; if this need really materializes, I want it to happen only once. For example, we can consider reading the Production environment configuration settings from Azure <code class="literal">KeyVault</code>
+ when a service runs in the Production environment while using some other configuration information carrier in other environments, for example, environment variables pointing to data stubs.</p>
+</div>
+
+
+<div class="section" title="Continuation passing style">
+<div class="titlepage">
+<div>
+<div>
+<h1 class="title"><a id="ch07lvl1sec54"/>
+ Continuation passing style</h1>
+</div>
+</div>
+</div>
+<p>This sophisticated technique of arranging recursion allows you to avoid stack consumption by putting all function calls into the tail position with <span class="strong">
+<strong>continuation</strong>
+</span>
+ , that is, a function that performs the remaining computations instead of returning result to the caller. Let me demonstrate this technique by refactoring the <span class="emphasis">
+<em>factorial</em>
+</span>
+ implementation one more time as shown in the following snippet (<code class="literal">Ch7_6.fsx</code>
+ ):</p>
+<pre class="programlisting">let rec ``factorial (cps)`` cont = function 
+  | z when z = 0I -&gt; cont 1I 
+  | n -&gt; ``factorial (cps)`` (fun x -&gt; cont(n * x)) (n - 1I)  
+</pre>
+<p>Although slightly mind-bending, the code consists of all tail calls:</p>
+<div class="itemizedlist">
+<ul class="itemizedlist">
+<li class="listitem">A recursive call to itself <code class="literal">``factorial (cps)``</code>
+ is a tail call</li>
+<li class="listitem">A new continuation anonymous function also makes a tail call to the old continuation, <code class="literal">cont</code>
+</li>
+</ul>
+</div>
+<p>The <code class="literal">cont</code>
+ function has inferred signature of <code class="literal">(BigInteger -&gt; 'a);</code>
+ so, in order to perform the sought-for calculations, using the <code class="literal">id</code>
+ identity function for the <code class="literal">cont</code>
+ as the first argument of <code class="literal">``factorial (cps)``</code>
+ would be just fine. Testing the continuation passing style implementation of <code class="literal">``factorial (cps)``</code>
+ function in FSI is presented in the following screenshot:</p>
+<div class="mediaobject"><img src="Image00034.jpg" alt="Continuation passing style"/>
+<div class="caption">
+<p>Implementing a factorial function with the help of continuation passing style</p>
+</div>
+</div>
+<p style="clear: both; height: 1em;"/>
+<p>This works perfectly, although those of you not already familiar with continuation passing style may develop a headache when dealing with this code for the first time.</p>
+</div>
+
+
+<div class="section" title="Active patterns">
+<div class="titlepage">
+<div>
+<div>
+<h1 class="title"><a id="ch07lvl1sec55"/>
+ Active patterns</h1>
+</div>
+</div>
+</div>
+<p>I promised in <a class="link" title="Chapter 4.  Basic Pattern Matching" href="text00039.html#page">Chapter 4</a>
+ , <span class="emphasis">
+<em>Basic Pattern Matching</em>
+</span>
+ , that I would add to the subject by covering <span class="strong">
+<strong>active patterns</strong>
+</span>
+ ; now is a perfect time. Remember matching with <span class="strong">
+<strong>guards?</strong>
+</span>
+ Guards provide a way to drill down into the matched <code class="literal">pattern-expression</code>
+ function by attaching an arbitrary calculation having the <code class="literal">bool</code>
+ result.</p>
+<p>Guard mechanism adds a certain customization potential to the vanilla pattern matching, but it is kind of detached: regardless of how much data decomposition is required in order to complete the guard calculation, all this effort is discarded for both matching and non-matching possible calculation results. Wouldn't it be nice to have a fully customizable transition between the recognition and transformation phases of pattern matching? Active patterns aim exactly at this matter. Broadly speaking, active patterns represent a special kind of function allowed to be used inside <code class="literal">pattern-expression</code>
+ .</p>
+<p>They allow you to implement some typical patterns of data transformations in a very terse and elegant manner as following:</p>
+<div class="itemizedlist">
+<ul class="itemizedlist">
+<li class="listitem">Advanced transformations between types</li>
+<li class="listitem">Partitioning data into groups by relevant and irrelevant categories</li>
+<li class="listitem">Performing full categorization, in other words, taking any data and processing it according to this piece of data belonging to a specific category out of the couple given</li>
+</ul>
+</div>
+<p>Let's look at how active patterns play with each case of these data processing patterns.</p>
+<div class="section" title="Type transformations with active patterns">
+<div class="titlepage">
+<div>
+<div>
+<h2 class="title" id="toc_1"><a id="ch07lvl2sec86"/>
+ Type transformations with active patterns</h2>
+</div>
+</div>
+</div>
+<p>Active patterns use a special naming convention when being defined within a <code class="literal">let</code>
+ binding:</p>
+<div class="itemizedlist">
+<ul class="itemizedlist">
+<li class="listitem">The name of the active pattern function must begin with a capital letter even if it is a double-ticked like this: <code class="literal">``I'm active pattern``</code>
+</li>
+<li class="listitem">The name of the active pattern function must be wrapped into <span class="emphasis">
+<em>banana clips</em>
+</span>
+ <code class="literal">(|</code>
+ <code class="literal">and</code>
+ <code class="literal">|)</code>
+ as in <code class="literal">(|``Another active pattern``|)</code>
+</li>
+</ul>
+</div>
+<p>The data in which an active pattern works always comes as the last argument in the definition and at the time of its use being taken from the context (<code class="literal">match</code>
+ , <code class="literal">function</code>
+ , or any other F# construction where pattern matching occurs); all but the last arguments in a multi-argument definition are parameters that generalize the active pattern workings.</p>
+<p>Finally, when a literal is used at the place of the last argument, the <code class="literal">pattern-expression</code>
+   is considered matched when the result of the active pattern calculation matches the literal. If a name is used instead of the literal, then this name gets bound to the result of the active pattern calculation to be used in the corresponding <code class="literal">result-expression</code>
+ transformation.</p>
+<p>Does this sound confusing? In fact, it is easier than it may sound. Let me turn to some illustrative samples that might help.</p>
+<p>The first one represents a dummy sample as shown in the following code (<code class="literal">Ch7_7.fsx</code>
+ ):</p>
+<pre class="programlisting">let (|Echo|) x = x 
+let checkEcho p =  
+  match p with 
+  | Echo 42 -&gt; "42!" 
+  | Echo x -&gt; sprintf "%O is not good" x 
+</pre>
+<p>The <code class="literal">Echo</code>
+ active pattern is very minimalistic; it just echoes the input into the result. Then, the <code class="literal">checkEcho</code>
+ function puts this definition to use. In the first <code class="literal">pattern-expression</code>
+ , it simply checks whether the result of the <code class="literal">Echo p</code>
+ calculation (<code class="literal">p</code>
+ is implicitly taken from the head of the <code class="literal">match</code>
+ construction) equals <code class="literal">42</code>
+ . If it does, then the corresponding result expression returns string <code class="literal">"42!"</code>
+ . Otherwise, the next <code class="literal">result-expression</code>
+ is evaluated by unconditionally binding the result of the <code class="literal">Echo p</code>
+ calculation to variable <code class="literal">x</code>
+ , which in turn is used in <code class="literal">result-expression</code>
+ to produce a <code class="literal">"... is not good"</code>
+ string.</p>
+<p>So, when using the preceding sample in FSI, <code class="literal">checkEcho 0</code>
+ produces <code class="literal">"0 is not good"</code>
+ , while <code class="literal">checkEcho 42</code>
+ produces <code class="literal">"42!"</code>
+ .</p>
+<p>Is it getting clearer? Another simple sample reinforcing this understanding would be an active pattern:</p>
+<pre class="programlisting">let (|``I'm active pattern``|) x = x + 2 
+</pre>
+<p>While keeping the same type for the argument and result, this performs just a simple value transformation. The usage of the above active pattern is shown in the following screenshot:</p>
+<div class="mediaobject"><img src="Image00035.jpg" alt="Type transformations with active patterns"/>
+<div class="caption">
+<p>A simple type transformation with an active pattern</p>
+</div>
+</div>
+<p style="clear: both; height: 1em;"/>
+<p>The binding <code class="literal">let (|``I'm active pattern``|) x = x + 2</code>
+ that defines the active pattern does not match anything; instead, it takes the matched value and returns it, adding 2.</p>
+<p>The binding <code class="literal">let x = match 40 with ``I'm active pattern`` x -&gt; x</code>
+ is used as a part of the match construct and given the input argument <code class="literal">40</code>
+ , it returns <code class="literal">x</code>
+ bound to a sum value of <code class="literal">42</code>
+ .</p>
+<p>The binding <code class="literal">let (``I'm active pattern`` x) = 40</code>
+ is a slightly mind boggling example that becomes clear if you remember that the <code class="literal">let</code>
+ binding of a value is a corner case of pattern matching based data disassembling, so <code class="literal">``I'm active pattern``</code>
+ gets applied to input argument <code class="literal">40</code>
+ and binds the result <code class="literal">42</code>
+ to <code class="literal">x</code>
+ .</p>
+<p>At this point, this specific use case of applying active patterns for data transformations should be clear enough; I want to apply it in a more practically sound use case.</p>
+<p>It is a rather widespread technique to use <span class="strong">
+<strong>globally unique identifiers, or GUIDs</strong>
+</span>
+ (<a class="ulink" href="https://en.wikipedia.org/wiki/Globally_unique_identifier">https://en.wikipedia.org/wiki/Globally_unique_identifier</a>
+ ) to label unique entities popping up in the course of running a business. For example, in Jet.com, GUIDs are used to label customer orders, merchant orders, merchant order items, shipping, fulfillment centers, SKUs...the complete list would be too long. These codes are mostly exchanged and displayed as strings of 32 hexadecimal digits. In some nodes of the system, it is required that you validate that a given string is a legitimate representation of a GUID. This task can be easily performed with the help of active patterns as shown here (<code class="literal">Ch7_7.fsx</code>
+ ):</p>
+<pre class="programlisting">let hexCharSet = ['0'..'9'] @ ['a'..'f'] |&gt; set in 
+let (|IsValidGuidCode|) (guidstr: string) = 
+  let (|HasRightSize|) _ = guidstr.Length = 32 
+  let (|IsHex|) _ = (guidstr.ToLower() |&gt; set) = hexCharSet 
+  match () with (HasRightSize rightsize &amp; IsHex hex)-&gt; rightsize &amp;&amp; hex  
+</pre>
+<p>The preceding code has many interesting bits and pieces, such as the set of allowable <code class="literal">hexCharSet</code>
+ hexadecimal characters that are calculated only once and are local to the active pattern <code class="literal">IsValidGuidCode</code>
+ definition; the pair of internal active patterns <code class="literal">HasRightSize</code>
+ and <code class="literal">IsHex</code>
+ , each responsible only for the single verified property and disregarding its own input argument using one from the outer active pattern instead; and finally, the way two <code class="literal">pattern-expressions</code>
+ are combined with <code class="literal">&amp;</code>
+ , again omitting the argument as it is already delivered to their bodies and combining the final result within <code class="literal">result-expression</code>
+ based upon entities distilled in the complementary <code class="literal">pattern-expression</code>
+ . Those of you who fully understand how the preceding snippet works can claim yourselves to be experts on the subject of active patterns.</p>
+<p>To ensure that this code really works, let me perform a quick test drive. The upcoming figure reflects the results of this test, showing that the <code class="literal">IsValidGuidCode</code>
+ active pattern correctly identifies the <code class="literal">"abc"</code>
+ string as an invalid GUID and <code class="literal">"0123456789AbCdEfFFEEDDCCbbAA9988 "</code>
+ as a valid one:</p>
+<div class="mediaobject"><img src="Image00036.jpg" alt="Type transformations with active patterns"/>
+<div class="caption">
+<p>Verifying a GUID string using active patterns</p>
+</div>
+</div>
+<p style="clear: both; height: 1em;"/>
+<p>By the way, active patterns of the (<code class="literal">|active pattern name|</code>
+ ) form that I have covered so far are named <span class="strong">
+<strong>single total active patterns</strong>
+</span>
+ , as they deal with a single data type, transforming it into the same or a different data type by the enclosed calculation. Another peculiarity of considered samples is that all of them were working on a single argument. I will cover <span class="strong">
+<strong>active patterns with parameters</strong>
+</span>
+ later in this chapter.</p>
+</div>
+<div class="section" title="Data partitioning with active patterns">
+<div class="titlepage">
+<div>
+<div>
+<h2 class="title" id="toc_2"><a id="ch07lvl2sec87"/>
+ Data partitioning with active patterns</h2>
+</div>
+</div>
+</div>
+<p>My next foray into F# active patterns use as processing patterns is concerned with the typical practice of having data that may constitute one or more cases suitable for the processing and "just the rest" unsuitable. In the spirit of F#'s ubiquitous use of options active patterns capable of performing the above manner of partitioning transform the input data type into an <code class="literal">Option</code>
+ type, where the <code class="literal">None</code>
+ case represents unsuitable data and <code class="literal">Some</code>
+ wraps one or more types of suitable data.</p>
+<p>The definition of such active patterns is unambiguously distinguishable by having <code class="literal">|_</code>
+ characters prepended to the right-hand side banana clip <code class="literal">|)</code>
+ of the active pattern definition. The active patterns of this type are called <span class="strong">
+<strong>partial active patterns</strong>
+</span>
+ and their name groups look like this: <code class="literal">(|name 1[|name 2...]|_|)</code>
+ . Let's consider a pretty sizeable piece of real code from one of the Jet.com production systems to demonstrate this technique.</p>
+<p>The task at hand is to process the invoices from Jet.com vendors (shipping carriers, payment processors, and others) that package their data in the form of comma-separated files. I use "comma-separated" broadly here, as separators can be any characters. Files may or may not have headers and can carry just a gazillion other irregularities. Uploading these invoices for processing followed by archiving is a problem that carries a certain complexity.</p>
+<p>For the purposes of this chapter, I will take only a partially related problem, namely recognizing whether the last uploaded file is of a known <code class="literal">Processable</code>
+ type and should be processed or whether it is not and should be rejected.</p>
+<p>In order to keep the code implementing the preceding task reasonably short for the purposes of the book, I'll limit the number of vendors to just three, that is, <span class="strong">
+<strong>FedEx</strong>
+</span>
+  and <span class="strong">
+<strong>OnTrac</strong>
+</span>
+ shipping carriers and the <span class="strong">
+<strong>Braintree</strong>
+</span>
+ payment processor.</p>
+<p>I begin with the <code class="literal">Processable</code>
+ here that lists known vendor files as following (<code class="literal">Ch7_8.fsx</code>
+ ):</p>
+<pre class="programlisting">type Processable = 
+| FedexFile 
+| OnTracFile 
+| BrainTreeFile 
+with 
+  override this.ToString() = match this with 
+    | FedexFile -&gt; "Fedex" 
+    | OnTracFile -&gt; "OnTrac" 
+    | BrainTreeFile -&gt; "BrainTree" 
+</pre>
+<p>Nothing fancy here; just a common practice of representing domain entities with discriminated unions, perhaps slightly augmented.</p>
+<p>Next, file headers are hardcoded here and also significantly stripped from the right-hand side as the complete contents do not matter much as shown here (<code class="literal">Ch7_8.fsx</code>
+ ):</p>
+<pre class="programlisting">let BraintreeHdr = "Transaction ID,Subscription ID,..." 
+let FedexHdr = ""Bill to Account Number";"Invoice Date";..." 
+let OntracHdr = "AccountNum,InvoiceNum,Reference,ShipDate,TotalCharge,..." 
+</pre>
+<p>And finally, the active pattern definition is as follows (<code class="literal">Ch7_8.fsx</code>
+ ):</p>
+<pre class="programlisting">let (|IsProcessable|_|) (stream: Stream) = 
+  use streamReader = new StreamReader(stream) 
+  let hdr = streamReader.ReadLine() 
+  [(Processable.BrainTreeFile,BraintreeHdr); 
+  (Processable.FedexFile,FedexHdr); 
+  (Processable.OnTracFile,OntracHdr)] 
+  |&gt; List.tryFind (fun x -&gt; (snd x) = hdr) 
+  |&gt; function 
+  | None -&gt; (if hdr.StartsWith(""1",") then 
+    Some (Processable.OnTracFile) else None) 
+  | _ as zx -&gt; Some (fst zx.Value) 
+</pre>
+<p>The active pattern name, as expected, points to the partial active pattern, the argument is of type <code class="literal">System.IO.Stream</code>
+ carrying the file contents, and its return is of type <code class="literal">Processable</code>
+ option.</p>
+<p>The function first creates <code class="literal">StreamReader</code>
+ and reads the first line from there into the <code class="literal">hdr</code>
+ value.</p>
+<p>Then, it takes a list of tuples, which members perform pairing of <code class="literal">Processable</code>
+ cases with the string literals denoting the corresponding comma-separated file headers and tries to find the element that has the second part of the tuple that is equal to the <code class="literal">hdr</code>
+ . If such exists, then the file can be processed and the function returns option value <code class="literal">Some</code>
+ , wrapping the first part of the found tuple.</p>
+<p>If the element is not found (option value <code class="literal">None</code>
+ case), consider at this point that often <code class="literal">OnTrac</code>
+ files may not carry headers. To exploit this knowledge, I examine a bit more into the already taken stream contents and whether the file begins with some symbols pointing to the <code class="literal">OnTrac</code>
+ origin the active pattern returns <code class="literal">Some (Processable.OnTracFile)</code>
+ ; otherwise, the file is considered non-processable.</p>
+<p>In my opinion, the <code class="literal">IsProcessable</code>
+ active pattern represents quite a terse and clean implementation of the business feature.</p>
+</div>
+<div class="section" title="Data categorization with active patterns">
+<div class="titlepage">
+<div>
+<div>
+<h2 class="title" id="toc_3"><a id="ch07lvl2sec88"/>
+ Data categorization with active patterns</h2>
+</div>
+</div>
+</div>
+<p>I wrap up our journey into the exciting world of F# active patterns with the active pattern type that applies to the processing pattern of <span class="strong">
+<strong>categorization</strong>
+</span>
+ , or partitioning the data into the entirety of subcategories that completely cover the domain entity, not leaving any space for non-applicable outliers.</p>
+<p>As some of you may have already deducted, the name associated with this active pattern is <span class="strong">
+<strong>multicase active pattern</strong>
+</span>
+ . Its syntactic definition is also very distinguishable from the already considered cases. It has contained between the banana clips just few case names separated from each other by <code class="literal">|</code>
+ pipe symbols.</p>
+<p>Let's delve into the illustrative sample. An e-commerce domain operating with payments considers different payment terms and policies. In particular, if the payment terms are not immediate, it make sense to introduce a certain policy or policies concerned with determining when each particular payment is due. Hence, given the date on which a service or merchandise was supplied, the corresponding payment is due or not due depends on the amount of time passed from that date to now.</p>
+<p>The implementation using active patterns is very straightforward; just for simplicity, let's assume that the business has adopted a single policy of postponing the payments for no more than three days (certainly, the policy can be a subject of parameterization in a more sophisticated design) as shown here (<code class="literal">Ch7_9.fsx</code>
+ ):</p>
+<pre class="programlisting">open System 
+ 
+let (|Recent|Due|) (dt: DateTimeOffset) = 
+  if DateTimeOffset.Now.AddDays(-3.0) &lt;= dt then Recent 
+  else Due 
+ 
+let isDue = function 
+| Recent -&gt; printfn "don't do anything" 
+| Due  -&gt; printfn "time to pay this one" 
+</pre>
+<p>The function using the active pattern is also pretty simple, but this is OK for the purpose of illustration. The preceding code is presented in the following figure:</p>
+<div class="mediaobject"><img src="Image00037.jpg" alt="Data categorization with active patterns"/>
+<div class="caption">
+<p>Multi-case active patterns for data categorization</p>
+</div>
+</div>
+<p style="clear: both; height: 1em;"/>
+<p>I forgot to mention that the maximal number of cases in F# 4.0 multicase active patterns as of today is limited to 7, which may be the limiting factor in using active patterns in some cases.</p>
+</div>
+</div>
+
+
+<div class="section" title="Summary">
+<div class="titlepage">
+<div>
+<div>
+<h1 class="title"><a id="ch07lvl1sec56"/>
+ Summary</h1>
+</div>
+</div>
+</div>
+<p>This chapter was quite a long field trip into relatively advanced F# idioms that an average F# developer uses in the course of a work day quite frequently.</p>
+<p>The next chapter will cover even more widely used language patterns playing the central role in data crunching, with F# demonstrating polymorphic behavior for multiple data collection types.</p>
+</div>
+</body></html>

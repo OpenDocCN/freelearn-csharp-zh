@@ -1,0 +1,1252 @@
+<html><head></head><body><div class="chapter" title="Chapter&#xA0;7.&#xA0; Building a File Storage Application"><div class="titlepage"><div><div><h1 class="title"><a id="ch07"/>Chapter 7.  Building a File Storage Application </h1></div></div></div><p>In this chapter, we will walk through advanced development with <code class="literal">Xamarin.Forms</code>. We take a look at the use of Behaviors on UI elements. Then we will build a custom layout using the <code class="literal">Layout &lt;View&gt;</code> framework. We will also build our first SQLite database for storing text files. The following topics will be covered in this chapter: </p><p>Expected knowledge:</p><div class="itemizedlist"><ul class="itemizedlist"><li class="listitem" style="list-style-type: disc">Basic Xamarin.Forms</li><li class="listitem" style="list-style-type: disc">XAML</li><li class="listitem" style="list-style-type: disc">MVVM</li><li class="listitem" style="list-style-type: disc">SQL</li><li class="listitem" style="list-style-type: disc">C# threading</li></ul></div><p>In this chapter, you will learn the following:</p><div class="itemizedlist"><ul class="itemizedlist"><li class="listitem" style="list-style-type: disc">Project structure setup</li><li class="listitem" style="list-style-type: disc">Building a data access layer using SQLite</li><li class="listitem" style="list-style-type: disc">Building the ISQLiteStorage interface</li><li class="listitem" style="list-style-type: disc">Additional threading techniques</li><li class="listitem" style="list-style-type: disc">Creating the AsyncSemaphore</li><li class="listitem" style="list-style-type: disc">Creating the AsyncLock</li><li class="listitem" style="list-style-type: disc">Implementing native setup requirements for SQLite</li><li class="listitem" style="list-style-type: disc">Implementing the IoC container and modules</li><li class="listitem" style="list-style-type: disc">Implementing cross-platform logging</li><li class="listitem" style="list-style-type: disc">Implementing the SQLiteStorage class</li><li class="listitem" style="list-style-type: disc">Introduction to C# 6.0 syntax</li><li class="listitem" style="list-style-type: disc">Handling alerts in view-models</li><li class="listitem" style="list-style-type: disc">Building the IMethods interface</li><li class="listitem" style="list-style-type: disc">Building the ExtendedContentPage</li><li class="listitem" style="list-style-type: disc">Building a CarouselView using custom layouts</li><li class="listitem" style="list-style-type: disc">Adding scroll control to the CarouselView</li><li class="listitem" style="list-style-type: disc">Building a CustomRenderer for native gestures</li><li class="listitem" style="list-style-type: disc">Building the user interface</li><li class="listitem" style="list-style-type: disc">Using a SynchronizationContext</li><li class="listitem" style="list-style-type: disc">Building the EditFilePage</li><li class="listitem" style="list-style-type: disc">Challenge</li><li class="listitem" style="list-style-type: disc">Building the Windows Phone version</li></ul></div><div class="section" title="Project structure setup"><div class="titlepage"><div><div><h1 class="title"><a id="ch07lvl1sec101"/>Project structure setup</h1></div></div></div><p>Let's begin by creating a new <code class="literal">Xamarin.Forms</code> project. Select <span class="strong"><strong>File</strong></span> | <span class="strong"><strong>New</strong></span> | <span class="strong"><strong>Solution</strong></span> and create a new <span class="strong"><strong>Forms App</strong></span>, as shown in the following screenshot<span class="strong"><strong>:</strong></span></p><div class="mediaobject"><img src="graphics/B05293_07_01.jpg" alt="Project structure setup"/></div><p>Call the project <code class="literal">FileStorage</code>. Once the project is created, create another portable class library called <code class="literal">FileStorage.Portable</code>, as shown in the following screenshot:</p><div class="mediaobject"><img src="graphics/B05293_07_02.jpg" alt="Project structure setup"/></div><p>We are going to start at the lower level and work upwards to native projects.</p></div></div>
+<div class="section" title="Building a data access layer using SQLite"><div class="titlepage"><div><div><h1 class="title"><a id="ch07lvl1sec102"/>Building a data access layer using SQLite</h1></div></div></div><p>In the previous chapter, we focused on project architecture and we discussed the concepts one layer for data access this is where our database layer sits. Our data access layer is where we will be storing local text files.</p><p>SQLite is the most commonly used database framework for mobiles. It is an in-process library that implements a self-contained, serverless, zero-configuration, transactional SQL database engine, and is free to use.</p><div class="note" title="Note" style=""><div class="inner"><h3 class="title"><a id="note100"/>Note</h3><p>There are other frameworks that Xamarin supports such as ADO.NET and Realm, but it has been proven that SQLite is the most efficient database layer.</p></div></div><p>The first step in the setup process is to add the following SQLite NuGet packages in our <code class="literal">FileStorage.Portable</code> project:</p><div class="itemizedlist"><ul class="itemizedlist"><li class="listitem" style="list-style-type: disc"><code class="literal">SQLite.Net.Async-PCL</code></li><li class="listitem" style="list-style-type: disc"><code class="literal">SQLite.Net.Core-PCL</code></li><li class="listitem" style="list-style-type: disc"><code class="literal">SQLite.Net-PCL</code></li></ul></div><p>Once you add these in your packages, they should look like the following:</p><div class="mediaobject"><img src="graphics/B05293_07_03.jpg" alt="Building a data access layer using SQLite"/></div><p>The next step is to add a new folder called <code class="literal">DataAccess</code>. Inside this folder, create two subfolders called <code class="literal">Storable</code> and <code class="literal">Storage</code>. Inside the <code class="literal">Storable</code> folder, add a new file called <code class="literal">IStorable.cs</code> and implement the following:</p><pre class="programlisting">public interface IStorable
+    {
+       string Key { get; set; }
+    }</pre><p>This will be the interface for every object type stored in the database. In the preceding example, we are only going to have one storable, and each storable must have a string property called <code class="literal">Key</code>. This property will be used as the primary key for each database table.</p><p>Create another file in the <code class="literal">Storable</code> folder called <code class="literal">FileStorable.cs</code> and implement the following:</p><pre class="programlisting">public class FileStorable : IStorable
+    {
+        #region Public Properties
+        [PrimaryKey] public string Key { get; set; }
+        public string Contents { get; set; }
+        #endregion 
+    }</pre><p>The <code class="literal">FileStorable</code> object will be used as the data model for the file storable table in the database. In SQLite, during the setup of the database, tables are created from objects using the following:</p><pre class="programlisting">CreateTable&lt;FileStorable&gt;(CancellationToken.None);</pre><p>The <code class="literal">FileStorable</code> object we pass as the type to the <code class="literal">CreateTable</code> function is used to map columns in the table.</p></div>
+<div class="section" title="Building the ISQLiteStorage interface"><div class="titlepage"><div><div><h1 class="title"><a id="ch07lvl1sec103"/>Building the ISQLiteStorage interface</h1></div></div></div><p>Now we must set up another class, which  will be used to control the queries performed on the database. Add a new file called <code class="literal">ISQLiteStorage.cs</code> into the <code class="literal">Storage</code> folder and implement the following:</p><pre class="programlisting">public interface ISQLiteStorage
+    {
+         void CreateSQLiteAsyncConnection();
+         Task CreateTable&lt;T&gt;(CancellationToken token) where T : class, IStorable, new();
+         Task InsertObject&lt;T&gt;(T item, CancellationToken token) where T : class, IStorable, new();
+         Task&lt;IList&lt;T&gt;&gt; GetTable&lt;T&gt;(CancellationToken token) where T : class, IStorable, new();
+         Task&lt;T&gt; GetObject&lt;T&gt;(string key, CancellationToken token) where T : class, IStorable, new();
+         Task ClearTable&lt;T&gt;(CancellationToken token) where T : class, IStorable, new();
+         Task DeleteObjectByKey&lt;T&gt;(string key, CancellationToken token) where T : class, IStorable, new();
+         void CloseConnection();
+    }</pre><p>The preceding interface defines all the functions that will be executed on the database. The advantage of using SQLite is that it performs all processing asynchronously, so every function that executes an SQL query returns a task. If you look closely at the <code class="literal">InsertObject</code> and <code class="literal">DeleteObjectByKey</code> functions, these require a type, meaning that we can execute queries to specific tables using types.</p></div>
+<div class="section" title="Adding additional threading techniques"><div class="titlepage"><div><div><h1 class="title"><a id="ch07lvl1sec104"/>Adding additional threading techniques</h1></div></div></div><p>This is where we will add some finesse with a common threading approach known as <span class="strong"><strong>asynchronous locking</strong></span>. Since there will only be one instance of the <span class="strong"><strong>SQLiteStorage</strong></span> object, this means we have the possibility of a race condition as multiple threads can make changes to the same database connection at the same time.</p><div class="note" title="Note" style=""><div class="inner"><h3 class="title"><a id="tip101"/>Tip</h3><p>Race conditions are a common threading issue where multiple threads try to perform operations at the same time on shared data.</p></div></div><div class="section" title="How do we solve this problem?"><div class="titlepage"><div><div><h2 class="title"><a id="ch07lvl2sec52"/>How do we solve this problem?</h2></div></div></div><p>Locking is the most common C# approach for restricting shared resources between multiple threads. In order to avoid this situation, we create an object for locking as follows:</p><pre class="programlisting">private Object lockObject = new Object();</pre><p>Then, to restrict code blocks to one thread at any one time, we do the following:</p><pre class="programlisting">lock (thisLock)
+        {
+            ...
+        }</pre><p>This is the perfect approach when our code is synchronous. The problem we have is our SQLite implementation is asynchronous, and the restriction with basic locking is we cannot execute asynchronous code inside a lock statement. This is where we have to implement the async-lock pattern.</p></div></div>
+<div class="section" title="Creating the AsyncSemaphore"><div class="titlepage"><div><div><h1 class="title"><a id="ch07lvl1sec105"/>Creating the AsyncSemaphore</h1></div></div></div><p>Let's add a new folder called <code class="literal">Threading</code> to the <code class="literal">FileStorage.Portable</code> project. Inside this folder, we are going to add a new file called <code class="literal">AsyncSemaphore.cs</code> and implement the first part as follows:</p><pre class="programlisting">public class AsyncSemaphore
+    {
+        private readonly static Task s_completed = Task.FromResult(true);
+        private readonly Queue&lt;TaskCompletionSource&lt;bool&gt;&gt; m_waiters = new Queue&lt;TaskCompletionSource&lt;bool&gt;&gt;();
+        private int m_currentCount;
+        public AsyncSemaphore(int initialCount)
+        {
+           if (initialCount &lt; 0) throw new ArgumentOutOfRangeException("initialCount");
+           m_currentCount = initialCount; 
+        }
+        public Task WaitAsync()
+        {
+           lock (m_waiters)
+            {
+               if (m_currentCount &gt; 0)
+                 {
+                    --m_currentCount;
+                    return s_completed;
+                 }
+               else
+                {
+                   var waiter = new TaskCompletionSource&lt;bool&gt;();
+                   m_waiters.Enqueue(waiter); return waiter.Task;
+                }
+         }
+      }
+}</pre><div class="note" title="Note" style=""><div class="inner"><h3 class="title"><a id="note102"/>Note</h3><p>A <code class="literal">SemaphoreSlim</code> object is used to limit the number of threads that can access a resource.</p></div></div><p>The <code class="literal">AsyncSemaphore</code> keeps a count (the <code class="literal">m_count</code> property), which is the number of open <span class="emphasis"><em>slots</em></span> it has available to satisfy waiters.</p><p>The <code class="literal">Task</code> returned from the <code class="literal">WaitAsync</code> function (the static <code class="literal">s_completed</code> property) will enter the completed state when the <code class="literal">AsyncSemaphore</code> has given it an available slot. That same <code class="literal">Task</code> will enter the <code class="literal">Canceled</code> state if the <code class="literal">CancellationToken</code> is signaled before the wait is satisfied; in that case, the <code class="literal">AsyncSemaphore</code> does not lose a slot.</p><div class="note" title="Note" style=""><div class="inner"><h3 class="title"><a id="note103"/>Note</h3><p>A waiter is simply a <code class="literal">TaskCompletionSource</code> of type bool. It contains a <code class="literal">Task</code>, which is the operation to be performed by a single thread.</p></div></div></div>
+<div class="section" title="Creating the AsyncLock"><div class="titlepage"><div><div><h1 class="title"><a id="ch07lvl1sec106"/>Creating the AsyncLock</h1></div></div></div><p>Now that we have built the <code class="literal">AsyncSemaphore</code> class, we will use this object inside the <code class="literal">AsyncLock</code> object. Let's add a new file called <code class="literal">AsyncLock.cs</code> into the <code class="literal">Threading</code> folder and implement the following:</p><pre class="programlisting">public class AsyncLock
+    {
+        private readonly AsyncSemaphore m_semaphore;
+        private readonly Task&lt;Releaser&gt; m_releaser;
+        public AsyncLock()
+          {
+              m_semaphore = new AsyncSemaphore(1);
+              m_releaser = Task.FromResult(new Releaser(this));
+          }
+        public Task&lt;Releaser&gt; LockAsync()
+         {
+              var wait = m_semaphore.WaitAsync();
+              return wait.IsCompleted ?
+              m_releaser :
+              wait.ContinueWith((_, state) =&gt;
+              new Releaser((AsyncLock)state),
+                this, CancellationToken.None,
+                TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+     }
+       public struct Releaser : IDisposable
+         {
+             private readonly AsyncLock m_toRelease;
+             internal Releaser(AsyncLock toRelease) { m_toRelease = toRelease; }
+             public void Dispose()
+               {
+                   if (m_toRelease != null)
+                       m_toRelease.m_semaphore.Release();
+               }
+        }
+  }</pre><p>The <code class="literal">AsyncLock</code> class uses the <code class="literal">AsyncSemaphore</code> to ensure that only one thread at any one time has access to the bounded code block after the <code class="literal">LockAsync</code> function. The lock can be acquired asynchronously by calling <code class="literal">LockAsync</code>, and it is released by disposing the result of that task. The <code class="literal">AsyncLock</code> takes an optional <code class="literal">CancellationToken</code>, which can be used to cancel the acquiring of the lock.</p><p>The <code class="literal">Task</code> returned from the <code class="literal">LockAsync</code> function will enter the <code class="literal">Completed</code> state when it has acquired the <code class="literal">AsyncLock</code>. That same <code class="literal">Task</code> will enter the Canceled state if the <code class="literal">CancellationToken</code> is signaled before the wait is satisfied; in that case, the <code class="literal">AsyncLock</code> is not taken by that task.</p><p>Now let's get back to implementing the <code class="literal">SQLiteStorage</code> class; this is where we are going to implement the async-lock pattern.</p></div>
+<div class="section" title="Implementing native setup requirements for SQLite"><div class="titlepage"><div><div><h1 class="title"><a id="ch07lvl1sec107"/>Implementing native setup requirements for SQLite</h1></div></div></div><p>Our next step is to add the final setup requirements. Each device platform has a specific framework that it must use when setting up the connection to the local database. This means we are going to add another dependency-injected interface to set these native side requirements.</p><p>Add a new file called <code class="literal">ISqliteSetup.cs</code> to the <code class="literal">Storage</code> folder and implement the following:</p><pre class="programlisting">public interface ISQLiteSetup
+    {
+       string DatabasePath { get; set; }
+       ISQLitePlatform Platform { get; set; }
+    }</pre><p>Before we implement this class in the platform projects, we need to add the following SQLite NuGet packages for all platform projects:</p><div class="itemizedlist"><ul class="itemizedlist"><li class="listitem" style="list-style-type: disc"><code class="literal">SQLite.Net.Async-PCL</code></li><li class="listitem" style="list-style-type: disc"><code class="literal">SQLite.Net.Core-PCL</code></li><li class="listitem" style="list-style-type: disc"><code class="literal">SQLite.Net-PCL</code></li></ul></div><p>Now let's turn our attention to the iOS project. Add a new folder called <code class="literal">DataAccess</code>, add in a new file called <code class="literal">SQLiteSetup.cs</code>, and implement the following:</p><pre class="programlisting">public class SQLiteSetup : ISQLiteSetup
+    { 
+        public string DatabasePath { get; set; }
+        public ISQLitePlatform Platform { get; set; }
+        public SQLiteSetup(ISQLitePlatform platform)
+          {
+              DatabasePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Personal), "filestorage.db3");;
+              Platform = platform; 
+          }
+    }</pre><p>The main property that we need to focus on is <code class="literal">ISQLitePlatform</code>. This comes from the <code class="literal">SQLite.Net.Interop</code> library. We will be registering this item inside an IoC container as we will need this instance down in the portable project when we create a connection to the database.</p><p>Before we go any further, we need to set up the IoC container with Autofac.</p></div>
+<div class="section" title="Implementing the IoC container and modules"><div class="titlepage"><div><div><h1 class="title"><a id="ch07lvl1sec108"/>Implementing the IoC container and modules</h1></div></div></div><p>Just like our last projects, we are going to set up another IoC container using Autofac. Let's first add the Autofac nuget packages to all projects in the solution. We can then copy the <code class="literal">IoC</code> folder from the <code class="literal">Stocklist.Portable</code> project in <a class="link" href="ch05.html" title="Chapter 5. Building a Stocklist Application">Chapter 5</a>,<span class="emphasis"><em> Building a Stocklist Application</em></span>. Make sure you include both the <code class="literal">IoC.cs</code> and <code class="literal">IModule.cs</code> files.</p><p>Now let's hop over to the native projects, add the <code class="literal">Modules</code> folder in the iOS and Android projects, and implement <code class="literal">IOSModule.cs</code> and <code class="literal">DroidModule.cs</code>:</p><pre class="programlisting">public class IOSModule : IModule 
+    { 
+        #region Public Methods
+        public void Register(ContainerBuilder builder)
+        {
+           builder.RegisterType&lt;SQLiteSetup&gt;().As&lt;ISQLiteSetup&gt;().SingleInstance();
+           builder.RegisterType&lt;SQLitePlatformIOS&gt;().As&lt;ISQLitePlatform&gt;().SingleInstance();
+        }
+        #endregion 
+    }</pre><p>and the DroidModule,</p><pre class="programlisting">public class DroidModule : IModule
+    {
+        #region Public Methods
+        public void Register(ContainerBuilder builder) 
+        {
+            builder.RegisterType&lt;SQLiteSetup&gt;().As&lt;ISQLiteSetup&gt;().SingleInstance();
+            builder.RegisterType&lt;SQLitePlatformAndroid&gt;().As&lt;ISQLitePlatform&gt;().SingleInstance();
+        }
+    #endregion 
+}</pre><div class="note" title="Note" style=""><div class="inner"><h3 class="title"><a id="note104"/>Note</h3><p><span class="strong"><strong>Notice how quick we are piecing things together?</strong></span></p><p>When you have the right direction in building cross-platform applications, the complexity of multiple platform support should not be an issue.</p></div></div><p>Inside both of the aforementioned modules we are registering the <code class="literal">SQLiteSetup</code> and <code class="literal">SQLitePlatformIOS/Droid</code> objects so the <code class="literal">SQLiteStorage</code> implementation can use these items inside the <code class="literal">FileStorage.Portable</code> project.</p><p>Before we get back to finishing off the <code class="literal">SQLiteStorage</code> implementation, we are going to set up a useful logging approach that can be used in all cross-platform applications.</p></div>
+<div class="section" title="Implementing cross-platform logging"><div class="titlepage"><div><div><h1 class="title"><a id="ch07lvl1sec109"/>Implementing cross-platform logging</h1></div></div></div><p>Now that we have our IoC container, we are going to use dependency injection for logging. Adding customized logging features in cross-platform applications is very useful for tracking operations between all of the different projects. The first step is to add a new folder called <code class="literal">Logging</code>, add a new file called <code class="literal">ILogger.cs</code>, and implement the following:</p><pre class="programlisting">public interface ILogger 
+    { 
+        #region Methods
+        void WriteLine(string message);
+        void WriteLineTime(string message, params object[] args);
+        #endregion 
+    }</pre><p>For this example, our logger is going to use the standard <code class="literal">Debug</code> console from <code class="literal">System.Diagnostics</code> with iOS, but in Android we are going to use the extensive logging functionality provided by Android.</p><p>Now let's add the <code class="literal">Logging</code> folder in both iOS and Android and implement the following:</p><pre class="programlisting">public class LoggeriOS : ILogger 
+    { 
+        #region Public Methods
+        public void WriteLine(string text) 
+        { 
+            Debug.WriteLine(text);
+        }
+        public void WriteLineTime(string text, params object[] args)
+        {
+            Debug.WriteLine(DateTime.Now.Ticks + " " + String.Format(text, args));
+        }
+        #endregion
+    }</pre><p>Nothing too flash with iOS logging, but we have an extra output line for logging statements with current time.</p><p>Now, for the Android implementation, we are going to use native logging from the <code class="literal">Android.Util</code> library:</p><pre class="programlisting">public class LoggerDroid : ILogger
+    {
+        #region Public Methods
+        public void WriteLine(string text)
+        { 
+            Log.WriteLine(LogPriority.Info, text, null);
+        }
+        public void WriteLineTime(string text, params object[] args)
+        { 
+            Log.WriteLine(LogPriority.Info, DateTime.Now.Ticks + " " + 
+            String.Format(text, args), null);
+        }
+        #endregion 
+    }</pre><p>In the <code class="literal">Log</code> object from the <code class="literal">Android.Util</code> library, we have the option to specify priorities (<code class="literal">info</code>, <code class="literal">debug</code>, <code class="literal">error</code>). The more we can dig into the specifics of what we want the application to spit out, the better we can track exactly what is happening under the hood.</p><p>Excellent! Now let's get back to building the <code class="literal">SQLiteStorage</code> implementation.</p></div>
+<div class="section" title="Implementing the SQLiteStorage class"><div class="titlepage"><div><div><h1 class="title"><a id="ch07lvl1sec110"/>Implementing the SQLiteStorage class</h1></div></div></div><p>Now back to the <code class="literal">FileStorage.Portable</code> project. Let's add another file into the <code class="literal">Storage</code> folder called <code class="literal">SQLiteStorage.cs</code> and implement the <code class="literal">private</code> variables:</p><pre class="programlisting">public class SQLiteStorage : ISQLiteStorage 
+    {
+        #region Private Properties
+        private readonly AsyncLock asyncLock = new AsyncLock();
+        private readonly object lockObject = new object();
+        private SQLiteConnectionWithLock _conn;
+        private SQLiteAsyncConnection _dbAsyncConn;
+        private readonly ISQLitePlatform _sqlitePlatform;
+        private string _dbPath;
+        private readonly ILogger _log;
+        private readonly string _tag;
+        #endregion
+    }</pre><p>We have a private <code class="literal">AsyncLock</code> object as we will be doing synchronous and asynchronous locking implementations. We then have two SQLite objects for creating the connection to our local database. The <code class="literal">_dbPath</code> variable is used to hold the local database path; this will be used for setting up the connection. We also have our dependency service interface <code class="literal">ILogger</code> and another string for tagging the current object. Tagging is useful with logging as it tells the logger what class is logging.</p></div>
+<div class="section" title="Introduction to C# 6.0 syntax"><div class="titlepage"><div><div><h1 class="title"><a id="ch07lvl1sec111"/>Introduction to C# 6.0 syntax</h1></div></div></div><p>Now let's add in the constructor as follows:</p><pre class="programlisting">public SQLiteStorage(ISQLiteSetup sqliteSetup, ILogger log) 
+    {
+         _dbPath = sqliteSetup?.DatabasePath;
+         _sqlitePlatform = sqliteSetup?.Platform;
+         _log = log; _tag = $"{GetType()} ";
+    }</pre><p>Here we can see some C# 6.0 syntax. Using the question mark (<code class="literal">?</code>) after the constructor parameter <code class="literal">sqliteSetup</code> means that, if the object is not null, we can access the property. This avoids having to create an <code class="literal">if</code> statement such as the following:</p><pre class="programlisting">If (sqliteSetup != null)
+    _dbPath = sqliteSetup?.DatabasePath;</pre><p>There is also some more C# 6.0 syntax with the following:</p><pre class="programlisting">_tag = $"{GetType()} ";</pre><p>The dollar sign (<code class="literal">$</code>) character is used for interpolated strings. Interpolated string expressions create a string by replacing the contained expressions with the <code class="literal">ToString</code> representations of the expressions' results.</p><p>Look more closely at the items we are assigning. We are using the <code class="literal">SQLiteSetup</code> object to set the database path and SQLite platform properties.</p><p>Let's add our first two methods:</p><pre class="programlisting">public void CreateSQLiteAsyncConnection() 
+    { 
+        var connectionFactory = new Func&lt;SQLiteConnectionWithLock&gt;(() =&gt;
+        {
+            if (_conn == null)
+            {
+                _conn = new SQLiteConnectionWithLock(_sqlitePlatform, new SQLiteConnectionString(_dbPath, true));
+            }
+            return _conn;
+        });
+        _dbAsyncConn = new SQLiteAsyncConnection(connectionFactory);
+     }
+        public async Task CreateTable&lt;T&gt;(CancellationToken token) where T : class, IStorable, new()
+        {
+             using (var releaser = await asyncLock.LockAsync())
+             {
+                 await _dbAsyncConn.CreateTableAsync&lt;T&gt;(token);
+             }
+        }</pre><p>The <code class="literal">CreateSQLiteAsyncConnection</code> function creates a new <code class="literal">Func</code> of type <code class="literal">SQLiteConnectionWithLock</code>, we use this <code class="literal">Func</code> to instantiate a new <code class="literal">SQLiteAsyncConnection</code>. The <code class="literal">Func</code> checks if we have already created a connection to the database. If we haven't yet established this connection, it will create a new instance of the <code class="literal">SQLiteConnectionWithLock</code> object and pass in the database path and platform we retrieved from the <code class="literal">SQLSetup object</code>.</p><p>In the <code class="literal">CreateTable</code> function, we will take our first look at the async-lock pattern. The great thing about the <code class="literal">AsyncLock</code> object is that we can contain the await inside a <code class="literal">using</code> statement. When one thread is creating a table on the one instance of the <code class="literal">SQLiteAsyncConnection</code>, another thread will have to wait at the using line until the previous thread has finished creating the table.</p><p>Our next function is <code class="literal">GetTable</code>. This will use the async-lock pattern again to make sure that only one thread is querying the database at any one time. This function will perform a standard SQL query for selecting all the items of a table:</p><pre class="programlisting">
+<span class="strong"><strong>SELECT * FROM {TableName};</strong></span>
+</pre><p>The table will be determined by the type <code class="literal">T</code> passed, and the result received from the database will be all the table's items as an <code class="literal">IEnumerable</code> of type <code class="literal">T</code>:</p><pre class="programlisting">public async Task&lt;IList&lt;T&gt;&gt; GetTable&lt;T&gt;(CancellationToken token) where T : class, IStorable, new()
+    { 
+        var items = default(IList&lt;T&gt;);
+        using (var releaser = await asyncLock.LockAsync()) 
+        {
+            try
+            { 
+                items = await _dbAsyncConn.QueryAsync&lt;T&gt;(string.Format("SELECT * FROM {0};", typeof(T).Name));
+            }
+            catch (Exception error)
+            {
+                var location = string.Format("GetTable&lt;T&gt;() Failed to 'SELECT *' from table {0}.", typeof(T).Name);
+                _log.WriteLineTime(_tag + "\n" + location + "\n" + "ErrorMessage: \n" + error.Message + "\n" + "Stacktrace: \n " + error.StackTrace);
+             }
+        }
+        return items; 
+    }</pre><p>Notice how we are catching any exception that may occur in this query?</p><p>We are building a location string to pinpoint the exact location in our application where the exception is coming from. Then we use our <code class="literal">ILogger</code> implementation to route the custom-built exception string to the specific native output console.</p><p>Next we have the <code class="literal">InsertObject</code> function. This will be responsible for adding a new item to the correct table in the database. We will also make use of the async-lock pattern to lock the connection from being accessed while an insertion is taking place:</p><pre class="programlisting">public async Task InsertObject&lt;T&gt;(T item, CancellationToken token) where T : class, IStorable, new()
+   { 
+        using (var releaser = await asyncLock.LockAsync())
+        { 
+            try
+            {
+                var insertOrReplaceQuery = item.CreateInsertOrReplaceQuery();
+                await _dbAsyncConn.QueryAsync&lt;T&gt;(insertOrReplaceQuery);
+            }
+           catch (Exception error)
+           {
+               var location = string.Format("InsertObject&lt;T&gt;() Failed to insert 
+               or replace object with key {0}.", item.Key);
+               _log.WriteLineTime(_tag + "\n" + location + "\n" + "ErrorMessage: 
+               \n" + error.Message + "\n" + "Stacktrace: \n " + 
+               error.StackTrace);
+           }
+      }
+   }</pre><p>Notice the <code class="literal">CreateInsertOrReplaceQuery</code> function?</p><p>We are going to add an extension class to the <code class="literal">IStorable</code> interface. Add a new file called <code class="literal">StorableExtensions.cs</code> to the location <span class="strong"><strong>DataAccess</strong></span><span class="strong"><strong>| Storable</strong></span> in the <code class="literal">FileStorage.Portable</code> project and implement the following:</p><pre class="programlisting">public static class StorableExtensions
+    {
+        #region Public Methods
+        public static string CreateInsertOrReplaceQuery(this IStorable storable)
+        {
+           var properties = storable.GetType().GetRuntimeProperties();
+           var tableName = storable.GetType().Name;
+           string propertiesString = "";
+           string propertyValuesString = "";
+           var index = 0;
+           foreach (var property in properties) 
+           { 
+              propertiesString += (index == (properties.Count() - 1)) ?
+              property.Name : property.Name + ", ";
+              var value = property.GetValue(storable);
+              var valueString = value == null ? "null" : value is bool ? "'"
+              + ((bool)value ? 1 : 0) + "'" : "'" + value + "'";
+             // if data is serialized if (property.Name.Equals("Data") &amp;&amp; 
+             !valueString.Equals("null"))
+             {
+                 valueString = valueString.Replace(""", """); 
+             }
+             propertyValuesString += valueString + 
+             ((index == (properties.Count() - 1)) ? string.Empty : ", ");
+             index++;
+          }
+             return string.Format("INSERT OR REPLACE INTO {0}({1})
+             VALUES ({2});", tableName, propetiesString, propertyValuesString);
+       }
+        #endregion
+    }</pre><p>The preceding function is clever enough to build an insert and replace query out of any item that inherits the <code class="literal">IStorable</code> interface. It uses the <code class="literal">System.Reflection</code> library to retrieve all properties of an <code class="literal">IStorable</code> object using the <code class="literal">GetRuntimeProperties</code> function. We then iterate through all properties and build a query according to the following syntax:</p><pre class="programlisting">    INSERT OR REPLACE INTO names (prop1, prop2, ...) VALUES (val1, val2, ...)
+</pre><div class="note" title="Note" style=""><div class="inner"><h3 class="title"><a id="tip105"/>Tip</h3><p>If we didn't have the <code class="literal">PrimaryKey</code> attribute set on the <code class="literal">Key</code> property in the <code class="literal">FileStorable</code> class, the update would not work and a new item would be added every time.</p></div></div><p>Now for the <code class="literal">DeleteObjectByKey</code> function. This will be used to delete an item from a table using the <code class="literal">Key</code> property from the <code class="literal">IStorable</code> interface:</p><pre class="programlisting">public async Task DeleteObjectByKey&lt;T&gt;(string key, CancellationToken token) where T : class, IStorable, new()
+    { 
+        using (var releaser = await asyncLock.LockAsync()) 
+          {
+            try
+            {
+                await _dbAsyncConn.QueryAsync&lt;T&gt;(string.Format("DELETE FROM {0} WHERE Key='{1}';", typeof(T).Name, key));
+             }
+            catch (Exception error)
+             {
+                 var location = string.Format("DeleteObjectByKey&lt;T&gt;() Failed to 
+                 delete object from key {0}.", key);
+                 _log.WriteLineTime(_tag + "\n" + location + "\n" + 
+                 "ErrorMessage: \n" + error.Message + "\n" + "Stacktrace: \n " + 
+                 error.StackTrace);
+             }
+          }
+     }</pre><p>Fantastic! SQLite has been set up and integrated with the async-lock pattern to make it thread-safe. Our final step is to add the <code class="literal">PortableModule</code> for the IoC container and register the <code class="literal">SqliteStorage</code> class.</p><p>Inside the <code class="literal">FireStorable.Portable</code> project, create a new folder called <code class="literal">Modules</code>, add in a new file called <code class="literal">PortableModule.cs</code>, and implement the following:</p><pre class="programlisting">public class PortableModule : IModule
+    {
+         #region Public Methods
+         public void Register(ContainerBuilder builder)
+          {
+              builder.RegisterType&lt;SQLiteStorage&gt;().As&lt;ISQLiteStorage&gt;().SingleInstance();
+          }
+         #endregion
+    }</pre><p>Now we can start with the user interface layer and begin building some custom UI objects.</p></div>
+<div class="section" title="Handling alerts in view-models"><div class="titlepage"><div><div><h1 class="title"><a id="ch07lvl1sec112"/>Handling alerts in view-models</h1></div></div></div><p>Handling alerts via view-models is important as we handle many errors via <code class="literal">try/catch</code> statements. To respond to these errors, we want to display an alert dialog showing the error message to the user. There are two ways we are going to do this:</p><div class="itemizedlist"><ul class="itemizedlist"><li class="listitem" style="list-style-type: disc">Using an <code class="literal">EventHandler</code> for pushing events to the current page so that we can call the <code class="literal">DisplayAlert</code> function with different messages</li><li class="listitem" style="list-style-type: disc">Using an interface for dependency injection where we will implement native alerts</li></ul></div><p>Our first step is to add the <code class="literal">ViewModelBase</code> class; this is where alerts will be fired from.</p><p>Create a new folder in the <code class="literal">FileStorage.Portable</code> project called <code class="literal">ViewModels</code>, add a new file called <code class="literal">ViewModelBase.cs</code>, and implement the following:</p><pre class="programlisting">public class ViewModelBase : INotifyPropertyChanged 
+    {
+        #region Public Events
+          public event PropertyChangedEventHandler PropertyChanged;
+          public event EventHandler&lt;string&gt; Alert;
+        #endregion
+        #region Private Properties
+          private IMethods _methods;
+        #endregion
+        #region Public Properties
+          public INavigationService Navigation;
+        #endregion
+        #region Constructors
+          public ViewModelBase(INavigationService navigation, IMethods methods) 
+          {
+              Navigation = navigation;
+              _methods = methods; 
+          }
+        #endregion
+    }</pre><p>We are using the same <code class="literal">ViewModelBase</code> implementation we used in <a class="link" href="ch05.html" title="Chapter 5. Building a Stocklist Application">Chapter 5</a>,<span class="emphasis"><em> Building a Stocklist Application</em></span>, except we are adding an extra <code class="literal">IMethods</code> interface in the constructor (we will implement this later), which is used to show native alerts.</p><p>Next, add the protected methods <code class="literal">OnPropertyChanged</code> and <code class="literal">LoadAsync</code> as follows:</p><pre class="programlisting">#region Protected Methods
+protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null)
+ {
+    PropertyChangedEventHandler handler = PropertyChanged;
+    if (handler != null) 
+      {
+          handler(this, new PropertyChangedEventArgs(propertyName));
+      }
+  }
+  protected virtual async Task LoadAsync(IDictionary&lt;string, object&gt; parameters) 
+  {
+  }
+#endregion</pre><p>And the public methods as follows:</p><pre class="programlisting">#region Public Methods
+public Task&lt;string&gt; ShowEntryAlert(string message)
+  {
+    var tcs = new TaskCompletionSource&lt;string&gt;();
+    _methods.DisplayEntryAlert(tcs, message);
+    return tcs.Task; 
+  }
+public void NotifyAlert(string message)
+  {
+    if (Alert != null)
+    { 
+      Alert(this, message);
+    }
+  }
+public void OnShow(IDictionary&lt;string, object&gt; parameters) 
+  {
+    LoadAsync(parameters).ToObservable().Subscribe( result =&gt;
+      { 
+         // we can add things to do after we load the view model }, ex =&gt;
+          {
+            // we can handle any areas from the load async function });
+          }
+#endregion</pre><div class="note" title="Note" style=""><div class="inner"><h3 class="title"><a id="note106"/>Note</h3><p>Even though we are working in the portable project, this is still part of the presentation layer when it comes to architecture.</p></div></div><p>The <code class="literal">NotifyAlert</code> function is used to display alerts via the <code class="literal">Xamarin.Forms</code> function <code class="literal">DisplayAlert</code> on a <code class="literal">ContentPage</code>. The <code class="literal">ShowEntryAlert</code> function is used to display alerts via the <code class="literal">IMethod</code> interface.</p><p>Notice the use of the TaskCompletionSource?</p><p>This means we can await the <code class="literal">ShowEntryAlert</code> function. When the user responds to the alert, the <code class="literal">Task</code> will enter the completed state. This ensures that the code is executed only once a response is received. </p></div>
+<div class="section" title="Building the IMethods interface"><div class="titlepage"><div><div><h1 class="title"><a id="ch07lvl1sec113"/>Building the IMethods interface</h1></div></div></div><p>Let's start by creating a new folder in the <code class="literal">FileStorage.Portable</code> project, adding a new file called <code class="literal">IMethods.cs</code>, and implementing the following:</p><pre class="programlisting">public interface IMethods 
+  {
+    #region Methods
+    void Exit();
+    void DisplayEntryAlert(TaskCompletionSource&lt;string&gt; tcs, string message);
+    #endregion 
+  }</pre><p>For all native projects, add a new folder called <code class="literal">Extras</code>. Let's start with the iOS project. add a new file called <code class="literal">IOSMethods.cs</code>, and implement the following:</p><pre class="programlisting">public class IOSMethods : IMethods
+  {
+    #region Public Methods
+    public void Exit()
+     {
+       UIApplication.SharedApplication.PerformSelector(new ObjCRuntime.Selector("terminateWithSuccess"), null, 0f);
+     }
+    public void DisplayEntryAlert(TaskCompletionSource&lt;string&gt; tcs, string message)
+    { 
+      UIAlertView alert = new UIAlertView(); alert.Title = "Title"; 
+      alert.AddButton("OK");
+      alert.AddButton("Cancel"); 
+      alert.Message = message;
+      alert.AlertViewStyle = UIAlertViewStyle.PlainTextInput; 
+      alert.Clicked += (object s, UIButtonEventArgs ev) =&gt;
+        {
+          if (ev.ButtonIndex == 0)
+            {
+              tcs.SetResult(alert.GetTextField(0).Text); 
+            } 
+          else
+            {
+              tcs.SetResult(null);
+            }
+        };
+      alert.Show(); 
+    }
+  #endregion 
+}</pre><p>We should recognize the <code class="literal">Exit</code> function from previous chapters. The <code class="literal">DisplayEntryAlert</code> function creates a <code class="literal">PlainTextInputUIAlertView</code>. This alert will ask for text input via a textbox and we can retrieve this text value using the <code class="literal">GetTextField</code> function. The alert will also display a <code class="literal">Yes</code> and <code class="literal">No</code> button, so when the user enters text and presses <code class="literal">Yes</code>, a new file will be created with the text input set as the filename.</p><p>Now let's replicate the same procedure for Android. Add a new file called <code class="literal">DroidMethods.cs</code> and implement the following:</p><pre class="programlisting">public class DroidMethods : IMethods 
+  { 
+    #region Public Methods
+    public void Exit() 
+      { 
+        Android.OS.Process.KillProcess(Android.OS.Process.MyPid());
+      }
+     public void DisplayEntryAlert(TaskCompletionSource&lt;string&gt; tcs, string message)
+      {
+        var context = Forms.Context;
+        LayoutInflater factory = LayoutInflater.From(context);
+        var view = factory.Inflate(Resource.Layout.EntryAlertView, null);
+        var editText = view.FindViewById&lt;EditText&gt;(Resource.Id.textEntry);
+        new AlertDialog.Builder(context)
+         .SetTitle("Chat") 
+         .SetMessage(message) 
+         .SetPositiveButton("Ok", (sender, e) =&gt;
+           {
+             tcs.SetResult(editText.Text); 
+           })
+         .SetNegativeButton("Cancel", (sender, e) =&gt;
+           { 
+             tcs.SetResult(null);
+           })
+         .SetView(view)
+          .Show(); 
+        }
+    #endregion 
+  }</pre><p>This time for Android, we are using the <code class="literal">AlertDialog.Builder</code> framework. We use the <code class="literal">Forms.Context</code> property to retrieve the current context, which we use to create a new <code class="literal">AlertDialog.Builder</code>. We have to use the <code class="literal">SetView</code> function in this framework to assign a custom view for text input. This custom view is created using a new XML layout. </p><p>Add a new file called <code class="literal">EntryAlertView.xml</code> to the <span class="strong"><strong>Resources</strong></span> | <span class="strong"><strong>layout</strong></span> folder and implement the following:</p><pre class="programlisting">&lt;?xml version="1.0" encoding="utf-8"?&gt;
+&lt;EditText  
+    android:id="@+id/textEntry" android:layout_height="wrap_content" 
+    android:layout_width="250px" android:layout_centerHorizontal="true"
+    android:singleLine="true" /&gt;</pre><p>All we have is an <code class="literal">EditText</code> object to retrieve the filename from the user in the alert dialog. Using <code class="literal">FindViewById</code> in the <code class="literal">DroidMethods</code> class, we can reference this <code class="literal">EditText</code> item to retrieve the text value entered by the user.</p><p>That's everything. Our next step is a customized <code class="literal">ContentPage</code> to handle the <code class="literal">Alert</code> events from each view-model.</p></div>
+<div class="section" title="Building the ExtendedContentPage"><div class="titlepage"><div><div><h1 class="title"><a id="ch07lvl1sec114"/>Building the ExtendedContentPage</h1></div></div></div><p>Add a new folder called <code class="literal">UI</code> inside the <code class="literal">FileStorage</code> project, add in a new file called <code class="literal">ExtendedContentPage.cs</code>, and implement the following:</p><pre class="programlisting">public class ExtendedContentPage : ContentPage
+  {
+    #region Private Properties
+      private ViewModelBase _model;
+    #endregion
+    #region Constructors
+      public ExtendedContentPage(ViewModelBase model)
+      {
+        _model = model;
+        _model.Alert -= HandleAlert;
+        _model.Alert += HandleAlert;
+      }
+    #endregion
+    #region Private Methods
+      private async void HandleAlert(object sender, string message) 
+      {
+        await DisplayAlert("FileStorage", message, "OK");
+      }
+    #endregion 
+  }</pre><p>The <code class="literal">_model</code> property is used to reference the view-model of each page as every view-model inherits the <code class="literal">ViewModelBase</code> class. When the page is created, we register the <code class="literal">HandleAlert</code> function to the view-model <code class="literal">Alert</code> event. Every time this function is called, it will call the <code class="literal">DisplayAlert</code> function from <code class="literal">Xamarin.Forms</code>.</p><div class="section" title="Why are we implementing two different techniques for showing alerts?"><div class="titlepage"><div><div><h2 class="title"><a id="ch07lvl2sec53"/>Why are we implementing two different techniques for showing alerts?</h2></div></div></div><p>The cross-platform feature for displaying alerts does not allow us to use the text input addition that we built natively.</p><p>Great! We now have a nice solution for multiple types of alert in out cross-platform projects. Our next step is to implement our first custom layout known as a <code class="literal">CarouselView</code>.</p><div class="note" title="Note" style=""><div class="inner"><h3 class="title"><a id="tip107"/>Tip</h3><p><code class="literal">Xamarin.Forms</code> has its own <code class="literal">CarouselView</code>, but it has been removed until the UI object is more stable.</p></div></div></div></div>
+<div class="section" title="Building a CarouselView using custom layouts"><div class="titlepage"><div><div><h1 class="title"><a id="ch07lvl1sec115"/>Building a CarouselView using custom layouts</h1></div></div></div><p><code class="literal">Xamarin.Forms</code> is a very young layout system, meaning that the number of layouts is quite limited. There are times when we will need to implement our own custom layouts to give us control over exactly where and how our views and controls appear on screen. The requirement will come from situations where you need to improve performance on screens that display a lot of views and controls, and sometimes the standard layouts are not good enough. We want to implement our custom layouts to carry out the absolute minimum amount of work required to produce the required layout.</p><div class="note" title="Note" style=""><div class="inner"><h3 class="title"><a id="note108"/>Note</h3><p>All layouts derive from the <code class="literal">Xamarin.Forms.Layout</code> class, which provides the required mechanisms for adding and removing children internally as well as some key utilities for writing a layout.</p></div></div><p>Let's start by adding a new folder called <code class="literal">Controls</code> in the <code class="literal">FireStorable</code> project. Add a new file called <code class="literal">CarouselLayout.cs</code> and implement the first part as follows:</p><pre class="programlisting">public class CarouselLayout : Layout&lt;View&gt;
+  {
+    #region Private Properties
+      private IDisposable dataChangesSubscription;
+      public double LayoutWidth;
+    #endregion
+  }</pre><p>All layouts must inherit the <code class="literal">Layout</code> framework. <code class="literal">Xamarin.Forms.Layout&lt;T&gt;</code> provides a publicly exposed <code class="literal">IList&lt;T&gt;</code> Children that end users can access. We want all children of this collection to be of type <code class="literal">View</code>.</p><p>We have two <code class="literal">private</code> properties, one for the layout width and an <code class="literal">IDisposable</code> for handling data change subscriptions.</p><p>Let's add in some more properties:</p><pre class="programlisting">#region Public Properties
+public Object this[int index] 
+  {
+    get
+    {
+      return index &lt; ItemsSource.Count() ? ItemsSource.ToList()[index] : null;
+    }
+  }
+public DataTemplate ItemTemplate { get; set; }
+public IEnumerable&lt;Object&gt; ItemsSource { get; set; }
+#endregion</pre><p>We have an indexing reference that will return an array element from the <span class="strong"><strong>
+<code class="literal">ItemsSource IEnumerable</code>
+</strong></span>, and the <code class="literal">ItemTemplate</code> property, which is used to render a view layout for every child in <code class="literal">ItemsSource</code>. We have to use the <code class="literal">Linq</code> function <code class="literal">ToList</code> to allow us to access an <code class="literal">IEnumerable</code> via an index value.</p><p>Now we are going to add some overrides to the <code class="literal">Layout</code> framework. Every custom layout must override the <code class="literal">LayoutChildren</code> method. This is responsible for positioning children on screen:</p><pre class="programlisting">protected override void LayoutChildren(double x, double y, double width, double height)
+  { 
+    var layout = ComputeLayout(width, height);
+    var i = 0;
+    foreach (var region in layout)
+      { 
+        var child = Children[i];
+        i++;
+        LayoutChildIntoBoundingRegion(child, region);
+      }
+    }</pre><p>The preceding function will call another method, <code class="literal">ComputeLayout</code>, which will return an <code class="literal">IEnumerable</code> of <span class="strong"><strong>Rectangles</strong></span> (also known as <span class="strong"><strong>regions</strong></span>). We then iterate through the <code class="literal">IEnumerable</code> and call <code class="literal">LayoutChildIntoBoundingRegion</code> for each region. This method will handle positioning the element relative to the bounding region.</p><p>Our layout must also implement the <code class="literal">OnMeasure</code> function. This is required to make sure the new layout is sized correctly when placed inside other layouts. During layout cycles, this method may be called many times depending on the layout above it and how many layout exceptions are required to resolve the current layout hierarchy. Add the following below the <code class="literal">LayoutChildren</code> function:</p><pre class="programlisting">protected override SizeRequest OnMeasure(double widthConstraint, double heightConstraint)
+  {
+    List&lt;Row&gt; layout = ComputeNiaveLayout(widthConstraint, heightConstraint);
+    var last = layout[layout.Count - 1];
+    var width = (last.Count &gt; 0) ?
+    last[0].X + last.Width : 0; var height = (last.Count &gt; 0) ? last[0].Y + 
+    last.Height : 0;
+    return new SizeRequest(new Size(width, height)); 
+  }</pre><div class="note" title="Note" style=""><div class="inner"><h3 class="title"><a id="tip109"/>Tip</h3><p>It is therefore important to consider speed when implementing this function. Failure to implement this function will not always break your layout, particularly if it's always inside parents, which fix the child size anyway.</p></div></div><p>The <code class="literal">ComputeNiaveLayout</code> will return a list of <span class="strong"><strong>rows</strong></span>. We then retrieve the last row from this list and use this for the max x-value and max y-value to determine the total width and height by calculating the difference between the first and last element on both the x-axis and y-axis. Finally, we return a new <code class="literal">SizeRequest</code> object with the calculated width and height, which will be used to resize the layout.</p><p>Let's add the missing functions <code class="literal">ComputeNiaveLayout</code> and <code class="literal">ComputeLayout</code> as follows:</p><pre class="programlisting">public IEnumerable&lt;Rectangle&gt; ComputeLayout(double widthConstraint, double heightConstraint)
+  {
+    List&lt;Row&gt; layout = ComputeNiaveLayout(widthConstraint, heightConstraint);
+    return layout.SelectMany(s =&gt; s); 
+  }</pre><p>This function is used simply to perform the <code class="literal">SelectMany</code> query. The <code class="literal">ComputeNiaveLayout</code> layout is where all the work is done. This will iterate through all children; it will create one <span class="strong"><strong>row</strong></span>, and one rectangle inside this row that will size to the height of the layout and the width will equal the total of all children widths. All children will be positioned horizontally next to one another to the right of the screen, as shown in the following screenshot:</p><div class="mediaobject"><img src="graphics/B05293_07_04-1.jpg" alt="Building a CarouselView using custom layouts"/></div><p>But only one child will be visible on screen at any one time as each child is sized to the full height and width of the layout:</p><pre class="programlisting">private List&lt;Row&gt; ComputeNiaveLayout(double widthConstraint, double heightConstraint) 
+  {
+    var result = new List&lt;Row&gt;();
+    var row = new Row();
+    result.Add(row);
+    var spacing = 20;
+    double y = 0;
+    foreach (var child in Children) 
+    {
+       var request = child.Measure(double.PositiveInfinity,
+       double.PositiveInfinity);
+       if (row.Count == 0)
+       {
+         row.Add(new Rectangle(0, y, LayoutWidth, Height));
+         row.Height = request.Request.Height; continue; 
+       }
+       var last = row[row.Count - 1];
+       var x = last.Right + spacing;
+       var childWidth = LayoutWidth;
+       var childHeight = request.Request.Height;
+       row.Add(new Rectangle(x, y, childWidth, Height));
+       row.Width = x + childWidth; row.Height = Math.Max(row.Height, Height); 
+       }
+    return result; 
+ }</pre><p>Hold on! What if I have a lot of children? This means that they will be stacked horizontally past the width of the screen. What do we do now?</p><p>The idea of a carousel view is to only show one view at a time, when the user swipes left and right; the view on the left/right side of the current view will come onto screen while the current view will move out of view, as shown in the following screenshot:</p><div class="mediaobject"><img src="graphics/B05293_07_05.jpg" alt="Building a CarouselView using custom layouts"/></div><p>Even though we have a custom layout that presents children horizontally, how are we going to handle the swipe events and scroll control?</p><p>We will achieve scroll control via a <code class="literal">ScrollView</code> and create a custom renderer for handling swipe events.</p></div>
+<div class="section" title="Adding scroll control to the CarouselView"><div class="titlepage"><div><div><h1 class="title"><a id="ch07lvl1sec116"/>Adding scroll control to the CarouselView</h1></div></div></div><p>Add a new file into the <code class="literal">Controls</code> folder called <code class="literal">CarouselScroll.cs</code> and implement the first part as follows:</p><pre class="programlisting">public class CarouselScroll : ScrollView 
+  { 
+    #region Private Properties
+      private CarouselLayout _carouselLayout;
+    #endregion
+    public DataTemplate ItemTemplate
+    {
+      set
+      {
+        _carouselLayout.ItemTemplate = value;
+      }
+    }
+    public CarouselScroll()
+    {
+      Orientation = ScrollOrientation.Horizontal;
+      _carouselLayout = new CarouselLayout();
+      Content = _carouselLayout;
+     }
+   }</pre><p>The <code class="literal">CarouselScroll</code> will inherit the <code class="literal">ScrollView</code> object as this will be the bounding view for the <code class="literal">CarouselLayout</code>. We are also going to create a <code class="literal">DataTemplate</code> variable for setting the <code class="literal">DataTemplate</code> object inside the <code class="literal">CarouselLayout</code>. Then, in the constructor, we instantiate a new <code class="literal">CarouselLayout</code> object as the <code class="literal">Content</code> of the <code class="literal">ScrollView</code>.</p><p>Now let's add a custom binding object for the <code class="literal">ItemsSource</code>. Like a <code class="literal">ListView</code>, we will bind an <code class="literal">ObserableCollection</code> of items to this property:</p><pre class="programlisting">    public static readonly BindableProperty ItemsSourceProperty = BindableProperty.Create&lt;CarouselLayout, IEnumerable&lt;Object&gt;&gt;(o =&gt; o.ItemsSource,
+    default(IEnumerable&lt;Object&gt;), propertyChanged: (bindable, oldvalues, newValues) =&gt;
+    {
+      ((CarouselScroll)bindable)._carouselLayout.ItemsSource = newValues;
+    });</pre><p>Take note of the <code class="literal">propertyChanged</code> event; when the binding changes, we will update the <code class="literal">ItemsSource</code> property of the <code class="literal">CarouselLayout.</code> Remember that the <code class="literal">CarouselLayout</code> is in charge of laying out a child for every item in the <code class="literal">IEnumerable</code>.</p><p>We also need another bindable property for data changes. This will be an <code class="literal">IObservable</code> object that will listen for any <code class="literal">DataChange</code> events. If an event occurs, the <code class="literal">CarouselLayout</code> will layout the children:</p><pre class="programlisting">    public static readonly BindableProperty DataChangesProperty = BindableProperty.Create("DataChanges", 
+    typeof(IObservable&lt;DataChange&gt;), typeof(CarouselLayout), null, propertyChanged: (bindable, oldvalue, newValue) =&gt;
+    {
+         ((CarouselScroll)bindable)._carouselLayout.SubscribeDataChanges((IObservable&lt;DataChange&gt;)newValue);
+    });</pre><p>Then we need to override the <code class="literal">LayoutChildren</code> function; so when the <code class="literal">ScrollView</code> updates its children, we want to update the height and width properties of the <code class="literal">CarouselLayout</code>, thus updating the layout of the children:</p><pre class="programlisting">protected override void LayoutChildren(double x, double y, double width, double height)
+  { 
+    base.LayoutChildren(x, y, width, height);
+    if (_carouselLayout != null)
+      {
+         if (width &gt; _carouselLayout.LayoutWidth)
+          { 
+             _carouselLayout.LayoutWidth = width; 
+          }
+         _carouselLayout.ComputeLayout(width, height); 
+      }
+   }</pre><p>We also have one more function, <code class="literal">GetSelectedItem</code>, which simply returns a child from the <code class="literal">CarouselLayout</code> using an index:</p><pre class="programlisting">public Object GetSelectedItem(int selected)
+  {
+     return _carouselLayout[selected]; 
+  }</pre><p>Our next stage into the <code class="literal">CarouselView</code> is creating a <code class="literal">CustomRenderer</code> that will allow swipe gestures.</p></div>
+<div class="section" title="Building a CustomRenderer for native gestures"><div class="titlepage"><div><div><h1 class="title"><a id="ch07lvl1sec117"/>Building a CustomRenderer for native gestures</h1></div></div></div><p>Now we need to handle swipe left and right gestures for each mobile platform. Unfortunately, <code class="literal">Xamarin.Forms</code> doesn't offer a cross-platform feature for swipe gestures, so we need to implement this ourselves. In order to do this, we are going to build a <code class="literal">CustomRenderer</code>. Start by adding a new file to the <code class="literal">Controls</code> folder called <code class="literal">GestureView.cs</code> and implement the following:</p><pre class="programlisting">public class GestureView : View 
+  {
+    public event EventHandler SwipeLeft;
+    public event EventHandler SwipeRight;
+    public event EventHandler Touch;
+    public void NotifySwipeLeft()
+      {
+        if (SwipeLeft != null)
+        {
+          SwipeLeft (this, EventArgs.Empty); 
+        }
+      }
+    public void NotifySwipeRight()
+     {
+        if (SwipeRight != null)
+         {
+           SwipeRight (this, EventArgs.Empty);
+         }
+     }
+    public void NotifyTouch()
+     {
+        if (Touch != null)
+         {
+           Touch(this, EventArgs.Empty); 
+         }
+      }
+  }</pre><p>This view has an <code class="literal">EventHandler</code> for each gesture, we also require a gesture for tap events. Even though <code class="literal">Xamarin.Forms</code> offers this feature when we render over the top of the <code class="literal">CarouselView</code> at runtime, the <code class="literal">Xamarin.Forms</code> gesture will no longer work.</p><p>Now, inside the <code class="literal">FileStorage.iOS</code> project, let's add a new folder called <code class="literal">Renderers</code> and another folder inside this called <code class="literal">GestureView</code>. Then, inside the <code class="literal">GestureView</code> folder, add in a new file called <code class="literal">GestureViewiOS.cs</code> and implement the following:</p><pre class="programlisting">[Register("GestureViewiOS")]
+  public sealed class GestureViewiOS : UIView
+   { 
+     private UIView _mainView;
+     private UISwipeGestureRecognizer _swipeLeftGestureRecognizer;
+     private UISwipeGestureRecognizer _swipeRightGestureRecognizer;
+     private UITapGestureRecognizer _tapGestureRecognizer;
+     public GestureViewiOS()
+     {
+       _mainView = new UIView ()
+       {
+         TranslatesAutoresizingMaskIntoConstraints = false 
+        };
+       _mainView.BackgroundColor = UIColor.Clear;
+      Add (_mainView);
+     // set layout constraints for main view AddConstraints
+     (NSLayoutConstraint.FromVisualFormat("V:|[mainView]|", 
+      NSLayoutFormatOptions.DirectionLeftToRight, null,
+      new NSDictionary("mainView", _mainView)));
+     AddConstraints (NSLayoutConstraint.FromVisualFormat("H:|[mainView]|", NSLayoutFormatOptions.AlignAllTop, null, new NSDictionary ("mainView", _mainView)));
+     }
+   }</pre><p>This view has an <code class="literal">EventHandler</code> for each gesture, we also require a gesture for tap events. Even though <code class="literal">Xamarin.Forms</code> offers these features when we render over the top of the <code class="literal">CarouselView</code> at runtime, the Xamarin.Forms gesture will no longer work.</p><pre class="programlisting">public void InitGestures(GestureView swipeView)
+  {
+     _swipeLeftGestureRecognizer = new UISwipeGestureRecognizer (swipeView.NotifySwipeLeft);
+     _swipeLeftGestureRecognizer.Direction = UISwipeGestureRecognizerDirection.Left; 
+     _swipeRightGestureRecognizer = new UISwipeGestureRecognizer (swipeView.NotifySwipeRight); 
+     _swipeRightGestureRecognizer.Direction = UISwipeGestureRecognizerDirection.Right;
+     _tapGestureRecognizer = new UITapGestureRecognizer(swipeView.NotifyTouch);
+     _tapGestureRecognizer.NumberOfTapsRequired = 1;
+     _mainView.AddGestureRecognizer (_swipeLeftGestureRecognizer);
+     _mainView.AddGestureRecognizer (_swipeRightGestureRecognizer);
+     _mainView.AddGestureRecognizer (_tapGestureRecognizer);
+  }</pre><p>This function will only be called once from the <code class="literal">OnElementChanged</code> function of the <code class="literal">GestureViewRenderer</code>.</p><p>Now let's add the renderer class. Add another file called <code class="literal">GestureViewRenderer.cs</code> and implement the following:</p><pre class="programlisting">public class GestureLayoutRenderer : ViewRenderer&lt;GestureView, GestureViewiOS&gt;
+  {
+    private GestureViewiOS _swipeViewIOS;
+    private bool gesturesAdded;
+    public GestureLayoutRenderer()
+      {
+        _swipeViewIOS = new GestureViewiOS (); 
+      }
+    protected override void OnElementChanged (ElementChangedEventArgs&lt;GestureView&gt; e)
+     {
+        base.OnElementChanged (e);
+        if (Control == null) 
+          {
+             SetNativeControl(_swipeViewIOS); 
+          }
+        if (Element != null &amp;&amp; !gesturesAdded) 
+          {
+             _swipeViewIOS.InitGestures(Element); 
+             gesturesAdded = true;
+          }
+      }
+   }</pre><p>Whenever a property from the <code class="literal">UI</code> object changes, the <code class="literal">OnElementChanged</code> function will be called. We only call the <code class="literal">SetNativeControl</code> once if the <code class="literal">Control</code> property of the renderer is null. The <code class="literal">Element</code> property of a renderer is usually the UI object from the <code class="literal">Xamarin.Forms</code> project (in our case the <code class="literal">FileStorage</code> project, <code class="literal">GestureView</code>). When we receive a reference to the <code class="literal">GestureView</code> object (inside the <code class="literal">OnElementChanged</code> function), we pass this into the <code class="literal">InitGestures</code> function in order to use the <code class="literal">EventHandlers</code> on the <code class="literal">GestureView</code> object. Now, when we swipe left and right or tap on the native <code class="literal">mainView</code> object, it will call the <code class="literal">NotifySwipeLeft</code>, <code class="literal">NotifySwipeLeft</code>, and <code class="literal">NotifyTouch</code> functions for the <code class="literal">GestureView</code> object.</p><p>Don't forget to add the following line above the namespace declaration:</p><pre class="programlisting">[assembly: Xamarin.Forms.ExportRenderer(typeof(FileStorage.Controls.GestureView), typeof(FileStorage.iOS.Renderers.GestureView.GestureLayoutRenderer))]
+   namespace FileStorage.iOS.Renderers.GestureView</pre><p>We must always add the <code class="literal">ExportRenderer</code> attribute to a custom renderer class to specify that it will be used to render the <code class="literal">Xamarin.Forms</code> control.</p><p>The <code class="literal">GestureViewiOS</code> object will be the view displayed on top of the <code class="literal">GestureView</code> object in our <code class="literal">FileStorage</code> project. Wherever a new <code class="literal">GestureView</code> object is placed in our<code class="literal"> ContentPage</code>, the <code class="literal">GestureViewRenderer</code> will render a new <code class="literal">GestreViewiOS</code>view in its place.</p><p>Now let's implement the same for Android. Add a new folder inside the <code class="literal">FileStorage.Droid</code> project called <code class="literal">Renderers</code> and another folder inside this called <code class="literal">GestureView</code>. Then, inside the <code class="literal">GestureView</code> folder, add in a new file called <code class="literal">GestureListener.cs</code> and implement the first part:</p><pre class="programlisting">public class GestureListener : GestureDetector.SimpleOnGestureListener
+  {
+     private const int SWIPE_THRESHOLD = 50;
+     private const int SWIPE_VELOCITY_THRESHOLD = 50;
+     private GestureView _swipeView;
+     public void InitCoreSwipeView(GestureView swipeView)
+     {
+        _swipeView = swipeView;
+     }
+   }</pre><p>A <code class="literal">GestureDetector</code> is used to respond to multiple types of press event for a particular view. We also pass the <code class="literal">Xamarin.Forms GestureView</code> object into this class so that we can fire the <code class="literal">NotifySwipeLeft</code>, <code class="literal">NotifySwipeLeft</code>, and <code class="literal">NotifyTouch</code> functions when a particular event occurs. The threshold values are used as a minimum swipe distance and touch pressure. When a user performs a swipe on this view, a certain amount of pressure and movement must be applied for an event to be fired.</p><div class="note" title="Note" style=""><div class="inner"><h3 class="title"><a id="note110"/>Note</h3><p>The <code class="literal">SimpleOnGestureListener</code> extension is a convenience class when you only want to listen for a subset of all the gestures.</p></div></div><p>Now we must override the following functions (we aren't going to be doing anything with these but they must be overridden):</p><pre class="programlisting">public override void OnLongPress (MotionEvent e)
+  {
+    base.OnLongPress (e); 
+  }
+public override bool OnDoubleTap (MotionEvent e)
+  {
+    return base.OnDoubleTap (e);
+  }
+public override bool OnDoubleTapEvent (MotionEvent e)
+  { 
+    return base.OnDoubleTapEvent (e);
+  }
+public override bool OnDown (MotionEvent e) 
+  {
+    return base.OnDown (e); 
+  }
+public override bool OnScroll (MotionEvent e1, MotionEvent e2, float distanceX, float distanceY)
+  { 
+    return base.OnScroll (e1, e2, distanceX, distanceY);
+  }
+public override void OnShowPress (MotionEvent e)
+  { 
+     base.OnShowPress (e);
+  }
+public override bool OnSingleTapConfirmed (MotionEvent e)
+  { 
+     return base.OnSingleTapConfirmed (e);
+  }</pre><p>Now for the functions that we are going to use. The <code class="literal">OnSingleTapUp</code> function will be responsible for handling touch events, called when a user applies a single tap gesture to the view:</p><pre class="programlisting">public override bool OnSingleTapUp (MotionEvent e)
+   {
+    _swipeView.NotifyTouch(); 
+    return base.OnSingleTapUp (e);
+   }</pre><p>The <code class="literal">OnFling</code> function is responsible for handling swipe events. The two <code class="literal">MotionEvent</code> items are the start and end points (<span class="emphasis"><em>x</em></span>, <span class="emphasis"><em>y</em></span>) when a user starts to swipe and when the finger is removed. We calculate the drag distance and make sure that the absolute value of <code class="literal">diffX</code> is greater than the absolute value of <code class="literal">diffY</code>. This ensures that we are dragging horizontally. We then make sure that the absolute value of <code class="literal">diffX</code> is greater than the <code class="literal">Swipe_Threshold</code>, and the <code class="literal">VelocityX</code> is greater than the <code class="literal">Swipe_Velocity_Threshold</code>. If all this is met, we then fire a swipe right if the <code class="literal">diffX</code> is positive; otherwise, it will fire a swipe left:</p><pre class="programlisting">public override bool OnFling (MotionEvent e1, MotionEvent e2, float velocityX, float velocityY) 
+  { 
+    try 
+      { 
+        float diffY = e2.GetY() - e1.GetY(); 
+        float diffX = e2.GetX() - e1.GetX();
+        if (Math.Abs(diffX) &gt; Math.Abs(diffY)) 
+          {
+            if (Math.Abs(diffX) &gt; SWIPE_THRESHOLD &amp;&amp; Math.Abs(velocityX) &gt; SWIPE_VELOCITY_THRESHOLD)
+          {
+            if (_swipeView != null)
+              {
+                if (diffX &gt; 0)
+                  {
+                    _swipeView.NotifySwipeRight ();
+                  }
+                else
+                  {
+                    _swipeView.NotifySwipeLeft ();
+                  }
+              }
+         }
+      }
+    }
+    catch (Exception) { }
+    return base.OnFling (e1, e2, velocityX, velocityY); 
+  }</pre><p>Let's now build the <code class="literal">GestureViewRenderer</code> and integrate is with the <code class="literal">GestureDetector</code>. Add a new file into the <code class="literal">Gesture</code> folder called <code class="literal">GestureViewRenderer.cs</code> and implement the following:</p><pre class="programlisting">public class GestureViewRenderer : ViewRenderer&lt;GestureView, LinearLayout&gt;
+  {
+    private LinearLayout _layout;
+    private readonly GestureListener _listener;
+    private readonly GestureDetector _detector;
+    public GestureViewRenderer ()
+      {
+         _listener = new GestureListener ();
+         _detector = new GestureDetector (_listener);
+         _layout = new LinearLayout (Context); 
+      }
+   }</pre><p>We are now going to create an empty <code class="literal">LinearLayout</code>to use for the <code class="literal">Control</code>. This is the blank view that will receive the touch events. We then instantiate a new <code class="literal">GestureListener</code> from above and pass this into a new <code class="literal">GestureDetector</code>. The GestureDetector's <code class="literal">OnTouchEvent</code> function is called for all touch and motion events, and within this class we break down the events in more detail to determine the exact event that took place:</p><pre class="programlisting">protected override void OnElementChanged (ElementChangedEventArgs&lt;GestureView&gt; e)
+  {
+    base.OnElementChanged (e);
+    if (e.NewElement == null) 
+      {
+        GenericMotion -= HandleGenericMotion;
+        Touch -= HandleTouch;
+      }
+    if (e.OldElement == null)
+      {
+        GenericMotion += HandleGenericMotion;
+        Touch += HandleTouch;
+      }
+    if (Element != null)
+      {
+        _listener.InitCoreSwipeView(Element); 
+      }
+    SetNativeControl (_layout); 
+    }
+    private void HandleTouch (object sender, TouchEventArgs e) 
+      {
+        _detector.OnTouchEvent (e.Event);  
+      }
+    private void HandleGenericMotion (object sender, GenericMotionEventArgs e)
+      {
+        _detector.OnTouchEvent (e.Event);  
+      }</pre><p>Notice the null checks on the <code class="literal">OldElemenet</code> and <code class="literal">NewElement</code> properties of the arguments?</p><p>If the <code class="literal">OldElemenet</code> is null, we must deregister touch events, and if the <code class="literal">NewElement</code> is null, we register the <code class="literal">GenericMotion</code> and <code class="literal">Touch</code> events.</p><p>Now that we have our <code class="literal">GestureView</code> and <code class="literal">GestureViewRenderers</code> ready, it's time to create the final control and add a new <span class="strong"><strong>Forms ContentView Xaml</strong></span> file called <code class="literal">CarouselView.xaml</code>, as shown in the following screenshot:</p><div class="mediaobject"><img src="graphics/B05293_07_06.jpg" alt="Building a CustomRenderer for native gestures"/></div><p>We also implement the following in <code class="literal">CarouselView.xaml</code>:</p><pre class="programlisting">&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;ContentView  
+  
+  
+  x:Class="FileStorage.Controls.CarouselView"&gt;
+&lt;ContentView.Content&gt;
+  &lt;Grid x:Name="Container"&gt;
+  &lt;Grid.RowDefinitions&gt;
+  &lt;RowDefinition Height="*"/&gt; 
+  &lt;/Grid.RowDefinitions&gt; 
+  &lt;Grid.ColumnDefinitions&gt;
+  &lt;ColumnDefinition Width="*"/&gt;
+  &lt;/Grid.ColumnDefinitions&gt;
+  &lt;controls:CarouselScroll x:Name="CarouselScroll" ItemsSource="{Binding Cells}" 
+   ItemTemplate="{StaticResource CarouselTemplate}" 
+   DataChanges="{Binding DataChanges}" Grid.Row="0" Grid.Column="0"/&gt;
+  &lt;controls:GestureView x:Name="GestureView" Grid.Row="0" Grid.Column="0"/&gt;
+  &lt;/Grid&gt;
+ &lt;/ContentView.Content&gt;
+ &lt;/ContentView&gt;</pre><p>The preceding code will create a <code class="literal">Grid</code> to overlay the <code class="literal">GestureView</code> on top of the <code class="literal">CarouselScroll</code>. This means that the <code class="literal">GestureView</code> will detect the swipe and touch events and pass these down to the <code class="literal">CarouselScroll</code>.</p><p>Now let's implement <code class="literal">CarouselView.xaml.cs</code> as follows:</p><pre class="programlisting">public partial class CarouselView : ContentView 
+  {
+    private bool _animating;
+    public int SelectedIndex = 0;
+    public static readonly BindableProperty SelectedCommandProperty = BindableProperty.Create&lt;CarouselView, ICommand&gt;(w =&gt; w.SelectedCommand, default(ICommand),
+    propertyChanged: (bindable, oldvalue, newvalue) =&gt; { });
+
+    public ICommand SelectedCommand 
+      {
+        get
+        {
+          return (ICommand)GetValue(SelectedCommandProperty); 
+        }
+        set
+        {
+          SetValue(SelectedCommandProperty, value);
+        }
+      }
+    public CarouselView() 
+      {
+         InitializeComponent();
+         GestureView.SwipeLeft += HandleSwipeLeft;
+         GestureView.SwipeRight += HandleSwipeRight;
+         GestureView.Touch += HandleTouch;
+       }
+ }</pre><p>The first part shows the event registration to the <code class="literal">GestureView</code>. We also have a custom binding for a <code class="literal">Command</code>, which will be invoked when a <code class="literal">Touch</code> event occurs. Let's add the <code class="literal">EventHandler</code> functions as follows:</p><pre class="programlisting">public void HandleTouch(object sender, EventArgs e)
+  {
+    if (SelectedCommand != null)
+     {
+        var cell = CarouselScroll.GetSelectedItem(SelectedIndex); 
+        SelectedCommand.Execute(cell);
+     }
+   }
+public async void HandleSwipeLeft(object sender, EventArgs e)
+   { 
+     if (((CarouselScroll.ScrollX + CarouselScroll.Width) &lt; (CarouselScroll.Content.Width - CarouselScroll.Width)) &amp;&amp; !_animating)
+      {
+        _animating = true;
+        SelectedIndex++;
+        await CarouselScroll.ScrollToAsync(CarouselScroll.ScrollX + Width + 20, 0, true);
+        _animating = false;
+      } 
+   }
+public async void HandleSwipeRight(object sender, EventArgs e)
+   {
+     if (CarouselScroll.ScrollX &gt; 0 &amp;&amp; !_animating)
+      {
+         _animating = true;
+         SelectedIndex--;
+         await CarouselScroll.ScrollToAsync(CarouselScroll.ScrollX - Width - 20, 0, true);
+         _animating = false;
+      }
+   }
+ }</pre><p>The <code class="literal">HandleTouch</code> function will simply call the <code class="literal">GetSelectedItem</code> function from the <code class="literal">CarouselScroll.</code> This means we get the bound object from the view and we use this as a parameter that is passed into the execution of the <code class="literal">SelectCommand</code>. The <code class="literal">HandleSwipeLeft</code> function will increase the selected index by 1 and scroll to the left by the entire width amount of the view. Remember, each child takes up the entire width and height of the view, so in order to move to the next child, we have to scroll horizontally by the width.</p><p>Then we have the <code class="literal">HandleSwipeRight</code> function, which will perform the opposite to <code class="literal">HandleSwipeLeft</code> and scroll in the opposite direction. In each swipe function, we also perform a check to see if we are on the starting child or the last child.</p><p>Congratulations, you have just built your first custom layout. Now let's build the rest of the user interface and see how we can use it.</p></div>
+<div class="section" title="Building the user interface"><div class="titlepage"><div><div><h1 class="title"><a id="ch07lvl1sec118"/>Building the user interface</h1></div></div></div><p>It's now time to build the user interface screens; we are going to start by building the view-models. Inside the <code class="literal">FileStorage.Portable</code> project, add a new folder called <code class="literal">ViewModels</code>, add a new file called <code class="literal">MainPageViewModel.cs</code>, and implement the following:</p><pre class="programlisting">public class MainPageViewModel : ViewModelBase
+  {
+     #region Private Properties
+     private string _descriptionMessage = "Welcome to the Filing Room";
+     private string _FilesTitle = "Files";
+     private string _exitTitle = "Exit";
+     private ICommand _locationCommand;
+     private ICommand _exitCommand;
+     private ISQLiteStorage _storage;
+     #endregion
+  }</pre><p>We include the <code class="literal">ISQLiteStorage</code> object in this view-model because we will be creating the database tables when this view-model is created. Don't forget we need to implement the public properties for all <code class="literal">private</code> properties; the following are two properties to get you started:</p><pre class="programlisting">#region Public Properties
+public ICommand LocationCommand
+  {
+    get
+     {
+       return _locationCommand; 
+     }
+    set
+     {
+       if (value.Equals(_locationCommand))
+         {
+            return;
+         }
+       _locationCommand = value; OnPropertyChanged("LocationCommand"); 
+      }
+   }
+public ICommand ExitCommand
+  {
+    get
+      {
+        return _exitCommand;
+      }
+    set
+      {
+       if (value.Equals(_exitCommand))
+         {
+            return; 
+         }
+       _exitCommand = value; OnPropertyChanged("ExitCommand");
+      }
+    }
+#endregion</pre><p>Then we add the remaining properties. We call the <code class="literal">SetupSQLite</code> function from the constructor to set up the database as follows:</p><pre class="programlisting">#region Constructors
+public MainPageViewModel (INavigationService navigation, Func&lt;Action, ICommand&gt; commandFactory,
+IMethods methods, ISQLiteStorage storage) : base (navigation, methods)
+  {
+     _exitCommand = commandFactory (() =&gt; methods.Exit());
+     _locationCommand = commandFactory (async () =&gt; await Navigation.Navigate(PageNames.FilesPage, null));
+     _storage = storage;
+     SetupSQLite().ConfigureAwait(false); 
+  }
+#endregion
+private async Task SetupSQLite()
+  {
+    // create Sqlite connection _storage.CreateSQLiteAsyncConnection();
+    // create DB tables await _storage.CreateTable&lt;FileStorable&gt;
+    CancellationToken.None);
+  }
+}</pre><p>The <code class="literal">SetupSQLite</code> function is responsible for creating the asynchronous connection to the local database and building the one table from the <code class="literal">FileStorable</code> object.</p><p>Now let's build the page for this view-model. Add a new folder called <code class="literal">Pages</code> inside the <code class="literal">FileStorage</code> project, add in a new file called <code class="literal">MainPage.xaml</code>, and implement the following:</p><pre class="programlisting">&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;ui:ExtendedContentPage  
+    
+    
+    x:Class="FileStorage.Pages.MainPage"
+    BackgroundColor="White"
+    Title="Welcome"&gt;
+&lt;ui:ExtendedContentPage.Content&gt;
+      &lt;Grid x:Name="Grid" RowSpacing="10" Padding="10, 10, 10, 10" VerticalOptions="Center"&gt;
+      &lt;Grid.RowDefinitions&gt; 
+          &lt;RowDefinition Height="*"/&gt;
+          &lt;RowDefinition Height="Auto"/&gt;
+          &lt;RowDefinition Height="Auto"/&gt;
+          &lt;RowDefinition Height="Auto"/&gt;
+      &lt;/Grid.RowDefinitions&gt;
+      &lt;Grid.ColumnDefinitions&gt;
+          &lt;ColumnDefinition Width="*"/&gt;
+      &lt;/Grid.ColumnDefinitions&gt;
+      &lt;Image x:Name="Image" Source="files.png" HeightRequest="120" 
+          WidthRequest="120" Grid.Row="0" Grid.Column="0"/&gt;
+      &lt;Label x:Name="DesciptionLabel" Text="{Binding DescriptionMessage}" 
+          TextColor="Black" HorizontalOptions="Center" Font="Arial, 20" 
+          Grid.Row="1" Grid.Column="0"/&gt;
+      &lt;Button x:Name="LocationButton" Text="{Binding FilesTitle}"
+          Command="{Binding LocationCommand}" 
+          Style="{StaticResource ButtonStyle}" Grid.Row="2" Grid.Column="0"/&gt;
+      &lt;Button x:Name="ExitButton" Text="{Binding ExitTitle}"
+          Command="{Binding ExitCommand}" Style="{StaticResource ButtonStyle}" 
+          Grid.Row="3" Grid.Column="0"/&gt;
+      &lt;/Grid&gt;
+   &lt;/ui:ExtendedContentPage.Content&gt;
+&lt;/ui:ExtendedContentPage&gt;</pre><p>Remember our custom control <code class="literal">ExtendedContentPage</code>?</p><p>We are going to use this for all pages so that every page has alert functionality connected with its view-model. The following line gives the reference to our custom control:</p><pre class="programlisting"/><p>We have to declare a new <code class="literal">ExtendedContentPage</code> like the following:</p><pre class="programlisting">&lt;ui:ExtendedContentPage</pre><p>The rest of the page is the same as previous projects. A simple <span class="strong"><strong>Grid</strong></span> contains an image, label, and two buttons. Now implement the following for <code class="literal">MainPage.xaml.cs</code>:</p><pre class="programlisting">public partial class MainPage : ExtendedContentPage, INavigableXamarinFormsPage
+  {
+    #region Constructors
+    public MainPage (MainPageViewModel model) : base(model) 
+      {
+         BindingContext = model;
+         InitializeComponent (); 
+      }
+    #endregion
+    #region INavigableXamarinFormsPage interface
+    public void OnNavigatedTo(IDictionary&lt;string, object&gt; navigationParameters)
+      {
+         this.Show (navigationParameters);
+      }
+    #endregion 
+  }</pre><p>We are able to assign the <code class="literal">BindingContext</code> property through the constructor because we are registering this item inside the IoC container.</p><p>Now we move on to the next page, where we will be including the <code class="literal">CarouselView</code>. We will also be loading in our files that are saved locally in our database. Our first step is to create a new view-model for each view that is going to appear in the <code class="literal">CarouselView</code>. Add a new file to the <code class="literal">ViewModels</code> folder called <code class="literal">FileItemViewModel.cs</code> and implement the following:</p><pre class="programlisting">public class FileItemViewModel : ViewModelBase
+  {
+    #region Private Properties
+    private string _fileName;
+    private string _contents;
+    #endregion
+    #region Public Properties
+    public string FileName
+      {
+        get
+          { 
+            return _fileName;
+          }
+        set
+         {
+            if (value.Equals(_fileName))
+              {
+                return;
+              }
+        _fileName = value; OnPropertyChanged("FileName");
+         } 
+      }
+    public string Contents
+      { 
+        get 
+          { 
+            return _contents;
+          }
+        set 
+         { 
+           if (value.Equals(_contents))
+             { 
+                return; 
+             }
+          _contents = value; OnPropertyChanged("Contents");
+         } 
+       }
+    #endregion
+    #region Public Methods
+    public void Apply(FileStorable file)
+      {
+          FileName = file.Key ?? string.Empty; 
+          Contents = file.Contents ?? string.Empty;
+      }
+    #endregion
+    #region Constructors
+    public FileItemViewModel(INavigationService navigation, IMethods methods) : 
+    base(navigation, methods) { }
+    #endregion 
+  }</pre><p>It is very simple, just two properties to contain the filename and text contents of the file. These two items will be saved in a <code class="literal">FileStorable</code> object in our local database. We have an <code class="literal">Apply</code> function that will take a <code class="literal">FileStorable</code> object to load the properties of the view-model.</p><p>Now let's build the page. Inside the <code class="literal">ViewModels</code> folder, add a new file called <code class="literal">FilesPageViewModel.cs</code> and implement the following:</p><pre class="programlisting">public class FilesPageViewModel : ViewModelBase
+    {
+        #region Private Properties
+        private readonly Func&lt;FileItemViewModel&gt; _fileFactory;
+        private readonly ISQLiteStorage _storage;
+        private readonly SynchronizationContext _context;
+        private ICommand _editFileCommand;
+        private ICommand _createFileCommand;
+        private bool _noFiles;
+        #endregion
+   }</pre><p>We have two commands for editing a file, which will be bound to the custom binding <code class="literal">SelectCommandProperty</code> on the <code class="literal">CarouselView</code>. When a user touches the current child on the <code class="literal">CarouselLayout</code>, this command will be invoked.</p><p>Notice the <code class="literal">SynchronizationContext</code> property?</p><p>This will be used for threading purposes to ensure we update the <code class="literal">ObservableCollection</code> on the main UI thread.</p><p>Now let's add the public properties as follows:</p><pre class="programlisting">#region Public Properties
+public Subject&lt;DataChange&gt; DataChanges { get; private set; }
+public ICommand EditFileCommand
+  {
+    get
+     {
+       return _editFileCommand;
+     }
+    set
+     {
+       if (value.Equals(_editFileCommand))
+         {
+            return;
+         }
+    _editFileCommand = value; 
+    OnPropertyChanged("EditFileCommand");
+     } 
+   }
+public ICommand CreateFileCommand
+  {
+    get
+      { 
+         return _createFileCommand;
+      }
+    set 
+      { 
+        if (value.Equals(_createFileCommand))
+      {
+        return;
+      }
+    _createFileCommand = value; 
+    OnPropertyChanged("CreateFileCommand");
+     }
+   }
+public bool AnyFiles
+   {
+     get
+       {
+         return _noFiles; 
+       }
+     set
+       { 
+         if (value.Equals(_noFiles))
+          {
+            return; 
+          }
+         _noFiles = value;
+         OnPropertyChanged("AnyFiles");
+       }
+     }
+public ObservableCollection&lt;FileItemViewModel&gt; Cells { get; set; }
+#endregion</pre><div class="note" title="Note" style=""><div class="inner"><h3 class="title"><a id="tip111"/>Tip</h3><p>Don't forget that we only need a <code class="literal">public</code> property for the properties that are going to be bound to the view.</p></div></div><p>We have an <code class="literal">ObservableCollection</code> of type <code class="literal">FileItemViewModel;</code> so, for every file we pull from the database, a new view-model will be created to show the details on the child view of the <code class="literal">CarouselView</code>. We also have an <code class="literal">IObservable</code> property called <code class="literal">DataChanges</code>; every time we update the <code class="literal">ObservableCollection</code>, we will publish a new event through the stream, and because we will be binding this property to the <code class="literal">CarouselView</code>, the list of children will be structured accordingly.</p><p>Now let's add the constructor as follows:</p><pre class="programlisting">#region Constructors
+public FilesPageViewModel(INavigationService navigation, Func&lt;Action&lt;object&gt;, ICommand&gt; commandFactory, 
+    IMethods methods, ISQLiteStorage storage, Func&lt;FileItemViewModel&gt; 
+    fileFactory) : base(navigation, methods)
+       {
+           DataChanges = new Subject&lt;DataChange&gt;();
+           // retrieve main thread context _context = 
+           SynchronizationContext.Current; 
+           _storage = storage; 
+           _fileFactory = fileFactory;
+           Cells = new ObservableCollection&lt;FileItemViewModel&gt;();
+          _editFileCommand = commandFactory(async (file) =&gt;
+             {
+                await Navigation.Navigate(PageNames.EditFilePage,
+                new Dictionary&lt;string, object&gt;()
+                 {
+                   {
+                     "filename", (file as FileItemViewModel).FileName}, 
+                       {
+                         "contents", (file as FileItemViewModel).Contents} });
+                       });
+              _createFileCommand = commandFactory(async (obj) =&gt;
+               {
+                 var fileName = await ShowEntryAlert("Enter file name:");
+                 if (!string.IsNullOrEmpty(fileName))
+                   { 
+                     await Navigation.Navigate(PageNames.EditFilePage,
+                     new Dictionary&lt;string, object&gt;() 
+                       {
+                         {
+                           "filename", fileName
+                         }
+                       });
+                  }
+               }); 
+            }
+#endregion</pre></div>
+<div class="section" title="Using a SynchronizationContext"><div class="titlepage"><div><div><h1 class="title"><a id="ch07lvl1sec119"/>Using a SynchronizationContext</h1></div></div></div><p>In all <code class="literal">Xamarin.Forms</code> applications, when we update view-model properties that are bound to a view, they must be changed on the main UI thread.</p><div class="note" title="Note" style=""><div class="inner"><h3 class="title"><a id="tip112"/>Tip</h3><p>This rule applies to any application. UI changes must happen on the main UI thread.</p></div></div><p>The <code class="literal">SynchronizationContext.Current</code> property is used to retrieve the current sync context of any thread.</p><div class="section" title="How do we know this context is from the main UI thread?"><div class="titlepage"><div><div><h2 class="title"><a id="ch07lvl2sec54"/>How do we know this context is from the main UI thread?</h2></div></div></div><p>We store a reference to this context in the constructor because all view-models are created on the main UI thread. This means we have the current sync context of the main thread.</p><p>Let's have a look at how we are going to use this sync context reference:</p><pre class="programlisting">#region Private Methods
+private void UpdateFiles() 
+  { 
+    _context.Post(async (obj) =&gt;
+      {
+        Cells.Clear(); 
+        var files = await _storage.GetTable&lt;FileStorable&gt;(CancellationToken.None);
+        foreach (var file in files) 
+          { 
+            var fileModel = _fileFactory(); 
+            fileModel.Apply(file);
+            Cells.Add(fileModel);
+          }
+        AnyFiles = Cells.Any();
+        DataChanges.OnNext(new DataChange()
+          { 
+            SizeChanged = true
+          });
+       }, null);
+    }
+#endregion</pre><p>The <code class="literal">UpdateFiles</code> function is called every time the page appears. When we call <code class="literal">Post</code> on the context object, we have to pass an action that will be propagated to the main UI thread when it becomes available. Inside this action, we will use the <code class="literal">GetTable</code> function to retrieve all files from the table. Then, for every <code class="literal">FileStorable</code> object, we instantiate a new <code class="literal">FileItemViewModel</code> from the factory and add this to the <code class="literal">ObservableCollection</code>. After we do this for all files, we publish a new event to the <code class="literal">DataChanges</code> sequence.</p><p>Finally, we have to add the <code class="literal">OnAppear</code> function, which will be called every time the page appears; it doesn't matter if we push or pop to this page, this function will be called every time. This means that we will update the current files, every time the page appears, so the <code class="literal">CarouselView</code> will have the most current list of files in the database at all times:</p><pre class="programlisting">#region Public Methods
+public void OnAppear() 
+  {
+    UpdateFiles(); 
+  }
+#endregion</pre><p>Now let's build the page for this view-model. To do so, inside the <code class="literal">Pages</code> folder, add in <code class="literal">FilesPage.xaml</code> and implement the following:</p><pre class="programlisting">&lt;ui:ExtendedContentPage.Content&gt;
+  &lt;Grid x:Name="Grid" RowSpacing="10" Padding="10, 10, 10, 10"&gt; 
+  &lt;Grid.RowDefinitions&gt;
+  &lt;RowDefinition Height="*"/&gt;
+  &lt;RowDefinition Height="60"/&gt;
+  &lt;/Grid.RowDefinitions&gt;
+  &lt;Grid.ColumnDefinitions&gt; 
+  &lt;ColumnDefinition Width="*"/&gt;
+  &lt;/Grid.ColumnDefinitions&gt;
+  &lt;Label x:Name="NoFilesLabel" 
+     IsVisible="{Binding AnyFiles, Converter={StaticResource notConverter}}" 
+     HorizontalTextAlignment="Center" VerticalTextAlignment="Center" Grid.Row="0" 
+     Grid.Column="0"&gt;
+  &lt;Label.FormattedText&gt;
+  &lt;FormattedString&gt;
+  &lt;Span Text="{x:Static resx:LabelResources.NoFilesLabel}" FontFamily="Arial" 
+  FontSize="24" ForegroundColor="Black"/&gt; &lt;/FormattedString&gt; 
+  &lt;/Label.FormattedText&gt; 
+  &lt;/Label&gt;
+  &lt;controls:CarouselView x:Name="CarouselView" SelectedCommand="{Binding 
+  EditFileCommand}" Grid.Row="0" Grid.Column="0"/&gt;
+  &lt;Button x:Name="CreateFileButton" Command="{Binding CreateFileCommand}" 
+  Text="{x:Static resx:LabelResources.CreateFileLabel}" Style="{StaticResource 
+  ButtonStyle}" Grid.Row="1" Grid.Column="0"/&gt; 
+  &lt;/Grid&gt;
+&lt;/ui:ExtendedContentPage.Content&gt;</pre><p>Since we are including the <code class="literal">CarouselView</code> in this page, we have to add a new reference namespace at the top of the page as follows:</p><pre class="programlisting"/><p>Notice our custom binding property on the CarouselView with the SelectCommand?</p><p>Every time we click the current child, this will execute the EditFileCommand from the view-model.</p><p>The page has also been set up to hide the CarouselView and display the NoFilesLabel if there are no files in local storage. Then, if we want to create a new file, we click on the CreateFileButton.</p></div></div>
+<div class="section" title="Building the EditFilePage"><div class="titlepage"><div><div><h1 class="title"><a id="ch07lvl1sec120"/>Building the EditFilePage</h1></div></div></div><p>Now we move to the last page of the application. Add a new file called <code class="literal">EditFilePage.xaml</code> to the <code class="literal">Pages</code> folder and implement the following:</p><pre class="programlisting">&lt;ui:ExtendedContentPage.Content&gt; 
+  &lt;Grid x:Name="Grid" RowSpacing="10" Padding="10, 10, 10, 10"&gt; 
+    &lt;Grid.RowDefinitions&gt;
+      &lt;RowDefinition Height="60"/&gt;
+      &lt;RowDefinition Height="*"/&gt;
+      &lt;RowDefinition Height="60"/&gt; 
+      &lt;RowDefinition Height="60"/&gt; 
+    &lt;/Grid.RowDefinitions&gt;
+    &lt;Grid.ColumnDefinitions&gt;
+      &lt;ColumnDefinition Width="*"/&gt; 
+    &lt;/Grid.ColumnDefinitions&gt;
+    &lt;Entry x:Name="FileNameLabel" Text="{Binding FileName, Mode=TwoWay}" 
+        BackgroundColor="Silver" 
+        Grid.Row="0"
+        Grid.Column="0"&gt;
+     &lt;Entry.Behaviors&gt; 
+    &lt;beh:LowercaseEntryBehaviour/&gt; 
+    &lt;/Entry.Behaviors&gt;
+  &lt;/Entry&gt;
+    &lt;Editor x:Name="ContentsEditor" Text="{Binding Contents, Mode=TwoWay}"
+        BackgroundColor="Silver" Grid.Row="1" Grid.Column="0"/&gt;
+    &lt;Button x:Name="SaveFileButton" Command="{Binding SaveFileCommand}" 
+        Text="{x:Static resx:LabelResources.SaveFileLabel}" 
+        Style="{StaticResource ButtonStyle}" Grid.Row="2" Grid.Column="0"/&gt;
+    &lt;Button x:Name="DeleteFileButton" Command="{Binding DeleteFileCommand}"
+        Text="{x:Static resx:LabelResources.DeleteFileLabel}"
+        Style="{StaticResource ButtonStyle}" Grid.Row="3" Grid.Column="0"/&gt;
+    &lt;/Grid&gt;
+ &lt;/ui:ExtendedContentPage.Content&gt;</pre><p>We have an <code class="literal">Entry</code> property at the very top for editing the filename and we have an <code class="literal">Editor</code> for filling in the text contents of the file. We also have two buttons: one for saving the file and one for deleting it.</p><p>Now, turn our attention to the <code class="literal">Entry</code> item; we are going to introduce a new <code class="literal">Xamarin.Forms</code> feature called <code class="literal">Behaviours</code>.</p></div>
+<div class="section" title="Behaviours"><div class="titlepage"><div><div><h1 class="title"><a id="ch07lvl1sec121"/>Behaviours</h1></div></div></div><p>Behaviours enable you to implement objects which can be concisely attached to  events and behaviours of any control type. This means we can package and reuse behaviours between similar controls without having to write repetitive code behind our XAML sheets.</p><p>Let's create a new folder called <code class="literal">Behaviours</code>, add in a new file called <code class="literal">LowercaseEntryBehaviour.cs</code>, and implement the following:</p><pre class="programlisting">public class LowercaseEntryBehaviour : Behavior&lt;Entry&gt; 
+  {
+    protected override void OnAttachedTo(Entry entry)
+     { 
+       entry.TextChanged += OnEntryTextChanged; 
+       base.OnAttachedTo(entry);
+     }
+    protected override void OnDetachingFrom(Entry entry)
+     {
+       entry.TextChanged -= OnEntryTextChanged;
+       base.OnDetachingFrom(entry);
+     }
+    void OnEntryTextChanged(object sender, TextChangedEventArgs args)
+      { 
+         ((Entry)sender).Text = args.NewTextValue.ToLower();
+      } 
+    }</pre><p>The <code class="literal">OnAttachedTo</code> and <code class="literal">OnDetachingFrom</code> methods get invoked when the behavior is attached/detached from parent UI element; so we subscribe to the <code class="literal">TextChanged</code> event, and when it triggers, we update the <code class="literal">Text</code> property by calling the <code class="literal">ToLower</code> function. This means that irrespective of the case of the text when it is entered into the <code class="literal">Entry</code> object, it will always be lowercase.</p><p>Now let's add the view-model for the <code class="literal">EditFilePage</code>. Inside the <code class="literal">ViewModels</code> folder, add another file called <code class="literal">EditFilePageViewModel.cs</code> and implement the <code class="literal">private</code> properties first as follows:</p><pre class="programlisting">public class EditFilePageViewModel : ViewModelBase
+  { 
+    #region Private Properties
+    private readonly ISQLiteStorage _storage;
+    private ICommand _saveFileCommand;
+    private ICommand _deleteFileCommand;
+    private string _contents;
+    private string _fileName;
+    #endregion 
+  }</pre><p>We have to use the <code class="literal">ISQLiteStorage</code> object for saving and deleting files on the local database. We then have another two properties to record the contents of the file and filename. The two commands are used to invoke the SQLite functions for saving and deleting.</p><p>Let's go ahead and add the public properties as follows:</p><pre class="programlisting">#region Public Properties
+public ICommand SaveFileCommand 
+  { 
+    get 
+      { 
+        return _saveFileCommand; 
+      }
+    set
+     { 
+       if (value.Equals(_saveFileCommand)) 
+         { 
+           return;
+         }
+       _saveFileCommand = value; OnPropertyChanged("FileEditCommand");
+     }
+  }
+public ICommand DeleteFileCommand 
+  { 
+    get 
+      {
+        return _deleteFileCommand;
+      }
+    set 
+      { 
+        if (value.Equals(_deleteFileCommand)) 
+          { 
+            return;
+          }
+        _deleteFileCommand = value; OnPropertyChanged("CreateFileCommand");
+      }
+  }
+public string Contents 
+  {
+    get
+      { 
+        return _contents; 
+      }
+    set { if (value.Equals(_contents)) 
+      { 
+        return;
+      }
+     _contents = value; OnPropertyChanged("Contents"); 
+   }
+}
+public string FileName 
+  { 
+    get 
+      { 
+        return _fileName; 
+      }
+    set
+      { 
+        if (value.Equals(_fileName)) 
+          { 
+            return; 
+          }
+        _fileName = value; OnPropertyChanged("FileName"); 
+      } 
+    }
+#endregion</pre><div class="note" title="Note" style=""><div class="inner"><h3 class="title"><a id="tip113"/>Tip</h3><p>Remember that we only want to publicize the variables that are going to be bound through the XAML.</p></div></div><p>Now we add the constructor as follows:</p><pre class="programlisting">#region Constructors
+  public EditFilePageViewModel (INavigationService navigation, Func&lt;Action, ICommand&gt; commandFactory,
+     IMethods methods, ISQLiteStorage storage)
+       : base (navigation, methods)
+         { 
+            _storage = storage;
+            _saveFileCommand = commandFactory(async () =&gt; 
+            {
+               await _storage.InsertObject(new FileStorable()
+               {  
+                 Key = FileName, Contents = Contents }, CancellationToken.None);
+               NotifyAlert("File saved."); 
+            });
+            _deleteFileCommand = commandFactory(async () =&gt;
+             {
+                await _storage.DeleteObjectByKey&lt;FileStorable&gt;(FileName, CancellationToken.None);
+                await Navigation.Pop();
+              });
+          }
+#endregion</pre><p>Then, finally, we add the remaining functions; we have the <code class="literal">OnDisppear</code> function, which will be used for clearing the filename and contents whenever the page disappears. Then we have the <code class="literal">LoadAsync</code> override, which is going to set the filename and contents from the navigation parameters that are passed in from the previous page. From the <code class="literal">FilesPage</code>, when a user selects a file from the carousel, the <code class="literal">FileItemViewModel</code> object details are passed into a dictionary for the navigation parameters that are passed into the <code class="literal">EditFilePage</code>:</p><pre class="programlisting">#region Public Methods
+public void OnDisppear()
+  {
+    FileName = string.Empty;
+    Contents = string.Empty;
+  }
+protected override async Task LoadAsync (IDictionary&lt;string, object&gt; parameters)
+  {
+    if (parameters.ContainsKey("filename")) 
+      { 
+        FileName = (parameters["filename"] as string).ToLower(); 
+      }
+    if (parameters.ContainsKey("contents")) 
+      { 
+        Contents = parameters["contents"] as string; 
+      } 
+   }
+#endregion 
+ }</pre><p>Fantastic! We have finished implementing the user interface.</p></div>
+<div class="section" title="Challenge"><div class="titlepage"><div><div><h1 class="title"><a id="ch07lvl1sec122"/>Challenge</h1></div></div></div><p>We have built everything in the <code class="literal">FileStorage.Portable</code> and <code class="literal">FileStorage</code> projects, but there are still pieces missing. Here is your challenge; fill in the missing pieces of the solution and compile it. The remaining files are exactly the same from all our other <code class="literal">Xamarin.Forms</code> solutions, but now it is your turn to finish off the project.</p></div>
+<div class="section" title="Building the Windows Phone version"><div class="titlepage"><div><div><h1 class="title"><a id="ch07lvl1sec123"/>Building the Windows Phone version</h1></div></div></div><p>If you are looking for an even bigger challenge, then try adding on the Windows Phone version. Don't be intimidated by this exercise, most of the code is shared for you. On the Windows Phone version, you will have to implement the following:</p><div class="itemizedlist"><ul class="itemizedlist"><li class="listitem" style="list-style-type: disc"><code class="literal">WinPhoneMethods</code></li><li class="listitem" style="list-style-type: disc"><code class="literal">GestureViewRenderer</code></li><li class="listitem" style="list-style-type: disc"><code class="literal">SQLiteSetup</code></li><li class="listitem" style="list-style-type: disc"><code class="literal">LoggerWinPhone</code></li></ul></div><p>You will also need to download a Visual Studio extension for SQLite from the following link <a class="ulink" href="http://sqlite.org/download.html">http://sqlite.org/download.html</a>.</p><p>Download the <span class="strong"><strong>sqlite-wp81-winrt-3130000.vsix</strong></span> file:</p><div class="mediaobject"><img src="graphics/B05293_07_07.jpg" alt="Building the Windows Phone version"/></div><p>Install the extensions and then reopen Visual Studio. Then, in your Windows Phone project, right-click on <span class="strong"><strong>References</strong></span> and select <span class="strong"><strong>Add Reference....</strong></span> Then select <span class="strong"><strong>Windows Phone 8.1</strong></span> | <span class="strong"><strong>Extensions</strong></span> from the left-hand side and select <span class="strong"><strong>SQLite for Windows Phone 8.1</strong></span>, as shown in the following screenshot:</p><div class="mediaobject"><img src="graphics/B05293_07_08.jpg" alt="Building the Windows Phone version"/></div><p>When you run this project, you must make sure that the <span class="strong"><strong>x86</strong></span> configuration is set:</p><p>
+</p><div class="mediaobject"><img src="graphics/B05293_07_09.jpg" alt="Building the Windows Phone version"/></div><p>
+</p><p>To help you get started, the implementation for the <code class="literal">SQLiteSetup</code> class is as follows:</p><pre class="programlisting">public class SQLiteSetup : ISQLiteSetup 
+  { 
+    #region Public Properties
+    public string DatabasePath { get; set; }
+    public ISQLitePlatform Platform { get; set; }
+    #endregion
+    #region Constructors
+    public SQLiteSetup(ISQLitePlatform platform)
+      { 
+        DatabasePath = Path.Combine(ApplicationData.Current.LocalFolder.Path, 
+        "mycaremanager.db3")
+        Platform = platform; 
+      }
+    #endregion 
+}</pre><div class="note" title="Note" style=""><div class="inner"><h3 class="title"><a id="tip114"/>Tip</h3><p>To see the finished version, visit the following link: <a class="ulink" href="https://github.com/flusharcade/chapter7-filestorage">https://github.com/flusharcade/chapter7-filestorage</a>.</p></div></div></div>
+<div class="section" title="Summary"><div class="titlepage"><div><div><h1 class="title"><a id="ch07lvl1sec124"/>Summary</h1></div></div></div><p>In this chapter, we explored a walkthrough for integrating SQLite in a <code class="literal">Xamarin.Forms</code> application. We addressed the async-lock pattern and how to implement it with SQLite to make database connections thread-safe. In the final chapter, we will build a cross-platform camera application that will implement native control over camera hardware. We will also present camera video outlets via a <code class="literal">CustomRenderer</code> and build events to handle camera events in our portable library.</p></div></body></html>

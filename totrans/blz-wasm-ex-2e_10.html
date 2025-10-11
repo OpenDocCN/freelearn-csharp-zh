@@ -1,0 +1,817 @@
+<html><head></head><body>
+  <div id="_idContainer283" class="Basic-Text-Frame">
+    <h1 class="chapterNumber">10</h1>
+    <h1 id="_idParaDest-287" class="chapterTitle">Using Azure Active Directory to Secure a Blazor WebAssembly Application</h1>
+    <p class="normal">Security is important. Most applications require each user to provide their credentials before they can access all the functionality supplied by the application. Managing usernames, passwords, roles, and groups can be tedious and complicated. Using <strong class="keyWord">Azure Active Directory</strong> (<strong class="keyWord">Azure AD</strong>) makes it easy. Azure AD is an identity provider in the cloud.</p>
+    <p class="normal">The project that we create in this chapter will allow the user to view the claims provided by the token that is returned from Azure AD after the user is authenticated by Azure AD. We will be using the <strong class="keyWord">Microsoft Authentication Library</strong> (<strong class="keyWord">MSAL</strong>) to acquire <strong class="keyWord">JSON Web Tokens</strong> (<strong class="keyWord">JWTs</strong>)<strong class="keyWord"> </strong>from Azure AD. We will be using <strong class="keyWord">Open ID Connect</strong> (<strong class="keyWord">OIDC</strong>) endpoints to authenticate users. OIDC is a simple identity layer built on the industry standard OAuth 2.0 protocol. It allows clients to verify the identity of a user based on the authentication performed by an identity provider, such as Duende Identity Server or Azure AD.</p>
+    <p class="normal">In this chapter, we will learn the difference between authentication and authorization. We will learn how to use the <code class="inlineCode">RemoteAuthenticationView</code> component to handle the various actions required during each stage of authentication. We will also learn how to use the <code class="inlineCode">CascadingAuthenticationState</code> component to share the authentication state with each of its children. Finally, we will learn how to control what is rendered to the user by using the <code class="inlineCode">Authorize</code> attribute and the <code class="inlineCode">AuthorizeView</code> component.</p>
+    <p class="normal">The project that we create in this chapter will be a claims reader. It will allow users who belong to a particular group within Azure AD to view the contents of the token that is returned from Azure AD after authentication. If the user is not authenticated or does not belong to the appropriate group, they will receive a warning message.</p>
+    <blockquote class="packt_quote">
+      <p class="quote">Who are you? And what</p>
+      <p class="quote">are you authorized to do?</p>
+      <p class="quote">Your identity.</p>
+    </blockquote>
+    <p class="normal">In this chapter, we will cover the following topics:</p>
+    <ul>
+      <li class="bulletList">Understanding the difference between authentication and authorization</li>
+      <li class="bulletList">Working with authentication</li>
+      <li class="bulletList">Controlling the user interface using authorization</li>
+      <li class="bulletList">Creating the claims viewer project</li>
+    </ul>
+    <h1 id="_idParaDest-288" class="heading-1">Technical requirements</h1>
+    <p class="normal">To complete this project, you need to have Visual Studio 2022 installed on your PC. For instructions on how to install the free Community Edition of Visual Studio 2022, refer to <em class="chapterRef">Chapter 1</em>, <em class="italic">Introduction to Blazor WebAssembly</em>. Since we will be using Azure AD for authentication, you will need an account on Microsoft Azure. If you do not have an account on Microsoft Azure, refer to <em class="chapterRef">Chapter 1</em>, <em class="italic">Introduction to Blazor WebAssembly</em>, to create a free account.</p>
+    <p class="normal">The source code for this chapter is available in the following GitHub repository: <a href="https://github.com/PacktPublishing/Blazor-WebAssembly-by-Example-Second-Edition/tree/main/Chapter10"><span class="url">https://github.com/PacktPublishing/Blazor-WebAssembly-by-Example-Second-Edition/tree/main/Chapter10</span></a>.</p>
+    <p class="normal">The Code in Action video is available here: <a href="https://packt.link/Ch10"><span class="url">https://packt.link/Ch10</span></a>.</p>
+    <h1 id="_idParaDest-289" class="heading-1">Understanding the difference between authentication and authorization</h1>
+    <p class="normal">Authentication and authorization are the two sides of the same security coin. Authentication is the <a id="_idIndexMarker682"/>process of obtaining credentials from a user to verify the identity of the user. Authorization is the process of checking the privileges for the user to <a id="_idIndexMarker683"/>access specific resources. </p>
+    <p class="normal">Authentication always precedes authorization.</p>
+    <figure class="mediaobject"><img src="../Images/B18471_10_01.png" alt="Graphical user interface  Description automatically generated"/></figure>
+    <p class="packt_figref">Figure 10.1: Authentication vs Authorization</p>
+    <p class="normal">The preceding image illustrates the difference between authentication and authorization. The left-hand <a id="_idIndexMarker684"/>side of the image shows a sample login screen that is used to <a id="_idIndexMarker685"/>determine who the user is. The right-hand side of the image shows the list of groups or roles that the user does or does not belong to, which is used to determine what the user can do.</p>
+    <h2 id="_idParaDest-290" class="heading-2">Authentication</h2>
+    <p class="normal">Blazor provides the <strong class="keyWord">RemoteAuthenticatorView</strong> component to make creating the various authentication <a id="_idIndexMarker686"/>pages easier. This component persists and controls state across authentication operations.</p>
+    <p class="normal">This is a high-level explanation of how authentication works:</p>
+    <ol class="numberedList" style="list-style-type: decimal;">
+      <li class="numberedList" value="1">An anonymous user attempts to log in or requests a page with the <code class="inlineCode">Authorize</code> attribute applied.</li>
+      <li class="numberedList">The user is redirected to the <code class="inlineCode">/authentication/login</code> page.</li>
+      <li class="numberedList">The user enters their credentials.</li>
+      <li class="numberedList">If they are authenticated, they are redirected to the <code class="inlineCode">/authentication/login-callback</code> page.</li>
+      <li class="numberedList">However, if they are not authenticated, they are redirected to the <code class="inlineCode">/authentication/login-failed</code> page.</li>
+    </ol>
+    <p class="normal">This is the code for a sample <code class="inlineCode">Authentication</code> component that relies on the <code class="inlineCode">RemoteAuthenticatorView</code> component to handle the various authentication actions:</p>
+    <p class="normal"><strong class="keyWord">Authentication.razor</strong></p>
+    <pre class="programlisting code"><code class="hljs-code">@page "/authentication/{action}"
+@using Microsoft.AspNetCore.Components.WebAssembly.Authentication
+<span class="hljs-tag">&lt;</span><span class="hljs-name">RemoteAuthenticatorView</span><span class="hljs-tag"> </span><span class="hljs-attr">Action</span><span class="hljs-tag">=</span><span class="hljs-string">"@Action"</span><span class="hljs-tag">&gt;</span>
+    <span class="hljs-tag">&lt;</span><span class="hljs-name">LoggingIn</span><span class="hljs-tag">&gt;</span>
+        Please sign in to your account ...
+    <span class="hljs-tag">&lt;/</span><span class="hljs-name">LoggingIn</span><span class="hljs-tag">&gt;</span>
+<span class="hljs-tag">&lt;/</span><span class="hljs-name">RemoteAuthenticatorView</span><span class="hljs-tag">&gt;</span>
+@code{
+    [Parameter] public string? Action { get; set; }
+}
+</code></pre>
+    <p class="normal">In the preceding code, the <code class="inlineCode">Action</code> property is determined by the route, and the <code class="inlineCode">LoggingIn</code> property is used to define the UI that is rendered while the user is logging in. The <code class="inlineCode">LoggingIn</code> property is a <code class="inlineCode">RenderFragment</code>. We do not need to provide the <code class="inlineCode">LoggingIn</code> property since there is a default one defined by the <code class="inlineCode">RemoteAuthenticatorView</code> component. We have only included it as an example. All the properties of the <code class="inlineCode">RemoteAuthenticatorView</code> component that are of type <code class="inlineCode">RenderFragment</code> have default values provided for them by the framework.</p>
+    <p class="normal">In the preceding <a id="_idIndexMarker687"/>code, only two of the properties of the <code class="inlineCode">RemoteAuthenticatorView</code> component are defined. However, there are quite a few more properties available. </p>
+    <p class="normal">These are the properties of the <code class="inlineCode">RemoteAuthenticatorView</code> class:</p>
+    <ul>
+      <li class="bulletList"><code class="inlineCode">Action</code>: the current action. The options are <code class="inlineCode">LogIn</code>, <code class="inlineCode">LogInCallback</code>, <code class="inlineCode">LogInFailed</code>, <code class="inlineCode">LogOut</code>, <code class="inlineCode">LogOutCallback</code>, <code class="inlineCode">LogOutFailed</code>, <code class="inlineCode">LogOutSucceeded</code>, <code class="inlineCode">Profile</code>, and <code class="inlineCode">Register</code>.</li>
+      <li class="bulletList"><code class="inlineCode">ApplicationPaths</code>: the <a id="_idIndexMarker688"/>paths to the various authentication pages. Since we will be using the default values for each path, we will not be using this property.</li>
+      <li class="bulletList"><code class="inlineCode">AuthenticationState</code>: the authentication state. It is persisted during the authentication operation. It is of type <code class="inlineCode">TAuthenticationState</code>.</li>
+      <li class="bulletList"><code class="inlineCode">CompletingLoggingIn</code>: the UI to display when <code class="inlineCode">LogInCallback</code> is being handled. It is a <code class="inlineCode">RenderFragment</code>.</li>
+      <li class="bulletList"><code class="inlineCode">CompletingLogOut</code>: the UI to display when <code class="inlineCode">LogOutCallback</code> is being handled. It is a <code class="inlineCode">RenderFragment</code>.</li>
+      <li class="bulletList"><code class="inlineCode">LoggingIn</code>: the UI to display when <code class="inlineCode">LogIn</code> is being handled. It is a <code class="inlineCode">RenderFragment</code>.</li>
+      <li class="bulletList"><code class="inlineCode">LogInFailed</code>: the UI to display when <code class="inlineCode">LogInFailed</code> is being handled. It is a <code class="inlineCode">RenderFragment</code>.</li>
+      <li class="bulletList"><code class="inlineCode">LogOut</code>: the UI to display when <code class="inlineCode">LogOut</code> is being handled. It is a <code class="inlineCode">RenderFragment</code>.</li>
+      <li class="bulletList"><code class="inlineCode">LogOutFailed</code>: the UI to display when <code class="inlineCode">LogOutFailed</code> is being handled. It is a <code class="inlineCode">RenderFragment</code>.</li>
+      <li class="bulletList"><code class="inlineCode">LogOutSucceeded</code>: the UI to display when <code class="inlineCode">LogOutSucceeded</code> is being handled. It is a <code class="inlineCode">RenderFragment</code>.</li>
+      <li class="bulletList"><code class="inlineCode">OnLogInSucceeded</code>: the event <a id="_idIndexMarker689"/>callback that is invoked when the log-in operation succeeds.</li>
+      <li class="bulletList"><code class="inlineCode">OnLogOutSucceeded</code>: the event callback that is invoked when the logout operation succeeds.</li>
+      <li class="bulletList"><code class="inlineCode">Registering</code>: the UI to display when <code class="inlineCode">Register</code> is being handled. It is a <code class="inlineCode">RenderFragment</code>.</li>
+      <li class="bulletList"><code class="inlineCode">UserProfile</code>: the UI to display when <code class="inlineCode">Profile</code> is being handled. It is a <code class="inlineCode">RenderFragment</code>.</li>
+    </ul>
+    <p class="normal">Using the <code class="inlineCode">RemoteAuthenticatorView</code> component <a id="_idIndexMarker690"/>makes it easy to handle the authentication process.</p>
+    <h2 id="_idParaDest-291" class="heading-2">Authorization</h2>
+    <p class="normal">In Blazor WebAssembly applications, the authorization checks are all handled on the client. Since a <a id="_idIndexMarker691"/>malicious user can change the behavior of the client-side code, our authorization checks can be compromised. Therefore, we will only be using authorization to handle differences in the user interface that vary depending on the rights of the user.</p>
+    <div class="packt_tip">
+      <p class="normal"><strong class="keyWord">TIP</strong></p>
+      <p class="normal">Never trust the client!</p>
+    </div>
+    <p class="normal">Real security can only be enforced by using a backend server. We cannot authenticate our users on the client, nor can we reliably authorize their actions on the client.</p>
+    <p class="normal">Authentication and authorization work together to secure our applications. Authentication is <a id="_idIndexMarker692"/>used to determine who the user is, while authorization is used to determine what they can do.</p>
+    <p class="normal">In addition to the <code class="inlineCode">RemoteAuthenticatorView</code> component, Blazor WebAssembly provides some other built-in components to help us work with authentication.</p>
+    <h1 id="_idParaDest-292" class="heading-1">Working with authentication</h1>
+    <p class="normal">The <code class="inlineCode">CascadingAuthenticationState</code> component and the <code class="inlineCode">AuthorizeRouteView</code> component work together <a id="_idIndexMarker693"/>to make authentication simpler. The <code class="inlineCode">CascadingAuthenticationState</code> component is responsible for cascading the user’s authentication state to all its descendants. It is typically used to wrap the <code class="inlineCode">Router</code> component.</p>
+    <p class="normal">In the following example, the <code class="inlineCode">App</code> component relies on the <code class="inlineCode">CascadingAuthenticationState</code> component to provide the user’s authentication state to all the routable components:</p>
+    <div class="note">
+      <p class="normal"><strong class="keyWord">IMPORTANT NOTE</strong></p>
+      <p class="normal">Sometimes we refer to routable components as pages.</p>
+    </div>
+    <p class="normal"><strong class="keyWord">App.razor</strong></p>
+    <pre class="programlisting code"><code class="hljs-code">@inject NavigationManager Navigation
+<span class="hljs-tag">&lt;</span><span class="hljs-name">CascadingAuthenticationState</span><span class="hljs-tag">&gt;</span>
+    <span class="hljs-tag">&lt;</span><span class="hljs-name">Router</span><span class="hljs-tag"> </span><span class="hljs-attr">AppAssembly</span><span class="hljs-tag">=</span><span class="hljs-string">"@typeof(App).Assembly"</span><span class="hljs-tag">&gt;</span>
+        <span class="hljs-tag">&lt;</span><span class="hljs-name">Found</span><span class="hljs-tag"> </span><span class="hljs-attr">Context</span><span class="hljs-tag">=</span><span class="hljs-string">"routeData"</span><span class="hljs-tag">&gt;</span>
+        <span class="hljs-tag">&lt;/</span><span class="hljs-name">Found</span><span class="hljs-tag">&gt;</span>
+        <span class="hljs-tag">&lt;</span><span class="hljs-name">NotFound</span><span class="hljs-tag">&gt;</span>
+            <span class="hljs-tag">&lt;</span><span class="hljs-name">PageTitle</span><span class="hljs-tag">&gt;</span>Not found<span class="hljs-tag">&lt;/</span><span class="hljs-name">PageTitle</span><span class="hljs-tag">&gt;</span>
+            <span class="hljs-tag">&lt;</span><span class="hljs-name">LayoutView</span><span class="hljs-tag"> </span><span class="hljs-attr">Layout</span><span class="hljs-tag">=</span><span class="hljs-string">"@typeof(MainLayout)"</span><span class="hljs-tag">&gt;</span>
+                <span class="hljs-tag">&lt;</span><span class="hljs-name">p</span><span class="hljs-tag">&gt;</span>Sorry, there's nothing here.<span class="hljs-tag">&lt;/</span><span class="hljs-name">p</span><span class="hljs-tag">&gt;</span>
+            <span class="hljs-tag">&lt;/</span><span class="hljs-name">LayoutView</span><span class="hljs-tag">&gt;</span>
+        <span class="hljs-tag">&lt;/</span><span class="hljs-name">NotFound</span><span class="hljs-tag">&gt;</span>
+    <span class="hljs-tag">&lt;/</span><span class="hljs-name">Router</span><span class="hljs-tag">&gt;</span>
+<span class="hljs-tag">&lt;/</span><span class="hljs-name">CascadingAuthenticationState</span><span class="hljs-tag">&gt;</span>
+</code></pre>
+    <p class="normal">In the preceding markup, the <code class="inlineCode">Found</code> attribute contains the following <code class="inlineCode">AuthorizeRouteView</code> component:</p>
+    <pre class="programlisting code"><code class="hljs-code"><span class="hljs-tag">&lt;</span><span class="hljs-name">AuthorizeRouteView</span><span class="hljs-tag"> </span><span class="hljs-attr">RouteData</span><span class="hljs-tag">=</span><span class="hljs-string">"@routeData"</span><span class="hljs-tag"> </span>
+<span class="hljs-tag">                    </span><span class="hljs-attr">DefaultLayout</span><span class="hljs-tag">=</span><span class="hljs-string">"@typeof(MainLayout)"</span><span class="hljs-tag">&gt;</span>
+    <span class="hljs-tag">&lt;</span><span class="hljs-name">NotAuthorized</span><span class="hljs-tag">&gt;</span>
+        @if (context.User.Identity?.IsAuthenticated != true)
+        {
+            Navigation.NavigateToLogin($"authentication/login");
+        }
+        else
+        {
+            <span class="hljs-tag">&lt;</span><span class="hljs-name">p</span><span class="hljs-tag">&gt;</span>
+                ERROR: You are not authorized to access 
+                this page.
+            <span class="hljs-tag">&lt;/</span><span class="hljs-name">p</span><span class="hljs-tag">&gt;</span>
+        }
+    <span class="hljs-tag">&lt;/</span><span class="hljs-name">NotAuthorized</span><span class="hljs-tag">&gt;</span>
+<span class="hljs-tag">&lt;/</span><span class="hljs-name">AuthorizeRouteView</span><span class="hljs-tag">&gt;</span>
+<span class="hljs-tag">&lt;</span><span class="hljs-name">FocusOnNavigate</span><span class="hljs-tag"> </span><span class="hljs-attr">RouteData</span><span class="hljs-tag">=</span><span class="hljs-string">"@routeData"</span><span class="hljs-tag"> </span><span class="hljs-attr">Selector</span><span class="hljs-tag">=</span><span class="hljs-string">"h1"</span><span class="hljs-tag"> /&gt;</span>
+</code></pre>
+    <p class="normal">In the preceding code, the <code class="inlineCode">Router</code> component is used to route the requests. If a valid route is found, it <a id="_idIndexMarker694"/>uses the <code class="inlineCode">AuthorizeRouteView</code> component instead of the <code class="inlineCode">RouteView</code> component to determine if the user is authorized to view the page. If they are not authorized and they have not yet been authenticated, it redirects the user to the <code class="inlineCode">/authentication/login</code> page. However, if they are not authorized and they have been authenticated, it renders the error message.</p>
+    <p class="normal">Since the <code class="inlineCode">App</code> component is using the <code class="inlineCode">CascadingAuthenticationState</code> component, the <code class="inlineCode">Task&lt;AuthenticationState&gt;</code> cascading parameter is supplied to each page. The following code uses it to populate the <code class="inlineCode">userName</code> field:</p>
+    <pre class="programlisting code"><code class="hljs-code">[<span class="hljs-meta">CascadingParameter</span>] 
+<span class="hljs-keyword">private</span> Task&lt;AuthenticationState&gt; authStateTask { <span class="hljs-keyword">get</span>; <span class="hljs-keyword">set</span>; }
+<span class="hljs-keyword">private</span> <span class="hljs-built_in">string</span> userName;
+<span class="hljs-keyword">protected</span><span class="hljs-function"> </span><span class="hljs-keyword">override</span><span class="hljs-function"> </span><span class="hljs-keyword">async</span><span class="hljs-function"> Task </span><span class="hljs-title">OnInitializedAsync</span><span class="hljs-function">()</span>
+{
+    <span class="hljs-keyword">var</span> authState = <span class="hljs-keyword">await</span> authStateTask;
+    <span class="hljs-keyword">var</span> user = authState.User;
+    <span class="hljs-keyword">if</span> (user.Identity.IsAuthenticated)
+    {
+        userName = user.Identity.Name;
+    };
+}
+</code></pre>
+    <p class="normal">In the preceding code, the <code class="inlineCode">authStateTask</code> parameter is used to cascade the value of the <code class="inlineCode">AuthenticationState</code> from the <code class="inlineCode">CascadingAuthenticationState</code> component.</p>
+    <p class="normal">Blazor WebAssembly uses the built-in DI service called <code class="inlineCode">AuthenticationStateProvider</code> to determine whether the user is logged in. The <code class="inlineCode">AuthenicationStateProvider</code> class provides information <a id="_idIndexMarker695"/>about the authentication state of the current user. The <code class="inlineCode">User</code> property of the <code class="inlineCode">AuthenicationStateProvider</code> provides the <strong class="keyWord">ClaimsPrincipal</strong> for the current user. The <code class="inlineCode">ClaimsPrincipal</code> is simply the claims-based identity of the user.</p>
+    <p class="normal">By using the built-in components, we can confirm the identity of the user. Next, we need to determine what the user is authorized to do.</p>
+    <h1 id="_idParaDest-293" class="heading-1">Controlling the user interface using authorization</h1>
+    <p class="normal">After a user is <a id="_idIndexMarker696"/>authenticated, authorization <a id="_idIndexMarker697"/>rules are used to control what the user can see and do. The <code class="inlineCode">Authorize</code> attribute and the <code class="inlineCode">AuthorizeView</code> component are used to control the user interface.</p>
+    <h2 id="_idParaDest-294" class="heading-2">The Authorize attribute</h2>
+    <p class="normal">The <code class="inlineCode">Authorize</code> attribute is used to require that the user is authorized to view the page that is decorated <a id="_idIndexMarker698"/>with the attribute. It should only be used on routable components. The following component includes the <code class="inlineCode">Authorize</code> attribute:</p>
+    <p class="normal"><strong class="keyWord">Secure.razor</strong></p>
+    <pre class="programlisting code"><code class="hljs-code">@page "/secure"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize]
+<span class="hljs-tag">&lt;</span><span class="hljs-name">h2</span><span class="hljs-tag">&gt;</span>Secure Page<span class="hljs-tag">&lt;/</span><span class="hljs-name">h2</span><span class="hljs-tag">&gt;</span>
+Congratulations, you have been authenticated!
+</code></pre>
+    <p class="normal">When an unauthenticated user tries to navigate to a page with the <code class="inlineCode">Authorize</code> attribute, they are automatically redirected to the <code class="inlineCode">/authentication/login</code> page.</p>
+    <div class="packt_tip">
+      <p class="normal"><strong class="keyWord">TIP</strong></p>
+      <p class="normal">You can require authentication for every page by adding the <code class="inlineCode">Authorize</code> attribute to the <code class="inlineCode">_Imports.razor</code> file. However, if you do that, you must add the <code class="inlineCode">AllowAnonymous</code> attribute to the <code class="inlineCode">Authentication</code> component or your users won’t be able to log in.</p>
+    </div>
+    <p class="normal">The <code class="inlineCode">Authorize</code> component supports role-based and policy-based authorization. If the user has been authenticated and they try to navigate to a page that includes either role-based or policy-based <a id="_idIndexMarker699"/>authorization, and they do not meet the requirements, they will receive the message provided by the <code class="inlineCode">App</code> component. In the preceding sample <code class="inlineCode">App</code> component, the message is as follows:</p>
+    <pre class="programlisting con"><code class="hljs-con">ERROR: You are not authorized to access this page
+</code></pre>
+    <p class="normal">This example uses the <code class="inlineCode">Roles</code> parameter for role-based authorization:</p>
+    <pre class="programlisting code"><code class="hljs-code">@page <span class="hljs-string">"</span><span class="hljs-string">/secure"</span>
+@attribute [Authorize(Roles = <span class="hljs-string">"admin, siteadmin"</span>)]
+</code></pre>
+    <p class="normal">In the preceding example, only users who are in either the <code class="inlineCode">admin</code> or <code class="inlineCode">siteadmin</code> role can access this page.</p>
+    <p class="normal">This example uses the <code class="inlineCode">Policy</code> parameter for policy-based authorization:</p>
+    <pre class="programlisting code"><code class="hljs-code">@page <span class="hljs-string">"/secure"</span>
+@attribute [Authorize(Policy = <span class="hljs-string">"content-admin"</span>)]
+</code></pre>
+    <p class="normal">In the preceding example, only users who meet the requirements of the <code class="inlineCode">content-admin</code> policy can access the page.</p>
+    <p class="normal">The <code class="inlineCode">Authorize</code> attribute should only be used on routable components since authorization is not performed for child components within a page.</p>
+    <p class="normal">For example, if we create a routable component called <code class="inlineCode">Secure</code> and secure it using either role-based or policy-based authorization, the user cannot navigate to the page if their credentials do not meet the requirements. However, if we place the same component in another page that the <a id="_idIndexMarker700"/>user is authorized to view, they can see the content of the <code class="inlineCode">Secure</code> component.</p>
+    <p class="normal">To only authorize the display of certain parts of a page, use the <code class="inlineCode">AuthorizeView</code> component.</p>
+    <h2 id="_idParaDest-295" class="heading-2">The AuthorizeView component</h2>
+    <p class="normal">The <code class="inlineCode">AuthorizeView</code> component is <a id="_idIndexMarker701"/>used to control the parts of the user interface that are displayed based on what the user is authorized to view.</p>
+    <div class="note">
+      <p class="normal"><strong class="keyWord">IMPORTANT NOTE</strong></p>
+      <p class="normal">By default, non-authenticated users are not authorized to view any content.</p>
+    </div>
+    <p class="normal">The <code class="inlineCode">AuthorizeView</code> class has the following properties:</p>
+    <ul>
+      <li class="bulletList"><code class="inlineCode">Authorized</code>: the content that is rendered if the user is authorized. It is a <code class="inlineCode">RenderFragment</code>.</li>
+      <li class="bulletList"><code class="inlineCode">Authorizing</code>: the content <a id="_idIndexMarker702"/>that is rendered as the user is being authenticated. It is a <code class="inlineCode">RenderFragment</code>.</li>
+      <li class="bulletList"><code class="inlineCode">NotAuthorized</code>: the content that is rendered if the user is not authorized. It is a <code class="inlineCode">RenderFragment</code>.</li>
+      <li class="bulletList"><code class="inlineCode">Policy</code>: the policy that determines if the content can be rendered.</li>
+      <li class="bulletList"><code class="inlineCode">Roles</code>: a comma-delimited list of the roles that are allowed to render the content.</li>
+    </ul>
+    <p class="normal">Unlike the <code class="inlineCode">RemoteAuthenticatorView</code> component, the framework does not provide default values for the <code class="inlineCode">RenderFragments</code> used by the <code class="inlineCode">AuthorizeView</code> component.</p>
+    <p class="normal">The following code uses the <code class="inlineCode">AuthorizeView</code> component to create a <code class="inlineCode">LoginDisplay</code> component:</p>
+    <p class="normal"><strong class="keyWord">LoginDisplay.razor</strong></p>
+    <pre class="programlisting code"><code class="hljs-code">@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.WebAssembly.Authentication
+@inject NavigationManager Navigation
+<span class="hljs-tag">&lt;</span><span class="hljs-name">AuthorizeView</span><span class="hljs-tag">&gt;</span>
+    <span class="hljs-tag">&lt;</span><span class="hljs-name">Authorized</span><span class="hljs-tag">&gt;</span>
+        Hello, @context.User.Identity?.Name!
+        <span class="hljs-tag">&lt;</span><span class="hljs-name">button</span><span class="hljs-tag"> @</span><span class="hljs-attr">onclick</span><span class="hljs-tag">=</span><span class="hljs-string">"BeginLogout"</span><span class="hljs-tag">&gt;</span>Log out<span class="hljs-tag">&lt;/</span><span class="hljs-name">button</span><span class="hljs-tag">&gt;</span>
+    <span class="hljs-tag">&lt;/</span><span class="hljs-name">Authorized</span><span class="hljs-tag">&gt;</span>
+    <span class="hljs-tag">&lt;</span><span class="hljs-name">NotAuthorized</span><span class="hljs-tag">&gt;</span>
+        <span class="hljs-tag">&lt;</span><span class="hljs-name">a</span><span class="hljs-tag"> </span><span class="hljs-attr">href</span><span class="hljs-tag">=</span><span class="hljs-string">"authentication/login"</span><span class="hljs-tag">&gt;</span>Log in<span class="hljs-tag">&lt;/</span><span class="hljs-name">a</span><span class="hljs-tag">&gt;</span>
+    <span class="hljs-tag">&lt;/</span><span class="hljs-name">NotAuthorized</span><span class="hljs-tag">&gt;</span>
+<span class="hljs-tag">    &lt;</span><span class="hljs-name">Authorizing</span><span class="hljs-tag">&gt;</span>
+        Please be patient. We are trying to authorize you.
+<span class="hljs-tag">    &lt;/</span><span class="hljs-name">Authorizing</span><span class="hljs-tag">&gt;</span>
+<span class="hljs-tag">&lt;/</span><span class="hljs-name">AuthorizeView</span><span class="hljs-tag">&gt;</span>
+@code{
+    private void BeginLogout(MouseEventArgs args)
+    {
+        Navigation.NavigateToLogout("authentication/logout");
+    }
+}
+</code></pre>
+    <p class="normal">The preceding example provides both the <code class="inlineCode">Authorized</code> template and the <code class="inlineCode">NotAuthorized</code> template. If the user is authorized, their name is displayed, and the <strong class="screenText">Log out</strong> button is rendered. If the user is not authorized, the <strong class="screenText">Log in</strong> link is rendered.</p>
+    <p class="normal">The <code class="inlineCode">AuthorizeView</code> component supports role-based and policy-based authorization. If the user has been <a id="_idIndexMarker703"/>authenticated and they try to navigate to a page that includes either role-based or policy-based authorization, and they meet the requirements, the UI in the <code class="inlineCode">Authorized</code> template will be rendered; otherwise, the UI in the <code class="inlineCode">NotAuthorized</code> template will be rendered.</p>
+    <p class="normal">This example uses the <code class="inlineCode">Roles</code> parameter for role-based authorization:</p>
+    <pre class="programlisting code"><code class="hljs-code"><span class="hljs-tag">&lt;</span><span class="hljs-name">AuthorizeView</span><span class="hljs-tag"> </span><span class="hljs-attr">Roles</span><span class="hljs-tag">=</span><span class="hljs-string">"admin, siteadmin"</span><span class="hljs-tag">&gt;</span>
+    <span class="hljs-tag">&lt;</span><span class="hljs-name">p</span><span class="hljs-tag">&gt;</span>
+        You can only view this content if you are an admin or
+        siteadmin.
+    <span class="hljs-tag">&lt;/</span><span class="hljs-name">p</span><span class="hljs-tag">&gt;</span>
+<span class="hljs-tag">&lt;/</span><span class="hljs-name">AuthorizeView</span><span class="hljs-tag">&gt;</span>
+</code></pre>
+    <p class="normal">In the preceding example, only users who are in either the <code class="inlineCode">admin</code> or <code class="inlineCode">siteadmin</code> role will have the indicated text rendered.</p>
+    <p class="normal">This example uses the <code class="inlineCode">Policy</code> parameter for policy-based authorization:</p>
+    <pre class="programlisting code"><code class="hljs-code"><span class="hljs-tag">&lt;</span><span class="hljs-name">AuthorizeView</span><span class="hljs-tag"> </span><span class="hljs-attr">Policy</span><span class="hljs-tag">=</span><span class="hljs-string">"content-admin"</span><span class="hljs-tag">&gt;</span>
+    <span class="hljs-tag">&lt;</span><span class="hljs-name">p</span><span class="hljs-tag">&gt;</span>
+        You can only view this content if you satisfy 
+        the "content-admin" policy.
+    <span class="hljs-tag">&lt;/</span><span class="hljs-name">p</span><span class="hljs-tag">&gt;</span>
+<span class="hljs-tag">&lt;/</span><span class="hljs-name">AuthorizeView</span><span class="hljs-tag">&gt;</span>
+</code></pre>
+    <p class="normal">In the preceding example, only users who meet the requirements of the <code class="inlineCode">content-admin</code> policy will have the indicated text rendered.</p>
+    <p class="normal">The <code class="inlineCode">AuthorizeView</code> component can be used in the <code class="inlineCode">NavMenu</code> component. However, although a component <a id="_idIndexMarker704"/>does not appear in the <code class="inlineCode">NavMenu</code>, that does not prevent the user from navigating directly to the component. So, you must always set authorization rules at the component level.</p>
+    <div class="packt_tip">
+      <p class="normal"><strong class="keyWord">TIP</strong></p>
+      <p class="normal">Never rely on the <code class="inlineCode">NavMenu</code> component to hide components from unauthorized users.</p>
+    </div>
+    <p class="normal">We can use the <code class="inlineCode">Authorize</code> attribute and the <code class="inlineCode">AuthorizeView</code> component to force the user to be authenticated and to hide portions of the user interface.</p>
+    <p class="normal">Now, let’s get a quick overview of the project that we are going to build in this chapter.</p>
+    <h1 id="_idParaDest-296" class="heading-1">Creating the claims viewer project</h1>
+    <p class="normal">The Blazor WebAssembly application that we are going to build in this chapter is a claims viewer. First, we will add the application to Azure AD. After we have added the application, we will <a id="_idIndexMarker705"/>add a group and a user to Azure AD. We will add the required NuGet packages and configure the project to use MSAL authentication. Next, we will add components for authentication and login display. We will also add the following routable components: <strong class="screenText">Secure</strong> and <strong class="screenText">WhoAmI</strong>. Finally, we will add and test an authentication policy.</p>
+    <p class="normal">The following is a screenshot of the <strong class="screenText">WhoAmI</strong> component from the completed application:</p>
+    <figure class="mediaobject"><img src="../Images/B18471_10_02.png" alt="Text  Description automatically generated"/></figure>
+    <p class="packt_figref">Figure 10.2: The WhoAmI component from Claims Viewer</p>
+    <p class="normal">The build time <a id="_idIndexMarker706"/>for this project is approximately 60 minutes.</p>
+    <h2 id="_idParaDest-297" class="heading-2">Project overview</h2>
+    <p class="normal">The <code class="inlineCode">ClaimsViewer</code> project will be created by using Microsoft’s <strong class="keyWord">Blazor WebAssembly App </strong><strong class="keyWord">Empty</strong> project template <a id="_idIndexMarker707"/>to create an empty Blazor WebAssembly project. After we have created our project, we will configure Azure AD by adding the application, a new group, and a new user to our Azure AD tenant. Then, we will add the required NuGet packages and update our project’s settings. Next, we will add an authentication component and a login display component. We will also add a component to display <a id="_idIndexMarker708"/>the contents of our claims. Finally, we will add and test an authentication policy.</p>
+    <div class="note">
+      <p class="normal"><strong class="keyWord">IMPORTANT NOTE</strong></p>
+      <p class="normal">Since Microsoft is constantly updating the Azure Portal, some of the screens in the Azure Portal may no longer match the information in this chapter.</p>
+    </div>
+    <h2 id="_idParaDest-298" class="heading-2">Create the claims viewer project</h2>
+    <p class="normal">We need to create a <a id="_idIndexMarker709"/>new Blazor WebAssembly app. We do this as follows:</p>
+    <ol class="numberedList" style="list-style-type: decimal;">
+      <li class="numberedList" value="1">Open Visual Studio 2022.</li>
+      <li class="numberedList">Click the <strong class="screenText">Create a new project</strong> button.</li>
+      <li class="numberedList">Press <em class="keystroke">Alt</em>+<em class="keystroke">S</em> to enter the <strong class="screenText">Search for templates</strong> textbox.</li>
+      <li class="numberedList">Enter <code class="inlineCode">Blazor</code> and press the <em class="keystroke">Enter</em> key.
+    <p class="normal">The following screenshot shows the <strong class="screenText">Blazor WebAssembly App Empty</strong> project template:</p>
+    <figure class="mediaobject"><img src="../Images/B18471_10_03.png" alt="Graphical user interface, text, application, chat or text message  Description automatically generated"/></figure>
+    <p class="packt_figref">Figure 10.3: Blazor WebAssembly App Empty project template</p></li>
+    </ol>
+    <ol class="numberedList" style="list-style-type: decimal;">
+      <li class="numberedList" value="5">Select the <strong class="screenText">Blazor WebAssembly App Empty</strong> project template and click the <strong class="screenText">Next</strong> button.</li>
+      <li class="numberedList">Enter <code class="inlineCode">ClaimsViewer</code> in the <strong class="screenText">Project name</strong> textbox and click the <strong class="screenText">Next</strong> button.
+    <p class="normal">This is a screenshot of the dialog used to configure our new project:</p>
+    <figure class="mediaobject"><img src="../Images/B18471_10_04.png" alt="Graphical user interface, text, application, email  Description automatically generated"/></figure>
+    <p class="packt_figref">Figure 10.4: Blazor WebAssembly App Empty Project Template</p>
+    <div class="packt_tip">
+      <p class="normal"><strong class="keyWord">TIP</strong></p>
+      <p class="normal">In the preceding example, we placed the <code class="inlineCode">ClaimsViewer</code> project into the <code class="inlineCode">E:/Blazor</code> folder. However, the location of this project is not important.</p>
+    </div></li>
+    </ol>
+    <ol class="numberedList" style="list-style-type: decimal;">
+      <li class="numberedList" value="7">Select <strong class="screenText">.NET 7.0</strong> as the version of the <code class="inlineCode">Framework</code> to use.</li>
+      <li class="numberedList">Check the <strong class="screenText">Configure for HTTPS </strong>checkbox.</li>
+      <li class="numberedList">Uncheck <a id="_idIndexMarker710"/>the <strong class="screenText">ASP.NET Core Hosted</strong> checkbox.</li>
+      <li class="numberedList">Uncheck the <strong class="screenText">Progressive Web Application</strong> checkbox.
+    <p class="normal">This is a screenshot of the dialog used to collect additional information about our new project:</p>
+    <figure class="mediaobject"><img src="../Images/B18471_10_05.png" alt="Graphical user interface, text, application, email  Description automatically generated"/></figure>
+    <p class="packt_figref">Figure 10.5: Additional information dialog</p></li>
+    </ol>
+    <ol class="numberedList" style="list-style-type: decimal;">
+      <li class="numberedList" value="11">Click the <strong class="screenText">Create</strong> button.</li>
+    </ol>
+    <p class="normal">We have created an empty <code class="inlineCode">ClaimsViewer</code> Blazor WebAssembly project. We will use Azure AD to <a id="_idIndexMarker711"/>provide the identity services.</p>
+    <h2 id="_idParaDest-299" class="heading-2">Add the application to Azure AD</h2>
+    <p class="normal">We need to <a id="_idIndexMarker712"/>register the application in <a id="_idIndexMarker713"/>Azure AD and add an <code class="inlineCode">appsettings.json</code> file to the project. We do this as follows:</p>
+    <ol class="numberedList" style="list-style-type: decimal;">
+      <li class="numberedList" value="1">Right-click the <code class="inlineCode">wwwroot</code> folder and select the <strong class="screenText">Add</strong>, <strong class="screenText">New Item</strong> option from the menu.</li>
+      <li class="numberedList">Enter <code class="inlineCode">json</code> in the <strong class="screenText">Search</strong> box.</li>
+      <li class="numberedList">Select <strong class="screenText">App Settings File</strong>.</li>
+      <li class="numberedList">Name the new item <code class="inlineCode">appsettings.json</code>.</li>
+      <li class="numberedList">Click the <strong class="screenText">Add</strong> button.</li>
+      <li class="numberedList">Replace all the text in the file with the following:
+        <pre class="programlisting code"><code class="hljs-code"><span class="hljs-punctuation">{</span>
+  <span class="hljs-attr">"AzureAd"</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+    <span class="hljs-attr">"Authority"</span><span class="hljs-punctuation">:</span> <span class="hljs-string">"https://login.microsoftonline.com/{Directory (tenant) ID}"</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">"ClientId"</span><span class="hljs-punctuation">:</span> <span class="hljs-string">"{Application (client) ID}"</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">"ValidateAuthority"</span><span class="hljs-punctuation">:</span> <span class="hljs-keyword">true</span>
+  <span class="hljs-punctuation">}</span>
+<span class="hljs-punctuation">}</span>
+</code></pre>
+     
+    <p class="normal">After we add the application to Azure AD, we will replace the <code class="inlineCode">{Directory (tenant) ID} </code>and <a id="_idIndexMarker714"/>the <code class="inlineCode">{Application (client) ID}</code> placeholders used in the <a id="_idIndexMarker715"/>preceding code.</p> </li>
+    </ol>
+    <ol class="numberedList" style="list-style-type: decimal;">
+      <li class="numberedList" value="7">Navigate to the Azure Portal, <a href="https://portal.azure.com"><span class="url">https://portal.azure.com</span></a>.</li>
+      <li class="numberedList">Open your <code class="inlineCode">Azure Active Directory</code> resource.
+    <div class="note">
+      <p class="normal"><strong class="keyWord">IMPORTANT NOTE</strong></p>
+      <p class="normal">An instance of <code class="inlineCode">Azure Active Directory</code> was automatically created when you signed up for a Microsoft Cloud service subscription.</p>
+    </div></li>
+    </ol>
+    <ol class="numberedList" style="list-style-type: decimal;">
+      <li class="numberedList" value="9">Select <strong class="screenText">App registration </strong>from the <strong class="screenText">Add </strong>menu.</li>
+    </ol>
+    <figure class="mediaobject"><img src="../Images/B18471_10_06.png" alt="Graphical user interface, application  Description automatically generated"/></figure>
+    <p class="packt_figref">Figure 10.6: App registration in Azure AD</p>
+    <ol class="numberedList" style="list-style-type: decimal;">
+      <li class="numberedList" value="10">For the user-facing display name, enter <code class="inlineCode">ClaimsViewer</code>.</li>
+      <li class="numberedList">For the <a id="_idIndexMarker716"/>supported <a id="_idIndexMarker717"/>account types, select the <strong class="screenText">Accounts in this organizational directory only</strong> option.</li>
+      <li class="numberedList">For the redirect URI, select <strong class="screenText">Single-page application (SPA)</strong> as the platform and enter the following text for the URI:
+        <pre class="programlisting code"><code class="hljs-code">https://localhost:5001/authentication/login-callback
+</code></pre>
+     
+    <p class="normal">The following screenshot shows the completed <strong class="screenText">Register an application </strong>dialog:</p>
+    <figure class="mediaobject"><img src="../Images/B18471_10_07.png" alt="Graphical user interface, text, application, email  Description automatically generated"/></figure>
+    <p class="packt_figref">Figure 10.7: Register an application dialog</p> </li>
+    </ol>
+    <ol class="numberedList" style="list-style-type: decimal;">
+      <li class="numberedList" value="13">Click the <strong class="screenText">Register</strong> button.
+    <p class="normal">The following <a id="_idIndexMarker718"/>screenshot highlights <a id="_idIndexMarker719"/>the information that we need to copy to the <code class="inlineCode">appsettings.json</code> file in our project:</p>
+    <figure class="mediaobject"><img src="../Images/B18471_10_08.png" alt="Graphical user interface, text, application, email  Description automatically generated"/></figure>
+    <p class="packt_figref">Figure 10.8: ClaimsViewer app in Azure AD</p></li>
+    </ol>
+    <ol class="numberedList" style="list-style-type: decimal;">
+      <li class="numberedList" value="14">Return to Visual Studio.</li>
+      <li class="numberedList">Open the <code class="inlineCode">appsettings.json</code> file.</li>
+      <li class="numberedList">Replace the <strong class="screenText">{Directory (tenant) ID}</strong> placeholder with the value of <code class="inlineCode">Directory (tenant) ID</code> from Azure AD.</li>
+      <li class="numberedList">Replace the <strong class="screenText">{Application (client) ID}</strong> placeholder with the value of <code class="inlineCode">Application (client) ID</code> from Azure AD.</li>
+    </ol>
+    <p class="normal">To test our application, we <a id="_idIndexMarker720"/>need to add at least <a id="_idIndexMarker721"/>one user. Also, later in this project, we will need to use a group to enable policy-based authentication. So, let’s add a user and a group.</p>
+    <h2 id="_idParaDest-300" class="heading-2">Add a user and a group to Azure AD</h2>
+    <p class="normal">Before we <a id="_idIndexMarker722"/>exit the Azure Portal, let’s create <a id="_idIndexMarker723"/>a new group and add a new user to that group. We do this as follows:</p>
+    <ol class="numberedList" style="list-style-type: decimal;">
+      <li class="numberedList" value="1">Return to your <code class="inlineCode">Azure Active Directory</code> tenant.</li>
+      <li class="numberedList">Select <strong class="screenText">Groups </strong>from the menu.</li>
+      <li class="numberedList">Select <strong class="screenText">New group</strong> from the top menu.</li>
+      <li class="numberedList">For the <strong class="screenText">Group type</strong>, leave <strong class="screenText">Security</strong> selected.</li>
+      <li class="numberedList">For the <strong class="screenText">Group name</strong>, enter <code class="inlineCode">ViewAll</code>.</li>
+      <li class="numberedList">For the <strong class="screenText">Group description</strong>, enter <code class="inlineCode">Members</code> <code class="inlineCode">can</code> <code class="inlineCode">view</code> <code class="inlineCode">all</code> <code class="inlineCode">of</code> <code class="inlineCode">the</code> <code class="inlineCode">claims</code>.
+    <p class="normal">The following screenshot shows the completed <strong class="screenText">New Group</strong> dialog:</p>
+    <figure class="mediaobject"><img src="../Images/B18471_10_09.png" alt="Graphical user interface, text, application, email  Description automatically generated"/></figure>
+    <p class="packt_figref">Figure 10.9: New Group dialog in Azure AD</p></li>
+    </ol>
+    <ol class="numberedList" style="list-style-type: decimal;">
+      <li class="numberedList" value="7">Click the <strong class="screenText">Create</strong> button.
+    <p class="normal">You should now see the new group. If you do not see the new group, select the <strong class="screenText">Refresh </strong>option from the top menu. The following screenshot highlights the information that we will need to complete this project:</p>
+    <figure class="mediaobject"><img src="../Images/B18471_10_10.png" alt="Graphical user interface, text, application  Description automatically generated"/></figure>
+    <p class="packt_figref">Figure 10.10: Groups in Azure AD</p></li>
+    </ol>
+    <ol class="numberedList" style="list-style-type: decimal;">
+      <li class="numberedList" value="8">Copy the <strong class="screenText">Object Id</strong> for your new group and save it for later.
+    <p class="normal">We will <a id="_idIndexMarker724"/>need <a id="_idIndexMarker725"/>the <code class="inlineCode">Object Id</code> of the group when we add an authentication policy to our project.</p></li>
+    </ol>
+    <ol class="numberedList" style="list-style-type: decimal;">
+      <li class="numberedList" value="9">Return to your <code class="inlineCode">Azure Active Directory</code> tenant.</li>
+      <li class="numberedList">Select <strong class="screenText">App registrations</strong> from the menu.</li>
+      <li class="numberedList">Click on the <strong class="screenText">ClaimsViewer</strong> application.</li>
+      <li class="numberedList">Select <strong class="screenText">Token configuration</strong> from the menu.</li>
+      <li class="numberedList">Click the <strong class="screenText">Add groups claim</strong> option.</li>
+      <li class="numberedList">Check the <strong class="screenText">Security groups</strong> checkbox.</li>
+      <li class="numberedList">Click the <strong class="screenText">Add</strong> button.</li>
+      <li class="numberedList">Return to your <strong class="screenText">Azure Active Directory</strong> resource.</li>
+      <li class="numberedList">Select <strong class="screenText">Users</strong> from the menu.</li>
+      <li class="numberedList">Select <strong class="screenText">Create new user</strong> from the <strong class="screenText">New user</strong> top menu as shown in the following screenshot:
+    <figure class="mediaobject"><img src="../Images/B18471_10_11.png" alt="Graphical user interface, text, application, email  Description automatically generated"/></figure>
+    <p class="packt_figref">Figure 10.11: Create new user in Azure AD</p></li>
+    </ol>
+    <ol class="numberedList" style="list-style-type: decimal;">
+      <li class="numberedList" value="19">Enter a <strong class="screenText">Username</strong> and <strong class="screenText">Name</strong> for the new user.</li>
+      <li class="numberedList">Enter a <strong class="screenText">Password</strong>.</li>
+      <li class="numberedList">Add the <strong class="screenText">ViewAll</strong> group.</li>
+      <li class="numberedList">Click the <strong class="screenText">Create</strong> button.</li>
+    </ol>
+    <p class="normal">You should now <a id="_idIndexMarker726"/>see your new user. If <a id="_idIndexMarker727"/>you do not see your new user, select the <strong class="screenText">Refresh</strong> option from the top menu.</p>
+    <p class="normal">You have added a new user to Azure AD that is a member of the <strong class="screenText">ViewAll</strong> group. We have finished setting up Azure AD. Now we can return to Visual Studio.</p>
+    <h2 id="_idParaDest-301" class="heading-2">Add the required NuGet packages</h2>
+    <p class="normal">We need to <a id="_idIndexMarker728"/>add three NuGet packages to <a id="_idIndexMarker729"/>our application. We do this as follows:</p>
+    <ol class="numberedList" style="list-style-type: decimal;">
+      <li class="numberedList" value="1">Return to Visual Studio.</li>
+      <li class="numberedList">Select <strong class="screenText">Tools</strong>, <strong class="screenText">NuGet Package Manager</strong>, and <strong class="screenText">Package Manager Console</strong> from the Visual Studio menu to open the <strong class="screenText">Package Manager Console</strong>.</li>
+      <li class="numberedList">Enter the following command:
+        <pre class="programlisting con"><code class="hljs-con">Install-package Microsoft.AspNetCore.Authorization
+</code></pre>
+      </li>
+      <li class="numberedList">Press the <em class="keystroke">Enter</em> key.
+    <p class="normal">You have installed the ASP.NET Core authorization classes.</p></li>
+    </ol>
+    <ol class="numberedList" style="list-style-type: decimal;">
+      <li class="numberedList" value="5">Enter the following command:
+        <pre class="programlisting con"><code class="hljs-con">Install-package Microsoft.AspNetCore.Components.Authorization
+</code></pre>
+      </li>
+      <li class="numberedList">Press the <em class="keystroke">Enter</em> key.
+    <p class="normal">You have installed authentication and authorization classes for Blazor applications.</p></li>
+    </ol>
+    <ol class="numberedList" style="list-style-type: decimal;">
+      <li class="numberedList" value="7">Enter the following command:
+        <pre class="programlisting con"><code class="hljs-con">Install-package Microsoft.Authentication.WebAssembly.Msal
+</code></pre>
+      </li>
+      <li class="numberedList">Press the <em class="keystroke">Enter</em> key.
+    <p class="normal">You have installed the <code class="inlineCode">Microsoft Authentication Library</code>. It is used to acquire <a id="_idIndexMarker730"/>security tokens from <a id="_idIndexMarker731"/>the Microsoft identity platform. The tokens can be used to both authenticate users and access Web APIs.</p></li>
+    </ol>
+    <ol class="numberedList" style="list-style-type: decimal;">
+      <li class="numberedList" value="9">Open the <code class="inlineCode">_Imports.razor</code> file.</li>
+      <li class="numberedList">Add the following <code class="inlineCode">using</code> statements:
+        <pre class="programlisting code"><code class="hljs-code">@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.WebAssembly.Authentication
+</code></pre>
+      </li>
+    </ol>
+    <p class="normal">All the required NuGet packages have been installed. Now we need to update some of the project’s settings.</p>
+    <h2 id="_idParaDest-302" class="heading-2">Enable authentication</h2>
+    <p class="normal">We need to <a id="_idIndexMarker732"/>update some of the project’s files <a id="_idIndexMarker733"/>to enable authentication. We do this as follows:</p>
+    <ol class="numberedList" style="list-style-type: decimal;">
+      <li class="numberedList" value="1">Open the <code class="inlineCode">wwwroot/index.html</code> file.</li>
+      <li class="numberedList">Add the following <code class="inlineCode">script</code> element above the existing <code class="inlineCode">script</code> element:
+        <pre class="programlisting code"><code class="hljs-code"><span class="hljs-tag">&lt;</span><span class="hljs-name">script</span>
+<span class="hljs-attr">src</span><span class="hljs-tag">=</span><span class="hljs-string">"_content/Microsoft.Authentication.WebAssembly.Msal/AuthenticationService.js"</span><span class="hljs-tag">&gt;</span>
+<span class="hljs-tag">&lt;/</span><span class="hljs-name">script</span><span class="hljs-tag">&gt;</span>
+</code></pre>
+      </li>
+      <li class="numberedList">Open the <code class="inlineCode">Properties/launchSettings.json</code> file.</li>
+      <li class="numberedList">Add the following to <code class="inlineCode">iisSettings</code>:
+        <pre class="programlisting code"><code class="hljs-code">    <span class="hljs-attr">"windowsAuthentication"</span><span class="hljs-punctuation">:</span> <span class="hljs-keyword">false</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">"anonymousAuthentication"</span><span class="hljs-punctuation">:</span> <span class="hljs-keyword">true</span><span class="hljs-punctuation">,</span>
+</code></pre>
+      </li>
+      <li class="numberedList">Open the <code class="inlineCode">Program.cs</code> file.</li>
+      <li class="numberedList">Add the following code above the last line in the file:
+        <pre class="programlisting code"><code class="hljs-code">builder.Services.AddMsalAuthentication(options =&gt;
+{
+    builder.Configuration.Bind(<span class="hljs-string">"AzureAd"</span>, 
+        options.ProviderOptions.Authentication);
+    options.ProviderOptions.LoginMode = <span class="hljs-string">"redirect"</span>;
+}); 
+</code></pre>
+      
+    <p class="normal">In the preceding code, the application is instructed to reference the <strong class="screenText">AzureAd</strong> section of the <code class="inlineCode">appsetting.json</code> file for the parameters that are required to <a id="_idIndexMarker734"/>authenticate the app. The value of <code class="inlineCode">LoginMode</code> can be either <code class="inlineCode">popup</code> or <code class="inlineCode">redirect</code>. We are using <code class="inlineCode">redirect</code> because the popup login dialog is not modal and can easily get hidden behind other windows.</p></li>
+    </ol>
+    <ol class="numberedList" style="list-style-type: decimal;">
+      <li class="numberedList" value="7">Open the <code class="inlineCode">App.Razor</code> file.</li>
+      <li class="numberedList">Add the following directive:
+        <pre class="programlisting code"><code class="hljs-code">@inject NavigationManager Navigation
+</code></pre>
+      </li>
+      <li class="numberedList">Surround the <code class="inlineCode">Router</code> element with the following <code class="inlineCode">CascadingAuthenticationState</code> element:
+        <pre class="programlisting code"><code class="hljs-code"><span class="hljs-tag">&lt;</span><span class="hljs-name">CascadingAuthenticationState</span><span class="hljs-tag">&gt;</span>
+<span class="hljs-tag">&lt;/</span><span class="hljs-name">CascadingAuthenticationState</span><span class="hljs-tag">&gt;</span>
+</code></pre>
+      </li>
+      <li class="numberedList">Replace the <code class="inlineCode">RouteView</code> element with the following <code class="inlineCode">AuthorizeRouteView</code> element:
+        <pre class="programlisting code"><code class="hljs-code"><span class="hljs-tag">&lt;</span><span class="hljs-name">AuthorizeRouteView</span><span class="hljs-tag"> </span><span class="hljs-attr">RouteData</span><span class="hljs-tag">=</span><span class="hljs-string">"@routeData"</span><span class="hljs-tag">  </span>
+<span class="hljs-tag">    </span><span class="hljs-attr">DefaultLayout</span><span class="hljs-tag">=</span><span class="hljs-string">"</span><span class="hljs-string">@typeof(MainLayout)"</span><span class="hljs-tag">&gt;</span>
+    <span class="hljs-tag">&lt;</span><span class="hljs-name">NotAuthorized</span><span class="hljs-tag">&gt;</span>
+        @if (context.User.Identity?.IsAuthenticated != 
+           true)
+        {
+            Navigation.NavigateTo($"authentication/login");
+        }
+        else
+        {
+            <span class="hljs-tag">&lt;</span><span class="hljs-name">p</span><span class="hljs-tag">&gt;</span>
+                You are not authorized to access 
+                this resource.
+           <span class="hljs-tag">&lt;/</span><span class="hljs-name">p</span><span class="hljs-tag">&gt;</span>
+        }
+    <span class="hljs-tag">&lt;/</span><span class="hljs-name">NotAuthorized</span><span class="hljs-tag">&gt;</span>
+<span class="hljs-tag">&lt;/</span><span class="hljs-name">AuthorizeRouteView</span><span class="hljs-tag">&gt;</span>
+</code></pre>
+      </li>
+    </ol>
+    <p class="normal">In the preceding code, if the user is not authorized and they have not been authenticated, they are redirected to the <code class="inlineCode">authentication/login</code> page. However, if <a id="_idIndexMarker735"/>they are not authorized <a id="_idIndexMarker736"/>and they have been authenticated, the error message is rendered.</p>
+    <p class="normal">We have enabled authentication in our application. Now we need to add an <code class="inlineCode">Authentication</code> component.</p>
+    <h2 id="_idParaDest-303" class="heading-2">Add an Authentication component</h2>
+    <p class="normal">We need <a id="_idIndexMarker737"/>to add an <code class="inlineCode">Authentication</code> component <a id="_idIndexMarker738"/>to handle our authentication actions. We do this as follows:</p>
+    <ol class="numberedList" style="list-style-type: decimal;">
+      <li class="numberedList" value="1">Right-click the <code class="inlineCode">Pages</code> folder and select the <strong class="screenText">Add</strong>, <strong class="screenText">Razor Component</strong> option from the menu.</li>
+      <li class="numberedList">Name the new component <code class="inlineCode">Authentication</code>.</li>
+      <li class="numberedList">Replace all the text in the file with the following:
+        <pre class="programlisting code"><code class="hljs-code">@page <span class="hljs-string">"/authentication/{action}"</span>
+@using Microsoft.AspNetCore.Components.WebAssembly.Authentication
+&lt;RemoteAuthenticatorView Action=<span class="hljs-string">"@Action"</span> /&gt;
+@code {
+    [<span class="hljs-meta">Parameter</span>] <span class="hljs-keyword">public</span> <span class="hljs-built_in">string</span>? Action { <span class="hljs-keyword">get</span>; <span class="hljs-keyword">set</span>; }
+}
+</code></pre>
+      </li>
+    </ol>
+    <p class="normal">By leveraging the power of the <code class="inlineCode">RemoteAuthenticatorView</code> component, we were able to create <a id="_idIndexMarker739"/>an <code class="inlineCode">Authentication</code> component with only a few lines of code. Now let’s add a way for the users <a id="_idIndexMarker740"/>to log in and out of our application.</p>
+    <h2 id="_idParaDest-304" class="heading-2">Add a LoginDisplay component</h2>
+    <p class="normal">We will <a id="_idIndexMarker741"/>add a <code class="inlineCode">LoginDisplay</code> component <a id="_idIndexMarker742"/>to log the users in and out of our application. We do this as follows:</p>
+    <ol class="numberedList" style="list-style-type: decimal;">
+      <li class="numberedList" value="1">Right-click the <code class="inlineCode">ClaimsViewer</code> project and select the <strong class="screenText">Add</strong>, <strong class="screenText">New Folder</strong> option from the menu.</li>
+      <li class="numberedList">Name the new folder <code class="inlineCode">Shared</code>.</li>
+      <li class="numberedList">Right-click the <code class="inlineCode">Shared</code> folder and select the <strong class="screenText">Add</strong>, <strong class="screenText">Razor Component</strong> option from the menu.</li>
+      <li class="numberedList">Name the new component <code class="inlineCode">LoginDisplay</code>.</li>
+      <li class="numberedList">Replace all the text in the file with the following:
+        <pre class="programlisting code"><code class="hljs-code">@inject NavigationManager Navigation
+<span class="hljs-tag">&lt;</span><span class="hljs-name">AuthorizeView</span><span class="hljs-tag">&gt;</span>
+    <span class="hljs-tag">&lt;</span><span class="hljs-name">Authorized</span><span class="hljs-tag">&gt;</span>
+        <span class="hljs-tag">&lt;</span><span class="hljs-name">button</span><span class="hljs-tag"> @</span><span class="hljs-attr">onclick</span><span class="hljs-tag">=</span><span class="hljs-string">"BeginLogout"</span><span class="hljs-tag">&gt;</span>
+            Log out of Claims Viewer
+        <span class="hljs-tag">&lt;/</span><span class="hljs-name">button</span><span class="hljs-tag">&gt;</span>
+        Welcome, @context.User.Identity?.Name!
+    <span class="hljs-tag">&lt;/</span><span class="hljs-name">Authorized</span><span class="hljs-tag">&gt;</span>
+    <span class="hljs-tag">&lt;</span><span class="hljs-name">NotAuthorized</span><span class="hljs-tag">&gt;</span>
+        <span class="hljs-tag">&lt;</span><span class="hljs-name">button</span><span class="hljs-tag"> @</span><span class="hljs-attr">onclick</span><span class="hljs-tag">=</span><span class="hljs-string">"BeginLogin"</span><span class="hljs-tag">&gt;</span>
+            Log in to Claims Viewer
+        <span class="hljs-tag">&lt;/</span><span class="hljs-name">button</span><span class="hljs-tag">&gt;</span>
+    <span class="hljs-tag">&lt;/</span><span class="hljs-name">NotAuthorized</span><span class="hljs-tag">&gt;</span>
+<span class="hljs-tag">&lt;/</span><span class="hljs-name">AuthorizeView</span><span class="hljs-tag">&gt;</span>
+<span class="hljs-tag">&lt;</span><span class="hljs-name">hr</span><span class="hljs-tag"> /&gt;</span>
+@code {
+ 
+}
+</code></pre>
+      
+    <p class="normal">The preceding markup includes an <code class="inlineCode">AuthorizeView</code> component. If the user has been <a id="_idIndexMarker743"/>authenticated, the <strong class="screenText">Log out of Claims Viewer</strong> button is rendered. If the user has not <a id="_idIndexMarker744"/>been authenticated, the <strong class="screenText">Log in to Claims Viewer</strong> button is rendered.</p></li>
+    </ol>
+    <ol class="numberedList" style="list-style-type: decimal;">
+      <li class="numberedList" value="6">Add the following code to the code block:
+        <pre class="programlisting code"><code class="hljs-code"><span class="hljs-keyword">private</span><span class="hljs-function"> </span><span class="hljs-keyword">void</span><span class="hljs-function"> </span><span class="hljs-title">BeginLogin</span><span class="hljs-function">(</span><span class="hljs-params">MouseEventArgs args</span><span class="hljs-function">)</span>
+{
+    Navigation
+        .NavigateToLogin(<span class="hljs-string">$"authentication/login"</span>);
+}
+<span class="hljs-keyword">private</span><span class="hljs-function"> </span><span class="hljs-keyword">void</span><span class="hljs-function"> </span><span class="hljs-title">BeginLogout</span><span class="hljs-function">(</span><span class="hljs-params">MouseEventArgs args</span><span class="hljs-function">)</span>
+{
+    Navigation
+        .NavigateToLogout(<span class="hljs-string">$"authentication/logout"</span>, <span class="hljs-string">$"/"</span>);
+}
+</code></pre>
+      
+    <p class="normal">Both the <code class="inlineCode">BeginLogin</code> method and the <code class="inlineCode">BeginLogout</code> method redirect the user to the <code class="inlineCode">Authentication</code> page. The <code class="inlineCode">BeginLogin</code> method sets the action parameter to <code class="inlineCode">login</code>, and the <code class="inlineCode">BeginLogout</code> method sets the action parameter to <code class="inlineCode">logout</code> and includes a value for the <code class="inlineCode">ReturnUrl</code>. In this example, the <code class="inlineCode">ReturnUrl</code> is the <code class="inlineCode">Home</code> page.</p></li>
+    </ol>
+    <ol class="numberedList" style="list-style-type: decimal;">
+      <li class="numberedList" value="7">Open the <code class="inlineCode">_Imports.razor</code> file.</li>
+      <li class="numberedList">Add the following <code class="inlineCode">using</code> statement:
+        <pre class="programlisting code"><code class="hljs-code">@using ClaimsViewer.Shared
+</code></pre>
+      </li>
+      <li class="numberedList">Open the <code class="inlineCode">MainLayout.razor</code> file.</li>
+      <li class="numberedList">Update the <code class="inlineCode">main</code> element to the following:
+        <pre class="programlisting code"><code class="hljs-code"><span class="hljs-tag">&lt;</span><span class="hljs-name">main</span><span class="hljs-tag"> </span><span class="hljs-attr">style</span><span class="hljs-tag">=</span><span class="hljs-string">"padding:10px"</span><span class="hljs-tag">&gt;</span>
+    <span class="hljs-tag">&lt;</span><span class="hljs-name">LoginDisplay</span><span class="hljs-tag"> /&gt;</span>
+    <span class="hljs-tag">&lt;</span><span class="hljs-name">a</span><span class="hljs-tag"> </span><span class="hljs-attr">href</span><span class="hljs-tag">=</span><span class="hljs-string">"/secure"</span><span class="hljs-tag">&gt;</span>[Secure Page]<span class="hljs-tag">&lt;/</span><span class="hljs-name">a</span><span class="hljs-tag">&gt;</span>
+    <span class="hljs-tag">&lt;</span><span class="hljs-name">a</span><span class="hljs-tag"> </span><span class="hljs-attr">href</span><span class="hljs-tag">=</span><span class="hljs-string">"/whoami"</span><span class="hljs-tag">&gt;</span>[Who Am I?]<span class="hljs-tag">&lt;/</span><span class="hljs-name">a</span><span class="hljs-tag">&gt;</span>
+    @Body
+<span class="hljs-tag">&lt;/</span><span class="hljs-name">main</span><span class="hljs-tag">&gt;</span>
+</code></pre>
+      </li>
+    </ol>
+    <p class="normal">Since we have added the <code class="inlineCode">LoginDisplay</code> component to the <code class="inlineCode">MainLayout</code> component, it will appear <a id="_idIndexMarker745"/>on every page of <a id="_idIndexMarker746"/>our application.</p>
+    <p class="normal">Now that the users can log in and log out, let’s test our application by adding the <code class="inlineCode">Authorize</code> attribute to a routable component.</p>
+    <h2 id="_idParaDest-305" class="heading-2">Add a Secure component</h2>
+    <p class="normal">We will <a id="_idIndexMarker747"/>add the routable <code class="inlineCode">Secure</code> component <a id="_idIndexMarker748"/>to demonstrate the <code class="inlineCode">Authorize</code> attribute. We do this as follows:</p>
+    <ol class="numberedList" style="list-style-type: decimal;">
+      <li class="numberedList" value="1">Right-click the <code class="inlineCode">Pages</code> folder and select the <strong class="screenText">Add</strong>, <strong class="screenText">Razor Component</strong> option from the menu.</li>
+      <li class="numberedList">Name the new component <code class="inlineCode">Secure</code>.</li>
+      <li class="numberedList">Replace all the text in the file with the following:
+        <pre class="programlisting code"><code class="hljs-code">@page "/secure"
+@attribute [Authorize]
+<span class="hljs-tag">&lt;</span><span class="hljs-name">h2</span><span class="hljs-tag">&gt;</span>Secure Page<span class="hljs-tag">&lt;/</span><span class="hljs-name">h2</span><span class="hljs-tag">&gt;</span>
+Congratulations, you have been authenticated!
+</code></pre>
+      </li>
+      <li class="numberedList">Open the <code class="inlineCode">Pages</code>/<code class="inlineCode">Index.razor</code> page.</li>
+      <li class="numberedList">Replace the contents of the <code class="inlineCode">h1</code> element with the following:
+        <pre class="programlisting code"><code class="hljs-code">Welcome to the Claims Viewer app.
+</code></pre>
+      </li>
+      <li class="numberedList">Press <em class="keystroke">Ctrl</em>+<em class="keystroke">F5</em> to start the application without debugging.</li>
+      <li class="numberedList">Click the <strong class="screenText">Log in to Claims Viewer</strong> button.</li>
+      <li class="numberedList">Enter <a id="_idIndexMarker749"/>your credentials and click the <strong class="screenText">Sign in</strong> button.
+    <p class="normal">The first <a id="_idIndexMarker750"/>time you sign in, you will receive the following dialog:</p>
+    <figure class="mediaobject"><img src="../Images/B18471_10_12.png" alt="Graphical user interface, text, application, email  Description automatically generated"/></figure>
+    <p class="packt_figref">Figure 10.12: Permissions requested dialog</p></li>
+    </ol>
+    <ol class="numberedList" style="list-style-type: decimal;">
+      <li class="numberedList" value="9">Click the <strong class="screenText">Accept</strong> button.
+    <p class="normal">After <a id="_idIndexMarker751"/>you click the <strong class="screenText">Accept</strong> button, you <a id="_idIndexMarker752"/>will receive the following dialog:</p>
+    <figure class="mediaobject"><img src="../Images/B18471_10_13.png" alt="Graphical user interface, text, application, email  Description automatically generated"/></figure>
+    <p class="packt_figref">Figure 10.13: Security Defaults dialog</p></li>
+    </ol>
+    <ol class="numberedList" style="list-style-type: decimal;">
+      <li class="numberedList" value="10">Click the <strong class="screenText">Skip for now</strong> link.
+    <div class="note">
+      <p class="normal"><strong class="keyWord">IMPORTANT NOTE</strong></p>
+      <p class="normal">Do not click the <strong class="screenText">Next</strong> button on the preceding dialog unless you want to use Microsoft Authenticator.</p>
+    </div></li>
+    </ol>
+    <ol class="numberedList" style="list-style-type: decimal;">
+      <li class="numberedList" value="11">Click the <strong class="screenText">Yes</strong> button when asked if you want to stay signed in.
+    <p class="normal">You are now <a id="_idIndexMarker753"/>authenticated. Notice that the <code class="inlineCode">LoginDisplay</code> has been updated <a id="_idIndexMarker754"/>to display the <strong class="screenText">Log out of Claims Viewer</strong> button and the user’s name.</p></li>
+    </ol>
+    <ol class="numberedList" style="list-style-type: decimal;">
+      <li class="numberedList" value="12">Click the <strong class="screenText">Secure Page</strong> link.
+    <div class="note">
+      <p class="normal"><strong class="keyWord">IMPORTANT NOTE</strong></p>
+      <p class="normal">If you have not yet been authenticated when you click the <strong class="screenText">Secure Page</strong> link, you will be forced to log in because the page includes an <code class="inlineCode">Authenticate</code> attribute.</p>
+    </div></li>
+    </ol>
+    <ol class="numberedList" style="list-style-type: decimal;">
+      <li class="numberedList" value="13">Click the <strong class="screenText">Log out of Claims Viewer</strong> button.</li>
+      <li class="numberedList">Pick the account to sign out of.</li>
+      <li class="numberedList">Close the browser.</li>
+    </ol>
+    <p class="normal">We have demonstrated the <code class="inlineCode">Authorize</code> attribute. Now let’s use the <code class="inlineCode">AuthorizeView</code> component again.</p>
+    <h2 id="_idParaDest-306" class="heading-2">Add a WhoAmI component</h2>
+    <p class="normal">We need to create the <code class="inlineCode">WhoAmI</code> component that will be used to display information about the user. We <a id="_idIndexMarker755"/>will use the <code class="inlineCode">AuthorizeView</code> component <a id="_idIndexMarker756"/>to render different information based on the user’s authentication status. We do this as follows:</p>
+    <ol class="numberedList" style="list-style-type: decimal;">
+      <li class="numberedList" value="1">Return to Visual Studio.</li>
+      <li class="numberedList">Right-click the <code class="inlineCode">Pages</code> folder and select the <strong class="screenText">Add</strong>,<code class="inlineCode"> </code><strong class="screenText">Razor Component</strong> option from the menu.</li>
+      <li class="numberedList">Name the new component <code class="inlineCode">WhoAmI</code>.</li>
+      <li class="numberedList">Replace all the text in the file with the following:
+        <pre class="programlisting code"><code class="hljs-code">@page "/whoami"
+@using System.Security.Claims;
+<span class="hljs-tag">&lt;</span><span class="hljs-name">h1</span><span class="hljs-tag">&gt;</span>Who Am I?<span class="hljs-tag">&lt;/</span><span class="hljs-name">h1</span><span class="hljs-tag">&gt;</span>
+<span class="hljs-tag">&lt;</span><span class="hljs-name">AuthorizeView</span><span class="hljs-tag">&gt;</span>
+    <span class="hljs-tag">&lt;</span><span class="hljs-name">NotAuthorized</span><span class="hljs-tag">&gt;</span>
+        <span class="hljs-tag">&lt;</span><span class="hljs-name">div</span><span class="hljs-tag">&gt;</span>
+            <span class="hljs-tag">&lt;</span><span class="hljs-name">b</span><span class="hljs-tag">&gt;</span>WARNING: You are not authenticated!<span class="hljs-tag">&lt;/</span><span class="hljs-name">b</span><span class="hljs-tag">&gt;</span>
+            You must log in to Claims Viewer.
+        <span class="hljs-tag">&lt;/</span><span class="hljs-name">div</span><span class="hljs-tag">&gt;</span>
+    <span class="hljs-tag">&lt;/</span><span class="hljs-name">NotAuthorized</span><span class="hljs-tag">&gt;</span>
+    <span class="hljs-tag">&lt;</span><span class="hljs-name">Authorized</span><span class="hljs-tag">&gt;</span>
+        I am @myName
+    <span class="hljs-tag">&lt;/</span><span class="hljs-name">Authorized</span><span class="hljs-tag">&gt;</span>
+<span class="hljs-tag">&lt;/</span><span class="hljs-name">AuthorizeView</span><span class="hljs-tag">&gt;</span>
+@code {
+}
+</code></pre>
+      
+    <p class="normal">The preceding code renders the name of the user if they have been authenticated. If the user has not yet been authenticated, the warning message <a id="_idIndexMarker757"/>is rendered <a id="_idIndexMarker758"/>instead.</p></li>
+    </ol>
+    <ol class="numberedList" style="list-style-type: decimal;">
+      <li class="numberedList" value="5">Add the following code to the code block:
+        <pre class="programlisting code"><code class="hljs-code">[<span class="hljs-meta">CascadingParameter</span>]
+<span class="hljs-keyword">private</span> Task&lt;AuthenticationState&gt;?
+authStateTask
+{ <span class="hljs-keyword">get</span>; <span class="hljs-keyword">set</span>; }
+<span class="hljs-keyword">private</span> <span class="hljs-built_in">string</span>? myName;
+<span class="hljs-keyword">private</span> List&lt;Claim&gt;? myClaims;
+<span class="hljs-keyword">protected</span><span class="hljs-function"> </span><span class="hljs-keyword">override</span><span class="hljs-function"> </span><span class="hljs-keyword">async</span><span class="hljs-function"> Task </span><span class="hljs-title">OnInitializedAsync</span><span class="hljs-function">()</span>
+{
+    <span class="hljs-keyword">var</span> authState = <span class="hljs-keyword">await</span> authStateTask!;
+    <span class="hljs-keyword">var</span> user = authState.User;
+    <span class="hljs-keyword">if</span> (user.Identity!.IsAuthenticated)
+    {
+        myName = user.Identity.Name;
+        myClaims = user.Claims.ToList();
+    };
+}
+</code></pre>
+      
+    <p class="normal">In the preceding code, the value of <code class="inlineCode">authStateTask</code> is cascading from the <code class="inlineCode">App</code> component.</p></li>
+    </ol>
+    <ol class="numberedList" style="list-style-type: decimal;">
+      <li class="numberedList" value="6">Press <em class="keystroke">Ctrl</em>+<em class="keystroke">F5</em> to start the application without debugging.</li>
+      <li class="numberedList">Click the <strong class="screenText">Who Am I</strong> link.
+    <p class="normal">The <code class="inlineCode">AuthorizeView</code> component is rendering the text in the <code class="inlineCode">NotAuthorized</code> element.</p></li>
+    </ol>
+    <ol class="numberedList" style="list-style-type: decimal;">
+      <li class="numberedList" value="8">Click the <strong class="screenText">Log in to Claims Viewer</strong> button.</li>
+      <li class="numberedList">Provide your credentials and complete the login process.
+    <p class="normal">The <code class="inlineCode">AuthorizeView</code> component is rendering the user’s name.</p></li>
+    </ol>
+    <ol class="numberedList" style="list-style-type: decimal;">
+      <li class="numberedList" value="10">Click the <strong class="screenText">Log out of Claims Viewer</strong> button.</li>
+    </ol>
+    <p class="normal">The preceding code sets the value of <code class="inlineCode">myClaims</code> to the list of the user’s claims. But how does my app get <a id="_idIndexMarker759"/>the list of claims? The claims <a id="_idIndexMarker760"/>come from the ID token that is sent from Azure AD. We can view the ID token by using the browser’s developer tools. The ID token is a <strong class="keyWord">JSON Web Token</strong> (<strong class="keyWord">JWT</strong>).</p>
+    <h2 id="_idParaDest-307" class="heading-2">View the JSON Web Token (JWT)</h2>
+    <p class="normal">We will view <a id="_idIndexMarker761"/>the ID token sent from <a id="_idIndexMarker762"/>Azure AD to our web app. The ID token uses JWT to share security information between a server and a client. We do this as follows:</p>
+    <ol class="numberedList" style="list-style-type: decimal;">
+      <li class="numberedList" value="1">Press <em class="keystroke">F12</em> to open the browser’s developer tools.</li>
+      <li class="numberedList">Select the <strong class="screenText">Network</strong> tab.</li>
+      <li class="numberedList">Click the <strong class="screenText">Log in to Claims Viewer</strong> button.</li>
+      <li class="numberedList">Provide your credentials and complete the login process.</li>
+      <li class="numberedList">Click on <strong class="screenText">token</strong> and select the <strong class="screenText">Preview</strong> tab, as shown in the following screenshot:</li>
+    </ol>
+    <figure class="mediaobject"><img src="../Images/B18471_10_14.png" alt="Text  Description automatically generated"/></figure>
+    <p class="packt_figref">Figure 10.14: Sample Token</p>
+    <ol class="numberedList" style="list-style-type: decimal;">
+      <li class="numberedList" value="6">Copy the value of <code class="inlineCode">id_token</code> to the clipboard.
+    <p class="normal">Navigate to <a href="https://jwt.ms/"><span class="url">https://jwt.ms/</span></a>.</p></li>
+    </ol>
+    <ol class="numberedList" style="list-style-type: decimal;">
+      <li class="numberedList" value="7">Paste the contents of the clipboard into the empty text area.
+    <p class="normal">After you paste the contents of your token, the decoded token is rendered. This is the information that will be displayed on our <strong class="screenText">WhoAmI</strong> page. Next to the <strong class="screenText">Decoded Token</strong> tab is the <strong class="screenText">Claims</strong> tab.</p></li>
+    </ol>
+    <ol class="numberedList" style="list-style-type: decimal;">
+      <li class="numberedList" value="8">Click <a id="_idIndexMarker763"/>on the <strong class="screenText">Claims</strong> tab to <a id="_idIndexMarker764"/>learn more about each of the claims in the token.</li>
+      <li class="numberedList">Close the browser.</li>
+    </ol>
+    <p class="normal">Now that we know what to expect on our <strong class="screenText">WhoAmI</strong> page, let’s finish it.</p>
+    <h2 id="_idParaDest-308" class="heading-2">Add an authentication policy</h2>
+    <p class="normal">We want to limit <a id="_idIndexMarker765"/>access to the list of <a id="_idIndexMarker766"/>users’ claims to only users who are members of the <code class="inlineCode">ViewAll</code> group in Azure AD. To do that, we will add an authentication policy. We do this as follows:</p>
+    <ol class="numberedList" style="list-style-type: decimal;">
+      <li class="numberedList" value="1">Return to Visual Studio.</li>
+      <li class="numberedList">Open the <code class="inlineCode">Program.cs</code> file.</li>
+      <li class="numberedList">Add the following code above the last line in the file:
+        <pre class="programlisting code"><code class="hljs-code">builder.Services.AddAuthorizationCore(options =&gt;
+{
+    options.AddPolicy(<span class="hljs-string">"view-all"</span>, policy =&gt;
+        policy.RequireAssertion(context =&gt; 
+        context.User.HasClaim(c =&gt; 
+            c.Type == <span class="hljs-string">"groups"</span> &amp;&amp; 
+            c.Value.Contains(<span class="hljs-string">"{Object ID}"</span>))));
+});
+</code></pre>
+      </li>
+      <li class="numberedList">Open the <code class="inlineCode">Pages/Secure.razor</code> page.</li>
+      <li class="numberedList">Add the <strong class="screenText">view-all</strong> policy to the <code class="inlineCode">Authorize</code> attribute as shown below:
+        <pre class="programlisting code"><code class="hljs-code">@attribute [Authorize(Policy = <span class="hljs-string">"view-all"</span>)]
+</code></pre>
+      
+    <p class="normal">The preceding code will prevent users who do not meet all the requirements of the <code class="inlineCode">view-all</code> policy from viewing the page.</p></li>
+    </ol>
+    <ol class="numberedList" style="list-style-type: decimal;">
+      <li class="numberedList" value="6">Open the <code class="inlineCode">Pages/WhoAmI.razor</code> page.</li>
+      <li class="numberedList">Add the following markup below the existing <code class="inlineCode">AuthorizeView</code> component:
+        <pre class="programlisting code"><code class="hljs-code"><span class="hljs-tag">&lt;</span><span class="hljs-name">h2</span><span class="hljs-tag">&gt;</span>My Claims<span class="hljs-tag">&lt;/</span><span class="hljs-name">h2</span><span class="hljs-tag">&gt;</span>
+<span class="hljs-tag">&lt;</span><span class="hljs-name">AuthorizeView</span><span class="hljs-tag"> </span><span class="hljs-attr">Policy</span><span class="hljs-tag">=</span><span class="hljs-string">"view-all"</span><span class="hljs-tag">&gt;</span>
+    <span class="hljs-tag">&lt;</span><span class="hljs-name">NotAuthorized</span><span class="hljs-tag">&gt;</span>
+        <span class="hljs-tag">&lt;</span><span class="hljs-name">div</span><span class="hljs-tag">&gt;</span>
+            <span class="hljs-tag">&lt;</span><span class="hljs-name">b</span><span class="hljs-tag">&gt;</span>WARNING: You are not authorized!<span class="hljs-tag">&lt;/</span><span class="hljs-name">b</span><span class="hljs-tag">&gt;</span>
+            You must be a member of the ViewAll 
+            group in Azure AD.
+        <span class="hljs-tag">&lt;/</span><span class="hljs-name">div</span><span class="hljs-tag">&gt;</span>
+    <span class="hljs-tag">&lt;/</span><span class="hljs-name">NotAuthorized</span><span class="hljs-tag">&gt;</span>
+    <span class="hljs-tag">&lt;</span><span class="hljs-name">Authorized</span><span class="hljs-tag">&gt;</span>
+        <span class="hljs-tag">&lt;</span><span class="hljs-name">ul</span><span class="hljs-tag">&gt;</span>
+            @foreach (Claim item in myClaims!)
+            {
+                <span class="hljs-tag">&lt;</span><span class="hljs-name">li</span><span class="hljs-tag">&gt;</span>@item.Type: @item.Value<span class="hljs-tag">&lt;/</span><span class="hljs-name">li</span><span class="hljs-tag">&gt;</span>
+            }
+        <span class="hljs-tag">&lt;/</span><span class="hljs-name">ul</span><span class="hljs-tag">&gt;</span>
+    <span class="hljs-tag">&lt;/</span><span class="hljs-name">Authorized</span><span class="hljs-tag">&gt;</span>
+<span class="hljs-tag">&lt;/</span><span class="hljs-name">AuthorizeView</span><span class="hljs-tag">&gt;</span>
+</code></pre>
+      
+    <p class="normal">The preceding <a id="_idIndexMarker767"/>code will prevent <a id="_idIndexMarker768"/>users who do not meet all the requirements of the <code class="inlineCode">view-all</code> policy from viewing the list of claims.</p></li>
+    </ol>
+    <ol class="numberedList" style="list-style-type: decimal;">
+      <li class="numberedList" value="8">Press <em class="keystroke">Ctrl</em>+<em class="keystroke">F5</em> to start the application without debugging.</li>
+      <li class="numberedList">Click the <strong class="screenText">Log in to Claims Viewer</strong> button.</li>
+      <li class="numberedList">Click the <strong class="screenText">Secure Page</strong> link.
+    <p class="normal"><strong class="screenText">You are not authorized to see this page because the user does not meet the requirements of the policy</strong>. This message is coming from the <code class="inlineCode">App</code> component.</p></li>
+    </ol>
+    <ol class="numberedList" style="list-style-type: decimal;">
+      <li class="numberedList" value="11">Click the <strong class="screenText">Who Am I?</strong> link.
+    <p class="normal"><strong class="screenText">You are not authorized to view your claims</strong>. This message is coming directly from the <code class="inlineCode">WhoAmI</code> component.</p></li>
+    </ol>
+    <ol class="numberedList" style="list-style-type: decimal;">
+      <li class="numberedList" value="12">Return to Visual Studio.</li>
+      <li class="numberedList">Open the <code class="inlineCode">Program.cs</code> file.</li>
+      <li class="numberedList">Replace the <code class="inlineCode">{Object ID}</code> placeholder with the value of the <strong class="screenText">Object ID</strong> for the <strong class="screenText">ViewAll</strong> group in Azure AD.
+    <div class="note">
+      <p class="normal"><strong class="keyWord">IMPORTANT NOTE</strong></p>
+      <p class="normal">You saved the value of the group’s <strong class="screenText">Object ID</strong> after you added the <strong class="screenText">ViewAll</strong> group during the <strong class="screenText">Add a user and group to Azure AD </strong>step.</p>
+    </div></li>
+    </ol>
+    <ol class="numberedList" style="list-style-type: decimal;">
+      <li class="numberedList" value="15">Select <strong class="screenText">Build Solution</strong> from the <strong class="screenText">Build</strong> menu.</li>
+      <li class="numberedList">Return to the browser.
+    <p class="normal">Since the <a id="_idIndexMarker769"/>user now meets <a id="_idIndexMarker770"/>the requirements of the policy, you are now able to view the list of their claims.</p></li>
+    </ol>
+    <ol class="numberedList" style="list-style-type: decimal;">
+      <li class="numberedList" value="17">Click the <strong class="screenText">Secure Page</strong> link.
+    <p class="normal">Likewise, since the user now meets all of the requirements of the policy, you are now able to view the <strong class="screenText">Secure</strong> page.</p></li>
+    </ol>
+    <p class="normal">We have created a secure application that allows authenticated users who are members of the <code class="inlineCode">ViewAll</code> group to view the claims provided by the ID token from Azure AD.</p>
+    <h1 id="_idParaDest-309" class="heading-1">Summary</h1>
+    <p class="normal">You should now be able to render the list of an authenticated user’s claims by delegating identity management to Azure AD.</p>
+    <p class="normal">In this chapter, we learned the difference between authentication and authorization. We also learned how to work with the authentication components. Finally, we learned how to control the user interface by using the <code class="inlineCode">Authorize</code> attribute and the <code class="inlineCode">AuthorizeView</code> component.</p>
+    <p class="normal">After that, we used the <strong class="keyWord">Blazor WebAssembly App Empty</strong> project template to create a new project. Next, we used the Azure Portal to configure our Azure AD tenant to add a new application. Then we added a group to our new application and added a user to that group. We used the Client ID and the Tenant ID from Azure AD to update the <code class="inlineCode">appsettings.json</code> file in our project. We added the required NuGet packages and finished configuring our application to use authentication. We added the <code class="inlineCode">Authentication</code>, <code class="inlineCode">LoginDisplay</code>, <code class="inlineCode">Secure</code>, and <code class="inlineCode">WhoAmI</code> components. Finally, we used a policy to restrict access to the list of claims.</p>
+    <p class="normal">In the next chapter, we will use SQL Server to build a task manager using the ASP.NET Web API.</p>
+    <h1 id="_idParaDest-310" class="heading-1">Questions</h1>
+    <p class="normal">The following questions are provided for your consideration:</p>
+    <ol class="numberedList" style="list-style-type: decimal;">
+      <li class="numberedList" value="1">What is the difference between authentication and authorization?</li>
+      <li class="numberedList">If you add a <code class="inlineCode">Secure</code> component to the <code class="inlineCode">Home</code> page, will the user need to be authenticated to render it?</li>
+      <li class="numberedList">How can you secure a Blazor WebAssembly app without using the <code class="inlineCode">Authorize</code> attribute on every routable component?</li>
+      <li class="numberedList">What are some of the claims that are included in a <strong class="keyWord">JSON Web Token</strong> (<strong class="keyWord">JWT</strong>)?</li>
+    </ol>
+    <h1 id="_idParaDest-311" class="heading-1">Further reading</h1>
+    <p class="normal">The following resources provide more information concerning the topics covered in this chapter:</p>
+    <ul>
+      <li class="bulletList">For more information on the current authentication state, refer to <a href="https://learn.microsoft.com/en-us/dotnet/api/microsoft.aspnetcore.components.authorization"><span class="url">https://learn.microsoft.com/en-us/dotnet/api/microsoft.aspnetcore.components.authorization</span></a>.</li>
+      <li class="bulletList">For more information on the <code class="inlineCode">ClaimsPrincipal</code> class, refer to <a href="https://learn.microsoft.com/en-us/dotnet/api/system.security.claims.claimsprincipal"><span class="url">https://learn.microsoft.com/en-us/dotnet/api/system.security.claims.claimsprincipal</span></a>.</li>
+      <li class="bulletList">For more information on the Microsoft identity platform, refer to <a href="https://learn.microsoft.com/en-us/azure/active-directory/develop"><span class="url">https://learn.microsoft.com/en-us/azure/active-directory/develop</span></a>.</li>
+      <li class="bulletList">For the <code class="inlineCode">RemoteAuthenticatorViewCore</code> source code in GitHub, refer to <a href="https://github.com/dotnet/aspnetcore/blob/600eb9aa53c052ec7327e2399744215dbe493a89/src/Components/WebAssembly/WebAssembly.Authentication/src/RemoteAuthenticatorViewCore.cs"><span class="url">https://github.com/dotnet/aspnetcore/blob/600eb9aa53c052ec7327e2399744215dbe493a89/src/Components/WebAssembly/WebAssembly.Authentication/src/RemoteAuthenticatorViewCore.cs</span></a>.</li>
+      <li class="bulletList">To decode a <strong class="keyWord">JSON Web Token</strong> (<strong class="keyWord">JWT</strong>), refer to <a href="https://jwt.ms"><span class="url">https://jwt.ms</span></a>.</li>
+    </ul>
+  </div>
+  <div id="_idContainer285" class="Basic-Text-Frame">
+    <h1 id="_idParaDest-312" class="heading-1">Join our community on Discord</h1>
+    <p class="normal">Join our community’s Discord space for discussions with the author and other readers:</p>
+    <p class="normal"><a href="https://packt.link/BlazorWASM2e"><span class="url">https://packt.link/BlazorWASM2e</span></a></p>
+    <p class="normal"><img src="../Images/Discord_QR.png" alt=""/></p>
+  </div>
+</body></html>

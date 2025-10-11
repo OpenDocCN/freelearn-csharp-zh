@@ -1,6 +1,6 @@
-# Python 机器学习算法交易实用指南
+# Unity 2018 秘籍
 
-> 原文：[`zh.annas-archive.org/md5/fcb09c483bdb21866eb6782158d1f8d5`](https://zh.annas-archive.org/md5/fcb09c483bdb21866eb6782158d1f8d5)
+> 原文：[`zh.annas-archive.org/md5/efc9a5dc7072dc6b4bde7bb1a41e8e20`](https://zh.annas-archive.org/md5/efc9a5dc7072dc6b4bde7bb1a41e8e20)
 > 
 > 译者：[飞龙](https://github.com/wizardforcel)
 > 

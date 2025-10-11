@@ -1,6 +1,6 @@
-# Python 机器学习算法交易实用指南
+# Unity 认证程序员备考指南第二版
 
-> 原文：[`zh.annas-archive.org/md5/fcb09c483bdb21866eb6782158d1f8d5`](https://zh.annas-archive.org/md5/fcb09c483bdb21866eb6782158d1f8d5)
+> 原文：[`zh.annas-archive.org/md5/dada881490221e492773464f21c04884`](https://zh.annas-archive.org/md5/dada881490221e492773464f21c04884)
 > 
 > 译者：[飞龙](https://github.com/wizardforcel)
 > 

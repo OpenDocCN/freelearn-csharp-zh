@@ -1,6 +1,6 @@
-# C# 和 .NET 
+# C# 和 .NET 现代 SAAS 应用构建指南
 
-> 原文：[`zh.annas-archive.org/md5/fcb09c483bdb21866eb6782158d1f8d5`](https://zh.annas-archive.org/md5/fcb09c483bdb21866eb6782158d1f8d5)
+> 原文：[`zh.annas-archive.org/md5/e4ab3398f5c910a357232871ae58cd41`](https://zh.annas-archive.org/md5/e4ab3398f5c910a357232871ae58cd41)
 > 
 > 译者：[飞龙](https://github.com/wizardforcel)
 > 

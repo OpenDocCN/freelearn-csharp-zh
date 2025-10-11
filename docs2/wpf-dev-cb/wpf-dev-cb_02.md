@@ -34,7 +34,7 @@
 
 +   向窗口添加工具栏面板以执行快速任务
 
-# 简介
+# 第三章：简介
 
 每个 UI 框架都必须提供标准控件来设计应用程序 UI，**Windows Presentation Foundation**（**WPF**）就是其中之一。WPF 提供了一套标准控件和 UI 元素，例如 `TextBlock`、`TextBox`、`Button`、`Image`、各种形状、`ProgressBar`、`Slider`、各种菜单、`Toolbar`、`ListBox`、`ComboBox`、`DataGrid` 以及更多。
 

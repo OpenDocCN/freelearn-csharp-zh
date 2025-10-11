@@ -1,4 +1,4 @@
-# 保密 - 各种传感器数据和插件
+# 第三章：保密 - 各种传感器数据和插件
 
 希望您能原谅标题中的俏皮双关语。在本章中，我们将讨论我们可以通过提供的各种 SDK 访问的各种传感器。这包括 ARKit、Vuforia、ARCore、Swift API 和 Java API。现在，我们将采取这条路线的原因是，核心 API 中有一些内容在提供给 Unity 的 SDK 中没有暴露，但我们可以通过使用 C# 中的包装调用原生插件来利用这些内容。为了简化说明，不超出本书的范围，我将不会教授 Java 或 Swift 编程语言的语法；已经有其他 Packt 作者编写了一些关于这些材料的优秀书籍，例如 *《Swift 入门》* ([`www.packtpub.com/application-development/beginning-swift`](https://www.packtpub.com/application-development/beginning-swift)) 和 *《Java 编程入门》* ([`www.packtpub.com/application-development/java-programming-beginners`](https://www.packtpub.com/application-development/java-programming-beginners))。
 

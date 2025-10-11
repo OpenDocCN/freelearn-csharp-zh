@@ -1,6 +1,6 @@
-# Python 机器学习算法交易实用指南
+# C#7 测试驱动开发实践指南
 
-> 原文：[`zh.annas-archive.org/md5/fcb09c483bdb21866eb6782158d1f8d5`](https://zh.annas-archive.org/md5/fcb09c483bdb21866eb6782158d1f8d5)
+> 原文：[`zh.annas-archive.org/md5/91ee761e90c542d975f879ce615f9e82`](https://zh.annas-archive.org/md5/91ee761e90c542d975f879ce615f9e82)
 > 
 > 译者：[飞龙](https://github.com/wizardforcel)
 > 

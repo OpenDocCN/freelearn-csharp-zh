@@ -1,6 +1,6 @@
 # .NET 微服务设计模式
 
-> 原文：[`zh.annas-archive.org/md5/fcb09c483bdb21866eb6782158d1f8d5`](https://zh.annas-archive.org/md5/fcb09c483bdb21866eb6782158d1f8d5)
+> 原文：[`zh.annas-archive.org/md5/218460e5cc8e8d7e6c35b968fbaa82a8`](https://zh.annas-archive.org/md5/218460e5cc8e8d7e6c35b968fbaa82a8)
 > 
 > 译者：[飞龙](https://github.com/wizardforcel)
 > 

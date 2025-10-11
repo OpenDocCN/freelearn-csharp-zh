@@ -1,6 +1,6 @@
-# Python 机器学习算法交易实用指南
+# C# 设计模式的现实世界实现
 
-> 原文：[`zh.annas-archive.org/md5/fcb09c483bdb21866eb6782158d1f8d5`](https://zh.annas-archive.org/md5/fcb09c483bdb21866eb6782158d1f8d5)
+> 原文：[`zh.annas-archive.org/md5/11e871544054de0c7d4c4740ac456492`](https://zh.annas-archive.org/md5/11e871544054de0c7d4c4740ac456492)
 > 
 > 译者：[飞龙](https://github.com/wizardforcel)
 > 

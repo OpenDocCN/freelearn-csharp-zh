@@ -1,6 +1,6 @@
 
 
-# 使用 Azure Active Directory 保护 Blazor WebAssembly 应用程序
+# 第十章：使用 Azure Active Directory 保护 Blazor WebAssembly 应用程序
 
 安全性很重要。大多数应用程序在用户可以访问应用程序提供的所有功能之前，都需要用户提供其凭据。管理用户名、密码、角色和组可能会很繁琐且复杂。使用**Azure Active Directory**（**Azure AD**）可以使其变得简单。Azure AD 是云中的身份提供者。
 

@@ -1,6 +1,6 @@
 
 
-# 调试和部署 Blazor WebAssembly 应用
+# 第三章：调试和部署 Blazor WebAssembly 应用
 
 调试并不总是愉快的，但它却是软件开发的重要方面。当调试 Blazor WebAssembly 应用时，Microsoft Visual Studio 提供了我们所需的大部分功能。然而，由于使用 Blazor WebAssembly 构建的应用在客户端运行，我们还需要学习如何使用浏览器的 **开发者工具** (**DevTools**) 来调试应用。完成 Blazor WebAssembly 应用的调试后，我们可以使用 Microsoft Visual Studio 来部署它。
 

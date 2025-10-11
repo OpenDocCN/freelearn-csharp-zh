@@ -1,6 +1,6 @@
 
 
-# 使用 JavaScript 互操作性（JS Interop）构建本地存储服务
+# 第五章：使用 JavaScript 互操作性（JS Interop）构建本地存储服务
 
 Blazor WebAssembly 框架使我们能够在浏览器上运行 C# 代码。然而，有一些场景 C# 简直无法处理，对于这些场景，我们需要使用 JavaScript 函数。
 

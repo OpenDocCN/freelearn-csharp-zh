@@ -1,6 +1,6 @@
 
 
-# 构建您的第一个 Blazor WebAssembly 应用程序
+# 第二章：构建您的第一个 Blazor WebAssembly 应用程序
 
 **Razor 组件**是 Blazor WebAssembly 应用程序的构建块。Razor 组件是一块用户界面，它可以被共享、嵌套和重用。Razor 组件是普通的 C#类，可以放置在项目的任何位置。
 

@@ -1,6 +1,6 @@
 
 
-# Blazor WebAssembly 简介
+# 第一章：Blazor WebAssembly 简介
 
 **Blazor WebAssembly** 是微软为在 **.NET Framework** 上构建交互式 Web 应用程序而推出的新 **单页应用程序**（SPA）框架。由于它基于 .NET Framework，Blazor WebAssembly 允许您在客户端和服务器上运行 C# 代码。因此，我们不再被迫在客户端编写 **JavaScript**，现在我们可以到处使用 C#。
 

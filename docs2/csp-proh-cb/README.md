@@ -1,6 +1,6 @@
-# Python 机器学习算法交易实用指南
+# C# 编程秘籍
 
-> 原文：[`zh.annas-archive.org/md5/fcb09c483bdb21866eb6782158d1f8d5`](https://zh.annas-archive.org/md5/fcb09c483bdb21866eb6782158d1f8d5)
+> 原文：[`zh.annas-archive.org/md5/c11ba4fc7c437ceda4b3fb259efa0506`](https://zh.annas-archive.org/md5/c11ba4fc7c437ceda4b3fb259efa0506)
 > 
 > 译者：[飞龙](https://github.com/wizardforcel)
 > 

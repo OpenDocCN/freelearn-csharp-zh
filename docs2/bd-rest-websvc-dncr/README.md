@@ -1,6 +1,6 @@
-# Python 机器学习算法交易实用指南
+# .NET Core REST Web 服务构建指南
 
-> 原文：[`zh.annas-archive.org/md5/fcb09c483bdb21866eb6782158d1f8d5`](https://zh.annas-archive.org/md5/fcb09c483bdb21866eb6782158d1f8d5)
+> 原文：[`zh.annas-archive.org/md5/1e7ad7205a3cebbe0ef61345f17029dc`](https://zh.annas-archive.org/md5/1e7ad7205a3cebbe0ef61345f17029dc)
 > 
 > 译者：[飞龙](https://github.com/wizardforcel)
 > 

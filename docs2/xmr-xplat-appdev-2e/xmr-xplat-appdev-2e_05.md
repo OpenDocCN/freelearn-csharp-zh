@@ -1,4 +1,4 @@
-# 第五章 XamChat for iOS
+# 第五章：XamChat for iOS
 
 在本章中，我们将开发我们的跨平台 XamChat 应用程序的 iOS 部分。由于我们正在使用 MVVM 设计模式，我们将要做的大部分工作将在应用程序的视图层。我们将主要使用原生 iOS API，并了解我们如何利用便携式类库中的共享代码来应用它们。由于 Xamarin.iOS 允许我们直接调用 Apple API，我们的 iOS 应用程序将无法与使用 Objective-C 或 Swift 开发的程序区分开来。
 

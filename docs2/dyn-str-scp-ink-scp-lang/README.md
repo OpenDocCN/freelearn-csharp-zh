@@ -1,6 +1,6 @@
-# Python 机器学习算法交易实用指南
+# Ink 脚本语言动态故事脚本编程
 
-> 原文：[`zh.annas-archive.org/md5/fcb09c483bdb21866eb6782158d1f8d5`](https://zh.annas-archive.org/md5/fcb09c483bdb21866eb6782158d1f8d5)
+> 原文：[`zh.annas-archive.org/md5/8ad4a2c2d01859e9ea15bf3f5d0ec93f`](https://zh.annas-archive.org/md5/8ad4a2c2d01859e9ea15bf3f5d0ec93f)
 > 
 > 译者：[飞龙](https://github.com/wizardforcel)
 > 

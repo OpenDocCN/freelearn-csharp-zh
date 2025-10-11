@@ -1,6 +1,6 @@
-# Python 机器学习算法交易实用指南
+# .NET Core 测试驱动开发实用指南
 
-> 原文：[`zh.annas-archive.org/md5/fcb09c483bdb21866eb6782158d1f8d5`](https://zh.annas-archive.org/md5/fcb09c483bdb21866eb6782158d1f8d5)
+> 原文：[`zh.annas-archive.org/md5/090175b8503a2fd03da8637f3e71ad3e`](https://zh.annas-archive.org/md5/090175b8503a2fd03da8637f3e71ad3e)
 > 
 > 译者：[飞龙](https://github.com/wizardforcel)
 > 

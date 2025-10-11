@@ -1,6 +1,6 @@
-# Python 机器学习算法交易实用指南
+# .NET 标准 2.0 秘籍
 
-> 原文：[`zh.annas-archive.org/md5/fcb09c483bdb21866eb6782158d1f8d5`](https://zh.annas-archive.org/md5/fcb09c483bdb21866eb6782158d1f8d5)
+> 原文：[`zh.annas-archive.org/md5/4c555c436a572194e4929e640c176f78`](https://zh.annas-archive.org/md5/4c555c436a572194e4929e640c176f78)
 > 
 > 译者：[飞龙](https://github.com/wizardforcel)
 > 

@@ -1,6 +1,6 @@
-# Python 机器学习算法交易实用指南
+# Unity 5.x 2D 游戏开发入门指南
 
-> 原文：[`zh.annas-archive.org/md5/fcb09c483bdb21866eb6782158d1f8d5`](https://zh.annas-archive.org/md5/fcb09c483bdb21866eb6782158d1f8d5)
+> 原文：[`zh.annas-archive.org/md5/5f50ae4ce65cfcb489085cc63f62aac6`](https://zh.annas-archive.org/md5/5f50ae4ce65cfcb489085cc63f62aac6)
 > 
 > 译者：[飞龙](https://github.com/wizardforcel)
 > 

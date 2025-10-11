@@ -1,4 +1,4 @@
-# 智能化使用 WPF 的方法
+# 第一章：智能化使用 WPF 的方法
 
 当**Windows Presentation Foundation**（**WPF**）在 2006 年作为.NET Framework 3.0 的一部分首次发布时，它被誉为桌面应用程序**图形用户界面**（**GUI**）语言的未来，支持者声称它将结束之前的 GUI 技术，即 Windows Forms。然而，随着时间的推移，它远远没有达到这一预期。
 

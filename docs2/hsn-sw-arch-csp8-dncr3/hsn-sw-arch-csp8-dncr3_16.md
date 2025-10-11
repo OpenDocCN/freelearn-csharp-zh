@@ -1,4 +1,4 @@
-# 展示 ASP.NET Core MVC
+# 第十三章：展示 ASP.NET Core MVC
 
 在本章中，你将学习如何实现应用程序的表现层。更具体地说，你将学习如何基于 ASP.NET Core MVC 实现一个网络应用程序。
 

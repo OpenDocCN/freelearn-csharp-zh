@@ -1,6 +1,6 @@
 
 
-# .NET MAUI 中的数据绑定构建块
+# 第三章：.NET MAUI 中的数据绑定构建块
 
 在前面的章节中，我们熟悉了 MVVM 模式的核心概念，并探讨了.NET MAUI 的基础知识。在了解了 MVVM 原则和.NET MAUI 的能力之后，我们现在可以开始探讨如何将 MVVM 应用于.NET MAUI。
 

@@ -1,6 +1,6 @@
 
 
-# 使用流行的第三方库
+# 第六章：使用流行的第三方库
 
 本章介绍了几个流行的 .NET 第三方库，这些库允许你执行一些操作，这些操作要么无法使用核心 .NET 库完成，要么比内置功能更好。这些操作包括使用 **ImageSharp** 处理图像、使用 **Serilog** 记录、使用 **AutoMapper** 将对象映射到其他对象、使用 **FluentAssertions** 进行单元测试断言、使用 **FluentValidation** 验证数据以及使用 **QuestPDF** 生成 PDF。
 

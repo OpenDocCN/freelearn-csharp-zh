@@ -1,4 +1,4 @@
-# *第十章*: 自定义 ASP.NET Core Identity
+# 第十章：*第十章*: 自定义 ASP.NET Core Identity
 
 在本章中，我们将学习如何自定义 ASP.NET Core Identity。安全性是应用程序最重要的方面之一。Microsoft 将 ASP.NET Core Identity 作为 ASP.NET Core 框架的一部分提供，以向 ASP.NET Core 应用程序添加身份验证和用户管理。
 

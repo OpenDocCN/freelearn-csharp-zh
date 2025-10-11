@@ -1,4 +1,4 @@
-# *第七章*：使用 IHostedService 和 BackgroundService
+# 第七章：*第七章*：使用 IHostedService 和 BackgroundService
 
 这第七章并不是真的关于定制；它更多的是关于你可以用来创建后台服务以在应用程序内部异步运行任务的特性。我在一个小型的 ASP.NET Core 应用程序中定期从远程服务获取数据时使用了这个特性。
 

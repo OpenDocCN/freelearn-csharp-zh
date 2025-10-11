@@ -1,6 +1,6 @@
 
 
-# 使用 SQL Server 管理关系数据
+# 第二章：使用 SQL Server 管理关系数据
 
 本章是关于管理存储在 SQL Server、Azure SQL Database 或 Azure SQL Edge 中的关系数据。首先，您将学习如何使用原生 Transact-SQL 语句管理数据。接下来，您将学习如何使用 ADO.NET 库（`Microsoft.Data.SqlClient`）以低级别管理数据。最后，您将使用 Dapper 来简化与实体模型的工作。
 

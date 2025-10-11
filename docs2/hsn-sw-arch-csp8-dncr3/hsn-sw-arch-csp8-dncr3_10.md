@@ -1,4 +1,4 @@
-# 使用 Azure Functions
+# 第八章：使用 Azure Functions
 
 正如我们在第四章，“选择最佳云解决方案”中提到的，无服务器架构是提供灵活软件解决方案的最新方式之一。为此，Microsoft Azure 提供了 Azure Functions，这是一种事件驱动的、无服务器的、可扩展的技术，可以加速您的项目开发。本章的主要目标是向您介绍 Azure Functions 以及您在使用它时可以实施的最佳实践。
 

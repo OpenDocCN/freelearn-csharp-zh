@@ -1,4 +1,4 @@
-# 测试 JavaScript 应用
+# 第九章：测试 JavaScript 应用
 
 要开始使用 JavaScript 进行测试，我们需要创建一个 ReactJS 应用，并使用 Mocha、Chai、Enzyme 和 Sinon 库来配置它进行测试。
 

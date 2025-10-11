@@ -1,6 +1,6 @@
 
 
-# 使用 EF Core 为 SQL Server 构建实体模型
+# 第三章：使用 EF Core 为 SQL Server 构建实体模型
 
 本章将介绍如何使用名为**Entity Framework Core**（**EF Core**）的高级对象到数据存储映射技术来管理存储在 SQL Server、Azure SQL Database 或 Azure SQL Edge 中的关系型数据。然后，你将学习如何使用三种不同的映射策略存储使用继承层次结构的实体模型。最后，你将构建用于本书其余部分代码示例的 SQL Server 数据库的类库。
 

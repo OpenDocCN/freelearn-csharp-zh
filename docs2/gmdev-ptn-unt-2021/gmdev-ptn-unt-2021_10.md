@@ -14,7 +14,7 @@
 
 垃圾收集器（GC）作为一个自动的内存管理器，是大多数现代面向对象语言（如 C#）的一个基本组件。为了继续本章的学习，不需要理解它是如何工作的，但如果您对此感兴趣，可以在此处获取更多相关信息：[`docs.microsoft.com/en-us/dotnet/standard/garbage-collection/`](https://docs.microsoft.com/en-us/dotnet/standard/garbage-collection/)。
 
-# 技术要求
+# 第十一章：技术要求
 
 本章是实践性的，因此您需要对 Unity 和 C#有一个基本的了解。
 

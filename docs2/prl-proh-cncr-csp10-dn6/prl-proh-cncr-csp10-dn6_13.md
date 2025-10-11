@@ -1,4 +1,4 @@
-# *第十章*：使用 Visual Studio 调试多线程应用程序
+# 第十章：*第十章*：使用 Visual Studio 调试多线程应用程序
 
 Visual Studio 2022 是 Mac 和 Windows 上最新的 Visual Studio 版本。在本章中，我们将学习如何利用 Visual Studio 的强大功能来调试多线程.NET 应用程序。
 

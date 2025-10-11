@@ -1,6 +1,6 @@
 
 
-# 使用.NET MAUI 构建移动和桌面应用程序
+# 第十六章：使用.NET MAUI 构建移动和桌面应用程序
 
 本章是关于通过构建适用于 iOS 和 Android、macOS Catalyst 和 Windows 的跨平台移动和桌面应用程序来学习如何制作图形用户界面（GUI）应用程序。根据 MAUI 团队的说法，.NET 7 和.NET 8 之间没有破坏性 API 更改。他们主要专注于修复错误和改进性能。
 

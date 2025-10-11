@@ -1,4 +1,4 @@
-# *第十章*：创建 ASP.NET Core 6 Web API
+# 第十章：*第十章*：创建 ASP.NET Core 6 Web API
 
 近年来，Web 服务已成为 Web 应用程序开发的重要组成部分。随着需求的不断变化和商业复杂性的增加，松散耦合 Web 应用程序开发中涉及的各个组件/层非常重要，而与应用程序的核心业务逻辑解耦的方案则更为出色。这就是使用 RESTful 方法（其中 **REST** 代表 **REpresentational State Transfer**）的 Web 服务的简单性帮助我们开发可扩展的 Web 应用程序的地方。
 

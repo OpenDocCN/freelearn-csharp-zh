@@ -1,4 +1,4 @@
-# 模拟测试 1
+# 第十七章：模拟测试 1
 
 1.  我们有一个名为 `LogException` 的类。该类使用以下代码段实现 `CaptureException` 方法：`public static void CaptureException(Exception ex)`。从以下语法中选择一个，以确保捕获类中的所有异常并重新抛出原始异常，包括堆栈：
 

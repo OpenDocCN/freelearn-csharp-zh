@@ -1,4 +1,4 @@
-# *第四章*：使用 Kestrel 配置和自定义 HTTPS
+# 第四章：*第四章*：使用 Kestrel 配置和自定义 HTTPS
 
 在 **ASP.NET** **Core** 中，**HTTPS** 默认启用，并且是一个一等特性。在 Windows 上，启用 HTTPS 所需的证书是从 Windows 证书存储中加载的。如果你在 **Linux** 或 **Mac** 上创建项目，证书是从证书文件中加载的。
 

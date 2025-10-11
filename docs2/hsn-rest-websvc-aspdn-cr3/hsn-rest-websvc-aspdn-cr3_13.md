@@ -1,4 +1,4 @@
-# 实现 RESTful HTTP 层
+# 第十章：实现 RESTful HTTP 层
 
 在上一章中，我们学习了如何在 `Catalog.Domain` 项目中处理我们网络服务的逻辑。本章将向您介绍网络服务的 HTTP 部分，以及 `Catalog.API` 项目中的所有组件。
 

@@ -1,4 +1,4 @@
-# 使用 ARCore 进行 AR 制造
+# 第三章：使用 ARCore 进行 AR 制造
 
 在本章中，我们将使用 Google 的 ARCore 工具创建我们的第一个 AR 项目。本章的主要目标是向您介绍最新且增长最快的 AR 工具之一，ARCore。到本章结束时，您将掌握在 Android Studio 中轻松创建自己的 ARCore 项目的必要技能。同时，我们展示了 AR 在制造中的一个应用，即原型设计。
 

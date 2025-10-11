@@ -1,4 +1,4 @@
-# 6. 使用 SQL Server 的 Entity Framework
+# 第六章：6. 使用 SQL Server 的 Entity Framework
 
 概述
 

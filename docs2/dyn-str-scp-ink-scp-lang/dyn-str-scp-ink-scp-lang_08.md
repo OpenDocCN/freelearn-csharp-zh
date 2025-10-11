@@ -1,4 +1,4 @@
-# *第六章*：添加和使用 ink-Unity Integration 插件
+# 第六章：*第六章*：添加和使用 ink-Unity Integration 插件
 
 本章首先讨论如何在 Unity 项目及其项目窗口中添加 `.ink` 文件及其编译形式 `.json`。然后，我们将回顾如何将 Inky 与 ink 源文件关联，并使用它直接从 Unity 编辑文件。最后，我们将通过检查如何调整项目的插件设置来结束本章。
 

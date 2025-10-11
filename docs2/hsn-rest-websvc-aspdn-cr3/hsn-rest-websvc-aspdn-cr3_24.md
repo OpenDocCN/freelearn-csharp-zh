@@ -1,4 +1,4 @@
-# 使用 Postman 测试服务
+# 第二十章：使用 Postman 测试服务
 
 Postman 是我们可用于查询 API 的最强大的工具之一，主要面向开发者和企业团队。在本章中，我们将介绍 Postman 并展示如何使用此工具测试和监控 Web 服务。Postman 被描述为以 API 为首的解决方案，拥有行业唯一的完整 API 开发环境。接下来，我们将学习如何使用 Postman 调用通用 HTTP API。然后，我们将学习如何将上一章中生成的 OpenAPI 规范导入 Postman，以自动生成在目录服务中实现的 API 调用。
 

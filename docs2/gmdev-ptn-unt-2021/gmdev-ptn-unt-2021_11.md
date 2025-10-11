@@ -16,7 +16,7 @@
 
 +   审查替代方案
 
-# 技术要求
+# 第十二章：技术要求
 
 本章的代码文件可以在 GitHub 上找到：[`github.com/PacktPublishing/Game-Development-Patterns-with-Unity-2021-Second-Edition/tree/main/Assets/Chapters/Chapter09`](https://github.com/PacktPublishing/Game-Development-Patterns-with-Unity-2021-Second-Edition/tree/main/Assets/Chapters/Chapter09)。
 

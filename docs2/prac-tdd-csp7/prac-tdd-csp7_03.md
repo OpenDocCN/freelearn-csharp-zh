@@ -1,4 +1,4 @@
-# 设置 JavaScript 环境
+# 第三章：设置 JavaScript 环境
 
 在本章中，我们将通过纯 JavaScript 和 React 的示例来探索设置你的 JavaScript 开发环境。
 

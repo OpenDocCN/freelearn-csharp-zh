@@ -1,6 +1,6 @@
 
 
-# 使用 Azure Cosmos DB 管理 NoSQL 数据
+# 第四章：使用 Azure Cosmos DB 管理 NoSQL 数据
 
 本章将介绍如何使用 Azure Cosmos DB 管理 NoSQL 数据。您将了解 Cosmos DB 的一些关键概念，如其 API、数据建模方式以及吞吐量配置，这些都会影响成本。您将使用本地模拟器和 Azure 云创建一些 Cosmos DB 资源。然后您将学习如何使用 Core（SQL）API 处理更传统的数据。
 

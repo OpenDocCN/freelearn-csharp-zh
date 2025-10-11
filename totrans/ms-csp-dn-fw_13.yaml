@@ -1,0 +1,2811 @@
+- en: Chapter 13. Advanced Topics
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In [Chapter 12](part0078.xhtml#aid-2ACBS2 "Chapter 12. Performance"), *Performance*,
+    we studied application's performance under several points of view and analyzed
+    some of the most meaningful tools at our disposal in order to improve our software's
+    response time.
+  prefs: []
+  type: TYPE_NORMAL
+- en: This chapter covers advanced concepts, mainly related to three areas. So, you
+    can consider it a miscellaneous chapter, addressing several topics that either
+    do not fit directly within the context of any of the preceding chapters or are
+    too new, such as what happens with .NET Core.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Specifically, I will cover how an application can receive system's calls in
+    its own functions and also explain how our code can integrate and communicate
+    with the OS using its APIs.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Another topic we will cover is **Windows Management Instrumentation** (**WMI**)
+    and how it allows the developer to access and modify critical aspects of the system,
+    which are sometimes difficult to reach in other approaches.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We'll also cover parallelism, analyzing some myths and misunderstandings of
+    these topics and testing these approaches so that we can really evaluate the advantages
+    of this type of programming.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The chapter ends with an introduction to .NET Core 1.0 and its derivative work,
+    ASP.NET Core 1.0, and its implications and meaning in the open source programming
+    world, along with some examples of how to use it. The availability of this technology
+    was made public by the end of June, 2016, and some minor additions were included
+    in version 1.1, mainly bug fixes and coverage for more operating systems.
+  prefs: []
+  type: TYPE_NORMAL
+- en: So, we're going to start with the mechanisms that allow communication between
+    the OS and .NET in both directions. But first, it would be interesting to remember
+    the basics of how the operating system works internally and, specifically, how
+    it manages messages between windows if we really want to understand and take advantage
+    of this feature in the .NET code.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'To summarize, we will cover the following topics in this chapter:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Sub-classing and platform/invoke
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Windows Management Instrumentation
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Extended techniques in parallel programming
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: An introduction to .NET Core 1.0 and ASP.NET Core 1.0
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The Windows messaging subsystem
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: All Windows-based applications are event-driven. This means that they don't
+    make explicit calls to functions in the OS APIs. Instead, they wait for the system
+    to pass any input to them. So it's the system that's the one in charge of providing
+    that input.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The system''s kernel is in charge of converting hardware events (users'' clicks,
+    keyboard entries, touch screen gestures, the arrival of bytes in a communication''s
+    port, and so on) into software events, which take the form of messages addressed
+    to a software target: a button in a window, a textbox in a form, and so on. After
+    all, this is the soul of the Event-driven Programming paradigm.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: I'll start with a section that deals with how .NET can use low-level resources
+    of the operating system, in other words, how our applications can communicate
+    and use the core functionality of our operating system, despite being coded using
+    distinct models, with distinct data types and calling conventions. This technique
+    permits .NET applications to use resources in Windows that are not mapped directly
+    to CLR classes and integrate that functionality into our applications.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The MSG structure
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'A message is nothing but a numeric code that uniquely identifies a particular
+    event. For example, for the previous case when the user presses the left mouse
+    button, the window receives a message with this message code: `0x0201`. This number
+    is previously defined in code in the following way:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE0]'
+  prefs: []
+  type: TYPE_PRE
+- en: Some messages have data associated with them. For example, in this case, the
+    `WM_LBUTTONDOWN` message has to indicate the `x` coordinate and `y` coordinate
+    of the mouse cursor to the programmer.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Whenever a message is passed to a window, the operating system calls a special
+    function of that window, called the window procedure, which is registered for
+    that window at creation time.
+  prefs: []
+  type: TYPE_NORMAL
+- en: This is because in Windows, everything is a window (well, almost), and every
+    window procedure (called `WndProc`) takes care of the messages it receives as
+    soon as the system sends some input for that window. Actually, the messages are
+    queued, and the system has the ability to promote some messages in the queue thanks
+    to a priority policy.
+  prefs: []
+  type: TYPE_NORMAL
+- en: All aspects of a window's appearance (and behavior) depend on the window procedure's
+    response to these messages.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Tip
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'Remember, a window is anything that the system distinguishes with a handler:
+    a unique number that makes that component different from the rest. That is, buttons,
+    icons, among others, are just windows embedded in other windows, each one with
+    its own handler.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: So, every time you click on a button, pass the cursor over an icon or use *Ctrl*
+    + *C* to copy the content, and system sends a message to the target window (the
+    button, the icon, the clipboard, and so on).
+  prefs: []
+  type: TYPE_NORMAL
+- en: A message is received by the `wndproc` function associated with that target,
+    which processes that message and returns control to the system.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following figure shows this structure in more detail:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![The MSG structure](img/image00673.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'Note that according to the MSDN:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '"If a top-level window stops responding to messages for more than several seconds,
+    the system considers the window to be not responding. In this case, the system
+    hides the window and replaces it with a ghost window that has the same Z order,
+    location, size, and visual attributes. This allows the user to move it, resize
+    it, or even close the application. However, these are the only actions available
+    because the application is actually not responding. When in the debugger mode,
+    the system does not generate a ghost window."'
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: As mentioned earlier, either system messages or user messages are queued and
+    the `wndproc` function processes them in a first-in-first-out fashion (with some
+    exceptions).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Actually, you can distinguish between two kinds of messages: those sent by
+    user applications, which generally go to the FIFO queue, and others, sent by the
+    OS which can have a distinct priority and, therefore, can be located before the
+    rest in the queue (for example, error messages).'
+  prefs: []
+  type: TYPE_NORMAL
+- en: These messages can be sent via Post Message or Send Message APIs depending on
+    the expected behavior, and although we're not going to cover these aspects in
+    depth (since they go far beyond the scope of this chapter), we'll look at how
+    we can send messages using these APIs and what we can obtain through this technique.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The next figure shows how all this happens from different threads in the system:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![The MSG structure](img/image00674.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Our applications, though managed, behave the same way, and the fact that we
+    can access handles from our code makes it possible to capture events from the
+    system and change behaviors at will.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Among these techniques, the one that allows us to capture system or application
+    events is called sub-classing. Let's explain how it works and how we can use it.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Sub-classing techniques
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'Once we understand the previous architecture, it makes sense to use it in a
+    variety of ways: avoiding predefined behaviors for controls or windows, adding
+    specific elements to existing windows components, and many others.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Let's try a basic example. Suppose that we want to change the way a window responds
+    to the left button. Only that. So, we have a simple Windows Forms application,
+    and we need to think of the elements we need in order to code that behavior.
+  prefs: []
+  type: TYPE_NORMAL
+- en: First, we need to capture the specific messages addressed to the left button.
+    Then, we have the override to `WndProc` associated with our window, determine
+    what to do if the message is the one required, and finally, *always* return the
+    control to the operating system correctly.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'This figure shows the process:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Sub-classing techniques](img/image00675.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'Fortunately, in C#, that''s something pretty simple. Just look at this code,
+    which we add to the `main`, default window code created by the IDE:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE1]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'A few things should be noted in this fragment: first and foremost, we''re overriding
+    a method that is not defined in our code. Actually, `WndProc` is defined in the
+    `Form` class, as you can see by selecting the **Go to Definition** option in the
+    class declaration (over `Form`):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Sub-classing techniques](img/image00676.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: If you launch the application, it should run just fine, but any left click on
+    it will respond with a message box, indicating the processed message number. There's
+    no way to left-click on it; only right-click will work properly! (You might find
+    difficult to even close the window, although you can always close the application
+    from Visual Studio or right-click on the title's area).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The output will be something like what is shown in the following screenshot:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Sub-classing techniques](img/image00677.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: However, you might be wondering how in the world is the number 513 defined and
+    where can we find information about it.
+  prefs: []
+  type: TYPE_NORMAL
+- en: This might be the proper time to talk a bit about some tools (local or online)
+    that you can use to find not only that information, but also any other system-related
+    data you can use in these kind of .NET/OS interactions.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Some useful tools
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'If we deal with definitions and also with the distinct ways in which a system''s
+    API should be called from .NET, there''s a reference website: [PInvoke.net](http://PInvoke.net)
+    (available at [http://www.pinvoke.net/](http://www.pinvoke.net/)).'
+  prefs: []
+  type: TYPE_NORMAL
+- en: You'll find the vast majority of the system's APIs clearly detailed, explaining
+    the way they work, how they should be defined in our code (either from C# or VB.NET),
+    and all other related information.
+  prefs: []
+  type: TYPE_NORMAL
+- en: For example, knowing that all window messages are defined with the `WM_` prefix,
+    we can expand it under the **Constants** topic to locate the one I used earlier.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Furthermore, we are shown a definition of the message and its purpose, along
+    with the hexadecimal number associated with it, and at the end of that list, you''ll
+    find the C# definitions, where it''s easy to locate those linked to the left button,
+    as shown in the next screenshots:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Some useful tools](img/image00678.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'Following, you can see the definitions in C# code, ready to use in a program:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Some useful tools](img/image00679.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: In the code, as you already know, we can use the decimal equivalent (as I did)
+    or the hexadecimal definition, with the same results. Actually, it's preferable
+    to use these definitions to produce clearer and readable code instead of what
+    I did in the first demo.
+  prefs: []
+  type: TYPE_NORMAL
+- en: If, instead, you look for a function or scroll over some well-known system DLLs
+    such as `user32.dll`, you will see that it contains lots of functions related
+    to Windows, such as `FindWindowEx`. If you expand this function, you'll see the
+    definition that we should use in our code in order to call that function, as we
+    will do in the next section, *Platform/Invoke*.
+  prefs: []
+  type: TYPE_NORMAL
+- en: A bit further down, we can even find a sample of how to use the function in
+    practice (in this case, this is done in order to get a reference to the horizontal
+    scroll bar of a window).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'There''s also another interesting tool, created by Justin Van Patten, at **Microsoft:
+    P/Invoke Interop Assistant**, which we can download and install from Codeplex,
+    at [http://clrinterop.codeplex.com/releases/view/14120](http://clrinterop.codeplex.com/releases/view/14120).'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Once downloaded and installed, you'll find several tools in the `Program Files
+    (X86)/InteropSignatureToolkit` directory. Two of them are command-line tools to
+    help you define the function's signatures from other libraries or DLLs (they might
+    be TLBs as well).
+  prefs: []
+  type: TYPE_NORMAL
+- en: The last one is a Windows app that lets you do the work we previously did in
+    the PInvoke.net site, only from a Windows application. It's called Windows Signature
+    Generator (`winsiggen.exe`).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Within these tools, you can import DLLs from anywhere in the system, or you
+    can even consult the previous definition without requiring any more work: by selecting
+    the **SigImp Search** tag, you filter what you''re looking for and see the definitions
+    in a list. Furthermore, by selecting the definitions you want to work with, you''ll
+    have the choice to generate the C# or VB.NET code necessary, as the following
+    screenshot shows, in which I searched for the definitions used in the previous
+    demo:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Some useful tools](img/image00680.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'Besides this solution, there is another choice, which is pretty interesting
+    for the developer in Visual Studio: under the **Extensions and Updates** menu;
+    if you select **on-line** and filter **pinvoke** or similar, there''s a version
+    of this tool called **PInvoke.net for Visual Studio Extension**, lately managed
+    by Red Gate. You should find an entry like the one shown in the next screenshot:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Some useful tools](img/image00681.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Once installed (it takes a moment), it will create a new menu in the IDE after
+    a restart of Visual Studio.
+  prefs: []
+  type: TYPE_NORMAL
+- en: What you will see is a window similar to the one in the previous tool, but highly
+    simplified and with the option to search for any function or module or visit the
+    [PInvoke.net](http://PInvoke.net) site if you need to look for a definition.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Platform/Invoke: calling the OS from .NET'
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Platform/Invoke allows the coder to use standard (unmanaged) C/C++ DLLs. If
+    you need to have access to any function inside the extensive Windows APIs (which
+    hold basically everything the operating system can perform) and there's no available
+    wrapper to call the same functionality from the CLR, then this is the choice.
+  prefs: []
+  type: TYPE_NORMAL
+- en: From the developer's perspective, by Platform/Invoke, we understand a feature
+    of the CLR that allows a program to interact with the functionality that is unique
+    to the system in which the application runs, thus allowing managed code to call
+    native code and vice versa.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The assembly responsible for calling the APIs will define how the native code
+    is called and accessed, via metadata embedded inside, which usually requires attribute
+    decorations. These attributes are defined inside the class containing the caller
+    methods in order to indicate the compiler the correct way to do the marshaling
+    between the two worlds (managed and unmanaged).
+  prefs: []
+  type: TYPE_NORMAL
+- en: The idea is that if I need to call an unmanaged function from the managed code,
+    I should indicate the destination context how big the things that I'm passing
+    are and what direction they are going. That is if I'm asking for data or if I'm
+    passing data (or both).
+  prefs: []
+  type: TYPE_NORMAL
+- en: The caveat is that there are many exceptions, and often, there's always a better
+    way to do it, even if coded correctly. This is where the tools we just reviewed
+    help the programmer to deal with these situations.
+  prefs: []
+  type: TYPE_NORMAL
+- en: But let's first review the foundations of the platform invocation and how to
+    use it from C# with a simple example.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The process of platform invocation
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'To achieve platform invocation, the CLR has to do several things:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Locate the DLL containing the function and load it in memory
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Locate the function's memory address and push its arguments onto the stack,
+    marshaling data as required
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Note, however, that operating in this way also has some pitfalls. For example,
+    you no longer have the benefits of type safety or garbage collection, and you
+    have to be careful when using them. The great advantage, on the other hand, is
+    that the enormous amount of functionality provided by the system is available
+    for us, and we're talking about functionality that has been fully tested and optimized.
+  prefs: []
+  type: TYPE_NORMAL
+- en: It's easy to insert external APIs' definitions into our code. Let's look at
+    this in an example. Imagine that our application uses the system's calculator
+    (or any other system's tool) and we want to make sure that in certain circumstances,
+    the calculator is located in a given position (such as the screen's origin) and
+    also that we want to have the ability to close the calculator from our program.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We need three APIs here—`SetWindowPos` (to change the calculator's position),
+    `SendMessage` (to close the calculator), and `FindWindow`—in order to get the
+    calculator's handle that we need to use with other two.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'So, we search for these functions in the Platform/Invoke Assistant to find
+    their definitions, and we use the Insert button to have the translated definition
+    inserted in our code. For every function search, we should see a window like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![The process of platform invocation](img/image00682.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'After finding the three functions, we should have the following code available:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE2]'
+  prefs: []
+  type: TYPE_PRE
+- en: This is our bridge to the operating system's functionality, and we can call
+    these functions from any accessible place just like if they were .NET functions.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'For this demo, I''ll create a basic Windows Forms app with a couple of buttons
+    in order to implement the required functionality. The first button finds the calculator''s
+    handler and locates the `Calculator` in the top-left position:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE3]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Now, in another button, we have to send a message to the `Calculator` to close
+    it. Again, we can check with the assistant, knowing that the message identifier
+    is called `WM_CLOSE` and that we will find it searching for constants and going
+    down to those starting with `WM_`. So we insert this definition and are ready
+    to call the second button, which closes the calculator:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE4]'
+  prefs: []
+  type: TYPE_PRE
+- en: Remember that when we are using the system APIs, some parameters have to be
+    specifically **marshaled** (converted) into the destination types. This is why
+    the last two parameters are expressed as `IntPrt.Zero`, which is the correct definition
+    for this type in .NET.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Naturally, we can use this technique to close any window, including managed
+    ones, although in this case, we have other (simpler) options, including the possibilities
+    that we saw in relation to Reflection, if the holding assembly is external.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Also, note that some solutions called *multiplatform* are based on calls to
+    native code from managed code: in Silverlight; the runtime is based on **Platform
+    Adaptation Layer** (**PAL**) based on these principles. This allows you to call
+    native functions in different OSes.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: This can also be said for Platform/Invoke in Linux and MacOS, the most successful
+    manifestation of this being the Xamarin initiative (more information about Platform/Invoke
+    on these platforms is available at [http://www.mono-project.com/docs/advanced/pinvoke/](http://www.mono-project.com/docs/advanced/pinvoke/)).
+  prefs: []
+  type: TYPE_NORMAL
+- en: However, as we'll see at the end, the new .NET Core is a great promise in this
+    respect since it is thought of to work on any platform and any operating system.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Nevertheless, if we're programming for Windows, there are situations where we
+    need to know specific data about the configuration of our platform. That's where
+    **Windows Management Instrumentation** (**WMI**), or its recent alternative Windows
+    Management Infrastructure, can be very useful, not just for programmers, but for
+    IT people as well.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Windows Management Instrumentation
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'The official documentation defines WMI technology in this manner:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '"Windows Management Instrumentation (WMI) is the infrastructure for management
+    data and operations on Windows-based operating systems. You can write WMI scripts
+    or applications to automate administrative tasks on remote computers but WMI also
+    supplies management data to other parts of the operating system and products,
+    for example, System Center Operations Manager, formerly Microsoft Operations Manager
+    (**MOM**), or **Windows Remote Management** (**WinRM**)."'
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: 'However, the same documentation adds:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '"WMI is fully supported by Microsoft; however, the latest version of administrative
+    scripting and control is available through the Windows **Management Infrastructure**
+    (**MI**). MI is fully compatible with previous versions of WMI and provides a
+    host of features and benefits that make designing and developing providers and
+    clients easier than ever. For more information, see Windows Management Infrastructure
+    (MI)."'
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: You can find more information on configuring MI at [https://msdn.microsoft.com/en-us/library/dn313131(v=vs.85).aspx](https://msdn.microsoft.com/en-us/library/dn313131(v=vs.85).aspx)
+    if you want to dig into these features in depth.
+  prefs: []
+  type: TYPE_NORMAL
+- en: So, with WMI, we query the system to get details on its implementation and the
+    software and hardware installed. The reason for the query is that WMI stores the
+    system's information in **Common Information Model** (**CIM**) databases, stored
+    and updated by the system continuously.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'And by the way, the CIM is not something exclusive to Windows operating systems.
+    As Wikipedia states:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '"The **Common Information Model** (**CIM**) is an open standard that defines
+    how managed elements in an IT environment are represented as a common set of objects
+    and relationships between them.'
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: ''
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: The Distributed Management Task Force maintains the CIM to allow consistent
+    management of these managed elements, independent of their manufacturer or provider."
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: The DMTF updates these documents frequently (sometimes, twice a year).
+  prefs: []
+  type: TYPE_NORMAL
+- en: CIM searchable tables
+  prefs:
+  - PREF_H4
+  type: TYPE_NORMAL
+- en: There are many tables permanently updated by the system, which we can search.
+    The complete list is published on MSDN, and you can find this information in the
+    *Computer System Hardware Classes* section, available at [https://msdn.microsoft.com/en-us/library/aa389273(v=vs.85).aspx](https://msdn.microsoft.com/en-us/library/aa389273(v=vs.85).aspx).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'I''ll resume some of the most useful terms to search for programmers here:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Input device classes
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Mass storage classes
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Motherboard, controller, and port classes
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Networking device classes
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Power classes
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Printing classes
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Telephony classes
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Video and monitor classes
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Each one contains a set of distinct classes, holding a variety of information
+    about the hardware and the software.
+  prefs: []
+  type: TYPE_NORMAL
+- en: For this brief review, we're just going to use the classical WMI and look at
+    the type of data that can be revealed to us in a demo and how to query for it.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Although there are several ways to access this information for the .NET programmer,
+    .NET provides part of the WMI functionality through the `System.Management` namespace,
+    which is filled with classes to search for system-related information, such as
+    `ManagementObjectSearcher`, `SelectQuery`, `ManagementObject`, and so on.
+  prefs: []
+  type: TYPE_NORMAL
+- en: For a simple query about the system information, we first create a `ManagementObjectSearcher`
+    object that defines the focus of our search (an information provider). This object
+    should receive a SQL string, indicating the table we want to search for.
+  prefs: []
+  type: TYPE_NORMAL
+- en: So, in our demo, we're going to start by creating a Windows Forms app, including
+    a few buttons and a couple of Listbox controls to present the results.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We''ll start by coding a general query to obtain the list of tables available.
+    The code for the button in charge of that is as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE5]'
+  prefs: []
+  type: TYPE_PRE
+- en: As you can see, `meta_class` is a CIM object containing the complete list of
+    classes available for searching. Note that the query might take a while since
+    `ManagementObjectSearcher` has to go through all the information available in
+    the system and registered in the CIM tables.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'You should see output similar to the what is shown in the next screenshot:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![CIM searchable tables](img/image00683.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Later on, we can query these tables to retrieve the required data. In this demo,
+    we'll use several tables—**Win32_OperatingSystem**, **Win32_processor**, **Win32_bios**,
+    **Win32_Environment**, and **Win32_Share**—to find some information about the
+    running machine and related characteristics.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The way it works is always the same: you create `ManagementObjectSearcher`
+    and iterate over it, invoking the `Get()`method on every instance of the collection
+    returned by the searcher. So, we have the following code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE6]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'If you run the demo, depending on your machine, you''ll get some distinct values,
+    but the structure of the information should be similar to what is shown in the
+    next screenshot:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![CIM searchable tables](img/image00684.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: To summarize, WMI offers a simple, managed way to access practically any relevant
+    data related to the hardware and software on our machine and also in the network
+    to which we are connected (as far as the query has the required permissions).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'As for the security concerns, Microsoft has published an exhaustive article
+    on the subject on MSDN: *Maintaining WMI Security* ([https://msdn.microsoft.com/en-us/library/aa392291(v=vs.85).aspx](https://msdn.microsoft.com/en-us/library/aa392291(v=vs.85).aspx)),
+    with all the critical information and guidelines about maintaining security while
+    allowing access to these resources.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: There is much more functionality related to the `ManagementObject` class. For
+    instance, you can get information related to processes or services by creating
+    a new instance of the desired element and use the methods the object inherits.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'For example, if you want to know which services are dependent on other services
+    programmatically, you can use the `GetRelated` method of the object''s instance.
+    Let''s imagine we want to know which services are related to the **LSM** (**Local
+    Session Manager**) service. We could code the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE7]'
+  prefs: []
+  type: TYPE_PRE
+- en: In this way, we can get this (hard-to-find) information in a totally programmatic
+    manner. This will help us configure some scenarios in which one of our application's
+    procedures require the active presence of a certain service (remember that we
+    can launch a service from code as well).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Besides this, other actions are available, such as stopping, pausing, or resuming
+    a given service. In the case of the LSM service, we should see information similar
+    to what is shown in this screenshot:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![CIM searchable tables](img/image00685.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: And there is much more information that you will discover going through the
+    class hierarchy related to `System.Management`. Practically every byte of system-related
+    data that we should otherwise read via Registry or Windows APIs is available here
+    in a totally programmatic fashion with no need for complex approaches.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The only caveat is that the documentation is very long. Consequently, Microsoft
+    created a tool called WMI Code Creator, which analyzes the information available
+    and generates code for all possible scenarios (often, this code is expressed in
+    Windows Scripting Host), but a big part is perfectly translatable to C#.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Besides, we have the advantage of a tool that joins much of the functionality
+    available in a single user interface.
+  prefs: []
+  type: TYPE_NORMAL
+- en: You can download it from [https://www.microsoft.com/en-gb/download/details.aspx%3Fid%3D8572](https://www.microsoft.com/en-gb/download/details.aspx%3Fid%3D8572),
+    getting a ZIP file that contains the executable and the source code, which is
+    a valuable tip for coding in WMI.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The tool includes several options:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Query data from a WMI class
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Executing a method
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Receiving an event
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Browsing the namespaces on this computer
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'As you can see in the next screenshot, this tool is quite complete in possibilities
+    and in the information it provides:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![CIM searchable tables](img/image00686.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Another typical usage of WMI is to check the state of a piece of hardware before
+    performing an action that could provoke a system's failure, such as testing a
+    hard drive before copying big chunks of data that could exceed the disk quota.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The code, in this case, is simple, and it gives us an idea about how to code
+    other system-related queries. All we need is something like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE8]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Thus, after adding a new button and including the previous code to check the
+    state of the `C:` drive, we should see output similar to this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![CIM searchable tables](img/image00687.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: To summarize, we've seen several ways of interacting with the operating system.
+    We can analyze which messages are linked to a certain functionality and capture
+    the related events to either change, cancel, or modify the default behaviors.
+    In this case, the communication is in both directions.
+  prefs: []
+  type: TYPE_NORMAL
+- en: This also happens (bi-directional communications) when we use the system APIs
+    to call functionalities through Platform/Invoke, which offers unlimited possibilities.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: However, the official Microsoft recommendation is that if they're available
+    for the .NET programmer, it's always preferable to use the resources linked to
+    .NET classes.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Finally, Windows Management Instrumentation and its variant MI provide access
+    to otherwise difficult-to-reach information, allowing our applications to configure
+    and behave more suitably depending on the operating system's state.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Parallel programming
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: As you may remember, we've already talked about asynchronous programming, when
+    we were dealing with the `async/await` keywords that appeared in .NET Framework
+    4.5 as a solution to avoid performance bottlenecks and improve the overall responsiveness
+    of our applications.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Parallelism was present earlier, in version 4.0 of the framework, and it was
+    programmatically related to the **Task Parallel Library** (**TPL**). But first,
+    let''s define the concept of parallelism (at least according to Wikipedia):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '"Parallelism is a form of computation in which several operations can execute
+    simultaneously. It''s based on the ''Divide and Conquer'' principle, fragmenting
+    a task in smaller tasks, which are later solved in parallel."'
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: 'This is, obviously related to hardware, and we should be aware of the difference
+    between multiple processors and multiple cores. As Rodney Ringler says in his
+    excellent book *C# Multithreading and Parallel Programming* by *Packt Publishing*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '"A multiple core CPU has more than one physical processing unit. In essence,
+    it acts like more than one CPU. The only difference is that all cores of a single
+    CPU share the same memory cache instead of having their own memory cache. From
+    the multithreaded parallel developer standpoint, there is very little difference
+    between multiple CPUs and multiple cores in a CPU. The total number of cores across
+    all of the CPUs of a system is the number of physical processing units that can
+    be scheduled and run in parallel, that is, the number of different software threads
+    that can truly execute in parallel."'
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: 'Several types of parallelism can be distinguished: at bit level, at instruction
+    level, data parallelism, and task parallelism. And this is at the software level.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: There's another type of parallelism, at the hardware level, in which distinct
+    architectures can be implied, offering distinct solutions depending on the problem
+    to be solved (there's a particularly exhaustive explanation published by Lawrence
+    Livermore National Laboratory if you're interested in this topic, *Introduction
+    to Parallel Computing* at [https://computing.llnl.gov/tutorials/parallel_comp/](https://computing.llnl.gov/tutorials/parallel_comp/).
+    We'll stick to the software level, of course.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Parallelism can be applied in many different areas of computing, such as the
+    Monte-Carlo Algorithm, Combinational Logic, Graph Traversal and Modeling, Dynamic
+    Programming, Branch and Bound methods, Finite-state Machines, and so on.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'From a more practical perspective, this translates into solving problems related
+    to a wide variety of areas in science and engineering: astronomy, weather, rush
+    hour traffic, plate tectonics, civil engineering, finance, geophysics, information
+    services, electronics, biology, consulting, and, in a more everyday approach,
+    any process that takes certain time and that can be improved thanks to these techniques
+    (downloading data, I/O operations, expensive queries, and so on).'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The process followed in computing in parallel is explained in the previously
+    mentioned source in four steps:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: A problem is broken into discrete parts that can be solved concurrently.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Each part is further broken down into a series of instructions.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Instructions from each part execute on different processors simultaneously.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: An overall control/coordination mechanism is employed.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Note that the computational problem has to be of a nature such that:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: It can be broken into discrete fragments of work that can later be solved simultaneously
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: It has to be possible to execute several instructions at any moment in time
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: It should be solved in less time using multiple resources or the computer than
+    would be with a single resource
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'The resulting architecture can be explained in a graphic schema, as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Parallel programming](img/image00688.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Difference between multithreading and parallel programming
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'It''s also important to remember the difference between multithreading and
+    parallel programming. When we create a new thread in a given process (review the
+    discussion about this in the first chapter if you need more references), that
+    thread is scheduled by the operating system, which associates it with some CPU
+    time. The thread executes the code in an asynchronous manner: that is, it goes
+    its way until it finishes, a moment in which it should be synchronized with the
+    main thread in order to obtain the results (we''ve also talked about updating
+    main threads earlier).'
+  prefs: []
+  type: TYPE_NORMAL
+- en: However, at the same time, there are other applications in execution in our
+    computer (think of services, among other things). And these applications are also
+    given their corresponding CPU time; so, if our application uses more than one
+    thread, it's also given more CPU time, and the results are obtained more rapidly
+    without blocking the UI thread.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Moreover, if all this is executed in one core, we're not talking about parallel
+    programming. We can't talk about parallel programming if we don't have more than
+    one core.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Tip
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: A typical mistake that we see is when a program executes in a virtual machine,
+    and the code uses parallel approaches because in a virtual machine we only use
+    one core by default. You have to configure the VM to work with more than one core
+    in order to take advantage of parallelism.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Also, from the everyday programmer point of view, you can mainly divide the
+    types of tasks subject to parallel programming into two principal areas: those
+    that are CPU-bound and those that are I/O bound (we can also add another two,
+    Memory Bound, the amount of memory available is limited with respect to a process,
+    and Cache Bound, which happens when the process is limited by the amount and the
+    speed of the available cache. Think of a task that processes more data than the
+    cache space it has available).'
+  prefs: []
+  type: TYPE_NORMAL
+- en: In the first case, we're dealing with code that would run faster if the CPU
+    were faster, which is the case where the CPU spends the majority of time using
+    the CPU cores (complex calculations being a typical example).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The second scenario, (I/O-bound) happens when something would run faster if
+    the I/O subsystem could also run faster. This case might happen in different scenarios:
+    downloading something, accessing disk drives or network resources, and so on.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The first two cases are the most common, and this is where TPL comes into play.
+    Task Parallel Library appeared as a solution to implement parallel coding in our
+    applications linked to the first two scenarios: CPU-bound and I/O-bound.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Programmatically, we can find it in three flavors: Parallel LINQ, the Parallel
+    class, and the Task class. The first two are mainly used for CPU-bound processes,
+    while the Task class is more suitable (always generally speaking) for I/O-bound
+    scenarios.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: We already saw the basics of working with the Task class, which also allows
+    you to execute code asynchronously, and here, we'll see how it can also perform
+    cancelations (with tokens), continuations, synchronization of contexts, and so
+    on.
+  prefs: []
+  type: TYPE_NORMAL
+- en: So, let's review these three flavors to look at some typical solutions to coding
+    problems in which these libraries have noticeable improvements.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Parallel LINQ
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: As the name suggests, parallel LINQ is an extension of the previous LINQ capabilities
+    provided in previous versions of .NET.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In the first solution (Parallel LINQ), Microsoft expert Stephen Toub explains
+    the reasons for this approach in *Patterns Of Parallel Programming* (available
+    at [https://www.microsoft.com/en-us/download/details.aspx?id=19222](https://www.microsoft.com/en-us/download/details.aspx?id=19222)):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '"A significant majority of the work in many applications and algorithms is
+    done through loop control constructs. Loops, after all, often enable the application
+    to execute a set of instructions over and over, applying logic to discrete entities,
+    whether those entities are integral values, such as in the case of a for loop,
+    or sets of data, such as in the case of a for each loop.'
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: ''
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: 'Many languages have built-in control constructs for these kinds of loops, Microsoft
+    Visual C#® and Microsoft Visual Basic® being among them, the former with for and
+    foreach keywords, and the latter with For and For Each keywords. For problems
+    that may be considered delightfully parallel, the entities to be processed by
+    individual iterations of the loops may execute concurrently: thus, we need a mechanism
+    to enable such parallel processing."'
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: One of these mechanisms is the `AsParallel()` method, applicable to expressions
+    that imply the resources we've seen in relation to LINQ and Generic collections.
+    Let's explore this in detail in an example (in this case, the sample will be linked
+    to CPU-bound code).
+  prefs: []
+  type: TYPE_NORMAL
+- en: Our demo will have a simple UI, and we're going to calculate prime numbers between
+    1 and 3,000,000.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'I''ll start by creating the prime calculation algorithm as an extension method
+    of the `int` type, with the following code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE9]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Now, we''ll use three buttons to compare different behaviors: without parallelism,
+    with parallelism, and with parallelism using ordered results.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Previously, we defined some basic values:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE10]'
+  prefs: []
+  type: TYPE_PRE
+- en: The two important elements here are `Stopwatch`, to measure the time elapsed,
+    and the initial collection of numbers, which we are going to generate using the
+    static `Range` method of the `Enumerable` class, from 1 to 3,000,000.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The code in the first button is pretty straightforward:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE11]'
+  prefs: []
+  type: TYPE_PRE
+- en: But, in the second button, we're including the `AsParallel` construct we mentioned
+    earlier. It's quite similar to the previous one, but we indicate that before getting
+    any results, we want the `numbers` collection to be treated in parallel.
+  prefs: []
+  type: TYPE_NORMAL
+- en: When you execute the sample (the elapsed time values will vary slightly depending
+    on the machine you're using), this second method is considerably faster than the
+    previous one.
+  prefs: []
+  type: TYPE_NORMAL
+- en: This means that the code has used all cores available in the machine to perform
+    the task (the `where` method next to `AsParallel`).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'You have a way to prove this immediately: just open the Task Manager and select
+    the **Performance** tab. In there (if you''re using Windows 10 like me), you have
+    to open **Resource Monitor** to view the activities of all the CPUs present in
+    your machine.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Tip
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: Just to make sure you only watch the activity related to this demo, observe
+    that you can select the output process to view the list of processes (in this
+    case, it will be **DEMOLINQ1.vshost.exe**).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'At runtime, the difference becomes evident: in the first event handler, only
+    one CPU appears to be working. If you do this with the parallel method, you''ll
+    see that there is an activity (probably in all CPUs if it''s not configured in
+    some other way).'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'This happens with the third option as well, (more about it soon), which uses
+    the `AsOrdered()` clause. In my box (with eight cores), the resulting window shows
+    the following output:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Parallel LINQ](img/image00689.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: So, we're really using parallelism, with a very simple addition to our code!
+    The difference in the results becomes evident (as an average, it's about one-third
+    of the time with respect to the synchronous option).
+  prefs: []
+  type: TYPE_NORMAL
+- en: But we still have a problem. If you take a look at the output of the second
+    Listbox control, at some point, you'll see that the list is not ordered, as it
+    happened in the first case. This is normal, since we're using several cores to
+    run the results and the code adds these results in the order in which they are
+    received from the eight cores (in my case).
+  prefs: []
+  type: TYPE_NORMAL
+- en: This order will vary depending on the number of cores, the speed, and other
+    factors difficult to foresee. So, if we really need the results ordered, just
+    as in the first case, we can use the `AsOrdered()` method, applied right next
+    to the `AsParallel()` indication.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In this way, the resulting code is fairly the same as in the second method,
+    but the results are ordered now, just with a (usually negligible) delay.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In the next screenshot, I''m moving to prime number **18973** just to show
+    the different way in which Listboxes were filled:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Parallel LINQ](img/image00690.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: If there are no other processes consuming CPU, successive executions of these
+    methods will offer slightly different results, but the variations will be minimal
+    (actually, sometimes, you'll see that the `AsOrdered()` method appears to run
+    faster than the non ordered one, but that's only because of the CPU activity).
+  prefs: []
+  type: TYPE_NORMAL
+- en: In general, if you need to really evaluate the execution time, you should perform
+    the benchmarks several times and vary some of the initial conditions.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Dealing with other issues
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Dealing with other issues appears to be an excellent way to use all the resources
+    available in our machine, but other considerations may lead us to modify this
+    code. For example, if our application should behave correctly under stress conditions,
+    or we should respect the possible execution of other applications and the process
+    to parallelize is much heavier than this one, it could be wise to use a feature
+    called Parallelization Degree.
+  prefs: []
+  type: TYPE_NORMAL
+- en: With this feature, we can establish the number of cores to use in our application
+    by code, leaving the rest for other machines' applications and services.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We can use this code to include this feature in another button, which will use
+    only a limited number of cores this time. But how do we determine the number of
+    cores? A reasonable solution would be to use only half of the cores available
+    in the system, leaving the other half free.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Fortunately, there''s an easy way to find out this number (no need to use Platform/Invoke,
+    Registry values, or WMI): the `Environment` class has static properties that allow
+    simple access to certain useful values directly: in this case, the `ProcessorCount`
+    property returns the number of cores. So we can write the following (I''m showing
+    only the modified line):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE12]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'In this case, in my machine, I''ll be using only four cores, which should show
+    a gain in the performance although not as much as when using all cores (I''ve
+    changed the numbers collection to 5,000.000 in order to better appreciate these
+    values. Refer to the screenshot):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Dealing with other issues](img/image00691.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Canceling execution
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Another case that we should consider in our code in when the user, for whatever
+    reason, wants to have the ability to cancel the process at a given moment.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The solution for this, as mentioned earlier in this section, is the cancellation
+    feature. It is performed using `token`, which you pass to the process in its definition,
+    and can be later used to force the cancelation (and the subsequent detention of
+    the process).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'For code brevity, we''ll use a trick: extend again the `int` type so that it
+    admits this token feature. We can write simple extension code, as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE13]'
+  prefs: []
+  type: TYPE_PRE
+- en: As you can see, we now have an overload of `IsPrime`, which calls the basic
+    implementation only while `n` is distinct to `1000`. As we reach the thousandth
+    integer, the Cancel method of the `CancellationTokenSource` instance is called.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The behavior of this depends on the possible previous configuration values of
+    this class. As shown in the next screenshot, several values allow us to manipulate
+    and find out related information, such as whether it can be really canceled, whether
+    the cancelation has been requested, and even a low-level value `WaitHandle`, which
+    is signaled when the token is canceled.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'This `WaitHandle` property is another object that provides access to the native
+    operating system handle for this thread and has properties and methods to release
+    all resources held by the current `WaitHandle` property (the `Close` method) or
+    to block the current thread until `WaitHandle` receives a signal:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Canceling execution](img/image00692.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'Obviously, in this case, the process is a bit more complex, since we need to
+    catch the exception launched by the token and act accordingly:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE14]'
+  prefs: []
+  type: TYPE_PRE
+- en: Note the use of `WithCancellation(cs.Token)` inside the query and also that
+    the entire process in embedded in a `using` structure in order to guarantee the
+    release of resources after the process ends.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Besides, instead of using another mechanism, we add a cancelation message to
+    the corresponding Listbox control, indicating whether the token was really canceled.
+    You can see this in the next screenshot (also, note that the time elapsed is considerably
+    less than the rest of cases):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Canceling execution](img/image00693.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Nevertheless, there are some occasions in which the use of parallelism in this
+    form might not be recommendable or is limited, such as when using operators, such
+    as `Take` or `SkipWhile`, and also for the indexed versions of `Select` or `ElementAt`.
+    In other circumstances, the overhead generated might be big, such as when using
+    `Join`, `Union`, or `GroupBy`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The Parallel class
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The Parallel class is optimized for iterations and its behavior is even better—in
+    loops—than PLINQ, although the difference is not meaningful. However, there are
+    situations in which a fine-tuning of loops can noticeably increase the user experience.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The class has variants of the `for` and `foreach` methods (also `invoke`, but
+    it is rare to see this in practice), which can be used in loops when we think
+    the performance can be clearly slowed down using the nonparallel versions.
+  prefs: []
+  type: TYPE_NORMAL
+- en: If we take a look at the definition of the `Parallel.For` version, we'll see
+    that it receives a couple of numbers (`int` or `long`) to define the scope of
+    the loop and an `Action`, which relates to the functionality to be executed.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Let's test this with a example that is similar, but not exact, to the previous
+    one. We'll use the same `IsPrime` algorithm, but this time, we'll write the results
+    checking one by one inside a `for` loop. So, we start with a simple loop that
+    checks the first 1000 numbers and loads the result in RichTextbox.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Our initial code for the nonparallel version will be as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE15]'
+  prefs: []
+  type: TYPE_PRE
+- en: The problem here is knowing how to transform the previous code into a `Parallel.For`.
+    Now, the action to perform by the loop is indicated by a lambda expression that
+    is in charge of checking each value.
+  prefs: []
+  type: TYPE_NORMAL
+- en: However, we find an extra problem. Since this is parallel and new threads will
+    be created, we can't update the user interface directly, or we will get `InvalidOperationException`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: There are several solutions for this, but one of most used solutions is in the
+    `SynchronizationContext` object. As Joydip Kanjilal states in *Learning Synchronization
+    Context, async, and await* (refer to [http://www.infoworld.com/article/2960463/application-development/my-two-cents-on-synchronizationcontext-async-and-await.html](http://www.infoworld.com/article/2960463/application-development/my-two-cents-on-synchronizationcontext-async-and-await.html)),
+    The `SynchronizationContext` object represents an abstraction it denotes the location
+    where your application's code is executed and enables you to queue a task onto
+    another context (every thread can have its own `SynchronizatonContext` object).
+    The `SynchronizationContext` object was added to the `System.Threading` namespace
+    to facilitate communication between threads.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The resulting code for our Parallel. For that will look like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE16]'
+  prefs: []
+  type: TYPE_PRE
+- en: With this approach, we send a synchronization order from the thread in execution
+    (whichever it is) to the main thread (the UI Thread). To do this, we first cache
+    the `SynchronizationContext` object of the current thread at definition time,
+    and later, we use it to call the `Post` method on the context which will invoke
+    a new action to update the user interface.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note that this solution is coded in this way to show that `Parallel.For` can
+    also be used in processes that (one at a time) manipulate the user interface.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We can appreciate the difference between both approaches calculating the same
+    primes, as shown in the next screenshot:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![The Parallel class](img/image00694.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: The Parallel.ForEach version
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Another variant of the same idea is `Parallel.ForEach`. It's practically the
+    same except that we don't have a starting or ending number in the definition.
+    It's better to use a sequence of information and a unique variable that we'll
+    use to iterate over each element of the sequence.
+  prefs: []
+  type: TYPE_NORMAL
+- en: However, I'm going to change the type of process for this demo so that you can
+    compare and get your own conclusions. I will go through a list of small `.png`
+    files (icons128 x 128), and I'll create a new version of these icons (transparent),
+    saving the new modified icon in another directory.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We're using an IO-bound process in this case. The slow method will be linked
+    to the disk drive, not to the CPU. Other possible IO-bound processes you could
+    try include downloading files or images from a website or blog posts from any
+    social network.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Since the most important thing here is time gain, we''ll process the files
+    one after the other and compare the resulting elapsed times, showing the output
+    in a window. I''ll use a button to launch the process with the following code
+    (please, note that `Directory.GetFiles` should point to a directory of your own
+    where some `.png` files are present):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE17]'
+  prefs: []
+  type: TYPE_PRE
+- en: As you can see, there are two loops. The second one also uses a `file` variable
+    to iterate over the collection of files retrieved by the `Directory.GetFiles()`
+    call, but the second argument of the `Parallel.ForEach` loop is a lambda expression,
+    containing exactly the same code as the first `foreach` method (well, with the
+    slight difference that I'm appending a `T_` prefix to the name before saving it).
+  prefs: []
+  type: TYPE_NORMAL
+- en: However, the difference in the processing time is meaningful, even in this case
+    where just a handful of files were available (around a hundred).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'You can see the difference in the next screenshot:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![The Parallel.ForEach version](img/image00695.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: So, in both samples, either CPU- or IO-bound, the gain is important, and other
+    considerations apart (there's always some), we have a nice solution here, with
+    these two options for parallelism (Remember that you should change the program's
+    entry point, depending on the demo to execute, in the `Program.cs` file).
+  prefs: []
+  type: TYPE_NORMAL
+- en: Task Parallel
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: While all this is important, there are cases where this solution lacks enough
+    flexibility, and that's why we include **Task Parallel Library** in the set of
+    the software tools available.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We've seen the basics of the `Task` object in [Chapter 3](part0023.xhtml#aid-LTSU2
+    "Chapter 3. Advanced Concepts of C# and .NET"), *Advanced Concepts of C# and .NET*,
+    and [Chapter 12](part0078.xhtml#aid-2ACBS2 "Chapter 12. Performance"), *Performance*,
+    but now it's time to look at some more advanced aspects that make this object
+    one of the most interesting in .NET Framework regarding parallel programming.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Communication between threads
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: As you know, the results obtained after task completions can be of any type
+    (Generics included).
+  prefs: []
+  type: TYPE_NORMAL
+- en: When you create a new `Task<T>` object, you inherit several methods and properties
+    to facilitate data manipulation and retrieval. For example, you have properties
+    such as `Id`, `IsCancelled`, `IsCompleted`, `IsFaulted`, and `Status` to determine
+    the state of the task and a `Result` property, which contains the returning value
+    of the task.
+  prefs: []
+  type: TYPE_NORMAL
+- en: As for the methods available, you have a `Wait` method to force the `Task` object
+    to wait until completion, and another very useful method called `ContinueWith`.
+    With this method, you can code what to do when the task is finished, knowing that
+    the results are obtainable from the `Result` property.
+  prefs: []
+  type: TYPE_NORMAL
+- en: So, let's imagine a situation like we did in the earlier demo about reading
+    and manipulating files in a directory – only this time, we're just reading the
+    names and using a `Task` object.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'With all this functionality, we might think that the following code should
+    work correctly:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE18]'
+  prefs: []
+  type: TYPE_PRE
+- en: As you can see, we create a new `Task<List<string>>` object instance; so, we
+    can take advantage of its functionality and invoke `ContinueWith` to update the
+    user interface with the results.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'However, we get `InvalidOperationException` in the `UpdateUI` method because
+    it''s still the Task (another thread) that is trying to access a different thread.
+    And it does not matter that the results have been obtained correctly, as you can
+    see in this screenshot, showing the value of `Result`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Communication between threads](img/image00696.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Fortunately, we have a solution linked to the `TaskScheduler` object, which
+    is part of this set of tools. We just have to pass another argument to the `ContinueWith`
+    method, indicating the `FromCurrentSynchronizationContext` property.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'So, we''ll modify the previous call as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE19]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Now everything works perfectly, as you can see in the final screenshot of the
+    execution:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Communication between threads](img/image00697.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: And there it is! A very simple form of updating the user interface from a task
+    without needing complex constructions or other specific objects.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Also, note that this method has up to 40 overloads in order to allow us the
+    behavior configuration in many different ways:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Communication between threads](img/image00698.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'Other interesting possibilities linked to the `Task` object are related to
+    some of its static methods, especially `WaitAll`, `WaitAny`, `WhenAll`, and `WhenAny`.
+    Let''s look at what they do:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`WaitAll`: Waits for all the provided `Task` objects to complete the execution
+    (it receives a collection of the `Task` objects)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`WaitAny`: It has the same structure as `WaitAll`, but it waits for the first
+    task to finish'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`WhenAll`: Creates a new task that executes only when all the provided tasks
+    are completed'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`WhenAny`: The same structure as the earlier one, but it waits for the first
+    task to finish'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'And there''s still another interesting feature: `ContinueWhenAll`, which guarantees
+    that something is done only when all tasks passed as arguments are finished.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let''s take an example to see how this works. We have three algorithms for
+    image manipulation: the three receive a `Bitmap` object and return another bitmap,
+    transformed. You can read the algorithms in the demo code (they are named `BitmapInvertColors`,
+    `MakeGrayscale`, and `CorrectGamma`).'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'When the button is clicked on, four tasks are created: each one calling to
+    a method in charge of transforming a bitmap and presenting the result in a different
+    `pictureBox` control. And we use the previous `ContinueWith` method to update
+    a label''s text in the user interface so that we know the order in which they
+    execute.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The code is as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE20]'
+  prefs: []
+  type: TYPE_PRE
+- en: If we want the `All finished` label to update the last one, we need a way to
+    make sure that the fifth Task is executed as the latest in the sequence (of course,
+    if we don't use a Task, it would be updated as the first).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'As you can see in the next screenshot, the order of the second, third, and
+    fourth tasks will be random, but the first one (because it doesn''t do any heavy
+    work; it only loads the original image) will always appear heading the sequence
+    and the fifth one will appear the latest:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Communication between threads](img/image00699.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: There are other interesting features still, similar to the ones we saw earlier
+    in the parallel demos in relation to cancellation.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'To cancel a task, we will use a similar procedure—only in this case, it is
+    simpler. I''ll use a Console application to show it in a couple of simple methods:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE21]'
+  prefs: []
+  type: TYPE_PRE
+- en: As you can see, we generate a Task over a `DoALongWork` method, which includes
+    a delay of a tenth of a second in a 100-iteration loop. However, in every iteration,
+    we check the value of the `ThrowIfCancellationRequested` method, which belongs
+    to the `CancellationTokenSource` method previously generated at task creation,
+    and passes it to the slow method.
+  prefs: []
+  type: TYPE_NORMAL
+- en: After 500 milliseconds, `cs.Cancel()` is called in the main thread, thread execution
+    stops, and `Exception` is launched and recovered on the `catch` side in order
+    to present the output in the Console as a message, showing whether the cancellation
+    was really requested.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The next screenshot shows what you should see when executing this code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Communication between threads](img/image00700.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Up until here, this was a review of Task Parallel Library and some of its most
+    interesting possibilities.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We''ll move toward the end of this book by talking about the latest innovations
+    in .NET now: the so-called NET Core 1.0, which is intended to execute on all platforms,
+    including Linux and MacOS.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: .NET Core 1.0
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: '.NET Core is a version of .NET Framework (first versions were released in the
+    summer of 2016) that denotes a major breakthrough in the Microsoft Development
+    Technologies ecosystem, the greatest promise being its ability to execute cross-platform:
+    Windows, MacOS, and Linux.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Besides, .NET Core is modular, open source, and cloud-ready. It can be deployed
+    along with the application itself, minimizing installation issues.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Although the number was consecutive to previous versions initially, Microsoft
+    decided to restart the numbering, reinforcing the idea that this is a totally
+    new concept with respect to classical versions, as a better way to avoid ambiguities.
+    For those who were already aware of the initial versions, let''s remember that
+    the equivalence is as follows (refer to the screenshot):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![.NET Core 1.0](img/image00701.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: The screenshot shows the equivalence between the new names and how some technologies
+    go beyond platforms and (as it happens in ASP.NET Core or MVC Core) can even execute
+    over the classic platform (.NET Framework 4.6).
+  prefs: []
+  type: TYPE_NORMAL
+- en: .NET Core is based on CoreCLR, which is a lightweight runtime, providing the
+    basic services. This includes automatic memory management, garbage collection,
+    and the basic type libraries.
+  prefs: []
+  type: TYPE_NORMAL
+- en: .NET Core, as with many other projects now, is part of the .NET foundation.
+  prefs: []
+  type: TYPE_NORMAL
+- en: It also includes CoreFx, which is a set of modular assemblies. These assemblies
+    can be added to your project as per your demand (remember that in .NET 4.x, we
+    always had to make the entire BCL available). Now, you select only the assemblies
+    that you need.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The list of supported environments
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'According to C# Corner''s *.NET Core - Fork In The Road* ([http://www.c-sharpcorner.com/article/net-core-fork-in-the-road/](http://www.c-sharpcorner.com/article/net-core-fork-in-the-road/)),
+    the following table explains availability for distinct platforms, although the
+    list is continuously growing:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![The list of supported environments](img/image00702.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Another target of .NET Core is to achieve project unification by means of a
+    unique `project.json` file, in which all configuration features will appear independently
+    of the type of project being built (no more `app.config`, `web.config`, and so
+    on). However, in Visual Studio 2017, the dependencies declared in the `project.json`
+    file have been moved to the `.sln` file for unification.
+  prefs: []
+  type: TYPE_NORMAL
+- en: .NET Core is supposed to be built on four parts, including Core FX, Core CLR,
+    Core RT, and Core CLI. Let's take a quick look these parts, one by one.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Core FX
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'Core FX contains the implementation of the foundational libraries, including
+    the classic namespaces: `System.Collections`, `System.IO`, `System.Xml`, and so
+    on. However, it doesn''t include the base types, which are part of `mscorlib`,
+    in a different repo, `CoreCLR`.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: You can access these repos in GitHub at [https://github.com/dotnet/corefx](https://github.com/dotnet/corefx).
+  prefs: []
+  type: TYPE_NORMAL
+- en: Core CLR
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: Core CLR is actually the .NET virtual machine (the runtime). It includes RyuJIT
+    (or CLR JIT), which is a new generation 64-bit compiler, the .NET Garbage Collector,
+    the `mscorlib.dll` previously mentioned, and a bunch of libraries.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The repo is available at [https://github.com/dotnet/coreclr](https://github.com/dotnet/coreclr),
+    and you'll also find all the related documentation there.
+  prefs: []
+  type: TYPE_NORMAL
+- en: It is deployed along with your application (so no more `.NET Framework x.x version
+    required` messages) and allows side-by-side execution; therefore, it guarantees
+    the integrity of other existing applications.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Core RT
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: Core RT is an alternative to Core CLR, optimized for **AoT** (**Ahead of Time**)
+    scenarios. It's available at the repo at [https://github.com/dotnet/corert](https://github.com/dotnet/corert).
+  prefs: []
+  type: TYPE_NORMAL
+- en: Obviously, you might be wondering about this term (AoT) and the difference with
+    respect to the JIT compilation that we've been using.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Let's remember that a JIT compiler is responsible for converting MSIL code into
+    native code. And this is done at runtime; so, every time a method is called for
+    the first time, it is compiled and executed.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In this manner, the application can be executed in distinct CPUs and OSes with
+    the runtime installed, but the caveat is that it's a process that takes time and
+    has an impact on the application's performance.
+  prefs: []
+  type: TYPE_NORMAL
+- en: On the other hand, AoT compilers also compile MSIL to native code, but Wikipedia
+    says that they do it, reducing the runtime overhead, into a native (system-dependent)
+    machine code with the intention of executing the resulting binary file natively.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Wikipedia also adds this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '"In most situations with fully AOT compiled programs and libraries it is possible
+    to drop a considerable fraction of theruntime environment, thus saving disk space,
+    memory, battery and startup times (no JIT warmup phase), etc. Because of this,
+    it can be useful in embedded or mobile devices."'
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: 'As RobJb points out in StackOverflow:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '"AOT compilers can also spend as much time optimizing as they like, whereas
+    JIT compilation is bound by time requirements (to maintain responsiveness) and
+    the resources of the client machine. For this reason, AOT compilers can perform
+    a complex optimization that would be too costly during JIT."'
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: To summarize, the emphasis of CoreRT is on code optimization and conversion
+    into a specific native platform. The generated executable will greater in size,
+    but it contains the application, all its dependencies, plus the CoreRT.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Applications that use CoreRT execute faster and can use the proper optimizations
+    of a native compiler, favoring better performance and code quality improvement.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Core CLI
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: Core CLI is a command line interface, independent from other libraries, providing
+    an easy way to install a basic framework where we can test .NET Core code on any
+    platform in only a few steps.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The installation is simple: files of types MSI in Windows, PKG in MacOS, or
+    and `apt-get` in Linux; or they may even use a `curl` script.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Besides, a re-platform of ASP.NET over .NET Core 1.0 has been created, as we'll
+    see later. The project file will be a `.xproj` file, with no differences between
+    flavors or languages.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Once installed, you can emit commands such as `dotnetbuild`, for example, and
+    generate the results and see the execution. One point to note is that the Core
+    CLI itself is made using Core RT; so it uses optimized native technology as well.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Installation of .NET Core
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'The .NET Core installation has changed since the first release candidates,
+    and now the previous location at GitHub will lead us to the [https://www.microsoft.com/net/core](https://www.microsoft.com/net/core)
+    site, where we''ll find instructions to download .NET Core in four different contexts:
+    Windows, Linux, MacOS, and Docker.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: Also, note that in order to work with .NET Core from Visual Studio 2015, you
+    need to have Upgrade 3 installed. It will appear as an option under the **Extensions
+    and Updates** in the **Updates** section.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Besides this installation, you can use .NET Core inside Visual Studio 2015
+    and higher versions if you additionally install NET Core 1.0.0 – VS 2015 Tooling,
+    available at the same page. It takes a few minutes and asks for a confirmation
+    (refer to the screenshot):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Installation of .NET Core](img/image00703.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Note that, at the time of writing this, the VS 2015 Tooling is available as
+    a preview version and will probably be in its final version by the time you read
+    this. Additionally, you can install the Core CLI from the same page mentioned
+    earlier or go directly to the [https://github.com/dotnet/cli](https://github.com/dotnet/cli)
+    page.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Once the installation is complete, if we go to Visual Studio and select **New
+    Project**, we''ll see a new section called **NET Core**, offering three types
+    of applications: Class Library, Console Application, and ASP.NET Core Web Application:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Installation of .NET Core](img/image00704.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: As you can imagine, in the fist case, we can create a DLL to be used by other
+    projects, and the two latest options are the ones that make sense (for the moment)
+    with this initial version of .NET Core.
+  prefs: []
+  type: TYPE_NORMAL
+- en: If we take a look at the files created with the **Console Application** option,
+    the Solution Explorer will show us a familiar structure with some differences,
+    though.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'To start with, we see the presence of two main directories: one for the solution
+    (which includes a `global.json` file) and another called `src`, where we find
+    the rest of the assets of our application.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The `global.json` file contains the folders that should be searched at compile-time
+    when resolving dependencies for projects. The build system will only search top-level
+    child folders.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'By default, the following content is included:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE22]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'This defines two projects in our solution: the standard one and another for
+    testing. Besides this, the `sdk` key indicates the version to be used (`1.0.0-preview-003121`),
+    and we can add or change that at will.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: A very interesting aspect of the tooling in Visual Studio 2015, when dealing
+    with `.json` files for configuration is that if we change any value, the corresponding
+    reference will be searched online automatically and downloaded to our project.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'There are other options available, such as the architecture to be used (x64
+    / x86) or the target runtime, as shown in the next screenshot:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Installation of .NET Core](img/image00705.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Within the `src` directory, the typical console structure can be found, only
+    that all references included in the **References** section point to **Microsoft.NETCore.App
+    (1.0.0)** and include a long list of components available, all of them in a hierarchical
+    structure of dependencies.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The aspect of the main `Program.cs` file is just the usual in these projects
+    (no changes), and this is true for `AssemblyInfo.cs` (although some values would
+    be ignored on other platforms).
+  prefs: []
+  type: TYPE_NORMAL
+- en: However, there's no `app.config` file. This file has been replaced with another
+    `.json` file, `project.json`, which will be in charge of the definitions of the
+    application's configuration from now on (remember that this has changed in Visual
+    Studio 2017, where the `.sln` file is used to declare dependencies).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'And, as it happens with the `global.json` file, the editor recognizes the values
+    assigned to the keys and provides Intellisense here as well, with interesting
+    hints about the possible values to configure (the next screenshot includes the
+    initial list of references and Intellisense in action within the `project.json`
+    file):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Installation of .NET Core](img/image00706.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Now, I'm going to use a simple code snippet to explore how some of the common
+    namespaces are implemented in .NET Core. In this case, we have three text files
+    located in the same directory as the application (could be any directory, of course),
+    and we're going to search for them, read their content, and present it in the
+    console.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'So we have some very simple code in the `program.cs` file, which serves as
+    the entry point of the application:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE23]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'We can compile the program as always, and at runtime, we should see the output,
+    only working on the .NET Core infrastructure (refer to the next screenshot):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Installation of .NET Core](img/image00707.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: As you can see, the functionalities, code, libraries, and namespaces used are
+    just the same as the ones we would use in a standard Console application—only
+    now, we're using the .NET Core 1.0 libraries and architecture.
+  prefs: []
+  type: TYPE_NORMAL
+- en: However, a look at the code (and the output) will probably call your attention,
+    since the name of the executable that we see in the output window is `dotnet.exe`
+    and not `NETCoreConsoleApp1` (the name we gave to our solution).
+  prefs: []
+  type: TYPE_NORMAL
+- en: The reason for this has to do with the complexity linked to this model. The
+    application is thought to be executable on distinct platforms. The default option
+    allows the deployment architecture to determine the best way to configure the
+    JIT compilers depending on the target. This is why the execution is undertaken
+    by the dotnet runtime (named `dotnet.exe`).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In NET Core, two types of applications are defined: portable and self-contained.
+    As the official documentation states:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '"Portable applications are the default type in .NET Core. They require .NET
+    Core to be installed on the targeted machine in order for them to run. To you
+    as a developer, this means that your application is portable between installations
+    of .NET Core.'
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: ''
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: A self-contained application does not rely on any shared component to be present
+    on the machine where you want to deploy the application. As its name implies,
+    it means that the entire dependency closure, including the runtime, is packaged
+    with the application. This makes it larger, but also makes it capable of running
+    on any .NET Core supported platforms with the correct native dependencies, whether
+    it has .NET Core installed or not. This makes it that much easier to deploy to
+    the target machine since you only deploy your application."
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: The default configuration we're using is the portable one. Where is this configuration
+    established? In the `project.json` dependencies section, you'll see that there
+    is a `"type":"Platform"` entry. That's what indicates this execution model.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Actually, the resulting assembly is a DLL, as you can see by watching the `bin/debug`
+    directory after compilation. In our case, this DLL is only 6 Kb long.
+  prefs: []
+  type: TYPE_NORMAL
+- en: What about the other choice? Well, if you know that you're going to target a
+    certain platform, you can eliminate the previously mentioned entry in the `project.json`
+    file (that's first). Second, you should leave the `Microsoft.NET Core.App` dependency,
+    since it will retrieve all of the rest of the required components. Finally, it
+    will be necessary to indicate (in the runtimes node) those that you want to use.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'So, I changed the `project.json` file to appear with this configuration:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE24]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Now the compiler behaves differently: it generates a new folder (dependent
+    on the debug folder), containing a real native executable, which contains all
+    the required elements to run in any platform of that type (`win10-x64`, in our
+    demo).'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'After compilation, you''ll see new files appearing, and one of them will be
+    an executable file now. If you move to that folder in the Explorer, you''ll see
+    that there''s a new file named `NETCoreConsoleApp1.exe`, which is the standalone
+    executable. Also, this new file is larger than the DLL since it contains all the
+    requirements (refer to the screenshot):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Installation of .NET Core](img/image00708.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Note
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: There is an exhaustive explanation of all possible configuration options at
+    [https://docs.microsoft.com/es-es/dotnet/articles/core/tools/project-json](https://docs.microsoft.com/es-es/dotnet/articles/core/tools/project-json).
+  prefs: []
+  type: TYPE_NORMAL
+- en: The CLI interface
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: As we mentioned earlier, another choice available to develop these type of applications
+    is now a command-line interface offered by the standalone installation of Core
+    CLI or by the previous installation I made (the `DotNetCore.1.0.0 - VS2015Tools.Preview2.0.1`
+    file).
+  prefs: []
+  type: TYPE_NORMAL
+- en: Several preconfigured command-line windows are made available depending on the
+    platform to target under the generic name of Cross Tools Command Prompt. Just
+    open the one that corresponds to your target platform and proceed as follows.
+  prefs: []
+  type: TYPE_NORMAL
+- en: You can use the initial, basic demo mode that Microsoft has prepared as a start
+    up with this tool. After opening Command Prompt, create a new directory that will
+    serve as the root for a new project. In my case, I do it in a new `C:\dev\hello_world`
+    directory (among other things, to avoid some security issues that might arise
+    when using the `C:\` root directory).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'At this point, you can ask for help by just typing `dotnet –help`, as shown
+    in the following screenshot:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![The CLI interface](img/image00709.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: To create a new project over this location, type `dotnet` new. Core CLI will
+    download all the required components to your directories, including a basic application
+    template, which holds a `program.cs` file with the classic `Hello World` console
+    application, along with the default `project.json` file.
+  prefs: []
+  type: TYPE_NORMAL
+- en: From this point, you can also open the project with Visual Studio Code (any
+    platform, remember) and make the desired changes. The dot (`.`) indicates the
+    IDE to use the current directory as the solution's directory.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The next step is to call `dotnet` restore. The result is that NuGet gets called
+    in order to restore the tree dependencies defined in `project.json` and creates
+    a variant of this file called `project.lock.json`, which is required if you want
+    to be able to compile and run (if you open this file, you'll see that it is pretty
+    large).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The official documentation defines this file as:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '"A persisted and complete set of the graph of NuGet dependencies and other
+    information describing an app. This file is read by other tools, such as dotnet
+    build and dotnet run, enabling them to process the source code with a correct
+    set of NuGet dependencies and binding resolutions."'
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: From here, several options are available. You can launch a `dotnet build` command,
+    which will build the application and generate a directory structure similar to
+    the one we saw in Visual Studio. It will not run; it will only generate the resulting
+    files.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The alternative option is to call `dotnet run`. With this command, the `build`
+    option is called, and next, it launches execution; so, you should see something
+    like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![The CLI interface](img/image00710.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'And, of course, it''s a good practice to take a look at the resulting files,
+    which will be located in a subdirectory of the debug file, just like in our Visual
+    Studio app:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![The CLI interface](img/image00711.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: If you're curious, you can change the `project.json` file to generate the standalone
+    executable, just like we did earlier, and the results should be equivalent.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Well, up until this point, we've seen an introduction to the .NET Core 1.0,
+    but that's not the only development model .NET Core supports. Let's take a look
+    at the—very interesting—ASP.NET Core 1.0.
+  prefs: []
+  type: TYPE_NORMAL
+- en: ASP.NET Core 1.0
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The model adopted for ASP.NET applications that use .NET Core is totally based
+    on the previous MVC model. But it's built from scratch, with the target on cross-platform
+    execution, the elimination of some features (no longer necessary), and the unification
+    of the previous MVC with the web API variant; so, they work with the same controller
+    type.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Besides this, the code doesn't need to be compiled prior to execution while
+    you're developing. You change the code on the fly and Roselyn services take care
+    of updating; so, you just have to refresh your page to see the changes.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'If we take a look at the new list of templates, after installing .NET Core
+    in the "Web" development section, we''re offered a classic version of ASP.NET,
+    where we have the typical templates you already know (including Web Forms applications)
+    and two new options: ASP.Core Web Application (.NET Core) and ASP.NET Core Web
+    Application (.NET Framework) (Review the first image at the beginning of the *.NET
+    Core 1.0* section to remember the architecture).'
+  prefs: []
+  type: TYPE_NORMAL
+- en: What's new
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Many new things show up in this version of ASP.NET Core. First, there's a new
+    hosting model because ASP.NET is completely decoupled from the web server environment
+    that hosts the application. It supports IIS versions and also self-hosting contexts
+    via Kestrel (cross-platform, extremely optimized, built on top of LibUv, the same
+    component that Node.js uses) and WebListener HTTP (Windows-only) servers.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We also count on a new generation of middleware that are asynchronous, very
+    modular, lightweight, and totally configurable, where we define things such as
+    routing, authentication, static files, diagnostics, error handling, session, CORS,
+    localization, and even you can write and include your own middleware.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: For those who don't know, middleware is a pipeline element that is run before
+    and after the user code. The components of a pipeline are executed in a sequence
+    and they call the next one in the pipeline. In this way, we can execute pre/post
+    code. When a piece of middleware generates a `Response` object, the pipeline returns.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Refer to the following schema:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![What''s new](img/image00712.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: In addition, a new built-in IoC container for dependency injection is responsible
+    for bootstrapping the system, and we also find a new configuration system, which
+    we'll discuss in more detail a bit later.
+  prefs: []
+  type: TYPE_NORMAL
+- en: ASP.NET Core joins many things that were separate earlier. No more distinctions
+    between MVC and Web API, and a complete set of new Tag Helpers is available. And
+    if you target .NET Core, or if you prefer to target any of the other versions
+    of .NET, the architectural model is going to be MVC with this rebuilt architecture.
+  prefs: []
+  type: TYPE_NORMAL
+- en: A first approach
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Let''s look at the structure of a project made up of the default templates
+    available in Visual Studio 2015\. You just have to select **New Project** | **Web**
+    in Visual Studio to see these alternatives in action:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![A first approach](img/image00713.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'I think it''s a good idea to start with the simplest possible template and
+    start digging into the programming architecture that lies behind this new proposal.
+    So, I''ll start with one of these new projects and select the **Empty** option.
+    I''m offered the three initial choices: **Empty**, **Web API**, and **Web Application**.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: A basic directory structure will be created for us, where we'll easily find
+    some of the elements we previously saw in the introduction to .NET Core (including
+    the separated `global.json` file used to define directories, projects, and packages).
+    I named this demo `ASPNETCoreEmpty` (refer to the next screenshot for the solution
+    structure).
+  prefs: []
+  type: TYPE_NORMAL
+- en: You might be surprised to notice the absence (and also the presence) of certain
+    files at first.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'For instance, there''s a new folder named `wwwroot`, which you surely know
+    from other applications hosted in IIS. In this case, that hasn''t to do with IIS:
+    it only means that it is the root directory of our site. Actually, you''ll also
+    see a `web.config` file, but that''s only to be used if you want the website to
+    be hosted in IIS precisely.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'You will also see the presence of a `project.json` file, but be careful with
+    this. As the official documentation states:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '"ASP.NET Core''s configuration system has been re-architected from previous
+    versions of ASP.NET, which relied on System.Configuration and XML configuration
+    files like web.config. The new configuration model provides streamlined access
+    to key/value based settings that can be retrieved from a variety of sources. Applications
+    and frameworks can then access configured settings in a strongly typed fashion
+    using the new Options pattern."'
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: 'The next capture remarks the two main `.cs` files created by the project:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![A first approach](img/image00714.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Furthermore, the official recommendation is that you use a configuration written
+    in C#, which is linked to the `Startup.cs` file that you see in the file structure.
+    Once there, you should use Options pattern to access any individual setting.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'So we now have two initial points: one related to the host and another that
+    configures our application.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Configuration and Startup settings
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Let''s briefly analyze the file''s contents:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE25]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'You can see, there are only two methods: `ConfigureServices` and `Configure`.
+    The former permits (you guessed it) to configure services. The `IServiceCollection`
+    element it receives allows you to configure logins, options, and two flavors of
+    services: `scoped` and `transient`.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The latter is the initial entry point of our application, and it receives three
+    arguments that permit the developer all types of configuration and initial settings.
+    The first one, `loggerFactory`, lets you add `ILoggerProvider` to the login system
+    (refer to [https://docs.asp.net/en/latest/fundamentals/logging.html](https://docs.asp.net/en/latest/fundamentals/logging.html)
+    for more details), and in this case, it adds the `Console` provider.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: Observe that these two method's arguments are received automatically. Behind
+    the scenes,the Dependency Injection engine provides these and other instances'
+    elements.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We can add as many logging providers as we want: each time we write a log entry,
+    that entry will be forwarded to each logging provider. The default provider writes
+    to the Console window (if available).'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following lines also explain some important things about the way this pipeline
+    works. The second argument (of type `IHosting Environment`) lets you configure
+    two different working environments: development and production, so we can, like
+    in this case, activate error pages proper for development, or we can configure
+    these errors in a customized manner. This argument also contains some utility
+    properties for developers.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The third argument (of type `IApplication Builder`) is the one that really
+    launches the application. As you can see, it calls the `Run` method of another
+    object received by injection: the `context` variable (of type `HttpContext`),
+    which holds all the required information and methods to manipulate the dialog
+    process.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: If you take a look, you'll see that it has properties such as `Connection`,
+    `Request`, `Response`, `Session`, `User`, among others and an `Abort` method to
+    cancel the connection at any time.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Actually, the code calls the `Run` method asynchronously (with `async/await`),
+    and it writes content that is addressed to the clients. Note that no HTML is implied
+    here yet. If you run the project, you will see the `Hello World` text as expected
+    every time a request to a port is made over localhost. (The IDE randomly assigns
+    a different port for each application and you can change that, of course).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'So, you can change the `Response` object, adding some more information to the
+    initial response. A look at the `context` object shows several properties related
+    to the process, such as the `Connection` object, which has a `Local Port` property
+    whose value we can add to `Response` by just modifying the code in this way:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE26]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'However, we said we can change the hosting context. If we select the running
+    host to be the name of our application instead of IIS Express, then we''re opting
+    for the self-hosting option, and two windows will open at runtime: a Console window
+    (corresponding to the host) and the browser we select, sending a request over
+    the application.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'So, we should see one console with the data related to the hosting, as shown
+    in the next screenshot:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Configuration and Startup settings](img/image00715.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'Simultaneously, the selected browser will open, showing the initial message
+    plus the modified information, including the port number:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Configuration and Startup settings](img/image00716.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Note that although a look at the code seems to have some markup, this is included
+    in the browsers because when they receive plain text, they wrap it around some
+    basic markup instead of just presenting the text without any HTML. But we still
+    didn't activate the option to serve static files.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Also, observe that there's no checking of resources; so, no matter what you
+    put next to the `localhost:5000` address, you'll get the same result.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'On the other hand, the host construction is made in the `Program.cs` file,
+    where we find the entry point, which only creates a new host that calls the constructor
+    of `WebHost Builder` and configures some default behavior:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE27]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'If you take a look at the `WebHost Builder` class (which follows the builder
+    pattern), you''ll see that it is full of `Use*` like methods, which allow the
+    programmer to configure this behavior:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Configuration and Startup settings](img/image00717.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: In the preceding example, the Kestrel web server is used, but other web servers
+    can be specified. The code also indicates that you use the current directory as
+    the content root to integrate with IIS (that's why this is optional) and to use
+    the `Startup` instance available in order to finish its configuration before actually
+    building the server.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Once built, the server is launched, and that's the reason for the information
+    we see in the console if we select self-hosting instead of IIS.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Self-hosted applications
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Self-hosted applications have a number of benefits, as we said: the application
+    carries out anything it needs to run. That is, there''s no need to have .NET Core
+    preinstalled, which makes this option pretty useful for constrained environments.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Operationally, it works like a normal native executable, and we can build it
+    for any of the supported platforms. Future plans are to convert this executable
+    into pure native executables depending on the platform to be used.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Before digging into MVC, if you want to serve a static file, you''ll have to
+    ensure that the `UseContentRoot` method has been configured, and you have to add
+    another piece of middleware indicating that. Just add the following to your `Configure`
+    method and add some static content that you can invoke:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE28]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'In my case, I''ve created a very simple `index.html` file with a couple of
+    HTML text tags and an `img` tag to make a dynamic call to the `http://lorempixel.com`
+    site in order to serve an image file of size 200 x 100:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE29]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'If you leave this file in the `wwwroot` directory, you can now invoke the `http://localhost:<port>/index.html`
+    address, and you should see the page just as well:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Self-hosted applications](img/image00718.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Consequently, nothing prevents you from using ASP.NET Core technologies to build
+    and deploy static sites or even sites that perform a functionality depending on
+    the input without the need to use MVC, Web Pages, Web Forms, or other classic
+    ASP.NET elements.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Once we understand the basic structure of ASP.NET Core, it's time to look at
+    a more complex project, (MVC type), similar to the typical initial solution that
+    Microsoft used to include in previous templates, including controllers, views,
+    use of Razor, and third-party resources, such as BootStrap and jQuery, among others.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'But before we get into that, let me just indicate some surprising results obtained
+    recently in benchmarks published by the ASP.NET Core development team: the performance
+    gains using ASP.NET Core are meaningful.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The benchmark was made to compare classic ASP.NET 4.6, Node.js, ASP.NET Core
+    (Weblist), ASP.NET Core on Mono, ASP.NET Core (CLR), ASP.NET Core (on Linux),
+    and ASP.NET Core (Windows), resulting in the last case 1,150,000 requests per
+    second in fine-grained requests (highly superior to Node.js). Refer to the following
+    figure:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Self-hosted applications](img/image00719.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: ASP.NET Core 1.0 MVC
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: If we opt for a complete template when creating a new ASP.NET Core application,
+    we'll find some meaningful changes and extended functionality.
+  prefs: []
+  type: TYPE_NORMAL
+- en: I think it's interesting to compare both approaches in order to see exactly
+    which elements are added or modified to permit these type of applications. First,
+    pay attention to the new file structure.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Now, we recognize the typical elements that we already know from ASP.NET MVC
+    applications: Controllers, Views, (no `Model` folder in this case because there''s
+    no need for it in the basic template), and another four folders with static resources
+    pending from `wwwroot`.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: They contain the recommended location folders for the CSS used in the application,
+    static images, JavaScript files (for instance, to access the new ECMA Script2015
+    APIs), plus versions 3.3.6 of Bootstrap, version 2.2 of jQuery, and version 1.14
+    of the jQuery Validation plugin (of course, the version number will vary with
+    time).
+  prefs: []
+  type: TYPE_NORMAL
+- en: These files are loaded into the project via `Bower`. Under the dependencies
+    section, you'll find a `Bower` folder that you can use—even dynamically—to change
+    versions, update to higher ones, and so on.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Tip
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: If you right-click on any of the `Bower` entries, a contextual menu will offer
+    to update the package, uninstall it, or manage other packages so that you can
+    add new missing packages.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'All this is under the **wwwroot** section. But taking a look at the **Controllers**
+    and **Views** folders, you''ll discover a—somehow—familiar structure and content:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![ASP.NET Core 1.0 MVC](img/image00720.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Of course, if you execute the application, the main page launches, similar to
+    the previous versions of ASP.NET MVC—only, the structure has changed. Let's see
+    how, starting with a review of the `Startup.cs` and `Program.cs` files.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The first thing to notice in the `Startup` content is that now, the class has
+    a constructor. This constructor uses an object of type `IConfigurationRoot`, named
+    `Configuration`, defined as public; so, whatever it contains is accessible all
+    over the application.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'As the documentation states:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '"Configuration is just a collection of sources, which provide the ability to
+    read and write name/value pairs. If a name/value pair is written to Configuration,
+    it is not persisted. This means that the written value will be lost when the sources
+    are read again."'
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: 'For the project to work properly, you must configure at least one source. Actually,
+    the current implementation does something else:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE30]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The process goes in two phases. First, a `Configuration Builder` object is
+    created and configured to read from distinct sources (JSON files). In this manner,
+    when the runtime creates the `Startup` instance, all the required values are already
+    read, as shown in the next screenshot:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![ASP.NET Core 1.0 MVC](img/image00721.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: The next important change from the original demo is that MVC is an optional
+    service that requires to be explicitly registered. This is done in the `ConfigureServices`
+    method.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Finally, the runtime calls `Configure` in the `Startup` object. This time, we
+    see that `Add Debug()`is called, and depending on the application's environment
+    (development or production), distinct error pages are configured. (By the way,
+    also note the call to `Add StaticFiles()`, which we added in the previous demo.)
+  prefs: []
+  type: TYPE_NORMAL
+- en: The last step in this middleware configuration process is to configure routes.
+    Those of you who are experienced and who already know ASP.NET MVC will easily
+    recognize the similar code structure that we used in the classic version, although
+    here, the default configuration has been simplified.
+  prefs: []
+  type: TYPE_NORMAL
+- en: This also explains why `Configure Services` should be called prior to `Configure`
+    because it's using the MVC service this latter call adds.
+  prefs: []
+  type: TYPE_NORMAL
+- en: With all this, the application is ready to start; so, the runtime goes to the
+    entry point (the `Main` method in `Program.cs`).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Another interesting behavior is shown here: the web host is built. And `WebHost
+    Builder` is in charge of it. Only when this builder is instantiated and configured
+    does the process end, calling the `Build()`method. This method generates a working
+    and tuned server, which is finally launched. A look at the code also tells us
+    more about the structure:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE31]'
+  prefs: []
+  type: TYPE_PRE
+- en: Note how the `UseStartup` method connects the main program with the previously
+    defined `Startup` object.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Naturally, if you want to check the properties of the final, running server,
+    a breakpoint in the `host.Run()`call will inform you about that in the `Services`
+    and `Server Features` properties.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Of course, there is much more about the runtime and the classes it uses to configure
+    and execute the server, which you'll find in the documentation, and that goes
+    far beyond the scope of this introduction.
+  prefs: []
+  type: TYPE_NORMAL
+- en: As for the rest of the code (the business logic), it's pretty similar to what
+    we had in classic MVC, but we'll find many additions and modifications in order
+    to make the architecture cross-platform, besides certain native support for common
+    developer tools, such as Bower, NPM, Gulp, Grunt, and so on.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'A look at the `HomeController` class shows basically the same structure, with
+    the exception that now the action methods are defined as being of type `IActionResult`
+    instead of `ActionResult`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE32]'
+  prefs: []
+  type: TYPE_PRE
+- en: So, we can add another action method by following exactly the same pattern.
+    This happens to the **Models** section (not present here). A model should be defined
+    as a **POCO** (**Plain Old CLR Object**) class, with little or no behavior. In
+    this way, business logic is encapsulated and can be accessed wherever it's needed
+    in the app.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Let's create a `Model` and an `Action` method and its corresponding view so
+    that we can see how similar it is with respect to the previous version.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We''ll create a new `Model` folder, and inside it, we''ll add a class named
+    `PACKTAddress`, where we''ll define a few properties:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE33]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Once compiled, we can create a new action method inside `HomeController`. We
+    need to create an instance of the `PACKTAddress` class, fill its properties with
+    the required information, and pass it to the corresponding view, which will receive
+    and present the data:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE34]'
+  prefs: []
+  type: TYPE_PRE
+- en: With this, the business logic for our new view is almost ready. The next step
+    is to add a new view file of the same name as the action method, that will sit
+    next to its siblings in the `Views/Home` folder.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In the view, we need to add a reference to the model we just passed and later
+    use Tag Helpers in order to recover the data, presenting its results in the page.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'This is quite easy and straightforward:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE35]'
+  prefs: []
+  type: TYPE_PRE
+- en: A few things should be noticed when building this view. First, we have plain
+    Intellisense in the view's editor, just like we did with the classic MVC. This
+    is important so that we can always make sure that the context recognizes value
+    models appropriately.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Thus, if we have compiled the code and everything is correct, we should see
+    these helping features as we proceed with the creation of the view:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![ASP.NET Core 1.0 MVC](img/image00722.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'Finally, we have to integrate our new view with the main page (`_Layout.cshtml`)
+    by including a new menu entry to point to the view in the same way as the previous
+    entries. So, the modified menu will be as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE36]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Here, you''ll notice the presence of new customized attributes related to ASP.NET:
+    `asp-controller`, `asp-action`, and so on. This is similar to the way we work
+    with controllers when building AngularJS applications.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Also, note that we pass some extra information using the `ViewData` object,
+    which has been recovered for preferable use instead of the previous `ViewBag`
+    object.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Finally, I''ve added a link to this book''s cover in a standard image (no problems
+    or configuration features for that). When we launch the application, a new menu
+    element will appear, and if we go to that link, we should see the new page inside
+    the main application page, just like we expected:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![ASP.NET Core 1.0 MVC](img/image00723.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Managing scripts
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'As you''ve probably seen after a review of the folder''s contents, there are
+    more `.json` files related to configuration options. Actually, in this project,
+    we see several files, each one in charge of some part of the configuration. Their
+    purpose is the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`launch Settings.json`: It is located under `Properties`. It configures ports,
+    browsers, basic URLs, and environment variables.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`app Settings.json`: It is located at root level, and not wwwroot. It defines
+    logging values and is also the place to locate other application-related data,
+    such as connection strings.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`bower.json`: It is located at root level, and not wwwroot). It defines which
+    external components have to be updated in the application, utilizing Bower services:
+    Bootstrap, jQuery, and so on.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`bundle Config.json`: It is located at root level, and not wwwroot. This is
+    where you define which files are to be bundled and minified, indicating the original
+    and final filenames in each case.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: So, we've seen how the programming model has been improved, and there's much
+    more to deal with in relation to the new Tag Helpers, other improvements in the
+    modeling, data access, and so many other features that we cannot cover here, but
+    I hope this has served as an introduction to the new architecture.
+  prefs: []
+  type: TYPE_NORMAL
+- en: NET Core 1.1
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'A few days before closing this book''s editing process, Microsoft announced
+    in the Connect() event the availability of this new version of .NET Core. This
+    update also affects the related versions of the "Core" family: ASP.NET Core 1.1
+    and EF Core 1.1.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Obviously, it's not a version with many foundational changes, nor breaking changes,
+    either. The focus of the development team was to broaden the OS targets, improve
+    performance, and fix bugs, fundamentally.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Thus, and according to the official page in Github ([https://github.com/dotnet/core/blob/master/release-notes/1.1/1.1.md](https://github.com/dotnet/core/blob/master/release-notes/1.1/1.1.md))
+    and the team''s blog, the changes are mainly located around four different areas:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Support for the following distributions:'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Red Hat Enterprise Linux 7.2
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: CentOS 7.1+
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Debian 8.2+
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Fedora 23, 24*
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Linux Mint 17.1, 18*
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Oracle Linux 7.1
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Ubuntu 14.04 & 16.04
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Mac OS X 10.11, and 10.12
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Windows 7+ / Server 2012 R2+
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Windows Nano Server TP5 Linux Mint 18
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: OpenSUSE 42.1
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: MacOS 10.12 (also added to .NET Core 1.0)
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Windows Server 2016 (also added to .NET Core 1.0)
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Performance improvements, which had led to surpass the benchmarks obtained by
+    Node and Nginx (reaching in ASP.NET Core 1,15 million requests/second)
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Several new features added to the API's and hundreds of bug fixes
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: A serious update to the documentation, now, more accessible and comprehensive
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'As for ASP.NET Core 1.1, the documentation states that this release was designed
+    around the following feature themes in order to help developers:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Improved and cross-platform compatible site hosting capabilities when using
+    a host other than Windows Internet Information Server (IIS)
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Support for developing with native Windows capabilities
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Compatibility, portability and performance of middleware and other MVC features
+    throughout the UI framework
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Improved deployment and management experience of ASP.NET Core applications on
+    Microsoft Azure
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: For additional details on the news offered by this version, you can read the
+    article *Announcing the Fastest ASP.NET Yet, ASP.NET Core 1.1 RTM*, at [https://blogs.msdn.microsoft.com/webdev/2016/11/16/announcing-asp-net-core-1-1/](https://blogs.msdn.microsoft.com/webdev/2016/11/16/announcing-asp-net-core-1-1/).
+  prefs: []
+  type: TYPE_NORMAL
+- en: Summary
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In this final chapter, we saw three not-well-known aspects for distinct reasons,
+    and that included a brief introduction to the new .NET Core and ASP.NET Core proposals
+    that Microsoft presented officially this year.
+  prefs: []
+  type: TYPE_NORMAL
+- en: This is the last chapter of this book in which I've reviewed the state of .NET
+    Programming using (mainly, but not exclusively), the C# language.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We made a historic tour of the language in its different versions, including
+    the latest stable, C# 7, and we've seen with a bunch of examples the way it behaves
+    and how we can use it in distinct contexts and application scenarios.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We've also compared languages taking a sneak peek at other proposals, like the
+    functional language F# and the popular TypeScript.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Data management has been another important topic, covering the two most popular
+    models today (SQL and NoSQL), sampling how to use both, their advantages and caveats.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Finally, we've dedicated several chapters to traversal techniques which imply
+    the whole application, like architecture, good practices, security and performance,
+    to end with this miscellaneous chapter.
+  prefs: []
+  type: TYPE_NORMAL
+- en: I, sincerely, expect this text serves you as a reference on the many possibilities
+    that a .NET programmer has today, and, possibly opens new paths and channels of
+    development for your needs.
+  prefs: []
+  type: TYPE_NORMAL

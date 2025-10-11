@@ -1,0 +1,784 @@
+- en: Chapter 5. Cameras, Rendering, and Scenes
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: This chapter focuses on some of the many things you can do with cameras, rendering,
+    and scenes, as well as interesting combinations of them. Generally speaking, the
+    camera is an eye point from which a scene is rendered. It is a point in 3D space
+    from which a view of the scene, from a given perspective and field of view, is
+    captured and rasterized to a texture in the form of pixels. After this, it's rendered
+    to the screen by being blended and composited on top of any previous renders from
+    any other cameras. Thus, cameras, rendering, and scenes are intimately connected
+    processes. In this chapter, we'll see how to animate cameras and build fly-through
+    animations, move cameras along curved paths, and see how objects can know whether
+    they are being seen and when they are being seen by any specific camera. In addition,
+    we'll see how to manually edit and process camera renders to create a postprocess
+    effect, and we'll also see how to configure orthographic cameras to render pixel
+    perfect 2D textures for 2D games and graphic user interfaces. So let's get started.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Camera gizmos
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'When a camera is selected in the **Scene** tab and the **Gizmo** display is
+    enabled, it displays a frustum gizmo that indicates clearly where the camera is
+    positioned in the scene and what the camera can see from that view, given its
+    other properties such as field of view, as shown in the following screenshot:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Camera gizmos](img/0655OT_05_01.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Camera displays the frustum when selected in the Scene view
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'This gizmo is especially helpful to position selected cameras to get the best
+    possible view of the scene. However, there are times when you want to achieve
+    almost the reverse, that is, to position objects in the view of unselected cameras.
+    Specifically, you''ll want to move particular objects in the frustum of a camera
+    and make sure it''s visible to that camera. This can be tedious to achieve under
+    normal circumstances, because, by default, cameras don''t display their frustum
+    gizmo when deselected. This means that as you move objects around, you''ll need
+    to continually select and reselect your cameras to check whether the moved objects
+    are really in the camera frustum, and adjust and tweak their positions if required.
+    To solve this issue, it''d be great if Unity allowed you to view the frustum gizmo
+    permanently, even when the camera was deselected, but it doesn''t, at least, not
+    at the time of writing this book. To work around this, however, you can write
+    a script, as shown in the following code sample 5-1:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE0]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The following are the comments in code sample 5-1:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**Lines 27-31**: The `Gizmos.DrawFrustum` function accepts arguments such as
+    position and rotation in world space and not local space. This means all positional
+    arguments must first be transformed using a matrix from local space to world space.
+    This is achieved with the `localToWorldMatrix` member of the `Transform` class.
+    Additionally, the aspect argument requires further calculation between the actual
+    viewport height and width, and the size of the game window in width and height.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Lines 35-40**: The `GetGameViewSize` function returns a 2D vector that express
+    the actual pixel dimensions of the **Game** tab view. It retrieves these values
+    using undocumented editor features. The "undocumented" nature of the function
+    call should be emphasized; this means that the code can easily be broken or invalidated
+    by future and even minor releases.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'The following screenshot shows the frustum:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Camera gizmos](img/0655OT_05_02.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Frustum is shown even when the camera is deselected
+  prefs: []
+  type: TYPE_NORMAL
+- en: Being seen
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: There are many occasions during gameplay when questions of object visibility
+    arise, some actual and some hypothetical. Concerning the actual occasion, there
+    are several questions we could ask, including whether object X is visible to camera
+    Y right now, whether object X is visible to any camera right now, or when does
+    object X become visible or nonvisible to a specific camera or to any camera. With
+    regard to hypotheticals, we would ask whether object X would be visible if camera
+    Y were moved to position Z. In the actual occasion case, we're concerned with
+    the real visibility of objects for the current frame, based on the positions of
+    all cameras, and concerning hypotheticals, we're concerned with what would be
+    the case if a camera were moved to a specific position. Both these cases are important
+    for games. Knowing whether objects (such as enemy characters) are really visible
+    to the camera is important to define behavior and AI. This is because when objects
+    are not visible, there are many behaviors and calculations we could suspend to
+    save the processing workload. Further, knowing whether an object would become
+    visible if the camera were moved is helpful because it lets us anticipate which
+    objects, if any, will enter visibility for the next frame so that we can prepare
+    them ahead of time. Now, before moving on to consider how these questions can
+    be answered in script, it's worth considering the visibility in its narrowest
+    sense.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In terms of visibility, there are two main concepts: frustum and occlusion.
+    Each perspective camera has a viewing frustum, as we saw earlier; this frustum
+    is a trapezoidal volume extended outwards from the camera lens and contains a
+    region defined by field of view and clipping plane distance properties. The frustum,
+    in essence, mathematically defines the horizons of a camera—the region of a scene
+    that the camera can potentially observe right now. The word, potentially, is significant,
+    because even when an active and visible object is within the camera frustum, it
+    doesn''t necessarily mean that it''s visible to the camera. This is because objects
+    within the frustum can occlude others also inside the frustum; that is, nearer
+    objects can obscure or conceal objects behind them either fully or partially.
+    For this reason, true visibility tests involve at least two processes: first,
+    determining whether an object is in the frustum, and second, determining whether
+    it is occluded or not. Only if an object passes both tests can it be classified
+    as visible to the camera, and even then, only on the assumption that an object
+    is not concealed or rendered invisible by custom shaders or other postprocess
+    effects. In short, there are many reasons why true visibility testing is an intricate
+    process, but here, I''ll take the two-stage test as good enough for most purposes.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Detecting the object visibility
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Perhaps, the simplest and more direct visibility test for objects in Unity
+    is determining when an object becomes visible and invisible to any camera. The
+    two companion events, `OnBecameVisible` and `OnBecameInvisible`, are called automatically
+    on any object with a renderer component, including `MeshRenderer` and `SkinnedMeshRenderer`.
+    It''s not, of course, called on empty game objects even if they fall within the
+    view of the camera, as they (technically speaking) contain no visible parts, despite
+    all parts being spatially located. You can handle these events, as shown in the
+    following code sample 5-2:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE1]'
+  prefs: []
+  type: TYPE_PRE
+- en: There are several important caveats worth noting with the events `OnBecameVisible`
+    and `OnBecameInvisible`. First, visibility here only means that an object has
+    come within the camera frustum; thus, it can still be occluded by other, nearer
+    objects, and so, it might not be truly visible at all. Second, the events pertain
+    to all cameras and not to specific cameras. `OnBecameVisible` is called once to
+    tell you that the object, while previously not visible, has now entered the frustum
+    of at least one camera. Likewise, `OnBecameInvisible` is called once and tells
+    you that the object, while previously visible, has now left the frustum of all
+    cameras. Finally, and rather unhelpfully, these functions also include the visibility
+    of the scene camera. This means that if you're testing your game with the **Scene**
+    tab open and visible and the object is visible to you in the **Scene** tab, this
+    will count as being visible. In short, the methods `OnBecameVisible` and `OnBecameInvisible`
+    would be useful only if your behavior depends on the total visibility or invisibility
+    in the scene, where visibility just corresponds to the frustum's presence. In
+    other words, these events are a great place to toggle behaviors such as AI behaviors
+    that depend on visibility, for example, NPC panic behaviors and other kinds of
+    NPC-to-NPC interactions.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Tip
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: More information on the functions `OnBecameVisible` and `OnBecameInvisible`
+    can be found online in the Unity documentation at [http://docs.unity3d.com/ ScriptReference/MonoBehaviour.OnBecameVisible.html](http://docs.unity3d.com/
+    ScriptReference/MonoBehaviour.OnBecameVisible.html) and [http://docs.unity3d.com/ScriptReference/MonoBehaviour.OnBecameInvisible.html](http://docs.unity3d.com/ScriptReference/MonoBehaviour.OnBecameInvisible.html).
+  prefs: []
+  type: TYPE_NORMAL
+- en: More on the object visibility
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Another check that''s important, besides testing when an object enters and
+    leaves camera visibility, is to test whether an object is visible right now to
+    a specific camera. Unlike `OnBecameVisible` and `OnBecameInvisible`, which were
+    called on a one-off basis when an object enters or leaves the frustum, this kind
+    of test is about the current state of an object that assumes no prior knowledge
+    of it. To achieve this, the `OnWillRenderObject` event can be used. This event
+    is called continuously on an object, once per frame for each camera to which it
+    is visible as long as the object is visible to that camera. "Visible" here is
+    taken to mean "within the camera frustum". Again, no occlusion testing is applied.
+    Refer to the following code sample 5-3, and notice that inside this event, the
+    `Camera.current` member can be used to retrieve a reference to the camera to which
+    the object is currently visible, including the scene view camera:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE2]'
+  prefs: []
+  type: TYPE_PRE
+- en: Frustum testing – renderers
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'There are many times when the Unity native camera events, as we saw earlier,
+    are not sufficient for your visibility and frustum-testing requirements. Specifically,
+    you might simply want to test whether just one specific camera can see a renderer,
+    whether an invisible object would be seen if it were visible, whether a specified
+    point in space is seen by the camera, or whether a camera would see a specific
+    object if it were moved to a new location. All of these cases can be important
+    visibility tests in different situations, and all of them require some degree
+    of manual testing. To meet these camera visibility needs, we''ll need to code
+    more intensively. The functions in the following sections will be compiled together
+    as static functions in a dedicated `CamUtility` class. Let''s start by creating
+    a function to test whether a specific renderer component is within the frustum
+    of a specific `Camera` object, as shown in the following code sample 5-4:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE3]'
+  prefs: []
+  type: TYPE_PRE
+- en: From lines 10–17, the `GeometryUtility` class is used to generate an array of
+    plane objects that describe the camera frustum. Planes are to 3D space what lines
+    are to 2D space; they mark out a flat, imaginary surface in 3D. The frustum planes
+    are a collection of six planes that are rotated and aligned in 3D space to represent
+    the complete trapezoidal camera frustum. This array is then used by the `TestPlanesAABB`
+    function, **Axially Aligned Bounding Box** (**AABB**), which determines whether
+    the collision boundary of a mesh renderer exists inside the frustum as defined
+    by the planes.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Frustum testing – points
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Of course, you don't always want to test renderers for visibility. Instead,
+    you might simply want to test for a point. This might be for two main reasons.
+    First, you might want to know whether an object, such as a particle or a gun target
+    location, is actually visible. Second, you might not only want to know whether
+    a point is visible but also where in the screen space; this will be rendered by
+    the camera. The following code sample 5-5 will do this. It will test whether a
+    point is within the camera frustum, and if so, it would further return where the
+    point would be rendered on screen in a normalized viewport space (between 1-0).
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE4]'
+  prefs: []
+  type: TYPE_PRE
+- en: Frustum testing – occlusion
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'As mentioned earlier, visibility in its strictest sense is primarily a two-stage
+    and not a one-stage process. All visibility testing so far has consisted only
+    of checking for an object''s presence within the frustum of a camera. Typically,
+    this is enough, and it should always be preferred. However, sometimes, it''s really
+    not enough, because even among objects within the frustum, it''s possible for
+    one object to occlude another, as nearer objects can conceal objects further away,
+    either fully or partially. This, in itself, is not always a problem though, because
+    more often than not, the main interest in determining object visibility is simply
+    to know whether the camera is near enough for a set of performance-intensive behaviors
+    (such as AI behaviors) to be enabled. The aim is not truly visibility testing,
+    but to know whether the camera is close enough. In these cases, it doesn''t matter
+    whether the objects are occluded; it only matters whether they are in the frustum.
+    Yet, occasionally, occlusion matters, such as when displaying GUI elements or
+    pop-up notifications as the player looks at specific objects. In these cases,
+    occlusion is important, because GUI elements should not pop up for objects on
+    the other side of a wall, for example. Sometimes, you can even get around these
+    situations with an inventive use of colliders, triggers, and careful object placement,
+    and sometimes, there''s really no choice but to further filter objects in the
+    frustum with occlusion testing. Now, occlusion testing among objects within the
+    frustum is a deep subject that can, via some implementations, have a significant
+    performance overhead. For this reason, one of the best methods is to use a simple
+    `Physics.LineCast` method call to determine whether an imaginary line drawn between
+    the camera and destination object is intersected by other colliders. This method
+    usually works well, but its limitations should be recognized. First, it assumes
+    that all visible objects have colliders; any exceptions to this rule will not
+    be detected by the `LineCast` method. Second, as colliders only approximate the
+    bounds of a mesh and do not wrap around the mesh vertex for vertex, it''s possible
+    for the `LineCast` method to fail when meshes have internal holes, as the surrounding
+    collider will prevent `LineCast` from penetrating them. Finally, meshes with transparent
+    materials that reveal objects behind them will always fail the `LineCast` method.
+    Consider the following code sample 5-6:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE5]'
+  prefs: []
+  type: TYPE_PRE
+- en: Camera vision – front and back
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'In some games, such as RTS games or casual games, the camera horizon (or far
+    clipping plane) does not have so great a significance, because the camera always
+    sees everything that is in front of it. In these cases, when objects are outside
+    the frustum, they are only outside in the *x* and *y* planes but not in the local
+    *z* axis; that is, the hidden objects are only hidden because the camera is not
+    directly looking at them. However, when the camera is appropriately orientated,
+    objects can never be too far away in the distance to be seen beyond the far clipping
+    plane. In situations like these, visibility tests can often be reduced to faster
+    and simpler orientation tests. Thus, the question changes from, "Is the object
+    within the frustum and not occluded?" to "Is the object in front of the camera
+    or is it behind?" Here, the answer we need is different; the question is not one
+    of visibility but of orientation, whether the camera and its subject are so oriented
+    that the subject is in front of the camera or behind it. To test for this, the
+    vector dot product can be used. The dot product accepts two vectors as input and
+    reduces them to a single dimensional, numerical value as output. This value describes
+    the angular relationship between the two input vectors. In the following code
+    sample 5-7, the `CamFieldView` class can be attached to a camera, and it detects
+    whether the camera can see a target object, that is, whether the target object
+    is within a limited field of view in front of the camera:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE6]'
+  prefs: []
+  type: TYPE_PRE
+- en: Orthographic cameras
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'Every newly created camera object in Unity is, by default, configured as a
+    perspective camera, unless you change the default settings. This type of camera
+    most closely corresponds to real-life cameras that have a position within the
+    3D space, a curved lens, and employ methods to convert captured images onto a
+    flat, 2D surface, like a screen. The chief symptom of such a camera is foreshortening,
+    the name given to the distortion applied to rendered objects. Specifically, rendered
+    objects grow smaller as they recede into the distance, the shape and appearance
+    of objects change as they move further from the center of vision, and all parallel
+    lines converge at a vanishing point somewhere in the distance, whether on the
+    horizon line itself or on a secondary line. In contrast to perspective cameras,
+    however, there are orthographic cameras. These are useful for the creation of
+    2D and truly isometric games and not just for the semblance of isometric. With
+    orthographic cameras, the lens is flattened out to a plane, and the result is
+    a loss of foreshortening, that is, parallel lines remain parallel, objects don''t
+    shrink with distance, 2D remains 2D even when moved away from the center of the
+    view, and so on. You can easily switch a camera from **Perspective** to **Orthographic**
+    using the **Projection** type setting from the Object Inspector, as shown in the
+    following screenshot:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Orthographic cameras](img/0655OT_05_03.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Changing a Perspective camera to an Orthographic one
+  prefs: []
+  type: TYPE_NORMAL
+- en: After changing the **Perspective** type to **Orthographic**, the camera frustum
+    will also change from a trapezoidal volume to a box. Everything within the box
+    will be visible, and nearer objects will continue to obscure more distant ones,
+    but all other senses of depth will be lost, as shown in the following screenshot.
+    Hence, this camera is considered suitable for 2D games.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Orthographic cameras](img/0655OT_05_04.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: The frustum for an Orthographic camera is a box
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The central problem when working with the **Orthographic** cameras is how to
+    create a 1:1 relationship between world units (in the scene) and pixels (on screen).
+    This problem arises because in 2D games and GUIs, it''s useful to show graphics
+    on screen at their default and correct sizes, as defined in the texture files.
+    In most 3D games, by contrast, texture mapping, foreshortening, and perspective
+    means textures are seen distorted, that is, projected onto the surface of 3D objects
+    where they are viewed not directly as though in a photo-editing program, but in
+    perspective. With 2D games and sprites, the situation is different. These graphics
+    are typically viewed head on. For this reason, it''s desirable to display them
+    in their default sizes, pixel for pixel. This kind of display is called pixel
+    perfection, because each pixel in the texture will be shown onscreen and in the
+    game, unchanged. Achieving this in practice, however, requires a specific approach.
+    In short, to map 1 world unit to 1 pixel, the **Size** field in the **Camera**
+    tab should be set to half the vertical resolution of the game. Thus, if your game
+    runs at 1024 x 768, the **Size** field should be `364`, because 768 / 2 = 364,
+    as shown here:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Orthographic cameras](img/0655OT_05_05.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: The Size field controls how world units map to pixels on screen
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'You can set the **Size** field directly in the editor, but this would only
+    work if your game resolution is constant and never changes. If the user can resize
+    the game window or change the game resolution, then you would need to update the
+    camera size in script, as shown in the following code sample 5-8:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE7]'
+  prefs: []
+  type: TYPE_PRE
+- en: Notice that the member variable `PixelsToWorldUnits` has been added to line
+    13 to scale the orthographic size according to the **Pixels To Units** field of
+    imported sprite textures, as shown in the following screenshot. This helps ensure
+    that sprites will appear in their correct pixel sizes when shown on screen. This
+    is so because all sprites are necessarily scaled by this value to map pixels in
+    the texture to units in the world.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Orthographic cameras](img/0655OT_05_06.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Setting the Pixels to Units scale for sprite textures
+  prefs: []
+  type: TYPE_NORMAL
+- en: Camera rendering and postprocessing
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The official Unity documentation concerning camera rendering and postprocessing
+    is comparatively sparse. However, this should not be taken as an indication that
+    there's little to be said on the subject. On the contrary, Unity cameras and objects
+    offer extensive flexibility over how the scene is rendered. These topics fall
+    under the umbrella term of postprocessing. Specifically, this refers to all the
+    additional edits and amendments made to a camera's rendered output that is not
+    included as part of the normal render. This includes blur effects, color adjustments,
+    fish-eye effects, and so on. It should be said here that access to these features
+    is included only in the professional version of Unity and not in the free version.
+    For this reason, free users will not be able to follow along and complete this
+    section. However, for professional version users, there is a wide range of camera-rendering
+    features available, as shown in the following screenshot. This section considers
+    them by creating a camera change system in which one camera will cross-fade smoothly
+    into another. By cross-fade, I don't simply mean that one camera will cut to another,
+    which (incidentally) can be achieved by changing a camera's depth field, as higher-order
+    cameras are rendered above lower-order cameras. I rather mean that the rendered
+    output of the first camera will gradually dissolve in opacity to reveal the output
+    of the second camera. So, let's get started.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Camera rendering and postprocessing](img/0655OT_05_07.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Creating a scene with multiple cameras
+  prefs: []
+  type: TYPE_NORMAL
+- en: Start the project with a scene that contains two separate areas or regions,
+    as shown in the preceding screenshot. The sample project is included in the book's
+    companion files (code bundle) inside the `Cameras` folder of this chapter. Each
+    region of the scene should be assigned a separate camera; this makes a total of
+    two cameras in the scene, and each camera component should be disabled. This will
+    prevent the cameras from rendering themselves automatically. Here, we'll be rendering
+    the cameras manually; this will allow the render from each camera to be composited
+    and faded on top of the other.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Tip
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: For each camera, the `AudioListener` component was removed, because a Unity
+    scene can have only one `AudioListener` active at any one time.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Next, create a third camera tagged as `MainCamera` at the scene''s origin and
+    set with a culling mask of nothing, making sure that the camera is active but
+    can render nothing. This will represent the central main scene camera that composites
+    together renders from all other cameras, as shown here:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Camera rendering and postprocessing](img/0655OT_05_08.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Creating a third main camera for rendering
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Now, the scene should have three cameras: two separate and disabled cameras
+    at different locations (cameras **X** and **Y**), and one main camera at the scene''s
+    origin (camera **Z**). On this basis, the following code sample 5-9 can be assigned
+    to camera **Z**, and this allows fading between cameras **X** and **Y** when Space
+    bar is pressed:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE8]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The following are comments in code sample 5-9:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**Lines 011-020**: The `CamerFader` class is responsible for cross fading between
+    `Camera[0]` and `Camera[1]`. To achieve this, several variables are created. The
+    `Cameras` array maintains a list of cameras: two cameras in this case. The `CamCols`
+    array is linked to `Cameras`. It describes the color by which the render from
+    the camera will be multiplied; this allows the alpha value to make the render
+    transparent. The `FadeTime` variable defines the total time in seconds for a camera
+    fade in one direction, either fade-out or fade-in. Finally, the `Mat` variable
+    references any valid material that will be applied to the final render from the
+    main camera, that is, the pixels of the completed render, including everything
+    composited from all the other cameras.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Lines 023-038**: The `Start` method creates `RenderTexture` for each camera
+    that assigns the texture to its `TargetTexture` member. In essence, this means
+    each camera is assigned an internal texture to which its render is locally composited.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Lines 033-052**: The `OnPostRender` event is called automatically by Unity
+    for any active camera objects in the scene, once for each frame and after the
+    camera has completed its render as normal. It gives the object an opportunity
+    to render additional cameras or elements on top of the normal rendered data. Here,
+    the `Render` method of each camera in the `Cameras` array is called; this method
+    manually renders the camera, not directly on screen but to its render texture.
+    Once rendered to the texture, the `Graphics.DrawTexture` function draws `RenderTexture`
+    for each camera onto the screen in the order of the array, one atop the other.
+    Notice that each `DrawTexture` call multiplies the `CamCols` color to the texture;
+    this also factors in the alpha component for transparency.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Lines 059-063**: Like `OnPostRender`, the `OnRenderImage` event is called
+    automatically on active camera objects by Unity, once per frame. It''s called
+    after `OnPostRender` and just before the camera render is presented on screen.
+    This event provides two arguments, namely, `src` and `dst`. The `src` argument
+    is a reference to a render texture that contains the completed render from the
+    camera, which was output from `OnPostRender`, and the `dst` argument reference
+    defines the render texture that will be shown on screen when the `OnRenderImage`
+    event completes. In short, this function gives us an opportunity to edit the pixels
+    of the render either manually in code or via shader. Here, the `Graphics.Blit`
+    function is called to copy the source to the destination render texture using
+    the shader associated with the material reference `Mat`.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Lines 067-085**: `Fade` is a `CoRoutine` that transitions a `From` color
+    to a `To` color over the time (`TotalTime`). This `CoRoutine` method is used to
+    transition the alpha of a camera color between `0` and `1`, which refer to transparent
+    and opaque, respectively.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'The following screenshot shows the cross-fading camera effect:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Camera rendering and postprocessing](img/0655OT_05_09.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Cross-fading cameras
+  prefs: []
+  type: TYPE_NORMAL
+- en: Camera shake
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'Now, here''s an effect we can achieve with the Unity free version: camera shake!
+    For fighting, shooting, and action games generally, a camera shake effect can
+    be important. It conveys impact, danger, action, dynamism, and excitement—a form
+    of kinetic feedback. It can, in fact, be used to stand in for lots of other animations
+    too that simulate a pervasive motion and emotion where there really isn''t any
+    to be found elsewhere in the scene. To this extent, camera shakes can save us
+    lots of work by creating an overarching animation, as shown here:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Camera shake](img/0655OT_05_10.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Camera shake effects
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'There are many ways to create camera shakes, but all of them involve fluctuation
+    of the camera position between a minimum and maximum range using some kind of
+    "randomness" function. Sometimes, the "randomness" is left raw, and sometimes,
+    it''s smoothened using the damping functionality to create a slower or more "flowing"
+    shake. Refer to the following code sample 5-10 that can be attached to any camera
+    to create a shake effect:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE9]'
+  prefs: []
+  type: TYPE_PRE
+- en: Cameras and animation
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Camera fly-throughs are animations in which the camera is moved and rotated
+    over time across specific positions to create a cinematic. Their importance is
+    primarily to create cut-scenes, though not exclusively. It can be useful for the
+    creation of stylized third-person cameras and other top-down views in which the
+    camera motion must be mapped in a specific and deliberated way. One of the most
+    common methods to create a camera motion like this is to predefine them either
+    using Unity's animation editor or third-party tools such as Maya, Blender, and
+    3DS Max. However, there are times when more programmatic control is required over
+    the camera to adjust its position manually, away from an average center, using
+    smooth, curved motions, passing through a series of points or following a specific
+    and predefined route. This section considers three approaches.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Follow cameras
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Perhaps, one of the most common camera needs is a follow camera, that is, a
+    camera that tracks a specified object in the scene and follows it. This camera
+    maintains some distance between the object and the camera, as shown in the following
+    screenshot. This is useful for third-person cameras, such as over-the-shoulder
+    views and top-down views for RTS games.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Follow cameras](img/0655OT_05_11.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Making a camera smoothly follow an object
+  prefs: []
+  type: TYPE_NORMAL
+- en: Tip
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: This project can be found in the book's companion files (code bundle) inside
+    the `Camera_Smooth_Damp` folder of this chapter.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'For such cameras, a simple follow behavior is usually not enough for your purposes.
+    If it were, you could simply parent the camera to the object and leave it at that.
+    However, typically, you''ll want some degree of smoothing or damping to the camera
+    motion, that is, a falling-off of speed that allows the camera to gradually slow
+    down to a stop on reaching the target, as opposed to a sudden and immediate stop
+    in which the camera is either travelling at full speed or not at all. To achieve
+    this, the `Quaternion.Slerp` and `Vector3.SmoothDamp` functions can be used. Consider
+    the following code sample 5-11 for a class that can be attached to any camera
+    to smoothly follow an object:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE10]'
+  prefs: []
+  type: TYPE_PRE
+- en: Tip
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: More information on `Quaternion.Slerp` can be found online at [http://docs.unity3d.com/ScriptReference/Quaternion.Slerp.html](http://docs.unity3d.com/ScriptReference/Quaternion.Slerp.html),
+    and more information on `Vector3.SmoothDamp` can be found online at [http://docs.unity3d.com/ScriptReference/Vector3.SmoothDamp.html](http://docs.unity3d.com/ScriptReference/Vector3.SmoothDamp.html).
+  prefs: []
+  type: TYPE_NORMAL
+- en: Cameras and curves
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'For cut-scenes, menu backgrounds, or simpler camera fly-throughs, you might
+    just need the camera to travel roughly in a straight line that allows some curvature
+    and fluctuation in speed as the camera moves using a smooth-in and smooth-out
+    motion. This means that the camera picks up speed at the beginning and slowly
+    drops in speed towards the end of the path. To achieve this, you can use a prescripted
+    animation via Unity''s animation editor, or you can use animation curves, which
+    offer a high degree of flexibility and control over object transformations across
+    time, as shown here:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Cameras and curves](img/0655OT_05_12.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Moving cameras with animation curves
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'To create a camera control script that allows you to control object speed and
+    motion over time, including curved motion and smoothing or damping of speed, the
+    following code sample 5-12 can be used:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE11]'
+  prefs: []
+  type: TYPE_PRE
+- en: Tip
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: A sample project using animation curves for camera movement can be found in
+    the book's companion files (code bundle) inside the `Camera_Anim_Curves` folder
+    of this chapter.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'To use the `CameraMover` class, attach the script to a camera, and from the
+    Object Inspector, click on each of the **X**, **Y**, and **Z** curve fields to
+    plot the distance and speed of the camera over time. By clicking on a **Graph**
+    swatch, you can edit the graph, thus adding points and defining a motion curve
+    to apply for that axis. Notice that the **X**, **Y**, and **Z** motion is plotted
+    to the object''s local axes (forward, up, and right) and not to the world axes
+    (*x*, *y*, and *z*). This allows the object motion to apply relatively that offers
+    you root-level control of object motion while honoring the relevance of animation
+    data, as shown here:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Cameras and curves](img/0655OT_05_13.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Plotting motion curves using animation curves
+  prefs: []
+  type: TYPE_NORMAL
+- en: Tip
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: More information on animation curves can be found online in the Unity documentation
+    at [http://docs.unity3d.com/Manual/AnimatorCurves.html](http://docs.unity3d.com/Manual/AnimatorCurves.html).
+  prefs: []
+  type: TYPE_NORMAL
+- en: Camera paths – iTween
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: One very common feature request that, strangely, has not yet been implemented
+    as a native Unity feature is programmable motion paths. This refers to the ability
+    to have a `GameObject`, such as a camera, smoothly follow a path or spline using
+    spherical interpolation, where the path is defined by a series of connected game
+    objects. This feature already exists in the sense that camera motion can be defined
+    through prescripted animations that are created using Unity's animation editor.
+    However, there is a desire for more flexible and programmatic control over a motion
+    path in which the path is defined by a set of waypoints that can be adjusted in
+    code over time. This functionality is especially useful, for example, for space-shooter
+    games where the trajectory of enemy ships clearly follows smooth, curved flight
+    paths that sometimes change according to the position of the player's space ship,
+    as shown in the following screenshot. There are many ways to achieve this in Unity,
+    but a quick and easy solution is to use the freely available add-on, iTween by
+    Bob Berkebile; this can be downloaded and imported directly from Unity's Asset
+    Store. More information on iTween can be found at [http://itween.pixelplacement.com/index.php](http://itween.pixelplacement.com/index.php).
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Camera paths – iTween](img/0655OT_05_14.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Creating camera motion paths with iTween
+  prefs: []
+  type: TYPE_NORMAL
+- en: In addition to the default iTween package, you can also download the freely
+    available extension for iTween, namely, the Visual iTween Path Editor, which is
+    accessible from [http://pixelplacement.com/2010/12/03/visual-editor-for-itween-motion-paths/](http://pixelplacement.com/2010/12/03/visual-editor-for-itween-motion-paths/).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'After importing both iTween packages, the next step is to start using it to
+    create an object animated along a path. To take the example of a camera fly-through,
+    drag-and-drop the script `iTweenPath` onto a camera object. This script allows
+    you to create an independent and named path that consists of multiple waypoints,
+    as shown here:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Camera paths – iTween](img/0655OT_05_15.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: The iTweenPath script allows you to define a path of waypoints
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'To define multiple waypoints for a path, enter the total number of waypoints
+    to create inside the **Node Count** field and then select each node gizmo in the
+    **Scene** viewport that transforms each into place. Notice the curved path drawn
+    between the points that outline the path for the camera to take:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Camera paths – iTween](img/0655OT_05_16.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Defining the waypoints for a path
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Then, to make the camera follow the path at runtime, add the following code
+    sample 5-13 script to the camera :'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE12]'
+  prefs: []
+  type: TYPE_PRE
+- en: Tip
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: More information on iTween and its usage can be found online at [http://itween.pixelplacement.com/gettingstarted.php](http://itween.pixelplacement.com/gettingstarted.php).
+  prefs: []
+  type: TYPE_NORMAL
+- en: Summary
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: This chapter concentrated on many common tasks expected or needed of cameras.
+    Cameras are essential in Unity and in any game engine, because they represent
+    the perspective from which the scene is rendered to the screen. Most of the camera
+    functionality is commonly taken for granted in Unity, and as a result, much of
+    the flexibility and control that cameras offer us is lost and not discussed. Specifically,
+    here, we first considered gizmo rendering, that is, how to permanently render
+    the camera gizmo in the scene viewport even when the camera is deselected. Second,
+    we saw how to determine which objects are visible to the camera and which are
+    not. This included several kinds of important tests such as frustum presence and
+    occlusion testing. Third, we saw how to create and configure orthographic cameras
+    that render 2D elements without perspective distortion. Fourth, we saw how to
+    edit and enhance a camera render through render textures. This involved overriding
+    a series of camera-critical events and blending renders from other cameras to
+    create a camera cross-fade effect. Fifth, we saw how to create more advanced camera
+    motions, such as camera shake. Finally, you learned about camera paths, that is,
+    the ability for a camera to follow a specified path, whether this path was defined
+    by a series of game object waypoints or was simply an object to follow. Next up,
+    we'll explore the Mono Framework further.
+  prefs: []
+  type: TYPE_NORMAL

@@ -1,0 +1,1083 @@
+- en: 'Chapter 7.  Advanced Techniques: Functions Revisited'
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'This chapter builds upon the basic F# idioms in functions, pattern matching,
+    and data sequences that we have observed in the previous chapters. Here, I turn
+    to the advanced patterns of data transformations, in other words, the repeated
+    use of functions over data. The goal of this chapter is to familiarize you with
+    the major patterns where combined basic F# idioms work in synergy. This chapter
+    covers the following topics:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Advanced **recursion** patterns, including tail recursion and the mutual recursion
+    of functions and sequences
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Folding** as a universal pattern of aggregation'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Memoization** and **lazy evaluation** as complementary patterns of the **just-in-time
+    principle** applied to data'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The **continuation passing** pattern extending the core **call-return** principle
+    of function interaction
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Advanced pattern matching by generalizing matching with **active patterns**
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: These synergies often manifest themselves in clean, concise, and efficient F#
+    code.
+  prefs: []
+  type: TYPE_NORMAL
+- en: A deep dive into recursion
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: I've already scratched the surface of **recursion** in [Chapter 3](text00030.html#ch03
+    "Chapter 3.  Basic Functions") , *Basic Functions* , showing how the `rec` modifier
+    changes the scoping of the function definition. This explicit indication allows
+    the function to reference itself before the function body is fully defined. Now
+    I'll show you how recursion can be employed in the right or wrong way so that
+    you can learn to follow the right recursion pattern.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Tail recursion
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: I would not be breaking new ground by pointing out that a function, recursive
+    or not, as it is implemented these days, consumes a certain amount of resources
+    for local values, argument values, and so forth. A non-recursive function consumes
+    these resources upon being called and releases them upon returning the result.
+    So far, so good.
+  prefs: []
+  type: TYPE_NORMAL
+- en: But what happens when the function calls itself? Each nested call can stash
+    local resources to be released when this particular level of recursion is done.
+    Hence, a deep recursion may temporarily increase resource consumption. Quite frequently,
+    run-time implementations of the function call and return semantics (including
+    the F# one) use the application *stack space* of a limited volume to temporarily
+    stash the local resources. If a recursive function aggressively consumes this
+    space by deeply nesting self-calls without unwinding the stack, this reserved
+    volume can be exhausted, ending the chain of nested self-calls with the notorious
+    .NET `StackOverflowException` . Even when stack overflow is not the case, the
+    stack space hungry implementation puts a strain on resources and the performance,
+    as the allocations and releases of stack frames keeping the function call local
+    context take time.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'A classic (although severely worn out) example of a poorly arranged recursion
+    aiming at the calculation of the **factorial** ([https://en.wikipedia.org/wiki/Factorial](https://en.wikipedia.org/wiki/Factorial)
+    ) function is as follows (`Ch7_1.fsx` ):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE0]'
+  prefs: []
+  type: TYPE_PRE
+- en: '(I retreat to the `BigInteger` type here, as in order to cause the stack overflow
+    the argument should be in such a range that the result of the factorial function
+    may easily consist of thousands of digits). Now, with the help of FSI, let''s
+    look at what would be the values of [PRE1] and [PRE2]  . The following screenshot
+    shows a number of quite a high magnitude for the first call, but the second call
+    fails exactly as was predicted with `StackOverflowException` :'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Tail recursion](img/Image00027.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: The failure of a non-tail recursive function call
+  prefs: []
+  type: TYPE_NORMAL
+- en: What happens here is that this implementation continuously nests calls to [PRE3]
+    , with the decreasing argument value piling stack frames until it reaches [PRE4]
+    . Then, it begins to unwind the stack performing deferred multiplications, ending
+    up with an empty stack and sought function value. It is easy to notice that the
+    amount of consumed stack frames coincides with the function argument value. It
+    is enough stack space to accommodate 1000 frames, but 10 times more than overwhelms
+    the application.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'What can be done here? We may grasp that all partial multiplications can be
+    done immediately as the recursion unwinds and the interim result may be passed
+    as an extra argument. Such a wise twist to the previous naive approach is shown
+    in the following snippet (`Ch7_1.fsx` ):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE5]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'In the preceding [PRE6] definition, recursion is delegated to the inner `factorial_tail_call`
+    function, which has two arguments instead of one:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: One is the **factorial** argument for any calculation step (it is hidden by
+    the use of `function` in place of more descriptive `match` construction)
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The other is **accumulator ** `acc` , carrying the interim product for the already
+    performed recursion steps
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: It is easy to spot now that the recursive call to `factorial_tail_call` does
+    not constitute any sort of subexpression of any other expression involving other
+    values from the context; also, evaluating this self-contained expression is the
+    last action the self-calling function performs. That's why it is called a **tail
+    call** , and thereafter, the function having all the recursive calls as tail calls
+    is called **tail recursive** .
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let''s take a look at how the [PRE7] implementation will do after being exercised
+    with arguments of a substantial magnitude. In order to save space, let''s output
+    the number of digits in the function''s result string presentation with an elegant
+    `let howLong = (string >> String.length)` combinator instead of the actual result
+    factorial number as the following screenshot shows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Tail recursion](img/Image00028.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Pushing factorial limits with the tail-recursive implementation
+  prefs: []
+  type: TYPE_NORMAL
+- en: After tail recursion's invigorating refactoring, our [PRE8] implementation does
+    not have any problem calculating even the factorial of 100,000, or in traditional
+    math notation, *100,000!* . It's time to get excited indeed, as this number requires
+    almost half a million digits to be recorded, `456574` to be exact!
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Careful readers may observe that the implementation of [PRE9] that''s free
+    of subexpressions and context-carried values very closely resembles the good old
+    imperative cycle. Surprisingly, this is exactly what the F# optimizing compiler
+    does in such cases. I refer those of you interested in the inner workings of the
+    tail recursion compilation to this blog from the Microsoft Visual F# team: **Tail
+    calls in F#** ([https://blogs.msdn.microsoft.com/fsharpteam/2011/07/08/tail-calls-in-f/](https://blogs.msdn.microsoft.com/fsharpteam/2011/07/08/tail-calls-in-f/)
+    ).'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Mutual recursion
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: So far, all the considered use cases related to recursion were dealing with
+    **self-recursion** , where the recursive function calls itself. However, it is
+    not hard to extrapolate that recursive function abstraction allows a natural generalization,
+    where the group of two or more functions dispatch to each other in definitions,
+    allowing circular dependencies. This generalization brings the **mutual recursion**
+    pattern to the table.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'To express this kind of mutual dependency, F# introduces a special kind of
+    `let rec` binding, where definitions of two or more constituent functions are
+    grouped together with the `and` keyword as shown here:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE10]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'As outlined in **recursive functions** ([https://msdn.microsoft.com/en-us/library/dd233232.aspx](https://msdn.microsoft.com/en-us/library/dd233232.aspx)
+    ), I have already covered the inner workings of the single function binding that
+    has the `rec` modifier in [Chapter 3](text00030.html#ch03 "Chapter 3.  Basic Functions")
+    , *Basic Functions* . Mutual recursion binding simply extends the same principle:
+    one or more `and` parts just throw in additional bindings, making the bound function
+    names available for forward referral immediately.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Conceptually, the mutual recursion is quite a simple generalization. However,
+    the growing number of moving parts may make the reasoning about mutually recursive
+    function behavior quite complicated, allowing bugs to sneak in. A good illustration
+    of the above observation can be the example definition of the mutually recursive
+    functions pair `Even` and `Odd` provided on MSDN at the reference given above.
+    The following code shows the following two mutually recursive functions definition
+    taken from there (`Ch7_2.fsx` ):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE11]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The definition looks very succinct and elegant, right? Unfortunately, this
+    impression is superficial, and the preceding definition does not work as expected
+    in certain cases, allowing recursion to run away without stopping. Just check
+    for yourself how the preceding code works for the `Even(1)` test case: it runs
+    away! I refer those of you interested in the fixing of this mutually recursive
+    definition to my blog post **A Tale of Two Functions** ([https://infsharpmajor.wordpress.com/2013/04/21/a-tale-of-two-functions/](https://infsharpmajor.wordpress.com/2013/04/21/a-tale-of-two-functions/)
+    ) published in April 2013, where I covered the bases of the issue, its history,
+    and the suggested fix.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: It seems to me that a certain similarity exists between the definition of mutually
+    recursive functions and the piece of imperative code peppered with many `goto`
+    . operators. In both cases it is similarly hard to mentally track the flow of
+    control, which in turn creates the opportunity for bugs to sneak in.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let me now turn to a sample of a good application of a mutual recursion pattern,
+    demonstrating the bits and pieces of reasoning behind taming its power. I''m going
+    to use my own **Stack Overflow answer** ([http://stackoverflow.com/a/9772027/917053](http://stackoverflow.com/a/9772027/917053)
+    ) to the question there **Using Functional Programming to compute prime numbers
+    efficiently** ([http://stackoverflow.com/questions/9766613/using-functional-programming-to-compute-prime-numbers-efficiently](http://stackoverflow.com/questions/9766613/using-functional-programming-to-compute-prime-numbers-efficiently)
+    ). I approach this challenge with the arsenal of patterns already uncovered until
+    this point in the narrative as shown here (`Ch7_2.fsx` ):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE12]'
+  prefs: []
+  type: TYPE_PRE
+- en: The first piece is the definition of the `primes` sequence of an indefinite
+    length (in fact, limited by the manner of the preceding implementation to `int`
+    prime numbers only but this matter can be easily generalized). The surprising
+    part here is that a sequence binding `seq {...}` can be a part of mutually recursive
+    function bindings. Nevertheless, the `primes` binding uses the `seq { yield 2;
+    yield! Seq.unfold nextPrime 3 }` sequence expression, which yields the first prime
+    number 2, followed by `yield!` of the `Seq.unfold` generator function relying
+    on the assumption that there is a `nextPrime` function around that, being given
+    a prime number argument can generate the next prime number of the greater value.
+    Please take into account how I use a forward reference to `nextPrime` granted
+    by the `rec` modifier of the `let` binding. It's very convenient and it allows
+    you to postpone the definition of `nextPrime` , concentrating only on the sequence
+    generation at the moment.
+  prefs: []
+  type: TYPE_NORMAL
+- en: So far, so good. Now, I turn directly to the definition of `nextPrime` . I do
+    that with an assumption that there is a function `isPrime` around that, being
+    given an `int` argument, can find out whether it's a prime number or not. Again,
+    as discussed earlier, I will make a forward reference to `isPrime` without bothering
+    about its implementation at the moment thanks to the `let rec ...` `and` `...`
+    binding that allows me such freedom.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The `nextPrime` function is built by the rules of the `Seq.unfold` higher-order
+    function. The first thing it calculates is the next candidate for primeness regardless
+    of the primeness of the argument at the moment with a slightly obscure binding,
+    `let next = n + if n%6 = 1 then 4 else 2` . In fact, there is nothing exciting
+    here, apparently, potential candidates are odd numbers and I begin unfolding with
+    the smallest odd prime, `3` . For each candidate of value `n` , if `n` is greater
+    by 1 than a multiple of `6` , then the next candidate would be `n + 4` (as `n
+    + 2` is apparently; the multiple of `3` ); otherwise, it's just `n + 2` , you
+    know, just a small optimization. Next, having a prime candidate `n` and the following
+    `n` prime candidate `next` at hand, I check whether value `n` is prime with the
+    help of the (not yet defined) `isPrime` function. If affirmative, it returns the
+    `Some(n, next)option` ; otherwise, it recursively calls itself with `next` as
+    the argument.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Great! The last piece of the puzzle is to define `isPrime` . The first thing
+    is that it sifts out integers of less than 2 (an additional useful property of
+    `isPrime` is that it can be used just as a primeness detector to be called from
+    elsewhere). Now pay attention: for argument values greater than or equal to `2`
+    , it actively uses the members of the already generated `primes` sequence of lesser
+    than or equal to the square root of the argument values with the help of the `Seq.tryFind`
+    higher-order function for the checking! That''s why I cached the output of the
+    sequence expression with `Seq.cache` in the definition of `primes` ; otherwise,
+    `isPrime` would be slow. We trade here the memory space for the execution speed.
+    So, `Seq.tryFind` traverses the cache until it either finds the factor of the
+    argument value or it reaches the point where the `primes` member multiplied by
+    itself gets greater than the argument. The first outcome means that the argument
+    is not a prime number, and the second means that it is a prime number. This statement
+    wraps up the lengthy and slightly annoying comments about the implementation of
+    `primes` .'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'I wrap up this section by checking how performant the `primes` implementation
+    is. For this purpose, let me turn to the familiar **Project Euler** ([https://projecteuler.net/](https://projecteuler.net/)
+    ), particularly to the **Problem 10 - Summation of Primes** ([https://projecteuler.net/problem=10](https://projecteuler.net/problem=10)
+    ):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE13]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Applying the `primes` definition to the summation of prime numbers not exceeding
+    2,000,000 is shown in the upcoming figure. It takes just less than 1.5 seconds
+    on my computer. Also, consider that the repeated run yields the result in just
+    10 milliseconds, thanks to the sequence caching:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Mutual recursion](img/Image00029.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Using mutual recursion for primes generation
+  prefs: []
+  type: TYPE_NORMAL
+- en: Personally, I find a lot of aesthetic value in the `primes` code, in how it
+    uses forward references twice, finally closing in on the self-computed data. And
+    each of three circularly dependent parts of the definition is a pure function
+    (well, kind of, as caching definitely represents a hidden state but in a very
+    clean form). This is the power of functional programming!
+  prefs: []
+  type: TYPE_NORMAL
+- en: Folding
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'Now is the perfect time to revisit the `factorial` function that I used at
+    the beginning of this chapter when covering tail recursion. Let''s take a sequence
+    of `bigint` numbers from `1I` to a value `n` represented by the following expression:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE14]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Does the `factorial(n)` function represent nothing else but a product of the
+    factors, each being a member of the preceding sequence? Sure, it can be seen (and
+    implemented) as such. Let me create this implementation in the best traditions
+    of the imperative programming style as shown here (`Ch7_3.fsx` ):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE15]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Expressed in plain words, this implementation can be laid out in the following
+    manner:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Take a mutable value that will serve as a result accumulator
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Enumerate the sequence of factors
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: For each factor in the sequence, get a new value of the accumulator by multiplying
+    the current accumulator value by the current factor
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Return the final accumulator value as a function result
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Some of you with experience in object-oriented design may perhaps have already
+    spotted the signs of the **visitor** ([https://en.wikipedia.org/wiki/Visitor_pattern](https://en.wikipedia.org/wiki/Visitor_pattern)
+    ) pattern in the preceding implementation. Indeed, the operation (multiplication
+    in this case) is applied to the sequence data without in any way changing this
+    data, eventually deriving the result as the aggregate of these repeated operations.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Generalizing this in the form of a higher-order function signature, the following
+    can be derived:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE16]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Here, the function of type `(''State -> ''T -> ''State)` named `folder` applies
+    to the pair of arguments:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The first of type `'State` representing the accumulator
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The second of type `seq 'T` representing the sequence of elements that have
+    the type `'T`
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The `folder` function returns the final value of the accumulator. This function,
+    named `fold` , represents the ubiquitous pattern of data processing by name `folding`
+    .
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'As can be expected, the generic folding of the preceding form is indeed a member
+    of the F# core library: **Seq.fold<''T,''State> function ** ([https://msdn.microsoft.com/en-us/library/ee353471.aspx](https://msdn.microsoft.com/en-us/library/ee353471.aspx)
+    ). Rewriting [PRE17] with the help of the `Seq.fold` library function, which hides
+    all these pesky moving parts involved (the enumerator, state holder, and traversing
+    enumeration), gives the following, much more terse version (`Ch7_3.fsx` ):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE18]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Let''s compare both implementations from a performance standpoint. The results
+    of running both versions side by side are given in the following screenshot:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Folding](img/Image00030.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Hand-coded folding versus the library fold function performance
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'It should not be surprising to observe that the `library` function shows slightly
+    better performance than the hand coded imperative version. The `library` function
+    implementation is highly optimized. For those who are curious, the current library
+    implementation of the `fold` function taken from GitHub looks like what is shown
+    in the following snippet (`Ch3_7.fsx` ):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE19]'
+  prefs: []
+  type: TYPE_PRE
+- en: You may have already noticed how closely folding resembles tail recursion with
+    the accumulator. This resemblance is not accidental. Both thread the state through
+    the sequence of function calls, although the `recursive` function materializes
+    these calls when it is executed, while the `fold` function applies the `folder`
+    function to the explicit to-be-folded data sequence.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'It can be formally proven that in a language with first-order tuples and functions,
+    which F# is, any function can be expressed as `fold` . I refer those of you who
+    are interested to the classic paper on this subject: Graham Hutton''s **A Tutorial
+    on the Expressiveness and Universality of Fold** ([www.cs.nott.ac.uk/~pszgmh/fold.pdf](http://www.cs.nott.ac.uk/~pszgmh/fold.pdf)
+    ).'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Memoization
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The next two relatively advanced topics I will cover somehow resemble the **Just **
+    **in ** **Time** approach taken outside of the compilation context. With **Just
+    in Time** ([https://en.wikipedia.org/wiki/Just_in_Time](https://en.wikipedia.org/wiki/Just_in_Time)
+    ), Wikipedia comes up first with a production strategy in manufacturing, where
+    components are delivered immediately before being utilized as a way of being *lean*
+    on inventory costs.
+  prefs: []
+  type: TYPE_NORMAL
+- en: As a matter of fact, **memoization** and **lazy evaluation** complement each
+    other in this *lean* calculation sense. While laziness allows you not to perform
+    calculations until the result is absolutely required, memoization makes the results
+    of the already performed *fat* resource expensive calculations reusable by not
+    allowing them to be wasted.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'I have already used memoization somewhat when implementing prime number generation
+    earlier in this chapter for covering mutual recursion. An expensively generated
+    sequence was cached there in order to use the already generated elements to find
+    the next ones, which are not generated yet. Now, I want to concentrate on memoization
+    in general, allowing any function to be memoized. Prior to doing this, it is important
+    that you realize the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Memoization may work for *pure functions only* . This is almost obvious; if
+    a function is not referentially transparent, it cannot be memoized as memoization
+    captures solely arguments, not arguments, *and* state
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Memoization exploits a precalculated state
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'With this in mind, let''s mimic implementations presented elsewhere on the
+    Internet ([https://blogs.msdn.microsoft.com/dsyme/2007/05/31/a-sample-of-the-memoization-pattern-in-f/](https://blogs.msdn.microsoft.com/dsyme/2007/05/31/a-sample-of-the-memoization-pattern-in-f/)
+    and [http://www.fssnip.net/8P](http://www.fssnip.net/8P) ) in order to investigate
+    related limitations and gotchas as shown here (`Ch7_4.fsx` ):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE20]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The type inferred for memoization by the F# compiler is shown here:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE21]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Here, `f` represents a function to be memoized, `cache` serves as a state repository
+    using the immutable **Map F# collection** ([https://msdn.microsoft.com/en-us/library/ee353880.aspx](https://msdn.microsoft.com/en-us/library/ee353880.aspx)
+    ) under the hood. `memoize` itself represents a full-fledged high-order function
+    that takes a function as an argument and also returns a function. This closes
+    over mutable `cache` (an F# 4.0 feature) and does the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: If its argument `x` , which is used as a key against the closed `Map` `cache`
+    can be found, then it logs the indication that the precached value is to be used
+    and returns this `res` value.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Otherwise, it mutates the closed `cache` to a new `Map` that has, in addition
+    to the existed entries, the entry represented by the newly calculated tuple (`x,
+    f(x)` ), then it logs the fact that memoization took place and returns `f(x)`
+    .
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Let''s see for now how this works in FSI, which the following screenshot captures:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Memoization](img/Image00031.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Memoization with F# Map
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'First, I memoized the `fun` `x -> x*x` function, which is supposed to represent
+    a "fat" resource hungry calculation into the `fm:(int -> int)` function. Then,
+    I used `fm` a couple of times with different arguments as shown here:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`fm 10` : The result `100` was memoized for argument 10 and then returned'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`fm 42` : The result `1764` was also memoized and then returned'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`fm 10` : As this argument value has already occurred, the result `100` is
+    returned without any recalculation'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: This pattern seems quite straightforward; however, it carries a few gotchas.
+  prefs: []
+  type: TYPE_NORMAL
+- en: For example, the signature of `memoize` indicates that `'a` is required in order
+    to represent comparison; what gives? Digging down the `memoize` implementation
+    allows you to conclude that this constraint is a mere corollary of using F# `Map`
+    to back the state persistence.
+  prefs: []
+  type: TYPE_NORMAL
+- en: As the implementation behind `Map` is likely to be a **balanced tree** , it
+    requires its keys to be *comparable* for rebalancing. Oops! Sounds like a **leaky
+    abstraction** ([https://en.wikipedia.org/wiki/Leaky_abstraction](https://en.wikipedia.org/wiki/Leaky_abstraction)
+    ) takes place here. Also, this may be a limiting factor for the application of
+    memoization generically, as comparability is not a universal property of a generic
+    type `'a` .
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let''s change the persistence implementation mechanism to a generic **Dictionary**
+    ([https://msdn.microsoft.com/en-us/library/xfhwa508(v=vs.100).aspx](https://msdn.microsoft.com/en-us/library/xfhwa508(v=vs.100).aspx)
+    ), as shown in the following code (`Ch7_4.fsx` ):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE22]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'This changes the memoized argument constraint from comparison to equality as
+    shown here:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE23]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'This can be considered more universal, only until some innocuous usage like
+    this occurs:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE24]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Executing this code will end up with the following exception:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE25]'
+  prefs: []
+  type: TYPE_PRE
+- en: What the heck? Turns out nothing special happened, just another leaky abstraction
+    has taken place, and consequently, the gotcha occurred. This time, the gotcha
+    stems from the underlying persistence mechanism that does not allow you to have
+    the `null` value as a `Dictionary` key (on the contrary, `Map` happily allows
+    this)!
+  prefs: []
+  type: TYPE_NORMAL
+- en: Finally, I want to touch the matter of combining memoization with recursion,
+    as quite frequently, recursion is the tool to solve problems with the **divide
+    and conquer** strategy, where memoization fits naturally and may really shine.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let''s take some use case more appropriate for the purpose, for example, the
+    simple calculation of *binomial coefficients* with the help of **Pascal''s triangle**
+    ([https://en.wikipedia.org/wiki/Pascal%27s_triangle](https://en.wikipedia.org/wiki/Pascal%27s_triangle)
+    ) as shown here (`Ch7_4.fsx` ):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE26]'
+  prefs: []
+  type: TYPE_PRE
+- en: The easily noticeable recurrent relationship between elements of Pascal's triangle
+    rows allows you to expect a serious benefit from memoization.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The memoized implementation of `binomial` is also straightforward; `memoize`
+    is turned into an internal function in order to strip the logging introduced within
+    its initial version. The only other problem left is that the memoized function
+    has one argument. However, applying uncurrying helps with this trouble nicely
+    as shown here (`Ch7_4.fsx` ):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE27]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Now it''s time to measure the gain achieved from the memoization. The code
+    in the upcoming figure measures the duration of repeating `binomial 500 2` 10,000
+    times compared to the duration of repeating it 10,000 times as `memoizedBinomial
+    (500,2)` :'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Memoization](img/Image00032.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Memoizing of the "divide and conquer" solution
+  prefs: []
+  type: TYPE_NORMAL
+- en: The results of the comparison are absolutely stunning, that is, `23781 / 15
+    = 1585` , which means that memoization has improved the performance by 1585 times!
+  prefs: []
+  type: TYPE_NORMAL
+- en: Lazy evaluation
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'This concept is very simple. By default, F# follows the **eager evaluation**
+    ([https://en.wikipedia.org/wiki/Eager_evaluation](https://en.wikipedia.org/wiki/Eager_evaluation)
+    ) strategy, or an expression is evaluated as soon as it is bound. The alternative
+    strategy available in other functional programming languages is to postpone the
+    calculations until their result is absolutely necessary. F# can be explicitly
+    told where to use lazy evaluation; by default, it uses lazy evaluations only for
+    sequences. Expressing lazy evaluation if F# is not complicated syntactically,
+    the following binding serves the purpose as shown:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE28]'
+  prefs: []
+  type: TYPE_PRE
+- en: Here, `name` is bound to the result of calculating `expression` , but the calculation
+    itself is postponed. The type of value `name` is a special one, that is, `Lazy<'T>;`
+    it represents a wrapper over `'T` , which is the type of the expression per se.
+    The computation gets performed by calling the `Force` method of type `Lazy<'T>`
+    , like this `name.Force()` . This action also unwraps the underlying type of `Lazy`
+    , so the type of the `name.Force()` expression is `'T` .
+  prefs: []
+  type: TYPE_NORMAL
+- en: Take into account that this feature is not specific to F#; the `Lazy<T>` class
+    is a part of the .NET framework class library of the System namespace.
+  prefs: []
+  type: TYPE_NORMAL
+- en: It is important to understand that the expression is calculated only once, so
+    if the expression wrapped into the `lazy` method has a side effect, it is performed
+    only once on the expression calculation. Even if the calculation is forced another
+    time, nothing will happen on the side; only the cached result will be returned.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let''s demonstrate this with the following snippet (`Ch7_5.fsx` ):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE29]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The following screenshot shows how this code behaves in FSI:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Lazy evaluation](img/Image00033.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Lazy evaluation and side-effects
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note that the binding for `twoByTwo` did not bring any calculations to life,
+    but it wrapped the future calculation into the `Lazy` type. Then, the first `twoByTwo.Force()`
+    function performed the wrapped calculation, so the side-effect popped up. Finally,
+    any consequent `twoByTwo.Force()` function will just repeatedly bring the result
+    of the very first calculation without any side-effects.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The lazy evaluation pattern has its own niche in enterprise F# development.
+    I often use it when in need of a resource that's probably being initialized; if
+    this need really materializes, I want it to happen only once. For example, we
+    can consider reading the Production environment configuration settings from Azure
+    `KeyVault` when a service runs in the Production environment while using some
+    other configuration information carrier in other environments, for example, environment
+    variables pointing to data stubs.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Continuation passing style
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'This sophisticated technique of arranging recursion allows you to avoid stack
+    consumption by putting all function calls into the tail position with **continuation**
+    , that is, a function that performs the remaining computations instead of returning
+    result to the caller. Let me demonstrate this technique by refactoring the *factorial*
+    implementation one more time as shown in the following snippet (`Ch7_6.fsx` ):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE30]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Although slightly mind-bending, the code consists of all tail calls:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: A recursive call to itself [PRE31] is a tail call
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: A new continuation anonymous function also makes a tail call to the old continuation,
+    `cont`
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'The `cont` function has inferred signature of `(BigInteger -> ''a);` so, in
+    order to perform the sought-for calculations, using the `id` identity function
+    for the `cont` as the first argument of [PRE32] would be just fine. Testing the
+    continuation passing style implementation of [PRE33] function in FSI is presented
+    in the following screenshot:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Continuation passing style](img/Image00034.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Implementing a factorial function with the help of continuation passing style
+  prefs: []
+  type: TYPE_NORMAL
+- en: This works perfectly, although those of you not already familiar with continuation
+    passing style may develop a headache when dealing with this code for the first
+    time.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Active patterns
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: I promised in [Chapter 4](text00039.html#page "Chapter 4.  Basic Pattern Matching")
+    , *Basic Pattern Matching* , that I would add to the subject by covering **active
+    patterns** ; now is a perfect time. Remember matching with **guards?** Guards
+    provide a way to drill down into the matched `pattern-expression` function by
+    attaching an arbitrary calculation having the `bool` result.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Guard mechanism adds a certain customization potential to the vanilla pattern
+    matching, but it is kind of detached: regardless of how much data decomposition
+    is required in order to complete the guard calculation, all this effort is discarded
+    for both matching and non-matching possible calculation results. Wouldn''t it
+    be nice to have a fully customizable transition between the recognition and transformation
+    phases of pattern matching? Active patterns aim exactly at this matter. Broadly
+    speaking, active patterns represent a special kind of function allowed to be used
+    inside `pattern-expression` .'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'They allow you to implement some typical patterns of data transformations in
+    a very terse and elegant manner as following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Advanced transformations between types
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Partitioning data into groups by relevant and irrelevant categories
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Performing full categorization, in other words, taking any data and processing
+    it according to this piece of data belonging to a specific category out of the
+    couple given
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Let's look at how active patterns play with each case of these data processing
+    patterns.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Type transformations with active patterns
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Active patterns use a special naming convention when being defined within a
+    `let` binding:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The name of the active pattern function must begin with a capital letter even
+    if it is a double-ticked like this: [PRE34]'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The name of the active pattern function must be wrapped into *banana clips*
+    `(|` `and` `|)` as in [PRE35]
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The data in which an active pattern works always comes as the last argument
+    in the definition and at the time of its use being taken from the context (`match`
+    , `function` , or any other F# construction where pattern matching occurs); all
+    but the last arguments in a multi-argument definition are parameters that generalize
+    the active pattern workings.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Finally, when a literal is used at the place of the last argument, the `pattern-expression`
+      is considered matched when the result of the active pattern calculation matches
+    the literal. If a name is used instead of the literal, then this name gets bound
+    to the result of the active pattern calculation to be used in the corresponding
+    `result-expression` transformation.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Does this sound confusing? In fact, it is easier than it may sound. Let me turn
+    to some illustrative samples that might help.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The first one represents a dummy sample as shown in the following code (`Ch7_7.fsx`
+    ):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE36]'
+  prefs: []
+  type: TYPE_PRE
+- en: The `Echo` active pattern is very minimalistic; it just echoes the input into
+    the result. Then, the `checkEcho` function puts this definition to use. In the
+    first `pattern-expression` , it simply checks whether the result of the `Echo
+    p` calculation (`p` is implicitly taken from the head of the `match` construction)
+    equals `42` . If it does, then the corresponding result expression returns string
+    `"42!"` . Otherwise, the next `result-expression` is evaluated by unconditionally
+    binding the result of the `Echo p` calculation to variable `x` , which in turn
+    is used in `result-expression` to produce a `"... is not good"` string.
+  prefs: []
+  type: TYPE_NORMAL
+- en: So, when using the preceding sample in FSI, `checkEcho 0` produces `"0 is not
+    good"` , while `checkEcho 42` produces `"42!"` .
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Is it getting clearer? Another simple sample reinforcing this understanding
+    would be an active pattern:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE37]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'While keeping the same type for the argument and result, this performs just
+    a simple value transformation. The usage of the above active pattern is shown
+    in the following screenshot:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Type transformations with active patterns](img/Image00035.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: A simple type transformation with an active pattern
+  prefs: []
+  type: TYPE_NORMAL
+- en: The binding [PRE38] that defines the active pattern does not match anything;
+    instead, it takes the matched value and returns it, adding 2.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The binding [PRE39] is used as a part of the match construct and given the input
+    argument `40` , it returns `x` bound to a sum value of `42` .
+  prefs: []
+  type: TYPE_NORMAL
+- en: The binding [PRE40] is a slightly mind boggling example that becomes clear if
+    you remember that the `let` binding of a value is a corner case of pattern matching
+    based data disassembling, so [PRE41] gets applied to input argument `40` and binds
+    the result `42` to `x` .
+  prefs: []
+  type: TYPE_NORMAL
+- en: At this point, this specific use case of applying active patterns for data transformations
+    should be clear enough; I want to apply it in a more practically sound use case.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'It is a rather widespread technique to use  **globally unique identifiers,
+    or GUIDs** ([https://en.wikipedia.org/wiki/Globally_unique_identifier](https://en.wikipedia.org/wiki/Globally_unique_identifier)
+    ) to label unique entities popping up in the course of running a business. For
+    example, in Jet.com, GUIDs are used to label customer orders, merchant orders,
+    merchant order items, shipping, fulfillment centers, SKUs...the complete list
+    would be too long. These codes are mostly exchanged and displayed as strings of
+    32 hexadecimal digits. In some nodes of the system, it is required that you validate
+    that a given string is a legitimate representation of a GUID. This task can be
+    easily performed with the help of active patterns as shown here (`Ch7_7.fsx` ):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE42]'
+  prefs: []
+  type: TYPE_PRE
+- en: The preceding code has many interesting bits and pieces, such as the set of
+    allowable `hexCharSet` hexadecimal characters that are calculated only once and
+    are local to the active pattern `IsValidGuidCode` definition; the pair of internal
+    active patterns `HasRightSize` and `IsHex` , each responsible only for the single
+    verified property and disregarding its own input argument using one from the outer
+    active pattern instead; and finally, the way two `pattern-expressions` are combined
+    with `&` , again omitting the argument as it is already delivered to their bodies
+    and combining the final result within `result-expression` based upon entities
+    distilled in the complementary `pattern-expression` . Those of you who fully understand
+    how the preceding snippet works can claim yourselves to be experts on the subject
+    of active patterns.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'To ensure that this code really works, let me perform a quick test drive. The
+    upcoming figure reflects the results of this test, showing that the `IsValidGuidCode`
+    active pattern correctly identifies the `"abc"` string as an invalid GUID and
+    `"0123456789AbCdEfFFEEDDCCbbAA9988 "` as a valid one:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Type transformations with active patterns](img/Image00036.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Verifying a GUID string using active patterns
+  prefs: []
+  type: TYPE_NORMAL
+- en: By the way, active patterns of the (`|active pattern name|` ) form that I have
+    covered so far are named **single total active patterns** , as they deal with
+    a single data type, transforming it into the same or a different data type by
+    the enclosed calculation. Another peculiarity of considered samples is that all
+    of them were working on a single argument. I will cover **active patterns with
+    parameters** later in this chapter.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Data partitioning with active patterns
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: My next foray into F# active patterns use as processing patterns is concerned
+    with the typical practice of having data that may constitute one or more cases
+    suitable for the processing and "just the rest" unsuitable. In the spirit of F#'s
+    ubiquitous use of options active patterns capable of performing the above manner
+    of partitioning transform the input data type into an `Option` type, where the
+    `None` case represents unsuitable data and `Some` wraps one or more types of suitable
+    data.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The definition of such active patterns is unambiguously distinguishable by
+    having `|_` characters prepended to the right-hand side banana clip `|)` of the
+    active pattern definition. The active patterns of this type are called **partial
+    active patterns** and their name groups look like this: `(|name 1[|name 2...]|_|)`
+    . Let''s consider a pretty sizeable piece of real code from one of the Jet.com
+    production systems to demonstrate this technique.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The task at hand is to process the invoices from Jet.com vendors (shipping carriers,
+    payment processors, and others) that package their data in the form of comma-separated
+    files. I use "comma-separated" broadly here, as separators can be any characters.
+    Files may or may not have headers and can carry just a gazillion other irregularities.
+    Uploading these invoices for processing followed by archiving is a problem that
+    carries a certain complexity.
+  prefs: []
+  type: TYPE_NORMAL
+- en: For the purposes of this chapter, I will take only a partially related problem,
+    namely recognizing whether the last uploaded file is of a known `Processable`
+    type and should be processed or whether it is not and should be rejected.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In order to keep the code implementing the preceding task reasonably short for
+    the purposes of the book, I'll limit the number of vendors to just three, that
+    is, **FedEx**  and  **OnTrac** shipping carriers and the **Braintree** payment
+    processor.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'I begin with the `Processable` here that lists known vendor files as following
+    (`Ch7_8.fsx` ):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE43]'
+  prefs: []
+  type: TYPE_PRE
+- en: Nothing fancy here; just a common practice of representing domain entities with
+    discriminated unions, perhaps slightly augmented.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Next, file headers are hardcoded here and also significantly stripped from
+    the right-hand side as the complete contents do not matter much as shown here
+    (`Ch7_8.fsx` ):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE44]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'And finally, the active pattern definition is as follows (`Ch7_8.fsx` ):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE45]'
+  prefs: []
+  type: TYPE_PRE
+- en: The active pattern name, as expected, points to the partial active pattern,
+    the argument is of type `System.IO.Stream` carrying the file contents, and its
+    return is of type `Processable` option.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The function first creates `StreamReader` and reads the first line from there
+    into the `hdr` value.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Then, it takes a list of tuples, which members perform pairing of `Processable`
+    cases with the string literals denoting the corresponding comma-separated file
+    headers and tries to find the element that has the second part of the tuple that
+    is equal to the `hdr` . If such exists, then the file can be processed and the
+    function returns option value `Some` , wrapping the first part of the found tuple.
+  prefs: []
+  type: TYPE_NORMAL
+- en: If the element is not found (option value `None` case), consider at this point
+    that often `OnTrac` files may not carry headers. To exploit this knowledge, I
+    examine a bit more into the already taken stream contents and whether the file
+    begins with some symbols pointing to the `OnTrac` origin the active pattern returns
+    `Some (Processable.OnTracFile)` ; otherwise, the file is considered non-processable.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In my opinion, the `IsProcessable` active pattern represents quite a terse and
+    clean implementation of the business feature.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Data categorization with active patterns
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: I wrap up our journey into the exciting world of F# active patterns with the
+    active pattern type that applies to the processing pattern of **categorization**
+    , or partitioning the data into the entirety of subcategories that completely
+    cover the domain entity, not leaving any space for non-applicable outliers.
+  prefs: []
+  type: TYPE_NORMAL
+- en: As some of you may have already deducted, the name associated with this active
+    pattern is **multicase active pattern** . Its syntactic definition is also very
+    distinguishable from the already considered cases. It has contained between the
+    banana clips just few case names separated from each other by `|` pipe symbols.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Let's delve into the illustrative sample. An e-commerce domain operating with
+    payments considers different payment terms and policies. In particular, if the
+    payment terms are not immediate, it make sense to introduce a certain policy or
+    policies concerned with determining when each particular payment is due. Hence,
+    given the date on which a service or merchandise was supplied, the corresponding
+    payment is due or not due depends on the amount of time passed from that date
+    to now.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The implementation using active patterns is very straightforward; just for
+    simplicity, let''s assume that the business has adopted a single policy of postponing
+    the payments for no more than three days (certainly, the policy can be a subject
+    of parameterization in a more sophisticated design) as shown here (`Ch7_9.fsx`
+    ):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE46]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The function using the active pattern is also pretty simple, but this is OK
+    for the purpose of illustration. The preceding code is presented in the following
+    figure:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Data categorization with active patterns](img/Image00037.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Multi-case active patterns for data categorization
+  prefs: []
+  type: TYPE_NORMAL
+- en: I forgot to mention that the maximal number of cases in F# 4.0 multicase active
+    patterns as of today is limited to 7, which may be the limiting factor in using
+    active patterns in some cases.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Summary
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: This chapter was quite a long field trip into relatively advanced F# idioms
+    that an average F# developer uses in the course of a work day quite frequently.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The next chapter will cover even more widely used language patterns playing
+    the central role in data crunching, with F# demonstrating polymorphic behavior
+    for multiple data collection types.
+  prefs: []
+  type: TYPE_NORMAL

@@ -1,0 +1,793 @@
+- en: Chapter 9. More Data Crunching
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Up until this point, all F# data transformation patterns covered were dealing
+    with in-memory collections. That is, important data crunching use cases, such
+    as querying data, already persisted within the enterprise, and ingesting data
+    from outside of the enterprise have not been considered yet.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'This chapter covers these data transformation scenarios and related coding
+    patterns:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Querying the external data. I'll begin with querying the data using F# query
+    expressions. We are going to see how the same transformation patterns we distilled
+    in [Chapter 8](text00065.html#page "Chapter 8. Data Crunching – Data Transformation
+    Patterns") , *Data Crunching - Data Transformation Patterns* , in relation to
+    core library function members are fully applicable to querying the external data
+    presented in a data base or a web service. It also would be interesting to push
+    the limits of composition in query expressions.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Parsing data from the external sources. We already spent a fair amount of time
+    considering pattern matching amplified by active patterns. However, I do not feel
+    an imperative need for using some advanced techniques, such as parser combinators.
+    I'll show some from-the-trenches examples of production quality data parsing achieved
+    with just a bit of custom coding.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Data querying
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: So far in the book, the sources of data collections were either collection generators
+    or the file system. Let me move toward more realistic enterprise data sources,
+    where data are persisted in databases. To access and transform such data, F# provides
+    **query expressions** ([https://msdn.microsoft.com/visualfsharpdocs/conceptual/query-expressions-%5bfsharp%5d](https://msdn.microsoft.com/visualfsharpdocs/conceptual/query-expressions-%5bfsharp%5d)
+    ).
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**Query expressions** represent a concrete type of **computation expressions**
+    that is embedded into the language. They allow to bring data into memory by querying
+    external sources and transforming incoming data to the desired shape.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The F# query expressions are akin to sequence expressions: both produce data
+    sequences. However, before the final data projection shaping the produced data
+    sequence a query expression may apply to data a wide variety of data transformations
+    that are similar to what we used to see in **LINQ** ([https://en.wikipedia.org/wiki/Language_Integrated_Query](https://en.wikipedia.org/wiki/Language_Integrated_Query)
+    ). Query expressions can be considered LINQ support in F#.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: F# and LINQ before query expressions
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Chronologically, query expressions were introduced in F# 3.0\. Prior to that,
+    F# allowed you to access the LINQ machinery via **.NET 3.5 Enumerable** **extension**
+    **methods** ([https://msdn.microsoft.com/en-us/library/system.linq.enumerable_methods(v=vs.110).aspx](https://msdn.microsoft.com/en-us/library/system.linq.enumerable_methods(v=vs.110).aspx)
+    ). Let''s look at the following script, which finds out the last vowel in the
+    sequence of lexicographically ordered letters of the English alphabet (`Ch9_1_1.fsx`
+    ):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE0]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'If we recollect that the F# sequence `alphabet` is `IEnumerable` , then the
+    task can be achieved with LINQ extension methods (`Ch9_1_2.fsx` ):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE1]'
+  prefs: []
+  type: TYPE_PRE
+- en: Using the *fluent interface* of LINQ extension methods as a rough substitute
+    for the F# pipe operator, `|>` , we have achieved almost one-to-one correspondence
+    between the definitions. The same result has been achieved by combining the `Seq`
+    library functions, `filter-sortDescending-head` , and by combining the LINQ extension
+    methods, `Where-OrderByDescending-First` .
+  prefs: []
+  type: TYPE_NORMAL
+- en: Introducing F# query expressions
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'You may ask why I pay so much attention to the above similarity? That is because
+    query expressions are nothing more than *syntactic sugar* similar to the one we
+    observed with sequence expressions in [Chapter 6](text00053.html#ch06 "Chapter 6. 
+    Sequences - The Core of Data Processing Patterns") , *Sequences - The Core of
+    Data Processing Patterns* . Query expressions use F# computation expressions magic
+    to express chain of function applications as a linear sequence of SQL-like operations
+    within built-in computation expression builder `query { ... }` . This approach
+    is similar to `seq { ... }` workings for generating F# sequences. The script `Ch9_1_2.fsx`
+    given in the previous section may be present using a query expression as (`Ch9_1_3.fsx`
+    ):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE2]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'When dissecting the preceding query expression you may spot the already familiar
+    **ETL** data transformation process considered in [Chapter 8](text00065.html#page
+    "Chapter 8. Data Crunching – Data Transformation Patterns") , *Data Crunching
+    - Data Transformation Patterns* : given a collection, perform one or more modifications
+    on its members, eventually projecting the query result. As a computation expression
+    `query` provides that magic glue between adjacent lines. It makes the data flowing
+    from one query operator to another in the manner similar to functions chained
+    with the `>>` combinator.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Query operators
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Although the number of **query operators** ([https://msdn.microsoft.com/en-us/visualfsharpdocs/conceptual/query-expressions-%5Bfsharp%5D](https://msdn.microsoft.com/en-us/visualfsharpdocs/conceptual/query-expressions-%5Bfsharp%5D)
+    ) is substantially less than the number of F# core library functions for collections
+    - only around 40 - the query operators fit nicely into, where applicable, the
+    hierarchy of data transformation patterns (another similar *classification* I
+    managed to discover is the following one ([https://weblogs.asp.net/dixin/understanding-linq-to-objects-2-query-methods-and-query-expressions](https://weblogs.asp.net/dixin/understanding-linq-to-objects-2-query-methods-and-query-expressions)
+    ). The mapping accompanied by the similar category names from the preceding classification
+    provided in round brackets is given as following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**The aggregation p** **attern** ( *aggregation* ): This includes functions
+    such as `count` , `averageBy` , `averageByNullable` , `minBy` , `maxBy` , `minByNullable`
+    , `maxByNullable` , `sumBy` , and `sumByNullable`'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**The searching pattern** : This includes the `find` function'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**The selection pattern** ( *restriction* ): This contains  `last` , `lastOrDefault`
+    , `head` , `headOrDefault` , `nth` , `exactlyOne` , `exactlyOneOrDefault` , `take`
+    , `takeWhile` , `skip` , `skipWhile` , `distinct` , and `where`'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**The partitioning pattern** ( *grouping* ): This contains  `groupBy` and `groupValBy`'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**The reordering pattern** ( *ordering* ): This contains  `sortBy` , `sortByDescending`
+    , `sortByNullable` , `sortByNullableDescending` , `thenBy` , `thenByDescending`
+    , `thenByNullable` , and `thenByNullableDescending`'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**The testing pattern** ( *quantifier* ): This contains  `exists` and `all`'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**The mapping pattern** ( *projection* ): This contains  `select`'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**The merge/split pattern** ( *convolution* ): This contains `zip` , `join`
+    , `groupJoin` , and `leftOuterJoin`'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Nice! However, so far, the consideration was rotating around in-memory collections.
+    Then how do we encompass querying out-of-memory data? F# provides considerable
+    flexibility in this matter; so, let's approach it gradually in order to explore
+    the richness and variety of the available schemes.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The role of a LINQ provider
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: The important detail in using LINQ that often gets missed by occasional users
+    is that the query mechanism is agnostic to the nature of the data collection.
+    There is a layer that may be involved that abstracts the details of the concrete
+    data source behind the **IQueryable<'T>** ([https://msdn.microsoft.com/en-us/library/bb351562(v=vs.110).aspx](https://msdn.microsoft.com/en-us/library/bb351562(v=vs.110).aspx)
+    ) interface that we did not touch yet. Without involving this layer, you are on
+    your own with our familiar `IEnumerable<'T>` interface.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Both interfaces ensure deferred execution. However, `IEnumerable<'T>` just brings
+    into memory the data collection that matches a query expressed with relevant external
+    means, subject to further **LINQ-to-Object** in-memory manipulations.
+  prefs: []
+  type: TYPE_NORMAL
+- en: By comparison, `IQueryable<'T>` allows **LINQ-to-Something** ( **LINQ-to-SQL,
+    LINQ-to-OData, LINQ-to-WMI,** to name a few) workings by the virtue of the component
+    named **LINQ provider** . It ensures hidden translation of a LINQ query to terms
+    that the concrete substitute of *Something* part understands, followed by the
+    translated query execution by *Something* , bringing just the matching data collection
+    back into the memory. Those of you interested in what entity may play the role
+    of *Something* , I refer to the representative-although slightly outdated - **LINQ-to-Everywhere
+    - List of LINQ Providers** ([https://blogs.msdn.microsoft.com/knom/2009/04/27/linq-to-everywhere-list-of-linq-providers/](https://blogs.msdn.microsoft.com/knom/2009/04/27/linq-to-everywhere-list-of-linq-providers/)
+    ).
+  prefs: []
+  type: TYPE_NORMAL
+- en: There are two key moments in the previous paragraph that must be understood
+    properly. Firstly, *the LINQ provider fully abstracts the details of query translation
+    and execution* . For the intuitively clear case of **LINQ-to-SQL** , such translation
+    is quite straightforward. The translated SQL query is to be executed on the side
+    of the engaged database engine, sending back over the wire only the results of
+    the server-side query execution. For something like, for example, **LINQ-to-CRM**
+    ([http://linqtocrm.codeplex.com/](http://linqtocrm.codeplex.com/) ), some further
+    digging would be required in order to find out what exactly this particular LINQ
+    provider does.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Secondly, the to-be-translated LINQ query should not contain elements that cannot
+    be expressed in terms of the translated query execution engine. Such violations
+    may take place through selectiveness of features in the provider implementation,
+    or unintentional capturing of unrelated elements from the context. This means
+    that if the provider implementation, for example, does not support the sorting
+    operation, the LINQ query that has the sorting piece will be rejected by the underlying
+    provider. Also, sometimes, the translated query execution engines may have varying
+    abilities and the same LINQ-to-SQL query may be successfully executed by the Microsoft
+    SQL engine but fail miserably on a MySQL engine.
+  prefs: []
+  type: TYPE_NORMAL
+- en: With the role of LINQ provider in mind, let's first turn to the case of LINQ
+    provider-free F# querying.
+  prefs: []
+  type: TYPE_NORMAL
+- en: External data querying via IEnumerable<'T>
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: For this use case, let me take something that can be easily reproduced by you.
+    Being on the Microsoft platform myself, I will be using the traditional test database
+    Microsoft supplies to developers, namely **Adventureworks 2014** ([https://msftdbprodsamples.codeplex.com/releases/view/125550](https://msftdbprodsamples.codeplex.com/releases/view/125550)
+    ). It has been installed under the **localdb** Microsoft SQL engine that comes
+    with Visual Studio 2013.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'There is a `[Person].[Person]` table in this database that carries, among other
+    things, names of people. Let me perform a simple analytical task on it by performing
+    the following query:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE3]'
+  prefs: []
+  type: TYPE_PRE
+- en: This allows me to find out that the database carries 1018 distinct personal
+    first names. Let's find out how these names are distributed by the first letter
+    in the English alphabet.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'To access the database, I will be using the simple `Reader` object of native
+    .NET `System.Data.SqlClient` library. The first (and rather simplistic) approach
+    would be to just provide the complete list of distinct first names over the wire
+    to the memory on demand. The following script implements this approach (`Ch9_1_4.fsx`
+    ):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE4]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'There are two query expressions here: the first goes over each `letter` of
+    the `alphabet` , delegating the trip to the database for the complete set of data
+    to the nested second query, and then filtering out everything in memory except
+    names starting with the current `letter` value, throwing away duplicates and finding
+    the resulting number of names. The outer query puts this number into its place
+    according to the found frequency and returns the sought-for projection `(letter,
+    howMuch)` as the `distribution` sequence. Materializing it in FSI, I can observe
+    the target name distribution. The timed results of running the script `Ch9_1_4.fsx`
+    are presented in the following screenshot, where FSI just takes source script
+    code from the given file path:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![External data querying via IEnumerable<''T>](img/Image00042.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'External SQL Querying: version 1'
+  prefs: []
+  type: TYPE_NORMAL
+- en: You may notice that while running, the script performed a complete reading of
+    the list of first names from the `[Person][Person]` database table for 26 times,
+    which is an apparent overkill, and the approach can be improved significantly.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'For example, we may parameterize our SQL command and get back not all names,
+    but just the distinct names for each specific letter, which will dramatically
+    decrease the traffic over the wire with the database. The script being refactored
+    to reflect this improvement approach is given in the following code (`Ch9_1_5.fsx`
+    ):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE5]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'You may notice that there is no need for the nested `query {...}` groups now,
+    as a significant amount of work is delegated to the SQL engine over the wire.
+    The timed results of running the refactored script are given in the following
+    screenshot:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![External data querying via IEnumerable<''T>](img/Image00043.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: External SQL Querying - version 2
+  prefs: []
+  type: TYPE_NORMAL
+- en: You may observe an almost four-fold improvement in performance due to significant
+    decrease of network traffic volume in the second version.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Pushing this trend of minimizing traffic to the extreme and giving as much
+    work to the SQL server as possible, I may make all work get pushed on the side
+    of SQL server, leaving just a rudimentary task of getting remote data for the
+    F# query, such as in the third version of the script shown here (`Ch9_1_6.fsx`
+    ):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE6]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Note that now all the dirty work is done by the SQL server, which is perfectly
+    fine as Microsoft SQL Server is a masterpiece of software dedicated to data storing
+    and crunching, and it does its work really well (if you do not detrimentally interfere,
+    of course). The results of running the final script refactoring are presented
+    in the following screenshot. Do not miss there the evidence that the whole data
+    exchange over the wire took just a single round trip:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![External data querying via IEnumerable<''T>](img/Image00044.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'External SQL querying: version 3'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Wow, this optimization is the bomb! Version 3, in comparison with version 1,
+    has roughly *17.6 times better performance* . Now your take-home lesson is hard
+    to forget.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Tip
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: Enterprise development demands that the underlying technology ensures the ample
+    ability of distributing remote load. Such ability can be granted by F# `query`
+    as well as by other means.
+  prefs: []
+  type: TYPE_NORMAL
+- en: External data querying via IQuerable<'T>
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: I hope that after the bold performance results achieved in the previous section
+    there is no need to convince you just how important the ability of relaying LINQ
+    query execution to the remote party is. However, do not expect to take this for
+    granted. This direction may have a steep learning curve, which we will notice
+    shortly.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Let's take as a use case the 100% real task I was recently addressing on the
+    job at **Jet.com Inc.** ([https://jet.com/about-us](https://jet.com/about-us)
+    ). I will be building a backend for a dashboard, showing some *top-paid partners
+    of Jet.com* in real time (merchants with the largest amounts of reimbursement
+    for fulfilled orders that they have shipped to Jet.com customers).
+  prefs: []
+  type: TYPE_NORMAL
+- en: I will be accessing a limited amount of data from the Jet.com Quality Assurance
+    environment, so the numbers will not be that indicative of real top-paid partners.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The data required for the dashboard backend are split between two databases:
+    `SQL.Colossus` carries the data on payments in the `Payments` table, while `SQL.IronmanData`
+    carries the data on partners in the `Partner` table.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'If the case is that the data is located at the same SQL engine that supports
+    cross-DB queries, then the T-SQL script that brings me the sought-for data would
+    be something along the following lines (`Ch9_2.fsx` , commented section at the
+    top):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE7]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'After being executed against the target environment in SQL Server Management
+    Studio, this yields the results reflected in the following screenshot:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![External data querying via IQuerable<''T>](img/Image00045.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: SQL Query to feed the top-paid Jet.com Partners dashboard
+  prefs: []
+  type: TYPE_NORMAL
+- en: Let me make the first attempt in expressing the similar T-SQL query using the
+    F# query expression `query{...}` . In order to get access to LINQ-to-SQL, I will
+    be using a more advanced F# mechanism to get strongly typed access to the data
+    than **ADO.NET** , which I was using in the previous section. This mechanism is
+    known as the F# **type provider** . Specifically, I will be using the **SQLDataConnection
+    (LINQ to SQL) type provider** ([http://fsharp.org/guides/data-access/#sql-data-access](http://fsharp.org/guides/data-access/#sql-data-access)
+    ), which is a part of the standard F# distribution that has been targeting Microsoft
+    Windows since F# v3.0.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: Those of you who are totally unfamiliar with the matter can follow this **MSDN
+    walkthrough** ([https://msdn.microsoft.com/visualfsharpdocs/conceptual/walkthrough-accessing-a-sql-database-by-using-type-providers-%5bfsharp%5d](https://msdn.microsoft.com/visualfsharpdocs/conceptual/walkthrough-accessing-a-sql-database-by-using-type-providers-%5bfsharp%5d)
+    ) in order to better understand the contents of this section.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The F# script that can be put into the core of the dashboard backend is as
+    follows (`Ch9_2.fsx` ):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE8]'
+  prefs: []
+  type: TYPE_PRE
+- en: Take into account that in order to adhere with the security requirements, I
+    do not reveal any parameters of the Jet.com infrastructure except some (not necessarily
+    coinciding with real ones) names of databases and tables.
+  prefs: []
+  type: TYPE_NORMAL
+- en: When it comes to the type provider, it is important to realize that the provider
+    itself works at compile-time, providing typed access to the fields of the involved
+    SQL tables. In order to do this, it requires access to the SQL schema information
+    at compile-time. This access to the structural information in the preceding script
+    is given via the `compileTimeCsusCS` and `compileTimeImCS` connection strings
+    for `Colossus.DB` and `SQL.Ironman` databases, respectively.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note that compile-time access to the local SQL engine from the type provider
+    has nothing to do with application data. It just retrieves system data about SQL
+    schemas. These schemas are structurally similar to ones carrying application data
+    on production SQL data engine. So, the provided `Colossus` and `IronManData` types
+    are built off the `localdb` SQL engine, while the `pmtContext` and `imContext`
+    runtime data contexts are built off the production server(s) with the help of
+    `runTimeCsusCS` and `runTimeImCS` runtime connection strings.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The `mostPaid` function represents the query used to find any given number
+    of top-paid partners along with their aggregate deposited payments. As we may
+    expect, the signature of this function is `mostPaid : x:int -> System.Linq.IQueryable<string
+    * decimal>` , and it is to be translated by the LINQ-to-SQL provider into plain
+    T-SQL, to be executed on the SQL server side.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Another interesting moment is that in Jet.com''s Microsoft Azure production
+    environment, cross-database queries such as the one from Figure *SQL Query to
+    feed the top-paid Jet.com Partners dashboard* do not work, so I split the access
+    into three phases:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: At the first phase, `active` represents a collection of tuples `(merchantId,
+    paymentAmount)` of which the list of pertinent partner IDs, `activeIds` , can
+    be easily projected
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: At the second phase, another query, `mostActiveNames` , retrieves only those
+    partner display names that belong only to the top-paid partners and packages them
+    into a dictionary
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Finally, `active` experiences a transformation where the ID is substituted by
+    `mostActiveNames.[id]` , yielding the final data shape required for the dashboard.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'The results of running the previous script with FSI are presented in the following
+    screenshot; as expected, they are identical to previous ones:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![External data querying via IQuerable<''T>](img/Image00046.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: F# Query via IQueryable<'T> in action
+  prefs: []
+  type: TYPE_NORMAL
+- en: Composable queries
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Wouldn't it be great to compose smaller F# subqueries into bigger queries? Put
+    differently, it would mean composing multiple queryables into a single LINQ query
+    translated into SQL and executed on the database engine side.
+  prefs: []
+  type: TYPE_NORMAL
+- en: This sounds promising, and it has attracted the attention of some individual
+    developers and groups.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'The most sizeable effort was taken by a group at the University of Edinburgh,
+    UK, governed by functional programming authorities such as Philip Wadler. Their
+    results can be found at the **FSharpComposableQuery**  ([http://fsprojects.github.io/FSharp.Linq.ComposableQuery/index.html](http://fsprojects.github.io/FSharp.Linq.ComposableQuery/index.html)
+    ) project home page, offering a NuGet package, source code, tutorial, and even
+    some theoretical papers on the subject. An introductory video presentation given
+    by Philip Wader is available on the SkillsMatter website: **A practical theory
+    of language-integrated query** ([https://skillsmatter.com/skillscasts/4486-a-practical-theory-of-language-integrated-query](https://skillsmatter.com/skillscasts/4486-a-practical-theory-of-language-integrated-query)
+    ).'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Also, a few years ago, an alternative and more lightweight approach to composable
+    queries was suggested in this **blog post** ([http://fpish.net/blog/loic.denuziere/id/3508/2013924-f-query-expressions-and-composability](http://fpish.net/blog/loic.denuziere/id/3508/2013924-f-query-expressions-and-composability)
+    ) by **Loïc Denuzière** ([http://fpish.net/profile/loic.denuziere](http://fpish.net/profile/loic.denuziere)
+    ). It is based on splicing partial F# query expressions together in order to build
+    more complex ones. I will make a foray into composable LINQ queries based on the
+    latter approach.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Just before we start writing the code, I must point out a big limitation of
+    F# querying based on LINQ-to-SQL: it is not possible to perform cross-database
+    and cross-engine queries, as *all subqueries must share the same LINQ context!*
+    This factor might be a show-stopper for enterprises that have a multitude of **OLTP**
+    and **OLAP** databases.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: In order to refactor to a composable query a T-SQL query from the script `Ch9_2.fsx`
+    that was covered above in the dashboard use case discussion, I have moved a copy
+    of the `Partner` table to the `SQL.Colossus` database. It can now share the same
+    LINQ context with the `Payments` table.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The composition method is based on introducing a special `PartialQueryBuilder`
+    class that:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Subclasses standard `Linq.QueryBuilder` introducing extra method `Run`
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Augmenting `Linq.QueryBuilder` with method `Source`
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: All these measures allow you writing subqueries with the alternative expression
+    builder `pquery` that gets wrapped into quotations instead of being evaluated
+    . These quotations are embedded into ordinary queries and get evaluated uniformly.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In the following script, which relies on these features, I''ve omitted the
+    separation of compile-time and run-time connections for brevity (`Ch9_3.fsx` ):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE9]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Then goes the utility part defining `pquery` :'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE10]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Finally, the composed queries are as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE11]'
+  prefs: []
+  type: TYPE_PRE
+- en: Note how `mostPaid` is spliced into the `dashboard` , creating a seamless composition,
+    and in turn, `dashboard` is spliced into the final query.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Running the script in FSI yields the results shown here:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Composable queries](img/Image00047.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Getting dashboard data with the composed query
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'You may wonder whether there is a way to check out that the query composition
+    really took place. Fortunately, that is not that hard to do. All it takes is adding
+    the following property to the LINQ context, as shown here:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE12]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'After running the preceding script again, the LINQ log file now contains the
+    SQL code executed by the SQL engine:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE13]'
+  prefs: []
+  type: TYPE_PRE
+- en: Note how all `IQueryable` bits and pieces from the script F# queries get molded
+    into the single SQL statement.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Data parsing
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The parsing of data is absolutely essential for the enterprise. As an enterprise
+    F# developer at Jet.com, I come across this data transformation pattern on a daily
+    basis. Every case of **LOB** applications' integration with a third-party system
+    -  **ERP** , **Bank** , or **Carrier ** - involves data parsing on the ingesting
+    edges. Despite a plethora of integration technologies around that promise great
+    data quality, timeliness, integrity, you name it...time and again, I am forced
+    by my contractors to deal with flat fixed format files, CSV files, and Excel files.
+    This is the boring reality of today.
+  prefs: []
+  type: TYPE_NORMAL
+- en: On this battlefield, the weaponry varies from case-by-case hand-coded solutions
+    based on **Regex** and F# active patterns to fairly generic solutions targeting
+    whole classes of incoming data with F# type providers. Some typical examples of
+    semi-generic solutions are invoices in the form of CSV files and Excel files that
+    are to be persisted in the SQL server for further processing, reconciliation,
+    and future audit. I'll show how the high-quality parsing of incoming data can
+    be achieved for the use case of digesting the carrier invoices ingested as an
+    Excel file into the SQL server.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The use case - LaserShip invoicing
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: LaserShip is one of the "last mile" delivery companies usually engaged by e-commerce
+    for same-day expedited deliveries. Jet.com uses LaserShip services along with
+    other carriers.
+  prefs: []
+  type: TYPE_NORMAL
+- en: LaserShip delivers its invoicing information packaged as Excel files. For the
+    purposes of reconciliation and auditing, it is desirable to load LaserShip invoices
+    into the SQL server.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Approaching the parsing task
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'When resembling ETL tasks pop up, I usually approach them with the following
+    pattern:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Define the schema of the SQL table that will carry the loaded data. Add to the
+    data that come from the carrier extra field(s) allowing you to reference any chunk
+    of data back to the carrier's file it originated from. Also, add the synthetic
+    and/or natural key field(s) and reasonable constraints. The sample SQL table schema
+    has been provided in the form of T-SQL script `SCHEMA_LaserShip.sql` .
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Ingest the file with the help of **Excel Provider** ([http://fsprojects.github.io/ExcelProvider/](http://fsprojects.github.io/ExcelProvider/)
+    ). Adjust the type provider settings to suppress the default field type interpretation
+    and force the delivery of fields as strings. The Excel file template distributed
+    by LaserShip to their customers has been provided as Excel file `Lasership Invoice
+    Format.xlsx` .
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: For the fields that may be omitted in the source represented the such as **nullable**
+    values. Omitted values are to be filled with `System.DBNull.Value` singleton.
+    Create or reuse a set of parsing functions for each field type returning a boxed
+    parsed value or `System.DBNull.Value` .
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Parse the contents of the file into the  `System.Data.DataTable` instance matching
+    column names with database fields and unboxing values parsed with generic parsing
+    functions. The example invoice containing an excerpt of a real invoice with personal
+    data wiped out has been provided as Excel file `LaserShip20160701.xlsx` .
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Load the filled `DataTable` instance into the SQL server using the ADO.NET **SqlBulkCopy**
+    ([https://msdn.microsoft.com/en-us/library/system.data.sqlclient.sqlbulkcopy(v=vs.110).aspx](https://msdn.microsoft.com/en-us/library/system.data.sqlclient.sqlbulkcopy(v=vs.110).aspx)
+    ).
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: LaserShip parser implementation
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'The approach outlined earlier is implemented by the script `Ch9_4.fsx` . As
+    the script length does not fit well with the book format it will not be given
+    here in its entirety. Instead, I''ll reproduce in this section only the most important
+    excerpts from the script with my comments:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE14]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The line above ensures that NuGet package **Excel Provider 0.8.0** ([https://www.nuget.org/packages/ExcelProvider](https://www.nuget.org/packages/ExcelProvider)
+    ) is accessible from the script:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE15]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The line above is extremely important. It gets processed *in compile-time*
+    by the referred F# Excel type provider. The type provider using the given file
+    path gets to the Excel file `lasership invoice format.xlsx` that represents the
+    data template. We adjust type provider settings by defining `HasHeaders` and `ForceString`
+    static `bool` parameters. The type provider produces on the fly the provided type
+    `LaserShip` that will allow to access any cell of the invoice row by its name:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE16]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The preceding definition of `asNullableString` function implements the idiomatic
+    typed transition from the Excel data cell that we know is of type `string` to
+    its `obj` representation suitable to be placed into not statically typed `System.Data.DataTable`
+    in-memory data table. If data in Excel are omitted for the cell the function is
+    given as argument, the returned value would be boxed `System.DBNull.Value` value
+    suitable to be placed into the database field of type, described in T-SQL as `NVARCHAR(...)
+    NULL` . The script defines functions similar to `asNullableString` for each type
+    of the Excel file where strong type checking is required: `asNullableDate` , `asString`
+    , `asNullableMoney` , and others:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE17]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The preceding binding would be necessary for associating columns of in-memory
+    data table with the database table columns for `SQLBulkCopy` :'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE18]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'This function definition is very important as it performs ingestion of invoice
+    data from the Excel file specified by the given `excelPath` argument to the in-memory
+    placeholder `Data` procured by the provided type `LaserShip` :'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE19]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The preceding definition of the `fillDataTable` function is the gist of the
+    script. You may notice the interesting type of argument it has: `rows: IEnumerable<LaserShip.Row>`
+    . In other words `rows` is a sequence of another provided type `LaserShip.Row`
+    representing a single row of invoice spreadsheet. Within the function a new instance
+    of `DataTabledt` is created and supplied by column names taken from `headers`
+    . Then each row of the ingested Excel file is parsed into the `dt` , taking care
+    of data validity. In the end the loaded data table `dt` is returned.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'A small, but very important detail: the `sourceId` argument above just references
+    another table that keeps track of of the processed invoices. It has been written
+    into the each row of in-memory data table, so after the data upload the reference
+    will be available in the persisted to SQL server data to the metadata describing
+    the data originating source. Further details are beyond the scope here.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Finally, another important function `loadIntoSQL` makes the bulk data upload
+    into SQL server. Its definition is as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE20]'
+  prefs: []
+  type: TYPE_PRE
+- en: There a connection `con` to the database gets opened using the provided connection
+    string `connStr` value. Using the created connection and given SQL table name
+    the instance of `SqlBulkCopy` is created and used for persisting in-memory `dataTable`
+    to the associated SQL server table.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The preceding script can be further generalized to the degree where the only
+    variable part will be the data related to the concrete file type. This variable
+    part can be made pluggable into the universal Excel file parser. And this can
+    be achieved in fewer than a hundred lines of code.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Summary
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: This chapter wraps up the topic of data transformation patterns. Most of it
+    is devoted to querying persisted data with the help of F# query expressions. You
+    should be able to grasp the nuances of query work distribution between in-memory
+    collections and the network-located data engine.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We also touched the important issue of data parsing, demonstrating the handful
+    of simple patterns that allow you to ingest arbitrary Excel files with the helping
+    hand of F# type providers, which will be further covered in [Chapter 11](text00074.html#page
+    "Chapter 11. F# Expert Techniques") , *F# Expert Techniques* .
+  prefs: []
+  type: TYPE_NORMAL
+- en: In the next chapter, I will concentrate on dual patterns of type specialization
+    (augmentation) and type generalization in F#.
+  prefs: []
+  type: TYPE_NORMAL

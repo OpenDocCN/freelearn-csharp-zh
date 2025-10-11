@@ -14,7 +14,7 @@ Azure DevOps 是 Visual Studio Team Services 的进化版本，它提供了许�
 
 # 技术需求
 
-本章要求您创建一个新的免费 Azure 账户或使用现有的一个。[第 1 章](14b5c5da-4042-439e-9e5a-2e19ba4c4930.xhtml)中*理解软件架构的重要性*的*创建 Azure 账户*部分解释了如何创建一个。
+本章要求您创建一个新的免费 Azure 账户或使用现有的一个。第一章中*理解软件架构的重要性*的*创建 Azure 账户*部分解释了如何创建一个。
 
 # 介绍 Azure DevOps
 
@@ -24,7 +24,7 @@ Azure DevOps 是一个微软 **软件即服务** (**SaaS**) 平台，它使您�
 
 软件开发目前是可用的。所有涉及软件生产的步骤的自动化确保了现有解决方案的持续增强和改进，以便适应市场需求。
 
-您可以从 Azure 门户开始此过程。如果您不知道如何创建 Azure 门户账户，请参阅[第 1 章](14b5c5da-4042-439e-9e5a-2e19ba4c4930.xhtml)，*理解软件架构的重要性*。创建 Azure DevOps 账户的步骤相当简单：
+您可以从 Azure 门户开始此过程。如果您不知道如何创建 Azure 门户账户，请参阅第一章，*理解软件架构的重要性*。创建 Azure DevOps 账户的步骤相当简单：
 
 1.  选择“创建资源”然后选择“DevOps 项目”：
 
@@ -58,7 +58,7 @@ Azure DevOps 包含收集需求和组织整个开发流程的工具。您可以�
 
 ![图片](img/aeaf61e6-9ec3-4739-836b-373b4b95bf2d.png)
 
-Azure DevOps 中其他所有功能将在以下小节中简要介绍。它们将在第 15 章 [使用单元测试用例和 TDD 测试您的代码](c707cf13-3616-4788-8f39-687bd1cb7c7b.xhtml)到第 20 章 [软件测试自动化](e61b3c5d-3abd-4442-9c9c-e12fd3acedcc.xhtml)中详细讨论。
+Azure DevOps 中其他所有功能将在以下小节中简要介绍。它们将在第十五章 使用单元测试用例和 TDD 测试您的代码到第二十章 软件测试自动化中详细讨论。
 
 # Azure DevOps 仓库
 
@@ -144,11 +144,11 @@ Team Explorer 菜单允许您执行大多数 Git 命令，启动远程构建（�
 
 在那里，您可以定义一个完整的任务管道，包括它们的触发事件，这包括代码构建、启动测试计划以及在测试通过后要执行的操作。
 
-通常，在测试通过后，应用程序会自动部署到一个预发布区域，在那里可以进行beta测试。您还可以定义生产中自动部署的准则。这些准则包括但不限于以下内容：
+通常，在测试通过后，应用程序会自动部署到一个预发布区域，在那里可以进行 beta 测试。您还可以定义生产中自动部署的准则。这些准则包括但不限于以下内容：
 
-+   应用程序进行beta测试的天数
++   应用程序进行 beta 测试的天数
 
-+   在beta测试期间发现的错误数量以及/或最后代码更改中删除的错误数量
++   在 beta 测试期间发现的错误数量以及/或最后代码更改中删除的错误数量
 
 +   一位或多位经理/团队成员的手动批准
 
@@ -190,7 +190,7 @@ Azure DevOps 允许您使用 *工作项* 来记录系统需求。工作项作为
 
 # 书籍用例 – 在 Azure DevOps 中展示用例
 
-本节通过wwtravelclub的实际案例来阐明上一节中提出的概念。考虑到[第1章](14b5c5da-4042-439e-9e5a-2e19ba4c4930.xhtml)中描述的场景，即“理解软件架构的重要性”，我们决定定义三个史诗级工作项，如下所示：
+本节通过 wwtravelclub 的实际案例来阐明上一节中提出的概念。考虑到第一章中描述的场景，即“理解软件架构的重要性”，我们决定定义三个史诗级工作项，如下所示：
 
 ![图片](img/4ffaa42d-4b11-498c-92a9-eb0ea4c4547f.png)
 
@@ -206,7 +206,7 @@ Azure DevOps 允许您使用 *工作项* 来记录系统需求。工作项作为
 
 ![图片](img/64a16342-99a5-4d09-8844-cf33fbbd41fc.png)
 
-1.  之后，可以为每个产品待办事项工作项创建任务和测试用例工作项。Azure DevOps提供的用户界面非常有效，因为它允许你跟踪功能链及其之间的关系：
+1.  之后，可以为每个产品待办事项工作项创建任务和测试用例工作项。Azure DevOps 提供的用户界面非常有效，因为它允许你跟踪功能链及其之间的关系：
 
 ![图片](img/fe92bd07-a172-4c78-a547-e22c363404bd.png)
 
@@ -218,23 +218,23 @@ Azure DevOps 允许您使用 *工作项* 来记录系统需求。工作项作为
 
 # 摘要
 
-本章介绍了如何为软件开发项目创建Azure DevOps账户，以及如何使用Azure DevOps开始管理您的项目。它还简要回顾了所有Azure DevOps功能，解释了如何通过Azure DevOps主菜单访问它们。本章更详细地描述了如何管理系统需求，以及如何使用各种类型的工作项组织工作，以及如何规划和组织旨在交付具有许多功能的Epic解决方案的迭代。
+本章介绍了如何为软件开发项目创建 Azure DevOps 账户，以及如何使用 Azure DevOps 开始管理您的项目。它还简要回顾了所有 Azure DevOps 功能，解释了如何通过 Azure DevOps 主菜单访问它们。本章更详细地描述了如何管理系统需求，以及如何使用各种类型的工作项组织工作，以及如何规划和组织旨在交付具有许多功能的 Epic 解决方案的迭代。
 
-下一章将讨论软件架构的不同模型。我们还将了解在开发基础设施时，如何从复杂的云平台（如Azure）提供的选项中选择基本提示和标准。
+下一章将讨论软件架构的不同模型。我们还将了解在开发基础设施时，如何从复杂的云平台（如 Azure）提供的选项中选择基本提示和标准。
 
 # 问题
 
-1.  Azure DevOps仅适用于.NET Core项目吗？
+1.  Azure DevOps 仅适用于.NET Core 项目吗？
 
-1.  Azure DevOps能在特定分支提交后触发自动构建吗？Azure DevOps能自动触发生产环境的部署吗？
+1.  Azure DevOps 能在特定分支提交后触发自动构建吗？Azure DevOps 能自动触发生产环境的部署吗？
 
-1.  Azure DevOps中可用的测试计划有哪些？
+1.  Azure DevOps 中可用的测试计划有哪些？
 
-1.  DevOps项目可以使用私有NuGet包吗？
+1.  DevOps 项目可以使用私有 NuGet 包吗？
 
 1.  我们为什么使用工作项？
 
-1.  Epic和功能工作项之间的区别是什么？
+1.  Epic 和功能工作项之间的区别是什么？
 
 1.  任务与产品待办事项/用户故事工作项之间存在什么样的关系？
 
@@ -242,8 +242,8 @@ Azure DevOps 允许您使用 *工作项* 来记录系统需求。工作项作为
 
 这里有一些书籍和链接，您可以考虑阅读，以收集更多关于本章信息：
 
-+   [https://go.microsoft.com/fwlink/?LinkID=825688](https://go.microsoft.com/fwlink/?LinkID=825688)
++   [`go.microsoft.com/fwlink/?LinkID=825688`](https://go.microsoft.com/fwlink/?LinkID=825688)
 
-+   [https://www.packtpub.com/virtualization-and-cloud/hands-devops-azure-video](https://www.packtpub.com/virtualization-and-cloud/hands-devops-azure-video)
++   [`www.packtpub.com/virtualization-and-cloud/hands-devops-azure-video`](https://www.packtpub.com/virtualization-and-cloud/hands-devops-azure-video)
 
-+   [https://www.packtpub.com/application-development/mastering-non-functional-requirements](https://www.packtpub.com/application-development/mastering-non-functional-requirements)
++   [`www.packtpub.com/application-development/mastering-non-functional-requirements`](https://www.packtpub.com/application-development/mastering-non-functional-requirements)

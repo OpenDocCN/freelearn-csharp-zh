@@ -1,6 +1,6 @@
-# 测试RESTful Web服务
+# 测试 RESTful Web 服务
 
-一个系统在经过各种场景的测试之前无法成熟。这些场景通常基于领域专家的经验或现有的生产环境。即使在系统被称为完美系统的情况下，系统在生产环境中崩溃的可能性总是存在的。对于Web应用程序，由于性能问题、糟糕的用户体验等原因，条件更为关键。系统应该通过一系列开发原则的过程来应对这些问题。简单来说，我们必须测试系统。测试是一个确保系统质量的过程。
+一个系统在经过各种场景的测试之前无法成熟。这些场景通常基于领域专家的经验或现有的生产环境。即使在系统被称为完美系统的情况下，系统在生产环境中崩溃的可能性总是存在的。对于 Web 应用程序，由于性能问题、糟糕的用户体验等原因，条件更为关键。系统应该通过一系列开发原则的过程来应对这些问题。简单来说，我们必须测试系统。测试是一个确保系统质量的过程。
 
 换句话说，质量保证或测试是从不同方面评估系统的一种方式。当系统需要测试以识别错误代码，或者我们想要评估其业务合规性时，这个过程也非常有用。
 
@@ -8,13 +8,13 @@
 
 测试完全依赖于系统的架构风格，并且因系统而异；一切取决于我们如何策略性地规划测试方法或计划。
 
-在本章中，我们将主要关注测试RESTful服务，并通过遵循测试驱动开发方法来使我们的代码更佳。在本章结束时，你将能够使用测试范式在日常开发活动中进行测试，了解存根、模拟以及了解集成和安全性和性能测试。
+在本章中，我们将主要关注测试 RESTful 服务，并通过遵循测试驱动开发方法来使我们的代码更佳。在本章结束时，你将能够使用测试范式在日常开发活动中进行测试，了解存根、模拟以及了解集成和安全性和性能测试。
 
 在本章中，我们将涵盖以下主题：
 
 +   测试范式（包括测试用例创建在内的质量保证基础）
 
-+   测试ASP.NET核心控制器（单元测试）
++   测试 ASP.NET 核心控制器（单元测试）
 
 +   存根和模拟
 
@@ -24,7 +24,7 @@
 
 +   模拟对象
 
-+   使用Postman、Advanced RESTClient等工具进行服务调用测试
++   使用 Postman、Advanced RESTClient 等工具进行服务调用测试
 
 +   用户验收测试
 
@@ -50,9 +50,9 @@
 
 测试期间执行的测试用例的测量称为测试覆盖率。
 
-代码经过单元测试，并已证明被覆盖的代码已通过测试。在这个代码覆盖率中，会有许多被覆盖的内容，包括代码行、函数、条件、表达式、API资源等。
+代码经过单元测试，并已证明被覆盖的代码已通过测试。在这个代码覆盖率中，会有许多被覆盖的内容，包括代码行、函数、条件、表达式、API 资源等。
 
-对于软件测试术语，请参阅[http://castb.org/wp-content/uploads/2014/05/istqb_glossary_of_testing_terms_v2.3.pdf](http://castb.org/wp-content/uploads/2014/05/istqb_glossary_of_testing_terms_v2.3.pdf)。
+对于软件测试术语，请参阅[`castb.org/wp-content/uploads/2014/05/istqb_glossary_of_testing_terms_v2.3.pdf`](http://castb.org/wp-content/uploads/2014/05/istqb_glossary_of_testing_terms_v2.3.pdf)。
 
 测试覆盖率和代码覆盖率也可以涵盖以下任何测试类型：
 
@@ -68,7 +68,7 @@
 
 当某人使用测试范式工作时，他们应该了解任务、场景和用例等术语。在本节中，我们将详细讨论这些术语：
 
-+   **任务**：任务是一个通用词汇，不仅与软件行业相关，还与许多其他行业相关。这是一项需要完成的行动或工作。完成任务会有不同的方法，但任务的整体意图是应该完成。在不同的领域，任务有不同的目的。在敏捷开发中（[https://whatis.techtarget.com/definition/storyboard](https://whatis.techtarget.com/definition/storyboard)），故事板或任务板帮助开发者理解需要完成的工作。
++   **任务**：任务是一个通用词汇，不仅与软件行业相关，还与许多其他行业相关。这是一项需要完成的行动或工作。完成任务会有不同的方法，但任务的整体意图是应该完成。在不同的领域，任务有不同的目的。在敏捷开发中（[`whatis.techtarget.com/definition/storyboard`](https://whatis.techtarget.com/definition/storyboard)），故事板或任务板帮助开发者理解需要完成的工作。
 
 以下图表说明了我们所说的任务：
 
@@ -124,9 +124,9 @@
 
 # 测试金字塔
 
-测试金字塔是一种策略或定义在RESTful服务中应该测试什么的途径。换句话说，我们可以这样说，测试金字塔帮助我们定义RESTful服务的测试范围。
+测试金字塔是一种策略或定义在 RESTful 服务中应该测试什么的途径。换句话说，我们可以这样说，测试金字塔帮助我们定义 RESTful 服务的测试范围。
 
-测试金字塔的概念是由 Mike Cohn 在 2009 年开发的 ([http://www.mountaingoatsoftware.com/blog/the-forgotten-layer-of-the-test-automation-pyramid](http://www.mountaingoatsoftware.com/blog/the-forgotten-layer-of-the-test-automation-pyramid))。
+测试金字塔的概念是由 Mike Cohn 在 2009 年开发的 ([`www.mountaingoatsoftware.com/blog/the-forgotten-layer-of-the-test-automation-pyramid`](http://www.mountaingoatsoftware.com/blog/the-forgotten-layer-of-the-test-automation-pyramid))。
 
 测试金字塔有各种版本；不同的作者通过说明他们如何放置或优先考虑他们的测试范围来描述这一点。
 
@@ -152,7 +152,7 @@
 
 单元测试通常是测试单个函数调用，以确保程序的最小部分得到测试。因此，这些测试旨在验证特定功能，而不考虑其他组件。在这里，测试策略派上用场，并确保系统将执行最佳的质量保证。当它与 **测试驱动开发**（**TDD**）方法结合使用时，它增加了更多的力量。
 
-您可以通过在 [https://github.com/garora/TDD-Katas](https://github.com/garora/TDD-Katas) 上的 Katas 学习和实践 TDD。
+您可以通过在 [`github.com/garora/TDD-Katas`](https://github.com/garora/TDD-Katas) 上的 Katas 学习和实践 TDD。
 
 我们将借助代码示例来讨论这一点。在继续之前，请查看以下先决条件：
 
@@ -198,7 +198,21 @@
 
 1.  将其命名为`Product.cs`并将以下代码添加到此类中：
 
-[PRE0]
+```cs
+namespace Chap06_01.Core.Model
+{
+  public class Product
+  {
+    public Guid Id { get; set; }
+    public string Name { get; set; }
+    public string Description { get; set; }
+    public string Image { get; set; }
+    public decimal Price { get; set; }
+    public Guid CategoryId { get; set; }
+    public virtual Category Category { get; set; }
+  }
+}
+```
 
 1.  重复*步骤 7*和*步骤 8*以添加`Category.cs`和`ProductViewModel.cs`。
 
@@ -212,37 +226,102 @@
 
 1.  现在，打开`appsettings.json`文件并添加以下代码片段：
 
-[PRE1]
+```cs
+"ConnectionStrings": 
+{
+  "ProductConnection": "Data Source=.;Initial
+  Catalog=ProductsDB;Integrated
+  Security=True;MultipleActiveResultSets=True"
+}
+```
 
 1.  在解决方案资源管理器中右键单击项目，然后选择“管理 Nuget 包”。
 
 1.  在 Nuget 包管理器屏幕下，搜索`Swashbuckle.AspNetCore`并安装它。
 
-**Swagger**是开源的，遵循开放规范([https://github.com/OAI/OpenAPI-Specification/blob/master/versions/2.0.md](https://github.com/OAI/OpenAPI-Specification/blob/master/versions/2.0.md))。Swagger 允许您描述 API 的结构。Swagger 为用户提供文档（将要使用 API 的开发者）。有许多开源和商业工具可以与 Swagger 集成。
+**Swagger**是开源的，遵循开放规范([`github.com/OAI/OpenAPI-Specification/blob/master/versions/2.0.md`](https://github.com/OAI/OpenAPI-Specification/blob/master/versions/2.0.md))。Swagger 允许您描述 API 的结构。Swagger 为用户提供文档（将要使用 API 的开发者）。有许多开源和商业工具可以与 Swagger 集成。
 
-**Swagger CodeGen**([https://swagger.io/swagger-codegen/](https://swagger.io/swagger-codegen/))有助于为 API 生成客户端库。
+**Swagger CodeGen**([`swagger.io/swagger-codegen/`](https://swagger.io/swagger-codegen/))有助于为 API 生成客户端库。
 
-**Swagger UI**([https://swagger.io/swagger-ui/](https://swagger.io/swagger-ui/))有助于生成 API 的文档。
+**Swagger UI**([`swagger.io/swagger-ui/`](https://swagger.io/swagger-ui/))有助于生成 API 的文档。
 
-**Swashbuckle.AspNetCore**([https://github.com/domaindrivendev/Swashbuckle.AspNetCore](https://github.com/domaindrivendev/Swashbuckle.AspNetCore))是一个帮助文档基于 ASP.NET Core 的 API 的工具。
+**Swashbuckle.AspNetCore**([`github.com/domaindrivendev/Swashbuckle.AspNetCore`](https://github.com/domaindrivendev/Swashbuckle.AspNetCore))是一个帮助文档基于 ASP.NET Core 的 API 的工具。
 
 1.  在`Core/Interfaces`下添加`interface IProductRepository`。
 
 1.  将以下代码添加到`IProductRepository`接口中：
 
-[PRE2]
+```cs
+namespace Chap06_01.Core.Interfaces
+{
+  public interface IProductRepository
+  {
+    void Add(Product product);
+    IEnumerable<Product> GetAll();
+    Product GetBy(Guid id);
+    void Remove(Guid id);
+    void Update(Product product);
+  }
+}
+```
 
-请注意，对于完整的源代码，请参阅 GitHub 仓库[https://github.com/PacktPublishing/Building-RESTful-Web-Services-with-DotNET-Core](https://github.com/PacktPublishing/Building-RESTful-Web-Services-with-DotNET-Core)。
+请注意，对于完整的源代码，请参阅 GitHub 仓库[`github.com/PacktPublishing/Building-RESTful-Web-Services-with-DotNET-Core`](https://github.com/PacktPublishing/Building-RESTful-Web-Services-with-DotNET-Core)。
 
 1.  在`Infrastructure`文件夹下添加`ProductRepository`类。
 
 1.  将以下代码添加到`ProductRepository`:
 
-[PRE3]
+```cs
+namespace Chap06_01.Infrastructure
+{
+  public class ProductRepository : IProductRepository
+  {
+    private readonly ProductContext _context;
+    public ProductRepository(ProductContext context)
+    => _context = context;
+    public IEnumerable<Product> GetAll() =>
+    _context.Products.Include(c => 
+    c.Category).ToList();
+    public Product GetBy(Guid id) => _context.Products.
+    Include(c => c.Category).FirstOrDefault(x => x.Id == id);
+    public void Add(Product product)
+    {
+      _context.Products.Add(product);
+      _context.SaveChanges();
+    }
+    public void Update(Product product)
+    {
+      _context.Update(product);
+      _context.SaveChanges();
+    }
+    public void Remove(Guid id)
+    {
+      var product = GetBy(id);
+      _context.Remove(product);
+      _context.SaveChanges();
+    }
+  }
+}
+```
 
 1.  打开`Startup.cs`文件并添加以下代码：
 
-[PRE4]
+```cs
+services.AddScoped<IProductRepository, ProductRepository>();
+services.AddDbContext<ProductContext>
+(
+  o => o.UseSqlServer(Configuration.GetConnectionString
+  ("ProductConnection"))
+);
+services.AddSwaggerGen
+(
+  swagger =>
+  {
+    swagger.SwaggerDoc("v1", new Info { Title = "Product 
+    APIs", Version = "v1" });
+  }
+);
+```
 
 您的项目层次结构现在应该看起来像以下解决方案资源管理器截图：
 
@@ -266,7 +345,7 @@
 
 为了设置我们的测试项目，以下是一些简单的步骤：
 
-1.  在 Visual Studio 的解决方案资源管理器中，右键单击解决方案 'Chap06_01'（1个项目），然后单击“添加”|“新建项目...”，如下所示截图：
+1.  在 Visual Studio 的解决方案资源管理器中，右键单击解决方案 'Chap06_01'（1 个项目），然后单击“添加”|“新建项目...”，如下所示截图：
 
 ![截图](img/f253fcb9-d4a8-4094-a762-4a95b2126c47.png)
 
@@ -280,11 +359,73 @@
 
 1.  `ProductData.cs` 类应该看起来如下所示：
 
-[PRE5]
+```cs
+namespace Chap06_01_Test.Fake
+{
+  public class ProductData
+  {
+    public IEnumerable<ProductViewModel> GetProducts()
+    {
+      var productVm = new List<ProductViewModel>
+      {
+        new ProductViewModel
+        {
+          CategoryId = Guid.NewGuid(),
+          CategoryDescription = "Category Description",
+          CategoryName = "Category Name",
+          ProductDescription = "Product Description",
+          ProductId = Guid.NewGuid(),
+          ProductImage = "Image full path",
+          ProductName = "Product Name",
+          ProductPrice = 112M
+        },
+        new ProductViewModel
+        {
+          CategoryId = Guid.NewGuid(),
+          CategoryDescription = "Category Description-01",
+          CategoryName = "Category Name-01",
+          ProductDescription = "Product Description-01",
+          ProductId = Guid.NewGuid(),
+          ProductImage = "Image full path",
+          ProductName = "Product Name-01",
+          ProductPrice = 12M
+        }
+      };
+      return productVm;
+    }
+    public IEnumerable<Product> GetProductList()
+    {
+      return new List<Product>
+      {
+        new Product
+        {
+          Category = new Category(),
+          CategoryId = Guid.NewGuid(),
+          Description = "Product Description-01",
+          Id = Guid.NewGuid(),
+          Image = "image full path",
+          Name = "Product Name-01",
+          Price = 12M
+        },
+        new Product
+        {
+          Category = new Category(),
+          CategoryId = Guid.NewGuid(),
+          Description = "Product Description-02",
+          Id = Guid.NewGuid(),
+          Image = "image full path",
+          Name = "Product Name-02",
+          Price = 125M
+        }
+      };
+    }
+  }
+}
+```
 
 在前面的代码片段中，我们为 `Products` 和 `ProductsViewModel` 创建了假数据。
 
-完整代码可以从以下链接下载：[https://github.com/PacktPublishing/Building-RESTful-Web-Services-with-DotNET-Core](https://github.com/PacktPublishing/Building-RESTful-Web-Services-with-DotNET-Core)。
+完整代码可以从以下链接下载：[`github.com/PacktPublishing/Building-RESTful-Web-Services-with-DotNET-Core`](https://github.com/PacktPublishing/Building-RESTful-Web-Services-with-DotNET-Core)。
 
 1.  `ProductTest.cs`，我们的单元测试类，看起来如下所示：
 
@@ -294,7 +435,32 @@ xUnit 的重要术语：
 
 +   **理论（Theory）** 是一个属性，用于参数化测试方法
 
-[PRE6]
+```cs
+namespace Chap06_01_Test.Services
+{
+  public class ProductTests
+  {
+    [Fact]
+    public void Get_Returns_ActionResults()
+    {
+      // Arrange
+      var mockRepo = new Mock<IProductRepository>();
+      mockRepo.Setup(repo => repo.GetAll()).Returns(new
+      ProductData().GetProductList());
+      var controller = new ProductController(mockRepo.Object);
+      // Act
+      var result = controller.GetList();
+      // Assert
+      var viewResult = Assert.IsType<OkObjectResult>(result);
+      var model = 
+      Assert.IsAssignableFrom<IEnumerable<ProductViewModel>>
+      (viewResult.Value);
+      Assert.NotNull(model);
+      Assert.Equal(2, model.Count());
+    }
+  }
+}
+```
 
 在前面的代码片段中，我们只是测试我们的 `ProductController`，它是一个 `Get` 资源，`GetList`。在这段代码中，我们模拟了列表；我们实际上并没有击中数据库，而是使用假数据测试我们的 `Controller` 方法。
 
@@ -316,11 +482,11 @@ xUnit 的重要术语：
 
 安全是一个非常广泛的概念，不能在几行文字中解释清楚。一般来说，安全测试是一种测试应用程序是否安全或是否存在泄露他人数据的任何可能性的方法。
 
-安全和安全的系统将在第 8 章 [Securing RESTful Web Services](18479f1e-2030-404b-b016-1764984f46ed.xhtml) 中讨论。
+安全和安全的系统将在第八章 Securing RESTful Web Services 中讨论。
 
 安全测试非常重要，尤其是在我们处理基于 Web 的应用程序时。Web 应用程序是公开可用的，容易受到攻击，因此认证和授权是这里最重要的因素。
 
-FxCop ([https://en.wikipedia.org/wiki/FxCop](https://en.wikipedia.org/wiki/FxCop))，它是与 Visual Studio 和 VeraCode ([https://www.veracode.com/](https://www.veracode.com/)) 一起提供的，是安全测试中最受欢迎的工具之一。
+FxCop ([`en.wikipedia.org/wiki/FxCop`](https://en.wikipedia.org/wiki/FxCop))，它是与 Visual Studio 和 VeraCode ([`www.veracode.com/`](https://www.veracode.com/)) 一起提供的，是安全测试中最受欢迎的工具之一。
 
 # 集成测试
 
@@ -336,13 +502,32 @@ FxCop ([https://en.wikipedia.org/wiki/FxCop](https://en.wikipedia.org/wiki/FxCop
 
 1.  在 `ProductTest.cs` 的构造函数中编写以下代码：
 
-[PRE7]
+```cs
+var server = new TestServer
+(
+  new WebHostBuilder()
+  .UseStartup<TestStartup>()
+);
+_client = server.CreateClient();
+```
 
 在前面的代码块中，我们初始化了 `TestServer`，其中我们使用 `TestStartup` 作为我们的启动入口文件。最后，我们创建了一个 `WebHostBuilder()` 的 `private readonly HttpClient _client;`。
 
 1.  然后，编写一个简单的调用产品列表资源的函数：
 
-[PRE8]
+```cs
+[Fact]
+public async Task ReturnProductList()
+{
+  // Act
+  var response = await _client.GetAsync("api/Product
+  /productlist");
+  response.EnsureSuccessStatusCode();
+  var responseString = await response.Content.ReadAsStringAsync();
+  // Assert
+  Assert.NotEmpty(responseString);
+}
+```
 
 在前面的代码中，我们正在消费我们的资源 `GET api/product/productlist` 并测试它是否返回预期的输出。
 
@@ -352,11 +537,81 @@ FxCop ([https://en.wikipedia.org/wiki/FxCop](https://en.wikipedia.org/wiki/FxCop
 
 1.  按如下所示完成 `ProductTes.cs` 的代码：
 
-[PRE9]
+```cs
+namespace Chap06_02_Test.Services
+{
+  public class ProductTest
+  {
+    public ProductTest()
+    {
+      // Arrange
+      var server = new TestServer(new WebHostBuilder()
+      .UseStartup<TestStartup>());
+      _client = server.CreateClient();
+    }
+    private readonly HttpClient _client;
+    [Fact]
+    public async Task ReturnProductList()
+    {
+      // Act
+      var response = await
+      _client.GetAsync("api/Product/productlist");
+      response.EnsureSuccessStatusCode();
+      var responseString = await
+      response.Content.ReadAsStringAsync();
+      // Assert
+      Assert.NotEmpty(responseString);
+    }
+  }
+}
+```
 
 1.  按如下所示编写 `TestStartup` 文件代码：
 
-[PRE10]
+```cs
+namespace Chap06_02_Test
+{
+  public class TestStartup : Startup
+  {
+    public TestStartup(IConfiguration configuration) : 
+    base(configuration)
+    {  }
+    public static IConfiguration InitConfiguration()
+    {
+      var config = new ConfigurationBuilder()
+      .AddJsonFile("appsettings.json")
+      .Build();
+      return config;
+    }
+    public override void ConfigureServices(
+    IServiceCollection services)
+    {
+      //mock context
+      services.AddDbContext<ProductContext>
+      (
+        o => o.UseSqlServer
+        (
+          InitConfiguration().GetConnectionString
+          (
+            "ProductConnection"
+          )
+        )
+      );
+      services.AddMvc();
+      services.AddScoped<IProductRepository, 
+      ProductRepository>();
+    }
+    public override void Configure
+    (
+      IApplicationBuilder app, IHostingEnvironment env
+    )
+    {
+      app.UseStaticFiles();
+      app.UseMvc();
+    }
+  }
+}
+```
 
 在前面的代码中，我们的 `TestStartup` 类继承了 `Startup` 类，这意味着我们现在正在使用其成员和方法。
 
@@ -376,33 +631,76 @@ FxCop ([https://en.wikipedia.org/wiki/FxCop](https://en.wikipedia.org/wiki/FxCop
 
 # 模拟对象
 
-如其名所示，模拟对象是非真实对象。模拟对象用于测试目的，包含实际代码，但并非所有真实功能。例如，我们可以创建一个模拟对象来使用Entity Framework Core获取数据记录；在这种情况下，我们更倾向于使用内存数据库（[https://docs.microsoft.com/en-us/ef/core/miscellaneous/testing/in-memory](https://docs.microsoft.com/en-us/ef/core/miscellaneous/testing/in-memory)）而不是直接数据库连接。
+如其名所示，模拟对象是非真实对象。模拟对象用于测试目的，包含实际代码，但并非所有真实功能。例如，我们可以创建一个模拟对象来使用 Entity Framework Core 获取数据记录；在这种情况下，我们更倾向于使用内存数据库（[`docs.microsoft.com/en-us/ef/core/miscellaneous/testing/in-memory`](https://docs.microsoft.com/en-us/ef/core/miscellaneous/testing/in-memory)）而不是直接数据库连接。
 
 # 运行测试
 
-让我们参考上一节中开发的单元测试应用程序。按照前面章节中提到的步骤添加一个新的xUnit测试项目。
+让我们参考上一节中开发的单元测试应用程序。按照前面章节中提到的步骤添加一个新的 xUnit 测试项目。
 
 我们正在寻找用于测试目的的模拟对象或数据，所以我们将不会连接到实际的数据库服务器。相反，这里我们将使用内存数据库。
 
-您需要添加`Microsoft.EntityFrameworkCore.InMemory` NuGet包以启动内存数据库。
+您需要添加`Microsoft.EntityFrameworkCore.InMemory` NuGet 包以启动内存数据库。
 
 我们在这里不会做任何更改，但我们将创建模拟数据和记录以进行测试。要继续，请将以下代码添加到`TestStartup.cs`文件中的`ConfigureServices`方法：
 
-[PRE11]
+```cs
+//for tests use InMemory db
+services.AddDbContext<ProductContext>
+(
+  o => o.UseInMemoryDatabase
+  (
+    InitConfiguration().GetConnectionString
+    (
+      "ProductConnection"
+    )
+  )
+);
+```
 
 在这里，我们使用以下内容：
 
-+   仅用于测试目的的InMemory数据库，通过在`TestStartup`类中添加`.UseInMemoryDatabase`来实现。
++   仅用于测试目的的 InMemory 数据库，通过在`TestStartup`类中添加`.UseInMemoryDatabase`来实现。
 
 +   对于我们的实际代码，数据库服务器在`Startup.cs`类中保持不变，即`.UseSqlServer`
 
 现在我们需要模拟数据和记录，所以请在`TestStartup`类中添加以下方法：
 
-[PRE12]
+```cs
+private static void FakeData(DbContext context)
+{
+  var category = new Category
+  {
+    Id = ToGuid("A5DBF00D-2E29-4993-A0CA-7E861272C6DC"),
+    Description = "Technical Videos",
+    Name = "Videos"
+  };
+  context.Add(category);
+  var product = new Product
+  {
+    Id = ToGuid("02341321-C20B-48B1-A2BE-47E67F548F0F"),
+    CategoryId = category.Id,
+    Description = "Microservices for .NET Core",
+    Image = "microservices.jpeg",
+    Name = "Microservices for .NET",
+    Price = 651,
+    InStock = 5
+  };
+  context.Add(product);
+  context.SaveChanges();
+}
+```
 
 然后，从`Configure(IApplicationBuilder app, IHostingEnvironment env)`方法中调用`FakeData(context)`方法，如下所示：
 
-[PRE13]
+```cs
+public override void Configure(IApplicationBuilder app, IHostingEnvironment env)
+{
+    var context = app.ApplicationServices.GetService<ProductContext>();
+    FakeData(context);
+    app.UseStaticFiles();
+    app.UseMvc();
+}
+```
 
 现在我们已经准备好运行测试，所以打开测试资源管理器并运行所有测试。如果测试通过，你应该会看到以下截图：
 
@@ -410,7 +708,18 @@ FxCop ([https://en.wikipedia.org/wiki/FxCop](https://en.wikipedia.org/wiki/FxCop
 
 为了确保测试没有实际连接到数据库，让我们调试测试代码。打开`ProductTest.cs`类，并为以下测试设置断点：
 
-[PRE14]
+```cs
+[Fact]
+public async Task ReturnProductList()
+{
+  // Act
+  var response = await _client.GetAsync("api/Product/productlist");
+  response.EnsureSuccessStatusCode();
+  var responseString = await response.Content.ReadAsStringAsync();
+  // Assert
+  Assert.NotEmpty(responseString);
+}
+```
 
 现在右键单击“调试测试”，使用单步进入（*F11*键）进入控制器和仓储，并检查实际的产品列表。您可以看到我们的测试返回的是模拟数据，这意味着它们没有连接到实际的数据库。以下是被调试代码的截图：
 
@@ -428,7 +737,7 @@ FxCop ([https://en.wikipedia.org/wiki/FxCop](https://en.wikipedia.org/wiki/FxCop
 
 # Postman
 
-**Postman**（[https://www.getpostman.com/](https://www.getpostman.com/））是测试网络服务输出时最受欢迎的工具之一。它还附带一个 Google Chrome 扩展程序：
+**Postman**（[`www.getpostman.com/`](https://www.getpostman.com/））是测试网络服务输出时最受欢迎的工具之一。它还附带一个 Google Chrome 扩展程序：
 
 1.  启动 Postman。如果您还没有它，可以从前面的链接安装它。
 
@@ -442,7 +751,7 @@ FxCop ([https://en.wikipedia.org/wiki/FxCop](https://en.wikipedia.org/wiki/FxCop
 
 # 高级 Rest 客户端
 
-**高级 rest 客户端**（**ARC**）是另一个流行的工具，也作为 Chrome 扩展程序提供。您可以从 Chrome 扩展程序商店安装它，或者直接从 [https://install.advancedrestclient.com/](https://install.advancedrestclient.com/) 安装：
+**高级 rest 客户端**（**ARC**）是另一个流行的工具，也作为 Chrome 扩展程序提供。您可以从 Chrome 扩展程序商店安装它，或者直接从 [`install.advancedrestclient.com/`](https://install.advancedrestclient.com/) 安装：
 
 1.  如果尚未安装，请安装 ARC 的 Chrome 扩展程序。
 
@@ -460,19 +769,19 @@ FxCop ([https://en.wikipedia.org/wiki/FxCop](https://en.wikipedia.org/wiki/FxCop
 
 这种测试取决于实际将在生产环境中使用应用程序的用户。这种测试通常在 UAT 或预生产环境中进行。
 
-行业中典型的环境被称为开发、预发布、QA、UAT、预生产和生产。在您的组织中，您可能不会根据项目需求拥有所有这些环境；如果是这样，请参阅 [https://www.guru99.com/user-acceptance-testing.html](https://www.guru99.com/user-acceptance-testing.html)。
+行业中典型的环境被称为开发、预发布、QA、UAT、预生产和生产。在您的组织中，您可能不会根据项目需求拥有所有这些环境；如果是这样，请参阅 [`www.guru99.com/user-acceptance-testing.html`](https://www.guru99.com/user-acceptance-testing.html)。
 
-UAT测试也被视为最终测试，其接受或拒绝决定告诉我们当前版本是否将被部署到生产环境中。这种测试的主要重点是业务相关的。这种测试不涉及测试代码或各种模式的实现；它只是确保所有业务规则和需求都已实现。
+UAT 测试也被视为最终测试，其接受或拒绝决定告诉我们当前版本是否将被部署到生产环境中。这种测试的主要重点是业务相关的。这种测试不涉及测试代码或各种模式的实现；它只是确保所有业务规则和需求都已实现。
 
 # 性能或负载测试
 
-对于Web应用程序的性能，可伸缩性非常重要。一个应用程序可以非常安全、经过良好测试，并且使用良好的代码创建，但如果它不可伸缩，用户仍然可能会避免使用它。
+对于 Web 应用程序的性能，可伸缩性非常重要。一个应用程序可以非常安全、经过良好测试，并且使用良好的代码创建，但如果它不可伸缩，用户仍然可能会避免使用它。
 
-我们将在[第9章](dfa68fd5-a510-4446-be5c-fe23d0ca08cd.xhtml)中详细讨论RESTful Web服务的扩展，*扩展RESTful服务（Web服务的性能）*。
+我们将在第九章中详细讨论 RESTful Web 服务的扩展，*扩展 RESTful 服务（Web 服务的性能）*。
 
-对于一个好的API来说，性能非常重要，因此我们需要测试并确保我们的应用程序能够处理或承受大量请求。负载测试是一种非功能性测试([https://www.guru99.com/non-functional-testing.html](https://www.guru99.com/non-functional-testing.html))，负载测试的主要目的不是验证代码或测试代码的健康状况。
+对于一个好的 API 来说，性能非常重要，因此我们需要测试并确保我们的应用程序能够处理或承受大量请求。负载测试是一种非功能性测试([`www.guru99.com/non-functional-testing.html`](https://www.guru99.com/non-functional-testing.html))，负载测试的主要目的不是验证代码或测试代码的健康状况。
 
-这种测试的主要目的是确保基于各种指标（如可伸缩性、可靠性等）的Web API表现良好。
+这种测试的主要目的是确保基于各种指标（如可伸缩性、可靠性等）的 Web API 表现良好。
 
 以下是一些性能测试的技术或类型：
 
@@ -484,29 +793,65 @@ UAT测试也被视为最终测试，其接受或拒绝决定告诉我们当前�
 
 +   **峰值测试**：这是一种确保系统能够承受工作负载的方法。确定性能的最佳任务之一是突然增加用户负载。
 
-在ASP.NET Core中，我们可以使用以下方法进行负载测试：
+在 ASP.NET Core 中，我们可以使用以下方法进行负载测试：
 
-+   **Visual Studio**：如果你有Visual Studio Enterprise Edition，你可以轻松创建一个负载测试项目；更多信息，请访问以下链接：[https://docs.microsoft.com/en-us/vsts/load-test](https://docs.microsoft.com/en-us/vsts/load-test)。
++   **Visual Studio**：如果你有 Visual Studio Enterprise Edition，你可以轻松创建一个负载测试项目；更多信息，请访问以下链接：[`docs.microsoft.com/en-us/vsts/load-test`](https://docs.microsoft.com/en-us/vsts/load-test)。
 
-+   **WebSurge**：这是一种用于API的负载测试工具。你可以用于云服务或免费用于学习目的。更多信息，请访问[http://websurge.west-wind.com/](http://websurge.west-wind.com/)。
++   **WebSurge**：这是一种用于 API 的负载测试工具。你可以用于云服务或免费用于学习目的。更多信息，请访问[`websurge.west-wind.com/`](http://websurge.west-wind.com/)。
 
-+   **BenchmarkDotNet**：这个工具告诉我们代码中有多少是高效的。它测试不同代码块，这些代码块给出相同的结果，以查看哪个性能最好。更多信息，请访问 [https://github.com/dotnet/BenchmarkDotNet](https://github.com/dotnet/BenchmarkDotNet)。
++   **BenchmarkDotNet**：这个工具告诉我们代码中有多少是高效的。它测试不同代码块，这些代码块给出相同的结果，以查看哪个性能最好。更多信息，请访问 [`github.com/dotnet/BenchmarkDotNet`](https://github.com/dotnet/BenchmarkDotNet)。
 
-+   **Netling**：这是一个针对网络应用的负载测试工具。使用 Netling，你可以修改代码并重新测试以符合你的性能规模。更多信息，请访问 [https://github.com/hallatore/Netling](https://github.com/hallatore/Netling)。
++   **Netling**：这是一个针对网络应用的负载测试工具。使用 Netling，你可以修改代码并重新测试以符合你的性能规模。更多信息，请访问 [`github.com/hallatore/Netling`](https://github.com/hallatore/Netling)。
 
 这些工具和 Visual Studio 负载测试的解释，以及工作示例，超出了本书的范围。
 
 在本节中，我们将简单地测试我们的产品 API，以检查它们列出我们请求的产品所需的时间。
 
-你也可以使用简单的网络客户端测试 API 的请求时间。在第 10 章 [Building a Web Client (Consuming Web Services)](9fcac4d2-710a-48a2-98be-ed0034525cee.xhtml) 中，我们将详细讨论如何构建网络客户端。
+你也可以使用简单的网络客户端测试 API 的请求时间。在第十章 Building a Web Client (Consuming Web Services) 中，我们将详细讨论如何构建网络客户端。
 
 查看我们的 `ProductTest` 类的代码，如下所示：
 
-[PRE15]
+```cs
+public class ProductTest
+  {
+    public ProductTest(ITestOutputHelper output)
+    {
+      _output = output;
+    }
+    private const double ExpectedRequestTime = 1000;
+    private const int ApiLoad = 100;
+    private const string RequestUri = 
+    "http://localhost:60431/api/product/productlist";
+    private readonly ITestOutputHelper _output;
+    private static double RequestCallTime()
+    {
+      DateTime start;
+      DateTime end;
+      using (var client = new HttpClient())
+      {
+        start = DateTime.Now;
+        var response = client.GetAsync(RequestUri).Result;
+        end = DateTime.Now
+      }
+      var actual = (end - start).TotalMilliseconds;
+      return actual;
+    }
+    [Fact]
+    public void SingleCallRequestTime()
+    {
+      var actual = RequestCallTime();
+      _output.WriteLine($"Actual time: {ExpectedRequestTime}
+      millisecond. 
+      Expected time: {actual} millisecond.");
+      Assert.True(actual <= ExpectedRequestTime);
+    }
+    //code truncated
+}
+```
 
 上述代码是自我解释的。我们只是在计算单个和多次请求所需的时间，并检查是否达到我们的基准。
 
-完整的代码可以从 [https://github.com/PacktPublishing/Building-RESTful-Web-Services-with-DotNET-Core](https://github.com/PacktPublishing/Building-RESTful-Web-Services-with-DotNET-Core) 下载。
+完整的代码可以从 [`github.com/PacktPublishing/Building-RESTful-Web-Services-with-DotNET-Core`](https://github.com/PacktPublishing/Building-RESTful-Web-Services-with-DotNET-Core) 下载。
 
 # 运行测试
 
@@ -550,7 +895,7 @@ UAT测试也被视为最终测试，其接受或拒绝决定告诉我们当前�
 
 ![图片](img/48deb5d8-fe65-4a84-8ff8-769f704632c8.png)
 
-访问 [https://docs.microsoft.com/en-us/dotnet/core/tools/?tabs=netcore2x](https://docs.microsoft.com/en-us/dotnet/core/tools/?tabs=netcore2x) 检查所有可用的 CLI 命令。
+访问 [`docs.microsoft.com/en-us/dotnet/core/tools/?tabs=netcore2x`](https://docs.microsoft.com/en-us/dotnet/core/tools/?tabs=netcore2x) 检查所有可用的 CLI 命令。
 
 在本节中，我们尝试了一个基于请求时间的简单负载测试。我们尝试了单个调用和多次调用。
 
@@ -558,4 +903,4 @@ UAT测试也被视为最终测试，其接受或拒绝决定告诉我们当前�
 
 测试有助于确保我们的代码无错误。测试也是所有希望使代码整洁和易于维护的开发者的实践。在本章中，我们涵盖了开发团队日常活动中测试范式，包括对存根和模拟的了解，以及理解集成、安全性和性能测试的重要性。
 
-在接下来的章节中，我们将讨论安全性，包括遵循OWASP安全标准和JWT认证。我们将使用自定义过滤器和输入验证来涵盖更复杂的场景。数据保护对于任何Web应用来说始终是最高优先级，因此我们还将探讨敏感数据的持久化和存储。
+在接下来的章节中，我们将讨论安全性，包括遵循 OWASP 安全标准和 JWT 认证。我们将使用自定义过滤器和输入验证来涵盖更复杂的场景。数据保护对于任何 Web 应用来说始终是最高优先级，因此我们还将探讨敏感数据的持久化和存储。

@@ -18,7 +18,7 @@
 
 本章的技术要求如下：
 
-+   一台支持 Unity 3D 的计算机（请参阅最新的要求：[https://unity3d.com/unity/system-requirements](https://unity3d.com/unity/system-requirements)）。本章的示例项目是在 Windows 10 x 64 计算机上开发的。
++   一台支持 Unity 3D 的计算机（请参阅最新的要求：[`unity3d.com/unity/system-requirements`](https://unity3d.com/unity/system-requirements)）。本章的示例项目是在 Windows 10 x 64 计算机上开发的。
 
 +   Unity 3D（本书中为 2019.1.2f1 版）。
 
@@ -26,9 +26,9 @@
 
 +   Unity 3D 中包含的最新版本的 Vuforia（本书中为 8.3.8 版）。
 
-+   一款支持 Vuforia Fusion 的移动设备（请参阅[https://library.vuforia.com/content/vuforia-library/en/articles/Solution/ground-plane-supported-devices.html](https://library.vuforia.com/content/vuforia-library/en/articles/Solution/ground-plane-supported-devices.html)）。
++   一款支持 Vuforia Fusion 的移动设备（请参阅[`library.vuforia.com/content/vuforia-library/en/articles/Solution/ground-plane-supported-devices.html`](https://library.vuforia.com/content/vuforia-library/en/articles/Solution/ground-plane-supported-devices.html)）。
 
-本章的资源和相关代码文件可以在以下位置找到：[https://github.com/PacktPublishing/Enterprise-Augmented-Reality-Projects/tree/master/Chapter06](https://github.com/PacktPublishing/Enterprise-Augmented-Reality-Projects/tree/master/Chapter06)。
+本章的资源和相关代码文件可以在以下位置找到：[`github.com/PacktPublishing/Enterprise-Augmented-Reality-Projects/tree/master/Chapter06`](https://github.com/PacktPublishing/Enterprise-Augmented-Reality-Projects/tree/master/Chapter06)。
 
 # 使用 AR 进行零售
 
@@ -44,25 +44,25 @@
 
 +   在超市或大型商店中，通过区域引导客户到他们想要的产品。
 
-这个领域还允许我们在各种硬件上显示AR，包括客户的移动设备、触觉屏幕和虚拟试衣间。因此，在过去的几年里，零售业的AR解决方案数量激增，尤其是在ARKit（来自苹果）和ARCore（来自谷歌）进入市场之后。这两款软件使我们能够利用移动设备的摄像头和传感器轻松识别环境，并在地面或桌子等平坦表面上放置虚拟元素。
+这个领域还允许我们在各种硬件上显示 AR，包括客户的移动设备、触觉屏幕和虚拟试衣间。因此，在过去的几年里，零售业的 AR 解决方案数量激增，尤其是在 ARKit（来自苹果）和 ARCore（来自谷歌）进入市场之后。这两款软件使我们能够利用移动设备的摄像头和传感器轻松识别环境，并在地面或桌子等平坦表面上放置虚拟元素。
 
-在本章中，我们将利用Vuforia Fusion，Vuforia SDK的地形检测功能，该功能还可以与ARCore结合使用，在我们的周围环境中放置虚拟对象，而无需任何类型的打印目标，创建一个客户可以用来查看家具如何融入他们家庭的AR家具查看器。
+在本章中，我们将利用 Vuforia Fusion，Vuforia SDK 的地形检测功能，该功能还可以与 ARCore 结合使用，在我们的周围环境中放置虚拟对象，而无需任何类型的打印目标，创建一个客户可以用来查看家具如何融入他们家庭的 AR 家具查看器。
 
-对于我们的项目，我们将使用来自Euro Seating公司的真实目录页面和3D模型，该公司在全球100多个国家设有业务。[https://www.euroseating.com/en/](https://www.euroseating.com/en/)，一个座椅制造商。使用他们的高质量3D模型和真实目录将帮助我们把这个项目可视化为一个真实的AR应用，可以在任何其他营销环境中使用。本章中使用的模型和图像已由该公司转让，用于本书的上下文中。
+对于我们的项目，我们将使用来自 Euro Seating 公司的真实目录页面和 3D 模型，该公司在全球 100 多个国家设有业务。[`www.euroseating.com/en/`](https://www.euroseating.com/en/)，一个座椅制造商。使用他们的高质量 3D 模型和真实目录将帮助我们把这个项目可视化为一个真实的 AR 应用，可以在任何其他营销环境中使用。本章中使用的模型和图像已由该公司转让，用于本书的上下文中。
 
-我们将首先探索Vuforia以及如何将其集成到我们的Unity项目中。
+我们将首先探索 Vuforia 以及如何将其集成到我们的 Unity 项目中。
 
-# 探索Vuforia
+# 探索 Vuforia
 
-Vuforia最初由高通公司开发，目前由PTC运营，是历史最悠久且最知名的AR SDK之一。它是市场上最稳定和性能最好的软件之一，与ARKit和ARCore一起，是AR开发者的首选之一。
+Vuforia 最初由高通公司开发，目前由 PTC 运营，是历史最悠久且最知名的 AR SDK 之一。它是市场上最稳定和性能最好的软件之一，与 ARKit 和 ARCore 一起，是 AR 开发者的首选之一。
 
-Vuforia提供了一系列功能，包括2D图像和3D对象跟踪、无需参考图像即可启动AR内容的无标记AR（本章我们将使用）以及类似条形码的标记称为Vumarks。它提供了多个示例和额外功能，如虚拟按钮、运行时图像目标创建和背景视频纹理操作。
+Vuforia 提供了一系列功能，包括 2D 图像和 3D 对象跟踪、无需参考图像即可启动 AR 内容的无标记 AR（本章我们将使用）以及类似条形码的标记称为 Vumarks。它提供了多个示例和额外功能，如虚拟按钮、运行时图像目标创建和背景视频纹理操作。
 
-与其他AR软件一样，Vuforia需要在移动设备上部署时需要许可证。Vuforia提供免费的开发密钥生成器，当应用处于生产阶段时，必须将其切换为部署密钥。您可以在他们的网页上查看其定价选项：[https://developer.vuforia.com/pricing](https://developer.vuforia.com/pricing)。
+与其他 AR 软件一样，Vuforia 需要在移动设备上部署时需要许可证。Vuforia 提供免费的开发密钥生成器，当应用处于生产阶段时，必须将其切换为部署密钥。您可以在他们的网页上查看其定价选项：[`developer.vuforia.com/pricing`](https://developer.vuforia.com/pricing)。
 
 Vuforia SDK 可以下载用于 Android 和 iOS，并且也可以在 Unity 3D 平台上使用。自 Unity 2017.2 版本以来，它直接集成到 Unity 编辑器中，就像任何其他主要资源一样，并且必须在其中安装和激活。现在，我们将 Vuforia 集成到一个新项目中，并设置它以便可以在 Android 设备上构建。让我们开始吧：
 
-1.  当您第一次在计算机上安装 Unity 时（见 [第 2 章](54a1260e-a741-4eb5-9c98-01350fcba94b.xhtml)，*Unity AR 开发入门*），您应该选择了添加 Vuforia 模块选项。如果您没有安装它或者您不确定，请打开 Unity Hub，转到 安装 标签页，并检查您 Unity 版本底部的已安装模块：
+1.  当您第一次在计算机上安装 Unity 时（见 第二章，*Unity AR 开发入门*），您应该选择了添加 Vuforia 模块选项。如果您没有安装它或者您不确定，请打开 Unity Hub，转到 安装 标签页，并检查您 Unity 版本底部的已安装模块：
 
 ![](img/d508932b-5c92-4d39-9148-71a0b3e95384.png)
 
@@ -148,13 +148,13 @@ Vuforia 行为组件检测到 Vuforia 尚未启用
 
 在“其他设置|渲染”下从图形 API 中删除 Vulkan
 
-1.  在此之下，填写识别部分的“包名”和“最低API级别”：
+1.  在此之下，填写识别部分的“包名”和“最低 API 级别”：
 
 ![图片](img/dde477a2-98b0-42cb-be27-d4b364d9cd60.png)
 
-在“其他设置|识别”下更新包名和最低API级别
+在“其他设置|识别”下更新包名和最低 API 级别
 
-目前，Vuforia 支持 Android 4.4 及以上版本和 iOS 11 及以上版本。然而，我们建议将最低API级别设置为 `5`，以确保运行应用程序的设备足够强大。您可以在以下位置检查 Vuforia 的最低要求：[https://library.vuforia.com/articles/Solution/Vuforia-Supported-Versions](https://library.vuforia.com/articles/Solution/Vuforia-Supported-Versions)。
+目前，Vuforia 支持 Android 4.4 及以上版本和 iOS 11 及以上版本。然而，我们建议将最低 API 级别设置为 `5`，以确保运行应用程序的设备足够强大。您可以在以下位置检查 Vuforia 的最低要求：[`library.vuforia.com/articles/Solution/Vuforia-Supported-Versions`](https://library.vuforia.com/articles/Solution/Vuforia-Supported-Versions)。
 
 1.  此步骤并非总是必需，但可能的情况是，与您的 Unity 版本一起安装的 Vuforia 版本不是最新版本。如果是这样，当选择 ARCamera 时，Vuforia 行为组件上将会出现一条消息，指出有新版本可用：
 
@@ -184,7 +184,7 @@ Vuforia 的主要功能，用于在用户的环境中实时放置虚拟对象，
 
 **同时定位与建图**（**SLAM**）算法同时估计对象的位置和周围环境的地图。**视觉惯性同时定位与建图**（**VISLAM**）是 Vuforia 的算法，它将**视觉里程计**（**VIO**）和 SLAM 结合起来以提高后者的性能。
 
-尽管列表迅速增加，但并非所有设备都支持 Vuforia 的地面平面。一般来说，如果运行设备支持 ARCore 或 ARKit，它将工作。如果不支持，它将取决于内部 AR 启用技术。Vuforia 在其网页上保留了一份当前支持的设备列表：[https://library.vuforia.com/articles/Solution/vuforia-fusion-supported-devices.html](https://library.vuforia.com/articles/Solution/vuforia-fusion-supported-devices.html)。
+尽管列表迅速增加，但并非所有设备都支持 Vuforia 的地面平面。一般来说，如果运行设备支持 ARCore 或 ARKit，它将工作。如果不支持，它将取决于内部 AR 启用技术。Vuforia 在其网页上保留了一份当前支持的设备列表：[`library.vuforia.com/articles/Solution/vuforia-fusion-supported-devices.html`](https://library.vuforia.com/articles/Solution/vuforia-fusion-supported-devices.html)。
 
 在下一个子节中，我们将学习如何在 Vuforia 中启用 ARCore。如果你的设备不支持 ARCore，你可以直接跳到下一个子节。如果你计划将你的应用分发到支持和不支持 ARCore 的设备上，并且想要首先测试 Vuforia 的 VISLAM 性能，请跳过此步骤，在测试最终应用后进行此操作以查看差异。
 
@@ -192,9 +192,9 @@ Vuforia 的主要功能，用于在用户的环境中实时放置虚拟对象，
 
 在本节中，我们将学习如何为 Vuforia 启用 ARCore；如果你的设备支持 ARCore，你将受益于与 Vuforia 一起使用它，因为生成的应用将更快、更精确地检测平坦表面。要在 Unity 中为 Vuforia 启用 ARCore，请按照以下步骤操作：
 
-1.  从 Google 的存储库下载 ARCore 库的最新版本。全局链接是 `https://dl.google.com/dl/android/maven2/com/google/ar/core/<ARCORE_VERSION>/core-<ARCORE_VERSION>.aar`。您可以在 [https://github.com/google-ar/arcore-unity-sdk/releases](https://github.com/google-ar/arcore-unity-sdk/releases) 检查可用的最新版本。
+1.  从 Google 的存储库下载 ARCore 库的最新版本。全局链接是 `https://dl.google.com/dl/android/maven2/com/google/ar/core/<ARCORE_VERSION>/core-<ARCORE_VERSION>.aar`。您可以在 [`github.com/google-ar/arcore-unity-sdk/releases`](https://github.com/google-ar/arcore-unity-sdk/releases) 检查可用的最新版本。
 
-在撰写此章节时，当前版本是 1.9.0，因此链接将是 [https://dl.google.com/dl/android/maven2/com/google/ar/core/1.9.0/core-1.9.0.aar](https://dl.google.com/dl/android/maven2/com/google/ar/core/1.9.0/core-1.9.0.aar)。
+在撰写此章节时，当前版本是 1.9.0，因此链接将是 [`dl.google.com/dl/android/maven2/com/google/ar/core/1.9.0/core-1.9.0.aar`](https://dl.google.com/dl/android/maven2/com/google/ar/core/1.9.0/core-1.9.0.aar)。
 
 1.  在 Unity 中，在项目窗口中，右键点击 `Assets` 文件夹并按 Create|Folder。将其命名为 `Plugins` 并在它里面创建另一个名为 `Android` 的文件夹：
 
@@ -256,25 +256,25 @@ ARCore 库在检查器窗口中的属性
 
 +   默认可追踪事件处理器，这是 Vuforia 的默认脚本，用于在目标被找到/丢失时显示/隐藏元素
 
-1.  要创建一个虚拟对象进行测试，右键单击地面平面阶段并创建3D Object|Cube。确保它作为地面平面阶段的子级出现，以便在适当的时候显示/隐藏：
+1.  要创建一个虚拟对象进行测试，右键单击地面平面阶段并创建 3D Object|Cube。确保它作为地面平面阶段的子级出现，以便在适当的时候显示/隐藏：
 
 ![](img/3ffe14d4-b884-4d64-963a-d756307b13a7.png)
 
 创建一个立方体作为地面平面阶段的子级
 
-1.  缩小立方体，使其小于地面平面阶段的视觉参考。确保它在游戏视图中从ARCamera可见（如果不是，移动/旋转ARCamera或更理想的是地面平面阶段，直到它在视图中）：
+1.  缩小立方体，使其小于地面平面阶段的视觉参考。确保它在游戏视图中从 ARCamera 可见（如果不是，移动/旋转 ARCamera 或更理想的是地面平面阶段，直到它在视图中）：
 
 ![](img/61ba0799-3123-4c41-9a85-cc730f5dca21.png)
 
 放置在地面平面阶段参考网格上的立方体
 
-1.  在层次结构窗口外部右键单击，并选择Vuforia Engine|地面平面|平面查找器：
+1.  在层次结构窗口外部右键单击，并选择 Vuforia Engine|地面平面|平面查找器：
 
 ![](img/8473749c-717e-4faf-bf1e-9433c3f5d458.png)
 
 创建平面查找器以检测地面平面
 
-1.  此GameObject附有三个脚本：
+1.  此 GameObject 附有三个脚本：
 
 +   锚点输入监听器行为，负责监听用户的输入（屏幕上的点击）
 
@@ -290,13 +290,13 @@ ARCore 库在检查器窗口中的属性
 
 1.  在继续之前，按*Ctrl* + *S* 保存当前场景。
 
-现在我们已经配置了AR场景，我们将添加Vuforia密钥，这是在移动设备上构建Vuforia所必需的步骤。
+现在我们已经配置了 AR 场景，我们将添加 Vuforia 密钥，这是在移动设备上构建 Vuforia 所必需的步骤。
 
 # 获取密钥
 
-Vuforia要求应用在真实设备上运行时需要一个开发/部署密钥。为此，请按照以下步骤操作：
+Vuforia 要求应用在真实设备上运行时需要一个开发/部署密钥。为此，请按照以下步骤操作：
 
-1.  前往Vuforia的开发者页面([https://developer.vuforia.com/license-manager](https://developer.vuforia.com/license-manager))，注册并登录。
+1.  前往 Vuforia 的开发者页面([`developer.vuforia.com/license-manager`](https://developer.vuforia.com/license-manager))，注册并登录。
 
 1.  在许可证管理器选项卡上，选择获取开发密钥以获取开发期间使用的免费密钥。
 
@@ -304,37 +304,37 @@ Vuforia要求应用在真实设备上运行时需要一个开发/部署密钥。
 
 1.  选择你新创建的许可证并复制密钥数字。
 
-1.  返回Unity编辑器并选择场景中的ARCamera。
+1.  返回 Unity 编辑器并选择场景中的 ARCamera。
 
-1.  在检查器窗口中单击打开Vuforia Engine配置以打开通用Vuforia配置：
+1.  在检查器窗口中单击打开 Vuforia Engine 配置以打开通用 Vuforia 配置：
 
 ![](img/211f4bd7-180b-4e05-b06a-c05d6da55533.png)
 
-检查器窗口中的ARCamera GameObject
+检查器窗口中的 ARCamera GameObject
 
 1.  在此处，将你的密钥粘贴到应用许可证密钥字段中：
 
 ![](img/8b4cdedd-5a87-442a-a28a-bdf1331678b9.png)
 
-检查器窗口中的Vuforia配置选项
+检查器窗口中的 Vuforia 配置选项
 
-现在，我们已经在项目中包含了一个Vuforia开发密钥，这将使我们能够在真实设备上构建和安装我们的应用。
+现在，我们已经在项目中包含了一个 Vuforia 开发密钥，这将使我们能够在真实设备上构建和安装我们的应用。
 
-请记住，当你想要将应用程序上传到商店（Google或Apple）时，你必须根据Vuforia的计划购买一个部署密钥。你可以在[https://developer.vuforia.com/pricing](https://developer.vuforia.com/pricing)找到更新的价格。
+请记住，当你想要将应用程序上传到商店（Google 或 Apple）时，你必须根据 Vuforia 的计划购买一个部署密钥。你可以在[`developer.vuforia.com/pricing`](https://developer.vuforia.com/pricing)找到更新的价格。
 
-在下一节中，我们将测试我们的应用程序在Unity中，以确保一切按预期工作。
+在下一节中，我们将测试我们的应用程序在 Unity 中，以确保一切按预期工作。
 
 # 测试应用程序
 
-在Unity中开发项目时，在构建之前测试它是良好的实践，因为构建过程需要时间。这样，你可以检测基本问题和错误，并在实际尝试在手机上运行应用程序之前快速纠正它们。
+在 Unity 中开发项目时，在构建之前测试它是良好的实践，因为构建过程需要时间。这样，你可以检测基本问题和错误，并在实际尝试在手机上运行应用程序之前快速纠正它们。
 
-Vuforia目前不能作为一个独立的应用程序构建，但它有一个与ARCamera集成的脚本，用于测试目的。当你正在Unity编辑器中测试应用程序时，它将使用电脑的摄像头来模拟AR。如果它没有检测到摄像头，它将使背景保持黑色并直接播放AR。
+Vuforia 目前不能作为一个独立的应用程序构建，但它有一个与 ARCamera 集成的脚本，用于测试目的。当你正在 Unity 编辑器中测试应用程序时，它将使用电脑的摄像头来模拟 AR。如果它没有检测到摄像头，它将使背景保持黑色并直接播放 AR。
 
-另一方面，当你使用地面平面项目并想要测试应用程序时，Vuforia无法使用设备的传感器来检测平坦的表面。相反，它提供了一个图像目标参考来模拟地面平面识别，当相机检测到该图像时，它将表现得像在手机上检测到一个平坦的表面。
+另一方面，当你使用地面平面项目并想要测试应用程序时，Vuforia 无法使用设备的传感器来检测平坦的表面。相反，它提供了一个图像目标参考来模拟地面平面识别，当相机检测到该图像时，它将表现得像在手机上检测到一个平坦的表面。
 
 要测试我们的应用程序，请按照以下步骤操作：
 
-1.  在项目窗口中找到名为“`Emulator Ground Plane.pdf`”的PDF文件，位于Vuforia|Databases|ForPrint|Emulator。打印它并将其放置在地面上（你也可以直接在电脑上打开PDF图像，尽管尺寸参考可能不准确）。
+1.  在项目窗口中找到名为“`Emulator Ground Plane.pdf`”的 PDF 文件，位于 Vuforia|Databases|ForPrint|Emulator。打印它并将其放置在地面上（你也可以直接在电脑上打开 PDF 图像，尽管尺寸参考可能不准确）。
 
 1.  在顶部的工具栏中按下播放按钮，并将网络摄像头指向图像。当软件检测到表面（在这种情况下为目标）时，你会看到一个视觉标记。在按下播放按钮之前，你可以点击游戏视图右上角的“播放时最大化”按钮，以便在屏幕上最大化显示图像：
 
@@ -342,17 +342,17 @@ Vuforia目前不能作为一个独立的应用程序构建，但它有一个与A
 
 游戏视图检测地面平面模拟器图像
 
-1.  点击游戏视图上的电脑屏幕以在手机上模拟屏幕触摸。立方体将出现在目标上方。其大小将取决于你在Unity编辑器中之前给出的尺寸（Unity中的地面平面舞台为100厘米 x 100厘米，而打印的模拟器为20厘米 x 20厘米）：
+1.  点击游戏视图上的电脑屏幕以在手机上模拟屏幕触摸。立方体将出现在目标上方。其大小将取决于你在 Unity 编辑器中之前给出的尺寸（Unity 中的地面平面舞台为 100 厘米 x 100 厘米，而打印的模拟器为 20 厘米 x 20 厘米）：
 
 ![](img/1276a128-54ff-4fd9-89d0-63d504191a76.png)
 
 点击游戏视图时，立方体出现在地板上
 
-如果一切按预期工作，我们可以更改立方体并开始塑造我们的AR应用程序，以在现实世界中显示家具。
+如果一切按预期工作，我们可以更改立方体并开始塑造我们的 AR 应用程序，以在现实世界中显示家具。
 
-# 创建AR家具查看器
+# 创建 AR 家具查看器
 
-现在我们有了AR场景的主结构，我们将定制应用程序以创建一个AR家具查看器，允许我们在现实世界中放置椅子。应用程序将让我们做以下事情：
+现在我们有了 AR 场景的主结构，我们将定制应用程序以创建一个 AR 家具查看器，允许我们在现实世界中放置椅子。应用程序将让我们做以下事情：
 
 +   在地面上放置一把椅子
 
@@ -364,23 +364,23 @@ Vuforia目前不能作为一个独立的应用程序构建，但它有一个与A
 
 # 向我们的项目中添加元素
 
-我们将首先向我们的项目和场景添加新元素，包括3D模型和用户界面：
+我们将首先向我们的项目和场景添加新元素，包括 3D 模型和用户界面：
 
 1.  在项目窗口的`Assets`文件夹中创建自己的文件夹，并将其命名为`@MyAssets`。然后，在它内部创建三个其他文件夹，分别命名为`Images`、`Models`和`Scripts`：
 
 ![图片](img/09188c1a-37c8-4b7e-a782-7893a8826888.png)
 
-@MyAssets内部的新文件夹
+@MyAssets 内部的新文件夹
 
 1.  现在，从项目的资源中，将模型和图像复制到项目窗口中相应的文件夹。
 
-1.  在检查器窗口中，将`chair.png`和`cinema.png`图像的纹理类型更改为精灵（2D和UI），然后点击应用。这将允许我们稍后将其用作UI元素。其他图像将作为常规纹理应用于平面上：
+1.  在检查器窗口中，将`chair.png`和`cinema.png`图像的纹理类型更改为精灵（2D 和 UI），然后点击应用。这将允许我们稍后将其用作 UI 元素。其他图像将作为常规纹理应用于平面上：
 
 ![图片](img/c14d5088-5a1c-45d8-8131-b37e843fb3b6.png)
 
-检查器窗口中的chair.png图像导入设置
+检查器窗口中的 chair.png 图像导入设置
 
-1.  将从Assets|Models|Prince文件夹中的王子模型拖动到层次结构窗口，作为地面平面舞台的子对象。
+1.  将从 Assets|Models|Prince 文件夹中的王子模型拖动到层次结构窗口，作为地面平面舞台的子对象。
 
 1.  删除立方体，因为我们不再需要它了。
 
@@ -390,21 +390,21 @@ Vuforia目前不能作为一个独立的应用程序构建，但它有一个与A
 
 场景中王子模型作为地面平面舞台对象的子对象
 
-1.  要创建UI，在层次结构窗口中右键单击并选择UI|按钮。它将自动将按钮封装在新的Canvas元素中，并将必要的Event System添加到场景中：
+1.  要创建 UI，在层次结构窗口中右键单击并选择 UI|按钮。它将自动将按钮封装在新的 Canvas 元素中，并将必要的 Event System 添加到场景中：
 
 ![图片](img/7dbfa02f-22ae-4828-a896-a73e509e42aa.png)
 
 在层次结构窗口中创建按钮
 
-1.  选择画布，并更改Canvas Scaler的参数，以便它根据设备的屏幕大小进行缩放：
+1.  选择画布，并更改 Canvas Scaler 的参数，以便它根据设备的屏幕大小进行缩放：
 
 ![图片](img/e2703a80-5d9a-422b-a884-549aab5b1b42.png)
 
-新的画布缩放器参数以适应UI的大小到屏幕大小
+新的画布缩放器参数以适应 UI 的大小到屏幕大小
 
-1.  选择按钮并删除其Text GameObject。
+1.  选择按钮并删除其 Text GameObject。
 
-1.  在检查器窗口中，将其名称更改为`chair_b`以进行识别，并使用Rect Transform组件来设置其位置和大小。将椅子图像添加到图像组件的源图像中：
+1.  在检查器窗口中，将其名称更改为`chair_b`以进行识别，并使用 Rect Transform 组件来设置其位置和大小。将椅子图像添加到图像组件的源图像中：
 
 ![图片](img/6f897b1a-d5fb-450c-b302-cb35ad4a09fb.png)
 
@@ -422,37 +422,62 @@ Vuforia目前不能作为一个独立的应用程序构建，但它有一个与A
 
 现在，让我们通过向项目中添加新脚本来创建应用程序的逻辑。这将负责在单个和多个椅子之间切换：
 
-1.  在项目窗口的@MyAssets|Scripts文件夹中，右键单击并选择创建|C#脚本。将其命名为`OnTheGoHandler.cs`：
+1.  在项目窗口的@MyAssets|Scripts 文件夹中，右键单击并选择创建|C#脚本。将其命名为`OnTheGoHandler.cs`：
 
 ![图片](img/b4c53ee9-eb88-461e-9421-db3362b0f1ed.png)
 
 在项目窗口中添加新脚本
 
-1.  双击它以在Visual Studio中打开：
+1.  双击它以在 Visual Studio 中打开：
 
 ![图片](img/eb1187f2-fedd-48e9-9c17-b32449ff3a98.png)
 
-Visual Studio中的OnTheGoHandler脚本
+Visual Studio 中的 OnTheGoHandler 脚本
 
 1.  在脚本顶部添加 `Vuforia` 库以使用其功能：
 
-[PRE0]
+```cs
+using Vuforia;
+```
 
 1.  在类中声明以下变量：
 
-[PRE1]
+```cs
+public GameObject chairButton;
+public Sprite[] buttonSprites;
+private ContentPositioningBehaviour contentPosBehaviour; 
+private bool multipleChairs = false;
+```
 
 `chairButton` 变量将对应我们在 Unity 中创建的按钮。`buttonSprites` 数组将包含按钮的两个背景图像，我们将在这两者之间切换。`contentPosBehaviour` 变量来自 `Vuforia` 类，负责将我们的虚拟对象添加到现实世界中。我们将使用 `multipleChairs` 布尔值在两种状态（一把椅子或多把椅子）之间切换。公共变量将在 Unity 编辑器中初始化。
 
 1.  在 `Start()` 方法中，添加以下代码：
 
-[PRE2]
+```cs
+contentPosBehaviour = GetComponent<ContentPositioningBehaviour>(); 
+```
 
 这将检索包含脚本的 GameObject 的 `ContentPositioningBehaviour` 组件。
 
 1.  在 `Update()` 方法之后，创建一个新的方法：
 
-[PRE3]
+```cs
+public void SwitchMultipleChairs()
+ {
+     if (!multipleChairs) 
+     {
+         chairButton.GetComponent<UnityEngine.UI.Image>().sprite = buttonSprites[1];
+         contentPosBehaviour.DuplicateStage = true;
+         multipleChairs = true;
+     }
+     else
+     {
+         chairButton.GetComponent<UnityEngine.UI.Image>().sprite = buttonSprites[0];
+         contentPosBehaviour.DuplicateStage = false;
+         multipleChairs = false;
+     }
+ }
+```
 
 当此方法被调用时，它会检查当前状态是一把椅子还是多把椅子。相应地切换 UI 按钮的图像，并调整 `ContentPositioningBehaviour` 类的 `DuplicateStage` 参数以允许一个或多个相同的椅子实例。然后，它将 `multipleChairs` 设置为 `true` 或 `false` 以跟踪当前状态。
 
@@ -556,19 +581,49 @@ ChairHandler 脚本在 Visual Studio 中
 
 1.  在课程开始时添加以下变量：
 
-[PRE4]
+```cs
+public GameObject rotateGO;
+private float rotateSpeed = 0.8f;
+```
 
 第一个变量指的是我们之前创建的 Quad GameObject（带有旋转箭头图像）。第二个变量控制椅子的旋转速度。
 
 1.  在 `Start()` 方法中，添加以下代码：
 
-[PRE5]
+```cs
+rotateGO.SetActive(false);
+```
 
 通过这种方式，我们隐藏了旋转箭头，直到椅子实际上在旋转。
 
 1.  现在，在 `Update()` 方法中，添加以下代码：
 
-[PRE6]
+```cs
+Touch[] touches = Input.touches;
+if (Input.touchCount == 2 && (touches[0].phase == TouchPhase.Moved || touches[1].phase == TouchPhase.Moved))
+{
+ rotateGO.SetActive(true);
+
+ Vector2 previousPosition= touches[1].position - touches[1].deltaPosition - (touches[0].position - touches[0].deltaPosition);
+ Vector2 currentPosition = touches[1].position - touches[0].position;
+ float angleDelta = Vector2.Angle(previousPosition, currentPosition);
+ Vector3 cross = Vector3.Cross(previousPosition, currentPosition);
+
+ Vector3 previousRotation = transform.localEulerAngles;
+ if (cross.z > 0)
+ {
+ transform.localEulerAngles = previousRotation - new Vector3(0, angleDelta * rotateSpeed, 0);
+ }
+ else if (cross.z < 0)
+ {
+ transform.localEulerAngles = previousRotation + new Vector3(0, angleDelta * rotateSpeed, 0);
+ } 
+}
+else
+{
+ rotateGO.SetActive(false);
+} 
+```
 
 上述代码检索来自屏幕的触摸。如果是两个触摸（两个手指触摸屏幕）并且至少有一个在移动，它执行以下操作：
 
@@ -608,4 +663,4 @@ ChairHandler 脚本在 Visual Studio 中
 
 从这里，你可以尝试使用 Vuforia 的“空中”选项，它不是将附着在地面上的物体放置在地面上，而是将它们放置在地面的距离之外。这对于在墙上放置物体，如画框、图片等，或者当与无人机等飞行物体一起工作时非常有用。它们的使用非常相似；你不需要创建“平面查找器”和“地面平面舞台”，而是创建一个“空中位置器”和“空中舞台”。
 
-你还可以从 Unity 资产商店下载 Vuforia 核心示例（[https://assetstore.unity.com/packages/templates/packs/vuforia-core-samples-99026](https://assetstore.unity.com/packages/templates/packs/vuforia-core-samples-99026)），其中包含地面平面及其功能的完整示例。
+你还可以从 Unity 资产商店下载 Vuforia 核心示例（[`assetstore.unity.com/packages/templates/packs/vuforia-core-samples-99026`](https://assetstore.unity.com/packages/templates/packs/vuforia-core-samples-99026)），其中包含地面平面及其功能的完整示例。

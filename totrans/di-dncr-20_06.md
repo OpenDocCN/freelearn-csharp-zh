@@ -6,11 +6,11 @@
 
 如果计算机程序暴露了错误并错误地管理内存分配，那么资源将变得不可用。这种情况被称为内存泄漏。
 
-为了避免内存泄漏，我们在设计类时应该采取适当的注意，以确保在需要时资源可用。这只会发生在程序在对象超出作用域时立即释放与对象关联的资源的情况下。因此，应用程序可以无缝运行，因为未使用的空间会定期清理。然而，这个过程并不是在所有情况下都是自动的。我们要探讨这个主题的原因是了解DI技术在不同场景下如何管理对象的生命周期不同，这反过来又帮助我们设计类时做出适当的决策。
+为了避免内存泄漏，我们在设计类时应该采取适当的注意，以确保在需要时资源可用。这只会发生在程序在对象超出作用域时立即释放与对象关联的资源的情况下。因此，应用程序可以无缝运行，因为未使用的空间会定期清理。然而，这个过程并不是在所有情况下都是自动的。我们要探讨这个主题的原因是了解 DI 技术在不同场景下如何管理对象的生命周期不同，这反过来又帮助我们设计类时做出适当的决策。
 
-当相关类被实例化时，对象就诞生了。新生的对象会存在一段时间，只要应用程序保持对该对象的引用并继续使用它。如果你的应用程序关闭或对象的引用在代码中超出作用域，那么.NET Framework将标记该对象从内存中删除。
+当相关类被实例化时，对象就诞生了。新生的对象会存在一段时间，只要应用程序保持对该对象的引用并继续使用它。如果你的应用程序关闭或对象的引用在代码中超出作用域，那么.NET Framework 将标记该对象从内存中删除。
 
-在这个特定的章节中，我们将学习.NET Core如何管理对象。此外，我们还将探讨确定对象何时可回收以及如何与之交互的技术。
+在这个特定的章节中，我们将学习.NET Core 如何管理对象。此外，我们还将探讨确定对象何时可回收以及如何与之交互的技术。
 
 本章我们将涵盖以下主题：
 
@@ -20,7 +20,7 @@
 
 +   `IDisposal`接口
 
-+   .NET Core中的对象生命周期管理
++   .NET Core 中的对象生命周期管理
 
 # 管理对象生命周期
 
@@ -44,7 +44,13 @@
 
 考虑以下示例：
 
-[PRE0]
+```cs
+    static void Main(string[] args)
+    {
+      string name = "Dependency Injection";
+      SomeClass sc = new SomeClass()
+    }
+```
 
 变量 `name` 是一个值类型，它直接存储在栈上。但是，当我们编写 `SomeClass sc = new SomeClass()` 时，实际上是在告诉框架将对象存储在堆上。除此之外，它还在栈上为变量 `sc` 分配了一块内存空间，该空间持有对这个对象的引用。
 
@@ -58,7 +64,7 @@
 
 纯 .NET 代码被称为**托管资源**，因为它们可以直接由运行时环境管理。另一方面，非托管资源是指那些不在运行时直接控制之下的资源，例如文件句柄、COM 对象、数据库连接等等。例如，如果你打开到数据库服务器的连接，这将使用服务器上的资源（用于维护连接）以及可能的其他非 .NET 资源。
 
-管理资源直接由CLR（公共语言运行时）针对，因此垃圾收集器会清理它们，这是一个自动的过程。作为开发者，你通常不需要显式调用GC。然而，有一个问题，当我们考虑非托管资源，如数据库连接时。我们必须自己处理它们，因为CLR无法处理。我们必须使用`Finalize`方法手动释放它们。
+管理资源直接由 CLR（公共语言运行时）针对，因此垃圾收集器会清理它们，这是一个自动的过程。作为开发者，你通常不需要显式调用 GC。然而，有一个问题，当我们考虑非托管资源，如数据库连接时。我们必须自己处理它们，因为 CLR 无法处理。我们必须使用`Finalize`方法手动释放它们。
 
 # 代数
 
@@ -66,11 +72,11 @@
 
 堆上有以下三代对象：
 
-+   **第0代**：当一个对象被初始化时，它的代数开始。它首先落入第0代。这个代的对象通常是短暂的。这些对象更容易被GC销毁。GC收集这些短暂的对象，以便它们可以被释放出来，从而释放内存空间。如果对象在GC收集后仍然存活，这意味着它们将停留更长的时间，因此被提升到下一代。
++   **第 0 代**：当一个对象被初始化时，它的代数开始。它首先落入第 0 代。这个代的对象通常是短暂的。这些对象更容易被 GC 销毁。GC 收集这些短暂的对象，以便它们可以被释放出来，从而释放内存空间。如果对象在 GC 收集后仍然存活，这意味着它们将停留更长的时间，因此被提升到下一代。
 
-+   **第1代**：这个代的对象比第0代对象存在的时间更长。GC确实会从这个代收集对象，但不像第0代那样频繁，因为它们的生存期被应用程序扩展以进行更多操作。这个代幸存下来的对象将进入第2代。
++   **第 1 代**：这个代的对象比第 0 代对象存在的时间更长。GC 确实会从这个代收集对象，但不像第 0 代那样频繁，因为它们的生存期被应用程序扩展以进行更多操作。这个代幸存下来的对象将进入第 2 代。
 
-+   **第2代**：这些是在应用程序中存在时间最长的对象。成功通过前两代的对象被认为是第2代。GC在释放这些对象时很少介入。
++   **第 2 代**：这些是在应用程序中存在时间最长的对象。成功通过前两代的对象被认为是第 2 代。GC 在释放这些对象时很少介入。
 
 # 对象创建
 
@@ -90,7 +96,12 @@
 
 终结器用于销毁对象。我们可以使用带有类名波浪号 (`~`) 符号的析构方法来设计终结器。我们很快就会看到它的实际应用：
 
-[PRE1]
+```cs
+    ~Order()
+    {
+      // Destructor or Finalizer
+    }
+```
 
 垃圾回收器完全控制着终结过程，因为它在对象超出作用域时内部调用此方法。然而，我们可以在析构函数中编写代码以自定义我们的需求，但我们不能只是告诉某人调用析构函数。即使你非常确定对象不再需要并决定释放它，你也不能显式执行析构函数以释放空间。你必须等待垃圾回收器收集对象以进行销毁。
 
@@ -104,17 +115,33 @@
 
 此方法是 `IDisposable` 接口中的唯一方法，可以用来手动释放未托管资源。
 
-[PRE2]
+```cs
+    public interface IDisposable
+    {
+      void Dispose();
+    }
+```
 
 现在只需调用 `Dispose()` 方法即可。但等等。你只能从实现了此接口并定义了 `Dispose()` 方法的类对象中调用此方法。
 
 例如，`SqlConnection` 类实现了此接口，并为我们提供了 `Dispose()` 方法，可以使用如下方式使用它。一旦你完成对连接对象的操作，就调用 `Dispose`：
 
-[PRE3]
+```cs
+    var connection = new SqlConnection("ConnectionString");
+    // Do Database related stuff here.
+
+    // After we are done, let's call Dispose.
+    connection.Dispose();
+```
 
 在 .NET 中处理对象销毁的另一种优雅方法是，而不是直接调用 `Dispose`，我们可以使用 `using` 块。相同的语句可以用以下方式用 `using` 块装饰：
 
-[PRE4]
+```cs
+     using (var connection = new SqlConnection("ConnectionString"))
+    {
+      // Use the connection object and do database operation.
+    }
+```
 
 当我们这样做时，它将代码转换为 `try...finally` 中间代码。在 `finally` 块中销毁连接对象，这是我们创建的。除非你这样做，否则连接对象将保留在内存中。随着时间的推移，当我们获得大量连接时，内存开始泄漏。
 
@@ -124,23 +151,110 @@
 
 `Dispose()` 与 `Close()`: 对于 `SqlConnection` 对象，您是否感到困惑应该调用哪一个？它们是两种不同的方法，用于解决不同的问题。`Close()` 仅关闭连接。您可以使用相同的对象重新打开连接。然而，`Dispose()` 关闭连接（在底层调用 `Close()`）然后从内存中释放对象。您不能再使用该对象了。
 
-您可以在 [https://docs.microsoft.com/en-us/dotnet/standard/garbage-collection/](https://docs.microsoft.com/en-us/dotnet/standard/garbage-collection/) 上了解更多关于垃圾回收器的信息。
+您可以在 [`docs.microsoft.com/en-us/dotnet/standard/garbage-collection/`](https://docs.microsoft.com/en-us/dotnet/standard/garbage-collection/) 上了解更多关于垃圾回收器的信息。
 
 # 考虑一个例子
 
 一个简单的 `Order` 类可以有一个默认的、参数化的、复制构造函数以及一个析构函数（用于销毁对象）：
 
-[PRE5]
+```cs
+    class Order
+    {
+        public string ProductName { get; set; }
+        public int Quantity { get; set; }
+
+        public Order()
+        {
+           // Default Constructor
+        }
+
+        public Order(string productName, int quantity)
+        {
+           // Constructor with two arguments
+           ProductName = productName;
+           Quantity = quantity;
+        }
+
+        public Order(Order someOrder)
+        {
+           // Copy constructor
+           ProductName = someOrder.ProductName;
+           Quantity = someOrder.Quantity;
+        }
+
+        ~Order()
+        {
+           // Destructor or Finalizer
+        }
+    }
+```
 
 您可以看到构造函数是如何使用和不使用参数形成的。注意复制构造函数，它接受一个与同一类相同的对象作为参数，并在体内将它的属性赋值给正在创建的对象。
 
 终结器隐式地调用对象的基类的 `Finalize` 方法。因此，当垃圾回收器调用终结器时，可能会调用如下所示的方法：
 
-[PRE6]
+```cs
+    protected override void Finalize()
+    {  
+      try  
+      {  
+        // Cleanup statements...  
+      }  
+      finally  
+      {  
+         base.Finalize();  
+      }  
+    }
+```
 
 让我们通过在 .NET Core 2.0 的控制台应用程序中使用代码片段来验证这种行为：
 
-[PRE7]
+```cs
+    class BaseClass
+    {
+      ~BaseClass()
+      {
+        System.Diagnostics.Trace.WriteLine("BaseClass's destructor is called.");
+      }
+    }
+    class DeriveClass1 : BaseClass
+    {
+      ~DeriveClass1()
+      {
+        System.Diagnostics.Trace.WriteLine("DeriveClass1's destructor
+            is called.");
+      }
+    }
+
+   class DeriveClass2 : DeriveClass1
+   {
+      public DeriveClass2()
+      {
+        System.Diagnostics.Trace.WriteLine("DeriveClass2's constructor is called.");
+      }
+
+      ~DeriveClass2()
+      {        
+         System.Diagnostics.Trace.WriteLine("DeriveClass2's destructor 
+          is called.");
+      }
+   }
+
+   class Program
+  {
+    static void Main(string[] args)
+    {
+       DeriveClass2 t = new DeriveClass2();
+
+       // Unlike .NET Framework, .NET Core 2.0, as of now, 
+       // does not call GC on application termination 
+       // to finalise the objects.
+       // So, we are trying to manually call GC
+       // to see the output.
+       System.GC.Collect();
+    }
+  }
+```
 
 首先创建 `DeriveClass2` 对象，它记录构造函数消息。然后执行 `DeriveClass2` 的析构函数。因此，当 `Main` 函数执行完成后，它首先被销毁。此外，父类也有析构函数。因为子类 (`DeriveClass2`) 对象已经被销毁，它也会运行父类的析构函数。以下截图来自 Visual Studio 的输出窗口。请确保以发布模式运行应用程序：
 
@@ -156,13 +270,51 @@
 
 我们将有一个 `ExampleIDisposable` 类，它实现了 `IDisposable` 接口。我不会演示非托管资源的用法，因为我们的目的是学习这个模式。我只是在构造函数中有一个控制台行，说明我们正在获取非托管资源。
 
-[PRE8]
+```cs
+    class ExampleIDisposable : IDisposable
+    {
+        public Dictionary<int, string> Chapters{ get; set; }
+        public ExampleIDisposable(Dictionary<int, string> chapters)
+        {
+           // Managed resources
+           Console.WriteLine("Managed Resources acquired");
+           Chapters = chapters;
+
+           // Some Unmanaged resources
+           Console.WriteLine("Unmanaged Resources acquired");
+        }
+
+        public void Dispose()
+        {
+           Console.WriteLine("Someone called Dispose");
+
+           // Dispose managed resources
+           if (Chapters != null)
+           {
+              Chapters = null;
+           }
+
+          // Dispose unmanaged resources
+        }
+     }
+```
 
 你可以看到这个类包含一个托管属性，它在构造函数中被初始化。我们将为它打印一行。同样，我们可能有一些在类中声明并由构造函数赋予生命的非托管资源属性。由于我们实现了 `IDisposable`，我们被迫定义唯一的方法 `Dispose()`。目前，我们只是在其中有一个控制台行。
 
 让我们试一试：
 
-[PRE9]
+```cs
+    static void Main(string[] args)
+   {
+      ExampleIDisposable disposable = new ExampleIDisposable(new Dictionary<int,
+        string> {{ 5, "Object Composition" },
+                { 6, "Object Lifetime" }
+        });
+
+      disposable.Dispose();
+      Console.ReadLine();
+    }
+```
 
 这会产生以下输出：
 
@@ -180,7 +332,47 @@
 
 我们在类内部定义的 `Dispose()` 方法将在我们直接通过类的对象调用它时帮助我们。然而，我们还需要在类内部定义另一个 `Dispose()` 重载，这将回答我们之前讨论过的问题。让我们将这个方法引入到我们的类中。
 
-[PRE10]
+```cs
+    class ExampleIDisposable : IDisposable
+    {
+      public Dictionary<int, string> Chapters { get; set; }
+      public ExampleIDisposable(Dictionary<int, string> chapters)
+      {
+        // Managed resources
+        System.Diagnostics.Trace.WriteLine("Managed Resources acquired");
+        Chapters = chapters;
+
+        // Some Unmanaged resources
+         System.Diagnostics.Trace.WriteLine("Unmanaged Resources acquired");
+      }
+      public void Dispose()
+       {
+         System.Diagnostics.Trace.WriteLine("Someone called Dispose");
+         Dispose(true);
+         GC.SuppressFinalize(this);
+       }
+       public void Dispose(bool disposeManagedResources)
+        {
+          if (disposeManagedResources)
+          {
+            if (Chapters != null)
+            {
+              Chapters = null;
+            }
+
+            System.Diagnostics.Trace.WriteLine("Managed Resources disposed");
+          }
+          System.Diagnostics.Trace.WriteLine("Unmanaged Resources disposed");
+        }
+
+        ~ExampleIDisposable()
+        {
+          System.Diagnostics.Trace.WriteLine("Finalizer called: Managed
+              resources will be cleaned");
+          Dispose(false);
+        }
+      }
+```
 
 对 `Dispose` 方法所做的修改如下所述：
 
@@ -196,9 +388,9 @@
 
 ![图片](img/3ab0882c-c4b8-412a-a457-cc9b83b35a01.png)
 
-这意味着无论开发者是否忘记丢弃，最终都会调用最终化器，我们在其中调用了`Dispose(false);`，最终释放了非托管资源。当然，最终化器会自动删除托管资源。您可以看到，在最后一种情况下，缺少了“有人调用了Dispose”和“已丢弃托管资源”这两行。
+这意味着无论开发者是否忘记丢弃，最终都会调用最终化器，我们在其中调用了`Dispose(false);`，最终释放了非托管资源。当然，最终化器会自动删除托管资源。您可以看到，在最后一种情况下，缺少了“有人调用了 Dispose”和“已丢弃托管资源”这两行。
 
-# 第3步 - 修改派生类的Dispose(bool)
+# 第 3 步 - 修改派生类的 Dispose(bool)
 
 由于我们有`Dispose(bool)`重载，它将直接在对象上可用以调用。我们没有必要将`Dispose(bool)`暴露给对象以进行直接调用，因为我们从`Dispose()`和最终化器内部调用它。
 
@@ -208,47 +400,146 @@
 
 前面的段落要求修改我们非常知名的方法`Dispose(bool)`：
 
-[PRE11]
+```cs
+    protected virtual void Dispose(bool disposeManagedResources)
+    {
+      if (disposeManagedResources)
+      {
+        if (Chapters != null)
+        {
+           Chapters = null;
+        }
+        System.Diagnostics.Trace.WriteLine("Managed Resources disposed");
+      }
+      System.Diagnostics.Trace.WriteLine("Unmanaged Resources disposed");
+    }
+```
 
-# 第4步 - 处理重复的Dispose调用
+# 第 4 步 - 处理重复的 Dispose 调用
 
 我们应该管理用户可能多次调用`Dispose()`的情况。如果我们不处理这种情况，后续的调用将只是对运行时来说不必要的执行，因为运行时将尝试释放已经被丢弃的对象。
 
 我们可以在类内部轻松地放置一个标志，该标志将指示对象是否已被丢弃。
 
-[PRE12]
+```cs
+    bool disposed = false;
+    protected virtual void Dispose(bool disposeManagedResources)
+    {
+      if (disposed)
+      {
+        System.Diagnostics.Trace.WriteLine("Dispose(bool) already called");
+         return;
+      }
+      if (disposeManagedResources)
+        {
+          if (Chapters != null)
+          {
+             Chapters = null;
+          }
+          System.Diagnostics.Trace.WriteLine("Managed Resources disposed");
+       }
+       System.Diagnostics.Trace.WriteLine("Unmanaged Resources disposed");
+       disposed = true;
+     }
+```
 
 注意`disposed`变量，它在`Dispose(bool)`内部使用。我们在方法内部检查它是否为真。如果是真的，那么我们就从方法中返回/退出，否则执行丢弃代码。最后，我们将它设置为真。因此，第一次`Dispose(bool)`将完全执行，之后，它将仅在调用一次后返回。这样，我们防止了多次丢弃同一个对象，这是一个开销。
 
 让我们修改代码以多次调用`Dispose()`：
 
-[PRE13]
+```cs
+    disposable.Dispose();
+    disposable.Dispose();
+    disposable.Dispose();
+```
 
 这将给出以下输出：
 
 ![图片](img/ac96fa07-23c1-4416-9e2f-fb32c5d50b49.png)
 
-你可以看到，对于第一次调用，一切如预期进行。对于同一对象的下一个两个后续的Dispose()调用，结果只是方法的一个简单返回。这就是为什么我们看到两组“Someone called Dispose”和“Dispose(bool) already called”的消息。
+你可以看到，对于第一次调用，一切如预期进行。对于同一对象的下一个两个后续的 Dispose()调用，结果只是方法的一个简单返回。这就是为什么我们看到两组“Someone called Dispose”和“Dispose(bool) already called”的消息。
 
 好的，我想在所有这些步骤之后展示最终的代码：
 
-[PRE14]
+```cs
+    class ExampleIDisposable : IDisposable
+    {
+        public Dictionary<int, string> Chapters { get; set; }
+        bool disposed = false;
+
+        public ExampleIDisposable(Dictionary<int, string> chapters)
+        {
+            // Managed resources
+            System.Diagnostics.Trace.WriteLine("Managed Resources acquired");
+            Chapters = chapters;
+
+            // Some Unmanaged resources
+            System.Diagnostics.Trace.WriteLine("Unmanaged Resources acquired");
+        }
+
+        public void Dispose()
+        {
+           System.Diagnostics.Trace.WriteLine("Someone called Dispose");
+
+           Dispose(true);
+           GC.SuppressFinalize(this);
+        }
+
+        protected virtual void Dispose(bool disposeManagedResources)
+        {
+           if (disposed)
+           {
+               System.Diagnostics.Trace.WriteLine("Dispose(bool) already called");
+               return;
+           }
+
+           if (disposeManagedResources)
+           {
+              if (Chapters != null)
+              {
+                 Chapters = null;
+              }
+              System.Diagnostics.Trace.WriteLine("Managed Resources
+                  disposed");
+           }
+
+           System.Diagnostics.Trace.WriteLine("Unmanaged Resources disposed");
+           disposed = true;
+        }
+
+        ~ExampleIDisposable()
+        {
+          System.Diagnostics.Trace.WriteLine("Finalizer called: Managed 
+                resources will be cleaned");
+          Dispose(false);
+        }
+      }
+```
 
 不要忘记，你可以使用`using`语句与任何实现了`IDisposable`接口的类一起使用。例如，让我们为`ExampleIDisposable`编写代码：
 
-[PRE15]
+```cs
+    using (ExampleIDisposable disposable = 
+        new ExampleIDisposable(new Dictionary<int, string> {
+        { 5, "Object Composition" },
+        { 6, "Object Lifetime" }
+        }))
+    {
+      // Do something with the "disposable" object.
+    }
+```
 
-如果你运行这个，它会产生与*步骤2：定义Dispose重载方法*部分下的第一个截图相同的结果。
+如果你运行这个，它会产生与*步骤 2：定义 Dispose 重载方法*部分下的第一个截图相同的结果。
 
-# .NET Core中的对象生命周期管理
+# .NET Core 中的对象生命周期管理
 
-在前面的章节中，我们已经探讨了依赖注入是如何集成到.NET Core中的。现在我们已经了解了对象是如何由.NET Framework管理的，让我们来看看它们在.NET Core中的生命周期。
+在前面的章节中，我们已经探讨了依赖注入是如何集成到.NET Core 中的。现在我们已经了解了对象是如何由.NET Framework 管理的，让我们来看看它们在.NET Core 中的生命周期。
 
-只用一行代码，我可以说，在启动时，.NET Core会取一个类，给它标记一个生命周期，然后实例化并存储在容器或服务集合中。考虑以下截图：
+只用一行代码，我可以说，在启动时，.NET Core 会取一个类，给它标记一个生命周期，然后实例化并存储在容器或服务集合中。考虑以下截图：
 
 ![](img/663079d7-0bb5-478d-a787-557867ec8ef7.png)
 
-我们将探讨在.NET Core中如何处理以下内容：
+我们将探讨在.NET Core 中如何处理以下内容：
 
 +   对象创建。
 
@@ -258,11 +549,17 @@
 
 # 对象创建
 
-通常在ASP.NET Core 2.0中，注入的类型被称为**服务**。例如，注入的接口被称为`IServiceCollection`，我们可以通过使用这里的`AddSingleton`方法添加所需的服务。我们很快就会了解更多关于它的内容：
+通常在 ASP.NET Core 2.0 中，注入的类型被称为**服务**。例如，注入的接口被称为`IServiceCollection`，我们可以通过使用这里的`AddSingleton`方法添加所需的服务。我们很快就会了解更多关于它的内容：
 
-[PRE16]
+```cs
+    public void ConfigureServices(IServiceCollection services)
+    {
+      services.AddMvc();
+      services.AddSingleton<IExampleService, ExampleService>();
+    }
+```
 
-当我们执行前面的代码时，ASP.NET Core内置的DI框架执行两个重要的步骤：
+当我们执行前面的代码时，ASP.NET Core 内置的 DI 框架执行两个重要的步骤：
 
 +   **实例化**：提供的服务的对象（例如：`ExampleService`）被实例化，以便在调用控制器时可以使用。对象通过构造函数注入或属性注入获得。`IExampleService`将是控制器的参数。这个接口的实现者`ExampleService`可以被实例化和注入。我们稍后会看到构造函数。
 
@@ -278,7 +575,7 @@
 
 我们现在将详细查看每个概念。不用担心，如果你在阅读后感到困惑。在精心设计的例子之后，你肯定会理解这个概念的。
 
-首先，让我们设计我们的ASP.NET MVC Core应用程序以使用所有这些类型的生命周期。这个例子与官方文档中给出的例子相似，可以在[https://docs.microsoft.com/en-us/aspnet/core/fundamentals/dependency-injection](https://docs.microsoft.com/en-us/aspnet/core/fundamentals/dependency-injection)找到。
+首先，让我们设计我们的 ASP.NET MVC Core 应用程序以使用所有这些类型的生命周期。这个例子与官方文档中给出的例子相似，可以在[`docs.microsoft.com/en-us/aspnet/core/fundamentals/dependency-injection`](https://docs.microsoft.com/en-us/aspnet/core/fundamentals/dependency-injection)找到。
 
 此处的主要目标是理解实例在传入请求期间是如何保持的。我们将从两个地方调查这些实例：一个是从控制器，另一个是从一个类。这两个家伙都将使用相同的接口作为构造函数中注入的依赖项。让我们一步一步地来了解这些内容。
 
@@ -286,7 +583,25 @@
 
 首先编写一个接口`IExampleService`，它有一个`Guid`类型的属性`ExampleId`。然后编写四个实现此接口的接口。我们根据不同的生命周期类型给它们命名，这样我们就可以在之后轻松地识别它们：
 
-[PRE17]
+```cs
+    public interface IExampleService
+    {
+      Guid ExampleId { get; }
+    }
+
+    public interface IExampleTransient : IExampleService
+    {
+    }
+    public interface IExampleScoped : IExampleService
+    {
+    }
+    public interface IExampleSingleton : IExampleService
+    {
+    }
+    public interface IExampleSingletonInstance : IExampleService
+    {
+    }
+```
 
 # 具体类
 
@@ -296,21 +611,107 @@
 
 ![](img/36b8337a-1d81-4ff2-9ace-c1d5a66d9050.png)
 
-一个单独的`Example`类实现了所有这些接口，并定义了`ExampleId` guid。有两个构造函数：一个接受`Guid`作为参数，另一个是默认的，它初始化一个新的guid。所有这些接口都将在这个类的*Startup*中解析。我们很快就会接近那段代码：
+一个单独的`Example`类实现了所有这些接口，并定义了`ExampleId` guid。有两个构造函数：一个接受`Guid`作为参数，另一个是默认的，它初始化一个新的 guid。所有这些接口都将在这个类的*Startup*中解析。我们很快就会接近那段代码：
 
-[PRE18]
+```cs
+    using LifetimesExample.Interfaces;
+    using System;
+
+    namespace LifetimesExample.Models
+   {
+      public class Example : IExampleScoped, IExampleSingleton, 
+         IExampleTransient, IExampleSingletonInstance
+      {
+        public Guid ExampleId { get; set; }
+        public Example()
+        {
+          ExampleId = Guid.NewGuid();
+        }
+        public Example(Guid exampleId)
+        {
+          ExampleId = exampleId;
+        }
+      }
+    }
+```
 
 # 服务类
 
 正如我们之前所说的，使用这些接口创建一个简单的类，这个类被称作`ExampleService`。这里有一个构造函数，它等待接口被注入并分配给局部接口类型变量。
 
-[PRE19]
+```cs
+    using LifetimesExample.Interfaces;
+    namespace LifetimesExample.Services
+    {
+    public class ExampleService
+    {
+        public IExampleTransient TransientExample { get; }
+        public IExampleScoped ScopedExample { get; }
+        public IExampleSingleton SingletonExample { get; }
+        public IExampleSingletonInstance SingletonInstanceExample { get; }
+
+        public ExampleService(IExampleTransient transientExample,
+            IExampleScoped scopedExample,
+            IExampleSingleton singletonExample,
+            IExampleSingletonInstance instanceExample)
+        {
+            TransientExample = transientExample;
+            ScopedExample = scopedExample;
+            SingletonExample = singletonExample;
+            SingletonInstanceExample = instanceExample;
+        }
+      }
+    }
+```
 
 # 控制器
 
 控制器几乎与 `Service` 类相同，只是多了一个 `ExampleService` 的引用。它有一个构造函数来初始化它们。`ExampleService` 的属性将在视图中打印出来，这就是为什么我们引用那个类：
 
-[PRE20]
+```cs
+    using Microsoft.AspNetCore.Mvc;
+    using LifetimesExample.Services;
+    using LifetimesExample.Interfaces;
+
+    namespace LifetimesExample.Controllers
+    {
+      public class ExampleController : Controller
+      {
+        private readonly ExampleService _exampleService;
+        private readonly IExampleTransient _transientExample;
+        private readonly IExampleScoped _scopedExample;
+        private readonly IExampleSingleton _singletonExample;
+        private readonly IExampleSingletonInstance _singletonInstanceExample;
+
+        public ExampleController(ExampleService ExampleService,
+            IExampleTransient transientExample,
+            IExampleScoped scopedExample,
+            IExampleSingleton singletonExample,
+            IExampleSingletonInstance singletonInstanceExample)
+        {
+            _exampleService = ExampleService;
+            _transientExample = transientExample;
+            _scopedExample = scopedExample;
+            _singletonExample = singletonExample;
+            _singletonInstanceExample = singletonInstanceExample;
+        }
+
+        public IActionResult Index()
+        {
+            // viewbag contains controller-requested services
+            ViewBag.Transient = _transientExample;
+            ViewBag.Scoped = _scopedExample;
+            ViewBag.Singleton = _singletonExample;
+            ViewBag.SingletonInstance = _singletonInstanceExample;
+
+            // Example service has its own requested services
+            ViewBag.Service = _exampleService;
+
+            return View();
+        }
+      }
+    }
+```
 
 在 `Index()` 动作中，我们正在将所有这些值返回到 `ViewBag`。
 
@@ -318,7 +719,72 @@
 
 最后，但同样重要的是，我们将简单地设计一个视图，以显示所有这些值，这样我们就可以开始观察。这将是 `Views/Example` 中的 `Index.cshtml`。
 
-[PRE21]
+```cs
+    @using LifetimesExample.Interfaces
+    @using LifetimesExample.Services
+
+    @{
+      ViewData["Title"] = "Index";
+     }
+
+    @{
+      IExampleTransient transient = (IExampleTransient)ViewData["Transient"];
+      IExampleTransient scoped = (IExampleTransient)ViewData["Scoped"];
+      IExampleTransient singleton = (IExampleTransient)ViewData["Singleton"];
+      IExampleTransient singletonInstance = (IExampleTransient)ViewData["SingletonInstance"];
+      ExampleService service = (ExampleService)ViewBag.Service;
+    }
+
+    <h2>Lifetimes</h2>
+
+    <h3>ExampleController Dependencies</h3>
+    <table>
+     <tr>
+        <th>Lifestyle</th>
+        <th>Guid Value</th>
+     </tr>
+    <tr>
+        <td>Transient</td>
+        <td>@transient.ExampleId</td>
+    </tr>
+    <tr>
+        <td>Scoped</td>
+        <td>@scoped.ExampleId</td>
+    </tr>
+    <tr>
+        <td>Singleton</td>
+        <td>@singleton.ExampleId</td>
+    </tr>
+    <tr>
+        <td>Instance</td>
+        <td>@singletonInstance.ExampleId</td>
+    </tr>
+   </table>
+
+   <h3>ExampleService Dependencies</h3>
+   <table>
+    <tr>
+        <th>Lifestyle</th>
+        <th>Guid Value</th>
+    </tr>
+    <tr>
+        <td>Transient</td>
+        <td>@service.TransientExample.ExampleId</td>
+    </tr>
+    <tr>
+        <td>Scoped</td>
+        <td>@service.ScopedExample.ExampleId</td>
+    </tr>
+    <tr>
+        <td>Singleton</td>
+        <td>@service.SingletonExample.ExampleId</td>
+    </tr>
+    <tr>
+        <td>Instance</td>
+        <td>@service.SingletonInstanceExample.ExampleId</td>
+    </tr>
+  </table>
+```
 
 最后，我们完成了代码。你确定吗？我们忘记了主要入口点。决定哪个类将针对哪个接口进行解析的那个。
 
@@ -326,7 +792,20 @@
 
 现在，每种类型的生命周期都被添加到使用 `Example` 类解析的容器中。`ExampleService` 类为自己解析。这意味着，无论何时在应用程序的任何地方需要 `ExampleService` 进行注入，它都会自动分配一个具有所有属性的该类对象：
 
-[PRE22]
+```cs
+    public void ConfigureServices(IServiceCollection services)
+    {
+        // Add framework services.
+        services.AddMvc();
+
+        services.AddTransient<IExampleTransient, Example>();
+        services.AddScoped<IExampleScoped, Example>();
+        services.AddSingleton<IExampleSingleton, Example>();
+        services.AddSingleton<IExampleSingletonInstance, Example>();
+        services.AddSingleton(new Example(Guid.Empty));
+        services.AddTransient<ExampleService, ExampleService>();
+    }
+```
 
 `Add***` 方法（具有不同的生命周期）确保对象根据预期的行为被创建。一旦这些对象被初始化，它们就可以在任何需要的地方被注入。
 
@@ -352,7 +831,23 @@
 
 虽然在代码中创建作用域是可能的。有一个名为 `IServiceScopeFactory` 的接口，它公开了 `CreateScope` 方法。`CreateScope` 是 `IServiceScope` 类型，它实现了 `IDisposable`。在这里，`using` 块帮助我们处理作用域实例的释放：
 
-[PRE23]
+```cs
+    var serviceProvider = services.BuildServiceProvider();
+    var serviceScopeFactory = serviceProvider.GetRequiredService<
+          IServiceScopeFactory>();
+
+    IExampleScoped scopedOne;
+    IExampleScoped scopedTwo;
+
+    using (var scope = serviceScopeFactory.CreateScope())
+    {
+      scopedOne = scope.ServiceProvider.GetService<IExampleScoped>();
+    }
+    using (var scope = serviceScopeFactory.CreateScope())
+    {
+     scopedTwo = scope.ServiceProvider.GetService<IExampleScoped>();
+    }
+```
 
 我们在前面代码中使用 `CreateScope` 创建了两个作用域实例。这两个实例相互独立，并且不像普通的作用域实例那样在请求中共享。这是因为我们手动指定了作用域而不是默认的 Web 请求作用域。
 
@@ -362,7 +857,7 @@
 
 # 实例
 
-最后一个是Singleton的特殊情况，用户创建对象并将其提供给`AddSingleton`方法。因此，我们明确地创建了`Example`类的对象（`services.AddSingleton(new Example(Guid.Empty))`），并要求DI框架将其注册为Singleton。在这种情况下，我们发送了`Guid.Empty`。因此，一个空的GUID被分配，对所有请求保持不变。
+最后一个是 Singleton 的特殊情况，用户创建对象并将其提供给`AddSingleton`方法。因此，我们明确地创建了`Example`类的对象（`services.AddSingleton(new Example(Guid.Empty))`），并要求 DI 框架将其注册为 Singleton。在这种情况下，我们发送了`Guid.Empty`。因此，一个空的 GUID 被分配，对所有请求保持不变。
 
 # 对象销毁
 
@@ -370,11 +865,23 @@
 
 考虑以下示例，其中`ServiceDisposable`实现了`IDisposable`，我们告诉服务将其生命周期管理为`Scoped`。因此，它将创建实例，然后在整个应用程序的资源中为单个请求提供它。最后，当请求结束时，它将销毁它：
 
-[PRE24]
+```cs
+    public class ServiceDisposable : IDisposable {}
+    public void ConfigureServices(IServiceCollection services)
+    {
+      services.AddScoped(ServiceDisposable);
+    }
+```
 
-然而，当我们显式创建对象并将其提供给DI时，我们需要自己处理其销毁。在以下情况下，我们必须在某个地方手动调用`Dispose()`以销毁实例：
+然而，当我们显式创建对象并将其提供给 DI 时，我们需要自己处理其销毁。在以下情况下，我们必须在某个地方手动调用`Dispose()`以销毁实例：
 
-[PRE25]
+```cs
+    public class ServiceDisposable : IDisposable {}
+    public void ConfigureServices(IServiceCollection services)
+    {
+      services.AddScoped(new ServiceDisposable());
+    }
+```
 
 # 何时选择什么？
 
@@ -382,43 +889,179 @@
 
 +   需要占用更多空间并使用大量服务器资源的对象不应被重新创建，而应重用。例如，数据库对象应重用于所有遵循`Singleton`模式的后续请求。
 
-+   在批量或循环中运行的操作可以在特定请求中重用，但对于另一个请求则应重新创建。这表明是Scoped生命周期。
++   在批量或循环中运行的操作可以在特定请求中重用，但对于另一个请求则应重新创建。这表明是 Scoped 生命周期。
 
-+   每次我们尝试创建`Model`和`View Model`类时，都应该实例化它们。在进行CRUD操作时，我们不能重用`Model`类对象，否则可能会导致错误的值进入数据库。当然，这是`Transient`的，因为它存在的时间很短。
++   每次我们尝试创建`Model`和`View Model`类时，都应该实例化它们。在进行 CRUD 操作时，我们不能重用`Model`类对象，否则可能会导致错误的值进入数据库。当然，这是`Transient`的，因为它存在的时间很短。
 
 # 生命周期之间的关系和依赖
 
-在本节中，我们将深入挖掘生命周期之间的关系。原因很清楚。当我们用不同类型的生活方式实例化我们的类时，我们可能会遇到需要另一个类依赖一个类的情况。但是，这里的难点是它们可能不遵循类似的生活方式。那么，在`Singleton`类内部引用的遵循scoped生命周期的实例会发生什么？它是否表现得像Scoped？
+在本节中，我们将深入挖掘生命周期之间的关系。原因很清楚。当我们用不同类型的生活方式实例化我们的类时，我们可能会遇到需要另一个类依赖一个类的情况。但是，这里的难点是它们可能不遵循类似的生活方式。那么，在`Singleton`类内部引用的遵循 scoped 生命周期的实例会发生什么？它是否表现得像 Scoped？
 
 让我们动手做一些代码修改，将依赖注入到彼此中。
 
-# 根据Scoped和Transient选择Singleton
+# 根据 Scoped 和 Transient 选择 Singleton
 
 首先，我们需要向现有的`IExampleSingleton`接口添加两个新属性：
 
-[PRE26]
+```cs
+    public interface IExampleSingleton : IExampleService
+    {
+        Guid ScopedExampleId { get; }
+        Guid TransientExampleId { get; }
+   }
+```
 
-接下来，我们想要为所有生命周期设计一个新类。正如我们计划的，让我们通过构造函数将Transient和Scoped依赖项注入到这个`Singleton`类中。为依赖的生活方式定义的属性将从参数中相应地分配值。
+接下来，我们想要为所有生命周期设计一个新类。正如我们计划的，让我们通过构造函数将 Transient 和 Scoped 依赖项注入到这个`Singleton`类中。为依赖的生活方式定义的属性将从参数中相应地分配值。
 
-[PRE27]
+```cs
+    using System;
+    namespace LifetimesExample
+    {
+      public class ExampleSingleton : IExampleSingleton
+      {
+        public Guid ExampleId { get; set; }
+        public Guid ScopedExampleId { get; set; }
+        public Guid TransientExampleId { get; set; }
+
+        public ExampleSingleton(IExampleTransient transient, IExampleScoped scoped)
+        {
+            ExampleId = Guid.NewGuid();
+            ScopedExampleId = scoped.ExampleId;
+            TransientExampleId = transient.ExampleId;
+        }
+      }
+      public class ExampleScoped : IExampleScoped
+      {
+        public Guid ExampleId { get; set; }
+
+        public ExampleScoped()
+        {
+            ExampleId = Guid.NewGuid();
+        }
+      }
+      public class ExampleTransient : IExampleTransient
+      {
+        public Guid ExampleId { get; set; }
+
+        public ExampleTransient()
+        {
+            ExampleId = Guid.NewGuid();
+        }
+       }
+     }
+```
 
 我只是为了这本书的可读性，在同一个地方定义了所有类。理想情况下，你应该每次都把它们添加到不同的文件中。
 
 控制器是我们需要添加操作的下一个地方，该操作将返回一个视图，我们将展示其中的值。
 
-[PRE28]
+```cs
+    using Microsoft.AspNetCore.Mvc;
+    namespace LifetimesExample.Controllers
+    {
+      public class ExampleController : Controller
+      {
+        private readonly ExampleService _exampleService;
+        private readonly IExampleTransient _transientExample;
+        private readonly IExampleScoped _scopedExample;
+        private readonly IExampleSingleton _singletonExample;
+
+        public ExampleController(ExampleService ExampleService,
+            IExampleTransient transientExample,
+            IExampleScoped scopedExample,
+            IExampleSingleton singletonExample)
+        {
+            _exampleService = ExampleService;
+            _transientExample = transientExample;
+            _scopedExample = scopedExample;
+            _singletonExample = singletonExample;
+        }
+
+        public IActionResult SingletonDependencies()
+        {
+            ViewBag.Singleton = _singletonExample;
+
+            ViewBag.Service = _exampleService;
+
+            return View("Singleton");
+        }
+      }
+    }
+```
 
 这与我们在`Index`操作中做的是相似的。区别在于我们移除了`SingletonInstance`引用，并返回了一个名为`Singleton`的视图。
 
 视图看起来可能如下所示：
 
-[PRE29]
+```cs
+  @{
+    ViewData["Title"] = "Index";
+  }
+
+  @{
+    IExampleSingleton singleton = (IExampleSingleton)ViewData["Singleton"];
+    ExampleService service = (ExampleService)ViewBag.Service;
+  }
+  <h2>Singleton Lifetime Dependencies</h2>
+
+  <h3>ExampleController</h3>
+
+  <h5><u>Singleton ExampleId: @singleton.ExampleId</u></h5>
+
+  <table>
+    <tr>
+        <th>Dependencies</th>
+        <th>Guid Value</th>
+    </tr>
+
+    <tr>
+        <td>Scoped Dependency</td>
+        <td>@singleton.ScopedExampleId</td>
+    </tr>
+    <tr>
+        <td>Transient Dependency</td>
+        <td>@singleton.TransientExampleId</td>
+    </tr>
+  </table>
+
+  <h3>ExampleService</h3>
+
+  <h5><u>Singleton ExampleId: @service.SingletonExample.ExampleId</u></h5>
+
+  <table>
+    <tr>
+        <th>Dependencies</th>
+        <th>Guid Value</th>
+    </tr>
+
+    <tr>
+        <td>Scoped Dependency</td>
+        <td>@service.SingletonExample.ScopedExampleId</td>
+    </tr>
+    <tr>
+        <td>Transient Dependency</td>
+        <td>@service.SingletonExample.TransientExampleId</td>
+    </tr>
+  </table>
+```
 
 因此，我正在尝试打印`Singleton`对象的`ExampleId`以及与依赖对象（`Transient`和`Scoped`）相关的属性。我已经省略了这段代码中的样式，只是为了使表格看起来更酷。
 
 是时候告诉`Startup` `ConfigureService`注册具有适当生命周期的类了：
 
-[PRE30]
+```cs
+public void ConfigureServices(IServiceCollection services)
+{
+        // Add framework services.
+        services.AddMvc();
+
+        services.AddSingleton<IExampleSingleton, ExampleSingleton>();
+        services.AddScoped<IExampleScoped, ExampleScoped>();
+        services.AddTransient<IExampleTransient, ExampleTransient>();
+
+        services.AddTransient<ExampleService, ExampleService>();
+}
+```
 
 哇！我们完成了。让我们检查输出。我已经并排粘贴了两个请求的截图，这样我们可以轻松地标记发现的内容：
 
@@ -428,23 +1071,52 @@
 
 等一下！这里有些奇怪。依赖对象的值在请求之间也是相同的。注意红色块中的值。尽管这些类被注册为`Scoped`和`Transient`，但它们的行为像`Singleton`。这意味着这些对象的正常生命周期被篡改了。
 
-**推断**：不建议在`Singleton`类内部引用`Scoped`和`Transient`生命周期类，因为它们将失去其正常行为并变成Singleton。
+**推断**：不建议在`Singleton`类内部引用`Scoped`和`Transient`生命周期类，因为它们将失去其正常行为并变成 Singleton。
 
 显然，一个`Singleton`类可以依赖于另一个`Singleton`类。同样，其他生活方式遵循相同的规则。因此，一个`Scoped`类可以引用另一个`Scoped`类，一个`Transient`可以引用另一个`Transient`。当执行时，它们都将按预期行为。
 
-# Scoped依赖于Singleton和Transient
+# Scoped 依赖于 Singleton 和 Transient
 
 同样，我们可以在`Scoped`类内部测试依赖关系。我们将从向接口`IExampleScoped`添加两个属性开始：
 
-[PRE31]
+```cs
+public interface IExampleScoped : IExampleService
+{
+        Guid SingletonExampleId { get; }
+        Guid TransientExampleId { get; }
+}
+```
 
 `ExampleScoped`现在应该实现这两个属性。同时，与`Transient`和`Singleton`相关的接口需要注入到`constructor`中：
 
-[PRE32]
+```cs
+    public class ExampleScoped : IExampleScoped
+    {
+        public Guid ExampleId { get; set; }
+        public Guid SingletonExampleId { get; set; }
+        public Guid TransientExampleId { get; set; }
+
+        public ExampleScoped(IExampleTransient transient, IExampleSingleton singleton)
+        {
+          ExampleId = Guid.NewGuid();
+          SingletonExampleId = singleton.ExampleId;
+          TransientExampleId = transient.ExampleId;
+        }
+    }
+```
 
 添加了一个新的操作，它将返回名为`Scoped`的视图：
 
-[PRE33]
+```cs
+    public IActionResult ScopedDependencies()
+    {
+        ViewBag.Scoped = _scopedExample;
+
+        ViewBag.Service = _exampleService;
+
+        return View("Scoped");
+    }
+```
 
 看起来我们已经完成了。让我们运行应用程序：
 
@@ -452,7 +1124,7 @@
 
 哎呀！我们看到了一个异常屏幕，上面显示检测到一个循环依赖。
 
-**循环依赖**，正如其名所示，是一个依赖于另一个类的类，而另一个类又反过来依赖于第一个类。我们设计了一切来测试Scoped生活方式中其他生活方式的依赖，但在做之前，我们忘记了一件事。之前，我们在`Singleton`类内部添加了`Scoped`类的依赖，现在，如果你看到前面的`ExampleScoped`构造函数，我们现在注入`IExampleSingleton`，它被解析为`Singleton`类`ExampleSingleton`。这就是它变成循环的原因。
+**循环依赖**，正如其名所示，是一个依赖于另一个类的类，而另一个类又反过来依赖于第一个类。我们设计了一切来测试 Scoped 生活方式中其他生活方式的依赖，但在做之前，我们忘记了一件事。之前，我们在`Singleton`类内部添加了`Scoped`类的依赖，现在，如果你看到前面的`ExampleScoped`构造函数，我们现在注入`IExampleSingleton`，它被解析为`Singleton`类`ExampleSingleton`。这就是它变成循环的原因。
 
 因此，我们需要从`Singleton`类中移除依赖以进行测试。我们还可以通过为`Singleton`创建另一个接口和类来进行测试。所以，当你修复代码时，我们将得到以下输出。我这里不会写`View`的代码。它与我们在`Singleton`中做的几乎一样。我们只需要打印`ExampleId`、`SingletonExampleId`和`TransientExampleId`：
 
@@ -462,19 +1134,48 @@
 
 **推断：** 这就是为什么建议在`Scoped`类内部使用`Scoped`和`Singleton`依赖，而不是`Transient`。
 
-# Transient依赖于Singleton和Scoped
+# Transient 依赖于 Singleton 和 Scoped
 
 对于`Transient`，我们将按照相同的模式设计所需的接口和类。接口看起来如下：
 
-[PRE34]
+```cs
+public interface IExampleTransient : IExampleService
+{
+        Guid SingletonExampleId { get; }
+        Guid ScopedExampleId { get; }
+}
+```
 
 接下来是`Transient`类依赖于`Singleton`和`Scoped`。
 
-[PRE35]
+```cs
+public class ExampleTransient : IExampleTransient
+{
+        public Guid ExampleId { get; set; }
+        public Guid SingletonExampleId { get; set; }
+        public Guid ScopedExampleId { get; set; }
+
+        public ExampleTransient(IExampleSingleton singleton, IExampleScoped scoped)
+        {
+                ExampleId = Guid.NewGuid();
+                SingletonExampleId = singleton.ExampleId;
+                ScopedExampleId = scoped.ExampleId;
+        }
+}
+```
 
 最后，但同样重要的是，一个新的动作来渲染视图`Transient`：
 
-[PRE36]
+```cs
+    public IActionResult TransientDependencies()
+   {
+        ViewBag.Transient = _transientExample;
+
+        ViewBag.Service = _exampleService;
+
+        return View("Transient");
+   }
+```
 
 在设计视图之后运行，最终结果可能如下所示：
 
@@ -494,10 +1195,10 @@
 
 # 摘要
 
-在本章中，我们学习了.NET Framework如何创建和销毁对象。我们讨论了创建和销毁机制。*垃圾回收器*在通过终结器自动处理中扮演着重要角色，我们通过示例进行了分析。
+在本章中，我们学习了.NET Framework 如何创建和销毁对象。我们讨论了创建和销毁机制。*垃圾回收器*在通过终结器自动处理中扮演着重要角色，我们通过示例进行了分析。
 
 最重要的是，我们看到了如何通过实现`IDisposal`接口来手动处理对象的步骤分解。
 
-之后，我们探讨了.NET Core中对象维护的不同生命周期。我们通过控制器和服务类示例了解了对象的创建和销毁过程。最重要的是，我们实验了不同生活方式之间的适应性。
+之后，我们探讨了.NET Core 中对象维护的不同生命周期。我们通过控制器和服务类示例了解了对象的创建和销毁过程。最重要的是，我们实验了不同生活方式之间的适应性。
 
-依赖注入的另一个支柱——拦截，将在[第7章](d36b8d07-937a-4f06-ba4c-3cd040798052.xhtml)“拦截”中介绍。
+依赖注入的另一个支柱——拦截，将在第七章“拦截”中介绍。

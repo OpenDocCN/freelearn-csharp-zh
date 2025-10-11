@@ -2,59 +2,61 @@
 
 在本章中，我们将探讨以下食谱：
 
-+   在Ubuntu中设置.NET Core
++   在 Ubuntu 中设置.NET Core
 
 +   创建一个文本日志
 
-+   在Ubuntu中创建一个ASP.NET Core应用程序以使用库
++   在 Ubuntu 中创建一个 ASP.NET Core 应用程序以使用库
 
-+   在macOS中设置.NET Core
++   在 macOS 中设置.NET Core
 
 +   从逗号分隔（CSV）文本文件中读取
 
-+   在macOS中创建一个.NET Core控制台应用程序以使用库
++   在 macOS 中创建一个.NET Core 控制台应用程序以使用库
 
 +   压缩？为什么不呢？
 
-+   创建一个经典Windows应用程序以使用库
++   创建一个经典 Windows 应用程序以使用库
 
 +   在文本文件中加密和解密内容
 
-+   创建一个经典Windows应用程序以使用库
++   创建一个经典 Windows 应用程序以使用库
 
 # 技术要求
 
-读者应具备C#的基本知识。他们还应具备使用Visual Studio、使用NuGet安装包以及在其他项目中引用库的基本知识。
+读者应具备 C#的基本知识。他们还应具备使用 Visual Studio、使用 NuGet 安装包以及在其他项目中引用库的基本知识。
 
-本章的代码文件可以在GitHub上找到：
+本章的代码文件可以在 GitHub 上找到：
 
-[https://github.com/PacktPublishing/DotNET-Standard-2-Cookbook/tree/master/Chapter03](https://github.com/PacktPublishing/DotNET-Standard-2-Cookbook/tree/master/Chapter03)
+[`github.com/PacktPublishing/DotNET-Standard-2-Cookbook/tree/master/Chapter03`](https://github.com/PacktPublishing/DotNET-Standard-2-Cookbook/tree/master/Chapter03)
 
 观看以下视频以查看代码的实际操作：
 
-[https://goo.gl/82FCEP](https://goo.gl/82FCEP)
+[`goo.gl/82FCEP`](https://goo.gl/82FCEP)
 
 # 简介
 
-作为一名开发者，在某个时候，我们不得不将一些数据写入磁盘或从磁盘读取数据。这可能是一个简单的文本文件，或者可能是一个您所编写的系统中的日志文件。.NET Framework为与文件操作提供了强大的支持。主要，我们将关注`System.IO`命名空间及其使用。
+作为一名开发者，在某个时候，我们不得不将一些数据写入磁盘或从磁盘读取数据。这可能是一个简单的文本文件，或者可能是一个您所编写的系统中的日志文件。.NET Framework 为与文件操作提供了强大的支持。主要，我们将关注`System.IO`命名空间及其使用。
 
-在本章中，我们还将探讨一些跨平台应用程序。每个食谱将介绍如何设置新的环境，例如Ubuntu和macOS，以及构建.NET Standard 2.0库及其配套的应用程序。
+在本章中，我们还将探讨一些跨平台应用程序。每个食谱将介绍如何设置新的环境，例如 Ubuntu 和 macOS，以及构建.NET Standard 2.0 库及其配套的应用程序。
 
-# 在Ubuntu中设置.NET Core
+# 在 Ubuntu 中设置.NET Core
 
-在本食谱中，我们将介绍如何在Ubuntu系统中设置.NET Core 2.x。Ubuntu是一个广泛使用的基于Debian的Linux环境。通过访问[https://www.ubuntu.com/desktop](https://www.ubuntu.com/desktop)，您可以轻松地下载并在您的系统上安装Ubuntu。您可能需要使用虚拟PC来完成此操作。有两个出色的免费工具您可以使用：
+在本食谱中，我们将介绍如何在 Ubuntu 系统中设置.NET Core 2.x。Ubuntu 是一个广泛使用的基于 Debian 的 Linux 环境。通过访问[`www.ubuntu.com/desktop`](https://www.ubuntu.com/desktop)，您可以轻松地下载并在您的系统上安装 Ubuntu。您可能需要使用虚拟 PC 来完成此操作。有两个出色的免费工具您可以使用：
 
-1.  VMWare Workstation Player for Windows: [https://www.vmware.com/products/workstation-player.html](https://www.vmware.com/products/workstation-player.html)
+1.  VMWare Workstation Player for Windows: [`www.vmware.com/products/workstation-player.html`](https://www.vmware.com/products/workstation-player.html)
 
-1.  Oracle Virtual Box for Windows, Linux, and macOS: [https://www.virtualbox.org/wiki/Downloads](https://www.virtualbox.org/wiki/Downloads)
+1.  Oracle Virtual Box for Windows, Linux, and macOS: [`www.virtualbox.org/wiki/Downloads`](https://www.virtualbox.org/wiki/Downloads)
 
 本章假设您已经设置并安装了所需的操作系统。
 
 # 准备工作
 
-您将需要下载一个虚拟PC并安装最新版本的Ubuntu。如果您还没有运行Ubuntu的虚拟PC，在继续此食谱之前请确保已经完成。我在这里使用的是Ubuntu版本16.04。要找出您拥有哪个版本，只需在终端中输入以下命令：
+您将需要下载一个虚拟 PC 并安装最新版本的 Ubuntu。如果您还没有运行 Ubuntu 的虚拟 PC，在继续此食谱之前请确保已经完成。我在这里使用的是 Ubuntu 版本 16.04。要找出您拥有哪个版本，只需在终端中输入以下命令：
 
-[PRE0]
+```cs
+$ lsb_release -a
+```
 
 您应该得到以下输出：
 
@@ -62,7 +64,7 @@
 
 # 如何操作...
 
-1.  打开您喜欢的浏览器，输入以下URL，然后按*Enter*键：
+1.  打开您喜欢的浏览器，输入以下 URL，然后按*Enter*键：
 
     `https://www.microsoft.com/net/download/linux`
 
@@ -78,31 +80,49 @@
 
 1.  现在打开终端，输入以下命令并按 *Enter* 键：
 
-[PRE1]
+```cs
+ $ curl https://packages.microsoft.com/keys/microsoft.asc | 
+      gpg --dearmor > microsoft.gpg
+```
 
 1.  如果您有一个全新的 Ubuntu 安装，您可能没有安装 curl。如果没有，请使用以下命令安装 curl：
 
-[PRE2]
+```cs
+ $ sudo apt-get install curl 
+```
 
 1.  现在，再次在终端中输入以下命令并按 *Enter* 键以获取文件列表：
 
-[PRE3]
+```cs
+ $ sudo mv microsoft.gpg /etc/apt/trusted.gpg.d/microsoft.gpg
+```
 
 1.  在终端中输入以下命令并按 *Enter* 键：
 
-[PRE4]
+```cs
+ $ sudo sh -c 'echo "deb [arch=amd64] 
+      https://packages.microsoft.com/repos/
+      microsoft-ubuntu-xenial-prod xenial main" > 
+      /etc/apt/sources.list.d/dotnetdev.list'
+```
 
 1.  让我们使用以下命令更新软件包列表：
 
-[PRE5]
+```cs
+ $ sudo apt-get update
+```
 
 1.  最后，让我们使用以下命令安装 SDK：
 
-[PRE6]
+```cs
+ $ sudo apt-get install dotnet-sdk-2.0.2
+```
 
 1.  现在我们已经完成了 SDK 的安装，让我们使用以下命令来测试它：
 
-[PRE7]
+```cs
+ $ dotnet --version 
+```
 
 1.  如果一切正常，您应该会看到以下输出：
 
@@ -124,7 +144,7 @@
 
 确保您已安装 Ubuntu 16.04 和 .NET Core 2.0 SDK。如果没有，请按照前面的菜谱进行操作。假设一切已安装且 .NET Core 2.0 正在运行，让我们开始创建一个将日志作为文本写入的库。
 
-确保您已从 [https://code.visualstudio.com](https://code.visualstudio.com) 下载并安装了 Visual Studio Code。这是一个从网站下载 `.deb` 文件的简单安装。
+确保您已从 [`code.visualstudio.com`](https://code.visualstudio.com) 下载并安装了 Visual Studio Code。这是一个从网站下载 `.deb` 文件的简单安装。
 
 # 如何操作...
 
@@ -132,23 +152,31 @@
 
 1.  现在在您的家目录或任何其他目录中输入以下命令并按 *Enter* 键：
 
-[PRE8]
+```cs
+      $ dotnet new sln -o Chapter3 -n Chapter3.LogFile
+```
 
 1.  现在，使用以下命令切换到新创建的目录：
 
-[PRE9]
+```cs
+ $ cd Chapter3
+```
 
-1.  现在您已经处于解决方案的根目录。让我们使用以下命令创建.NET Standard库项目：
+1.  现在您已经处于解决方案的根目录。让我们使用以下命令创建.NET Standard 库项目：
 
-[PRE10]
+```cs
+ $ dotnet new classlib -o Chapter3.LogFile.LogLib
+```
 
-1.  现在我们已经创建了我们的`Class Library Project`，让我们使用Visual Studio Code打开整个解决方案。
+1.  现在我们已经创建了我们的`Class Library Project`，让我们使用 Visual Studio Code 打开整个解决方案。
 
 1.  在终端中输入以下命令并按*Enter*键：
 
-[PRE11]
+```cs
+ $ code .
+```
 
-1.  之前的命令将在当前目录中打开Visual Studio Code，IDE应该看起来像这样：
+1.  之前的命令将在当前目录中打开 Visual Studio Code，IDE 应该看起来像这样：
 
 ![](img/4fd8eb18-8cc1-4128-9c60-7769677d1de8.png)
 
@@ -158,7 +186,16 @@
 
 1.  现在您的代码应该看起来像这样：
 
-[PRE12]
+```cs
+      using System;
+
+      namespace Chapter3.LogFile.LogLib
+      {
+          public class TextLog
+          {
+          }
+      }
+```
 
 1.  让我们将我们的新项目添加到解决方案中。确保您位于项目目录的根目录。输入`ls`命令，输出应该像这样：
 
@@ -166,11 +203,16 @@
 
 1.  在终端中输入以下命令并按*Enter*键：
 
-[PRE13]
+```cs
+ $ dotnet sln Chapter3.LogFile.sln  
+      add Chapter3.LogFile.LogLib/Chapter3.LogFile.LogLib.csproj
+```
 
 1.  现在，在解决方案的根目录中，输入以下命令来构建解决方案及其关联的项目：
 
-[PRE14]
+```cs
+      $ dotnet build 
+```
 
 1.  输出窗口应该看起来像这样：
 
@@ -178,39 +220,76 @@
 
 1.  让我们在库中添加一些代码。在`using`指令的顶部添加以下代码：
 
-[PRE15]
+```cs
+      using System.IO;
+```
 
 1.  在类的顶部，紧邻开括号，添加以下代码：
 
-[PRE16]
+```cs
+      private string logFileName = "server_log.txt";
+      private StreamWriter logFile;
+```
 
 1.  让我们添加一个构造函数。在我们创建的变量旁边添加以下代码：
 
-[PRE17]
+```cs
+      public TextLog()
+      {
+          if (!File.Exists(logFileName))
+          {
+              logFile = File.CreateText(logFileName);
+          }
+          else
+          {
+              logFile = File.AppendText(logFileName);
+          } 
+      }
+```
 
 1.  在构造函数代码旁边，添加写入日志文件的函数：
 
-[PRE18]
+```cs
+      public void WriteLog(string message)
+      {
+          logFile.WriteLine($"{DateTime.Now} Log Message: {message} ");
+      }
+```
 
 1.  让我们在代码中添加最后一个方法：
 
-[PRE19]
+```cs
+      public void CloseLog()
+      {
+          logFile.Close();
+      }
+```
 
 1.  现在我们已经将所有代码添加到库中，让我们回到终端窗口并使用以下命令进行构建：
 
-[PRE20]
+```cs
+ $ dontnet build
+```
 
 # 它是如何工作的...
 
-在第一步中，我们在Ubuntu系统中打开了终端窗口。这个终端类似于您在Windows操作系统中使用的命令窗口。终端可以帮助您执行由.NET Core 2.0支持的shell命令。在第*2*步中，我们创建了一个空白解决方案。`dotnet new`命令创建了一个包含目录的新解决方案文件。在第*3*步中，我们将目录更改为解决方案文件的根目录。从这一点开始，我们将向解决方案中添加项目。
+在第一步中，我们在 Ubuntu 系统中打开了终端窗口。这个终端类似于您在 Windows 操作系统中使用的命令窗口。终端可以帮助您执行由.NET Core 2.0 支持的 shell 命令。在第*2*步中，我们创建了一个空白解决方案。`dotnet new`命令创建了一个包含目录的新解决方案文件。在第*3*步中，我们将目录更改为解决方案文件的根目录。从这一点开始，我们将向解决方案中添加项目。
 
-在第4步中，我们使用了相同的`dotnet new`命令来创建类库。默认情况下，这个类库将使用.NET Standard 2.0库，因此我们不需要告诉命令行工具创建.NET Standard 2.0库。我们可以通过在Visual Studio Code中展开`Chapter3.LogFile.LogLib`节点，然后点击`Chapter3.LogFile.LogLib.csproj`标签来确认这一点。在Visual Studio Code的右侧窗格中，您将能够看到以下XML代码：
+在第 4 步中，我们使用了相同的`dotnet new`命令来创建类库。默认情况下，这个类库将使用.NET Standard 2.0 库，因此我们不需要告诉命令行工具创建.NET Standard 2.0 库。我们可以通过在 Visual Studio Code 中展开`Chapter3.LogFile.LogLib`节点，然后点击`Chapter3.LogFile.LogLib.csproj`标签来确认这一点。在 Visual Studio Code 的右侧窗格中，您将能够看到以下 XML 代码：
 
-[PRE21]
+```cs
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <TargetFramework>netstandard2.0</TargetFramework>
+    </PropertyGroup>
+</Project>
+```
 
 在此代码中，`<TargetFramwork>` 标记表示它是 `netstandard2.0`，并且已经确认，我们手头有一个 .NET Standard 2.0 库。在第 6 步到第 10 步中，我们使用 Visual Studio Code 打开当前目录并对现有类进行了修改。在第 11 步中，我们确保我们处于解决方案的根目录。在第 12 步中，我们使用命令行工具将类库项目添加到解决方案中。你可以在终端中执行以下命令来列出解决方案中的所有项目：
 
-[PRE22]
+```cs
+$ dotnet sln list 
+```
 
 命令将列出当前解决方案文件中所有可用的项目。在第 13 步中，我们执行了一个 `build` 命令以确保一切完好且运行正常。在第 15 步中，我们添加了用于处理输入和输出的命名空间。`System.IO` 命名空间包含其内部的所有文件处理类。
 
@@ -236,23 +315,34 @@
 
 1.  现在在终端中输入以下命令并按 *Enter* 键以创建新的 ASP.NET Core MVC 应用程序：
 
-[PRE23]
+```cs
+      $ dotnet new mvc -o Chapter3.LogFile.LogAppMvc
+```
 
 1.  让我们将这个新项目添加到解决方案中：
 
-[PRE24]
+```cs
+     $ dotnet sln add 
+ Chapter3.LogFile.LogAppMvc/Chapter3.LogFile.LogAppMvc.csproj
+```
 
 1.  现在让我们执行构建以检查一切是否正常工作：
 
-[PRE25]
+```cs
+      $ dotnet build
+```
 
 1.  现在，导航到我们刚刚创建的应用程序：
 
-[PRE26]
+```cs
+      $ cd Chapter3.LogFile.LogAppMvc/
+```
 
 1.  使用以下命令执行应用程序：
 
-[PRE27]
+```cs
+ $ dotnet run
+```
 
 1.  如果一切正常，打开您的浏览器，在地址栏中输入 `http://localhost:5000` 并按 *Enter*。浏览器输出应该如下所示：
 
@@ -262,15 +352,22 @@
 
 1.  我们需要添加之前构建的 .NET Standard 2.0 库的引用。现在让我们使用终端中的此命令来添加它：
 
-[PRE28]
+```cs
+ $ dotnet add reference 
+      ../Chapter3.LogFile.LogLib/Chapter3.LogFile.LogLib.csproj 
+```
 
 1.  让我们通过输入以下命令回到根文件夹：
 
-[PRE29]
+```cs
+      $ cd ..
+```
 
 1.  现在，在解决方案目录的根目录中，输入以下命令以使用当前目录打开 Visual Studio Code：
 
-[PRE30]
+```cs
+      $ code . 
+```
 
 1.  在 Visual Studio Code 中，展开 `Chapter3` 标签，然后展开 `Chapter3.LogFile.LogAppMvc`**。**
 
@@ -280,27 +377,45 @@
 
 1.  在 `HomeController.cs` 中，将以下 `using` 指令添加到 `using` 指令块的最后一行：
 
-[PRE31]
+```cs
+      using Chapter3.LogFile.LogLib;
+```
 
 1.  现在，在 `HomeController` 类的 `Index` 方法的起始大括号旁边，添加以下代码：
 
-[PRE32]
+```cs
+      TextLog logFile = new TextLog();
+      logFile.WriteLog("You are in the Index action.");
+      logFile.CloseLog();
+```
 
 1.  让我们在 `About` 方法内部也添加更多的代码：
 
-[PRE33]
+```cs
+      TextLog logFile = new TextLog();
+      logFile.WriteLog("You are in the About action.");
+      logFile.CloseLog();
+```
 
 1.  同样对 `Contact` 方法也进行相同的操作：
 
-[PRE34]
+```cs
+      TextLog logFile = new TextLog();
+      logFile.WriteLog("You are in the Contact action.");
+      logFile.CloseLog();
+```
 
 1.  现在，我们已经完成了代码的添加，让我们导航到 `Chapter3.LogFile.LogAppMvc`：
 
-[PRE35]
+```cs
+ $ cd Chapter3.LogFile.LogAppMvc/
+```
 
 1.  让我们运行应用程序：
 
-[PRE36]
+```cs
+      $ dotnet run
+```
 
 1.  打开您喜欢的浏览器，在地址栏中输入 `localhost:5000`，然后按 *Enter*。点击导航链接 Home、About 和 Contact 几次。
 
@@ -318,7 +433,9 @@
 
 在步骤 1 和 2 中，我们打开了终端并确保我们处于正确的目录，即解决方案的根目录。然后，在步骤 3 中，我们创建了 ASP.NET Core 2.0 MVC 应用程序。在步骤 4 中，我们将该项目添加到解决方案中。完成此步骤后，解决方案中就有两个项目了，您可以通过在解决方案目录的根目录中输入以下命令来查看解决方案中的所有项目：
 
-[PRE37]
+```cs
+dotnet sln list 
+```
 
 在步骤 5、6 和 7 中，我们从根目录构建项目以检查一切是否正常。然后，我们导航到新创建的项目文件夹并执行项目以测试是否一切正常。在步骤 8 中，我们打开默认浏览器并给出测试 ASP.NET Core 2.0 应用程序的 URL。如您所见，URL 看起来像 `http://localhost:5000`。默认情况下，网络服务器（即 Kestrel）运行在端口 5000。
 
@@ -340,7 +457,7 @@ Kestrel 是一个跨平台的 ASP.NET Core 网络服务器，它使用名为 **l
 
 # 如何操作...
 
-1.  打开您喜欢的浏览器，导航到 [https://www.microsoft.com/net/download/macos](https://www.microsoft.com/net/download/macos)。
+1.  打开您喜欢的浏览器，导航到 [`www.microsoft.com/net/download/macos`](https://www.microsoft.com/net/download/macos)。
 
 1.  点击 `Download .NET Core 2.1.x SDK`（在撰写本文时，版本是 2.1.105）按钮。
 
@@ -354,13 +471,15 @@ Kestrel 是一个跨平台的 ASP.NET Core 网络服务器，它使用名为 **l
 
 1.  现在，在终端中，输入以下命令：
 
-[PRE38]
+```cs
+      $ dotnet --version
+```
 
 1.  如果一切正常，您应该会看到如下输出：
 
 ![](img/8aa3723a-93b1-4a64-898d-ba2472140a8c.png)
 
-1.  让我们在 [https://code.visualstudio.com/](https://code.visualstudio.com/) 下载 Visual Studio Code for Mac。
+1.  让我们在 [`code.visualstudio.com/`](https://code.visualstudio.com/) 下载 Visual Studio Code for Mac。
 
 1.  在对话框中，选择“保存文件”以下载。
 
@@ -376,7 +495,7 @@ Kestrel 是一个跨平台的 ASP.NET Core 网络服务器，它使用名为 **l
 
 # 准备工作
 
-如果您还没有完成之前的菜谱，请确保您已经完成了。这将帮助您下载.NET Core 2.0和Visual Studio Code作为IDE。让我们启动终端并开始吧。
+如果您还没有完成之前的菜谱，请确保您已经完成了。这将帮助您下载.NET Core 2.0 和 Visual Studio Code 作为 IDE。让我们启动终端并开始吧。
 
 # 如何做到这一点...
 
@@ -384,23 +503,32 @@ Kestrel 是一个跨平台的 ASP.NET Core 网络服务器，它使用名为 **l
 
 1.  现在，在您的`home`目录中，输入以下命令（您可能需要为项目创建一个单独的目录并执行以下命令）：
 
-[PRE39]
+```cs
+      $ dotnet new sln -o Chapter3.CsvFile
+```
 
 1.  现在，输入以下命令以导航到新创建的解决方案：
 
-[PRE40]
+```cs
+      $ cd Chapter3.CsvFile
+```
 
-1.  再次输入此命令以创建.NET Standard 2.0库项目：
+1.  再次输入此命令以创建.NET Standard 2.0 库项目：
 
-[PRE41]
+```cs
+      $ dotnet new classlib -o Chapter3.CsvFile.CsvReader
+```
 
 1.  现在，让我们通过输入此命令将此项目添加到我们的解决方案中：
 
-[PRE42]
+```cs
+      $ dotnet sln add 
+      Chapter3.CsvFile.CsvReader/Chapter3.CsvFile.CsvReader.csproj
+```
 
-1.  让我们打开Visual Studio Code并打开当前解决方案目录（文件 | 打开）。（Visual Studio Code通常会在应用程序目录下列出它）。
+1.  让我们打开 Visual Studio Code 并打开当前解决方案目录（文件 | 打开）。（Visual Studio Code 通常会在应用程序目录下列出它）。
 
-1.  Visual Studio Code应该看起来像这样：
+1.  Visual Studio Code 应该看起来像这样：
 
 ![](img/829d3393-bfac-46d5-8baf-197754713df2.png)
 
@@ -412,47 +540,92 @@ Visual Studio Code
 
 1.  现在，在代码编辑器中，将`Class1`类名更改为与文件名`CsvFileLib`匹配。
 
-1.  让我们点击CsvFileLib.cs选项卡并添加一些代码。在代码窗口的最后一行`using`指令旁边添加`using`指令：
+1.  让我们点击 CsvFileLib.cs 选项卡并添加一些代码。在代码窗口的最后一行`using`指令旁边添加`using`指令：
 
-[PRE43]
+```cs
+      using System.IO;
+      using System.Collections.Generics;
+
+```
 
 1.  在`CsvFileLib`的开放花括号上方，在类中添加以下代码：
 
-[PRE44]
+```cs
+      private string _fileName; 
+```
 
 1.  现在，在上一行旁边，添加以下类的构造函数代码：
 
-[PRE45]
+```cs
+      public CsvFileLib(string csvFile)
+      {
+          _fileName = csvFile;
+      }
+```
 
-1.  最后，让我们添加一个方法来读取CSV文件中的所有行：
+1.  最后，让我们添加一个方法来读取 CSV 文件中的所有行：
 
-[PRE46]
+```cs
+      public List<string> ReadCsvFile()
+      {
+          var fileContents = new List<string>();
+
+          using (var csvFile = File.OpenRead(_fileName))
+          {
+              var fileStream = new StreamReader(csvFile);
+
+              while(!fileStream.EndOfStream)
+              {
+                  fileContents.Add(fileStream.ReadLine());
+              }
+              fileStream.Close();
+          }
+
+          return fileContents;
+      }
+```
 
 1.  现在，在终端中输入以下命令来构建解决方案（确保您位于解决方案目录的根目录）：
 
-[PRE47]
+```cs
+      $ dotnet build
+```
 
 1.  这将构建并检查代码中的任何语法错误。
 
 # 它是如何工作的...
 
-在步骤1到5中，我们使用了.NET Core命令行工具来创建解决方案和项目，然后将项目添加到解决方案中。在步骤6和7中，我们打开了macOS上的Visual Studio Code并打开了刚刚创建的目录。macOS上的Visual Studio Code允许您在macOS上使用基于.NET的应用程序。此外，通过安装扩展，它还允许您使用其他流行的技术。
+在步骤 1 到 5 中，我们使用了.NET Core 命令行工具来创建解决方案和项目，然后将项目添加到解决方案中。在步骤 6 和 7 中，我们打开了 macOS 上的 Visual Studio Code 并打开了刚刚创建的目录。macOS 上的 Visual Studio Code 允许您在 macOS 上使用基于.NET 的应用程序。此外，通过安装扩展，它还允许您使用其他流行的技术。
 
-在步骤9和10中，我们将模板生成的默认`Class1.cs`重命名，并将文件和类重命名为有意义的名称。在步骤11中，我们添加了必要的命名空间来处理文件和集合。在步骤12中，我们创建了一个私有变量来保存文件名。在步骤13中，我们创建了一个构造函数，它接受一个包含路径的文件名作为`string`参数，然后填充了我们在步骤12中创建的变量。
+在步骤 9 和 10 中，我们将模板生成的默认`Class1.cs`重命名，并将文件和类重命名为有意义的名称。在步骤 11 中，我们添加了必要的命名空间来处理文件和集合。在步骤 12 中，我们创建了一个私有变量来保存文件名。在步骤 13 中，我们创建了一个构造函数，它接受一个包含路径的文件名作为`string`参数，然后填充了我们在步骤 12 中创建的变量。
 
-在第14步中，我们创建了一个方法，该方法读取整个文件并将文本的每一行存储到一个列表集合中。这个集合将其项目存储为`string`，在`ReadCsvFile()`方法的第1行，我们创建了一个局部变量来保存CSV文本文件的句柄。代码的下一部分打开给定的文本文件，在下一行将所有内容存储在一个变量中作为一个流。第3行循环到文件末尾，并将每一行存储在之前的列表中。最后，它关闭流并从`ReadCsvFile()`方法返回内容列表：
+在第 14 步中，我们创建了一个方法，该方法读取整个文件并将文本的每一行存储到一个列表集合中。这个集合将其项目存储为`string`，在`ReadCsvFile()`方法的第 1 行，我们创建了一个局部变量来保存 CSV 文本文件的句柄。代码的下一部分打开给定的文本文件，在下一行将所有内容存储在一个变量中作为一个流。第 3 行循环到文件末尾，并将每一行存储在之前的列表中。最后，它关闭流并从`ReadCsvFile()`方法返回内容列表：
 
-[PRE48]
+```cs
+      using (var csvFile = File.OpenRead(_fileName))
+      {
+          var fileStream = new StreamReader(csvFile);
 
-# 在macOS上创建一个.NET Core控制台应用程序以使用库
+          while(!fileStream.EndOfStream)
+          {
+              fileContents.Add(fileStream.ReadLine());
+          }
 
-在这个菜谱中，我们将创建一个.NET Core控制台应用程序来使用之前会话中构建的库。.NET Core是一个跨平台的.NET版本，可以在Windows、Linux和macOS上运行。这个菜谱专注于在macOS下运行的.NET Core。
+          fileStream.Close();
+      }
+```
+
+# 在 macOS 上创建一个.NET Core 控制台应用程序以使用库
+
+在这个菜谱中，我们将创建一个.NET Core 控制台应用程序来使用之前会话中构建的库。.NET Core 是一个跨平台的.NET 版本，可以在 Windows、Linux 和 macOS 上运行。这个菜谱专注于在 macOS 下运行的.NET Core。
 
 # 准备工作
 
 让我们打开终端并确保我们位于之前菜谱中构建的解决方案的根目录。执行以下快速构建命令以检查一切是否正常工作：
 
-[PRE49]
+```cs
+$ dotnet build
+```
 
 # 如何操作...
 
@@ -460,11 +633,15 @@ Visual Studio Code
 
 1.  导航到之前菜谱中构建的解决方案的根目录，并输入以下命令：
 
-[PRE50]
+```cs
+      $ dotnet new console -o Chapter3.CsvFile.ConsoleApp
+```
 
 1.  再次，输入此命令以查看目录内容：
 
-[PRE51]
+```cs
+      $ ls
+```
 
 1.  您的终端应该看起来像这样：
 
@@ -472,11 +649,16 @@ Visual Studio Code
 
 1.  执行以下命令将此项目添加到解决方案并测试构建：
 
-[PRE52]
+```cs
+      $ dotnet sln add 
+ Chapter3.CsvFile.Console/Chapter3.CsvFile.ConsoleApp.csproj 
 
-1.  让我们打开Visual Studio Code并打开（文件 | 打开）完整的解决方案。
+ $ dotnet build
+```
 
-1.  您的Visual Studio Code应该看起来像这样：
+1.  让我们打开 Visual Studio Code 并打开（文件 | 打开）完整的解决方案。
+
+1.  您的 Visual Studio Code 应该看起来像这样：
 
 ![图片](img/1b308fc3-6669-406f-bf87-9bb1634c1e2c.png)
 
@@ -518,23 +700,42 @@ Visual Studio Code
 
 1.  输入以下命令并按*Enter*键将我们的库添加到控制台应用程序作为引用：
 
-[PRE53]
+```cs
+      $ dotnet add reference 
+ ../Chapter3.CsvFile.CsvReader/Chapter3.CsvFile.CsvReader.csproj
+```
 
-1.  让我们回到Visual Studio Code，选择`Program.cs`，并在`using`指令的最后一行之后添加此`using`指令：
+1.  让我们回到 Visual Studio Code，选择`Program.cs`，并在`using`指令的最后一行之后添加此`using`指令：
 
-[PRE54]
+```cs
+      using Chapter3.CsvFile.CsvReader;
+```
 
 1.  现在删除`Main()`方法中任何现有的代码，并在大括号之间添加此代码：
 
-[PRE55]
+```cs
+      var moviesFile = new CsvFileLib("movies.txt");
+      var moviesList = moviesFile.ReadCsvFile();
+
+      foreach (var movie in moviesList)
+      {
+          var row = movie.Split(',');
+          Console.WriteLine($"ID: {row[0]} Title : 
+              {row[1]} Year : {row[2]}");
+      }
+```
 
 1.  保存当前更改并回到终端，输入以下命令并按*Enter*键：
 
-[PRE56]
+```cs
+      $ dotnet build 
+```
 
 1.  再次，输入以下代码并按*Enter*键：
 
-[PRE57]
+```cs
+      $ dotnet run 
+```
 
 1.  你应该在终端窗口中看到以下输出：
 
@@ -542,11 +743,11 @@ Visual Studio Code
 
 # 它是如何工作的...
 
-在第1至4步中，我们导航到之前构建的 .NET Standard 2.0 库。使用 macOS 终端，我们到达该解决方案的根目录。此外，我们还创建了一个新的 .NET Standard 2.0 库。当你创建 .NET Core 2.0 的库项目时，默认情况下它会选择 .NET Standard 2.0 作为模板。所以我们不用担心告诉命令行工具创建 .NET Standard 2.0 库。
+在第 1 至 4 步中，我们导航到之前构建的 .NET Standard 2.0 库。使用 macOS 终端，我们到达该解决方案的根目录。此外，我们还创建了一个新的 .NET Standard 2.0 库。当你创建 .NET Core 2.0 的库项目时，默认情况下它会选择 .NET Standard 2.0 作为模板。所以我们不用担心告诉命令行工具创建 .NET Standard 2.0 库。
 
-在第5步中，我们将新创建的项目添加到我们的解决方案中，并执行构建以检查一切是否正常。在第6至9步中，我们使用 Visual Studio Code 打开当前目录，然后在第9至12步中，我们创建了用于测试目的的逗号分隔值样本文本文件。在第14步中，我们将库添加到我们的控制台应用程序中作为引用。
+在第 5 步中，我们将新创建的项目添加到我们的解决方案中，并执行构建以检查一切是否正常。在第 6 至 9 步中，我们使用 Visual Studio Code 打开当前目录，然后在第 9 至 12 步中，我们创建了用于测试目的的逗号分隔值样本文本文件。在第 14 步中，我们将库添加到我们的控制台应用程序中作为引用。
 
-在第15步中，我们在`using`语句中添加了库项目的引用，然后在第16步中创建了一个`CsvFileLib`类的实例，并将`ReadCsvFile()`方法的输出存储在一个变量中。最后，我们遍历了由`ReadCsvFile()`方法返回的列表，并在控制台窗口中打印了输出。
+在第 15 步中，我们在`using`语句中添加了库项目的引用，然后在第 16 步中创建了一个`CsvFileLib`类的实例，并将`ReadCsvFile()`方法的输出存储在一个变量中。最后，我们遍历了由`ReadCsvFile()`方法返回的列表，并在控制台窗口中打印了输出。
 
 # 压缩？为什么不呢？
 
@@ -596,23 +797,53 @@ Visual Studio Code
 
 1.  现在，在 `Zipper.cs` 代码窗口中（在解决方案资源管理器中双击 `Zipper.cs` 标签以打开），在 `using` 指令的最后一行旁边输入以下代码：
 
-[PRE58]
+```cs
+      using System.Collections.Generic;
+      using System.IO.Compression;
+```
 
 1.  在类代码顶部创建一个 `private` 类变量（紧挨着类的开始花括号）：
 
-[PRE59]
+```cs
+      private string _sourcePath;
+```
 
 1.  让我们通过添加以下代码向我们的类添加一个构造函数：
 
-[PRE60]
+```cs
+      public Zipper(string sourcePath)
+      {
+          _sourcePath = sourcePath;
+      }
+```
 
 1.  现在，在构造函数代码旁边添加此方法：
 
-[PRE61]
+```cs
+      public void CompressFile(string zipPath)
+      {
+          ZipFile.CreateFromDirectory(zipPath, _sourcePath);
+      }
+```
 
 1.  最后，添加以下代码以列出压缩内容：
 
-[PRE62]
+```cs
+      public List<string> ListArchive(string zipFile)
+      {
+          var fileList = new List<string>()
+
+          using (ZipArchive archive = ZipFile.OpenRead(zipFile)
+          {
+              foreach(var entry in archive.Entries)
+              {
+                  fileList.Add(entry.Name);
+              }
+          }
+
+          return fileList;
+      }
+```
 
 1.  通过按 *Ctrl* + *Shift* + *B* 执行快速构建，以检查语法错误。
 
@@ -622,7 +853,19 @@ Visual Studio Code
 
 步骤 16 介绍了具有源路径参数的构造函数以进行压缩。在步骤 17 中，我们创建了一个使用 `ZipFile` 类及其方法压缩指定源文件夹的方法。然后，最终，我们创建了一个列出压缩存档名称的方法。它接受一个参数作为压缩 zip 文件路径：
 
-[PRE63]
+```cs
+var fileList = new List<string>()
+
+    using (ZipArchive archive = ZipFile.OpenRead(zipFile)
+    {
+        foreach(var entry in archive.Entries)
+        {
+            fileList.Add(entry.Name);
+        }
+    }
+
+    return fileList;
+```
 
 第一行创建了一个空的列表，将 `strings` 作为项目填充。然后我们创建了一个 `ZipArchive` 实例。我们使用了 `using` 关键字来包围那个语句。这是一种安全的编程方法，用于此类项目。`using` 关键字是使用实现 `IDisposable` 接口的对象的一种非常方便的方法。
 
@@ -707,11 +950,32 @@ Visual Studio Code
 
 1.  在代码窗口中向上滚动并添加以下 `using` 指令到所有 `using` 指令的最后一行，即在顶部：
 
-[PRE64]
+```cs
+      using Chapter3.Compress.CompressLib;
+```
 
 1.  现在向下滚动，直到到达“浏览...”按钮的按钮点击事件，并在大括号之间添加以下代码：
 
-[PRE65]
+```cs
+      if (ZipFolder.ShowDialog() == DialogResult.OK)
+      {
+          FolderTextBox.Text = ZipFolder.SelectedPath;
+
+          string zipFileName = 
+              @"C:\Projects\Chapter3\TestFolder\result.zip";
+
+          var zipFile = new Zipper(zipFileName);
+          zipFile.CompressFile(FolderTextBox.Text);
+
+          MessageBox.Show("You folder has been zipped.", 
+              "Information", MessageBoxButtons.OK, 
+              MessageBoxIcon.Information);
+
+          var fileList = zipFile.ListArchive(zipFileName);
+
+          FileListBox.Items.AddRange(fileList.ToArray());
+      }
+```
 
 1.  让我们按 *F5* 并测试我们的代码。你的输出应该看起来像这样：
 
@@ -743,29 +1007,42 @@ Visual Studio Code
 
 # 作用原理...
 
-在步骤1到9中，我们打开了之前菜谱中构建的带有.NET Standard 2.0类库的现有解决方案。然后我们向该解决方案添加了一个新的经典Windows应用程序项目，并给它一个合适的名称以匹配解决方案。在步骤10和11中，我们将Visual Studio生成的默认Windows窗体重命名。在步骤12到16中，我们添加了必要的控件来构建我们应用程序的用户界面。
+在步骤 1 到 9 中，我们打开了之前菜谱中构建的带有.NET Standard 2.0 类库的现有解决方案。然后我们向该解决方案添加了一个新的经典 Windows 应用程序项目，并给它一个合适的名称以匹配解决方案。在步骤 10 和 11 中，我们将 Visual Studio 生成的默认 Windows 窗体重命名。在步骤 12 到 16 中，我们添加了必要的控件来构建我们应用程序的用户界面。
 
-在步骤18到21中，我们将.NET Standard 2.0库的引用添加到我们的经典Windows应用程序中。这是一个强制性的步骤，否则你将无法访问库及其功能。在步骤23中，我们添加了一个using语句，这将告诉Windows应用程序我们已经引用了库，并允许我们访问其可访问的方法。
+在步骤 18 到 21 中，我们将.NET Standard 2.0 库的引用添加到我们的经典 Windows 应用程序中。这是一个强制性的步骤，否则你将无法访问库及其功能。在步骤 23 中，我们添加了一个 using 语句，这将告诉 Windows 应用程序我们已经引用了库，并允许我们访问其可访问的方法。
 
-在步骤24中，我们向浏览...按钮的点击事件中添加了代码。在该代码的第一行中，我们使用了一个`if`语句来打开文件夹对话框，并检查对话框中是否按下了OK按钮。然后，接下来的两行代码将选定的路径存储在我们的Windows应用程序的文本框中：
+在步骤 24 中，我们向浏览...按钮的点击事件中添加了代码。在该代码的第一行中，我们使用了一个`if`语句来打开文件夹对话框，并检查对话框中是否按下了 OK 按钮。然后，接下来的两行代码将选定的路径存储在我们的 Windows 应用程序的文本框中：
 
-[PRE66]
+```cs
+FolderTextBox.Text = ZipFolder.SelectedPath;
 
-然后，我们有一个`string`变量，用于存储目标ZIP文件名：
+string zipFileName = @"C:\Projects\Chapter3\TestFolder\result.zip";
+```
 
-[PRE67]
+然后，我们有一个`string`变量，用于存储目标 ZIP 文件名：
 
-在第一行，我们创建了一个`Zipper`类的实例，在第二行，我们使用了它的`CompressFile()`方法。最后，我们通过使用`MessageBox.Show()`方法向最终用户显示了一个通知。最后，在接下来的两行代码中，我们使用了`ListArchive()`方法来提取ZIP文件的内容，并将其添加到列表框控件中：
+```cs
+var zipFile = new Zipper(zipFileName);
+zipFile.CompressFile(FolderTextBox.Text);
 
-[PRE68]
+MessageBox.Show("You folder has been zipped.", 
+    "Information", MessageBoxButtons.OK, MessageBoxIcon.Information);
+```
+
+在第一行，我们创建了一个`Zipper`类的实例，在第二行，我们使用了它的`CompressFile()`方法。最后，我们通过使用`MessageBox.Show()`方法向最终用户显示了一个通知。最后，在接下来的两行代码中，我们使用了`ListArchive()`方法来提取 ZIP 文件的内容，并将其添加到列表框控件中：
+
+```cs
+var fileList = zipFile.ListArchive(zipFileName);
+FileListBox.Items.AddRange(fileList.ToArray());
+```
 
 # 在文本文件中加密和解密内容
 
-在这个菜谱中，我们将查看`System.IO`命名空间的其他功能。我们将创建一个.NET Standard 2.0库，该库可以加密现有的文本文件，也可以解密它。
+在这个菜谱中，我们将查看`System.IO`命名空间的其他功能。我们将创建一个.NET Standard 2.0 库，该库可以加密现有的文本文件，也可以解密它。
 
 # 准备工作
 
-加密是保护文件的一种很好的方式。`System.IO`命名空间为你提供了加密和解密内容的功能。让我们看看如何在.NET Standard 2.0库中实现它。
+加密是保护文件的一种很好的方式。`System.IO`命名空间为你提供了加密和解密内容的功能。让我们看看如何在.NET Standard 2.0 库中实现它。
 
 # 如何操作...
 
@@ -773,7 +1050,7 @@ Visual Studio Code
 
 1.  点击文件 | 新建 | 项目来创建一个项目。
 
-1.  在“新建项目”对话框中，展开左侧窗格中的“其他项目类型”节点，并选择Visual Studio解决方案。在右侧窗格中，选择空白解决方案。
+1.  在“新建项目”对话框中，展开左侧窗格中的“其他项目类型”节点，并选择 Visual Studio 解决方案。在右侧窗格中，选择空白解决方案。
 
 1.  在“名称：”文本框中，键入`Chapter3.SecureFile`，在“位置：”文本框中，从下拉框中选择路径或点击浏览...按钮来定位路径。
 
@@ -809,23 +1086,42 @@ Visual Studio Code
 
 1.  在代码窗口中，向上滚动到顶部，并在 `using` 指令的最后一行添加以下 `using` 指令：
 
-[PRE69]
+```cs
+      using System.IO;
+```
 
 1.  现在，在 `CryptFile` 类的开始花括号旁边添加以下代码：
 
-[PRE70]
+```cs
+      private string _fileName;
+```
 
 1.  添加以下默认构造函数方法：
 
-[PRE71]
+```cs
+      public CryptFile(string fileName)
+      {
+          _fileName = fileName;
+      }
+```
 
 1.  现在，让我们添加一个加密文件的方法：
 
-[PRE72]
+```cs
+      public void EncryptFile()
+      {
+          File.Encrypt(_fileName);
+      }
+```
 
 1.  还要添加以下解密文件的方法：
 
-[PRE73]
+```cs
+      public void DecryptFile()
+      {
+          File.Decrypt(_fileName);
+      }
+```
 
 1.  按 *Ctrl* + *Shift* + *B* 进行快速构建以检查语法是否正确。
 
@@ -914,11 +1210,25 @@ Visual Studio Code
 
 1.  在代码窗口中，向上滚动到顶部，并将以下 `using` 指令作为 `using` 块的最后一行添加：
 
-[PRE74]
+```cs
+      using Chapter3.SecureFile.CryptLib;
+```
 
 1.  现在向下滚动到加密按钮，点击，并在大括号之间添加以下代码：
 
-[PRE75]
+```cs
+      if (OpenDialog.ShowDialog() == DialogResult.OK)
+      {
+          var textFileName = OpenDialog.FileName;
+          var secureFile = new CryptFile(textFileName);
+
+          secureFile.EncryptFile();
+
+          MessageBox.Show("File encrypted", "Information", 
+              MessageBoxButtons.OK,     
+              MessageBoxIcon.Information);
+      }
+```
 
 1.  现在通过点击 MainForm.cs [设计器] 选项卡，切换回设计窗口。
 
@@ -926,7 +1236,20 @@ Visual Studio Code
 
 1.  在按钮点击代码的大括号之间添加以下代码：
 
-[PRE76]
+```cs
+      if (OpenDialog.ShowDialog() == DialogResult.OK)
+      {
+
+          var textFileName = OpenDialog.FileName;
+          var secureFile = new CryptFile(textFileName);
+
+          secureFile.DecryptFile();
+
+          MessageBox.Show("File decrypted", "Information", 
+              MessageBoxButtons.OK,
+              MessageBoxIcon.Information);
+      }
+```
 
 1.  现在按 *F5* 执行代码（确保经典 Windows 应用程序项目是默认项目）
 
@@ -950,8 +1273,8 @@ Visual Studio Code
 
 # 它是如何工作的...
 
-在步骤1到4中，我们打开了包含我们在上一个菜谱中构建的库的现有解决方案。在步骤5到9中，我们将一个经典的Windows项目添加到解决方案中。我们为项目分配了适当的名称以保持一致性和可读性。在步骤10到15中，我们更改了Windows窗体的名称，并向窗体添加了必要的控件。最后，我们更改了这些控件的属性。
+在步骤 1 到 4 中，我们打开了包含我们在上一个菜谱中构建的库的现有解决方案。在步骤 5 到 9 中，我们将一个经典的 Windows 项目添加到解决方案中。我们为项目分配了适当的名称以保持一致性和可读性。在步骤 10 到 15 中，我们更改了 Windows 窗体的名称，并向窗体添加了必要的控件。最后，我们更改了这些控件的属性。
 
-在步骤18到21中，我们添加了对包含库的项目引用。这是一个强制性的步骤，否则我们无法从我们的Windows应用程序中访问库功能。现在，在步骤23中，我们从代码级别添加了对库项目的引用。这一步骤将允许您从代码级别访问所有可用的方法。在步骤24中，我们使用了一个`if`语句来打开文件打开对话框，并检查是否点击了打开按钮。在接下来的代码行中，我们创建了一个`CryptFile`类的实例，并使用带有路径的文件名作为其参数。最后，我们使用`EncryptFile()`方法开始加密，并使用`MessageBox.Show()`向用户显示信息。同样，在步骤25中，我们使用了应用程序的解密按钮来使用`CryptFile`类的另一个`DecryptFile()`方法。
+在步骤 18 到 21 中，我们添加了对包含库的项目引用。这是一个强制性的步骤，否则我们无法从我们的 Windows 应用程序中访问库功能。现在，在步骤 23 中，我们从代码级别添加了对库项目的引用。这一步骤将允许您从代码级别访问所有可用的方法。在步骤 24 中，我们使用了一个`if`语句来打开文件打开对话框，并检查是否点击了打开按钮。在接下来的代码行中，我们创建了一个`CryptFile`类的实例，并使用带有路径的文件名作为其参数。最后，我们使用`EncryptFile()`方法开始加密，并使用`MessageBox.Show()`向用户显示信息。同样，在步骤 25 中，我们使用了应用程序的解密按钮来使用`CryptFile`类的另一个`DecryptFile()`方法。
 
-最后，在步骤28到31中，我们执行了我们的应用程序并对其进行了测试。在步骤32和34中，我们确认了加密和解密功能正常工作。
+最后，在步骤 28 到 31 中，我们执行了我们的应用程序并对其进行了测试。在步骤 32 和 34 中，我们确认了加密和解密功能正常工作。

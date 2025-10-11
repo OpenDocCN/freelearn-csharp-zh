@@ -16,33 +16,61 @@
 
 +   使用内存数据库测试数据层
 
-本章中的代码可以从以下 GitHub 仓库获取：[https://github.com/PacktPublishing/Hands-On-RESTful-Web-Services-with-ASP.NET-Core-3](https://github.com/PacktPublishing/Hands-On-RESTful-Web-Services-with-ASP.NET-Core-3).
+本章中的代码可以从以下 GitHub 仓库获取：[`github.com/PacktPublishing/Hands-On-RESTful-Web-Services-with-ASP.NET-Core-3`](https://github.com/PacktPublishing/Hands-On-RESTful-Web-Services-with-ASP.NET-Core-3).
 
 # 设置项目
 
 就像之前的章节一样，我们可以通过使用 Web API 模板来创建一个新的项目。让我们打开终端并执行以下命令：
 
-[PRE0]
+```cs
+mkdir Catalog.API
+cd Catalog.API
+dotnet new sln -n Catalog.API
+mkdir src
+cd src
+dotnet new webapi -n Catalog.API
+dotnet sln ../Catalog.API.sln add Catalog.API
+```
 
 第一个 `dotnet new` 命令创建了一个名为 `Catalog.API` 的新解决方案文件。第二个 `dotnet new` 指令在 `src` 文件夹中创建了一个新的 Web API 项目。最后，最后一个 `dotnet sln` 命令将项目添加到我们的解决方案中。
 
 结果的文件系统结构如下所示：
 
-[PRE1]
+```cs
+.
+├── Catalog.API.sln
+├── src
+│   ├── Catalog.API
+│   │   ├── Controllers
+│   │   ├── Program.cs
+│   │   ├── Properties
+│   │   │   └── launchSettings.json
+│   │   ├── Startup.cs
+│   │   ├── Catalog.API.csproj
+│   │   ├── appsettings.Development.json
+│   │   ├── appsettings.json
+│   │   ├── bin
+│   │   ├── obj
+│   │   └── wwwroot
+```
 
 `src` 文件夹将包含我们所有的代码以及本书中我们将添加的附加项目。在本章的后面部分，我们还将添加一个 `tests` 文件夹，其中将包含我们项目的所有测试。
 
 # 实现域模型
 
-如第 5 章中在 *数据传输* 部分讨论的，[ASP.NET Core 中的 Web 服务堆栈](deede298-fc20-4523-afa6-02ed2c0592fd.xhtml)，*域模型* 是我们服务处理的数据的表示。考虑一个 *音乐商店的目录 Web 服务*，我们需要处理的主要数据包括 API 使用的 *实体*。
+如第五章中在 *数据传输* 部分讨论的，ASP.NET Core 中的 Web 服务堆栈，*域模型* 是我们服务处理的数据的表示。考虑一个 *音乐商店的目录 Web 服务*，我们需要处理的主要数据包括 API 使用的 *实体*。
 
 为了保证可重用性和松散耦合，我们将定义服务域模型为一个独立的项目。首先，让我们在 `src` 文件夹中通过执行以下命令创建一个新的 `Catalog.Domain` 项目：
 
-[PRE2]
+```cs
+dotnet new classlib -n Catalog.Domain -f netstandard2.1
+```
 
 上述命令还指定了 `netstandard2.1` 版本为目标框架。此外，在创建 `Catalog.Domain` 项目后，我们需要将其添加到我们的解决方案中：
 
-[PRE3]
+```cs
+dotnet sln ../Catalog.API.sln add Catalog.Domain
+```
 
 上述指令将 `Catalog.Domain` 项目添加到 `Catalog.API.sln` 文件中。因此，我们现在已经准备好设计和实现我们 Web 服务的实体。
 
@@ -68,13 +96,57 @@
 
 现在我们已经定义了目录服务中包含哪些属性和对象，让我们首先实现实体作为具体类型。所有领域模型都传统上存储在 `Catalog.Domain` 项目的 `Entities` 文件夹中。我们正在创建的第一个类型是 `Item` 类：
 
-[PRE4]
+```cs
+using System;
+
+namespace Catalog.Domain.Entities
+{
+    public class Item
+    {
+        public Guid Id { get; set; }
+        public string Name { get; set; }
+        public string Description { get; set; }
+        public string LabelName { get; set; }
+        public Price Price { get; set; }
+        public string PictureUri { get; set; }
+        public DateTimeOffset ReleaseDate { get; set; }
+        public string Format { get; set; }
+        public int AvailableStock { get; set; }
+        public Genre Genre { get; set; }
+        public Artist Artist { get; set; }
+    }
+}
+```
 
 首先，我们可以看到 `Item` 类的定义中包含了对其他类型的引用。需要注意的是，该实现使用 `Guid` 类型来指定 `Id`。这种方法的目的是在两个不同的数据源或目录合并时避免冲突。
 
 让我们继续定义我们领域模型的相关实体：
 
-[PRE5]
+```cs
+using System;
+
+namespace Catalog.Domain.Entities
+{
+    //Artist.cs file
+    public class Artist
+    {
+        public Guid ArtistId { get; set; }
+        public string ArtistName { get; set; }
+    }
+    //Genre.cs file
+    public class Genre
+    {
+        public Guid GenreId { get; set; }
+        public string GenreDescription { get; set; }
+    }
+    //Price.cs file
+    public class Price
+    {
+        public decimal Amount { get; set; }
+        public string Currency { get; set; }
+    }
+}
+```
 
 为了表示目的，以下类在相同的代码片段中实现。请注意，它们定义在不同的文件中：`Artist.cs`、`Genre.cs` 和 `Price.cs`。
 
@@ -96,11 +168,20 @@ EF Core 和 Dapper 都为我们提供了数据源的高级别抽象。尽管如�
 
 让我们分析一下这两个库的优缺点。在此之前，我们应该快速查看一些示例查询，以便了解两者之间的差异。以下代码片段描述了一个使用 EF Core 的示例查询：
 
-[PRE6]
+```cs
+using (var context = new CatalogContext()) {
+     var items = context.Items         
+                        .Where(b => b.Description.Contains("various 
+                         artists"))
+                        .ToList();
+}
+```
 
 在前面的代码中，我们搜索每个具有相应描述的 `Item` 实体。让我们以一个 Dapper 查询为例继续进行：
 
-[PRE7]
+```cs
+connection.Query<Item>("select * from (select Id from dbo.Catalog where Description like '%@searchTerm%', new { searchTerm = "various artists" });
+```
 
 如您所见，EF Core 在我们的数据源上提供了高级别的抽象。
 
@@ -110,15 +191,32 @@ EF Core 和 Dapper 都为我们提供了数据源的高级别抽象。尽管如�
 
 然而，EF Core 的一个常见问题是资源的早期获取。例如，考虑以下查询：
 
-[PRE8]
+```cs
+ List<Item> items = db.Items.ToList();
+ List<Item> variousArtistItems = items
+                     .Where(s => s.Description.Contains("various 
+                          artist") == city).ToList();
+
+```
 
 它生成一个类似于以下查询的 SQL 查询：
 
-[PRE9]
+```cs
+SELECT [i].[Id],
+       [i].[Description],
+       [i].[ArtistId], 
+       [i].[GenreId],
+FROM   [dbo].[Items] as [i]
+```
 
 如您所见，尽管我们使用了 `Where` 子句，但之前 `ToList` 方法在评估查询时没有考虑 `Where` 子句。为了得到更好的结果，我们应该在评估之前执行 `Where` 语句：
 
-[PRE10]
+```cs
+ List<Item> variousArtistItems = db.Items
+                     .Where(s => s.Description.Contains("various 
+                          artist") == city).ToList();
+
+```
 
 这种程序在性能和网络方面都更好。它可能看起来足够简单，但在分布式团队中，这些错误在代码库中很常见，而且在代码审查过程中很难发现。
 
@@ -134,7 +232,22 @@ EF Core 和 Dapper 都为我们提供了数据源的高级别抽象。尽管如�
 
 在我们开始之前，我们需要在 `Catalog.Domain` 项目中定义一些接口。让我们通过设置一个泛型接口来确定我们仓储的单元工作：
 
-[PRE11]
+```cs
+using System;
+using System.Threading;
+using System.Threading.Tasks;
+
+namespace Catalog.Domain.Repositories
+{
+    public interface IUnitOfWork : IDisposable
+    {
+        Task<int> SaveChangesAsync(CancellationToken cancellationToken = 
+         default(CancellationToken));
+        Task<bool> SaveEntitiesAsync(CancellationToken cancellationToken = 
+         default(CancellationToken));
+    }
+}
+```
 
 `IUnitOfWork` 定义了两个方法：`SaveChangesAsync` 和 `SaveEntitiesAsync`。这两个方法用于有效地将我们的集合更改保存到数据库中。这两个方法都是异步的：它们返回 `Task` 类型，并接受一个 `CancellationToken` 类型的参数。`CancellationToken` 参数提供了一种停止挂起的异步操作的方法。
 
@@ -142,13 +255,37 @@ EF Core 和 Dapper 都为我们提供了数据源的高级别抽象。尽管如�
 
 让我们继续，通过在之前定义的 `IUnitOfWork` 接口相同的文件夹级别定义一个 `IRepository` 接口：
 
-[PRE12]
+```cs
+namespace Catalog.Domain.Repositories
+{
+    public interface IRepository
+    {
+        IUnitOfWork UnitOfWork { get; }
+    }
+}
+```
 
 如您所见，`IRepository` 并没有隐式使用 `IUnitOfWork` 接口。此外，它将 `UnitOfWork` 实例作为类的属性暴露出来。这种做法保证了所有 `IRepository` 接口的消费者都必须显式地通过调用 `SaveChangesAsync` 或 `SaveEntitiesAsync` 方法来更新数据库。
 
 最后一步是定义 `IItemRepository` 接口，如下所示：
 
-[PRE13]
+```cs
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using Catalog.Domain.Entities;
+
+namespace Catalog.Domain.Repositories
+{
+    public interface IItemRepository : IRepository
+    {
+        Task<IEnumerable<Item>> GetAsync();
+        Task<Item> GetAsync(Guid id);
+        Item Add(Item item);
+        Item Update(Item item);
+    }
+}
+```
 
 该接口扩展了 `IRepository` 类，并引用了之前定义的 `Item` 实体。`IItemRepository` 定义了对数据源进行读取和写入操作。你可能注意到 `Add`、`Update` 等，这是因为它们只作用于应用程序内存中存储的集合，而有效的保存操作是由工作单元执行的。
 
@@ -156,25 +293,83 @@ EF Core 和 Dapper 都为我们提供了数据源的高级别抽象。尽管如�
 
 一旦我们定义了 `IItemRepository` 接口和领域项目中所有的抽象，我们应该继续创建代表之前定义的抽象的具体实现的类。我们还将创建一个新的 `Catalog.Infrastructure` 项目，其中包含我们存储库的所有实现以及代表我们服务和数据库之间层的类。让我们通过在 `src` 文件夹中执行以下命令来创建 `Catalog.Infrastructure` 项目：
 
-[PRE14]
+```cs
+dotnet new classlib -n Catalog.Infrastructure -f netstandard2.1 dotnet sln ../Catalog.API.sln add Catalog.Infrastructure
+```
 
 完成后，我们的解决方案的文件夹结构如下所示：
 
-[PRE15]
+```cs
+.
+├── Catalog.API.sln
+└── src
+    ├── Catalog.API
+    │ ...
+    ├── Catalog.Domain
+    │ ├── Entities
+    │ │ ├── Artist.cs
+    │ │ ├── Genre.cs
+    │ │ ├── Item.cs
+    │ │ └── Money.cs
+    │ │ └── Repositories
+    │ │ ├── IItemRepository.cs
+    │ │ ├── IRepository.cs
+    │ │ └── IUnitOfWork.cs
+    │ ├── Catalog.Domain.csproj
+    └── Catalog.Infrastructure
+        ├── Catalog.Infrastructure.csproj
+```
 
 在开始实现 `IItemRepository` 之前，我们需要通过在项目文件夹内执行以下命令将 `Microsoft.EntityFrameworkCore` NuGet 包添加到 `Catalog.Infrastructure` 项目中：
 
-[PRE16]
+```cs
+dotnet add package Microsoft.EntityFrameworkCore
+
+```
 
 之后，我们可以通过使用以下命令将 `Catalog.Domain` 项目的引用添加到基础设施项目中继续操作：
 
-[PRE17]
+```cs
+ dotnet add reference ../Catalog.Domain
+```
 
 # DbContext 定义
 
 `DbContext` 是我们应用程序和数据库之间的一种抽象。它使我们能够与数据交互，并对数据进行操作。`DbContext` 的实现也是我们应用程序和数据库之间会话的表示，我们可以用它来查询并将应用程序实体的实例保存到我们的数据源中。让我们快速看一下 `Catalog.Infrastructure` 项目中的 `DbContext` 实现：
 
-[PRE18]
+```cs
+using System.Threading;
+using System.Threading.Tasks;
+using Catalog.Domain.Entities;
+using Catalog.Domain.Repositories;
+using Microsoft.EntityFrameworkCore;
+
+namespace Catalog.Infrastructure
+{
+    public class CatalogContext : DbContext, IUnitOfWork
+    {
+        public const string DEFAULT_SCHEMA = "catalog";
+
+        public DbSet<Item> Items { get; set; }
+
+        public CatalogContext(DbContextOptions<CatalogContext> options) : 
+         base(options)
+        {
+        }
+
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+        }
+
+        public async Task<bool> SaveEntitiesAsync(CancellationToken 
+         cancellationToken = default(CancellationToken))
+        {
+            await SaveChangesAsync(cancellationToken);
+            return true;
+        }
+    }
+}
+```
 
 在快速查看代码后，我们应该提到以下几点：
 
@@ -194,7 +389,63 @@ EF Core 和 Dapper 都为我们提供了数据源的高级别抽象。尽管如�
 
 一旦我们构建了 `DbContext` 类，我们就可以通过实现具体的 `ItemRepository` 类来继续操作：
 
-[PRE19]
+```cs
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using Catalog.Domain.Entities;
+using Catalog.Domain.Repositories;
+using Microsoft.EntityFrameworkCore;
+
+namespace Catalog.Infrastructure.Repositories
+{
+    public class ItemRepository
+        : IItemRepository
+    {
+        private readonly CatalogContext _context;
+
+        public IUnitOfWork UnitOfWork => _context;
+
+        public ItemRepository(CatalogContext context)
+        {
+            _context = context ?? throw new 
+             ArgumentNullException(nameof(context));
+        }
+
+        public async Task<IEnumerable<Item>> GetAsync()
+        {
+            return await _context
+                .Items
+                .AsNoTracking()
+                .ToListAsync();
+        }
+
+        public async Task<Item> GetAsync(Guid id)
+        {
+            var item = await _context.Items
+                .AsNoTracking()
+                .Where(x => x.Id == id)
+                .Include(x => x.Genre)
+                .Include(x => x.Artist).FirstOrDefaultAsync();
+
+            return item;
+        }
+
+        public Item Add(Item order)
+        {
+            return _context.Items
+                .Add(order).Entity;
+        }
+
+        public Item Update(Item item)
+        {
+            _context.Entry(item).State = EntityState.Modified;
+            return item;
+        }
+    }
+}
+```
 
 上述代码实现了在 `IItemRepository` 接口中先前定义的 CRUD 操作。它还通过 `IUnitOfWork` 接口公开了 `CategoryContext`。这种方法的保证是，`IItemRepository` 的消费者可以修改和查询我们的集合，并使用相应的更改更新数据源。让我们回顾一下上述代码中实现的方法：
 
@@ -214,43 +465,148 @@ EF Core 鼓励我们在服务中使用代码优先的方法。**代码优先**�
 
 首先，让我们从我们的 `Item.cs` 实体开始，并添加一个 ID 来表示与其他实体的关系：
 
-[PRE20]
+```cs
+using System;
+
+namespace Catalog.Domain.Entities
+{
+ //Item.cs file
+   public class Item
+    {
+        public Guid Id { get; set; }
+        public string Name { get; set; }
+        public string Description { get; set; }
+        public string LabelName { get; set; }
+        public Price Price { get; set; }
+        public string PictureUri { get; set; }
+        public DateTimeOffset ReleaseDate { get; set; }
+        public string Format { get;set; }
+        public int AvailableStock { get; set; }
+        public Guid GenreId { get; set; }
+        public Genre Genre { get; set; }
+        public Guid ArtistId { get; set; }
+        public Artist Artist { get; set; }
+    }
+
+    //Artist.cs file
+    public class Artist
+    {
+        public Guid ArtistId { get; set; }
+        public string ArtistName { get; set; }
+        public ICollection<Item> Items {get; set;}
+    }
+
+ //Genre.cs file
+    public class Genre
+    {
+        public Guid GenreId { get; set; }
+        public string GenreDescription { get; set; }
+        public ICollection<Item> Items {get; set;}
+    }
+}
+```
 
 上述代码描述了 `Item` 类与 `Artist` 类以及 `Item` 类与 `Genre` 类之间的 **多对一** 关系。此外，`Artist` 和 `Genre` 实体都有一个集合，该集合引用了 `Item` 实体的集合。
 
-让我们继续通过使用Fluent API方法实现我们的`Item`实体约束。一般来说，EF Core ORM实现了Fluent API技术，帮助我们处理约束定义。
+让我们继续通过使用 Fluent API 方法实现我们的`Item`实体约束。一般来说，EF Core ORM 实现了 Fluent API 技术，帮助我们处理约束定义。
 
-通常，Fluent API，也称为**Fluent接口**，是一种组合面向对象API的方法，这些API本质上基于方法链。方法之间的链产生接近书面语法的源代码；例如，`myList.First().Items.Count().ShouldBe(2)`*.* 你可以看看这个例子有多易读；任何人都能理解。大多数EF Core约束通常都是使用这种方法构建的。
+通常，Fluent API，也称为**Fluent 接口**，是一种组合面向对象 API 的方法，这些 API 本质上基于方法链。方法之间的链产生接近书面语法的源代码；例如，`myList.First().Items.Count().ShouldBe(2)`*.* 你可以看看这个例子有多易读；任何人都能理解。大多数 EF Core 约束通常都是使用这种方法构建的。
 
 让我们在`Catalog.Infrastructure`项目中添加一个名为`SchemaDefinitions`的新文件夹。该文件夹将包含为应用程序实现的所有架构定义以及实体之间约束的所有定义。例如，在`Item`实体的情况下，我们需要创建一个新的`ItemEntitySchemaDefinition`类：
 
-[PRE21]
+```cs
+using System;
+using Catalog.Domain.Entities;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
+namespace Catalog.Infrastructure.SchemaDefinitions
+{
+    public class ItemEntitySchemaDefinition :
+        IEntityTypeConfiguration<Item>
+    {
+        public void Configure(EntityTypeBuilder<Item> builder)
+        {
+            builder.ToTable("Items", CatalogContext.DEFAULT_SCHEMA);
+            builder.HasKey(k => k.Id);
+
+            builder.Property(p => p.Name)
+                .IsRequired();
+
+            builder.Property(p => p.Description)
+                .IsRequired()
+                .HasMaxLength(1000);
+
+            builder
+                .HasOne(e => e.Genre)
+                .WithMany(c => c.Items)
+                .HasForeignKey(k => k.GenreId);
+
+            builder
+                .HasOne(e => e.Artist)
+                .WithMany(c => c.Items)
+                .HasForeignKey(k => k.ArtistId);
+
+            builder.Property(p => p.Price).HasConversion(
+                p => $"{p.Amount}:{p.Currency}",
+                p => new Price
+                {
+                    Amount = Convert.ToDecimal(
+                     p.Split(':', StringSplitOptions.None)[0]),
+                     Currency = p.Split(':', StringSplitOptions.None)[1]
+                });
+        }
+    }
+}
+```
 
 这是`Item`实体约束的架构定义。该类实现了由`Microsoft.EntityFrameworkCore.SqlServer`包公开的`IEntityTypeConfiguration<T>`接口。必须通过以下命令向`Catalog.Infrastructure`项目添加一个新的引用：
 
-[PRE22]
+```cs
+dotnet add package Microsoft.EntityFrameworkCore.SqlServer
+```
 
-该包提供了一个扩展方法来与SQL服务器数据库交互：`Configure`方法实现定义了规则，这些规则将应用于`Item`实体。由于Fluent API方法，这些规则很容易理解：
+该包提供了一个扩展方法来与 SQL 服务器数据库交互：`Configure`方法实现定义了规则，这些规则将应用于`Item`实体。由于 Fluent API 方法，这些规则很容易理解：
 
-+   `ToTable`方法用于显式定义SQL表名。
++   `ToTable`方法用于显式定义 SQL 表名。
 
 +   `HasKey`方法将属性设置为该实体类型的键。
 
 +   `IsRequired`方法用于标记所有必需的功能。
 
-EF Core为我们提供了不同的**开箱即用**配置选项；完整的列表可在[https://docs.microsoft.com/en-us/ef/core/modeling/](https://docs.microsoft.com/en-us/ef/core/modeling/)找到。这些属性可以组合起来，以获得关于正确表示我们的领域模型更好的结果。
+EF Core 为我们提供了不同的**开箱即用**配置选项；完整的列表可在[`docs.microsoft.com/en-us/ef/core/modeling/`](https://docs.microsoft.com/en-us/ef/core/modeling/)找到。这些属性可以组合起来，以获得关于正确表示我们的领域模型更好的结果。
 
 `Configure`方法还向`Item`实体与`Artist`实体和`Genre`实体之间的**一对多**关系添加了一些额外的约束：
 
-[PRE23]
+```cs
+      ...            
+            builder
+                .HasOne(e => e.Genre)
+                .WithMany(c => c.Items)
+                .HasForeignKey(k => k.GenreId);
 
-此代码片段指定了`Item`实体的关系。请注意，我们遵循了Fluent方法。在这种情况下，我们通过指定`GenreId`和`ArtistId`作为外键，在`Item`类和`Artist`类以及`Genre`类之间定义了一个1-N关系。
+            builder
+                .HasOne(e => e.Artist)
+                .WithMany(c => c.Items)
+                .HasForeignKey(k => k.ArtistId);
+      ...
+```
 
-# 使用Fluent API进行自定义转换。
+此代码片段指定了`Item`实体的关系。请注意，我们遵循了 Fluent 方法。在这种情况下，我们通过指定`GenreId`和`ArtistId`作为外键，在`Item`类和`Artist`类以及`Genre`类之间定义了一个 1-N 关系。
 
-EF Core还提供了一种添加自定义转换的方法。这种方法可能对于提供复杂实体的自定义表示很有用。例如，让我们看看在`ItemEntitySchemaDefinition`中声明的以下代码片段：
+# 使用 Fluent API 进行自定义转换。
 
-[PRE24]
+EF Core 还提供了一种添加自定义转换的方法。这种方法可能对于提供复杂实体的自定义表示很有用。例如，让我们看看在`ItemEntitySchemaDefinition`中声明的以下代码片段：
+
+```cs
+            builder.Property(p => p.Price).HasConversion(
+                p => $"{p.Amount}:{p.Currency}",
+                p => new Price
+                {
+                    Amount = Convert.ToDecimal(p.Split(':', 
+                     StringSplitOptions.None)[0]),
+                    Currency = p.Split(':', StringSplitOptions.None)[1]
+                });
+```
 
 `HasConversion`方法提供了一种自定义数据库中插入数据的方式。此方法通过以下格式将`Price`字段（`Price`类型）序列化为字符串：`34.05:EUR`。另一方面，当从数据库中读取`Price`数据时，字符串被反序列化为`Price`类型。
 
@@ -258,55 +614,224 @@ EF Core还提供了一种添加自定义转换的方法。这种方法可能对�
 
 要利用`ItemEntitySchemaDefinition`类中实现的架构，我们应该将其应用于`CatalogContext`类中包含的`OnModelCreating`方法：
 
-[PRE25]
+```cs
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.EntityFrameworkCore;
+using Catalog.Domain.Entities;
+using Catalog.Domain.Repositories;
+using Catalog.Infrastructure.SchemaDefinitions;
 
-上述代码使用`ApplyConfiguration`扩展方法在运行时执行期间将配置应用到SQL架构。需要注意的是，类中实现的`OnModelCreating`方法始终调用父类的`base.OnModelCreating`方法，以保留扩展类的行为。
+namespace Catalog.Infrastructure
+{
+    public class CatalogContext : DbContext, IUnitOfWork
+    {
+        public const string DEFAULT_SCHEMA = "catalog";
+        public DbSet<Item> Items { get; set; }
+
+        public CatalogContext(DbContextOptions<CatalogContext> options) 
+            : base (options) { }
+
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+ {
+ modelBuilder.ApplyConfiguration(new ItemEntitySchemaDefinition());
+ base.OnModelCreating(modelBuilder);
+ }
+
+        public async Task<bool> SaveEntitiesAsync(CancellationToken 
+            cancellationToken = default(CancellationToken))
+        {
+            await SaveChangesAsync(cancellationToken);
+            return true;
+        }        
+    }
+}
+```
+
+上述代码使用`ApplyConfiguration`扩展方法在运行时执行期间将配置应用到 SQL 架构。需要注意的是，类中实现的`OnModelCreating`方法始终调用父类的`base.OnModelCreating`方法，以保留扩展类的行为。
 
 # 为艺术家和流派实体生成架构
 
 上述过程也可以应用于`Artist`和`Genre`实体。以下代码显示了`Catalog.Domain.Entities`命名空间中两个实体的定义：
 
-[PRE26]
+```cs
+using System.Collections.Generic;
+
+namespace Catalog.Domain.Entities
+{
+    //Artist.cs
+    public class Artist
+    {
+        public Guid ArtistId { get; set; }
+        public string ArtistName { get; set; }
+        public ICollection<Item> Items { get; set; }
+    }
+
+    //Genre.cs
+    public class Genre
+    {
+        public Guid GenreId { get; set; }
+        public string GenreDescription { get; set; }
+        public ICollection<Item> Items { get; set; }
+    }
+}
+```
 
 因此，我们可以将两个文件添加到`Catalog.Infrastructure`项目中，如下所示：
 
-[PRE27]
+```cs
+ //SchemaDefinitions/ArtistEntitySchemaConfiguration.cs using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Catalog.Domain.Entities;
+
+namespace Catalog.Infrastructure.SchemaDefinitions
+{
+    public class ArtistEntitySchemaConfiguration : 
+        IEntityTypeConfiguration<Artist>
+    {
+        public void Configure(EntityTypeBuilder<Artist> builder)
+        {
+            builder.ToTable("Artists", CatalogContext.DEFAULT_SCHEMA);
+            builder.HasKey(k => k.ArtistId);
+
+            builder.Property(p => p.ArtistId);
+
+            builder.Property(p => p.ArtistName)
+                .IsRequired()
+                .HasMaxLength(200);
+        }
+    }
+}
+```
 
 `GenreEntitySchemaConfiguration.cs`文件如下所示：
 
-[PRE28]
+```cs
+ //SchemaDefinitions/GenreEntitySchemaConfiguration.cs using Catalog.Domain.Entities;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
+
+namespace Catalog.Infrastructure.SchemaDefinitions
+{
+    public class GenreEntitySchemaConfiguration : 
+        IEntityTypeConfiguration<Genre>
+    {
+        public void Configure(EntityTypeBuilder<Genre> builder)
+        {
+            builder.ToTable("Genres", CatalogContext.DEFAULT_SCHEMA);
+            builder.HasKey(k => k.GenreId);
+
+            builder.Property(p => p.GenreId);
+
+            builder.Property(p => p.GenreDescription)
+                .IsRequired()
+                .HasMaxLength(1000);
+        }
+    }
+}
+```
 
 `GenreEntitySchemaConfiguration`和`ArtistEntitySchemaConfiguration`都使用`HasKey`方法定义了我们表的主键。正如我们之前讨论的，它们使用了应用于先前定义的`ItemEntitySchemaConfiguration`类的相同流畅方法。此外，我们还需要将`GenreEntitySchemaConfiguration`和`ArtistEntitySchemaConfiguration`包含在`CatalogContext`类的`OnModelCreating`方法中：
 
-[PRE29]
+```cs
+
+    public class CatalogContext : DbContext, IUnitOfWork
+    {
+...
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+ {
+            modelBuilder.ApplyConfiguration(new ItemEntitySchemaDefinition()); modelBuilder.ApplyConfiguration(new GenreEntitySchemaConfiguration());
+            modelBuilder.ApplyConfiguration(new ArtistEntitySchemaConfiguration());            base.OnModelCreating(modelBuilder);
+ }
+...     
+    }
+```
 
 为了简洁，我省略了`CatalogContext`类的完整定义。显著的变化是扩展了`OnModelCreating`方法，通过应用`GenreEntitySchemaConfiguration`和`ArtistEntitySchemaConfiguration`类的配置。
 
 # 执行迁移
 
-使用EF Core实现数据访问的最后一个步骤是将`DbContext`实例连接到数据库，并使用.NET CLI公开的命令运行迁移。在这样做之前，我们需要在我们的本地环境中有一个可工作的数据库。为了使我们的本地开发环境尽可能轻量，此示例将使用Linux上的Microsoft SQL Server Docker镜像。您可以从这里获取Docker镜像：[https://hub.docker.com/r/microsoft/mssql-server-linux/](https://hub.docker.com/r/microsoft/mssql-server-linux/)。如果您没有任何Docker的先前经验，可以遵循此指南在您的本地机器上安装和设置它：[https://docs.microsoft.com/en-us/sql/linux/quickstart-install-connect-docker?view=sql-server-2017](https://docs.microsoft.com/en-us/sql/linux/quickstart-install-connect-docker?view=sql-server-2017)。
+使用 EF Core 实现数据访问的最后一个步骤是将`DbContext`实例连接到数据库，并使用.NET CLI 公开的命令运行迁移。在这样做之前，我们需要在我们的本地环境中有一个可工作的数据库。为了使我们的本地开发环境尽可能轻量，此示例将使用 Linux 上的 Microsoft SQL Server Docker 镜像。您可以从这里获取 Docker 镜像：[`hub.docker.com/r/microsoft/mssql-server-linux/`](https://hub.docker.com/r/microsoft/mssql-server-linux/)。如果您没有任何 Docker 的先前经验，可以遵循此指南在您的本地机器上安装和设置它：[`docs.microsoft.com/en-us/sql/linux/quickstart-install-connect-docker?view=sql-server-2017`](https://docs.microsoft.com/en-us/sql/linux/quickstart-install-connect-docker?view=sql-server-2017)。
 
 容器是快速设置本地环境的一种极好方式，无需配置大量不同的工具和系统。如今，微软在简化他们的系统和流程方面投入了大量资金，无论是针对开发者还是云系统。
 
 在运行我们的 SQL 实例后，让我们通过以下命令创建一个名为 `Store` 的新数据库：
 
-[PRE30]
+```cs
+docker exec -it sql1 "bash" 
+/opt/mssql-tools/bin/sqlcmd -S localhost -U SA -P '<YOUR_PASSWORD>' 
+1> CREATE LOGIN catalog_srv WITH PASSWORD = 'P@ssw0rd';
+2> CREATE DATABASE Store;
+3> GO
+1> USE Store;
+2> CREATE USER catalog_srv;
+3> GO
+1> EXEC sp_addrolemember N'db_owner', N'catalog_srv';
+2> GO
+```
 
-CLI 的一个有效替代方案是使用 SQL 编辑器。一个推荐的工具是 VS Code 的 `mssql` 扩展：[https://docs.microsoft.com/en-us/sql/linux/sql-server-linux-develop-use-vscode?view=sql-server-2017](https://docs.microsoft.com/en-us/sql/linux/sql-server-linux-develop-use-vscode?view=sql-server-2017)。否则，您可以下载基于 VS Code 的跨平台 SQL 编辑器：[https://docs.microsoft.com/en-us/sql/azure-data-studio/download?view=sql-server-2017](https://docs.microsoft.com/en-us/sql/azure-data-studio/download?view=sql-server-2017)。
+CLI 的一个有效替代方案是使用 SQL 编辑器。一个推荐的工具是 VS Code 的 `mssql` 扩展：[`docs.microsoft.com/en-us/sql/linux/sql-server-linux-develop-use-vscode?view=sql-server-2017`](https://docs.microsoft.com/en-us/sql/linux/sql-server-linux-develop-use-vscode?view=sql-server-2017)。否则，您可以下载基于 VS Code 的跨平台 SQL 编辑器：[`docs.microsoft.com/en-us/sql/azure-data-studio/download?view=sql-server-2017`](https://docs.microsoft.com/en-us/sql/azure-data-studio/download?view=sql-server-2017)。
 
 一旦我们在本地环境中使 Microsoft SQL Server 运行起来，我们就可以通过将我们的服务与数据库连接来继续操作。`Catalog.API` 项目中已经存在的 `Startup` 类将定义我们的服务使用的连接字符串和提供者。正如我们将看到的，所有迁移类也将存储在同一个项目中。这种方法保证了我们的 .NET CLI 指令有一个唯一的入口点，即 `Catalog.API`，而不与数据库逻辑（`Catalog.Infrastructure`）紧密耦合。
 
 在继续之前，我们需要在 API 项目文件夹中使用以下命令将 `Catalog.Infrastructure` 项目添加为 API 项目的引用：
 
-[PRE31]
+```cs
+dotnet add reference ../Catalog.Infrastructure
+```
 
 API 项目还要求您引用 `Microsoft.EntityFrameworkCore.Design` NuGet 包，该包共享 EF Core 工具的设计时组件。我们可以通过在 `Catalog.API` 项目文件夹中执行以下 CLI 指令来添加包的最新版本：
 
-[PRE32]
+```cs
+dotnet add package Microsoft.EntityFrameworkCore.Design
+```
 
 之后，我们可以在 `Startup` 类中添加数据库连接：
 
-[PRE33]
+```cs
+using System;
+using System.Reflection;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.EntityFrameworkCore;
+using Catalog.Infrastructure; 
+namespace Catalog.API
+{
+    public class Startup
+    {
+        public Startup(IConfiguration configuration)
+        {
+          ...
+        }
+
+        ...
+        public void ConfigureServices(IServiceCollection services)
+        {
+             services
+                .AddEntityFrameworkSqlServer()
+                .AddDbContext<CatalogContext>(contextOptions =>
+                {
+                    contextOptions.UseSqlServer(
+ "Server=localhost,1433;Initial Catalog=Store;User Id=<SA_USER>;Password=<PASSWORD>",
+                        serverOptions => {             
+                           serverOptions.MigrationsAssembly
+                           (typeof(Startup).Assembly.FullName); });
+                });
+             ...
+        }
+
+        public void Configure(IApplicationBuilder app, 
+            IHostingEnvironment env)
+        {
+          ...
+        }
+    }
+}
+
+```
 
 `ConfigureServices` 方法包含了 SQL 连接的初始化。首先，它使用 `AddEntityFameworkSqlServer` 添加了 SQL 提供者所需的服务。随后，它添加了 `CatalogContext`，通过传递 `Action<DbContextOptionsBuilder>` 类型的动作方法来利用 `AddContext<T>` 泛型方法。
 
@@ -314,15 +839,53 @@ API 项目还要求您引用 `Microsoft.EntityFrameworkCore.Design` NuGet 包，
 
 为了使我们的`Startup`类保持整洁和可读，我们可能需要创建一个自定义扩展方法来初始化对`Catalog`数据库的连接。让我们在`Catalog.API`项目中创建一个新的文件夹名为`Extensions`，添加一个新的`DatabaseExtension`类，并将我们的代码移动到一个新的`AddCatalogContext`方法中：
 
-[PRE34]
+```cs
+using Catalog.Infrastructure;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace Catalog.API.Extensions
+{
+        public static class DatabaseExtensions
+        {
+            public static IServiceCollection AddCatalogContext(this 
+                IServiceCollection services)
+            {
+                return services
+                    .AddEntityFrameworkSqlServer()
+                    .AddDbContext<CatalogContext>(contextOptions =>
+                    {
+                        contextOptions.UseSqlServer(
+                            "Server=localhost,1433;Initial Catalog=Store;User Id=<SA_USER>;Password=<PASSWORD>",
+                            serverOptions => { 
+                                serverOptions.MigrationsAssembly
+ (typeof(Startup).Assembly.FullName); });
+                    });
+            }
+        }
+}
+```
 
 我们可以简化`Startup`类如下：
 
-[PRE35]
+```cs
+   public class Startup
+    {
+       ...
+
+        public void ConfigureServices(IServiceCollection services)
+        {
+            services.AddCatalogContext();
+            ...
+        }
+    }
+```
 
 现在`Startup`类已经准备好了，请在`Catalog.API`项目文件夹中使用以下命令执行`migrations`：
 
-[PRE36]
+```cs
+dotnet ef migrations add InitMigration dotnet ef database update
+```
 
 第一个命令生成了`Migration`文件夹以及其中的两个不同文件：
 
@@ -332,87 +895,289 @@ API 项目还要求您引用 `Microsoft.EntityFrameworkCore.Design` NuGet 包，
 
 每个迁移类，包括我们刚刚生成的类，都具有以下结构：
 
-[PRE37]
+```cs
+using Microsoft.EntityFrameworkCore.Migrations;
+
+namespace Catalog.API.Migrations
+{
+    public partial class InitMigration : Migration
+    {
+        protected override void Up(MigrationBuilder migrationBuilder)
+        {
+          ...
+        }
+
+        protected override void Down(MigrationBuilder migrationBuilder)
+        {
+          ...
+        }
+    }
+}
+```
 
 该类包含两个方法：`Up`和`Down`。`Up`方法在生成数据库模式时被调用。`Down`方法在删除模式时被调用。
 
-生成的表和SQL实体位于`catalog`模式之下。每次我们执行以下命令时，`dotnet ef` CLI工具都会创建一个新的迁移类：
+生成的表和 SQL 实体位于`catalog`模式之下。每次我们执行以下命令时，`dotnet ef` CLI 工具都会创建一个新的迁移类：
 
-[PRE38]
+```cs
+dotnet ef migrations add <migration_name>
+```
 
-每次我们在项目文件夹中运行EF Core更新过程时，数据库的模式都会被刷新。因此，我们可以在`Catalog.API`项目文件夹中执行以下CLI命令：
+每次我们在项目文件夹中运行 EF Core 更新过程时，数据库的模式都会被刷新。因此，我们可以在`Catalog.API`项目文件夹中执行以下 CLI 命令：
 
-[PRE39]
+```cs
+dotnet ef database update 
+```
 
-前一个命令使用存储在项目`Migration`文件夹中的迁移创建了SQL模式：它将连接到`AddCatalogContext()`扩展方法中指定的数据库。在下一节中，我们将探讨如何将指定的连接字符串移动到`appsettings.json`文件中。
+前一个命令使用存储在项目`Migration`文件夹中的迁移创建了 SQL 模式：它将连接到`AddCatalogContext()`扩展方法中指定的数据库。在下一节中，我们将探讨如何将指定的连接字符串移动到`appsettings.json`文件中。
 
 # 定义配置部分
 
-如[第2章](6127f023-703b-42e3-a76e-b70a7b110b90.xhtml)“ASP.NET Core概述”中所述，`appsettings.json`文件通常包含应用程序设置。连接字符串通常存储在该文件中。因此，这种做法使我们的服务更具可重用性和可配置性，尤其是在它已经在预发布或生产环境中运行时。让我们以下述方式将连接字符串从`AddCatalogContext`方法移动到`appsettings.json`文件中：
+如第二章“ASP.NET Core 概述”中所述，`appsettings.json`文件通常包含应用程序设置。连接字符串通常存储在该文件中。因此，这种做法使我们的服务更具可重用性和可配置性，尤其是在它已经在预发布或生产环境中运行时。让我们以下述方式将连接字符串从`AddCatalogContext`方法移动到`appsettings.json`文件中：
 
-[PRE40]
+```cs
+{
+...
+  "DataSource": {
+    "ConnectionString": "Server=localhost,1433;Initial Catalog=Store;User Id=catalog_srv;Password=P@ssw0rd"
+  }
+}
+```
 
 这样，我们可以使用以下语法读取连接字符串并将其作为参数传递给`AddCatalogContext`：
 
-[PRE41]
+```cs
+..
+public void ConfigureServices(IServiceCollection services)
+{
+..    services.AddCatalogContext(Configuration.GetSection("DataSource:ConnectionString").Value);
+  ...
+}
+..
+```
 
 因此，我们需要通过添加一个`connectionString`参数来更改`AddCatalogContext`扩展方法的签名，如下所示：
 
-[PRE42]
+```cs
+public static IServiceCollection AddCatalogContext(this IServiceCollection services, string connectionString)
+```
 
 我们可以将新定义的`connectionString`参数传递给`UseSqlServer`扩展方法。在下一节中，我们将继续测试本节中实现的仓库逻辑。
 
-# 测试EF Core仓库
+# 测试 EF Core 仓库
 
-本节涵盖了用于测试.NET Core应用程序的一些常见测试实践。更具体地说，它侧重于测试应用程序的存储库部分。首先，让我们在项目根目录（与`.sln`文件相同的文件夹）中执行以下命令来创建一个新的测试项目：
+本节涵盖了用于测试.NET Core 应用程序的一些常见测试实践。更具体地说，它侧重于测试应用程序的存储库部分。首先，让我们在项目根目录（与`.sln`文件相同的文件夹）中执行以下命令来创建一个新的测试项目：
 
-[PRE43]
+```cs
+mkdir tests
+cd tests
+
+dotnet new xunit -n Catalog.Infrastructure.Tests
+dotnet sln ../Catalog.API.sln add Catalog.Infrastructure.Tests
+```
 
 因此，我们创建了一个新的`tests`目录，它将包含服务中所有的测试项目。我们还使用`xunit`模板创建了一个新的`Catalog.Infrastructure.Tests`项目。
 
-`xunit`是.NET生态系统中的一个非常流行的测试框架，并且是.NET Core框架模板中的默认选择。由于我们使用`xunit`模板创建了项目，因此`Catalog.Infrastructure.Tests.csproj`文件将包含对`xunit`包的引用：
+`xunit`是.NET 生态系统中的一个非常流行的测试框架，并且是.NET Core 框架模板中的默认选择。由于我们使用`xunit`模板创建了项目，因此`Catalog.Infrastructure.Tests.csproj`文件将包含对`xunit`包的引用：
 
-[PRE44]
+```cs
+<ItemGroup>
+  <PackageReference Include="Microsoft.NET.Test.Sdk" Version=".." />
+  <PackageReference Include="xunit" Version=".." />
+  <PackageReference Include="xunit.runner.visualstudio" Version=".." />
+  <DotNetCliToolReference Include="dotnet-xunit" Version=".." />
+</ItemGroup
+```
 
-这些包允许我们通过在解决方案级别的测试项目文件夹中使用`dotnet test` CLI指令或在我们的首选IDE（如Visual Studio或Rider）中集成的测试运行器工具来运行单元测试。
+这些包允许我们通过在解决方案级别的测试项目文件夹中使用`dotnet test` CLI 指令或在我们的首选 IDE（如 Visual Studio 或 Rider）中集成的测试运行器工具来运行单元测试。
 
-# 使用DbContext进行数据种子
+# 使用 DbContext 进行数据种子
 
-让我们继续探讨另一个EF Core功能，它允许我们进行数据种子。数据种子技术简化了测试环境，以便获取集成测试数据库的**默认**快照。
+让我们继续探讨另一个 EF Core 功能，它允许我们进行数据种子。数据种子技术简化了测试环境，以便获取集成测试数据库的**默认**快照。
 
-让我们通过一个.NET Core数据库种子示例来了解。首先，让我们创建一个新的`Data`文件夹，并添加包含测试记录的JSON文件。为了简洁，我在同一代码片段中包含了`artist.json`文件和`genre.json`文件。
+让我们通过一个.NET Core 数据库种子示例来了解。首先，让我们创建一个新的`Data`文件夹，并添加包含测试记录的 JSON 文件。为了简洁，我在同一代码片段中包含了`artist.json`文件和`genre.json`文件。
 
-[PRE45]
+```cs
+// Data/artist.json
+[
+    {
+        "ArtistId": "3eb00b42-a9f0-4012-841d-70ebf3ab7474",
+        "ArtistName": "Kendrick Lamar",
+        "Items": null
+    },
+    {
+        "ArtistId": "f08a333d-30db-4dd1-b8ba-3b0473c7cdab",
+        "ArtistName": "Anderson Paak.",
+        "Items": null
+    }
+]
+
+// Data/genre.json
+[
+    {
+        "GenreId": "c04f05c0-f6ad-44d1-a400-3375bfb5dfd6",
+        "GenreDescription": "Hip-Hop",
+        "Items": null
+    }
+]
+
+```
 
 上述文件包含与`Genre`和`Artist`实体相关的数据。同样地，我们可以通过创建一个新的`item.json`文件来包含关于`Item`实体的信息：
 
-[PRE46]
+```cs
+//item.json
+[
+    {
+        "Id": "86bff4f7-05a7-46b6-ba73-d43e2c45840f",
+        "Name": "DAMN.",
+        "Description": "DAMN. by Kendrick Lamar",
+        "LabelName": "TDE, Top Dawg Entertainment",
+        "Price": {
+            "Amount": 34.5,
+            "Currency": "EUR"
+        },
+        "PictureUri": "https://mycdn.com/pictures/45345345",
+        "ReleaseDate": "2017-01-01T00:00:00+00:00",
+        "Format": "Vinyl 33g",
+        "AvailableStock": 5,
+        "GenreId": "c04f05c0-f6ad-44d1-a400-3375bfb5dfd6",
+        "Genre": null,
+        "ArtistId": "3eb00b42-a9f0-4012-841d-70ebf3ab7474",
+        "Artist": null
+    },
+    {
+        "Id": "b5b05534-9263-448c-a69e-0bbd8b3eb90e",
+        "Name": "GOOD KID, m.A.A.d CITY",
+        "Description": "GOOD KID, m.A.A.d CITY. by Kendrick Lamar",
+        "LabelName": "TDE, Top Dawg Entertainment",
+        "Price": {
+            "Amount": 23.5,
+            "Currency": "EUR"
+        },
+        "PictureUri": "https://mycdn.com/pictures/32423423",
+        "ReleaseDate": "2016-01-01T00:00:00+00:00",
+        "Format": "Vinyl 33g",
+        "AvailableStock": 6,
+        "GenreId": "c04f05c0-f6ad-44d1-a400-3375bfb5dfd6",
+        "Genre": null,
+        "ArtistId": "3eb00b42-a9f0-4012-841d-70ebf3ab7474",
+        "Artist": null
+    },
+    {
+        "Id": "be05537d-5e80-45c1-bd8c-aa21c0f1251e",
+        "Name": "Malibu",
+        "Description": "Malibu. by Anderson Paak",
+        "LabelName": "Steel Wool/OBE/Art Club",
+        "Price": {
+            "Amount": 23.5,
+            "Currency": "EUR"
+        },
+        "PictureUri": "https://mycdn.com/pictures/32423423",
+        "ReleaseDate": "2016-01-01T00:00:00+00:00",
+        "Format": "Vinyl 43",
+        "AvailableStock": 3,
+        "GenreId": "c04f05c0-f6ad-44d1-a400-3375bfb5dfd6",
+        "Genre": null,
+        "ArtistId": "f08a333d-30db-4dd1-b8ba-3b0473c7cdab",
+        "Artist": null
+    }
+]
+```
 
 这些文件包含一些种子数据，需要在每次测试之前添加到我们的数据库中。为了读取它们，我们需要在`Catalog.Infrastructure.Tests`项目中包含`Newtonsoft.Json`包，使用以下命令在项目文件夹中执行：
 
-[PRE47]
+```cs
+dotnet add package Newtonsoft.Json
 
-我们还应该确保在编译步骤中将JSON文件复制到`bin`文件夹中，通过在`Catalog.Infrastructure.Tests.csproj`中添加以下代码来实现：
+```
 
-[PRE48]
+我们还应该确保在编译步骤中将 JSON 文件复制到`bin`文件夹中，通过在`Catalog.Infrastructure.Tests.csproj`中添加以下代码来实现：
 
-下一步是实现一个从JSON读取数据并将其序列化到我们的数据库上下文中的方法。我们还应该在测试项目中添加`Microsoft.EntityFrameworkCore` NuGet包，使用以下CLI命令：
+```cs
+...
+<ItemGroup>
+  <None Update="Data\artist.json">
+    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+  </None>
+  <None Update="Data\genre.json">
+    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+  </None>
+  <None Update="Data\item.json">
+    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+  </None>
+</ItemGroup>
+..
+```
 
-[PRE49]
+下一步是实现一个从 JSON 读取数据并将其序列化到我们的数据库上下文中的方法。我们还应该在测试项目中添加`Microsoft.EntityFrameworkCore` NuGet 包，使用以下 CLI 命令：
 
-上述包将提供EF Core的`ModelBuilder`类型，该类型用于生成我们测试中使用的模拟数据。由于我们将使用`Catalog.Infrastructure`项目中实现的一些代码，我们应在解决方案根目录下使用以下命令将测试项目添加到引用中：
+```cs
+dotnet add package Microsoft.EntityFrameworkCore
+```
 
-[PRE50]
+上述包将提供 EF Core 的`ModelBuilder`类型，该类型用于生成我们测试中使用的模拟数据。由于我们将使用`Catalog.Infrastructure`项目中实现的一些代码，我们应在解决方案根目录下使用以下命令将测试项目添加到引用中：
+
+```cs
+dotnet add ./tests/Catalog.Infrastructure.Tests reference ./src/Catalog.Infrastructure
+```
 
 之后，我们可以在`Catalog.Infrastructure.Tests`项目中的新`Extensions`文件夹内创建一个新的扩展方法，命名为`Seed<T>`。
 
-[PRE51]
+```cs
+using System.IO;
+using Microsoft.EntityFrameworkCore;
+using Newtonsoft.Json;
+
+namespace Catalog.Infrastructure.Tests.Extensions
+{
+    public static class ModelBuilderExtensions
+    {
+        public static ModelBuilder Seed<T>(this ModelBuilder 
+            modelBuilder, string file) where T : class
+        {
+            using (var reader = new StreamReader(file))
+            {
+                var json = reader.ReadToEnd();
+                var data = JsonConvert.DeserializeObject<T[]>(json);
+                modelBuilder.Entity<T>().HasData(data);
+            }
+
+            return modelBuilder;
+        }
+    }
+}
+```
 
 EF Core 2.1 通过公开 `HasData<T>` 方法引入了一种在数据库中执行数据播种的新方法。前面的代码允许我们读取 JSON 文件并将其序列化为由 `modelBuilder` 引用的实体。这种方法提供了一种使用 JSON 文件中写入的数据对模拟数据库进行播种的方法。
 
 最后，我们可以在 `Catalog.Infrastructure.Tests` 项目中创建一个新的上下文，命名为 `TestCatalogContext`：
 
-[PRE52]
+```cs
+using Microsoft.EntityFrameworkCore;
+using Catalog.Domain.Entities;
+using Catalog.Infrastructure.Tests.Extensions;
+
+namespace Catalog.Infrastructure.Tests
+{
+    public class TestCatalogContext : CatalogContext
+    {
+        public TestCatalogContext(DbContextOptions<CatalogContext> options) : base(options)
+        {
+        }
+
+        protected override void OnModelCreating(ModelBuilder 
+            modelBuilder)
+        {
+            base.OnModelCreating(modelBuilder);
+
+            modelBuilder.Seed<Artist>("./Data/artist.json");
+ modelBuilder.Seed<Genre>("./Data/genre.json");
+ modelBuilder.Seed<Item>("./Data/item.json");
+        }
+    }
+}
+```
 
 在这里，`TestCatalogContext` 类扩展了位于 `Catalog.Infrastructure` 项目的 `CatalogContext` 类，并重写了 `OnModelCreating` 方法以在实体上调用 `Seed<T>` 扩展方法。因此，当消费者使用 `TestCatalogContext` 初始化数据库时，它将具有在 JSON 中编写的所有预填充数据。
 
@@ -422,83 +1187,376 @@ EF Core 2.1 通过公开 `HasData<T>` 方法引入了一种在数据库中执行
 
 让我们在 `Catalog.Infrastructure.Tests` 项目中创建一个新的测试类，命名为 `ItemRepositoryTests`：
 
-[PRE53]
+```cs
+using Xunit;
+
+namespace Catalog.Infrastructure.Tests
+{
+    public class ItemRepositoryTests
+    {
+        [Fact]
+        public void should_get_data()
+        {
+            Assert.True(true);
+        }
+    }
+}
+```
 
 `Xunit` 框架使用 `Fact` 属性识别测试类。每个包含具有 `Fact` 属性的方法或，如本节稍后所示，具有 `Theory` 属性的类的类都将被视为测试，由单元测试运行器执行。
 
 让我们继续添加我们的第一个测试方法。这个方法检查 `ItemRepository` 类的 `GetAsync` 方法：
 
-[PRE54]
+```cs
+using System.Threading.Tasks;
+using Microsoft.EntityFrameworkCore;
+using Shouldly;
+using Catalog.Infrastructure.Repositories;
+using Xunit;
+
+namespace Catalog.Infrastructure.Tests
+{
+    public class ItemRepositoryTests
+    {
+        [Fact]
+        public async Task should_get_data()
+        {
+            var options = new DbContextOptionsBuilder<CatalogContext>()
+                .UseInMemoryDatabase(databaseName: "should_get_data")
+                .Options;
+
+            await using var context = new TestCatalogContext(options);
+            context.Database.EnsureCreated();
+
+            var sut = new ItemRepository(context);
+            var result = await sut.GetAsync();
+
+            result.ShouldNotBeNull();
+        }
+    }
+}
+```
 
 此代码使用 `DbContextOptionsBuilder<T>` 初始化一个新的 `Options` 对象，其类型为 `CatalogContext`。它还使用 `UseInMemoryDatabase` 扩展方法创建一个新的具有给定名称的内存数据库实例。由于 `DbContext` 由实现 `IAsyncDisposable` 类型的 `CatalogContext` 类扩展，因此可以使用 `await using var` 关键字。这种方法避免了任何类型的嵌套，并通过避免使用嵌套来提供更清晰的代码阅读方式：
 
-[PRE55]
+```cs
+...
+    using (var context = new TestCatalogContext(options))
+    {
+        context.Database.EnsureCreated();
+        var sut = new ItemRepository(context);
+
+        var result = await sut.GetAsync();
+
+        result.ShouldNotBeNull();
+    }
+...
+```
 
 要构建代码，需要在 `Catalog.Infrastructure.Tests` 项目中添加以下包：
 
-[PRE56]
+```cs
+dotnet add package Microsoft.EntityFrameworkCore.InMemory
+```
 
-`UseInMemoryDatabase` 扩展方法对于配置新的内存数据库实例很有用。需要注意的是，它不是设计为关系型数据库。此外，它不执行任何数据库完整性检查或约束检查。为了更合适的测试，我们应该使用 SQLite 的内存版本。您可以在以下文档中找到有关 SQLite 提供程序的更多信息：[https://docs.microsoft.com/en-us/ef/core/miscellaneous/testing/sqlite](https://docs.microsoft.com/en-us/ef/core/miscellaneous/testing/sqlite)。
+`UseInMemoryDatabase` 扩展方法对于配置新的内存数据库实例很有用。需要注意的是，它不是设计为关系型数据库。此外，它不执行任何数据库完整性检查或约束检查。为了更合适的测试，我们应该使用 SQLite 的内存版本。您可以在以下文档中找到有关 SQLite 提供程序的更多信息：[`docs.microsoft.com/en-us/ef/core/miscellaneous/testing/sqlite`](https://docs.microsoft.com/en-us/ef/core/miscellaneous/testing/sqlite)。
 
 在创建新的 `Options` 对象之后，`should_get_data` 方法创建了一个新的 `TestCatalogContext` 实例，并调用了 `EnsureCreated()` 方法，该方法确保上下文存在于内存数据库中。`EnsureCreate` 方法还隐式地调用了 `OnModelCreating` 方法。之后，测试通过上下文初始化了一个新的 `ItemRepository`，并执行了 `GetAsync` 方法。最后，它使用 `result.ShouldNotBeNull()` 检查结果。
 
-注意，本书中的所有测试示例都使用了 `Shouldly` 作为断言框架。`Shouldly` 专注于在断言失败时提供简洁明了的错误信息。可以通过使用 .NET Core 内置的默认断言框架来避免使用 `Shouldly`。有关 `Shouldly` 的更多信息，请参阅以下链接：[https://github.com/shouldly/shouldly](https://github.com/shouldly/shouldly)。您可以在 `Catalog.Infrastructure.Tests` 项目中执行以下 CLI 指令来添加 `Shouldly` 包：`dotnet add package Shouldly`。
+注意，本书中的所有测试示例都使用了 `Shouldly` 作为断言框架。`Shouldly` 专注于在断言失败时提供简洁明了的错误信息。可以通过使用 .NET Core 内置的默认断言框架来避免使用 `Shouldly`。有关 `Shouldly` 的更多信息，请参阅以下链接：[`github.com/shouldly/shouldly`](https://github.com/shouldly/shouldly)。您可以在 `Catalog.Infrastructure.Tests` 项目中执行以下 CLI 指令来添加 `Shouldly` 包：`dotnet add package Shouldly`。
 
 让我们继续实现 `ItemRepository` 类中所有方法的测试：
 
-[PRE57]
+```cs
+using System;
+using System.Threading.Tasks;
+using Microsoft.EntityFrameworkCore;
+using Shouldly;
+using Catalog.Infrastructure.Repositories;
+using Xunit;
+
+namespace Catalog.Infrastructure.Tests
+{
+    public class ItemRepositoryTests
+    {
+        [Fact]
+        public async Task should_get_data()
+        {
+            var options = new DbContextOptionsBuilder<CatalogContext>()
+                .UseInMemoryDatabase("should_get_data")
+                .Options;
+
+            await using var context = new TestCatalogContext(options);
+            context.Database.EnsureCreated();
+
+            var sut = new ItemRepository(context);
+            var result = await sut.GetAsync();
+
+            result.ShouldNotBeNull();
+        }
+
+        [Fact]
+        public async Task should_returns_null_with_id_not_present()
+        {
+            var options = new DbContextOptionsBuilder<CatalogContext>()
+                .UseInMemoryDatabase(databaseName: 
+                    "should_returns_null_with_id_not_present")
+                .Options;
+
+            await using var context = new TestCatalogContext(options);
+            context.Database.EnsureCreated();
+
+            var sut = new ItemRepository(context);
+            var result = await sut.GetAsync(Guid.NewGuid());
+
+            result.ShouldBeNull();
+        }
+
+        [Theory]
+        [InlineData("b5b05534-9263-448c-a69e-0bbd8b3eb90e")]
+        public async Task should_return_record_by_id(string guid)
+        {
+            var options = new DbContextOptionsBuilder<CatalogContext>()
+                .UseInMemoryDatabase(databaseName: 
+                    "should_return_record_by_id")
+                .Options;
+
+            await using var context = new TestCatalogContext(options);
+            context.Database.EnsureCreated();
+
+            var sut = new ItemRepository(context);
+            var result = await sut.GetAsync(new Guid(guid));
+
+            result.Id.ShouldBe(new Guid(guid));
+        }
+...
+```
 
 前面的代码片段定义了覆盖 `GetAsync` 方法的测试。第一个方法 `should_get_data` 测试了没有参数的 `GetAsync()` 重载，而第二个方法测试了 `GetAsync(guid id)` 重载。在这两种情况下，我们使用 `InMemoryDatabase` 来模拟底层数据源。在同一个 `ItemRepositoryTests` 类中，也可以定义与创建/更新操作相关的测试用例：
 
-[PRE58]
+```cs
+...
+        [Fact]
+        public async Task should_add_new_item()
+        {
+            var testItem = new Item
+            {
+                Name = "Test album",
+                Description = "Description",
+                LabelName = "Label name",
+                Price = new Price { Amount = 13, Currency = "EUR" },
+                PictureUri = "https://mycdn.com/pictures/32423423",
+                ReleaseDate = DateTimeOffset.Now,
+                AvailableStock = 6,
+                GenreId = new Guid("c04f05c0-f6ad-44d1-a400-3375bfb5dfd6"),
+                ArtistId = new Guid("f08a333d-30db-4dd1-b8ba-3b0473c7cdab")
+            };
+
+            var options = new DbContextOptionsBuilder<CatalogContext>()
+                .UseInMemoryDatabase("should_add_new_items")
+                .Options;
+
+            await using var context = new TestCatalogContext(options);
+            context.Database.EnsureCreated();
+
+            var sut = new ItemRepository(context);
+
+            sut.Add(testItem);
+            await sut.UnitOfWork.SaveEntitiesAsync();
+
+            context.Items
+                .FirstOrDefault(_ => _.Id == testItem.Id)
+                .ShouldNotBeNull();
+        }
+
+        [Fact]
+        public async Task should_update_item()
+        {
+            var testItem = new Item
+            {
+                Id = new Guid("b5b05534-9263-448c-a69e-0bbd8b3eb90e"),
+                Name = "Test album",
+                Description = "Description updated",
+                LabelName = "Label name",
+                Price = new Price { Amount = 50, Currency = "EUR" },
+                PictureUri = "https://mycdn.com/pictures/32423423",
+                ReleaseDate = DateTimeOffset.Now,
+                AvailableStock = 6,
+                GenreId = new Guid("c04f05c0-f6ad-44d1-a400-3375bfb5dfd6"),
+                ArtistId = new Guid("f08a333d-30db-4dd1-b8ba-3b0473c7cdab")
+            };
+
+            var options = new DbContextOptionsBuilder<CatalogContext>()
+                .UseInMemoryDatabase("should_update_item")
+                .Options;
+
+            await using var context = new TestCatalogContext(options);
+            context.Database.EnsureCreated();
+
+            var sut = new ItemRepository(context);
+            sut.Update(testItem);
+
+            await sut.UnitOfWork.SaveEntitiesAsync();
+
+            context.Items
+                .FirstOrDefault(x => x.Id == testItem.Id)
+                ?.Description.ShouldBe("Description updated");
+        }
+...
+}
+```
 
 最后，`ItemRepositoryTests` 类为 `ItemRepository` 类实现的全部 CRUD 方法提供了测试覆盖率。`should_get_data`、`should_returns_null_with_id_not_present` 和 `should_return_record_by_id` 方法执行 `GetAsync` 方法并检查结果是否符合预期。`should_add_new_item` 和 `should_update_item` 测试用例为 `ItemRepository.Add` 和 `ItemRepository.Update` 方法提供了测试覆盖率。这两个测试都初始化了一个新的 `Item` 类型的记录，并通过 `ItemRepository` 类型公开的方法更新数据库。
 
 因此，我们可以在 `Catalog.Infrastructure.Tests` 文件夹中执行以下命令来运行我们的测试：
 
-[PRE59]
+```cs
+ dotnet test 
+```
 
 前面的命令执行了项目中实现的所有测试。因此，结果将是一个包含成功测试列表的报告。作为替代，我们也可以选择使用 IDE 提供的测试运行器来运行测试。现在我们已经使用 EF Core 和代码优先方法完成了数据访问部分的实现，我们也可以快速了解一下 Dapper，以及它如何通过提供一种更轻量级的数据访问方式来发挥作用。
 
 # 使用 Dapper 实现数据访问层
 
-另一个提供实现数据访问层方法的标准化工具是Dapper。我们已经对Dapper进行了概述，但本节将更详细地介绍如何处理这个包以及如何使用它来实现数据访问层。以下过程将更加侧重于SQL。我们还将演示如何处理一些存储CRUD过程。
+另一个提供实现数据访问层方法的标准化工具是 Dapper。我们已经对 Dapper 进行了概述，但本节将更详细地介绍如何处理这个包以及如何使用它来实现数据访问层。以下过程将更加侧重于 SQL。我们还将演示如何处理一些存储 CRUD 过程。
 
-注意，EF Core还提供了一种通过存储过程查询数据源的方法。此外，它公开了`DbSet<TEntity>.FromSql()`或`DbContext.Database.ExecuteSqlCommand()`等方法。那么，为什么使用Dapper呢？如前所述，Dapper是一个简单且比EF Core更快的微型ORM。EF更像是一个多用途ORM，它在每个操作上都会增加一些额外的开销。
+注意，EF Core 还提供了一种通过存储过程查询数据源的方法。此外，它公开了`DbSet<TEntity>.FromSql()`或`DbContext.Database.ExecuteSqlCommand()`等方法。那么，为什么使用 Dapper 呢？如前所述，Dapper 是一个简单且比 EF Core 更快的微型 ORM。EF 更像是一个多用途 ORM，它在每个操作上都会增加一些额外的开销。
 
 在开始之前，让我们在`src`文件夹内创建另一个名为`Catalog.InfrastructureSP`的项目，通过在`src`文件夹内运行以下命令：
 
-[PRE60]
+```cs
+dotnet new classlib -n Catalog.InfrastructureSP
+```
 
 在创建`Catalog.InfrastructureSP`项目之后，我们需要将其添加到我们的解决方案中：
 
-[PRE61]
+```cs
+dotnet sln ../Catalog.API.sln add Catalog.InfrastructureSP
+```
 
-上述命令将`Catalog.InfrastructureSP`项目包含到解决方案中。一旦我们设置了包含所有数据访问层替代实现的新项目，我们就可以通过使用SQL-first方法来实现项目的核心部分。
+上述命令将`Catalog.InfrastructureSP`项目包含到解决方案中。一旦我们设置了包含所有数据访问层替代实现的新项目，我们就可以通过使用 SQL-first 方法来实现项目的核心部分。
 
-# 创建存储CRUD过程
+# 创建存储 CRUD 过程
 
-在当前示例中，我们使用了一些实现创建、读取和更新操作的存储过程。在这本书中，我们不会深入探讨SQL服务器编程模型，但理解代码-first方法不是唯一的方法是至关重要的。存储过程是实现服务与数据库之间交互的一种优秀方式。
+在当前示例中，我们使用了一些实现创建、读取和更新操作的存储过程。在这本书中，我们不会深入探讨 SQL 服务器编程模型，但理解代码-first 方法不是唯一的方法是至关重要的。存储过程是实现服务与数据库之间交互的一种优秀方式。
 
 存储过程是与数据库交互的最佳方式。开发者可以通过执行复杂查询并调用过程名称来继续操作。这种模块化方法在权限配置、更快的网络流量和更快的执行速度方面提供了一些好处。
 
 首先，让我们创建用于读取数据的存储过程：
 
-[PRE62]
+```cs
+create procedure [catalog].[GetAllItems] 
+as
+begin
+   select [Id]
+       [Name]
+      ,[Description]
+      ,[LabelName]
+      ,[Price]
+      ,[PictureUri]
+      ,[ReleaseDate]
+      ,[Format]
+      ,[AvailableStock]
+      ,[GenreId]
+      ,[ArtistId]
+  from [catalog].[Items]
+end
+```
 
-代码的第一个片段定义了`GetAllItems`存储过程。它返回整个项目集合。出于演示目的，该过程不包括任何性能优化。当我们对一个包含大量记录的大表执行`select`查询时，至少需要插入一个top语句以避免长时间运行的查询和超时问题。此外，在现实世界的应用程序中，很少看到没有特定过滤器的查询。让我们继续创建`GetItemById`过程：
+代码的第一个片段定义了`GetAllItems`存储过程。它返回整个项目集合。出于演示目的，该过程不包括任何性能优化。当我们对一个包含大量记录的大表执行`select`查询时，至少需要插入一个 top 语句以避免长时间运行的查询和超时问题。此外，在现实世界的应用程序中，很少看到没有特定过滤器的查询。让我们继续创建`GetItemById`过程：
 
-[PRE63]
+```cs
+create procedure [catalog].[GetItemById] 
+   @Id uniqueidentifier
+as
+begin
+   select [Id]
+       [Name]
+      ,[Description]
+      ,[LabelName]
+      ,[Price]
+      ,[PictureUri]
+      ,[ReleaseDate]
+      ,[Format]
+      ,[AvailableStock]
+      ,[GenreId]
+      ,[ArtistId]
+  from [catalog].[Items] 
+  where Id = @Id
+end
+```
 
 这两个过程相当简单。第一个过程从`catalog.Item`表中选取所有记录。第二个过程接受一个`Id`作为参数，并允许我们检索相应的记录。
 
 下一步是实现与创建和更新记录相关的操作。两种实现都非常简单——`InsertItem` 和 `UpdateItem` 存储过程封装了 `insert` 和 `update` SQL 语句：
 
-[PRE64]
+```cs
+create procedure [catalog].[InsertItem] (
+ @Id uniqueidentifier,
+ @Name nvarchar(max),
+ @Description nvarchar(1000),
+ @LabelName nvarchar(max) NULL,
+ @Price nvarchar(max) NULL,
+ @PictureUri nvarchar(max) NULL,
+ @ReleaseDate datetimeoffset(7),
+ @Format nvarchar(max) ,
+ @AvailableStock int,
+ @GenreId uniqueidentifier,
+ @ArtistId uniqueidentifier
+)
+as
+begin
+  insert into  [catalog].[Items]  (Id, Name, Description,LabelName,Price,PictureUri, ReleaseDate,
+  Format,AvailableStock, GenreId,ArtistId)
+  output inserted.*
+  values   (@Id,
+            @Name,
+            @Description,
+            @LabelName,
+            @Price,
+            @PictureUri,
+            @ReleaseDate,
+            @Format,
+            @AvailableStock,
+            @GenreId,
+            @ArtistId)
+end
+
+```
 
 `InsertItem` 存储过程通过接受存储过程的参数来在数据库上执行简单的 `insert` 语句。让我们通过定义 `UpdateItem` 存储过程来继续：
 
-[PRE65]
+```cs
+create procedure [catalog].[UpdateItem] (
+ @Id uniqueidentifier,
+ @Name nvarchar(max),
+ @Description nvarchar(1000),
+ @LabelName nvarchar(max) NULL,
+ @Price nvarchar(max),
+ @PictureUri nvarchar(max) NULL,
+ @ReleaseDate datetimeoffset(7) NULL,
+ @Format nvarchar(max) ,
+ @AvailableStock int,
+ @GenreId uniqueidentifier,
+ @ArtistId uniqueidentifier
+)
+as
+begin
+  update [catalog].[Items]
+  set Name = @Name,
+      Description = @Description,
+      LabelName = @LabelName,
+      Price = @Price,
+      PictureUri = @PictureUri,
+      ReleaseDate = @ReleaseDate,
+      Format = @Format,
+      AvailableStock = @AvailableStock,
+      GenreId = @GenreId,
+      ArtistId = @ArtistId
+   output inserted.*
+   where Id = @Id
+end
+```
 
 注意，这两个操作都使用 `output` 语句来检索执行结果中插入或更新的记录。这样，我们可以从我们的存储库模式中检索更新记录而无需额外努力。
 
@@ -512,15 +1570,92 @@ Microsoft SQL Server 提供了一种使用 *output* 操作符返回插入或删�
 
 因此，作为第一步，我们应该从我们的 `IItemRepository` 接口中移除 `IRepository` 接口的实现。此外，在这种情况下，我们可以看到依赖反转的真正力量：`Catalog.Domain` 不依赖于 `Catalog.Infrastructure`*.* 它也可以更改合同和需求，并迫使 `Catalog.Infrastructure` 改变其行为：
 
-[PRE66]
+```cs
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using Catalog.Domain.Infrastructure.Entities;
+
+namespace Catalog.Domain.Infrastructure.Repositories
+{
+    public interface IItemsRepository  
+    {
+        Task<IEnumerable<Item>> GetAsync();
+        Task<Item> GetAsync(Guid id);
+        Item Add(Item order);
+        Item Update(Item item);
+        Item Delete(Item item);
+    }
+}
+```
 
 下一步是将 Dapper 添加到我们的 `Catalog.InfrastructureSP` 项目中，通过执行以下命令：
 
-[PRE67]
+```cs
+ dotnet add package Dapper
+```
 
 让我们通过在 `Catalog.InfrastructureSP` 项目中使用 `ItemRepository` 类来实现 `IItemRepository` 接口：
 
-[PRE68]
+```cs
+using System;
+using System.Collections.Generic;
+using System.Data;
+using System.Data.SqlClient;
+using System.Threading.Tasks;
+using Dapper;
+using Catalog.Domain.Entities;
+using Catalog.Domain.Infrastructure.Repositories;
+
+namespace Catalog.InfrastructureSP
+{
+    public class ItemRepository : IItemRepository
+    {
+        private readonly SqlConnection _sqlConnection;
+
+        public ItemRepository(string connectionString)
+        {
+
+            _sqlConnection = new SqlConnection(connectionString);
+        }
+
+        public async Task<IEnumerable<Item>> GetAsync()
+        {
+            var result = await _sqlConnection.QueryAsync<Item>
+                ("GetAllItems",  commandType: 
+                CommandType.StoredProcedure);
+            return result.AsList();
+        }
+
+        public async Task<Item> GetAsync(Guid id)
+        {
+            return await _sqlConnection.ExecuteScalarAsync<Item>
+                ("GetAllItems", new {Id = id.ToString()}, commandType: 
+                CommandType.StoredProcedure);
+        }
+
+        public Item Add(Item order)
+        {
+            var result = _sqlConnection.ExecuteScalar<Item>
+            ("InsertItem", order, commandType:CommandType.StoredProcedure);
+            return result;
+        }
+
+        public Item Update(Item item)
+        {
+            var result = _sqlConnection.ExecuteScalar<Item>
+                ("UpdateItem", item, commandType: 
+                CommandType.StoredProcedure);
+            return result;
+        }
+
+        public Item Delete(Item item)
+        {
+            throw new NotImplementedException();
+        }
+    }
+}
+```
 
 为了初始化我们的具体类，必须在 `ItemRepository` 类的构造函数中将 `connectionString` 传递给 SQL 数据库。
 
@@ -528,8 +1663,8 @@ Microsoft SQL Server 提供了一种使用 *output* 操作符返回插入或删�
 
 # 摘要
 
-本章描述了如何使用EF Core和Dapper构建数据访问层。它还展示了如何使用内存数据库构建单元测试，以及如何使用EF Core执行迁移。我想重申，EF Core和Dapper之间的选择取决于不同的参数：我们正在构建的服务类型、团队成员的技能以及我们使用的类型基础设施。
+本章描述了如何使用 EF Core 和 Dapper 构建数据访问层。它还展示了如何使用内存数据库构建单元测试，以及如何使用 EF Core 执行迁移。我想重申，EF Core 和 Dapper 之间的选择取决于不同的参数：我们正在构建的服务类型、团队成员的技能以及我们使用的类型基础设施。
 
-本章涵盖的主题提供了使用代码优先和存储过程方法访问.NET Core数据源所需的知识。本章介绍了EF Core和Dapper等技术的使用。此外，它还展示了如何使用内存方法测试数据访问层。
+本章涵盖的主题提供了使用代码优先和存储过程方法访问.NET Core 数据源所需的知识。本章介绍了 EF Core 和 Dapper 等技术的使用。此外，它还展示了如何使用内存方法测试数据访问层。
 
 在下一章中，我们将演示如何实现处理程序和我们的服务逻辑。

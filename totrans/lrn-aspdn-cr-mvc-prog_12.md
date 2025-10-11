@@ -1,4 +1,4 @@
-# 第 12 章。ASP.NET Core Identity
+# 第十二章。ASP.NET Core Identity
 
 安全性对所有类型的应用程序都是必不可少的，包括 Web 应用程序。如果任何人都可以通过冒充您来更新您的状态，您会使用 Facebook 吗？如果这是可能的，那么没有人会再回到 Facebook。从这个例子中，我们可以看到安全性与其说是一个特性，不如说是一个对所有应用程序的必需品。
 
@@ -46,7 +46,12 @@ ASP.NET Core Identity 是一个会员系统，它使您能够轻松地保护应�
 
 如果您想在应用程序中使用 ASP.NET Identity 和 Entity Framework，您需要添加以下依赖项：
 
-[PRE0]
+```cs
+"EntityFramework.Commands": "7.0.0-rc1-final", 
+    "EntityFramework.MicrosoftSqlServer": "7.0.0-rc1-final", 
+    "Microsoft.AspNet.Authentication.Cookies": "1.0.0-rc1-final", 
+
+```
 
 创建一个 `appsettings.json` 文件并存储数据库连接字符串。
 
@@ -56,7 +61,16 @@ ASP.NET Core Identity 是一个会员系统，它使您能够轻松地保护应�
 
 将以下连接字符串存储在 `appsettings.json` 中。此连接字符串将由 ASP.NET Identity 用于在相关表中存储数据：
 
-[PRE1]
+```cs
+{ 
+  "Data": { 
+    "DefaultConnection": { 
+      "ConnectionString": "Server=(localdb)\\mssqllocaldb;Database=aspnet_security;Trusted_Connection=True;MultipleActiveResultSets=true" 
+   } 
+  } 
+} 
+
+```
 
 ## 添加 ApplicationUser 和 ApplicationDbContext 类
 
@@ -66,7 +80,13 @@ ASP.NET Core Identity 是一个会员系统，它使您能够轻松地保护应�
 
 `ApplicationUser` 类从 `AspNet.Identity.EntityFramework6` 命名空间中的 `IdentityUser` 类继承，如下所示：
 
-[PRE2]
+```cs
+public class ApplicationUser : IdentityUser 
+{
+..  
+} 
+
+```
 
 您可以根据应用程序的需求向用户添加属性。我没有添加任何属性，因为我希望保持简单，以展示 ASP.NET Identity 的功能。
 
@@ -74,7 +94,18 @@ ASP.NET Core Identity 是一个会员系统，它使您能够轻松地保护应�
 
 甚至 `OnModelCreating` 方法也被重写。如果您想更改任何表名（由 Identity 生成），可以按以下方式操作：
 
-[PRE3]
+```cs
+public class ApplicationDbContext : IdentityDbContext<ApplicationUser> 
+    { 
+        public ApplicationDbContext(string nameOrConnectionString) : base(nameOrConnectionString) { } 
+
+        protected override void OnModelCreating(DbModelBuilder modelBuilder) 
+        { 
+            base.OnModelCreating(modelBuilder);             
+        } 
+    } 
+
+```
 
 一旦我们创建了 `Models` 文件，我们需要配置应用程序和服务。您可以在 `Startup` 类中的 `Configure` 和 `ConfigureServices` 中配置这些。
 
@@ -82,11 +113,46 @@ ASP.NET Core Identity 是一个会员系统，它使您能够轻松地保护应�
 
 为了使用 Identity，我们只需在 `Startup` 类的 `Configure` 方法中添加以下行：
 
-[PRE4]
+```cs
+app.UseIdentity(); 
+
+```
 
 以下代码显示了完整的 `Configure` 方法，包括对 `UseIdentity` 方法的调用，即 `app.UseIdentity()` :
 
-[PRE5]
+```cs
+public void Configure(IApplicationBuilder app, IHostingEnvironment env,  ILoggerFactory loggerFactory) 
+        { 
+            loggerFactory.AddConsole(Configuration.GetSection("Logging")); 
+            loggerFactory.AddDebug(); 
+
+            if (env.IsDevelopment()) 
+            { 
+                app.UseBrowserLink(); 
+                app.UseDeveloperExceptionPage(); 
+                app.UseDatabaseErrorPage(); 
+            } 
+            else 
+            { 
+                app.UseExceptionHandler("/Home/Error"); 
+
+            app.UseIISPlatformHandler(options => options.AuthenticationDescriptions.Clear()); 
+
+            app.UseStaticFiles(); 
+
+            app.UseIdentity(); 
+
+            // To configure external authentication please see http://go.microsoft.com/fwlink/?LinkID=532715 
+
+            app.UseMvc(routes => 
+            { 
+                routes.MapRoute( 
+                    name: "default", 
+                    template: "{controller=Home}/{action=Index}/{id?}"); 
+            }); 
+        } 
+
+```
 
 在 `ConfigureServices` 方法中，我们将进行以下更改：
 
@@ -96,7 +162,28 @@ ASP.NET Core Identity 是一个会员系统，它使您能够轻松地保护应�
 
 +   最后，我们将要求 ASP.NET Core 在我们请求 `IEmailSender` 和 `ISMSSender` 类时返回 `AuthMessageSender`
 
-    [PRE6]
+    ```cs
+    public void ConfigureServices(IServiceCollection services 
+    { 
+    // Add framework services. 
+
+                services.AddScoped<ApplicationDbContext>(f => { 
+                    return new ApplicationDbContext(Configuration["Data:DefaultConnection:ConnectionString"]); 
+                }); 
+
+                services.AddIdentity<ApplicationUser, IdentityRole>() 
+                    .AddUserStore<UserStore<ApplicationUser, ApplicationDbContext>>() 
+                    .AddRoleStore<RoleStore<ApplicationDbContext>>() 
+                    .AddDefaultTokenProviders(); 
+
+                services.AddMvc(); 
+
+                // Add application services. 
+                services.AddTransient<IEmailSender, AuthMessageSender>(); 
+                services.AddTransient<ISmsSender, AuthMessageSender>(); 
+            } 
+
+    ```
 
 # 创建 ViewModels
 
@@ -104,55 +191,312 @@ ASP.NET Core Identity 是一个会员系统，它使您能够轻松地保护应�
 
 首先，我们将创建一个包含三个属性——`Email`、`Password` 和 `ConfirmPassword` 的 `RegisterViewModel` 类。我们使用适当的属性装饰这些属性，以便我们可以使用无障碍 jQuery 验证进行客户端验证。我们将所有字段都设置为必填项，如下所示：
 
-[PRE7]
+```cs
+public class RegisterViewModel 
+    { 
+        [Required] 
+        [EmailAddress] 
+        [Display(Name = "Email")] 
+        public string Email { get; set; } 
+
+        [Required] 
+        [StringLength(100, ErrorMessage = "The {0} must be at least {2} characters long.", MinimumLength = 6)] 
+        [DataType(DataType.Password)] 
+        [Display(Name = "Password")] 
+        public string Password { get; set; } 
+
+        [DataType(DataType.Password)] 
+        [Display(Name = "Confirm password")] 
+        [Compare("Password", ErrorMessage = "The password and confirmation password do not match.")] 
+        public string ConfirmPassword { get; set; } 
+    } 
+
+```
 
 现在，我们可以创建`LoginViewModel`模型，用户可以使用它来登录到你的应用程序。还有一个额外的属性`RememberMe`，当勾选时，将允许你登录而无需再次输入密码：
 
-[PRE8]
+```cs
+public class LoginViewModel 
+    { 
+        [Required] 
+        [EmailAddress] 
+        public string Email { get; set; } 
+
+        [Required] 
+        [DataType(DataType.Password)] 
+        public string Password { get; set; } 
+
+        [Display(Name = "Remember me?")] 
+        public bool RememberMe { get; set; } 
+    } 
+
+```
 
 # 创建控制器和相关操作方法
 
 现在我们需要创建一个`AccountController`类，我们将在这里定义认证和授权的操作方法：
 
-[PRE9]
+```cs
+public class AccountController : Controller 
+    { 
+        private readonly UserManager<ApplicationUser> _userManager; 
+        private readonly SignInManager<ApplicationUser> _signInManager; 
+        private readonly IEmailSender _emailSender; 
+        private readonly ISmsSender _smsSender; 
+        private readonly ILogger _logger; 
 
-在前面的代码中，我们正在使用不同组件提供的服务。`UserManager`和`SignInManager`由ASP.NET Identity提供。`IEmailSender`和`ISmsSender`是我们编写的自定义类，将用于发送电子邮件和短信。我们将在本章后面更详细地了解电子邮件和短信。日志记录由Microsoft Logging扩展提供。以下是一个简单的登录`HTTPGET`方法。它只是存储访问`Login`方法的URL并返回登录页面：
+        public AccountController( 
+            UserManager<ApplicationUser> userManager, 
+            SignInManager<ApplicationUser> signInManager, 
+            IEmailSender emailSender, 
+            ISmsSender smsSender, 
+            ILoggerFactory loggerFactory) 
+        { 
+            _userManager = userManager; 
+            _signInManager = signInManager; 
+            _emailSender = emailSender; 
+            _smsSender = smsSender; 
+            _logger = loggerFactory.CreateLogger<AccountController>(); 
+        } 
+    } 
 
-[PRE10]
+```
+
+在前面的代码中，我们正在使用不同组件提供的服务。`UserManager`和`SignInManager`由 ASP.NET Identity 提供。`IEmailSender`和`ISmsSender`是我们编写的自定义类，将用于发送电子邮件和短信。我们将在本章后面更详细地了解电子邮件和短信。日志记录由 Microsoft Logging 扩展提供。以下是一个简单的登录`HTTPGET`方法。它只是存储访问`Login`方法的 URL 并返回登录页面：
+
+```cs
+[HttpGet] 
+        [AllowAnonymous] 
+        public IActionResult Login(string returnUrl = null) 
+        { 
+            ViewData["ReturnUrl"] = returnUrl; 
+            return View(); 
+        } 
+
+```
 
 # 创建视图
 
 现在，我们将创建相应的登录视图页面。在这个视图页面中，我们只是显示了以下详细信息：
 
-[PRE11]
+```cs
+@using System.Collections.Generic 
+@using Microsoft.AspNet.Http 
+@using Microsoft.AspNet.Http.Authentication 
+@using AspNet.Identity.EntityFramework6 
+
+@model LoginViewModel 
+@inject SignInManager<ApplicationUser> SignInManager 
+
+@{ 
+    ViewData["Title"] = "Log in"; 
+} 
+
+<h2>@ViewData["Title"].</h2> 
+<div class="row"> 
+    <div class="col-md-8"> 
+        <section> 
+            <form asp-controller="Account" asp-action="Login" asp-route-returnurl="@ViewData["ReturnUrl"]" method="post" class="form-horizontal" role="form"> 
+                <h4>Use a local account to log in.</h4> 
+                <hr /> 
+                <div asp-validation-summary="ValidationSummary.All" class="text-danger"></div> 
+                <div class="form-group"> 
+                    <label asp-for="Email" class="col-md-2 control-label"></label> 
+                    <div class="col-md-10"> 
+                        <input asp-for="Email" class="form-control" /> 
+                        <span asp-validation-for="Email" class="text-danger"></span> 
+                    </div> 
+                </div> 
+                <div class="form-group"> 
+                    <label asp-for="Password" class="col-md-2 control-label"></label> 
+                    <div class="col-md-10"> 
+                        <input asp-for="Password" class="form-control" /> 
+                        <span asp-validation-for="Password" class="text-danger"></span> 
+                    </div> 
+                </div> 
+                <div class="form-group"> 
+                    <div class="col-md-offset-2 col-md-10"> 
+                        <div class="checkbox"> 
+                            <input asp-for="RememberMe" /> 
+                            <label asp-for="RememberMe"></label> 
+                        </div> 
+                    </div> 
+                </div> 
+                <div class="form-group"> 
+                    <div class="col-md-offset-2 col-md-10"> 
+                        <button type="submit" class="btn btn-default">Log in</button> 
+                    </div> 
+                </div> 
+                <p> 
+                    <a asp-action="Register">Register as a new user?</a> 
+                </p> 
+                <p> 
+                    <a asp-action="ForgotPassword">Forgot your password?</a> 
+                </p> 
+            </form> 
+        </section> 
+    </div> 
+
+</div> 
+
+@section Scripts { 
+    @{ await Html.RenderPartialAsync("_ValidationScriptsPartial"); } 
+} 
+
+```
 
 ![创建视图](img/Image00233.jpg)
 
 当用户首次登录应用程序时，他们可能没有任何登录凭证，因此我们的应用程序应该提供一个功能，让他们可以创建自己的登录账户。我们将创建一个简单的`Register`操作方法，该方法将仅返回一个视图，用户可以通过该视图注册自己：
 
-[PRE12]
+```cs
+[HttpGet] 
+[AllowAnonymous] 
+public IActionResult Register() 
+{ 
+    return View(); 
+} 
+
+```
 
 我们还将创建相应的视图，其中包含电子邮件、密码、密码确认和`Register`按钮的输入控件：
 
-[PRE13]
+```cs
+@model RegisterViewModel 
+@{ 
+    ViewData["Title"] = "Register"; 
+} 
 
-以下是对应的注册`POST`操作方法。在这里，程序检查模型是否有效，如果有效，它将使用模型数据创建一个`ApplicationUser`对象，并调用身份验证API（`CreateAsync`方法）。如果可以创建`user`变量，用户将使用该用户ID登录并重定向到`Home`页面：
+<h2>@ViewData["Title"].</h2> 
 
-[PRE14]
+<form asp-controller="Account" asp-action="Register" method="post" class="form-horizontal" role="form"> 
+    <h4>Create a new account.</h4> 
+    <hr /> 
+    <div asp-validation-summary="ValidationSummary.All" class="text-danger"></div> 
+    <div class="form-group"> 
+        <label asp-for="Email" class="col-md-2 control-label"></label> 
+        <div class="col-md-10"> 
+            <input asp-for="Email" class="form-control" /> 
+            <span asp-validation-for="Email" class="text-danger"></span> 
+        </div> 
+    </div> 
+    <div class="form-group"> 
+        <label asp-for="Password" class="col-md-2 control-label"></label> 
+        <div class="col-md-10"> 
+            <input asp-for="Password" class="form-control" /> 
+            <span asp-validation-for="Password" class="text-danger"></span> 
+        </div> 
+    </div> 
+    <div class="form-group"> 
+        <label asp-for="ConfirmPassword" class="col-md-2 control-label"></label> 
+        <div class="col-md-10"> 
+            <input asp-for="ConfirmPassword" class="form-control" /> 
+            <span asp-validation-for="ConfirmPassword" class="text-danger"></span> 
+        </div> 
+    </div> 
+    <div class="form-group"> 
+        <div class="col-md-offset-2 col-md-10"> 
+            <button type="submit" class="btn btn-default">Register</button> 
+        </div> 
+    </div> 
+</form> 
 
-登出功能相当简单。只需调用身份验证API的`SignoutAsync`方法，然后重定向到`Index`页面：
+@section Scripts { 
+    @{ await Html.RenderPartialAsync("_ValidationScriptsPartial"); } 
+} 
 
-[PRE15]
+```
 
-回到登录功能，以下是对应的操作方法。我们调用身份验证API的`PasswordSignInAsync`方法。登录成功后，我们将重定向到登录功能访问的URL：
+以下是对应的注册`POST`操作方法。在这里，程序检查模型是否有效，如果有效，它将使用模型数据创建一个`ApplicationUser`对象，并调用身份验证 API（`CreateAsync`方法）。如果可以创建`user`变量，用户将使用该用户 ID 登录并重定向到`Home`页面：
 
-[PRE16]
+```cs
+[HttpPost] 
+        [AllowAnonymous] 
+        [ValidateAntiForgeryToken] 
+        public async Task<IActionResult> Register(RegisterViewModel model) 
+        { 
+            if (ModelState.IsValid) 
+            { 
+                var user = new ApplicationUser { UserName = model.Email,  Email = model.Email }; 
+                var result = await _userManager.CreateAsync(user,  model.Password); 
+                if (result.Succeeded) 
+                { 
+                    await _signInManager.SignInAsync(user, isPersistent:  false); 
+                    return RedirectToAction(nameof(HomeController.Index),  "Home"); 
+                } 
+                AddErrors(result); 
+            } 
+
+            return View(model); 
+        } 
+
+```
+
+登出功能相当简单。只需调用身份验证 API 的`SignoutAsync`方法，然后重定向到`Index`页面：
+
+```cs
+[HttpPost] 
+        [ValidateAntiForgeryToken] 
+        public async Task<IActionResult> LogOff() 
+        { 
+            await _signInManager.SignOutAsync(); 
+            _logger.LogInformation(4, "User logged out."); 
+            return RedirectToAction(nameof(HomeController.Index), "Home"); 
+       } 
+
+```
+
+回到登录功能，以下是对应的操作方法。我们调用身份验证 API 的`PasswordSignInAsync`方法。登录成功后，我们将重定向到登录功能访问的 URL：
+
+```cs
+[HttpPost] 
+        [AllowAnonymous] 
+        [ValidateAntiForgeryToken] 
+        public async Task<IActionResult> Login(LoginViewModel model, string returnUrl = null) 
+        { 
+            ViewData["ReturnUrl"] = returnUrl; 
+            if (ModelState.IsValid) 
+            { 
+                var result = await _signInManager.PasswordSignInAsync(model.Email, model.Password, model.RememberMe, lockoutOnFailure: false); 
+                if (result.Succeeded) 
+                { 
+                    return RedirectToLocal(returnUrl); 
+                } 
+
+            } 
+            // If there is any error, display the form again 
+            return View(model); 
+        } 
+
+```
 
 # 电子邮件和短信服务
 
 如果你想将电子邮件和短信服务添加到应用程序的认证功能中，你可以通过创建这里显示的接口和类来实现：
 
-[PRE17]
+```cs
+public interface IEmailSender
+{
+        Task SendEmailAsync(string email, string subject, string message)
+  }
+  public interface ISmsSender
+    {
+        Task SendSmsAsync(string number, string message);
+    }
+public class AuthMessageSender : IEmailSender, ISmsSender
+    {
+        public Task SendEmailAsync(string email, string subject, string message)
+        {
+            // We can plug in our email service here to send an email.
+            return Task.FromResult(0);
+        }
+        public Task SendSmsAsync(string number, string message)
+        {
+            // We can plug in our SMS service here to send a text message.
+            return Task.FromResult(0);
+        }
+    }
+```
 
 # 在控制器中保护操作方法
 
@@ -160,27 +504,35 @@ ASP.NET Core Identity 是一个会员系统，它使您能够轻松地保护应�
 
 我们只需要在`Home`控制器中的`About`操作方法上装饰一个`[Authorize]`属性：
 
-[PRE18]
+```cs
+[Authorize] 
+        public IActionResult About() 
+        { 
+            ViewData["Message"] = "This is my about page"; 
+            return View(); 
+        } 
+
+```
 
 进行上述更改后，当用户尝试访问登录页面而未登录应用程序时，将重定向用户到登录页面：
 
 ![在控制器中保护操作方法](img/Image00234.jpg)
 
-在下面的屏幕截图中，您将注意到URL中有一个额外的查询参数，`ReturnURL`。这个`ReturnURL`参数将把应用程序重定向到特定的页面（在我们的例子中，是`ReturnURL`参数传递的值——**首页** / **关于**）。
+在下面的屏幕截图中，您将注意到 URL 中有一个额外的查询参数，`ReturnURL`。这个`ReturnURL`参数将把应用程序重定向到特定的页面（在我们的例子中，是`ReturnURL`参数传递的值——**首页** / **关于**）。
 
 一旦登录，您将被重定向到您之前请求的页面：
 
 ![在控制器中保护操作方法](img/Image00235.jpg)
 
-当您注册新用户时，用户的详细信息将被存储在ASP.NET Identity创建的相关表中。
+当您注册新用户时，用户的详细信息将被存储在 ASP.NET Identity 创建的相关表中。
 
-通过选择**视图** | **SQL Server对象资源管理器**选项打开SQL Server对象资源管理器窗口，如下面的屏幕截图所示：
+通过选择**视图** | **SQL Server 对象资源管理器**选项打开 SQL Server 对象资源管理器窗口，如下面的屏幕截图所示：
 
 ![在控制器中保护操作方法](img/Image00236.jpg)
 
-一旦选择**SQL Server对象资源管理器**选项，您将看到一个类似于以下屏幕截图的窗口。ASP.NET Identity使用Entity Framework和我们之前在`appsettings.json`包中提供的连接字符串为我们创建数据库。
+一旦选择**SQL Server 对象资源管理器**选项，您将看到一个类似于以下屏幕截图的窗口。ASP.NET Identity 使用 Entity Framework 和我们之前在`appsettings.json`包中提供的连接字符串为我们创建数据库。
 
-ASP.NET Identity创建多个表来维护与身份相关的信息和Entity Framework的数据库迁移历史。由于我们在基本级别使用ASP.NET Identity，除了  **dbo.AspNetUsers** 表外，没有任何与身份相关的表会被填充：
+ASP.NET Identity 创建多个表来维护与身份相关的信息和 Entity Framework 的数据库迁移历史。由于我们在基本级别使用 ASP.NET Identity，除了  **dbo.AspNetUsers** 表外，没有任何与身份相关的表会被填充：
 
 ![在控制器中保护操作方法](img/Image00237.jpg)
 
@@ -188,7 +540,7 @@ ASP.NET Identity创建多个表来维护与身份相关的信息和Entity Framew
 
 ![在控制器中保护操作方法](img/Image00238.jpg)
 
-由于在我们的应用程序中只注册了一个用户，因此只创建了一行。请注意，哈希密码（由ASP.NET Identity为我们标记）和空白密码将不会存储在表中。
+由于在我们的应用程序中只注册了一个用户，因此只创建了一行。请注意，哈希密码（由 ASP.NET Identity 为我们标记）和空白密码将不会存储在表中。
 
 # 读累了记得休息一会哦~
 
@@ -210,4 +562,4 @@ ASP.NET Identity创建多个表来维护与身份相关的信息和Entity Framew
 
 # 摘要
 
-在本章中，我们学习了身份验证和授权。我们还学习了如何通过逐步过程在ASP.NET Core应用程序中实现ASP.NET Identity。我们还讨论了ASP.NET Identity中涉及的表，并学习了如何查看ASP.NET Identity创建的数据。
+在本章中，我们学习了身份验证和授权。我们还学习了如何通过逐步过程在 ASP.NET Core 应用程序中实现 ASP.NET Identity。我们还讨论了 ASP.NET Identity 中涉及的表，并学习了如何查看 ASP.NET Identity 创建的数据。

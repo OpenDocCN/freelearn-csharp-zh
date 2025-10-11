@@ -1,4 +1,4 @@
-# *第 6 章*：.NET 6 中的配置
+# *第六章*：.NET 6 中的配置
 
 .NET 6 中的配置包括默认设置以及应用程序的运行时设置；配置是一个非常强大的功能。我们可以更新设置，如功能标志以启用或禁用功能、依赖服务端点、数据库连接字符串、日志级别等，并在不重新编译的情况下控制应用程序的运行时行为。
 
@@ -20,9 +20,7 @@
 
 配置通常存储为 `Program.cs`（），你将获得 .NET 6 提供的默认配置。此外，你可以配置不同的内置和自定义配置源，并在需要时使用不同的配置提供程序读取它们：
 
-![图 6.1 – 应用和配置
-
-](img/Figure_6.1_B18507.jpg)
+![图 6.1 – 应用和配置](img/Figure_6.1_B18507.jpg)
 
 图 6.1 – 应用和配置
 
@@ -34,37 +32,69 @@
 
 要了解默认配置的工作原理，让我们创建一个新的 .NET 6 Web API，将项目名称设置为 `TestConfiguration`，并打开 `Program.cs` 文件。以下是从 `Program.cs` 文件中的代码片段：
 
-[PRE0]
+```cs
+var builder = WebApplication.CreateBuilder(args);
+```
 
-[PRE1]
+```cs
+// Add services to the container.
+```
 
-[PRE2]
+```cs
+builder.Services.AddControllers();
+```
 
-[PRE3]
+```cs
+builder.Services.AddEndpointsApiExplorer();
+```
 
-[PRE4]
+```cs
+builder.Services.AddSwaggerGen();
+```
 
-[PRE5]
+```cs
+var app = builder.Build();
+```
 
-[PRE6]
+```cs
+// Configure the HTTP request pipeline.
+```
 
-[PRE7]
+```cs
+if (app.Environment.IsDevelopment())
+```
 
-[PRE8]
+```cs
+{
+```
 
-[PRE9]
+```cs
+    app.UseSwagger();
+```
 
-[PRE10]
+```cs
+    app.UseSwaggerUI();
+```
 
-[PRE11]
+```cs
+}
+```
 
-[PRE12]
+```cs
+app.UseHttpsRedirection();
+```
 
-[PRE13]
+```cs
+app.UseAuthorization();
+```
 
-[PRE14]
+```cs
+app.MapControllers();
+```
 
-[PRE15]
+```cs
+app.Run();
+```
 
 从前面的代码中，我们看到 `WebApplication.CreateBuilder` 负责为应用程序提供默认配置。
 
@@ -72,7 +102,7 @@
 
 1.  `MemoryConfigurationProvider`：此提供程序从内存集合中加载配置，作为配置键值对。
 
-1.  `ChainedConfigurationProvider`: 这添加主机配置并将其设置为第一个来源。有关主机配置的更多详细信息，您可以参考此链接：[https://docs.microsoft.com/en-us/aspnet/core/fundamentals/configuration/?view=aspnetcore-6.0](https://docs.microsoft.com/en-us/aspnet/core/fundamentals/configuration/?view=aspnetcore-6.0)。
+1.  `ChainedConfigurationProvider`: 这添加主机配置并将其设置为第一个来源。有关主机配置的更多详细信息，您可以参考此链接：[`docs.microsoft.com/en-us/aspnet/core/fundamentals/configuration/?view=aspnetcore-6.0`](https://docs.microsoft.com/en-us/aspnet/core/fundamentals/configuration/?view=aspnetcore-6.0)。
 
 1.  `JsonConfigurationProvider`: 这将从 `appsettings.json` 文件中加载配置。
 
@@ -84,9 +114,7 @@
 
 当您调试 `Program.cs` 代码时，您可以看到由 `CreateDefaultBuilder` 提供的默认配置被注入到配置中，如下所示：
 
-![图 6.2 – 默认配置来源
-
-](img/Figure_6.2_B18507.jpg)
+![图 6.2 – 默认配置来源](img/Figure_6.2_B18507.jpg)
 
 图 6.2 – 默认配置来源
 
@@ -106,71 +134,137 @@
 
 您可以将以下配置添加到 `appsettings.json` 文件中，以便在发生更改时直接更新它，并在无需重新编译和部署的情况下开始使用它：
 
-[PRE16]
+```cs
+"ApplicationInsights": {
+```
 
-[PRE17]
+```cs
+    "InstrumentationKey": "<Your instrumentation key>"
+```
 
-[PRE18]
+```cs
+  }
+```
 
-[PRE19]
+```cs
+"ApiConfigs": {
+```
 
-[PRE20]
+```cs
+    "Service 1": {
+```
 
-[PRE21]
+```cs
+      "Name": "<Your dependent service name 1>",
+```
 
-[PRE22]
+```cs
+      "BaseUri": "<Service base uri>",
+```
 
-[PRE23]
+```cs
+      "HttpTimeOutInSeconds": "<Time out value in
+```
 
-[PRE24]
+```cs
+        seconds>",      
+```
 
-[PRE25]
+```cs
+      "ApiURLs": [
+```
 
-[PRE26]
+```cs
+        {
+```
 
-[PRE27]
+```cs
+          "EndpointName": "<End point 1>"
+```
 
-[PRE28]
+```cs
+        },
+```
 
-[PRE29]
+```cs
+        {
+```
 
-[PRE30]
+```cs
+          "EndpointName": "<End point 2>"
+```
 
-[PRE31]
+```cs
+        }
+```
 
-[PRE32]
+```cs
+      ]
+```
 
-[PRE33]
+```cs
+    },
+```
 
-[PRE34]
+```cs
+    "Service 2": {
+```
 
-[PRE35]
+```cs
+      "Name": "<Your dependent service name 2>",
+```
 
-[PRE36]
+```cs
+      "BaseUri": "<Service base uri>",
+```
 
-[PRE37]
+```cs
+      "HttpTimeOutInSeconds": "<Time out value in
+```
 
-[PRE38]
+```cs
+       seconds>",      
+```
 
-[PRE39]
+```cs
+      "ApiURLs": [
+```
 
-[PRE40]
+```cs
+        {
+```
 
-[PRE41]
+```cs
+          "EndpointName": "<End point 1>"
+```
 
-[PRE42]
+```cs
+        },
+```
 
-[PRE43]
+```cs
+        {
+```
 
-[PRE44]
+```cs
+          "EndpointName": "<End point 2>"
+```
 
-[PRE45]
+```cs
+        }
+```
 
-[PRE46]
+```cs
+      ]
+```
 
-[PRE47]
+```cs
+    }
+```
 
-[PRE48]
+```cs
+}
+```
 
 从前面的代码中，我们看到我们为 `ApplicationInsights` 仪表化密钥添加了一个键值对，其中键是 `InstrumentationKey` 字符串，值是应用程序需要用于在 `ApplicationInsights` 中仪表化遥测的实际仪表化密钥。在 `ApiConfigs` 部分，我们以分层顺序添加了多个键值对，包括调用我们的依赖服务所需的配置。
 
@@ -182,75 +276,139 @@
 
 在 `Program.cs` 中由 `WebApplication.CreateBuilder` 提供的 `builder.Configuration` 对象实现了 `Microsoft.Extensions.Configuration.IConfiguration` 类型，您有以下选项可用于读取 `IConfiguration`：
 
-[PRE49]
+```cs
+         // Summary:
+```
 
-[PRE50]
+```cs
+        //     Gets or sets a configuration value.
+```
 
-[PRE51]
+```cs
+        // Parameters:
+```
 
-[PRE52]
+```cs
+        //   key:
+```
 
-[PRE53]
+```cs
+        //     The configuration key.
+```
 
-[PRE54]
+```cs
+        // Returns:
+```
 
-[PRE55]
+```cs
+        //     The configuration value.
+```
 
-[PRE56]
+```cs
+        string this[string key] { get; set; }
+```
 
-[PRE57]
+```cs
+        // Summary:
+```
 
-[PRE58]
+```cs
+        //Gets the immediate descendant configuration sub-
+```
 
-[PRE59]
+```cs
+        //sections.
+```
 
-[PRE60]
+```cs
+        // Returns:
+```
 
-[PRE61]
+```cs
+        //     The configuration sub-sections.
+```
 
-[PRE62]
+```cs
+        IEnumerable<IConfigurationSection> GetChildren();
+```
 
-[PRE63]
+```cs
+        // Summary:
+```
 
-[PRE64]
+```cs
+        //     Gets a configuration sub-section with the 
+```
 
-[PRE65]
+```cs
+        //     specified key.
+```
 
-[PRE66]
+```cs
+        // Parameters:
+```
 
-[PRE67]
+```cs
+        //   key:
+```
 
-[PRE68]
+```cs
+        //     The key of the configuration section.
+```
 
-[PRE69]
+```cs
+        // Returns:
+```
 
-[PRE70]
+```cs
+        //The Microsoft.Extensions.Configuration
+```
 
-[PRE71]
+```cs
+        //.IConfigurationSection.
+```
 
-[PRE72]
+```cs
+        // Remarks:
+```
 
-[PRE73]
+```cs
+        //     This method will never return null. If 
+```
 
-[PRE74]
+```cs
+         // no matching sub-section is found with
+```
 
-[PRE75]
+```cs
+        //     the specified key, an empty
+```
 
-[PRE76]
+```cs
+        //Microsoft.Extensions.Configuration.IConfiguration
+```
 
-[PRE77]
+```cs
+        //     Section will be returned.
+```
 
-[PRE78]
+```cs
+        IConfigurationSection GetSection(string key);
+```
 
 让我们看看如何利用 `Iconfiguration` 中的这些选项来读取我们在上一节中添加的配置，*添加配置*。
 
 要从 `appsettings.json` 中读取 `ApplicationInsights` 仪表化密钥，我们可以在 `Program.cs` 中使用以下代码使用 `string this[string key] { get; set; }` 选项：
 
-[PRE79]
+```cs
+builder.Configuration["ApplicationInsights:InstrumentationKey"];
+```
 
 要读取 `ApiConfigs`，我们可以使用以下代码。我们可以使用分隔符在配置键中读取层次化配置：
 
-[PRE80]
+```cs
+builder.Configuration["ApiConfigs:Service 1:Name"];
+```
 
 注意
 
@@ -266,33 +424,59 @@
 
 您可以创建以下 `ApiConfig` 和 `ApiUrl` 类并将它们添加到您的项目中：
 
-[PRE81]
+```cs
+public class ApiConfig
+```
 
-[PRE82]
+```cs
+{      
+```
 
-[PRE83]
+```cs
+    public string Name { get; set; }
+```
 
-[PRE84]
+```cs
+    public string BaseUri { get; set; }
+```
 
-[PRE85]
+```cs
+    public int HttpTimeOutInSeconds { get; set; }
+```
 
-[PRE86]
+```cs
+    public List<ApiUrl> ApiUrls { get; set; }
+```
 
-[PRE87]
+```cs
+}
+```
 
-[PRE88]
+```cs
+public class ApiUrl
+```
 
-[PRE89]
+```cs
+{        
+```
 
-[PRE90]
+```cs
+    public string EndpointName { get; set; }      
+```
 
-[PRE91]
+```cs
+}
+```
 
 在 `Program.cs` 中添加以下代码以使用 `GetSection` 方法读取配置，然后调用 `Bind` 以将配置绑定到我们已有的强类型类：
 
-[PRE92]
+```cs
+List<ApiConfig> apiConfigs = new List<ApiConfig>();
+```
 
-[PRE93]
+```cs
+builder.Configuration.GetSection("ApiConfigs").Bind(apiConfigs);
+```
 
 `GetSection` 将会读取 `appsettings.json` 中指定的特定部分。`Bind` 将尝试通过匹配属性名到配置键来将给定的对象实例绑定到配置值。`GetSection(string sectionName)` 如果请求的部分不存在，将返回 `null`。在实际的程序中，请确保您添加了空值检查。
 
@@ -330,53 +514,61 @@ Azure Key Vault 是一种基于云的服务，它提供了一个集中的配置�
 
 在本节中，我们将使用 Azure Cloud Shell 创建一个密钥库并添加一个机密。Azure Cloud Shell 是基于浏览器的，可以用来管理 Azure 资源。以下是需要您采取的步骤列表：
 
-1.  使用 [https://portal.azure.com](https://portal.azure.com) 登录到 Azure 门户。在门户页面上选择云 Shell 图标：
+1.  使用 [`portal.azure.com`](https://portal.azure.com) 登录到 Azure 门户。在门户页面上选择云 Shell 图标：
 
-![图 6.3 – Azure 云 Shell
-
-](img/Figure_6.3_B18507.jpg)
+![图 6.3 – Azure 云 Shell](img/Figure_6.3_B18507.jpg)
 
 图 6.3 – Azure 云 Shell
 
 1.  您将获得选择 **Bash** 或 **PowerShell** 的选项。选择 **PowerShell**。您可以在任何时候更改外壳：
 
-![图 6.4 – Azure 云 Shell 选项 – PowerShell 和 Bash
-
-](img/Figure_6.4_B18507.jpg)
+![图 6.4 – Azure 云 Shell 选项 – PowerShell 和 Bash](img/Figure_6.4_B18507.jpg)
 
 图 6.4 – Azure 云 Shell 选项 – PowerShell 和 Bash
 
 1.  使用以下命令创建一个资源组：
 
-    [PRE94]
+    ```cs
+    az group create --name "{RESOURCE GROUP NAME}" --location {LOCATION}
+    ```
 
 我为这个演示实际运行的命令如下：
 
-[PRE95]
+```cs
+az group create --name "ConfigurationDemoVaultRG" --location "East US"
+```
 
-`{RESOURCE GROUP NAME}` 代表新资源组的资源组名称，而`{LOCATION}`代表Azure区域（数据中心）。
+`{RESOURCE GROUP NAME}` 代表新资源组的资源组名称，而`{LOCATION}`代表 Azure 区域（数据中心）。
 
 1.  使用以下命令在资源组中创建密钥保管库：
 
-    [PRE96]
+    ```cs
+    az keyvault create --name {KEY VAULT NAME} --resource-group "{RESOURCE GROUP NAME}" --location {LOCATION}
+    ```
 
 这里是我在此演示中实际运行的命令：
 
-[PRE97]
+```cs
+az keyvault create --name "TestKeyVaultForConfig" --resource-group "ConfigurationDemoVaultRG" --location "East US"
+```
 
 `{KEY VAULT NAME}` 是新密钥保管库的唯一名称。
 
 `{RESOURCE GROUP NAME}` 是在上一步骤中创建的新资源组的资源组名称。
 
-`{LOCATION}` 是Azure区域（数据中心）。
+`{LOCATION}` 是 Azure 区域（数据中心）。
 
 1.  使用以下命令在密钥保管库中以名称-值对的形式创建密钥：
 
-    [PRE98]
+    ```cs
+    az keyvault secret set --vault-name {KEY VAULT NAME} --name "SecretName" --value "SecretValue"
+    ```
 
 这里是我在此演示中实际运行的命令：
 
-[PRE99]
+```cs
+az keyvault secret set --vault-name "TestKeyVaultForConfig" --name "TestKey" --value "TestValue"
+```
 
 `{KEY VAULT NAME}` 与您在上一步骤中创建的密钥保管库名称相同。
 
@@ -384,55 +576,45 @@ Azure Key Vault 是一种基于云的服务，它提供了一个集中的配置�
 
 `SecretValue` 是您的密钥值。
 
-我们现在已成功创建了一个名为`TestKeyVaultForConfig`的密钥保管库，并使用Azure Cloud Shell添加了一个密钥为`TestKey`、值为`TestValue`的密钥：
+我们现在已成功创建了一个名为`TestKeyVaultForConfig`的密钥保管库，并使用 Azure Cloud Shell 添加了一个密钥为`TestKey`、值为`TestValue`的密钥：
 
-![图6.5 – Azure密钥保管库密钥
+![图 6.5 – Azure 密钥保管库密钥![图 6.5 – 图 6.5_B18507.jpg](img/Figure_6.5_B18507.jpg)
 
-![图6.5 – 图6.5_B18507.jpg](img/Figure_6.5_B18507.jpg)
+图 6.5 – Azure 密钥保管库密钥
 
-图6.5 – Azure密钥保管库密钥
-
-您也可以使用Azure **命令行界面**（**CLI**）创建和管理Azure资源。您可以在以下位置了解更多关于Azure CLI的信息：https://docs.microsoft.com/en-us/cli/azure/?view=azure-cli-latest。
+您也可以使用 Azure **命令行界面**（**CLI**）创建和管理 Azure 资源。您可以在以下位置了解更多关于 Azure CLI 的信息：https://docs.microsoft.com/en-us/cli/azure/?view=azure-cli-latest。
 
 在下一节中，我们将看到如何让我们的应用程序访问密钥保管库。
 
 ### 授予应用程序访问密钥保管库的权限
 
-在本节中，让我们看看我们的`TestConfiguration` Web API如何通过以下步骤访问密钥保管库：
+在本节中，让我们看看我们的`TestConfiguration` Web API 如何通过以下步骤访问密钥保管库：
 
-1.  在**Azure Active Directory**（**AAD**）中注册`TestConfiguration`应用程序并创建一个身份。使用https://portal.azure.com登录Azure门户。
+1.  在**Azure Active Directory**（**AAD**）中注册`TestConfiguration`应用程序并创建一个身份。使用 https://portal.azure.com 登录 Azure 门户。
 
 1.  导航到**Azure Active Directory** | **应用程序注册**。点击**新建注册**：
 
-![图6.6 – AAD新应用程序注册
+![图 6.6 – AAD 新应用程序注册![图 6.6 – 图 6.6_B18507.jpg](img/Figure_6.6_B18507.jpg)
 
-![图6.6 – 图6.6_B18507.jpg](img/Figure_6.6_B18507.jpg)
-
-图6.6 – AAD新应用程序注册
+图 6.6 – AAD 新应用程序注册
 
 1.  填写默认值并点击**注册**，如图下所示截图，并记下**应用程序（客户端）ID**值。稍后访问密钥保管库时需要使用此值：
 
-![图6.7 – AAD注册完成
+![图 6.7 – AAD 注册完成![图 6.7 – 图 6.7_B18507.jpg](img/Figure_6.7_B18507.jpg)
 
-![图6.7 – 图6.7_B18507.jpg](img/Figure_6.7_B18507.jpg)
-
-图6.7 – AAD注册完成
+图 6.7 – AAD 注册完成
 
 1.  点击**证书和密钥**（**1**） | **新建客户端密钥**（**2**），输入**描述**（**3**）值，然后点击**添加**（**4**），如图下所示截图。记下在**新客户端密钥**下显示的**AppClientSecret**值，这是应用程序在请求令牌时用来证明其身份的：
 
-![图6.8 – 为其身份创建AAD新应用程序密钥
+![图 6.8 – 为其身份创建 AAD 新应用程序密钥![图 6.8 – 图 6.8_B18507.jpg](img/Figure_6.8_B18507.jpg)
 
-![图6.8 – 图6.8_B18507.jpg](img/Figure_6.8_B18507.jpg)
-
-图6.8 – 为其身份创建AAD新应用程序密钥
+图 6.8 – 为其身份创建 AAD 新应用程序密钥
 
 1.  使用访问策略授予应用程序访问密钥保管库的权限。搜索您刚刚创建的密钥保管库并选择它：
 
-![图6.9 – 密钥保管库搜索
+![图 6.9 – 密钥保管库搜索![图 6.9 – 图 6.9_B18507.jpg](img/Figure_6.9_B18507.jpg)
 
-![图6.9 – 图6.9_B18507.jpg](img/Figure_6.9_B18507.jpg)
-
-图6.9 – 密钥保管库搜索
+图 6.9 – 密钥保管库搜索
 
 1.  在密钥保管库属性中，选择 **设置** 下的 **访问策略**，然后点击 **添加访问策略**：
 
@@ -484,11 +666,42 @@ Figure 6.13 – appsettings.json 中的 Key Vault 部分
 
 1.  将 `Program.cs` 更新为利用 Azure Key Vault 配置提供程序来使用您的密钥保管库。以下代码将 Azure Key Vault 添加为另一个配置源，并使用 Azure Key Vault 配置提供程序获取所有配置：
 
-    [PRE100]
+    ```cs
+    using TestConfiguration;
+    var builder = WebApplication.CreateBuilder(args);
+    // Add services to the container.
+    builder.Services.AddControllers();
+    //Removed code for brevity
+    builder.Configuration.AddAzureKeyVault($"https://{builder.Configuration["KeyVault:Name"]}.vault.azure.net/",
+    builder.Configuration["KeyVault:AppClientId"],
+    builder.Configuration["KeyVault:AppClientSecret"]);
+    var app = builder.Build();
+    //Removed code for brevity 
+    ```
 
 1.  将 `WeatherForecastController.cs` 更新为从 Key Vault 读取密钥，如下所示：
 
-    [PRE101]
+    ```cs
+    [ApiController]
+    [Route("[controller]")]
+    public class WeatherForecastController : ControllerBase
+    {
+        private readonly ILogger<WeatherForecastController> _logger;
+        private readonly IConfiguration _configuration;
+        public WeatherForecastController(ILogger<Weather
+    ForecastController> logger, IConfiguration configuration)
+        {
+            _logger = logger;
+            _configuration = configuration;
+        }  
+        [HttpGet]
+        public IEnumerable<string> Get()
+        {
+            return new string[] { "TestKey", 
+             _configuration["TestKey"] };
+        }      
+    }
+    ```
 
 按照此处共享的代码示例包含所有引用。您可以运行应用程序并查看结果：
 
@@ -512,9 +725,7 @@ Figure 6.14 – Key Vault 结果
 
 您的应用程序可以使用其身份通过支持 AAD 认证的服务进行身份验证，例如 Azure Key Vault，这将帮助我们从代码中移除凭证：
 
-![图 6.15 – 应用程序部署后生产环境中访问密钥保管库
-
-](img/Figure_6.15_B18507.jpg)
+![图 6.15 – 应用程序部署后生产环境中访问密钥保管库](img/Figure_6.15_B18507.jpg)
 
 图 6.15 – 应用程序部署后生产环境中访问密钥保管库
 
@@ -526,9 +737,7 @@ Figure 6.14 – Key Vault 结果
 
 在本节中，我们学习了如何创建密钥保管库，如何将机密添加到密钥保管库，如何将我们的`TestConfiguration` Web API 注册到 Azure Active Directory (AAD)，如何创建机密或身份，如何让`TestConfiguration` Web API 获取对密钥保管库的访问权限，以及如何使用 Azure Key Vault 配置提供程序从我们的代码中访问密钥保管库。您还可以通过使用 Visual Studio 连接服务将密钥保管库添加到您的 Web 应用程序中，具体操作请参阅 https://docs.microsoft.com/en-us/azure/key-vault/general/vs-key-vault-add-connected-service:
 
-![图 6.16 – Azure Key Vault 作为连接服务
-
-](img/Figure_6.16_B18507.jpg)
+![图 6.16 – Azure Key Vault 作为连接服务](img/Figure_6.16_B18507.jpg)
 
 图 6.16 – Azure Key Vault 作为连接服务
 
@@ -542,41 +751,71 @@ Figure 6.14 – Key Vault 结果
 
 可以使用以下代码在`Program.cs`中配置 JSON 配置提供程序：
 
-[PRE102]
+```cs
+//Removed code for brevity
+```
 
-[PRE103]
+```cs
+builder.Configuration.AddJsonFile("AdditionalConfig.json",
+```
 
-[PRE104]
+```cs
+                optional: true,
+```
 
-[PRE105]
+```cs
+                reloadOnChange: true); 
+```
 
-[PRE106]
+```cs
+//Removed code for brevity               
+```
 
 在这种情况下，JSON 配置提供者将加载 `AdditionalConfig.json` 文件，`AddJsonFile` 方法的三个参数为我们提供了指定文件名、文件是否可选以及文件在文件被修改时是否必须重新加载的选项。
 
 以下是一个 `AdditionalConfig.json` 示例文件：
 
-[PRE107]
+```cs
+{  "TestKeyFromAdditionalConfigJSON":"TestValueFromAdditional ConfigJSON"}
+```
 
 然后，我们将更新 `WeatherForecastController.cs` 以从加载自 `AdditionalConfig.json` 配置文件的配置中读取键值对，如下所示：
 
-[PRE108]
+```cs
+//Removed code for brevity  
+```
 
-[PRE109]
+```cs
+    [HttpGet]
+```
 
-[PRE110]
+```cs
+    public Ienumerable<string> Get()
+```
 
-[PRE111]
+```cs
+    {
+```
 
-[PRE112]
+```cs
+        return new string[] { 
+```
 
-[PRE113]
+```cs
+" TestKeyFromAdditionalConfigJSON", 
+```
 
-[PRE114]
+```cs
+          _configuration["TestKeyFromAdditionalConfigJSON"] };
+```
 
-[PRE115]
+```cs
+    }      
+```
 
-[PRE116]
+```cs
+//Removed code for brevity
+```
 
 您可以运行应用程序并查看结果。应用程序将能够访问 `AdditionalConfig.json` 文件并读取配置。在下一节中，我们将探讨 XML 配置提供者。
 
@@ -584,45 +823,79 @@ Figure 6.14 – Key Vault 结果
 
 我们将在项目中添加一个名为 `AdditionalXMLConfig.xml` 的新文件和所需的配置。然后，可以使用以下代码在 `Program.cs` 中配置 XML 配置提供者，以从我们添加的文件中读取：
 
-[PRE117]
+```cs
+//Removed code for brevity
+```
 
-[PRE118]
+```cs
+builder.Configuration.AddXmlFile("AdditionalXMLConfig.xml",
+```
 
-[PRE119]
+```cs
+                optional: true,
+```
 
-[PRE120]
+```cs
+                reloadOnChange: true);
+```
 
-[PRE121]
+```cs
+//Removed code for brevity
+```
 
 在这种情况下，XML 配置提供者将加载 `AdditionalXMLConfig.xml` 文件，三个参数为我们提供了指定 XML 文件、文件是否可选以及文件在发生任何更改时是否必须重新加载的选项。
 
 以下是一个 `AdditionalXMLConfig.xml` 示例文件：
 
-[PRE122]
+```cs
+<?xml version="1.0" encoding="utf-8" ?>
+```
 
-[PRE123]
+```cs
+<configuration>
+```
 
-[PRE124]
+```cs
+  <TestKeyFromAdditionalXMLConfig>TestValueFrom
+```
 
-[PRE125]
+```cs
+AdditionalXMLConfig</TestKeyFromAdditionalXMLConfig>
+```
 
-[PRE126]
+```cs
+</configuration>
+```
 
 接下来，我们将更新 `WeatherForecastController.cs` 以从 `AdditionalXMLConfig.xml` 加载的配置中读取键值对，如下所示：
 
-[PRE127]
+```cs
+   [HttpGet]
+```
 
-[PRE128]
+```cs
+    public Ienumerable<string> Get()
+```
 
-[PRE129]
+```cs
+    {
+```
 
-[PRE130]
+```cs
+        return new string[] { 
+```
 
-[PRE131]
+```cs
+"TestKeyFromAdditionalXMLConfig", 
+```
 
-[PRE132]
+```cs
+          _configuration["TestKeyFromAdditionalXMLConfig"] };
+```
 
-[PRE133]
+```cs
+    }      
+```
 
 您可以运行应用程序并查看结果。应用程序将能够访问 `AdditionalXMLConfig.xml` 并读取配置。在 .NET 6 中，JSON 配置文件和 JSON 配置提供者可用，因此您不需要 XML 配置文件和 XML 配置提供者。话虽如此，我们刚才讨论的内容是针对那些喜欢 XML 文件和开闭标签的人来说的，例如。
 
@@ -646,115 +919,215 @@ Figure 6.14 – Key Vault 结果
 
 配置源的责任是创建配置提供者的一个实例并将其返回到源。它需要继承自`IConfigurationSource`接口，这要求我们实现`ConfigurationProvider Build(IConfigurationBuilder builder)`方法。
 
-在`Build`方法实现中，我们需要创建自定义配置提供者的一个实例并返回它。还应该有构建构建器所需的参数。在这种情况下，因为我们正在构建自定义SQL配置提供者，所以重要的参数是连接字符串和SQL查询。以下代码片段展示了`SqlConfigurationSource`类的一个示例实现：
+在`Build`方法实现中，我们需要创建自定义配置提供者的一个实例并返回它。还应该有构建构建器所需的参数。在这种情况下，因为我们正在构建自定义 SQL 配置提供者，所以重要的参数是连接字符串和 SQL 查询。以下代码片段展示了`SqlConfigurationSource`类的一个示例实现：
 
-[PRE134]
+```cs
+public class SqlConfigurationSource : IConfigurationSource
+```
 
-[PRE135]
+```cs
+    {
+```
 
-[PRE136]
+```cs
+        public string ConnectionString { get; set; }
+```
 
-[PRE137]
+```cs
+        public string Query { get; set; }
+```
 
-[PRE138]
+```cs
+        public SqlConfigurationSource(string
+```
 
-[PRE139]
+```cs
+          connectionString, string query)
+```
 
-[PRE140]
+```cs
+        {
+```
 
-[PRE141]
+```cs
+            ConnectionString = connectionString;
+```
 
-[PRE142]
+```cs
+            Query = query;
+```
 
-[PRE143]
+```cs
+        }
+```
 
-[PRE144]
+```cs
+        public IConfigurationProvider
+```
 
-[PRE145]
+```cs
+         Build(IConfigurationBuilder builder)
+```
 
-[PRE146]
+```cs
+        {
+```
 
-[PRE147]
+```cs
+            return new SqlConfigurationProvider(this);
+```
 
-[PRE148]
+```cs
+        }
+```
 
-[PRE149]
+```cs
+    }  
+```
 
-如您所见，实现这个方法非常简单且容易。您获取构建提供者所需的参数，然后创建提供者的新实例，然后返回这些参数。让我们看看如何在下一节中构建一个SQL配置提供者。
+如您所见，实现这个方法非常简单且容易。您获取构建提供者所需的参数，然后创建提供者的新实例，然后返回这些参数。让我们看看如何在下一节中构建一个 SQL 配置提供者。
 
 ## 配置提供者
 
 配置提供者的责任是从适当的位置加载所需的配置并返回相同的配置。它需要继承自`IConfigurationProvider`接口，这要求我们实现`Load()`方法。配置提供者类可以继承自`ConfigurationProvider`基类，因为它已经实现了`IConfigurationProvider`接口中的所有方法。这将帮助我们节省时间，因为我们不需要实现未使用的方法，而只需实现`Load`方法即可。
 
-在`Load`方法实现中，我们需要有从源获取配置数据的逻辑。在这种情况下，我们将执行一个查询从SQL存储中获取数据。以下代码片段展示了`SqlConfigurationProvider`类的一个示例实现：
+在`Load`方法实现中，我们需要有从源获取配置数据的逻辑。在这种情况下，我们将执行一个查询从 SQL 存储中获取数据。以下代码片段展示了`SqlConfigurationProvider`类的一个示例实现：
 
-[PRE150]
+```cs
+public class SqlConfigurationProvider : ConfigurationProvider
+```
 
-[PRE151]
+```cs
+    {
+```
 
-[PRE152]
+```cs
+        public SqlConfigurationSource Source { get; }
+```
 
-[PRE153]
+```cs
+        public SqlConfigurationProvider
+```
 
-[PRE154]
+```cs
+         (SqlConfigurationSource source)
+```
 
-[PRE155]
+```cs
+        {
+```
 
-[PRE156]
+```cs
+            Source = source;
+```
 
-[PRE157]
+```cs
+        }
+```
 
-[PRE158]
+```cs
+        public override void Load()
+```
 
-[PRE159]
+```cs
+        {
+```
 
-[PRE160]
+```cs
+            try
+```
 
-[PRE161]
+```cs
+            {    
+```
 
-[PRE162]
+```cs
+                // create a connection object  
+```
 
-[PRE163]
+```cs
+                SqlConnection sqlConnection = new
+```
 
-[PRE164]
+```cs
+                 SqlConnection(Source.ConnectionString);
+```
 
-[PRE165]
+```cs
+                // Create a command object  
+```
 
-[PRE166]
+```cs
+                SqlCommand sqlCommand = new
+```
 
-[PRE167]
+```cs
+                 SqlCommand(Source.Query, sqlConnection);
+```
 
-[PRE168]
+```cs
+                sqlConnection.Open();
+```
 
-[PRE169]
+```cs
+                // Call ExecuteReader to return a 
+```
 
-[PRE170]
+```cs
+                // DataReader  
+```
 
-[PRE171]
+```cs
+                SqlDataReader salDataReader =
+```
 
-[PRE172]
+```cs
+                 sqlCommand.ExecuteReader();
+```
 
-[PRE173]
+```cs
+                while (salDataReader.Read())
+```
 
-[PRE174]
+```cs
+                {
+```
 
-[PRE175]
+```cs
+                    Data.Add(salDataReader.GetString(0),
+```
 
-[PRE176]
+```cs
+                     salDataReader.GetString(1));
+```
 
-[PRE177]
+```cs
+                }
+```
 
-[PRE178]
+```cs
+                salDataReader.Close();
+```
 
-[PRE179]
+```cs
+                sqlCommand.Dispose();
+```
 
-[PRE180]
+```cs
+                sqlConnection.Close();
+```
 
-[PRE181]
+```cs
+            }            
+```
 
-[PRE182]
+```cs
+        }
+```
 
-[PRE183]
+```cs
+    }
+```
 
 让我们看看如何在下一节中构建配置扩展。
 
@@ -768,61 +1141,101 @@ Figure 6.14 – Key Vault 结果
 
 以下代码片段展示了在配置构建器中`SqlConfigurationExtensions`类的一个示例实现：
 
-[PRE184]
+```cs
+public static class SqlConfigurationExtensions
+```
 
-[PRE185]
+```cs
+    {
+```
 
-[PRE186]
+```cs
+        public static IConfigurationBuilder
+```
 
-[PRE187]
+```cs
+         AddSql(this IConfigurationBuilder
+```
 
-[PRE188]
+```cs
+         configuration, string connectionString,
+```
 
-[PRE189]
+```cs
+         string query)
+```
 
-[PRE190]
+```cs
+        {
+```
 
-[PRE191]
+```cs
+            configuration.Add(new
+```
 
-[PRE192]
+```cs
+             SqlConfigurationSource(connectionString,
+```
 
-[PRE193]
+```cs
+             query));
+```
 
-[PRE194]
+```cs
+            return configuration;
+```
 
-[PRE195]
+```cs
+        }
+```
 
-[PRE196]
+```cs
+    }
+```
 
 扩展方法将减少我们应用程序启动时的代码量。
 
 我们可以在`Program.cs`中添加引导代码，就像我们为其他配置提供者添加的那样，如下所示：
 
-[PRE197]
+```cs
+builder.Configuration.AddSql("Connectionstring","Query"); 
+```
 
-以下截图显示了数据库中的一些示例配置设置。您可以在`config.AddSql()`中传递适当的连接字符串和SQL查询，并从数据库加载以下配置。SQL查询可能是一个简单的`select`语句，用于读取所有键值对，就像以下截图所示：
+以下截图显示了数据库中的一些示例配置设置。您可以在`config.AddSql()`中传递适当的连接字符串和 SQL 查询，并从数据库加载以下配置。SQL 查询可能是一个简单的`select`语句，用于读取所有键值对，就像以下截图所示：
 
-![图6.17 – 数据库配置设置
-
-![图片](img/Figure_6.17_B18507.jpg)
+![图 6.17 – 数据库配置设置![图片](img/Figure_6.17_B18507.jpg)
 
 图 6.17 – 数据库配置设置
 
 按照以下方式更新 `WeatherForecastController.cs` 以从 SQL 配置提供程序加载的配置中读取键值对：
 
-[PRE198]
+```cs
+    [HttpGet]
+```
 
-[PRE199]
+```cs
+    public IEnumerable<string> Get()
+```
 
-[PRE200]
+```cs
+    {
+```
 
-[PRE201]
+```cs
+        return new string[] { "TestSqlKey", 
+```
 
-[PRE202]
+```cs
+         _configuration["TestSqlKey"] };
+```
 
-[PRE203]
+```cs
+    }      
+```
 
-[PRE204]
+```cs
+}
+```
 
 你可以运行应用程序并查看结果。应用程序将能够访问 SQL 配置并读取配置。
 

@@ -1,50 +1,50 @@
-# 使用Xamarin进入iOS
+# 使用 Xamarin 进入 iOS
 
 在本章中，我们将探讨以下菜谱：
 
-+   安装Visual Studio for Mac
++   安装 Visual Studio for Mac
 
-+   Hello iOS – 创建一个Xamarin iOS应用
++   Hello iOS – 创建一个 Xamarin iOS 应用
 
-+   创建.NET Standard 2.0库
++   创建.NET Standard 2.0 库
 
 +   整合组件并测试应用
 
 # 技术要求
 
-读者应具备C#的基本知识。他们还应具备使用Visual Studio、使用NuGet安装包以及在项目中引用其他项目库的基本知识。
+读者应具备 C#的基本知识。他们还应具备使用 Visual Studio、使用 NuGet 安装包以及在项目中引用其他项目库的基本知识。
 
-本章的代码文件可以在GitHub上找到：
+本章的代码文件可以在 GitHub 上找到：
 
-[https://github.com/PacktPublishing/DotNET-Standard-2-Cookbook/tree/master/Chapter08](https://github.com/PacktPublishing/DotNET-Standard-2-Cookbook/tree/master/Chapter08)
+[`github.com/PacktPublishing/DotNET-Standard-2-Cookbook/tree/master/Chapter08`](https://github.com/PacktPublishing/DotNET-Standard-2-Cookbook/tree/master/Chapter08)
 
 查看以下视频以查看代码的实际操作：
 
-[https://goo.gl/fG1ErJ](https://goo.gl/fG1ErJ)
+[`goo.gl/fG1ErJ`](https://goo.gl/fG1ErJ)
 
 # 简介
 
-Xamarin是一个开发平台，允许您为iOS、Android和Windows构建原生应用。Xamarin最令人惊奇之处在于，您可以使用现有的C#技能来开发这些应用。最初，Xamarin被称为Xamarin Studio，用于在macOS和Windows上构建应用。Windows用户有额外特权使用Visual Studio。在微软收购后，Xamarin Studio变成了Visual Studio for Mac。在本章中，我们将使用Visual Studio for Mac构建我们的应用，贯穿整个菜谱。
+Xamarin 是一个开发平台，允许您为 iOS、Android 和 Windows 构建原生应用。Xamarin 最令人惊奇之处在于，您可以使用现有的 C#技能来开发这些应用。最初，Xamarin 被称为 Xamarin Studio，用于在 macOS 和 Windows 上构建应用。Windows 用户有额外特权使用 Visual Studio。在微软收购后，Xamarin Studio 变成了 Visual Studio for Mac。在本章中，我们将使用 Visual Studio for Mac 构建我们的应用，贯穿整个菜谱。
 
-# 安装Visual Studio for Mac
+# 安装 Visual Studio for Mac
 
-在这个菜谱中，我们将探讨如何获取Visual Studio for Mac并安装它。我们还将探讨设置一些其他事情。
+在这个菜谱中，我们将探讨如何获取 Visual Studio for Mac 并安装它。我们还将探讨设置一些其他事情。
 
 # 准备工作
 
-确保您有一台Mac来完成此菜谱。目前，我正在使用macOS High Sierra版本10.13.3。同时，请确保您已经安装了最新的XCode版本。XCode是Mac构建iOS应用时所需的，与Visual Studio一起使用。
+确保您有一台 Mac 来完成此菜谱。目前，我正在使用 macOS High Sierra 版本 10.13.3。同时，请确保您已经安装了最新的 XCode 版本。XCode 是 Mac 构建 iOS 应用时所需的，与 Visual Studio 一起使用。
 
 # 如何操作...
 
 1.  让我们打开您最喜欢的浏览器。
 
-1.  在地址栏中输入[https://www.xamarin.com/download](https://www.xamarin.com/download)，然后按*Enter*。
+1.  在地址栏中输入[`www.xamarin.com/download`](https://www.xamarin.com/download)，然后按*Enter*。
 
 1.  你应该看到一个类似的屏幕：
 
 ![](img/14a6727e-719b-4e77-8f26-db4c38ef8f09.png)
 
-1.  现在，填写您的详细信息并按下“下载VS for Mac Community”按钮。
+1.  现在，填写您的详细信息并按下“下载 VS for Mac Community”按钮。
 
 1.  这将默认将文件下载到“下载”目录，命名为`VisualStudioForMacInstaller__215259590.1517557727.dmg`或类似名称（下载时末尾数字可能会变化。）
 
@@ -58,13 +58,13 @@ Xamarin是一个开发平台，允许您为iOS、Android和Windows构建原生�
 
 ![](img/f10758c4-2865-4038-8080-3b51658ac601.png)
 
-1.  点击安装按钮安装所有组件。请确保您已选择了Android和iOS。
+1.  点击安装按钮安装所有组件。请确保您已选择了 Android 和 iOS。
 
 1.  安装成功后，你应该看到这个：
 
 ![](img/806dfbab-e7ba-4498-b11e-d29730d476fb.png)
 
-1.  现在，您可以点击完成以退出，并启动Visual Studio for Mac以打开IDE：
+1.  现在，您可以点击完成以退出，并启动 Visual Studio for Mac 以打开 IDE：
 
 ![](img/7d6ac192-bd59-465e-9f99-0d01c7beca64.png)
 
@@ -208,7 +208,12 @@ Visual Studio for Mac
 
 1.  现在，在 `HelloLib` 类内部，添加以下代码：
 
-[PRE0]
+```cs
+      public string SayHello(string yourName)
+      {
+          return $"Hello {yourName}, Greetings from iOS";
+      }
+```
 
 1.  点击“生成”|“生成所有”以检查所有语法是否正确。
 
@@ -220,7 +225,7 @@ Visual Studio for Mac
 
 # 整合事物并测试应用程序
 
-在这个菜谱中，我们将向iOS应用程序添加一些控件，并使用之前菜谱中创建的.NET Standard 2.0库。
+在这个菜谱中，我们将向 iOS 应用程序添加一些控件，并使用之前菜谱中创建的.NET Standard 2.0 库。
 
 # 准备工作
 
@@ -228,11 +233,11 @@ Visual Studio for Mac
 
 # 如何操作...
 
-1.  打开Finder。
+1.  打开 Finder。
 
 1.  在左侧窗格中点击“应用程序”。
 
-1.  双击Visual Studio图标。
+1.  双击 Visual Studio 图标。
 
 1.  点击“打开”，定位 `Chapter8.Xamarin` 解决方案，并打开它。
 
@@ -246,11 +251,11 @@ Visual Studio for Mac
 
 1.  这将打开应用程序的故事板选项卡。
 
-1.  你应该看到iOS应用程序的默认布局如下：
+1.  你应该看到 iOS 应用程序的默认布局如下：
 
 ![图片](img/550a0a06-9990-46db-8536-d1b3cbdda88a.png)
 
-iOS应用程序的默认布局
+iOS 应用程序的默认布局
 
 1.  现在，选择工具箱窗口。
 
@@ -276,13 +281,30 @@ iOS应用程序的默认布局
 
 1.  向上滚动到 `using` 指令，并添加以下 `using` 指令以访问库：
 
-[PRE1]
+```cs
+      using Chapter8.Xamarin.iOSLib;
+
+```
 
 1.  现在，向下滚动到 `ViewDidLoad()` 方法。
 
 1.  在 `base.ViewDidLoad()` 行旁边添加以下代码：
 
-[PRE2]
+```cs
+      HelloButton.TouchUpInside += (object sender, EventArgs e) =>
+      {
+          var greetings = new HelloLib();
+          var message = greetings.SayHello("Fiqri Ismail");
+
+          //Create an alert box    
+          var greetingsAlert = UIAlertController.Create("Hello", 
+              message, UIAlertControllerStyle.Alert);
+          greetingsAlert.AddAction(UIAlertAction.Create("OK", 
+              UIAlertActionStyle.Default, null));
+
+          PresentViewController(greetingsAlert, true, null);
+       };
+```
 
 1.  现在，按 *command* + *return* 键来调试应用程序。
 
@@ -298,8 +320,8 @@ iOS应用程序的默认布局
 
 # 工作原理...
 
-在步骤1到6中，我们打开了一个现有的项目解决方案。在步骤10到13中，我们在画布上添加了一个简单的按钮控件。之后，我们更改了按钮的标题和名称属性。在步骤17中，我们从iOS项目添加了对库的引用。同样，在步骤19中，我们从代码级别添加了对.NET Standard库的引用。
+在步骤 1 到 6 中，我们打开了一个现有的项目解决方案。在步骤 10 到 13 中，我们在画布上添加了一个简单的按钮控件。之后，我们更改了按钮的标题和名称属性。在步骤 17 中，我们从 iOS 项目添加了对库的引用。同样，在步骤 19 中，我们从代码级别添加了对.NET Standard 库的引用。
 
-在第21步中，我们添加了代码来触发按钮触摸抬起事件。此事件在您在真实设备上触摸并抬起手指时触发，但在模拟器中，它会在您点击按钮时触发。我们是在`ViewDidLoad()`方法中添加的这段代码。该方法在视图加载后触发。在代码的前两行中，我们从一个库中创建了一个`HelloLib`类的实例。然后，我们执行了`SayHello`方法，并将返回值保存在一个变量中。
+在第 21 步中，我们添加了代码来触发按钮触摸抬起事件。此事件在您在真实设备上触摸并抬起手指时触发，但在模拟器中，它会在您点击按钮时触发。我们是在`ViewDidLoad()`方法中添加的这段代码。该方法在视图加载后触发。在代码的前两行中，我们从一个库中创建了一个`HelloLib`类的实例。然后，我们执行了`SayHello`方法，并将返回值保存在一个变量中。
 
-然后，我们创建了一个警报框来显示加尔各答消息，并附带一个确定按钮。最后，在第23步和第24步中，我们测试了我们刚刚构建的iOS应用程序。
+然后，我们创建了一个警报框来显示加尔各答消息，并附带一个确定按钮。最后，在第 23 步和第 24 步中，我们测试了我们刚刚构建的 iOS 应用程序。

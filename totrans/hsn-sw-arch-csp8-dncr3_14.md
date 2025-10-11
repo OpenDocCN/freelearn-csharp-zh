@@ -16,11 +16,11 @@
 
 +   你需要安装所有数据库工具的 Visual Studio 2017 或 2019 免费社区版或更高版本。
 
-+   免费Azure账户：[第 1 章](14b5c5da-4042-439e-9e5a-2e19ba4c4930.xhtml)中的“*理解软件架构的重要性*”部分，*创建 Azure 账户*，解释了如何创建一个。
++   免费 Azure 账户：第一章中的“*理解软件架构的重要性*”部分，*创建 Azure 账户*，解释了如何创建一个。
 
-+   Azure DevOps 账户：[第 3 章](bc26065f-b001-4123-9524-3bbfa87bfadd.xhtml)中的“*什么是 Azure DevOps*”部分，*使用 Azure DevOps 记录需求*，解释了如何创建一个。
++   Azure DevOps 账户：第三章中的“*什么是 Azure DevOps*”部分，*使用 Azure DevOps 记录需求*，解释了如何创建一个。
 
-你可以在[https://github.com/PacktPublishing/Hands-On-Software-Architecture-with-CSharp-8/tree/master/ch11](https://github.com/PacktPublishing/Hands-On-Software-Architecture-with-CSharp-8/tree/master/ch11)找到本章的示例代码。
+你可以在[`github.com/PacktPublishing/Hands-On-Software-Architecture-with-CSharp-8/tree/master/ch11`](https://github.com/PacktPublishing/Hands-On-Software-Architecture-with-CSharp-8/tree/master/ch11)找到本章的示例代码。
 
 # 理解代码重用性原则
 
@@ -44,7 +44,7 @@
 
 # 什么是非代码重用？
 
-你必须首先理解的是，代码复用并不意味着从一类复制粘贴代码到另一类。即使这段代码是由另一个团队或项目编写的，这也不表明你正确地运用了复用原则。让我们想象一个场景，我们将在本书的使用案例中找到这个场景，即WWTravelClub评估。
+你必须首先理解的是，代码复用并不意味着从一类复制粘贴代码到另一类。即使这段代码是由另一个团队或项目编写的，这也不表明你正确地运用了复用原则。让我们想象一个场景，我们将在本书的使用案例中找到这个场景，即 WWTravelClub 评估。
 
 在项目场景中，你可能想评估不同类型的主题，例如包、目的地专家、城市、评论等。无论你指的是哪个主题，获取评估平均值的流程都是相同的。因此，你可能希望通过复制粘贴每个评估的代码来*启用*复用。(不好的)结果可能如下所示：
 
@@ -82,13 +82,13 @@
 
 *使用-识别-修改-设计-构建* 过程是一种技术，你可能每次需要启用软件重用时都应考虑实施。一旦你有了为这个库编写所需的组件，你将需要决定将提供这些组件的技术。
 
-在软件开发的历史中，有许多实现这一目标的方法；其中一些在[第5章](49aed8bb-9a4a-4241-9efc-f53c3f53dd5a.xhtml)，“将微服务架构应用于您的企业应用程序”的*微服务作为模块概念的演变*部分中进行了讨论。
+在软件开发的历史中，有许多实现这一目标的方法；其中一些在第五章，“将微服务架构应用于您的企业应用程序”的*微服务作为模块概念的演变*部分中进行了讨论。
 
 # 使用 .NET Standard 进行代码重用
 
-.NET 自从第一个版本发布以来已经发展了很多。这种发展不仅与命令数量和性能问题相关，还与支持的平台相关。正如在[第1章](14b5c5da-4042-439e-9e5a-2e19ba4c4930.xhtml)，“理解软件架构的重要性”中讨论的那样，你可以在数十亿台设备上运行 C# .NET，即使它们运行的是 Linux、Android、macOS 或 iOS。因此，.NET Standard 首次与 .NET Core 1.0 一起宣布，但破坏性变化发生在 .NET Standard 2.0，当时 .NET Framework 4.6、.NET Core 和 Xamarin 都与之兼容。
+.NET 自从第一个版本发布以来已经发展了很多。这种发展不仅与命令数量和性能问题相关，还与支持的平台相关。正如在第一章，“理解软件架构的重要性”中讨论的那样，你可以在数十亿台设备上运行 C# .NET，即使它们运行的是 Linux、Android、macOS 或 iOS。因此，.NET Standard 首次与 .NET Core 1.0 一起宣布，但破坏性变化发生在 .NET Standard 2.0，当时 .NET Framework 4.6、.NET Core 和 Xamarin 都与之兼容。
 
-关键点在于 .NET Standard 不仅是一种 Visual Studio 项目。更重要的是，它是一种对所有 .NET 实现都适用的正式规范。正如你在下表中所见，它涵盖了从 .NET Framework 到 Unity ([https://github.com/dotnet/standard/tree/master/docs/versions](https://github.com/dotnet/standard/tree/master/docs/versions)) 的所有内容：
+关键点在于 .NET Standard 不仅是一种 Visual Studio 项目。更重要的是，它是一种对所有 .NET 实现都适用的正式规范。正如你在下表中所见，它涵盖了从 .NET Framework 到 Unity ([`github.com/dotnet/standard/tree/master/docs/versions`](https://github.com/dotnet/standard/tree/master/docs/versions)) 的所有内容：
 
 | .NET Standard | 1.0 | 1.1 | 1.2 | 1.3 | 1.4 | 1.5 | 1.6 | 2.0 | 2.1 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -113,9 +113,15 @@
 
 一旦你完成了这部分，你会注意到，一个普通类库和你创建的类库之间的唯一区别是项目文件中定义的目标框架：
 
-[PRE0]
+```cs
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+  </PropertyGroup>
+</Project>
+```
 
-一旦你的项目加载完毕，你就可以开始编写你打算重用的类。使用这种方法构建可重用类的优点是，你将能够在之前检查的所有项目类型中重用所编写的代码。另一方面，你会发现一些在 .NET Framework 中可用的 API 在这类项目中不存在。你可以通过[https://github.com/dotnet/standard/tree/master/docs/planning/netstandard-2.1](https://github.com/dotnet/standard/tree/master/docs/planning/netstandard-2.1)来关注标准的未来。
+一旦你的项目加载完毕，你就可以开始编写你打算重用的类。使用这种方法构建可重用类的优点是，你将能够在之前检查的所有项目类型中重用所编写的代码。另一方面，你会发现一些在 .NET Framework 中可用的 API 在这类项目中不存在。你可以通过[`github.com/dotnet/standard/tree/master/docs/planning/netstandard-2.1`](https://github.com/dotnet/standard/tree/master/docs/planning/netstandard-2.1)来关注标准的未来。
 
 # C# 如何处理代码重用？
 
@@ -133,11 +139,45 @@ C# 有许多方法帮助我们处理代码重用。我们之前检查的构建�
 
 第二个机会是我们使用多态，为相同的方法启用不同的行为：
 
-[PRE1]
+```cs
+public class PrimeUsersEvaluation : Evaluation
+{
+    /// <summary>
+    /// The business rule implemented here indicates that grades that 
+    /// came from prime users have 20% of increase
+    /// </summary>
+    /// <returns>the final grade from a prime user</returns>
+    public override double CalculateGrade()
+    {
+         return Grade * 1.2;
+    }
+}
+```
 
 你可以在前面的代码中检查多态原则的使用，其中对初级用户的评估计算将增加 20%。现在，看看调用同一类继承的不同对象是多么容易。由于集合内容实现了相同的接口 `IContentEvaluated`，它也可以有基本用户和初级用户：
 
-[PRE2]
+```cs
+public class EvaluationService
+{
+    public IContentEvaluated content { get; set; }
+    /// <summary>
+    /// No matter the Evaluation, the calculation will always get     
+    /// values from the method CalculateGrade
+    /// </summary>
+    /// <returns>The average of the grade from Evaluations</returns>
+    public double CalculateEvaluationAverage()
+    {
+        var count = 0;
+        double evaluationGrade = 0;
+        foreach (var evaluation in content.Evaluations)
+        {
+            evaluationGrade += evaluation.CalculateGrade();
+            count++;
+        }
+        return evaluationGrade/count;
+    }
+}
+```
 
 在使用 C# 时，面向对象的采用可以被认为是强制性的。然而，更具体的用法需要学习和实践。作为软件架构师，你应该始终鼓励你的团队学习面向对象的分析。他们的抽象能力越强，代码复用就越容易。
 
@@ -149,17 +189,27 @@ C# 有许多方法帮助我们处理代码重用。我们之前检查的构建�
 
 以下代码是对上一节中介绍的 `EvaluationService` 的修改。这里的想法是使服务泛化，从其创建时就定义评估的目标：
 
-[PRE3]
+```cs
+public class EvaluationService<T> where T: IContentEvaluated
+```
 
 这个声明表明，任何实现了 `IContentEvaluaded` 接口的类都可以用于这个服务。此外，服务将负责创建评估内容。
 
 以下代码实现了自服务构建以来创建的评估内容。这段代码使用了 `System.Reflection` 和来自类的泛型定义：
 
-[PRE4]
+```cs
+public EvaluationService()
+{
+    var name = GetTypeOfEvaluation();
+    content = (T)Assembly.GetExecutingAssembly().CreateInstance(name);
+}
+```
 
 值得注意的是，这段代码将能够工作，因为所有类都在同一个程序集中。这个修改的结果可以在服务的实例创建中进行检查：
 
-[PRE5]
+```cs
+var service = new EvaluationService<CityEvaluation>();
+```
 
 好消息是，现在你有一个泛型服务，它将自动实例化所需内容的评估列表对象。值得一提的是，泛型显然需要更多时间用于第一个项目的构建。然而，一旦设计完成，你将拥有一个良好、快速且易于维护的代码。这就是我们所说的复用！
 
@@ -205,16 +255,16 @@ C# 有许多方法帮助我们处理代码重用。我们之前检查的构建�
 
 这些是一些书籍和网站，您可以在其中找到更多关于本章的信息：
 
-+   《*整洁架构：软件结构与设计的工匠指南*》由Martin, Robert C. 著，Pearson Education，2018年。
++   《*整洁架构：软件结构与设计的工匠指南*》由 Martin, Robert C. 著，Pearson Education，2018 年。
 
-+   《*设计模式：可复用面向对象软件元素*》由Erica Gamma [等] 著，Addison-Wesley，1994年。
++   《*设计模式：可复用面向对象软件元素*》由 Erica Gamma [等] 著，Addison-Wesley，1994 年。
 
-+   《*设计原则与设计模式*》由Robert C. Martin 著，2000年。
++   《*设计原则与设计模式*》由 Robert C. Martin 著，2000 年。
 
-+   [https://devblogs.microsoft.com/dotnet/introducing-net-standard/](https://devblogs.microsoft.com/dotnet/introducing-net-standard/)
++   [`devblogs.microsoft.com/dotnet/introducing-net-standard/`](https://devblogs.microsoft.com/dotnet/introducing-net-standard/)
 
-+   [https://www.packtpub.com/application-development/net-standard-20-cookbook](https://www.packtpub.com/application-development/net-standard-20-cookbook)
++   [`www.packtpub.com/application-development/net-standard-20-cookbook`](https://www.packtpub.com/application-development/net-standard-20-cookbook)
 
-+   [https://github.com/dotnet/standard/blob/master/docs/versions.md](https://github.com/dotnet/standard/blob/master/docs/versions.md)
++   [`github.com/dotnet/standard/blob/master/docs/versions.md`](https://github.com/dotnet/standard/blob/master/docs/versions.md)
 
-+   [https://docs.microsoft.com/pt-br/dotnet/csharp/programming-guide/generics/](https://docs.microsoft.com/pt-br/dotnet/csharp/programming-guide/generics/)
++   [`docs.microsoft.com/pt-br/dotnet/csharp/programming-guide/generics/`](https://docs.microsoft.com/pt-br/dotnet/csharp/programming-guide/generics/)

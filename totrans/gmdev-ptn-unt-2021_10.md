@@ -2,7 +2,7 @@
 
 在大多数视频游戏中，屏幕上发生了很多事情。子弹在四处飞行，敌人正在地图周围生成，粒子在玩家周围弹出，这些各种对象在瞬间被加载和渲染到屏幕上。因此，为了避免在保持一致帧率的同时对**中央处理器**（**CPU**）造成压力，为我们的频繁生成的实体预留一些内存是一个好习惯。所以，我们不是从内存中释放最近被摧毁的敌人，而是将它们添加到对象池中以便以后重用。使用这种技术，我们避免了加载实体新实例的初始初始化成本。此外，因为我们没有摧毁可重用实体，所以**垃圾收集器**（**GC**）不会浪费周期清理一组定期重新初始化的对象。
 
-这就是我们将在本章中要做的，幸运的是，自从Unity版本2021以来，对象池已经原生集成到**应用程序编程接口**（**API**）中。因此，我们不需要像之前章节那样手动实现该模式；相反，我们将专注于学习如何使用它，并让引擎完成所有工作。
+这就是我们将在本章中要做的，幸运的是，自从 Unity 版本 2021 以来，对象池已经原生集成到**应用程序编程接口**（**API**）中。因此，我们不需要像之前章节那样手动实现该模式；相反，我们将专注于学习如何使用它，并让引擎完成所有工作。
 
 本章将涵盖以下主题：
 
@@ -12,19 +12,19 @@
 
 +   检查替代解决方案
 
-垃圾收集器（GC）作为一个自动的内存管理器，是大多数现代面向对象语言（如C#）的一个基本组件。为了继续本章的学习，不需要理解它是如何工作的，但如果您对此感兴趣，可以在此处获取更多相关信息：[https://docs.microsoft.com/en-us/dotnet/standard/garbage-collection/](https://docs.microsoft.com/en-us/dotnet/standard/garbage-collection/)。
+垃圾收集器（GC）作为一个自动的内存管理器，是大多数现代面向对象语言（如 C#）的一个基本组件。为了继续本章的学习，不需要理解它是如何工作的，但如果您对此感兴趣，可以在此处获取更多相关信息：[`docs.microsoft.com/en-us/dotnet/standard/garbage-collection/`](https://docs.microsoft.com/en-us/dotnet/standard/garbage-collection/)。
 
 # 技术要求
 
-本章是实践性的，因此您需要对Unity和C#有一个基本的了解。
+本章是实践性的，因此您需要对 Unity 和 C#有一个基本的了解。
 
-本章的代码文件可以在GitHub上找到，地址为[https://github.com/PacktPublishing/Game-Development-Patterns-with-Unity-2021-Second-Edition/tree/main/Assets/Chapters/Chapter08](https://github.com/PacktPublishing/Game-Development-Patterns-with-Unity-2021-Second-Edition/tree/main/Assets/Chapters/Chapter08)。
+本章的代码文件可以在 GitHub 上找到，地址为[`github.com/PacktPublishing/Game-Development-Patterns-with-Unity-2021-Second-Edition/tree/main/Assets/Chapters/Chapter08`](https://github.com/PacktPublishing/Game-Development-Patterns-with-Unity-2021-Second-Edition/tree/main/Assets/Chapters/Chapter08)。
 
 查看以下视频以查看代码的实际运行情况：
 
-[https://bit.ly/3yTLcI7](https://bit.ly/3yTLcI7)
+[`bit.ly/3yTLcI7`](https://bit.ly/3yTLcI7)
 
-需要注意的是，下一节中的代码示例在低于2021.1版本的Unity中无法工作，因为我们使用了最近添加的API功能。
+需要注意的是，下一节中的代码示例在低于 2021.1 版本的 Unity 中无法工作，因为我们使用了最近添加的 API 功能。
 
 # 理解对象池模式
 
@@ -36,7 +36,7 @@
 
 ![](img/9355c03f-fadf-4748-af73-7b54075cd42c.png)
 
-图8.1 – 对象池模式的统一建模语言（UML）图
+图 8.1 – 对象池模式的统一建模语言（UML）图
 
 在图中，我们可以看到对象池通过向客户端提供特定类型对象实例的池的访问来服务于客户端——例如，客户端可以是请求特定敌人类型实例的生成器。
 
@@ -50,27 +50,27 @@
 
 这些是对象池模式的一些潜在缺点：
 
-+   **在已管理的内存上增加层级**：有些人批评对象池模式在大多数情况下是不必要的，因为现代托管编程语言如C#已经最优地控制了内存分配。然而，这个说法在某些情况下可能是正确的，但在其他情况下可能是错误的。
++   **在已管理的内存上增加层级**：有些人批评对象池模式在大多数情况下是不必要的，因为现代托管编程语言如 C#已经最优地控制了内存分配。然而，这个说法在某些情况下可能是正确的，但在其他情况下可能是错误的。
 
 +   **不可预测的对象状态**：对象池模式的一个潜在陷阱是，如果处理不当，对象可能会以当前状态而不是初始状态返回池中。当池中的实体可受损或可破坏时，这种情况可能成为问题。例如，如果你有一个被玩家击败的敌人实体，如果你在恢复其健康之前将其返回池中，当对象池将其拉回给客户端时，它将以已损坏的状态重新生成到场景中。
 
 ## 何时使用对象池模式
 
-为了更好地理解何时使用对象池模式，让我们回顾一下何时不应使用它。例如，如果你在地图上需要一次性生成实体，比如最终Boss，将其放入对象池就是浪费内存，这些内存本可以用于更有用的地方。
+为了更好地理解何时使用对象池模式，让我们回顾一下何时不应使用它。例如，如果你在地图上需要一次性生成实体，比如最终 Boss，将其放入对象池就是浪费内存，这些内存本可以用于更有用的地方。
 
 此外，我们还应该记住，对象池不是一个缓存。它有一个类似的目的——对象的复用。核心区别在于，对象池有一个机制，在实体使用后自动将其返回到池中，并且如果实现得当，对象池会根据池的可用大小来处理对象的创建和删除。
 
-但假设我们在游戏过程中经常生成和销毁子弹、粒子以及敌人角色等实体。在这种情况下，对象池可以减轻我们对CPU施加的压力，通过减少重复的生命周期调用，例如创建和销毁，因此CPU将能够为更关键的任务保留处理能力。
+但假设我们在游戏过程中经常生成和销毁子弹、粒子以及敌人角色等实体。在这种情况下，对象池可以减轻我们对 CPU 施加的压力，通过减少重复的生命周期调用，例如创建和销毁，因此 CPU 将能够为更关键的任务保留处理能力。
 
 在下一节中，我们将把刚刚学到的概念转化为代码。
 
 # 实现对象池模式
 
-在开始本节之前，阅读以下链接下`UnityEngine.Pool`命名空间中`IObjectPool<T0>`类的官方API文档是个好主意：
+在开始本节之前，阅读以下链接下`UnityEngine.Pool`命名空间中`IObjectPool<T0>`类的官方 API 文档是个好主意：
 
-[https://docs.unity3d.com/2021.1/Documentation/ScriptReference/Pool.ObjectPool_1.html](https://docs.unity3d.com/2021.2/Documentation/ScriptReference/Pool.ObjectPool_1.html)
+[`docs.unity3d.com/2021.1/Documentation/ScriptReference/Pool.ObjectPool_1.html`](https://docs.unity3d.com/2021.2/Documentation/ScriptReference/Pool.ObjectPool_1.html)
 
-在实现以下代码示例时，我们将尽量避免陷入API规范中。相反，我们将专注于与对象池核心概念直接相关的关键元素。此外，原生对象池是Unity API的一个相对较新的功能，因此它可能会受到更改和更新的影响。因此，短期内关注文档是明智的。
+在实现以下代码示例时，我们将尽量避免陷入 API 规范中。相反，我们将专注于与对象池核心概念直接相关的关键元素。此外，原生对象池是 Unity API 的一个相对较新的功能，因此它可能会受到更改和更新的影响。因此，短期内关注文档是明智的。
 
 ## 实现对象池模式的步骤
 
@@ -78,17 +78,82 @@
 
 1.  让我们从实现我们的无人机开始，因为这是我们将要池化的实体。由于这个类非常长，我们将将其分为两个部分。您可以看到第一部分如下：
 
-[PRE0]
+```cs
+using UnityEngine;
+using UnityEngine.Pool;
+using System.Collections;
+
+namespace Chapter.ObjectPool 
+{
+    public class Drone : MonoBehaviour 
+    {
+        public IObjectPool<Drone> Pool { get; set; }
+
+        public float _currentHealth;
+
+        [SerializeField] 
+        private float maxHealth = 100.0f;
+
+        [SerializeField] 
+        private float timeToSelfDestruct = 3.0f;
+
+        void Start() 
+        {
+            _currentHealth = maxHealth;
+        }
+
+        void OnEnable() 
+        {
+            AttackPlayer();
+            StartCoroutine(SelfDestruct());
+        }
+
+        void OnDisable() 
+        {
+            ResetDrone();
+        }
+```
 
 在这个类段中，我们调用`ResetDrone()`方法是在`OnDisable()`事件函数中。我们这样做是因为我们想在将无人机返回池之前将其重置到初始状态。
 
-并且正如我们将在实现对象池模式时看到的那样，当一个GameObject返回池中时，它会被禁用，包括所有其子组件。因此，如果我们有任何需要执行的重新初始化代码，我们可以在`OnDisable()`调用中执行。
+并且正如我们将在实现对象池模式时看到的那样，当一个 GameObject 返回池中时，它会被禁用，包括所有其子组件。因此，如果我们有任何需要执行的重新初始化代码，我们可以在`OnDisable()`调用中执行。
 
 在本章的上下文中，我们保持简单；我们只恢复无人机的健康。但在高级实现中，我们可能需要重置视觉标记，例如移除损坏的标记。
 
 1.  在我们`Drone`类的最后一段中，我们将实现核心行为，如下所示：
 
-[PRE1]
+```cs
+        IEnumerator SelfDestruct() 
+        {
+            yield return new WaitForSeconds(timeToSelfDestruct);
+            TakeDamage(maxHealth);
+        }
+
+        private void ReturnToPool() 
+        {
+            Pool.Release(this);
+        }
+
+        private void ResetDrone() 
+        {
+            _currentHealth = maxHealth;
+        }
+
+        public void AttackPlayer() 
+        {
+            Debug.Log("Attack player!");
+        }
+
+        public void TakeDamage(float amount) 
+        {
+            _currentHealth -= amount;
+
+            if (_currentHealth <= 0.0f)
+                ReturnToPool();
+        }
+    }
+}
+```
 
 我们的无人机有两个关键行为，如下所述：
 
@@ -98,19 +163,110 @@
 
 1.  接下来是我们的 `ObjectPool` 类，它负责管理无人机实例的池。由于它是一个较长的类，我们将分两部分来审查它，第一部分在此处提供：
 
-[PRE2]
+```cs
+using UnityEngine;
+using UnityEngine.Pool;
+
+namespace Chapter.ObjectPool 
+{
+    public class DroneObjectPool : MonoBehaviour
+    {
+        public int maxPoolSize = 10;
+        public int stackDefaultCapacity = 10;
+
+        public IObjectPool<Drone> Pool 
+        {
+            get 
+            {
+                if (_pool == null)
+                    _pool = 
+                        new ObjectPool<Drone>(
+                            CreatedPooledItem, 
+                            OnTakeFromPool, 
+                            OnReturnedToPool, 
+                            OnDestroyPoolObject, 
+                            true, 
+                            stackDefaultCapacity,
+                            maxPoolSize);
+                return _pool;
+            }
+        }
+
+        private IObjectPool<Drone> _pool;
+```
 
 在脚本的第一部分，我们设置了一个名为 `maxPoolSize` 的关键变量；正如其名称所暗示的，这设置了我们将保留在池中的无人机实例的最大数量。`stackDefaultCapacity` 变量设置了默认的堆栈容量；这是我们用来存储无人机实例的堆栈数据结构的一个属性。我们可以暂时忽略它，因为它对我们实现不是关键的。
 
 在以下代码片段中，我们正在初始化对象池，这是我们类中最关键的部分：
 
-[PRE3]
+```cs
+public IObjectPool<Drone> Pool 
+{
+ get 
+ {
+ if (_pool == null)
+            _pool = 
+                new ObjectPool<Drone>(
+                    CreatedPooledItem, 
+                    OnTakeFromPool, 
+                    OnReturnedToPool, 
+                    OnDestroyPoolObject, 
+                    true, 
+                    stackDefaultCapacity,
+                    maxPoolSize);
+        return _pool;
+    }
+}
+```
 
 重要的是要注意，我们在 `ObjectPool<T>` 类的构造函数中传递了回调方法，并且在这些回调中我们将实现驱动我们的对象池的逻辑。
 
 1.  在 `DroneObjectPool` 类的最后一段，我们将实现我们在 `ObjectPool<T>` 构造函数中声明的回调，如下所示：
 
-[PRE4]
+```cs
+        private Drone CreatedPooledItem() 
+        {
+            var go = 
+                GameObject.CreatePrimitive(PrimitiveType.Cube);
+
+            Drone drone = go.AddComponent<Drone>();
+
+            go.name = "Drone";
+            drone.Pool = Pool;
+
+            return drone;
+        }
+
+        private void OnReturnedToPool(Drone drone) 
+        {
+            drone.gameObject.SetActive(false);
+        }
+
+        private void OnTakeFromPool(Drone drone) 
+        {
+            drone.gameObject.SetActive(true);
+        }
+
+        private void OnDestroyPoolObject(Drone drone) 
+        {
+            Destroy(drone.gameObject);
+        }
+
+        public void Spawn() 
+        {
+            var amount = Random.Range(1, 10);
+
+            for (int i = 0; i < amount; ++i) 
+            {
+                var drone = Pool.Get();
+
+                drone.transform.position = 
+                    Random.insideUnitSphere * 10;
+            }
+        }
+    }
+}
+```
 
 下面是对 `ObjectPool` 类将在特定时间调用的每个回调的简要说明：
 
@@ -136,19 +292,40 @@
 
 1.  将以下客户端脚本附加到您的空 GameObject 上：
 
-[PRE5]
+```cs
+using UnityEngine;
+
+namespace Chapter.ObjectPool
+{
+    public class ClientObjectPool : MonoBehaviour
+    {
+        private DroneObjectPool _pool;
+
+        void Start()
+        {
+            _pool = gameObject.AddComponent<DroneObjectPool>();
+        }
+
+        void OnGUI()
+        {
+            if (GUILayout.Button("Spawn Drones"))
+                _pool.Spawn();
+        }
+    }
+}
+```
 
 一旦你启动场景，你应该在左上角看到一个名为**Spawn Drones**的**图形用户界面**（**GUI**）按钮，如下截图所示：
 
 ![图片](img/4c618be6-fbe6-4ccb-aef1-ba042b8f4195.png)
 
-图8.2 – 代码示例的实际截图
+图 8.2 – 代码示例的实际截图
 
 通过按下 **Spawn Drones** 按钮，你现在可以在场景中的随机位置生成无人机。如果你想看到对象池机制的实际应用，请关注场景层次结构——你将能够看到无人机实体在进入和退出池时被启用和禁用。
 
 ## 检查对象池实现
 
-通过使用对象池模式，我们自动化了创建、销毁和池化无人机实例的过程。现在我们可以预留一定量的内存来生成无人机波次，同时避免给CPU带来负担。通过实现这个模式，我们在不牺牲可读性或增加复杂性的情况下，为我们的代码添加了优化和可扩展性。
+通过使用对象池模式，我们自动化了创建、销毁和池化无人机实例的过程。现在我们可以预留一定量的内存来生成无人机波次，同时避免给 CPU 带来负担。通过实现这个模式，我们在不牺牲可读性或增加复杂性的情况下，为我们的代码添加了优化和可扩展性。
 
 在下一节中，我们将回顾一些可以考虑的替代方案；在决定特定的模式之前考虑其他选项总是一个好习惯。
 
@@ -160,6 +337,6 @@
 
 # 摘要
 
-我们刚刚将对象池模式添加到我们的工具箱中——这是Unity开发者最有价值的模式之一。正如我们在代码示例中看到的，我们可以轻松地回收常用对象的实例。当处理需要快速且重复生成的大量实体时，这个模式可以帮助我们避免CPU峰值和延迟。这些好处只能帮助我们使游戏变得更好，因为玩家确实喜欢运行流畅的游戏。
+我们刚刚将对象池模式添加到我们的工具箱中——这是 Unity 开发者最有价值的模式之一。正如我们在代码示例中看到的，我们可以轻松地回收常用对象的实例。当处理需要快速且重复生成的大量实体时，这个模式可以帮助我们避免 CPU 峰值和延迟。这些好处只能帮助我们使游戏变得更好，因为玩家确实喜欢运行流畅的游戏。
 
 在下一章中，我们将使用观察者模式将组件彼此解耦。

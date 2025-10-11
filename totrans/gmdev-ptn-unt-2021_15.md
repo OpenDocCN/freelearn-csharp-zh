@@ -10,9 +10,9 @@
 
 空间分区的最简单定义是一个过程，它通过将对象按其位置在数据结构中整理，提供了一种高效定位对象的方法。本章中我们正在实现的关卡编辑器将使用栈数据结构构建，我们将保持特定顺序的栈中的对象类型是赛道段。这些赛道段将根据它们与玩家在地图上的位置的关系以特定的顺序生成或删除。
 
-所有这些都可能听起来非常抽象，但使用Unity **应用程序编程接口**（**API**）实现这一点相当简单，正如我们将在本章中看到的那样。
+所有这些都可能听起来非常抽象，但使用 Unity **应用程序编程接口**（**API**）实现这一点相当简单，正如我们将在本章中看到的那样。
 
-本章中我们正在实施的系统过于复杂，无法简化为一个骨架代码示例。因此，与前面的章节不同，这里展示的代码并不是为了复制或用作模板。我们反而建议您查看Git项目`/FPP`文件夹中的完整代码示例，该链接可在本章的*技术要求*部分找到。
+本章中我们正在实施的系统过于复杂，无法简化为一个骨架代码示例。因此，与前面的章节不同，这里展示的代码并不是为了复制或用作模板。我们反而建议您查看 Git 项目`/FPP`文件夹中的完整代码示例，该链接可在本章的*技术要求*部分找到。
 
 本章，我们将涵盖以下主题：
 
@@ -26,15 +26,15 @@
 
 # 技术要求
 
-我们还将使用以下特定的Unity引擎API功能：
+我们还将使用以下特定的 Unity 引擎 API 功能：
 
 +   栈
 
 +   可脚本化对象
 
-如果不熟悉这些概念，请参阅[第3章](c71c8dd0-2787-43e0-a140-d9cc4ab41ff9.xhtml)，《Unity编程简明指南》。
+如果不熟悉这些概念，请参阅第三章，《Unity 编程简明指南》。
 
-本章的代码文件可以在GitHub上找到，链接如下：[https://github.com/PacktPublishing/Game-Development-Patterns-with-Unity-2021-Second-Edition/tree/main/Assets/Chapters/Chapter13](https://github.com/PacktPublishing/Game-Development-Patterns-with-Unity-2021-Second-Edition/tree/main/Assets/Chapters/Chapter13)。
+本章的代码文件可以在 GitHub 上找到，链接如下：[`github.com/PacktPublishing/Game-Development-Patterns-with-Unity-2021-Second-Edition/tree/main/Assets/Chapters/Chapter13`](https://github.com/PacktPublishing/Game-Development-Patterns-with-Unity-2021-Second-Edition/tree/main/Assets/Chapters/Chapter13)。
 
 栈是一种线性数据结构，具有两个主要操作：**Push**，在栈顶添加一个元素，和**Pop**，从栈顶移除最近添加的元素。
 
@@ -68,7 +68,7 @@
 
 因此，基于这些核心设计支柱，我们不能使用像基于特定规则和约束生成随机障碍的程序生成地图这样的解决方案。因此，我们团队的水平设计师将不得不手动设计每条赛道的布局。
 
-这把我们带到了我们最大的挑战：在我们的游戏中，一辆自行车以非常高的速度在3D世界中直线行驶。如果我们希望比赛持续超过十几秒，我们将在内存中需要大量的资产，并且我们的设计师将不得不在编辑器中处理编辑大量水平的工作。
+这把我们带到了我们最大的挑战：在我们的游戏中，一辆自行车以非常高的速度在 3D 世界中直线行驶。如果我们希望比赛持续超过十几秒，我们将在内存中需要大量的资产，并且我们的设计师将不得不在编辑器中处理编辑大量水平的工作。
 
 这种方法在编辑阶段和运行时都不高效。因此，我们不会将整个赛道作为一个单一实体来管理，而是将其划分为段，每个段可以单独编辑，然后按照特定的顺序组装成一个单一的赛道。
 
@@ -76,7 +76,7 @@
 
 ![图片](img/980dd515-a76d-4ebc-8bd0-00021cb4eb36.png)
 
-图13.2 – 赛道段顺序图
+图 13.2 – 赛道段顺序图
 
 从这个系统中，我们获得了两个关键的好处，如下所述：
 
@@ -88,7 +88,7 @@
 
 ![图片](img/969c0861-9eee-44f6-8d25-12481ba438e6.png)
 
-图13.3 – 段堆叠图
+图 13.3 – 段堆叠图
 
 在实施此系统时，我们必须牢记我们游戏中的两个显著特点，如下所述：
 
@@ -110,7 +110,23 @@
 
 1.  首先，我们将编写一个名为`Track`的`ScriptableObject`类，如下所示：
 
-[PRE0]
+```cs
+using UnityEngine;
+using System.Collections.Generic;
+
+namespace Chapter.SpatialPartition
+{
+    [CreateAssetMenu(fileName = "New Track", menuName = "Track")]
+    public class Track : ScriptableObject
+    {
+        [Tooltip("The expected length of segments")] 
+        public float segmentLength;
+
+        [Tooltip("Add segments in expected loading order")] 
+        public List<GameObject> segments = new List<GameObject>();
+    }
+}
+```
 
 通过这个`ScriptableObject`类，我们的关卡设计师将能够通过将段添加到列表中并按特定顺序排列它们来设计新的赛道变体。每个赛道资产都将被送入`TrackController`类，该类将自动按设计师的顺序生成每个段。
 
@@ -118,21 +134,131 @@
 
 1.  接下来是`TrackController`类。在其中，我们将实现段加载机制，但由于它是一个庞大的类，我们将将其拆分并分部分查看，如下所示：
 
-[PRE1]
+```cs
+using UnityEngine;
+using System.Linq;
+using System.Collections.Generic;
+
+namespace Chapter.SpatialPartition
+{
+    public class TrackController : MonoBehaviour
+    {
+        private float _trackSpeed;
+        private Transform _prevSeg;
+        private GameObject _trackParent;
+        private Transform _segParent;
+        private List<GameObject> _segments;
+        private Stack<GameObject> _segStack;
+        private Vector3 _currentPosition = new Vector3(0, 0, 0);
+
+        [Tooltip("List of race tracks")] 
+        [SerializeField]
+        private Track track;
+
+        [Tooltip("Initial amount of segment to load at start")] 
+        [SerializeField]
+        private int initSegAmount;
+
+        [Tooltip("Amount of incremental segments to load at run")] 
+        [SerializeField]
+        private int incrSegAmount;
+
+        [Tooltip("Dampen the speed of the track")] 
+        [Range(0.0f, 100.0f)] 
+        [SerializeField]
+        private float speedDampener;
+
+        void Awake()
+        {
+            _segments = 
+                Enumerable.Reverse(track.segments).ToList();
+        }
+
+        void Start()
+        {
+            InitTrack();
+        }
+```
 
 第一部分仅仅是初始化代码，是自我解释的，但代码的后续部分则更有趣：
 
-[PRE2]
+```cs
+void Update()
+{
+    _segParent.transform.Translate(
+        Vector3.back * (_trackSpeed * Time.deltaTime));
+}
+
+private void InitTrack()
+{
+    Destroy(_trackParent);
+
+    _trackParent = 
+        Instantiate(
+            Resources.Load("Track", typeof(GameObject))) 
+            as GameObject;
+
+    if (_trackParent)
+        _segParent = 
+            _trackParent.transform.Find("Segments");
+
+    _prevSeg = null;
+
+    _segStack = new Stack<GameObject>(_segments);
+
+    LoadSegment(initSegAmount);
+}
+```
 
 如我们所见，在`Update()`循环中，我们将轨道父对象移动到玩家附近以模拟移动。在`InitTrack()`方法中，我们实例化一个轨道`GameObject`，它将作为轨道段的容器。但函数中有一行重要的代码是段加载机制的关键组成部分，这里进行了说明：
 
-[PRE3]
+```cs
+_segStack = new Stack<GameObject>(_segments);
+```
 
 在这一行，我们将段列表注入到一个新的栈容器中。正如本章开头所提到的，空间划分技术的一个关键部分是将环境对象组织在数据结构中，以便更容易查询。
 
 在下一个代码片段中，我们将看到我们如何使用栈数据结构按正确顺序加载段：
 
-[PRE4]
+```cs
+        private void LoadSegment(int amount)
+        {
+            for (int i = 0; i < amount; i++)
+            {
+                if (_segStack.Count > 0)
+                {
+                    GameObject segment = 
+                        Instantiate(
+                            _segStack.Pop(), _segParent.transform);
+
+                    if (!_prevSeg) 
+                        _currentPosition.z = 0;
+
+                    if (_prevSeg)
+                        _currentPosition.z =
+                            _prevSeg.position.z 
+                            + 
+                            track.segmentLength;
+
+                    segment.transform.position = _currentPosition;
+
+                    segment.AddComponent<Segment>();
+
+                    segment.GetComponent<Segment>().
+                        trackController = this;
+
+                    _prevSeg = segment.transform;
+                }
+            }
+        }
+
+        public void LoadNextSegment()
+        {
+            LoadSegment(incrSegAmount);
+        } 
+    }
+}
+```
 
 `LoadSegment()`私有方法是系统的核心。它接受一个特定数量的段落作为参数。这个值将决定在调用时它将加载多少个段落。如果有足够的段落剩余在堆栈上，它就会从顶部弹出一个并初始化它，位于之前加载的段落后面。它继续这个循环过程，直到加载了预期的数量。
 
@@ -140,7 +266,18 @@
 
 一旦自行车通过触发器，段落标记就会删除其父`GameObject`，正如我们在这里看到的：
 
-[PRE5]
+```cs
+using UnityEngine;
+
+public class SegmentMarker : MonoBehaviour
+{
+    private void OnTriggerExit(Collider other)
+    {
+        if (other.GetComponent<BikeController>()) 
+            Destroy(transform.parent.gameObject);
+    }
+}
+```
 
 当具有`BikeController`组件的实体从一个段落标记的触发器中退出时，它请求销毁其父`GameObject`，在这种情况下将是一个`Segment`实体。
 
@@ -148,21 +285,40 @@
 
 如`TrackController`类的`LoadSegment()`方法所示，每次我们从堆栈顶部弹出一个新的段落时，我们都会将其附加到一个名为`Segment`的脚本组件上，正如我们在这里看到的：
 
-[PRE6]
+```cs
+segment.transform.position = _currentPosition;
+
+segment.AddComponent<Segment>(); 
+
+segment.GetComponent<Segment>().trackController = this;
+```
 
 因为我们将`TrackController`类的当前实例传递给其`trackController`参数，所以`Segment`对象可以回调`TrackController`类，并在它被销毁之前请求加载下一个段落序列，正如我们在这里看到的：
 
-[PRE7]
+```cs
+using UnityEngine;
+
+public class Segment : MonoBehaviour
+{
+    public TrackController trackController;
+
+    private void OnDestroy()
+    {
+        if (trackController) 
+            trackController.LoadNextSegments();
+    }
+}
+```
 
 这种方法创建了一个循环机制，在特定间隔自动加载和卸载一定数量的段落。使用这种方法，我们管理在给定时间内场景中生成的实体数量。理论上，这将导致更一致的帧率。
 
 这种方法的另一个好处，它与游戏玩法更相关，是段落标记可以作为检查点系统的地标。检查点通常用于有时间限制的赛车游戏模式中，玩家必须在特定时间内到达赛道上的几个点。
 
-一个基于检查点的赛车游戏的优秀例子是1987年的*Rad Racer*。
+一个基于检查点的赛车游戏的优秀例子是 1987 年的*Rad Racer*。
 
 ## 使用关卡编辑器
 
-你可以通过在Git仓库中打开`/FPP`文件夹来玩关卡编辑器，然后执行以下操作：
+你可以通过在 Git 仓库中打开`/FPP`文件夹来玩关卡编辑器，然后执行以下操作：
 
 +   在`/Scenes/Gyms`文件夹下，你应该找到一个名为`Segment`的场景。在这个场景中，你可以编辑和创建新的段落预制体。
 

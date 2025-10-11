@@ -12,7 +12,9 @@
 
 本章假设您已经在您的机器上安装了 .NET Core 3.1 或更高版本。首先，让我们在我们的控制台中启动以下命令：
 
-[PRE0]
+```cs
+dotnet new
+```
 
 输出将如下所示：
 
@@ -24,27 +26,52 @@
 
 要创建一个新的模板，我们将使用简短名称。例如，为了创建一个控制台应用程序，我们应该运行以下指令：
 
-[PRE1]
+```cs
+dotnet new console -n HelloWorld
+```
 
 上述指令将在当前文件夹中创建一个新的项目，其结构如下：
 
-[PRE2]
+```cs
+.
+├── HelloWorld.csproj
+├── Program.cs
+└── obj
+    ├── ...
+```
 
 `HelloWorld.csproj` 文件包含有关项目的所有元信息。与之前版本的 .NET Framework 中的 `.csproj` 文件相比，.NET Core 版本的 `.csproj` 文件更轻量。我们将在本章中讨论此项目文件的新结构。`Program.cs` 文件是应用程序的入口点。
 
 要构建和执行我们的项目，我们可以在项目文件夹中运行以下命令：
 
-[PRE3]
+```cs
+dotnet build
+dotnet run
+```
 
 如预期，我们得到以下结果：
 
-[PRE4]
+```cs
+Hello World!
+```
 
 与旧 .NET Framework 项目不同，构建和运行步骤是轻量级过程，并且不需要任何额外的工具或配置。实际上，.NET Core 并不是像 .NET Framework 那样严格绑定到开发机器。最终，开发者可以编写代码而无需其他 IDE 或代码编辑器。然而，出于明显的原因，始终建议您使用它们以简化开发过程。
 
 还必须注意的是，一旦我们执行 `dotnet build` 命令，项目文件将按以下方式更改：
 
-[PRE5]
+```cs
+.
+├── HelloWorld.csproj
+├── Program.cs
+├── bin
+│   └── Debug
+│       └── netcoreapp3.1
+│           ├── ...
+└── obj
+├── Debug
+│   └── netcoreapp3.1
+│       ├── ...
+```
 
 `bin/Debug/` 文件夹包含所有应用程序的 DLL 文件。在其下方，我们可以看到 `netcoreapp3.1` 文件夹，它指的是当前的目标框架。因此，如果你使用多目标方法构建项目，你将找到一个针对你指定的每个目标框架的文件夹。现在我们已经能够运行一个简单的控制台应用程序，让我们更仔细地看看项目中的 *csproj* 文件。
 
@@ -52,19 +79,47 @@
 
 如前所述，在纯控制台应用程序模板中，有两个基本文件：`ProjectName.csproj` 和 `Program.cs`。首先，让我们看看 `.csproj` 文件：
 
-[PRE6]
+```cs
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <TargetFramework>netcoreapp3.0</TargetFramework>
+    </PropertyGroup>
+</Project>
+
+```
 
 `.csproj` 文件的格式是 XML，就像 .NET Framework 的早期版本一样。以下内容省略，因为它是无意义的空行。
 
 `Sdk="Microsoft.NET.Sdk"` 命名空间指的是我们想要用于构建项目的 SDK。`PropertyGroup` 节点包含一组属性，并且可以与一些条件行为相关联。`ItemGroup` 是一个通常包含包引用的节点。在 .NET Core 中，我们可以指定 `TargetFramework` 属性为项目分配目标框架。为了将我们的应用程序设置为 *多目标应用程序*，因此，我们可以将我们的 `TargetFramework` 节点更改为以下内容：
 
-[PRE7]
+```cs
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+<TargetFrameworks>netcoreapp3.1;netstandard2.0</TargetFrameworks>
+    </PropertyGroup>
+</Project>
+```
 
 注意，XML 节点已从 `TargetFramework` 更改为 `TargetFrameworks`，此外我们的项目将在 .NET Core 3.1 和 .NET Standard 2.0 上构建。
 
-根据 MSBuild 文档（[https://docs.microsoft.com/en-us/visualstudio/msbuild/msbuild?view=vs-2019](https://docs.microsoft.com/en-us/visualstudio/msbuild/msbuild?view=vs-2019)），可以为每个目标框架定义不同的包。例如，在一个双目标框架项目中，如前所述，我们可能为每个目标定义各种依赖项，如下所示：
+根据 MSBuild 文档（[`docs.microsoft.com/en-us/visualstudio/msbuild/msbuild?view=vs-2019`](https://docs.microsoft.com/en-us/visualstudio/msbuild/msbuild?view=vs-2019)），可以为每个目标框架定义不同的包。例如，在一个双目标框架项目中，如前所述，我们可能为每个目标定义各种依赖项，如下所示：
 
-[PRE8]
+```cs
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFrameworks>netcoreapp3.1;netstandard2.0</TargetFrameworks>
+  </PropertyGroup> 
+ ...
+
+  <ItemGroup Condition=" '$(TargetFramework)' == 'netstandard2.0' ">
+    <PackageReference Include="Microsoft.AspNetCore.Server.Kestrel.Core" Version="2.2.0" />
+  </ItemGroup>
+</Project>
+```
 
 在这个例子中，我们将为每个目标设置单独的引用：在编译时，框架生成两个目标版本，`netstandard2.0` 生成的输出将引用 `Microsoft.AspNetCore.Server.Kestrel.Core` 包。这是一种不寻常的配置类型，但如果我们项目有高度定制化，或者如果我们的项目是一个由不同版本的 .NET 消耗的库，它就很有用。`dotnet new` 命令还根据你创建的项目类型设置一个特定的 `OutputType` 属性：`OutputType` 属性定义项目是可执行的（`Exe`）还是库（`Library`）。显著的区别在于，在前一种情况下它可以被执行，而在后一种情况下它不包含任何运行应用程序的入口点。因此，我们无法在 `<OutputType>Library</OutputType>` 项目类型上执行 `dotnet run` 命令。另一方面，如果我们有一个 `<OutputType>Exe</OutputType>` 项目，我们确实需要指定 `static void Main` 入口点方法。让我们通过查看标准控制台模板的 `Program.cs` 文件来继续讨论可执行项目的领域。
 
@@ -72,39 +127,90 @@
 
 `Program.cs` 文件是应用程序的主要入口点。它设置并运行我们需要的所有组件。默认情况下，控制台应用程序模板执行单个语句：
 
-[PRE9]
+```cs
+using System;
 
-前面的代码片段是一个普通的.NET Core应用程序，它运行`Console.WriteLine`在控制台打印一条消息。在一个ASP.NET Core应用程序中，`Program.cs`文件通常用于初始化和运行Web宿主。
+namespace HelloWorld 
+{
+    class Program
+    {
+        static void Main(string[] args)
+        {
+ Console.WriteLine("Hello World!");
+        }
+    }
+}
+```
 
-C# 7.1版本引入了`async void Main`方法。这个特性是为了避免运行异步代码时涉及到的解决方案：
+前面的代码片段是一个普通的.NET Core 应用程序，它运行`Console.WriteLine`在控制台打印一条消息。在一个 ASP.NET Core 应用程序中，`Program.cs`文件通常用于初始化和运行 Web 宿主。
 
-[PRE10]
+C# 7.1 版本引入了`async void Main`方法。这个特性是为了避免运行异步代码时涉及到的解决方案：
 
-总结来说，`Program.cs`文件是建立在.NET Core 3.1之上的应用程序的主要执行根。它通常运行一系列语句以启动我们的应用程序。一般来说，我们应该尽可能保持`Program.cs`的简洁，以提高我们类的可重用性。在下一节中，我们将看到如何结合`csproj`结构和`Program.cs`文件来构建一个简单的API项目。
+```cs
+using System;
+using System.Threading.Tasks;
 
-# 设置ASP.NET Core项目
+namespace HelloWorld
+{
+    class Program
+    {
+         static async Task Main(string[] args)
+         {
+             await Task.Delay(10);
+             Console.WriteLine("Hello World!");
+         }
+     }
+}
+```
 
-如[第1章](b3e95a60-c4fb-491e-ad7e-a2213f70a63b.xhtml)中提到的，“REST 101和ASP.NET Core入门”，MVC模式的核心是分离关注点。它的目的是为开发者提供一些指导原则，以确保Web应用程序的不同组件不会混淆。以下是对MVC模式的复习：
+总结来说，`Program.cs`文件是建立在.NET Core 3.1 之上的应用程序的主要执行根。它通常运行一系列语句以启动我们的应用程序。一般来说，我们应该尽可能保持`Program.cs`的简洁，以提高我们类的可重用性。在下一节中，我们将看到如何结合`csproj`结构和`Program.cs`文件来构建一个简单的 API 项目。
+
+# 设置 ASP.NET Core 项目
+
+如第一章中提到的，“REST 101 和 ASP.NET Core 入门”，MVC 模式的核心是分离关注点。它的目的是为开发者提供一些指导原则，以确保 Web 应用程序的不同组件不会混淆。以下是对 MVC 模式的复习：
 
 +   模型旨在定义我们应用程序的领域模型。还应注意的是，模型不包含对我们数据源和数据库的任何引用。它们描述了我们的应用程序中的实体。
 
-+   视图部分以HTML页面的形式呈现数据。在Web服务中，视图不包括在内，因为模型以JSON、HTML或其他类似格式序列化。关键点是视图不应包含逻辑。它们难以测试和难以维护。在过去的几年里，视图变得越来越强大。Razor引擎，ASP.NET Core提供的默认视图渲染引擎，最近提供了一些新功能。开发者很容易在视图中实现逻辑，但应尽量避免这样做。
++   视图部分以 HTML 页面的形式呈现数据。在 Web 服务中，视图不包括在内，因为模型以 JSON、HTML 或其他类似格式序列化。关键点是视图不应包含逻辑。它们难以测试和难以维护。在过去的几年里，视图变得越来越强大。Razor 引擎，ASP.NET Core 提供的默认视图渲染引擎，最近提供了一些新功能。开发者很容易在视图中实现逻辑，但应尽量避免这样做。
 
-+   MVC的控制器部分处理来自用户的请求。它们从请求中获取信息并更新模型。在实际的商业应用程序中，控制器通常由服务或存储库类支持，这为领域模型层增加了另一个层次。
++   MVC 的控制器部分处理来自用户的请求。它们从请求中获取信息并更新模型。在实际的商业应用程序中，控制器通常由服务或存储库类支持，这为领域模型层增加了另一个层次。
 
-让我们详细了解一下默认的ASP.NET Core Web API项目模板。该项目使用MVC模式的模型和控制器部分来提供简单的HTTP响应，内容以JSON序列化。
+让我们详细了解一下默认的 ASP.NET Core Web API 项目模板。该项目使用 MVC 模式的模型和控制器部分来提供简单的 HTTP 响应，内容以 JSON 序列化。
 
 首先，让我们使用以下命令创建一个新的项目：
 
-[PRE11]
+```cs
+dotnet new webapi -n SampleAPI
+
+```
 
 执行前面的命令将创建以下文件夹结构：
 
-[PRE12]
+```cs
+.
+├── Controllers
+│ └── WeatherForecastController.cs
+├── Program.cs
+├── Properties
+│ └── launchSettings.json
+├── SampleAPI.csproj
+├── Startup.cs
+├── WeatherForecast.cs
+├── appsettings.Development.json
+├── appsettings.json
+└── obj
+```
 
 执行`dotnet new webapi`命令将在同名文件夹内创建一个名为`SampleAPI`的新项目文件。以下是`dotnet new webapi`命令生成的`SampleAPI.csproj`文件：
 
-[PRE13]
+```cs
+<Project Sdk="Microsoft.NET.Sdk.Web">
+    <PropertyGroup>
+ <TargetFramework>netcoreapp3.1</TargetFramework>
+    </PropertyGroup>
+</Project>
+
+```
 
 首先要注意的是，该项目使用 `Microsoft.NET.Sdk.Web` SDK，它指的是网页应用程序 SDK。此外，.NET Core 框架根据我们即将创建的项目目的提供不同的 SDK。例如，在桌面应用程序的情况下，项目将指定另一个 SDK：`Microsoft.NET.Sdk.WindowsDesktop`。在不同的 SDK 之间进行选择确保了开发者能够获得优秀的模块化水平。其次，项目文件没有指定任何特定的依赖项，除了应用程序使用的 `netcoreapp` 目标框架。
 
@@ -128,31 +234,145 @@ C# 7.1版本引入了`async void Main`方法。这个特性是为了避免运行
 
 让我们继续通过检查网页 API 项目的 `Program.cs` 文件：
 
-[PRE14]
+```cs
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+
+namespace SampleAPI
+{
+    public class Program
+    {
+        public static void Main(string[] args)
+        {
+            CreateHostBuilder(args).Build().Run();
+        }
+
+        public static IHostBuilder CreateHostBuilder(string[] 
+        args) =>
+            Host.CreateDefaultBuilder(args)
+                .ConfigureWebHostDefaults(webBuilder =>
+                {
+                    webBuilder.UseStartup<Startup>();
+                });
+    }
+}
+```
 
 以下代码导入了 `Microsoft.AspNetCore.Hosting` 和 `Microsoft.Extensions.Hosting` 命名空间。它们为在 `CreateHostBuilder` 函数中创建的新 `IHostBuilder` 实例的初始化提供了必要的引用。`CreateHostBuilder` 函数执行 `Host.CreateDefaultBuilder` 方法，该方法初始化我们的 API 的网页宿主。此外，我们还应该注意，`CreateDefaultBuilder` 方法返回的 `IHostBuilder` 实例指向项目的 `Startup` 类。`Main` 方法调用 `CreateHostBuilder` 函数并执行 `IHostBuilder` 接口公开的 `Build` 和 `Run` 方法。
 
 让我们检查`Startup`类（在`Startup.cs`文件中定义），它用于配置应用程序堆栈：
 
-[PRE15]
+```cs
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+
+namespace SampleAPI
+{
+    public class Startup
+    {
+        public Startup(IConfiguration configuration)
+        {
+            Configuration = configuration;
+        }
+
+        public IConfiguration Configuration { get; }
+
+        public void ConfigureServices(IServiceCollection services)
+        {
+            services.AddControllers();
+        }
+
+        public void Configure(IApplicationBuilder app, 
+        IWebHostEnvironment env)
+        {
+            if (env.IsDevelopment())
+            {
+                app.UseDeveloperExceptionPage();
+            }
+
+            app.UseHttpsRedirection();
+
+            app.UseRouting();
+
+            app.UseAuthorization();
+
+            app.UseEndpoints(endpoints =>
+            {
+                endpoints.MapControllers();
+            });
+        }
+    }
+}
+```
 
 `Startup`类通过依赖注入初始化`IConfiguration`属性。`IConfiguration`对象代表一个键/值对象，其中包含应用程序的配置。默认情况下，`Program.cs`文件中声明的`CreateDefaultBuilder`方法将`appsettings.json`设置为默认配置文件。
 
 `Startup`类有两个不同的方法，它们的行为如下：
 
-+   `ConfigureServices`方法通过依赖注入配置我们应用程序中的服务。默认情况下，它通过执行`.AddControllers`扩展方法来添加控制器。在ASP.NET Core中，术语服务通常指任何为我们应用程序提供功能和功能的组件或类。正如我们将在下一章中看到的，ASP.NET Core经常使用依赖注入来维护良好的设计和松散耦合的类。
++   `ConfigureServices`方法通过依赖注入配置我们应用程序中的服务。默认情况下，它通过执行`.AddControllers`扩展方法来添加控制器。在 ASP.NET Core 中，术语服务通常指任何为我们应用程序提供功能和功能的组件或类。正如我们将在下一章中看到的，ASP.NET Core 经常使用依赖注入来维护良好的设计和松散耦合的类。
 
-+   `Configure`方法用于配置应用程序的中间件管道。它接受两个参数：`IApplicationBuilder`和`IWebHostEnvironment`。第一个包含我们应用程序的所有管道并公开扩展方法来构建带有中间件的应用程序。我们将在[第3章](77d18c37-0c9d-4b2b-82f5-74fd874c0e0f.xhtml)，*与中间件管道一起工作*中详细查看中间件。`IWebHostEvironment`接口提供了有关应用程序当前托管环境的某些信息，例如其类型和名称。在一个Web API项目中，`Configure`方法执行一系列扩展方法。其中最重要的是`UseRouting`和`UseEndpoints`扩展方法。`UseRouting`方法的执行定义了管道中路由决策的点。`UseEndpoints`扩展方法定义了之前选择的端点的实际执行。在Web API项目中，涉及的端点只有控制器。因此，`UseEndpoints`方法执行`MapControllers`扩展方法来初始化由.NET Core提供的控制器类的默认路由约定。
++   `Configure`方法用于配置应用程序的中间件管道。它接受两个参数：`IApplicationBuilder`和`IWebHostEnvironment`。第一个包含我们应用程序的所有管道并公开扩展方法来构建带有中间件的应用程序。我们将在第三章，*与中间件管道一起工作*中详细查看中间件。`IWebHostEvironment`接口提供了有关应用程序当前托管环境的某些信息，例如其类型和名称。在一个 Web API 项目中，`Configure`方法执行一系列扩展方法。其中最重要的是`UseRouting`和`UseEndpoints`扩展方法。`UseRouting`方法的执行定义了管道中路由决策的点。`UseEndpoints`扩展方法定义了之前选择的端点的实际执行。在 Web API 项目中，涉及的端点只有控制器。因此，`UseEndpoints`方法执行`MapControllers`扩展方法来初始化由.NET Core 提供的控制器类的默认路由约定。
 
-应该注意的是，ASP.NET Core的`Startup`类通过依赖注入提供了一种高级、代码优先的方式来配置应用程序的依赖项，这意味着它只初始化你所需要的。此外，.NET Core具有强烈的模块化导向；这也是它比.NET Framework表现更好的原因之一。
+应该注意的是，ASP.NET Core 的`Startup`类通过依赖注入提供了一种高级、代码优先的方式来配置应用程序的依赖项，这意味着它只初始化你所需要的。此外，.NET Core 具有强烈的模块化导向；这也是它比.NET Framework 表现更好的原因之一。
 
 由于所有管道和依赖项都在上述类中初始化，你知道它们可以更改的位置。在具有许多不同组件的大型应用程序和服务中，建议创建自定义扩展方法来处理应用程序特定部分的初始化。
 
 # 控制器概述
 
-控制器是 ASP.NET Core 项目中 Web API 的基本部分。它们处理传入的请求并作为我们应用程序的入口点。我们将在第 4 章*依赖注入*中更详细地探讨控制器，但就目前而言，让我们检查 Web API 模板提供的默认 `WeatherForecastController`：
+控制器是 ASP.NET Core 项目中 Web API 的基本部分。它们处理传入的请求并作为我们应用程序的入口点。我们将在第四章*依赖注入*中更详细地探讨控制器，但就目前而言，让我们检查 Web API 模板提供的默认 `WeatherForecastController`：
 
-[PRE16]
+```cs
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
+
+namespace SampleAPI.Controllers
+{
+    [ApiController]
+    [Route("[controller]")]
+    public class WeatherForecastController : ControllerBase
+    {
+        private static readonly string[] Summaries = new[]
+        {
+            "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", 
+            "Balmy", "Hot", "Sweltering", "Scorching"
+        };
+
+        private readonly ILogger<WeatherForecastController> _logger;
+
+        public WeatherForecastController(ILogger<WeatherForecastController> 
+        logger)
+        {
+            _logger = logger;
+        }
+
+        [HttpGet]
+        public IEnumerable<WeatherForecast> Get()
+        {
+            var rng = new Random();
+            return Enumerable.Range(1, 5).Select(index => 
+            new WeatherForecast
+            {
+                Date = DateTime.Now.AddDays(index),
+                TemperatureC = rng.Next(-20, 55),
+                Summary = Summaries[rng.Next(Summaries.Length)]
+            })
+            .ToArray();
+        }
+    }
+}
+```
 
 `WeatherForecastController` 包含基本方法。默认情况下，它不使用任何数据源；它只是返回一些模拟值。让我们通过查看 `WeatherForecastController` 类的主要元素来继续：
 

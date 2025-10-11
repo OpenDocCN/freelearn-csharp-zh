@@ -10,21 +10,21 @@
 
 # 技术要求
 
-本章是一个实践章节；你需要对Unity和C#有一个基本的了解。
+本章是一个实践章节；你需要对 Unity 和 C#有一个基本的了解。
 
-我们将使用以下特定的Unity引擎和C#语言概念：
+我们将使用以下特定的 Unity 引擎和 C#语言概念：
 
 +   封闭类
 
 如果你对这个概念不熟悉，请在开始这一章之前复习一下。
 
-本章的代码文件可以在GitHub上找到：
+本章的代码文件可以在 GitHub 上找到：
 
-[https://github.com/PacktPublishing/Hands-On-Game-Development-Patterns-with-Unity-2018](https://github.com/PacktPublishing/Hands-On-Game-Development-Patterns-with-Unity-2018)
+[`github.com/PacktPublishing/Hands-On-Game-Development-Patterns-with-Unity-2018`](https://github.com/PacktPublishing/Hands-On-Game-Development-Patterns-with-Unity-2018)
 
 观看以下视频以查看代码的实际效果：
 
-[http://bit.ly/2UieM9v](http://bit.ly/2UieM9v)
+[`bit.ly/2UieM9v`](http://bit.ly/2UieM9v)
 
 # 适配器模式概述
 
@@ -66,11 +66,11 @@
 
 以下是一些缺点：
 
-+   **持久化遗留代码**：使用新系统与遗留代码一起使用是成本效益的，但从长远来看，可能会成为一个问题，因为旧代码可能会限制你的升级选项，因为它变得过时且与新版本的Unity或第三方库不兼容。
++   **持久化遗留代码**：使用新系统与遗留代码一起使用是成本效益的，但从长远来看，可能会成为一个问题，因为旧代码可能会限制你的升级选项，因为它变得过时且与新版本的 Unity 或第三方库不兼容。
 
 +   **轻微的性能损耗**：因为你在对象之间重定向调用，可能会有轻微的性能损失。
 
-从经验来看，将代码库从一个Unity版本迁移到另一个版本可能相当耗时。所以，如果你最终在电脑上安装了多个Unity版本，以便维护那些升级成本过高的遗留代码，请不要感到惊讶。
+从经验来看，将代码库从一个 Unity 版本迁移到另一个版本可能相当耗时。所以，如果你最终在电脑上安装了多个 Unity 版本，以便维护那些升级成本过高的遗留代码，请不要感到惊讶。
 
 # 用例示例
 
@@ -100,19 +100,78 @@
 
 当然，我们可以单独调用名字和姓氏的`GET`函数，然后在客户端将它们连接起来，但这意味着我们可能需要在需要获取用户全名的地方都这样做。换句话说，我们失去了对全名返回方式的一致性和本地化控制。您可以想象，如果我们需要适配更复杂的东西，比如游戏中的货币交易系统，这可能会变得多么危险：
 
-[PRE0]
+```cs
+public sealed class OnlinePlayer : ScriptableObject
+{
+    public string GetFirstName(int id)
+    {
+        // Lookup online database.
+        return "John"; // Retun a placeholder name.
+    }
+
+    public string GetLastName(int id)
+    {
+        // Lookup online database.
+        return "Doe"; // Return a placeholder last name.
+    }
+
+    public string GetFullName(int id)
+    {
+        // Lookup online database and get full name 
+        return "Doe Jonn";
+    }
+}
+```
 
 在`OnlinePlayer`类中还有其他一些重要的事情需要注意；它是`sealed`，这意味着我们不能将其用作基类。因此，我们不能直接扩展它，所以适应它是我们的唯一选择：
 
 1.  让我们构建一个适配器类来修复我们`GetFullName()`函数的问题：
 
-[PRE1]
+```cs
+using UnityEngine;
+
+public class OnlinePlayerObjectAdapter : ScriptableObject
+{
+    public string GetFullName(OnlinePlayer onlinePlayer, int userId)
+    {
+        return onlinePlayer.GetFirstName(userId) + " " + onlinePlayer.GetLastName(userId);
+    }
+}
+```
 
 如您所见，`OnlinePlayerObjectAdapter`类接收一个`OnlinePlayer`类的实例，并包装`GetFullName()`方法，因此返回预期的全名格式。因此，我们并没有修改或扩展被适配的类的行为，而只是调整它以满足客户端的期望。
 
 1.  让我们实现一个`Client`类来测试我们的实现：
 
-[PRE2]
+```cs
+using UnityEngine;
+
+public class Client : MonoBehaviour
+{
+    private OnlinePlayer m_OnlinePlayer;
+    private OnlinePlayerObjectAdapter m_OnlinePlayerAdapter;
+
+    void Update()
+    {
+        if (Input.GetKeyDown(KeyCode.U))
+        {
+            m_OnlinePlayer = ScriptableObject.CreateInstance<OnlinePlayer>();
+            m_OnlinePlayerAdapter = ScriptableObject.CreateInstance<OnlinePlayerObjectAdapter>();
+
+            string FirstName = m_OnlinePlayer.GetFirstName(79);
+            string LastName = m_OnlinePlayer.GetLastName(79);
+
+            string FullNameLastFirst = m_OnlinePlayer.GetFullName(79);
+            string FullNameFirstLast = m_OnlinePlayerAdapter.GetFullName(m_OnlinePlayer, 79);
+
+            Debug.Log(FirstName);
+            Debug.Log(LastName);
+            Debug.Log(FullNameLastFirst);
+            Debug.Log(FullNameFirstLast);
+        }
+    }
+}
+```
 
 现在我们有了适配器，我们可以访问`OnlinePlayer`类中`GetFullName()`函数的原始实现，以及它的一个适配版本。这种方法为我们提供了很多灵活性，风险最小，因为我们没有修改任何东西，而只是进行了适配。
 
@@ -122,19 +181,61 @@
 
 在本节中，我们将在我们的`OnlinePlayer`类中修改一个细节；我们将移除密封修饰符，因为我们希望能够继承`OnlinePlayer`类。所以，让我们假装它从一开始就不在那里：
 
-[PRE3]
+```cs
+public class OnlinePlayer : ScriptableObject
+{
+    public string GetFirstName(int id)
+    {
+        // Lookup online database.
+        return "John"; // Retun a placeholder name.
+    }
+
+    public string GetLastName(int id)
+    {
+        // Lookup online database.
+        return "Doe"; // Return a placeholder last name.
+    }
+
+    public string GetFullName(int id)
+    {
+        // Lookup online database and pull the full name in this sequence [Last Name & First Name].
+        return "Doe Jonn";
+    }
+}
+```
 
 要实现类适配器方法，让我们遵循以下步骤：
 
 1.  让我们先为我们的客户端实现一个目标接口；我们将称之为`IOnlinePlayer`：
 
-[PRE4]
+```cs
+public interface iOnlinePlayer
+{
+    string GetFirstName(int userID);
+    string GetLastName(int userID);
+    string GetFullNameLastFirst(int userID);
+    string GetFullNameFirstLast(int userID);
+}
+```
 
 你应该注意到，我们通过添加一个新的接口来适配`OnlinePlayer`类，这将暴露我们正在改进的类的新的功能。这种方法是灵活的，正如你将在以下步骤中看到的那样。
 
 1.  现在，在我们的适配器类中，我们将实现`IOnliePlayer`接口：
 
-[PRE5]
+```cs
+public class OnlinePlayerClassAdapter : OnlinePlayer, iOnlinePlayer
+{
+    public string GetFullNameLastFirst(int userId)
+    {
+        return GetFullName(userId);
+    }
+
+    public string GetFullNameFirstLast(int userId)
+    {
+        return GetFirstName(userId) + " " + GetLastName(userId);
+    }
+}
+```
 
 它看起来很简单，但有很多事情在进行中。让我们尝试解开这个谜团：
 
@@ -152,7 +253,33 @@
 
 1.  让我们看看我们如何利用`Client`类来利用这一点：
 
-[PRE6]
+```cs
+using UnityEngine;
+
+public class Client : MonoBehaviour
+{
+    private iOnlinePlayer m_OnlinePlayer;
+
+    void Update()
+    {
+        if (Input.GetKeyDown(KeyCode.U))
+        {
+            m_OnlinePlayer = ScriptableObject.CreateInstance<OnlinePlayerClassAdapter>();
+
+            string FirstName = m_OnlinePlayer.GetFirstName(79);
+            string LastName = m_OnlinePlayer.GetLastName(79);
+
+            string FullNameLastFirst = m_OnlinePlayer.GetFullNameLastFirst(79);
+            string FullNameFirstLast= m_OnlinePlayer.GetFullNameFirstLast(79);
+
+            Debug.Log(FirstName);
+            Debug.Log(LastName);
+            Debug.Log(FullNameLastFirst);
+            Debug.Log(FullNameFirstLast);
+        }
+    }
+}
+```
 
 我们将客户端与适配类解耦，因为我们只需要在`m_OnlinePlayer`成员变量的赋值过程中将其指向适配器。对于客户端来说，与适配的`OnlinePlayer`类的交互相对透明，并且与之前的实现保持一致。
 
@@ -166,8 +293,8 @@
 
 # 练习
 
-在本章中，我们实现了适配器模式的一个简单用例，但其投资回报在于将遗留代码适应到新的环境中。作为一个练习，我建议检查你的Unity项目，寻找可以适配到另一个项目中而不需要修改的组件或系统。
+在本章中，我们实现了适配器模式的一个简单用例，但其投资回报在于将遗留代码适应到新的环境中。作为一个练习，我建议检查你的 Unity 项目，寻找可以适配到另一个项目中而不需要修改的组件或系统。
 
 # 进一步阅读
 
-+   *《游戏编程模式》* by Robert Nystrom: [http://gameprogrammingpatterns.com](http://gameprogrammingpatterns.com/)
++   *《游戏编程模式》* by Robert Nystrom: [`gameprogrammingpatterns.com`](http://gameprogrammingpatterns.com/)

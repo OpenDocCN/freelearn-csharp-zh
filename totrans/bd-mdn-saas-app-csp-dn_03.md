@@ -1,20 +1,20 @@
 # 3
 
-# 什么是多租户，为什么它在SaaS应用程序中很重要？
+# 什么是多租户，为什么它在 SaaS 应用程序中很重要？
 
 多租户已成为现代**软件即服务**（**SaaS**）应用程序中的关键架构模式，使提供商能够从他们软件的单个实例为多个客户（租户）提供服务。
 
-本章将深入探讨构建SaaS应用程序的这部分非常重要的内容——称为*多租户*——其中多个租户可以使用部署应用程序的*同一实例*，同时仍然保持他们的数据私密和隔离。
+本章将深入探讨构建 SaaS 应用程序的这部分非常重要的内容——称为*多租户*——其中多个租户可以使用部署应用程序的*同一实例*，同时仍然保持他们的数据私密和隔离。
 
-在多租户系统中，SaaS应用程序的多个客户可以使用应用程序的同一实例，并且也可以选择使用相同的数据库，但他们的数据是隔离的，这样其他租户就无法看到数据——除非它们被明确共享。这显然引发了许多关于安全和数据隐私的问题。对于正在构建多租户SaaS应用程序的公司来说，确保任何客户只能看到自己的数据，永远看不到任何其他人的数据，这一点至关重要！
+在多租户系统中，SaaS 应用程序的多个客户可以使用应用程序的同一实例，并且也可以选择使用相同的数据库，但他们的数据是隔离的，这样其他租户就无法看到数据——除非它们被明确共享。这显然引发了许多关于安全和数据隐私的问题。对于正在构建多租户 SaaS 应用程序的公司来说，确保任何客户只能看到自己的数据，永远看不到任何其他人的数据，这一点至关重要！
 
-可以利用许多策略、模式、实用工具和技术来确保单个租户的数据保持隔离，但第一道防线始终是对底层概念有良好的技术理解。当应用程序正在构建时，开发团队理解这一点尤为重要。对于任何希望扩展的SaaS应用程序（几乎所有应用程序都会这样做）来说，多租户是必不可少的！
+可以利用许多策略、模式、实用工具和技术来确保单个租户的数据保持隔离，但第一道防线始终是对底层概念有良好的技术理解。当应用程序正在构建时，开发团队理解这一点尤为重要。对于任何希望扩展的 SaaS 应用程序（几乎所有应用程序都会这样做）来说，多租户是必不可少的！
 
-SaaS多租户应用程序中的数据隐私和安全至关重要。很难想象一个多租户SaaS应用程序的实例，它不需要至少保留一些租户和用户的数据保持私密。因此，在构建SaaS应用程序时，强大的数据安全和数据隔离是关键考虑因素。
+SaaS 多租户应用程序中的数据隐私和安全至关重要。很难想象一个多租户 SaaS 应用程序的实例，它不需要至少保留一些租户和用户的数据保持私密。因此，在构建 SaaS 应用程序时，强大的数据安全和数据隔离是关键考虑因素。
 
 在开始开发新应用程序的周期时，在项目一开始就将强大的安全性构建到应用程序中要比在以后追加上去容易得多！从一开始就正确地实现安全和隔离也要安全得多——一旦不可避免的应用程序蔓延和功能蔓延开始，就相当难以说服自己一切真的像应该的那样被严格锁定。
 
-我们在本书中较早地介绍这个主题，以便在我们构建演示应用程序时，您将对多租户及其对未来设计选择的影响有一个扎实的理解。我强烈建议您在构建SaaS应用程序时采取相同的方法，在项目开始时花时间制定多租户策略和将出现的安全考虑。
+我们在本书中较早地介绍这个主题，以便在我们构建演示应用程序时，您将对多租户及其对未来设计选择的影响有一个扎实的理解。我强烈建议您在构建 SaaS 应用程序时采取相同的方法，在项目开始时花时间制定多租户策略和将出现的安全考虑。
 
 在本章中，我们将涵盖以下主要内容：
 
@@ -26,23 +26,23 @@ SaaS多租户应用程序中的数据隐私和安全至关重要。很难想象�
 
 +   讨论安全考虑因素
 
-到本章结束时，您将很好地理解多租户、多租户应用以及在工作于SaaS和特别是多租户软件应用时可能出现的具体安全考虑因素。
+到本章结束时，您将很好地理解多租户、多租户应用以及在工作于 SaaS 和特别是多租户软件应用时可能出现的具体安全考虑因素。
 
 # 技术要求
 
-本章的所有代码都可以在[https://github.com/PacktPublishing/Building-Modern-SaaS-Applications-with-C-and-.NET/tree/main/Chapter-3](https://github.com/PacktPublishing/Building-Modern-SaaS-Applications-with-C-and-.NET/tree/main/Chapter-3)找到。
+本章的所有代码都可以在[`github.com/PacktPublishing/Building-Modern-SaaS-Applications-with-C-and-.NET/tree/main/Chapter-3`](https://github.com/PacktPublishing/Building-Modern-SaaS-Applications-with-C-and-.NET/tree/main/Chapter-3)找到。
 
 # 什么是多租户？
 
-多租户是一种在SaaS应用中常用的软件架构模式，其中单个应用实例为多个客户群体或组织（称为租户）提供服务。每个租户共享相同的基础基础设施和资源，如服务器、数据库和应用逻辑，但保持其自己的独立数据和配置。这种方法可以实现资源使用优化、维护流程简化以及运营成本降低。在多租户架构中的主要挑战是确保每个租户的数据隔离、安全和性能，同时提供定制和可扩展性。本质上，多租户使SaaS提供商能够通过共享应用实例向多样化的客户提供经济高效、安全且可定制的解决方案。
+多租户是一种在 SaaS 应用中常用的软件架构模式，其中单个应用实例为多个客户群体或组织（称为租户）提供服务。每个租户共享相同的基础基础设施和资源，如服务器、数据库和应用逻辑，但保持其自己的独立数据和配置。这种方法可以实现资源使用优化、维护流程简化以及运营成本降低。在多租户架构中的主要挑战是确保每个租户的数据隔离、安全和性能，同时提供定制和可扩展性。本质上，多租户使 SaaS 提供商能够通过共享应用实例向多样化的客户提供经济高效、安全且可定制的解决方案。
 
 ## 区分客户、租户和用户
 
 当谈论多租户时，区分相关但不同的概念是否重要：
 
-+   **客户**: 客户指的是购买或订阅软件产品或服务的组织或个人。在SaaS应用的情况下，客户可能被表示为一个或多个租户，每个客户群体都可以访问共享应用实例中的自己的独立环境。术语“客户”通常强调使用软件产品或服务的商业关系和财务方面。
++   **客户**: 客户指的是购买或订阅软件产品或服务的组织或个人。在 SaaS 应用的情况下，客户可能被表示为一个或多个租户，每个客户群体都可以访问共享应用实例中的自己的独立环境。术语“客户”通常强调使用软件产品或服务的商业关系和财务方面。
 
-+   **租户**: 租户代表使用多租户架构中共享的SaaS应用实例的独立组织、公司或群体。每个租户都有其自己的独立数据、配置和定制，同时与其他租户共享相同的软件基础设施和资源。多租户系统的一个关键方面是每个租户都可以有多个与其关联的用户，从而在共享的应用实例中实现个人访问和个性化体验。
++   **租户**: 租户代表使用多租户架构中共享的 SaaS 应用实例的独立组织、公司或群体。每个租户都有其自己的独立数据、配置和定制，同时与其他租户共享相同的软件基础设施和资源。多租户系统的一个关键方面是每个租户都可以有多个与其关联的用户，从而在共享的应用实例中实现个人访问和个性化体验。
 
 +   **用户**：用户是与软件系统或应用程序交互的个体人员，通常具有独特的登录凭证和个性化设置。用户属于特定的租户、组织或组，他们的操作和系统内的访问可以通过基于角色的权限或访问控制进行管理。用户代表实际使用软件的个人，在应用程序内执行各种任务和活动。
 
@@ -68,9 +68,9 @@ SaaS多租户应用程序中的数据隐私和安全至关重要。很难想象�
 
 维护、支持、升级和定制此类应用程序所需的资源非常高，这意味着最终用户的成本也很高，通常会将您的客户群限制在企业用户。如果您的最终目标是吸引非企业客户，这种单租户方法很可能不会成功。
 
-这也在一定程度上拉伸了SaaS的定义。如果每个客户只是获得一个独特的软件安装，尽管是在云中，那么它就与传统软件交付方式——带有唯一密钥的CD——非常接近了！
+这也在一定程度上拉伸了 SaaS 的定义。如果每个客户只是获得一个独特的软件安装，尽管是在云中，那么它就与传统软件交付方式——带有唯一密钥的 CD——非常接近了！
 
-在SaaS应用程序中，单租户模式实际上仅适用于非常小的一部分用例。对于本书，我们将不再进一步考虑这一点，除了提到在技术上可以构建一个不使用多租户架构的SaaS应用程序！
+在 SaaS 应用程序中，单租户模式实际上仅适用于非常小的一部分用例。对于本书，我们将不再进一步考虑这一点，除了提到在技术上可以构建一个不使用多租户架构的 SaaS 应用程序！
 
 ## 多租户的优缺点
 
@@ -82,7 +82,7 @@ SaaS多租户应用程序中的数据隐私和安全至关重要。很难想象�
 
 +   **易于更新**：由于应用程序只有一个实例被多个租户访问，因此只需进行一次更新，就可以让所有租户的用户都升级到最新和最好的版本。请注意，如果更复杂的话，也可以在单租户模式下使用**持续部署**（**CD**）**管道**来配置这一点。
 
-+   **可扩展性**：使用多租户架构的SaaS应用程序通常会随着租户和用户数量的增加而非常容易扩展。假设使用云提供商，这可以在开发团队方面几乎毫不费力地发生。可以将云服务配置为，随着用户基础的不断增长，系统面临更多需求时，自动部署更多资源。
++   **可扩展性**：使用多租户架构的 SaaS 应用程序通常会随着租户和用户数量的增加而非常容易扩展。假设使用云提供商，这可以在开发团队方面几乎毫不费力地发生。可以将云服务配置为，随着用户基础的不断增长，系统面临更多需求时，自动部署更多资源。
 
 然而，并非全是优点——也有一些缺点也应当考虑：
 
@@ -90,7 +90,7 @@ SaaS多租户应用程序中的数据隐私和安全至关重要。很难想象�
 
 +   **增加的安全要求**：多个租户共享单个应用程序实例的事实需要采取更加彻底的用户安全方法。如果他们的用户私数据通过应用程序泄露给另一个用户，对业务来说通常是一个绝对的灾难场景，如果那个用户属于不同的租户组织，那么情况更是如此。
 
-+   **停机是灾难**：如果多租户SaaS系统因任何原因而停机，那么通常，每个客户都将无法访问应用程序。这显然使得减少停机时间变得绝对关键。
++   **停机是灾难**：如果多租户 SaaS 系统因任何原因而停机，那么通常，每个客户都将无法访问应用程序。这显然使得减少停机时间变得绝对关键。
 
 +   **嘈杂的邻居**：鉴于每个租户共享一个应用程序，因此他们也在共享资源，例如集群的计算时间或应用程序部署的服务器。一个特别计算密集型的用户可能会对系统中的其他每个用户产生连锁反应。
 
@@ -102,9 +102,9 @@ SaaS多租户应用程序中的数据隐私和安全至关重要。很难想象�
 
 # 多租户应用程序的数据存储选项
 
-在任何应用程序中，数据库通常是构建其余应用程序的基础。在选择和设计数据库时所做的决策将对数据访问/API层产生重大影响，并可能对用户界面产生一定的影响。
+在任何应用程序中，数据库通常是构建其余应用程序的基础。在选择和设计数据库时所做的决策将对数据访问/API 层产生重大影响，并可能对用户界面产生一定的影响。
 
-此外，应用程序中存储的数据将代表客户的业务信息。通常，这些信息对他们来说极其宝贵，并且通过将其托付给你——作为一个在SaaS应用程序上工作的开发者——他们向你展示了显著的信任，相信你能安全地保管这个宝贵的资产。支撑SaaS应用程序的数据库应该像银行保险库一样，让客户愿意将他们的数据存入其中！
+此外，应用程序中存储的数据将代表客户的业务信息。通常，这些信息对他们来说极其宝贵，并且通过将其托付给你——作为一个在 SaaS 应用程序上工作的开发者——他们向你展示了显著的信任，相信你能安全地保管这个宝贵的资产。支撑 SaaS 应用程序的数据库应该像银行保险库一样，让客户愿意将他们的数据存入其中！
 
 因此，在数据库设计上做出正确的选择对于整个应用程序的开发至关重要，同样对于应用程序的租户和单个用户也是如此。
 
@@ -128,7 +128,7 @@ SaaS多租户应用程序中的数据隐私和安全至关重要。很难想象�
 
 持续维护的一个非常重要的方面是监控租户的使用情况。“80-20”原则很可能会适用，你需要知道哪些租户是最有利可图的……以及哪些是最有问题的！
 
-你需要考虑，一些租户可能对可用性的要求比其他租户更高。你能否支持一个要求99.99%正常运行时间的租户？并且你是否理解提供这一水平服务所涉及的成本和技术权衡？
+你需要考虑，一些租户可能对可用性的要求比其他租户更高。你能否支持一个要求 99.99%正常运行时间的租户？并且你是否理解提供这一水平服务所涉及的成本和技术权衡？
 
 如果在项目生命周期的早期没有考虑，支持和维护可能会迅速变成一个技术和财务上的噩梦。
 
@@ -136,7 +136,7 @@ SaaS多租户应用程序中的数据隐私和安全至关重要。很难想象�
 
 没有任何应用程序是带着十亿用户启动的——它们都是从一个人开始的！
 
-在规划SaaS应用程序时，你需要至少对短期、中期和长期预期运营的规模有一个大致的了解。有了这个理解，你可以做出适合从启动日到平台成熟的个人用户和租户的明智决策。
+在规划 SaaS 应用程序时，你需要至少对短期、中期和长期预期运营的规模有一个大致的了解。有了这个理解，你可以做出适合从启动日到平台成熟的个人用户和租户的明智决策。
 
 在第一天就浪费精力和资源去为十亿用户构建是没有意义的。同样，如果没有适当的计划来服务这么多的用户，那么达到十亿用户的目标也是不可能的。
 
@@ -162,11 +162,11 @@ SaaS多租户应用程序中的数据隐私和安全至关重要。很难想象�
 
 正如我们之前讨论的，确保与一个租户相关的数据对其他租户以及这些租户中的每个用户都是不可见的，这一点至关重要。单个租户的数据必须被隔离。有几种方法可以实现这一点：
 
-+   可以按一个容器一个租户的方式使用容器。这可以是一个非常有效的系统租户隔离方法，但如果应用程序变成下一个Facebook，那么就会存在扩展问题。
++   可以按一个容器一个租户的方式使用容器。这可以是一个非常有效的系统租户隔离方法，但如果应用程序变成下一个 Facebook，那么就会存在扩展问题。
 
 +   在同一数据库中可以为每个租户使用单独的表。这提供了很好的保证，确保数据不会“泄露”，但再次强调，这不会高效地扩展到数百个租户和数百万用户。
 
-+   基于租户ID的隔离，其中数据库中的数据都在一个表中，有一个`tenant_id`列。这扩展得非常好，但可能被认为比之前的选择不太安全。
++   基于租户 ID 的隔离，其中数据库中的数据都在一个表中，有一个`tenant_id`列。这扩展得非常好，但可能被认为比之前的选择不太安全。
 
 对于这个问题，没有“一刀切”的方法。所需的隔离级别将取决于客户类型和存储的数据类型。这应该在项目开始时仔细考虑，因为项目生命周期后期更改数据隔离的方法可能极具挑战性。
 
@@ -202,15 +202,15 @@ SaaS多租户应用程序中的数据隐私和安全至关重要。很难想象�
 
 企业客户几乎永远不会容忍类似社交媒体的数据处理方法，他们总是更喜欢更安全的制度。一些企业客户甚至完全不会接受多租户系统。例如，军事或政府客户几乎肯定会认为风险太高，并坚持使用单租户解决方案。
 
-如果一个应用程序的客户主要受安全性驱动，特别是严格的数据隔离和绝对保证不会出现任何疏漏，那么最好的解决方案就是不要设计多租户应用程序，因此也不构建SaaS应用程序！鉴于这本书是关于开发SaaS应用程序的，我们将完全排除这一客户类别。然而，了解这项技术的局限性是很重要的。一个主要受绝对数据安全驱动的客户群不太可能接受通过SaaS提供的应用程序。这些用户更有可能需要在其自己的网络内部署本地解决方案，并保留用户组织对数据的完全控制。
+如果一个应用程序的客户主要受安全性驱动，特别是严格的数据隔离和绝对保证不会出现任何疏漏，那么最好的解决方案就是不要设计多租户应用程序，因此也不构建 SaaS 应用程序！鉴于这本书是关于开发 SaaS 应用程序的，我们将完全排除这一客户类别。然而，了解这项技术的局限性是很重要的。一个主要受绝对数据安全驱动的客户群不太可能接受通过 SaaS 提供的应用程序。这些用户更有可能需要在其自己的网络内部署本地解决方案，并保留用户组织对数据的完全控制。
 
-既然我们是为那些我们认为会购买SaaS应用程序的客户构建的，让我们考虑一下这些客户吧！
+既然我们是为那些我们认为会购买 SaaS 应用程序的客户构建的，让我们考虑一下这些客户吧！
 
 ## 每个租户一个数据库
 
 将一个租户的数据与另一个租户的数据完全隔离的最安全方式是将数据存储在完全独立的数据库中。这种方案在维护和更新多个数据库（每个客户一个）方面会产生相当大的开销。这种方法几乎可以保证不会发生数据泄露，但额外的开销是相当大的。使用这种方案的应用程序在扩展方面也会面临挑战，如果选择的数据库平台有按实例许可的费用，可能会导致成本螺旋上升。
 
-规模化问题确实对系统设计可容纳的租户数量设定了一个硬性上限。如果每个租户组织都拥有独特且独立的数据库，微软是无法让他们的DevOps平台工作的——因为客户数量太多，这样做根本不可行。
+规模化问题确实对系统设计可容纳的租户数量设定了一个硬性上限。如果每个租户组织都拥有独特且独立的数据库，微软是无法让他们的 DevOps 平台工作的——因为客户数量太多，这样做根本不可行。
 
 除了安全性之外，这种方案的一个其他好处是，存储在单个数据库中的数据行数将低于共享数据库，因此在数据库层可能会有轻微的性能提升。请注意，这可能在应用层中被抵消。
 
@@ -218,11 +218,11 @@ SaaS多租户应用程序中的数据隐私和安全至关重要。很难想象�
 
 ## 共享模式
 
-这是最常见的解决方案，用于大多数日常使用中可能遇到的常用SaaS应用程序。甚至一些可能敏感的应用程序，如托管财务和税务信息的系统，也可能使用共享模式。
+这是最常见的解决方案，用于大多数日常使用中可能遇到的常用 SaaS 应用程序。甚至一些可能敏感的应用程序，如托管财务和税务信息的系统，也可能使用共享模式。
 
 在这种制度下，使用单个数据库，其中包含来自多个租户的数据表。数据通过数据库中的某种形式的标识来保护，防止共享。
 
-使用这种方案显著提高了最初使用SaaS范式所获得的益处。如今，有许多被广泛理解和使用的方案可以在这种方案下确保数据安全。也可能有人提出，只有一个数据库和一个模式需要管理，实际上使得系统更容易得到保护。
+使用这种方案显著提高了最初使用 SaaS 范式所获得的益处。如今，有许多被广泛理解和使用的方案可以在这种方案下确保数据安全。也可能有人提出，只有一个数据库和一个模式需要管理，实际上使得系统更容易得到保护。
 
 ## 每个租户一个模式
 
@@ -250,47 +250,122 @@ SaaS多租户应用程序中的数据隐私和安全至关重要。很难想象�
 
 +   CloudSphere，一个价格敏感的客户，选择更便宜的共享数据库方案
 
-+   DataStream，也将使用共享数据库并与CloudSphere共享
++   DataStream，也将使用共享数据库并与 CloudSphere 共享
 
 通过这四个示例组织，我们可以展示多租户数据库是如何工作的。这个示例不会详尽无遗，但将提供一个坚实的基础理解。
 
-在本节中，我们将基于我们在上一章中创建的`GoodHabits`数据库和API项目进行构建。
+在本节中，我们将基于我们在上一章中创建的`GoodHabits`数据库和 API 项目进行构建。
 
 ### 添加所需的包
 
-我们只需要为这一章的`HabitService`项目添加一个nuget包。在终端中导航到项目文件夹，并输入以下内容：
+我们只需要为这一章的`HabitService`项目添加一个 nuget 包。在终端中导航到项目文件夹，并输入以下内容：
 
-[PRE0]
+```cs
+dotnet add package Microsoft.AspNetCore.Mvc.NewtonsoftJson;
+```
 
 ### 修改实体
 
 数据库中的许多表将需要一个标识数据所有者（即租户）的列！为了便于此操作，我们可以先创建一个名为`IHasTenant`的接口。使用以下命令创建文件：
 
-[PRE1]
+```cs
+cd GoodHabits.Database; \
+mkdir Interfaces; \
+cd Interfaces; \
+touch IHasTenant.cs; \
+cd ..;
+```
 
 然后，将以下代码复制到文件中：
 
-[PRE2]
+```cs
+namespace GoodHabits.Database;
+public interface IHasTenant
+{ public string TenantName { get; set; } }
+```
 
-你会记得我们之前创建了一个名为`Habit`的实体类，该类定义了数据库的数据结构。这个实体将需要一个`TenantName`值，因此它应该实现`IHasTenant`接口。修改我们在[*第二章*](B19343_02.xhtml#_idTextAnchor056)中创建的类，使其看起来像这样：
+你会记得我们之前创建了一个名为`Habit`的实体类，该类定义了数据库的数据结构。这个实体将需要一个`TenantName`值，因此它应该实现`IHasTenant`接口。修改我们在*第二章*中创建的类，使其看起来像这样：
 
-[PRE3]
+```cs
+namespace GoodHabits.Database.Entities;
+public class Habit : IHasTenant
+{
+  public int Id { get; set; }
+  public string Name { get; set; } = default!;
+  public string Description { get; set; } = default!;
+  public string TenantName { get; set; } = default!;
+}
+```
 
 ### 创建租户配置
 
 在实际系统中，租户的配置通常会存储在某个单独的数据库中——例如客户端门户应用程序等。然而，为了演示目的，我们只需使用`appsettings.json`文件。在`Goodhabits.HabitService`项目的`appsettings.json`文件中添加以下内容：
 
-[PRE4]
+```cs
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  },
+  "AllowedHosts": "*",
+  "TenantSettings": {
+    "DefaultConnectionString": "Data
+      Source=sqlserver;Initial
+      Catalog=GoodHabitsDatabase;
+      User Id=sa;Password=Password1;
+      MultipleActiveResultSets=True;
+      TrustServerCertificate=True;",
+    "Tenants": [
+      {
+        "TenantName": "AscendTech",
+        "ConnectionString": "Data Source=sqlserver;
+          Initial Catalog=AscendTechGoodHabitsDatabase;
+          User Id=sa;Password=Password1;
+          MultipleActiveResultSets=True;
+          TrustServerCertificate=True;"
+      },
+      {
+        "TenantName": "Bluewave",
+        "ConnectionString": "Data Source=sqlserver;
+        Initial Catalog=BluewaveGoodHabitsDatabase;
+        User Id=sa;Password=Password1;
+        MultipleActiveResultSets=True;
+        TrustServerCertificate=True;"
+      },
+      {
+        "TenantName": "CloudSphere"
+      },
+      {
+        "TenantName": "Datastream"
+      }
+    ]
+  }
+}
+```
 
 上述配置已定义了四个租户：
 
-+   前两个，AscendTech和Bluewave，希望有完全隔离的数据库，并且已经指定了仅针对它们的唯一连接字符串
++   前两个，AscendTech 和 Bluewave，希望有完全隔离的数据库，并且已经指定了仅针对它们的唯一连接字符串
 
-+   后两个，CloudSphere和Datastream，没有唯一的连接字符串，因此它们被认为是乐意使用共享数据库的
++   后两个，CloudSphere 和 Datastream，没有唯一的连接字符串，因此它们被认为是乐意使用共享数据库的
 
 在`GoodHabits.Database`项目中，添加一个与之前添加到`appsettings.json`中的配置结构相匹配的类。该配置将在启动时加载到这个类中。将类命名为`TenantSettings`，然后粘贴以下内容：
 
-[PRE5]
+```cs
+namespace GoodHabits.Database;
+public class TenantSettings
+{
+    public string? DefaultConnectionString { get; set; }
+    public List<Tenant>? Tenants { get; set; }
+}
+public class Tenant
+{
+    public string? TenantName { get; set; }
+    public string? ConnectionString { get; set; }
+}
+```
 
 ### 创建租户服务
 
@@ -298,25 +373,141 @@ SaaS多租户应用程序中的数据隐私和安全至关重要。很难想象�
 
 从`GoodHabits.Database`项目开始，添加一个名为`ITenantService`的接口，然后添加以下代码：
 
-[PRE6]
+```cs
+namespace GoodHabits.Database;
+public interface ITenantService
+{
+    public string GetConnectionString();
+    public Tenant GetTenant();
+}
+```
 
-接下来，我们需要实现这个服务。这是在HabitService项目中完成的，应该看起来像这样。请务必确认您是将此添加到HabitService项目而不是Database项目中：
+接下来，我们需要实现这个服务。这是在 HabitService 项目中完成的，应该看起来像这样。请务必确认您是将此添加到 HabitService 项目而不是 Database 项目中：
 
-[PRE7]
+```cs
+using Microsoft.Extensions.Options;
+using GoodHabits.Database;
+namespace GoodHabits.HabitService;
+public class TenantService : ITenantService
+{
+    private readonly TenantSettings _tenantSettings;
+    private HttpContext _httpContext;
+    private Tenant _tenant;
+    public TenantService(IOptions<TenantSettings>
+      tenantSettings, IHttpContextAccessor contextAccessor)
+    {
+        _tenantSettings = tenantSettings.Value;
+        _httpContext = contextAccessor.HttpContext!;
+        if (_httpContext != null)
+        {
+            if (_httpContext.Request.Headers.TryGetValue(
+              "tenant", out var tenantId))
+            {
+                SetTenant(tenantId!);
+            }
+            else
+            {
+                throw new Exception("Invalid Tenant!");
+            }
+        }
+    }
+    private void SetTenant(string tenantId)
+    {
+        _tenant = _tenantSettings!.Tenants.Where(a =>
+          a.TenantName == tenantId).FirstOrDefault();
+        if (_tenant == null) throw new Exception("Invalid
+          Tenant!");
+        if (string.IsNullOrEmpty(_tenant.ConnectionString))
+          SetDefaultConnectionStringToCurrentTenant();
+    }
+    private void
+      SetDefaultConnectionStringToCurrentTenant() =>
+        _tenant.ConnectionString =
+          _tenantSettings.DefaultConnectionString;
+    public string GetConnectionString() =>
+      _tenant?.ConnectionString!;
+    public Tenant GetTenant() => _tenant;
+}
+```
 
-上述代码块的主要功能是拦截传入的HTTP请求，检查头部中是否有名为租户的条目，并将该名称与已知的租户进行匹配。
+上述代码块的主要功能是拦截传入的 HTTP 请求，检查头部中是否有名为租户的条目，并将该名称与已知的租户进行匹配。
 
-### 修改SeedData和AppDbContext类
+### 修改 SeedData 和 AppDbContext 类
 
-你会记得在[*第二章*](B19343_02.xhtml#_idTextAnchor056)中，我们添加了一些种子数据。由于我们现在要求数据库中必须有租户名称，因此我们必须更新种子数据。复制以下内容，或者只需添加`TenantName`：
+你会记得在*第二章*中，我们添加了一些种子数据。由于我们现在要求数据库中必须有租户名称，因此我们必须更新种子数据。复制以下内容，或者只需添加`TenantName`：
 
-[PRE8]
+```cs
+using GoodHabits.Database.Entities;
+using Microsoft.EntityFrameworkCore;
+public static class SeedData
+{
+    public static void Seed(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<Habit>().HasData(
+            new Habit { Id = 100, Name = "Learn French",
+            Description = "Become a francophone",
+            TenantName = "CloudSphere" },
+            new Habit { Id = 101, Name = "Run a marathon",
+              Description = "Get really fit",
+              TenantName = "CloudSphere"  },
+            new Habit { Id = 102, Name = "Write every day",
+              Description = "Finish your book project",
+              TenantName = "CloudSphere"  }
+        );
+    }
+}
+```
 
 之前创建的`GoodHabitsDbContext`类有一个硬编码的单个数据库连接字符串。我们将替换它并使用之前配置中定义的多个数据库连接。
 
 完全用以下内容替换`GoodHabitsDbContext`类：
 
-[PRE9]
+```cs
+using Microsoft.EntityFrameworkCore;
+using GoodHabits.Database.Entities;
+namespace GoodHabits.Database;
+public class GoodHabitsDbContext : DbContext
+{
+  private readonly ITenantService _tenantService;
+  public GoodHabitsDbContext(DbContextOptions options,
+    ITenantService service) : base(options) =>
+    _tenantService = service;
+  public string TenantName { get => _tenantService
+    .GetTenant()?.TenantName ?? String.Empty; }
+  public DbSet<Habit>? Habits { get; set; }
+    protected override void
+      OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+    {
+        var tenantConnectionString =
+          _tenantService.GetConnectionString();
+        if (!string.IsNullOrEmpty(tenantConnectionString))
+        {
+            optionsBuilder.UseSqlServer(_tenantService
+              .GetConnectionString());
+        }
+    }
+    protected override void OnModelCreating(ModelBuilder
+      modelBuilder)
+  {
+    base.OnModelCreating(modelBuilder);
+    modelBuilder.Entity<Habit>().HasQueryFilter(a =>
+      a.TenantName == TenantName);
+    SeedData.Seed(modelBuilder);
+    }
+  public override async Task<int>
+    SaveChangesAsync(CancellationToken cancellationToken =
+    new CancellationToken())
+  {
+    ChangeTracker.Entries<IHasTenant>()
+        .Where(entry => entry.State == EntityState.Added ||
+          entry.State == EntityState.Modified)
+        .ToList()
+        .ForEach(entry => entry.Entity.TenantName =
+          TenantName);
+    return await base.SaveChangesAsync(cancellationToken);
+  }
+}
+```
 
 前面代码的主要变化是现在连接字符串是从我们之前创建的`TenantService`类中读取的。这更加动态，允许我们在构建应用程序时即时为新的租户创建新的数据库。这也比在源代码中硬编码连接字符串并将其提交到存储库更加安全。
 
@@ -326,49 +517,190 @@ SaaS多租户应用程序中的数据隐私和安全至关重要。很难想象�
 
 ### 编写服务层
 
-我们现在已经配置了`Habit`服务以及数据库以多租户方式工作，强制在每个请求中包含租户ID。这是提供良好安全和租户之间分离的良好开端。
+我们现在已经配置了`Habit`服务以及数据库以多租户方式工作，强制在每个请求中包含租户 ID。这是提供良好安全和租户之间分离的良好开端。
 
-接下来，我们将通过连接数据库和服务，并对Habit服务进行一些测试调用，展示如何强制执行租户。
+接下来，我们将通过连接数据库和服务，并对 Habit 服务进行一些测试调用，展示如何强制执行租户。
 
 我们将首先编写服务层。在`HabitService`文件夹中打开一个终端并运行以下脚本：
 
-[PRE10]
+```cs
+touch IHabitService.cs; \
+touch HabitService.cs;
+```
 
 使用以下内容填充接口：
 
-[PRE11]
+```cs
+using GoodHabits.Database.Entities;
+namespace GoodHabits.HabitService;
+public interface IHabitService
+{
+        Task<Habit> Create(string name, string
+          description);
+        Task<Habit> GetById(int id);
+        Task<IReadOnlyList<Habit>> GetAll();
+}
+```
 
 然后，使用以下内容填充该类：
 
-[PRE12]
+```cs
+using GoodHabits.Database;
+using GoodHabits.Database.Entities;
+using Microsoft.EntityFrameworkCore;
+namespace GoodHabits.HabitService;
+public class HabitService : IHabitService
+{
+    private readonly GoodHabitsDbContext _dbContext;
+    public HabitService(GoodHabitsDbContext dbContext) =>
+      _dbContext = dbContext;
+    public async Task<Habit> Create(string name,
+      string description)
+    {
+        var habit = _dbContext.Habits!.Add(new Habit { Name
+          = name, Description = description }).Entity;
+        await _dbContext.SaveChangesAsync();
+        return habit;
+    }
+    public async Task<IReadOnlyList<Habit>> GetAll() =>
+      await _dbContext.Habits!.ToListAsync();
+    public async Task<Habit> GetById(int id) =>   await
+      _dbContext.Habits.FindAsync(id);
+}
+```
 
 此服务只是围绕对数据库的一些调用的一些简单包装。我们可以添加更多功能，但这将有助于展示多租户在实际中的工作方式。
 
 ### 编写控制器
 
-服务创建后，我们现在将添加一个控制器，使其可以通过HTTP提供来自服务的数据。
+服务创建后，我们现在将添加一个控制器，使其可以通过 HTTP 提供来自服务的数据。
 
 在`HabitService`文件夹中运行以下脚本以设置所需的文件：
 
-[PRE13]
+```cs
+rm WeatherForecast.cs; \
+cd Controllers; \
+rm WeatherForecastController.cs; \
+touch HabitsController.cs; \
+cd ..; \
+mkdir Dtos; \
+cd Dtos; \
+touch CreateHabitDto.cs
+```
 
 然后，添加控制器的代码，如下所示：
 
-[PRE14]
+```cs
+using GoodHabits.HabitService.Dtos;
+using Microsoft.AspNetCore.Mvc;
+namespace GoodHabits.HabitService.Controllers;
+[ApiController]
+[Route("api/[controller]")]
+public class HabitsController : ControllerBase
+{
+    private readonly ILogger<HabitsController> _logger;
+    private readonly IHabitService _habitService;
+    public HabitsController(
+        ILogger<HabitsController> logger,
+        IHabitService goodHabitsService
+        )
+    {
+        _logger = logger;
+        _habitService = goodHabitsService;
+    }
+    [HttpGet("{id}")]
+    public async Task<IActionResult> GetAsync(int id) =>
+      Ok(await _habitService.GetById(id));
+    [HttpGet]
+    public async Task<IActionResult> GetAsync() => Ok(await
+      _habitService.GetAll());
+    [HttpPost]
+    public async Task<IActionResult>
+      CreateAsync(CreateHabitDto request) => Ok(await
+      _habitService.Create(request.Name,
+      request.Description));
+}
+```
 
 此控制器仅提供了两个端点，通过我们之前创建的服务层创建和读取数据库中的习惯。
 
 最后，将以下代码添加到`CreateHabitDto`文件中：
 
-[PRE15]
+```cs
+namespace GoodHabits.HabitService.Dtos;
+public class CreateHabitDto {
+    public string Name { get; set; } = default!;
+    public string Description { get; set; } = default!;
+}
+```
 
 ### 添加服务扩展
 
 现在我们可能正在处理许多数据库实例，我们需要在应用程序启动时添加创建和更新所有数据库的能力。我们将创建一个服务集合的扩展来简化这一过程。
 
-在HabitService项目中添加一个名为`ServiceCollectionExtensions`的类，然后添加以下代码：
+在 HabitService 项目中添加一个名为`ServiceCollectionExtensions`的类，然后添加以下代码：
 
-[PRE16]
+```cs
+using GoodHabits.Database;
+using Microsoft.EntityFrameworkCore;
+namespace GoodHabits.HabitService;
+public static class ServiceCollectionExtensions
+{
+    public static IServiceCollection
+      AddAndMigrateDatabases(this IServiceCollection
+      services, IConfiguration config)
+    {
+        var options = services.GetOptions
+          <TenantSettings>(nameof(TenantSettings));
+        var defaultConnectionString =
+          options.DefaultConnectionString;
+        services.AddDbContext<GoodHabitsDbContext>(m =>
+          m.UseSqlServer(e => e.MigrationsAssembly(
+          typeof(GoodHabitsDbContext).Assembly.FullName)));
+        var tenants = options.Tenants;
+        foreach (var tenant in tenants)
+        {
+            string connectionString;
+            if (string.IsNullOrEmpty(
+              tenant.ConnectionString))
+            {
+                connectionString = defaultConnectionString;
+            }
+            else
+            {
+                connectionString = tenant.ConnectionString;
+            }
+            using var scope = services
+              .BuildServiceProvider().CreateScope();
+            var dbContext =
+              scope.ServiceProvider.GetRequiredService<Good
+              HabitsDbContext>();
+            dbContext.Database.SetConnectionString(
+              connectionString);
+            if (dbContext.Database.GetMigrations()
+              .Count() > 0)
+            {
+                dbContext.Database.Migrate();
+            }
+        }
+        return services;
+    }
+    public static T GetOptions<T>(this IServiceCollection
+      services, string sectionName) where T : new()
+    {
+        using var serviceProvider =
+          services.BuildServiceProvider();
+        var configuration =
+          serviceProvider.GetRequiredService<
+          IConfiguration>();
+        var section = configuration.GetSection(
+          sectionName);
+        var options = new T();
+        section.Bind(options);
+        return options;
+    }
+}
+```
 
 从前面的代码中理解的关键点是数据库连接字符串是基于租户设置的，并且当租户登录到应用程序时，租户的数据库将根据最新的迁移进行更新。
 
@@ -378,7 +710,35 @@ SaaS多租户应用程序中的数据隐私和安全至关重要。很难想象�
 
 最后，我们需要连接所有这些新服务。这需要在 `GoodHabits.HabitService` 项目的 `Program.cs` 文件中完成。在这个文件中，粘贴以下内容：
 
-[PRE17]
+```cs
+using GoodHabits.HabitService;
+using GoodHabits.Database;
+using GoodHabits.HabitService;
+using Microsoft.OpenApi.Models;
+var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddControllers().AddNewtonsoftJson();
+builder.Services.AddSwaggerGen(c => c.SwaggerDoc("v1", new OpenApiInfo { Title = "GoodHabits.HabitService", Version = "v1" }));
+builder.Services.AddTransient<ITenantService, TenantService>();
+builder.Services.AddTransient<IHabitService, HabitService>();
+builder.Services.Configure<TenantSettings>(builder.Configuration.GetSection(nameof(TenantSettings)));
+builder.Services.AddAndMigrateDatabases(builder.Configuration);
+builder.Services.AddEndpointsApiExplorer();
+var app = builder.Build();
+if (app.Environment.IsDevelopment())
+{
+    app.UseDeveloperExceptionPage();
+    app.UseSwagger();
+    app.UseSwaggerUI(c => c.SwaggerEndpoint(
+      "/swagger/v1/swagger.json", "GoodHabits.HabitService
+      v1"));
+}
+app.UseHttpsRedirection();
+app.UseRouting();
+app.UseAuthorization();
+app.MapControllers();
+app.Run();
+```
 
 在此代码中，你可以看到我们添加了我们创建的两个新服务。我们还使用了之前创建的服务扩展并配置了 Swagger 端点。
 
@@ -388,7 +748,9 @@ SaaS多租户应用程序中的数据隐私和安全至关重要。很难想象�
 
 由于我们对数据库进行了一些更改（通过在 `Habit` 表中添加 `TenantName` 列），我们需要使用 Entity Framework 创建一个新的迁移。通过导航到数据库项目并运行以下命令来创建迁移：
 
-[PRE18]
+```cs
+dotnet-ef migrations add MultiTenant --startup-project ../GoodHabits.HabitService/GoodHabits.HabitService.csproj
+```
 
 使用 `dotnet run` 启动应用程序并检查 API 是否运行正确。
 
@@ -400,7 +762,7 @@ SaaS多租户应用程序中的数据隐私和安全至关重要。很难想象�
 
 如果一切顺利，API 将会启动，你可以在 Swagger 中查看之前可用的端点！
 
-为了测试 `HabitService`，我们将使用我们在 [*第 2 章*](B19343_02.xhtml#_idTextAnchor056) 中安装的 `ThunderClient` 扩展。
+为了测试 `HabitService`，我们将使用我们在 *第二章* 中安装的 `ThunderClient` 扩展。
 
 打开 `ThunderClient` 扩展，点击 `CloudSphere`。
 
@@ -430,25 +792,25 @@ SaaS多租户应用程序中的数据隐私和安全至关重要。很难想象�
 
 ## 可能的安全陷阱
 
-每种类型的应用程序的开发者都将面临广泛的安全问题。不幸的是，SaaS应用程序，尤其是多租户应用程序的现实是，这类应用程序的开发者必须考虑几乎所有可能的安全威胁！
+每种类型的应用程序的开发者都将面临广泛的安全问题。不幸的是，SaaS 应用程序，尤其是多租户应用程序的现实是，这类应用程序的开发者必须考虑几乎所有可能的安全威胁！
 
-SaaS应用程序通常是分层的，至少包括数据库、API和用户界面。每一层都提供了一个攻击向量。SaaS应用程序也经常托管在云服务上。与本地托管相比，在云中托管通常更安全，但必须考虑许多额外的攻击向量。最重要的是，管理员的用户账户可能会被攻破，并且远程访问管理页面。这在本地解决方案中通常不是一个大问题，因为可能完全没有远程访问。
+SaaS 应用程序通常是分层的，至少包括数据库、API 和用户界面。每一层都提供了一个攻击向量。SaaS 应用程序也经常托管在云服务上。与本地托管相比，在云中托管通常更安全，但必须考虑许多额外的攻击向量。最重要的是，管理员的用户账户可能会被攻破，并且远程访问管理页面。这在本地解决方案中通常不是一个大问题，因为可能完全没有远程访问。
 
-本节将列出作为SaaS应用程序开发者你必须考虑的一些安全考虑因素。
+本节将列出作为 SaaS 应用程序开发者你必须考虑的一些安全考虑因素。
 
 ### 资源访问管理
 
 首先，最明显的是，一个系统中资源的访问权限必须限制只授予那些有权查看这些资源的人。
 
-例如，很明显，一个租户的数据永远不应该对另一个租户的用户可见，除非有故意共享数据的情况。在开发SaaS应用程序时，重要的是要理解攻击者会针对用户界面、API以及数据库进行攻击，以获取数据访问权限。
+例如，很明显，一个租户的数据永远不应该对另一个租户的用户可见，除非有故意共享数据的情况。在开发 SaaS 应用程序时，重要的是要理解攻击者会针对用户界面、API 以及数据库进行攻击，以获取数据访问权限。
 
-攻击者还会尝试在数据“在传输中”时拦截数据。当数据从数据库移动到API，或从API移动到用户界面时，它就处于易受攻击的状态。
+攻击者还会尝试在数据“在传输中”时拦截数据。当数据从数据库移动到 API，或从 API 移动到用户界面时，它就处于易受攻击的状态。
 
 除了个人用户数据外，很可能应用程序中会有一些只有特定*角色*的用户才能访问的部分，例如管理员。
 
-任何未能控制资源访问的SaaS系统都将很快被攻破，一个因丢失客户数据而声誉受损的应用程序将很快失去客户。在这个领域的失败可能对应用程序和公司的声誉造成灾难性的影响。
+任何未能控制资源访问的 SaaS 系统都将很快被攻破，一个因丢失客户数据而声誉受损的应用程序将很快失去客户。在这个领域的失败可能对应用程序和公司的声誉造成灾难性的影响。
 
-这在SaaS应用程序中是一个非常重要的考虑因素，尤其是在多租户应用程序中，租户将共享对某些资源（如数据库）的访问权限，而这些资源的访问必须非常谨慎地管理。
+这在 SaaS 应用程序中是一个非常重要的考虑因素，尤其是在多租户应用程序中，租户将共享对某些资源（如数据库）的访问权限，而这些资源的访问必须非常谨慎地管理。
 
 ### 数据泄露
 
@@ -458,7 +820,7 @@ SaaS应用程序通常是分层的，至少包括数据库、API和用户界面�
 
 +   一个用户界面将信用卡详情以纯文本形式从客户端传输到服务器，这允许进行**中间人攻击**（**MitM**），从而从所有用户那里收集信用卡信息。如前所述，数据“在传输中”往往容易受到攻击。
 
-+   一个缺少认证属性的API端点，因此任何人都可以访问，无论他们是否经过认证。同样，API端点可能有一个错误的认证属性。这一点非常重要，应该采取措施自动测试API是否得到了适当的保护。
++   一个缺少认证属性的 API 端点，因此任何人都可以访问，无论他们是否经过认证。同样，API 端点可能有一个错误的认证属性。这一点非常重要，应该采取措施自动测试 API 是否得到了适当的保护。
 
 +   一个安全性差的数据库允许攻击者访问、下载或删除数据库中的数据。
 
@@ -466,9 +828,9 @@ SaaS应用程序通常是分层的，至少包括数据库、API和用户界面�
 
 +   糟糕的密码卫生习惯允许攻击者通过暴力破解、彩虹表或类似的*暴力*攻击来*猜测*用户的密码。
 
-近年来，数据泄露可能给运营不安全应用程序的公司带来非常高的财务罚款。2018年，**英国航空公司**（**BA**）的网站泄露了38万名客户的信用卡数据——其中一人后来写了这本书！对BA的财务成本是1.83亿英镑（在撰写本书时为2.44亿美元）。对于BA来说，最初雇佣一支开发人员和安全专家团队来保护其网站要便宜得多！
+近年来，数据泄露可能给运营不安全应用程序的公司带来非常高的财务罚款。2018 年，**英国航空公司**（**BA**）的网站泄露了 38 万名客户的信用卡数据——其中一人后来写了这本书！对 BA 的财务成本是 1.83 亿英镑（在撰写本书时为 2.44 亿美元）。对于 BA 来说，最初雇佣一支开发人员和安全专家团队来保护其网站要便宜得多！
 
-在构建SaaS应用程序时，特别是具有多租户数据库的应用程序时，需要考虑一个额外的因素。就数据泄露而言，这些类型的应用程序存在一个很大的风险因素，即当两个租户共享存储资源、应用服务器、数据库或类似资源时，一个租户的数据可能会意外地泄露给属于不同租户的用户。正如本章所讨论的，当应用程序处于概念阶段时，需要采取严格的方法来设计多租户解决方案！
+在构建 SaaS 应用程序时，特别是具有多租户数据库的应用程序时，需要考虑一个额外的因素。就数据泄露而言，这些类型的应用程序存在一个很大的风险因素，即当两个租户共享存储资源、应用服务器、数据库或类似资源时，一个租户的数据可能会意外地泄露给属于不同租户的用户。正如本章所讨论的，当应用程序处于概念阶段时，需要采取严格的方法来设计多租户解决方案！
 
 ### 数据损坏
 
@@ -482,13 +844,13 @@ SaaS应用程序通常是分层的，至少包括数据库、API和用户界面�
 
 虽然上述一些数据泄露可能被视为漏洞或攻击，但数据泄露通常是更“被动”的——就像漏水的水管。漏洞则更为主动——就像有人用斧头砍过的水管！
 
-SaaS应用程序的运营商可能会面临广泛的攻击，但深入的安全问题超出了本章的范围，实际上也超出了本书的范围。
+SaaS 应用程序的运营商可能会面临广泛的攻击，但深入的安全问题超出了本章的范围，实际上也超出了本书的范围。
 
 然而，值得考虑的是共租户攻击的可能性，因为这种攻击是特定于多租户应用程序的。虽然外部攻击者通常可以访问应用程序，假设至少登录页面可以通过公共互联网访问，那么付费用户将定义上能够访问系统中的更多部分；因此，他们将处于更好的位置发起攻击。这种攻击可能针对基础设施或其他用户。
 
 ### 配置
 
-SaaS应用程序增加了复杂性，而随着这种复杂性，配置开销也会随之而来。
+SaaS 应用程序增加了复杂性，而随着这种复杂性，配置开销也会随之而来。
 
 例如，配置错误可能会意外泄露生产密码或对数据库或其他资源的访问权限。
 
@@ -498,17 +860,17 @@ SaaS应用程序增加了复杂性，而随着这种复杂性，配置开销也�
 
 ### 存储
 
-每个SaaS应用程序都将以某种形式存储数据，而这些数据构成了一个攻击向量，可以利用它来损害应用程序。
+每个 SaaS 应用程序都将以某种形式存储数据，而这些数据构成了一个攻击向量，可以利用它来损害应用程序。
 
 ### 数据保留和删除
 
-与上述类似，SaaS应用程序将保留敏感数据。确保这些数据的安全性至关重要。在数据保留方面，另一个关键考虑因素是，在许多司法管辖区，个人拥有“被遗忘的权利”，即与该个人相关的所有数据都必须匿名化。
+与上述类似，SaaS 应用程序将保留敏感数据。确保这些数据的安全性至关重要。在数据保留方面，另一个关键考虑因素是，在许多司法管辖区，个人拥有“被遗忘的权利”，即与该个人相关的所有数据都必须匿名化。
 
-在SaaS应用程序的背景下，这可能非常具有挑战性，原因如下：
+在 SaaS 应用程序的背景下，这可能非常具有挑战性，原因如下：
 
 +   数据库通常是多租户的。在不孤立其他记录的情况下，完全清除与单个租户相关的所有信息有多容易？
 
-+   记录很可能会在所有层——用户界面、API和数据库——上执行。你有多确定那些日志中没有敏感的客户数据？
++   记录很可能会在所有层——用户界面、API 和数据库——上执行。你有多确定那些日志中没有敏感的客户数据？
 
 +   备份显然是系统安全的重要组成部分，但如果你需要在任何时候进行恢复，你如何确保之前删除的数据现在没有被恢复？
 
@@ -516,9 +878,9 @@ SaaS应用程序增加了复杂性，而随着这种复杂性，配置开销也�
 
 ### 规章制度
 
-在构建现代SaaS应用程序时，数据安全的一个重要部分是理解你必须遵守的监管框架。互联网为你的应用程序提供了真正全球的覆盖范围，但这种全球覆盖范围意味着你可能必须考虑大量的监管框架，违反这些框架的后果通常是天文数字般的罚款和处罚。
+在构建现代 SaaS 应用程序时，数据安全的一个重要部分是理解你必须遵守的监管框架。互联网为你的应用程序提供了真正全球的覆盖范围，但这种全球覆盖范围意味着你可能必须考虑大量的监管框架，违反这些框架的后果通常是天文数字般的罚款和处罚。
 
-欧洲联盟的GDPR法律规定了组织必须如何使用个人数据，违反这些规定的处罚可能非常严厉——1000万欧元，或公司全年全球营业额的2%。这类法律在许多司法管辖区变得越来越普遍。
+欧洲联盟的 GDPR 法律规定了组织必须如何使用个人数据，违反这些规定的处罚可能非常严厉——1000 万欧元，或公司全年全球营业额的 2%。这类法律在许多司法管辖区变得越来越普遍。
 
 在这方面，你应该问自己的关键问题是：
 
@@ -534,11 +896,11 @@ SaaS应用程序增加了复杂性，而随着这种复杂性，配置开销也�
 
 ### 治理、风险和合规性（GRC）协议
 
-GRC是一套业务出于多种原因（如满足目标、维护监管合规性或充分保护SaaS应用程序）将实施的流程和程序！以下是一些可能的例子：
+GRC 是一套业务出于多种原因（如满足目标、维护监管合规性或充分保护 SaaS 应用程序）将实施的流程和程序！以下是一些可能的例子：
 
 +   详细说明应用程序升级应如何执行以及预发布检查清单。
 
-+   管理和控制对客户私有数据或IP访问的流程。
++   管理和控制对客户私有数据或 IP 访问的流程。
 
 +   对哪些员工有权访问生产数据库的限制。请注意，理想情况下，没有人应该有权限！
 
@@ -550,7 +912,7 @@ GRC是一套业务出于多种原因（如满足目标、维护监管合规性�
 
 ### 审计
 
-这是对所有应用程序的良好实践，而不仅仅是SaaS/多租户。应咨询独立第三方对所有IT系统和租户数据进行安全性和合规性审计。
+这是对所有应用程序的良好实践，而不仅仅是 SaaS/多租户。应咨询独立第三方对所有 IT 系统和租户数据进行安全性和合规性审计。
 
 除了检查数据是否物理安全外，审计员还应确认是否遵循行业标准，以及是否遵守任何监管框架。
 
@@ -566,34 +928,34 @@ SaaS/多租户应用程序特别容易受到由于资源分配不当而引发的
 
 ### 对协作工具非常小心
 
-通常，SaaS应用程序会允许用户选择与同一租户内的其他选定用户共享某些资源，而较少与不同租户的用户共享。这可以是一个极其有效的SaaS应用程序的补充，并且确实使用多租户解决方案的一个巨大优势。然而，这也引入了一个安全风险，即应用程序本身可能会以编程方式泄露数据。在构建SaaS应用程序中的协作元素时，应该采取重大的额外谨慎，因为这些将是恶意行为者首先试图利用以访问其他用户数据的地方。
+通常，SaaS 应用程序会允许用户选择与同一租户内的其他选定用户共享某些资源，而较少与不同租户的用户共享。这可以是一个极其有效的 SaaS 应用程序的补充，并且确实使用多租户解决方案的一个巨大优势。然而，这也引入了一个安全风险，即应用程序本身可能会以编程方式泄露数据。在构建 SaaS 应用程序中的协作元素时，应该采取重大的额外谨慎，因为这些将是恶意行为者首先试图利用以访问其他用户数据的地方。
 
 在任何应用程序中，良好的安全性都是困难的，尤其是在处理多租户应用程序时。一如既往，在项目开始时就实施良好的实践要比后来添加它们容易得多！
 
 # 摘要
 
-如我们所见，多租户是一个庞大且复杂的话题，但它是理解构建SaaS应用程序时绝对核心的。
+如我们所见，多租户是一个庞大且复杂的话题，但它是理解构建 SaaS 应用程序时绝对核心的。
 
-关于如何隔离数据库所做的决策将对应用程序的其余部分产生最大的影响，但考虑多个租户的存在如何影响API和用户界面层也非常重要。
+关于如何隔离数据库所做的决策将对应用程序的其余部分产生最大的影响，但考虑多个租户的存在如何影响 API 和用户界面层也非常重要。
 
 多租户引入了相当多的额外安全考虑。这些应该在开发过程一开始就考虑，并始终牢记在心。
 
-说到这里，实施多租户解决方案的额外挑战提供了**巨大**的潜在优势！应用程序的覆盖范围可以真正实现全球化，其可扩展性是任何其他范式都无法比拟的。考虑一下世界上最大的科技公司——谷歌、Meta、Netflix等等。这些公司中的每一个都接受了SaaS和多租户的概念，而且他们这么做是有充分理由的！
+说到这里，实施多租户解决方案的额外挑战提供了**巨大**的潜在优势！应用程序的覆盖范围可以真正实现全球化，其可扩展性是任何其他范式都无法比拟的。考虑一下世界上最大的科技公司——谷歌、Meta、Netflix 等等。这些公司中的每一个都接受了 SaaS 和多租户的概念，而且他们这么做是有充分理由的！
 
 在下一章中，我们将基于我们对多租户的了解，学习如何构建数据库并为数据丰富的应用程序进行规划。
 
 # 进一步阅读
 
-+   单租户与多租户：SaaS 架构：[https://www.clickittech.com/aws/single-tenant-multi-tenant/](https://www.clickittech.com/aws/single-tenant-multi-tenant/)
++   单租户与多租户：SaaS 架构：[`www.clickittech.com/aws/single-tenant-multi-tenant/`](https://www.clickittech.com/aws/single-tenant-multi-tenant/)
 
-+   多租户策略：[https://www.linkedin.com/pulse/effective-multi-tenancy-strategies-saas-applications-kulkarni/](https://www.linkedin.com/pulse/effective-multi-tenancy-strategies-saas-applications-kulkarni/)
++   多租户策略：[`www.linkedin.com/pulse/effective-multi-tenancy-strategies-saas-applications-kulkarni/`](https://www.linkedin.com/pulse/effective-multi-tenancy-strategies-saas-applications-kulkarni/)
 
-+   构建可扩展的多租户 SaaS 解决方案的战略：[https://aws.amazon.com/blogs/apn/in-depth-strategies-for-building-a-scalable-multi-tenant-saas-solution-with-amazon-redshift/](https://aws.amazon.com/blogs/apn/in-depth-strategies-for-building-a-scalable-multi-tenant-saas-solution-with-amazon-redshift/)
++   构建可扩展的多租户 SaaS 解决方案的战略：[`aws.amazon.com/blogs/apn/in-depth-strategies-for-building-a-scalable-multi-tenant-saas-solution-with-amazon-redshift/`](https://aws.amazon.com/blogs/apn/in-depth-strategies-for-building-a-scalable-multi-tenant-saas-solution-with-amazon-redshift/)
 
-+   实现多租户 SaaS 应用：[https://developers.redhat.com/articles/2022/05/09/approaches-implementing-multi-tenancy-saas-applications](https://developers.redhat.com/articles/2022/05/09/approaches-implementing-multi-tenancy-saas-applications)
++   实现多租户 SaaS 应用：[`developers.redhat.com/articles/2022/05/09/approaches-implementing-multi-tenancy-saas-applications`](https://developers.redhat.com/articles/2022/05/09/approaches-implementing-multi-tenancy-saas-applications)
 
-+   多租户的定义：[https://www.techtarget.com/whatis/definition/multi-tenancy](https://www.techtarget.com/whatis/definition/multi-tenancy)
++   多租户的定义：[`www.techtarget.com/whatis/definition/multi-tenancy`](https://www.techtarget.com/whatis/definition/multi-tenancy)
 
-+   多租户如何影响嵌入式分析：[https://yurbi.com/blog/what-is-multi-tenancy-security-and-how-does-it-impact-embedded-analytics/](https://yurbi.com/blog/what-is-multi-tenancy-security-and-how-does-it-impact-embedded-analytics/)
++   多租户如何影响嵌入式分析：[`yurbi.com/blog/what-is-multi-tenancy-security-and-how-does-it-impact-embedded-analytics/`](https://yurbi.com/blog/what-is-multi-tenancy-security-and-how-does-it-impact-embedded-analytics/)
 
-+   DLP 定义：[https://digitalguardian.com/blog/what-data-loss-prevention-dlp-definition-data-loss-prevention](https://digitalguardian.com/blog/what-data-loss-prevention-dlp-definition-data-loss-prevention)
++   DLP 定义：[`digitalguardian.com/blog/what-data-loss-prevention-dlp-definition-data-loss-prevention`](https://digitalguardian.com/blog/what-data-loss-prevention-dlp-definition-data-loss-prevention)

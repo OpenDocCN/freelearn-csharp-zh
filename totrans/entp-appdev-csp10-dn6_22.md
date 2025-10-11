@@ -16,7 +16,7 @@
 
 +   复制粘贴、打印和收藏内容
 
-你知道 Packt 提供每本书的电子书版本，包括 PDF 和 ePub 文件吗？您可以在 [packt.com](http://packt.com) 升级到电子书版本，并且作为印刷书客户，您有权获得电子书副本的折扣。如需了解更多详情，请联系我们 [customercare@packtpub.com](mailto:customercare@packtpub.com)。
+你知道 Packt 提供每本书的电子书版本，包括 PDF 和 ePub 文件吗？您可以在 [packt.com](http://packt.com) 升级到电子书版本，并且作为印刷书客户，您有权获得电子书副本的折扣。如需了解更多详情，请联系我们 customercare@packtpub.com。
 
 在 [www.packt.com](http://www.packt.com)，您还可以阅读一系列免费的技术文章，注册各种免费通讯，并享受 Packt 书籍和电子书的独家折扣和优惠。
 
@@ -24,7 +24,7 @@
 
 如果您喜欢这本书，您可能还会对 Packt 的这些其他书籍感兴趣：
 
-[![](img/9781803235660_Cover.png)](https://www.packtpub.com/product/modernizing-your-windows-applications-with-the-windows-app-sdk-and-winui/9781803235660)
+![](https://www.packtpub.com/product/modernizing-your-windows-applications-with-the-windows-app-sdk-and-winui/9781803235660)
 
 **使用 Windows App SDK 和 WinUI 现代化您的 Windows 应用程序**
 
@@ -46,7 +46,7 @@ ISBN: 9781803235660
 
 +   使用 MSIX 在 LOB 和面向客户的场景中部署您的应用程序
 
-[![](img/9781803235257_Cover.png)](https://packt.link/9781803235257)
+![](https://packt.link/9781803235257)
 
 **使用 C# 10 和 .NET 6 的软件架构 - 第三版**
 

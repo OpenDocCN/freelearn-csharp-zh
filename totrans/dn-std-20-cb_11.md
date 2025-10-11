@@ -2,45 +2,45 @@
 
 在本章中，我们将探讨以下菜谱：
 
-+   创建.NET Standard 2.0库
++   创建.NET Standard 2.0 库
 
-+   创建你的库的NuGet包
++   创建你的库的 NuGet 包
 
-+   将包提交到NuGet包管理器
++   将包提交到 NuGet 包管理器
 
-+   创建经典Windows应用程序并测试NuGet包
++   创建经典 Windows 应用程序并测试 NuGet 包
 
 # 技术要求
 
-读者应具备C#的基本知识。他们还应具备使用Visual Studio、使用NuGet安装包以及在其他项目中引用库的基本知识。
+读者应具备 C#的基本知识。他们还应具备使用 Visual Studio、使用 NuGet 安装包以及在其他项目中引用库的基本知识。
 
-本章的代码文件可以在GitHub上找到：
+本章的代码文件可以在 GitHub 上找到：
 
-[https://github.com/PacktPublishing/DotNET-Standard-2-Cookbook/tree/master/Chapter11](https://github.com/PacktPublishing/DotNET-Standard-2-Cookbook/tree/master/Chapter11)
+[`github.com/PacktPublishing/DotNET-Standard-2-Cookbook/tree/master/Chapter11`](https://github.com/PacktPublishing/DotNET-Standard-2-Cookbook/tree/master/Chapter11)
 
 查看以下视频以查看代码的实际操作：
 
-[https://goo.gl/XuznM7](https://goo.gl/XuznM7)
+[`goo.gl/XuznM7`](https://goo.gl/XuznM7)
 
 # 简介
 
-在本章中，我们将探讨如何创建你的库的NuGet包。我们将创建一个基本库，然后创建一个NuGet包并提交它。最后，我们将在两个不同的应用程序中使用该包。
+在本章中，我们将探讨如何创建你的库的 NuGet 包。我们将创建一个基本库，然后创建一个 NuGet 包并提交它。最后，我们将在两个不同的应用程序中使用该包。
 
-NuGet是.NET应用程序的包交付工具。它避免了寻找包或库所需的所有依赖项的麻烦。例如，如果你正在寻找库A，并且它需要几个其他库，如库B和库C，你只需获取库A。NuGet将为你节省搜索库B和C以及安装和配置它们的时间。
+NuGet 是.NET 应用程序的包交付工具。它避免了寻找包或库所需的所有依赖项的麻烦。例如，如果你正在寻找库 A，并且它需要几个其他库，如库 B 和库 C，你只需获取库 A。NuGet 将为你节省搜索库 B 和 C 以及安装和配置它们的时间。
 
-# 创建.NET Standard 2.0库
+# 创建.NET Standard 2.0 库
 
-在这个菜谱中，我们将创建一个用于打包的基本.NET Standard 2.0库；为了演示目的，我们将创建一个小计算器库。
+在这个菜谱中，我们将创建一个用于打包的基本.NET Standard 2.0 库；为了演示目的，我们将创建一个小计算器库。
 
 # 准备工作
 
-确保你的系统上已安装并更新了最新版本的Visual Studio 2017。这个菜谱假设你具备创建.NET Standard 2.0库的相当多的知识。
+确保你的系统上已安装并更新了最新版本的 Visual Studio 2017。这个菜谱假设你具备创建.NET Standard 2.0 库的相当多的知识。
 
 # 如何做...
 
-1.  打开Visual Studio 2017。
+1.  打开 Visual Studio 2017。
 
-1.  点击**文件** | **新建** | **项目**，然后在新建项目模板对话框中，在左侧窗格中选择**其他项目类型**下的**Visual Studio解决方案**，在右侧窗格中选择**空白解决方案**。
+1.  点击**文件** | **新建** | **项目**，然后在新建项目模板对话框中，在左侧窗格中选择**其他项目类型**下的**Visual Studio 解决方案**，在右侧窗格中选择**空白解决方案**。
 
 1.  在名称：文本框中，键入`Chapter11.Packaging`作为解决方案的名称，如图所示。在**位置**下拉列表中选择一个首选位置，或单击浏览...按钮并选择一个位置。保持默认设置不变：
 
@@ -50,7 +50,7 @@ NuGet是.NET应用程序的包交付工具。它避免了寻找包或库所需�
 
 1.  现在，在解决方案资源管理器中（或按*Ctrl* + *Alt* + *L*），选择`Chapter11.Packaging`。右键单击并选择**添加** | **新建项目**。
 
-1.  在添加新项目对话框中，展开Visual C#节点，并在左侧窗格中选择.NET Standard。
+1.  在添加新项目对话框中，展开 Visual C#节点，并在左侧窗格中选择.NET Standard。
 
 1.  在右侧窗格中，选择如图所示的类库(.NET Standard)：
 
@@ -72,7 +72,17 @@ NuGet是.NET应用程序的包交付工具。它避免了寻找包或库所需�
 
 1.  现在，将这些两个公共方法添加到类体中：
 
-[PRE0]
+```cs
+      public int Add(int num1, int num2)
+      {
+          return num1 + num2;
+      }
+
+      public int Subtract(int num1, int num2)
+      {
+          return num1 - num2;
+      }
+```
 
 1.  按 *Ctrl* + *Shift* + *B* 进行快速构建。
 
@@ -237,9 +247,9 @@ NuGet是.NET应用程序的包交付工具。它避免了寻找包或库所需�
 
 1.  现在，在引用标签上右键单击。
 
-1.  选择管理NuGet包**。**
+1.  选择管理 NuGet 包**。**
 
-1.  点击浏览，在搜索框中输入你上传时选择的包ID。
+1.  点击浏览，在搜索框中输入你上传时选择的包 ID。
 
 1.  在这个情况下，输入`Packt_DotNetStandard_CookBook_Chap1`，然后按*Enter*：
 
@@ -253,10 +263,6 @@ NuGet是.NET应用程序的包交付工具。它避免了寻找包或库所需�
 
 1.  在确认对话框中点击确定：
 
-![图片](img/0e8b9c6f-6975-456c-a2f7-2a7681cbe2a1.png）
-
-1.  安装成功后，输出窗口应该看起来像这样：
-
 ![图片](img/549ec163-11b7-4853-900e-14e4a0affb60.png)
 
 1.  现在，在解决方案资源管理器中，展开引用标签，你应该在那里看到我们的库：
@@ -269,17 +275,29 @@ NuGet是.NET应用程序的包交付工具。它避免了寻找包或库所需�
 
 1.  在`using`指令的末尾添加以下指令。
 
-[PRE1]
+```cs
+      using Chapter11.Packaging.CalcLib;
+```
 
 1.  现在，向下滚动直到到达`BtnAdd_Click()`方法。
 
 1.  在方法内部添加以下代码：
 
-[PRE2]
+```cs
+      var calculator = new Calculator();
+      var answer = calculator.Add(10, 20);
+
+      MessageBox.Show($"The answer is {answer}");
+```
 
 1.  现在，双击减按钮，并在`click`方法内部添加以下代码：
 
-[PRE3]
+```cs
+      var calculator = new Calculator();
+      var answer = calculator.Subtract(50, 20);
+
+      MessageBox.Show($"The answer is {answer}");
+```
 
 1.  现在，按*F5*测试应用程序。
 
@@ -293,17 +311,19 @@ NuGet是.NET应用程序的包交付工具。它避免了寻找包或库所需�
 
 # 它是如何工作的...
 
-在步骤1到7中，我们创建了一个经典的Windows应用程序项目。然后，在步骤9到11中，我们创建了Windows项目的UI。在步骤14和15中，我们打开了NuGet包管理器。然后我们搜索我们的包并确认它已加载。在步骤18到20中，我们安装了我们的包并确认它已安装。
+在步骤 1 到 7 中，我们创建了一个经典的 Windows 应用程序项目。然后，在步骤 9 到 11 中，我们创建了 Windows 项目的 UI。在步骤 14 和 15 中，我们打开了 NuGet 包管理器。然后我们搜索我们的包并确认它已加载。在步骤 18 到 20 中，我们安装了我们的包并确认它已安装。
 
-在步骤24中，我们添加了使用NuGet包管理器安装的库的引用。在步骤25和26中，我们创建了一个`Calculator`类的实例并使用了它的`Add()`和`Subtract()`方法。最后，在步骤28到30中，我们测试了应用程序。
+在步骤 24 中，我们添加了使用 NuGet 包管理器安装的库的引用。在步骤 25 和 26 中，我们创建了一个`Calculator`类的实例并使用了它的`Add()`和`Subtract()`方法。最后，在步骤 28 到 30 中，我们测试了应用程序。
 
-使用包管理器是从NuGet安装包的一种方式。但你可以使用NuGet包管理器控制台来完成同样的操作。要访问包管理器控制台，你可以点击工具 | NuGet包管理器 | 包管理器控制台：
+使用包管理器是从 NuGet 安装包的一种方式。但你可以使用 NuGet 包管理器控制台来完成同样的操作。要访问包管理器控制台，你可以点击工具 | NuGet 包管理器 | 包管理器控制台：
 
 ![图片](img/ec4c9099-d8d4-4edf-b4ea-d468bf4ad067.png)
 
 在控制台中，你可以输入：
 
-[PRE4]
+```cs
+Install-Package Packt_DotNetStandard_CookBook_Chap11 -Version 1.0.0
+```
 
 ![图片](img/37a6f006-8d10-4514-964e-740baf2efeb7.png)
 

@@ -4,18 +4,18 @@
 
 本部分包含以下章节：
 
-+   [*第6章*](B16617_06_Final_SB_Epub.xhtml#_idTextAnchor117), *.NET 集合*
++   *第六章*, *.NET 集合*
 
-+   [*第7章*](B16617_07_Final_SB_Epub.xhtml#_idTextAnchor139), *LINQ 性能*
++   *第七章*, *LINQ 性能*
 
-+   [*第8章*](B16617_08_Final_SB_Epub.xhtml#_idTextAnchor152), *文件和流 I/O*
++   *第八章*, *文件和流 I/O*
 
-+   [*第9章*](B16617_09_Final_SB_Epub.xhtml#_idTextAnchor168), *增强网络应用程序的性能*
++   *第九章*, *增强网络应用程序的性能*
 
-+   [*第10章*](B16617_10_Final_SB_Epub.xhtml#_idTextAnchor189), *设置我们的数据库项目*
++   *第十章*, *设置我们的数据库项目*
 
-+   [*第11章*](B16617_11_Final_SB_Epub.xhtml#_idTextAnchor205), *关系数据访问框架基准测试*
++   *第十一章*, *关系数据访问框架基准测试*
 
-+   [*第12章*](B16617_12_Final_SB_Epub.xhtml#_idTextAnchor215), *响应式用户界面*
++   *第十二章*, *响应式用户界面*
 
-+   [*第13章*](B16617_13_Final_SB_Epub.xhtml#_idTextAnchor239), *分布式系统*
++   *第十三章*, *分布式系统*

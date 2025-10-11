@@ -30,11 +30,15 @@ C# 的另一个显著特点是它是一种强类型编程语言。您将在接�
 
 安装后，在你的首选终端中运行以下命令：
 
-[PRE0]
+```cs
+dotnet --list-sdks
+```
 
 你应该看到如下输出：
 
-[PRE1]
+```cs
+6.0.100 [/usr/local/share/dotnet/sdk]
+```
 
 此输出显示你在计算机上安装了 6.0.100 版本的 SDK。这意味着你已准备好开始开发你的应用程序。如果你输入 `dotnet -–help`，你会注意到 CLI 中将出现几个命令供你选择运行。在本节中，你将了解你需要创建和运行应用程序的最基本命令：`new`、`build` 和 `run`。
 
@@ -46,11 +50,15 @@ C# 的另一个显著特点是它是一种强类型编程语言。您将在接�
 
 名称作为参数传递，这意味着你应该使用 `-n` 或 `–name` 标志来指定它。命令如下：
 
-[PRE2]
+```cs
+dotnet new TYPE -n NAME
+```
 
 例如，要创建一个名为 `MyConsoleApp` 的新控制台应用程序，你可以简单地输入：
 
-[PRE3]
+```cs
+dotnet new console -n MyConsoleApp
+```
 
 这将生成一个新文件夹，其中包含一个名为 `MyConsoleApp.csproj` 的文件，这是编译器构建你的项目所需的全部元数据文件，以及构建和运行应用程序所需的某些文件。
 
@@ -68,7 +76,7 @@ C# 的另一个显著特点是它是一种强类型编程语言。您将在接�
 
 在阅读本书的过程中，您将使用 Visual Studio Code (VS Code) 作为您的代码编辑器。它适用于所有平台，您可以在 https://code.visualstudio.com/ 下载适用于您操作系统的版本。尽管 VS Code 不是一个完整的集成开发环境 (IDE)，但它拥有许多扩展，使其成为开发 C# 的强大工具，无论使用的是哪种操作系统。
 
-为了正确开发 C# 代码，你主要需要安装 Microsoft C# 扩展。它为 VS Code 提供了代码补全和识别错误的能力，可在 [https://marketplace.visualstudio.com/items?itemName=ms-dotnettools.csharp](https://marketplace.visualstudio.com/items?itemName=ms-dotnettools.csharp) 获取。
+为了正确开发 C# 代码，你主要需要安装 Microsoft C# 扩展。它为 VS Code 提供了代码补全和识别错误的能力，可在 [`marketplace.visualstudio.com/items?itemName=ms-dotnettools.csharp`](https://marketplace.visualstudio.com/items?itemName=ms-dotnettools.csharp) 获取。
 
 注意
 
@@ -90,13 +98,17 @@ C# 的另一个显著特点是它是一种强类型编程语言。您将在接�
 
 1.  打开 VS Code 集成终端并输入以下内容：
 
-    [PRE4]
+    ```cs
+    dotnet new console -n Exercise1_01 
+    ```
 
 此命令将在 `Exercise1_01` 文件夹中创建一个新的控制台应用程序。
 
 1.  在命令行中，输入以下内容：
 
-    [PRE5]
+    ```cs
+    dotnet run --project Exercise1_01
+    ```
 
 您应该看到以下输出：
 
@@ -106,7 +118,7 @@ C# 的另一个显著特点是它是一种强类型编程语言。您将在接�
 
 注意
 
-您可以在 [https://packt.link/HErU6](https://packt.link/HErU6) 找到此练习使用的代码。
+您可以在 [`packt.link/HErU6`](https://packt.link/HErU6) 找到此练习使用的代码。
 
 在这个练习中，你使用 C# 创建了可能的最基本程序，这是一个将一些文本打印到提示符的控制台应用程序。你还学习了如何使用 .NET CLI，这是 .NET SDK 内部构建的机制，用于创建和管理 .NET 项目。
 
@@ -114,21 +126,36 @@ C# 的另一个显著特点是它是一种强类型编程语言。您将在接�
 
 ### 顶层语句
 
-你一定注意到了在*练习1.01*中，默认情况下，当你创建一个控制台应用程序时，你会有一个`Program.cs`文件，其中包含以下内容：
+你一定注意到了在*练习 1.01*中，默认情况下，当你创建一个控制台应用程序时，你会有一个`Program.cs`文件，其中包含以下内容：
 
 +   一个名为`Program`的类。
 
-+   静态void `Main`关键字。
++   静态 void `Main`关键字。
 
-你将在后面详细学习类和方法，但就目前而言，为了简单起见，你不需要这些资源来使用C#创建和执行程序。最新版本(.NET 6)引入了一个功能，使得编写简单的程序更加容易和简洁。例如，考虑以下：
+你将在后面详细学习类和方法，但就目前而言，为了简单起见，你不需要这些资源来使用 C#创建和执行程序。最新版本(.NET 6)引入了一个功能，使得编写简单的程序更加容易和简洁。例如，考虑以下：
 
-[PRE6]
+```cs
+using System;
+namespace Exercise1_01
+{
+    class Program
+    {
+        static void Main(string[] args)
+        {
+            Console.WriteLine("Hello World!");
+        }
+    }
+}
+```
 
 你可以简单地用以下两行代码替换这个片段，如下所示：
 
-[PRE7]
+```cs
+using System;
+Console.WriteLine("Hello World!");
+```
 
-通过使用这样的顶层语句，你可以编写简洁的程序。你只需将需要执行的语句放在程序顶部即可。这也有助于加快学习C#的曲线，因为你不需要一开始就担心高级概念。这里唯一需要注意的是，项目只能有一个包含顶层语句的文件。
+通过使用这样的顶层语句，你可以编写简洁的程序。你只需将需要执行的语句放在程序顶部即可。这也有助于加快学习 C#的曲线，因为你不需要一开始就担心高级概念。这里唯一需要注意的是，项目只能有一个包含顶层语句的文件。
 
 正因如此，在本章中，你会发现所有练习都将使用这种格式，以便尽可能清晰地说明。
 
@@ -138,7 +165,7 @@ C# 的另一个显著特点是它是一种强类型编程语言。您将在接�
 
 变量是给计算机内存位置起的名字，该位置存储了一些可能变化的数据。为了使变量存在，它首先必须用类型和名字**声明**。它也可以给它赋值。变量的声明可以通过几种不同的方式实现。
 
-关于C#中变量命名约定的基本考虑如下：
+关于 C#中变量命名约定的基本考虑如下：
 
 +   名称必须是唯一的，以字母开头，并且只能包含字母、数字和下划线字符（`_`）。名称也可以以下划线字符开头。
 
@@ -152,15 +179,23 @@ C# 的另一个显著特点是它是一种强类型编程语言。您将在接�
 
 可以通过写出其类型和值来**显式声明**一个变量。假设你想要创建两个变量，`a`和`b`，它们都包含整数。这样做显式地看起来像这样：
 
-[PRE8]
+```cs
+int a = 0;
+int b = 0;
+```
 
 在使用变量之前，必须给它赋值。否则，C#编译器在构建你的程序时会报错。以下示例说明了这一点：
 
-[PRE9]
+```cs
+int a;
+int b = a; // The compiler will prompt an error on this line: Use of unassigned local variable
+```
 
 你也可以在同一行声明多个变量，如下面的代码片段所示，其中你声明了三个变量；两个变量持有值`100`，一个变量持有值`10`：
 
-[PRE10]
+```cs
+int a, b = 100, c = 10;
+```
 
 ### 隐式声明变量
 
@@ -168,7 +203,9 @@ C# 的另一个显著特点是它是一种强类型编程语言。您将在接�
 
 假设你想使用这种方法创建一个包含一些文本的变量。这可以通过以下语句完成：
 
-[PRE11]
+```cs
+var name = "Elon Musk";
+```
 
 要在变量中存储文本，你应该使用双引号（`"`）开始和结束文本。在上面的例子中，通过查看分配给 `name` 的值，C# 知道这个变量持有的类型是字符串，即使声明中没有提到类型。
 
@@ -192,83 +229,132 @@ C# 的另一个显著特点是它是一种强类型编程语言。您将在接�
 
 1.  打开命令提示符并输入以下内容：
 
-    [PRE12]
+    ```cs
+    dotnet new console -n Exercise1_02
+    ```
 
 此命令在 `Exercise1_02` 文件夹中创建一个新的控制台应用程序。
 
 1.  打开 `Program.cs` 文件。在 `Main` 方法中粘贴以下内容：
 
-    [PRE13]
+    ```cs
+    Console.WriteLine("Hi! I'm your first Program. What is your name?");
+    var name = Console.ReadLine();
+    Console.WriteLine($"Hi {name}, it is very nice to meet you. We have a really fun journey ahead.");
+    ```
 
 1.  保存文件。在命令行中，输入以下内容：
 
-    [PRE14]
+    ```cs
+    dotnet run --project Exercise1_02
+    ```
 
 这将输出以下内容：
 
-[PRE15]
+```cs
+Hi! I'm your first Program. What is your name?
+```
 
 1.  现在，请在控制台中输入你的名字，然后按键盘上的 `Enter` 键。例如，如果你输入 `Mateus`，以下将是输出结果：
 
-    [PRE16]
+    ```cs
+    Hi! I'm your first Program. What is your name?
+    Mateus
+    Hi Mateus, it is very nice to meet you. We have a really fun journey ahead.
+    ```
 
     注意
 
-    你可以在 [https://packt.link/1fbVH](https://packt.link/1fbVH) 找到用于此练习的代码。
+    你可以在 [`packt.link/1fbVH`](https://packt.link/1fbVH) 找到用于此练习的代码。
 
 你对变量是什么、如何声明它们以及如何给它们赋值已经很熟悉了。现在，是时候开始讨论这些变量可以存储什么数据了，更具体地说，是讨论有哪些数据类型。
 
 # 数据类型
 
-在本节中，你将讨论C#中的主要数据类型及其功能。
+在本节中，你将讨论 C#中的主要数据类型及其功能。
 
 ## 字符串
 
 C#使用`string`关键字来标识存储文本作为字符序列的数据。你可以以多种方式声明字符串，如下面的代码片段所示。然而，当将某个值赋给字符串变量时，你必须将内容放在一对双引号之间，如最后两个示例所示：
 
-[PRE17]
+```cs
+// Declare without initializing.
+string message1;
+// Initialize to null.
+string message2 = null;
+// Initialize as an empty string
+string message3 = System.String.Empty;
+// Will have the same content as the above one
+string message4 = "";
+// With implicit declaration
+var message4 = "A random message"     ;
+```
 
-一种简单但有效的技术（你在前面的*练习1.02*中使用过）称为字符串插值。使用这种技术，将普通文本值与变量值混合变得非常简单，这样文本就可以在这两者之间结合。你可以通过以下步骤组合两个或多个字符串：
+一种简单但有效的技术（你在前面的*练习 1.02*中使用过）称为字符串插值。使用这种技术，将普通文本值与变量值混合变得非常简单，这样文本就可以在这两者之间结合。你可以通过以下步骤组合两个或多个字符串：
 
 1.  在初始引号之前插入一个`$`符号。
 
 1.  现在，在字符串中放置大括号和你要放入字符串中的变量的名称。在这种情况下，这是通过在初始字符串中放置`{name}`来完成的：
 
-    [PRE18]
+    ```cs
+    $"Hi {name}, it is very nice to meet you. We have a really fun journey ahead.");
+    ```
 
-关于字符串，需要记住的另一个重要事实是它们是不可变的。这意味着字符串对象在创建后不能被更改。这是因为C#中的字符串是一个字符数组。数组是收集相同类型对象并具有固定长度的数据结构。你将在接下来的章节中详细学习数组。
+关于字符串，需要记住的另一个重要事实是它们是不可变的。这意味着字符串对象在创建后不能被更改。这是因为 C#中的字符串是一个字符数组。数组是收集相同类型对象并具有固定长度的数据结构。你将在接下来的章节中详细学习数组。
 
 在下一个练习中，你将探索字符串不可变性。
 
-## 练习1.03：检查字符串不可变性
+## 练习 1.03：检查字符串不可变性
 
 在这个练习中，你将使用两个字符串来演示字符串引用始终是不可变的。执行以下步骤来完成此操作：
 
-1.  打开VS Code集成终端并输入以下内容：
+1.  打开 VS Code 集成终端并输入以下内容：
 
-    [PRE19]
+    ```cs
+    dotnet new console -n Exercise1_03
+    ```
 
 1.  打开`Program.cs`文件，创建一个具有`void`返回类型的方法，该方法替换字符串的一部分，如下所示：
 
-    [PRE20]
+    ```cs
+    static void FormatString(string stringToFormat)
+    {
+    stringToFormat.Replace("World", "Mars");
+    }
+    ```
 
 在前面的代码片段中，使用了`Replace`函数将第一个字符串（在这个例子中是`World`）替换为第二个字符串（`Mars`）。
 
 1.  现在，创建一个执行相同操作但返回结果的方法：
 
-    [PRE21]
+    ```cs
+    static string FormatReturningString(string stringToFormat)
+    {
+    return stringToFormat.Replace("Earth", "Mars");
+    }
+    ```
 
 1.  现在在前面方法之后插入以下内容。在这里，你创建了两个字符串变量，并在尝试使用前面创建的方法修改它们后观察它们的行为：
 
-    [PRE22]
+    ```cs
+    var greetings = "Hello World!";
+    FormatString(greetings);
+    Console.WriteLine(greetings);
+    var anotherGreetings = "Good morning Earth!";
+    Console.WriteLine(FormatReturningString(anotherGreetings));
+    ```
 
 1.  最后，从命令行调用`dotnet run --project Exercise1_03`。你应该在控制台上看到以下输出：
 
-    [PRE23]
+    ```cs
+    dotnet run
+    Hello World!
+    Good morning Mars!
+    ```
 
     注意
 
-    你可以在[https://packt.link/ZoNiw](https://packt.link/ZoNiw)找到用于此练习的代码。
+    你可以在[`packt.link/ZoNiw`](https://packt.link/ZoNiw)找到用于此练习的代码。
 
 通过这个练习，你看到了字符串不可变性的实际应用。当你传递一个作为引用类型的字符串（`Hello World!`）作为方法参数时，它没有被修改。这就是当你使用返回`void`的`FormatString`方法时发生的情况。由于字符串不可变性，会创建一个新的字符串，但不会分配给任何变量，原始字符串保持不变。第二个方法返回一个新的字符串，然后这个字符串被打印到控制台。
 
@@ -276,15 +362,25 @@ C#使用`string`关键字来标识存储文本作为字符序列的数据。你�
 
 即使字符串是引用类型，当你使用 `.Equals()` 方法、等号运算符 (`==`) 和其他运算符（例如 `!=`）时，你实际上是在比较字符串的值，如下例所示：
 
-[PRE24]
+```cs
+string first = "Hello.";
+string second = first;
+first = null;
+```
 
 现在，你可以比较这些值并调用 `Console.WriteLine()` 来输出结果，如下所示：
 
-[PRE25]
+```cs
+Console.WriteLine(first == second);
+Console.WriteLine(string.Equals(first, second));
+```
 
 运行前面的代码会产生以下输出：
 
-[PRE26]
+```cs
+False
+False
+```
 
 你得到这个输出是因为，尽管字符串是引用类型，但 `==` 和 `.Equals` 比较都是针对字符串值进行的。还要记住，字符串是不可变的。这意味着当你将 `second` 赋值给 `first` 并将 `first` 设置为 `null` 时，会为 `first` 创建一个新的值，因此 `second` 的引用不会改变。
 
@@ -308,65 +404,116 @@ C# 将其数值类型分为两大类——整型数和浮点型数。整型数�
 
 +   `float`: 占用四个字节，可以存储从 ± 1.5 x 10−45 到 ± 3.4 x 1038 的数字，精度范围为六到九位数字。要使用 `var` 声明一个浮点数，你只需在数字末尾附加 `f`，如下所示：
 
-    [PRE27]
+    ```cs
+    var myFloat = 10f;
+    ```
 
 +   `double`: 占用八个字节，可以存储从 ± 5.0 × 10−324 到 ± 1.7 × 1030 的数字，精度范围为 15 到 17 位数字。要使用 `var` 声明一个双精度数，你可以在数字末尾附加 `d`，如下所示：
 
-    [PRE28]
+    ```cs
+    var myDouble = 10d;
+    ```
 
 +   `decimal`: 占用 16 字节，可以存储从 ± 1.0 x 10-28 到 ± 7.9228 x 1028 的数字，精度范围为 28 到 29 位数字。要使用 `var` 声明一个十进制数，你只需在数字末尾附加 `m`，如下所示：
 
-    [PRE29]
+    ```cs
+    var myDecimal = 10m;
+    ```
 
 选择浮点数类型主要取决于所需的精度程度。例如，`decimal` 主要用于需要非常高的精度且不能依赖四舍五入进行准确计算的金融应用程序。对于 GPS 坐标，如果你想要处理通常有 10 位数字的亚米精度，`double` 变量可能很合适。
 
 在选择数值类型时，还需要考虑的一个相关点是性能。分配给变量的内存空间越大，使用这些变量的操作性能就越低。因此，如果不需要高精度，`float`类型的变量将比`double`类型的变量性能更好，而`double`类型的变量又将比`decimal`类型的变量性能更好。
 
-现在你已经掌握了变量及其主要类型的概念。接下来，你将使用它们进行一些基本的计算，例如加法、减法和乘法。这可以通过C#中可用的算术运算符来完成，如`+`、`-`、`/`和`*`。因此，继续进行下一个练习，你将使用这些运算符创建一个基本的计算器。
+现在你已经掌握了变量及其主要类型的概念。接下来，你将使用它们进行一些基本的计算，例如加法、减法和乘法。这可以通过 C#中可用的算术运算符来完成，如`+`、`-`、`/`和`*`。因此，继续进行下一个练习，你将使用这些运算符创建一个基本的计算器。
 
-## 练习1.04：使用基本算术运算符
+## 练习 1.04：使用基本算术运算符
 
 在这个练习中，你将创建一个简单的计算器，它接收两个输入并显示它们之间的结果，这取决于选定的算术运算。
 
 以下步骤将帮助你完成这个练习：
 
-1.  打开VS Code集成终端，并输入以下命令：
+1.  打开 VS Code 集成终端，并输入以下命令：
 
-    [PRE30]
+    ```cs
+    dotnet new console -n Exercise1_04
+    ```
 
 1.  导航到项目文件夹，打开`Program.cs`文件，然后在`Main`方法中声明两个变量来读取用户输入，如下所示：
 
-    [PRE31]
+    ```cs
+    Console.WriteLine("Type a value for a: ");
+    var a = int.Parse(Console.ReadLine());
+    Console.WriteLine("Now type a value for b: ");
+    var b = int.Parse(Console.ReadLine());
+    ```
 
 前面的代码片段使用了`.ReadLine`方法来读取输入。然而，这个方法返回的是一个`string`类型，而你需要评估一个数字。因此，这里使用了`Parse`方法。所有数值类型都有一个名为`Parse`的方法，它接收一个字符串并将其转换为数字。
 
 1.  接下来，你需要将这些基本运算符的输出写入控制台。将以下代码添加到`Main`方法中：
 
-    [PRE32]
+    ```cs
+    Console.WriteLine($"The value for a is { a } and for b is { b }");
+    Console.WriteLine($"Sum: { a + b}");
+    Console.WriteLine($"Multiplication: { a * b}");
+    Console.WriteLine($"Subtraction: { a - b}");
+    Console.WriteLine($"Division: { a / b}"); 
+    ```
 
 1.  使用`dotnet run`命令运行程序，如果你输入`10`和`20`，你应该会看到以下输出：
 
-    [PRE33]
+    ```cs
+    Type a value for a:
+    10
+    Now type a value for b:
+    20
+    The value for a is 10 and b is 20
+    Sum: 30
+    Multiplication: 200
+    Subtraction: -10
+    Division: 0
+    ```
 
     注意
 
-    你可以在[https://packt.link/ldWVv](https://packt.link/ldWVv)找到这个练习使用的代码。
+    你可以在[`packt.link/ldWVv`](https://packt.link/ldWVv)找到这个练习使用的代码。
 
-因此，你已经使用算术运算符在C#中构建了一个简单的计算器应用程序。你还学习了解析的概念，它用于将字符串转换为数字。在下一节中，将简要介绍类，这是C#编程的核心概念之一。
+因此，你已经使用算术运算符在 C#中构建了一个简单的计算器应用程序。你还学习了解析的概念，它用于将字符串转换为数字。在下一节中，将简要介绍类，这是 C#编程的核心概念之一。
 
 # 类
 
-类是C#编程的一个基本组成部分，将在*第2章*，*构建高质量面向对象代码*中全面介绍。本节将介绍类的基础知识，以便你可以在程序中使用它们。
+类是 C#编程的一个基本组成部分，将在*第二章*，*构建高质量面向对象代码*中全面介绍。本节将介绍类的基础知识，以便你可以在程序中使用它们。
 
-在C#中，当你想要定义一个对象类型时，会使用保留的`class`关键字。一个对象，也可以称为实例，不过是一个分配了内存块来存储信息的实体。根据这个定义，类的作用就是通过一些属性来描述这个对象，并指定这个对象可以通过方法执行的操作，从而作为对象的蓝图。
+在 C#中，当你想要定义一个对象类型时，会使用保留的`class`关键字。一个对象，也可以称为实例，不过是一个分配了内存块来存储信息的实体。根据这个定义，类的作用就是通过一些属性来描述这个对象，并指定这个对象可以通过方法执行的操作，从而作为对象的蓝图。
 
 例如，假设你有一个名为`Person`的类，具有两个属性`Name`和`Age`，以及一个检查`Person`是否为孩子的方法。方法是可以放置逻辑以执行某些操作的地方。它们可以返回特定类型的数据，或者有特殊的`void`关键字，表示它们不返回任何内容，只是执行一些操作。你还可以有调用其他方法的方法：
 
-[PRE34]
+```cs
+public class Person
+{
+	public Person() { }
+	public Person(string name, int age)
+{
+	Name = name;
+	Age = age;
+}
+	public string Name { get; set; }
+	public int Age { get; set; }
+	public void GetInfo()
+{
+	Console.WriteLine($"Name: {Name} – IsChild? {IsChild()}");
+}
+	public bool IsChild()
+{
+	return Age < 12;
+}
+}
+```
 
 尽管如此，还有一个问题。由于类充当蓝图（或者如果你更喜欢，定义），你实际上是如何为类定义的信息分配内存的？这是通过一个称为实例化的过程来完成的。当你实例化一个对象时，你会在一个称为堆的预留区域为其分配一些内存空间。当你将一个变量分配给一个对象时，你是在设置这个变量，使其拥有这个内存空间的地址，因此每次你操作这个变量时，它都会指向并操作在这个内存空间分配的数据。以下是一个简单的实例化示例：
 
-[PRE35]
+```cs
+var person = new Person();
+```
 
 注意，`Person`具有具有两个魔法关键字的属性——`get`和`set`。获取器定义了可以检索属性值，而设置器定义了可以设置属性值。
 
@@ -376,15 +523,23 @@ C# 将其数值类型分为两大类——整型数和浮点型数。整型数�
 
 +   在创建时，通过其构造函数：
 
-    [PRE36]
+    ```cs
+    var person = new Person("John", 10);
+    ```
 
 +   在创建时，通过直接变量赋值：
 
-    [PRE37]
+    ```cs
+    var person = new Person() { Name = "John", Age = 10 };
+    ```
 
 +   在对象创建后，如下所示：
 
-    [PRE38]
+    ```cs
+    var person = new Person();
+    person.Name = "John";
+    person.Age = 10;
+    ```
 
 在你接下来会看到的类中，还有很多内容。目前，主要思想如下：
 
@@ -398,17 +553,21 @@ C# 将其数值类型分为两大类——整型数和浮点型数。整型数�
 
 # 日期
 
-在C#中，可以使用`DateTime`值类型来表示日期。它是一个具有两个静态属性的结构体，分别称为`MinValue`和`MaxValue`，其中`MinValue`是公元0001年1月1日00:00:00，而`MaxValue`是公元9999年12月31日23:59:59。正如其名称所暗示的，这两个值都代表了根据格里高利日历日期格式的最小和最大日期。`DateTime`对象的默认值是`MinValue`。
+在 C#中，可以使用`DateTime`值类型来表示日期。它是一个具有两个静态属性的结构体，分别称为`MinValue`和`MaxValue`，其中`MinValue`是公元 0001 年 1 月 1 日 00:00:00，而`MaxValue`是公元 9999 年 12 月 31 日 23:59:59。正如其名称所暗示的，这两个值都代表了根据格里高利日历日期格式的最小和最大日期。`DateTime`对象的默认值是`MinValue`。
 
 可以以多种方式构造 `DateTime` 变量。以下是一些最常见的方法：
 
 +   按如下方式分配当前时间：
 
-    [PRE39]
+    ```cs
+    var now = DateTime.Now;
+    ```
 
 这将变量设置为调用计算机上的当前日期和时间，以本地时间表示。
 
-[PRE40]
+```cs
+var now = DateTime.UtcNow;
+```
 
 这将变量设置为这台计算机上的当前日期和时间，以协调世界时（UTC）表示。
 
@@ -424,27 +583,51 @@ C# 将其数值类型分为两大类——整型数和浮点型数。整型数�
 
 1.  打开 VS Code 集成终端并输入以下内容：
 
-    [PRE41]
+    ```cs
+    dotnet new console -n Exercise1_05
+    ```
 
 1.  打开 `Program.cs` 文件。
 
 1.  将以下代码粘贴到 `Main` 方法中并保存文件：
 
-    [PRE42]
+    ```cs
+    Console.WriteLine("Are the local and utc dates equal? {0}", DateTime.Now.Date == DateTime.UtcNow.Date);
+    Console.WriteLine("\nIf the dates are equal, does it mean that there's no TimeSpan interval between them? {0}",
+    (DateTime.Now.Date - DateTime.UtcNow.Date) == TimeSpan.Zero);
+    DateTime localTime = DateTime.Now;
+    DateTime utcTime = DateTime.UtcNow;
+    TimeSpan interval = (localTime - utcTime);
+    Console.WriteLine("\nDifference between the {0} Time and {1} Time: {2}:{3} hours",
+        localTime.Kind.ToString(),
+        utcTime.Kind.ToString(),
+        interval.Hours,
+        interval.Minutes);
+    Console.Write("\nIf we jump two days to the future on {0} we'll be on {1}",
+        new DateTime(2020, 12, 31).ToShortDateString(),
+        new DateTime(2020, 12, 31).AddDays(2).ToShortDateString());
+    ```
 
 在前面的代码片段中，您首先检查当前本地日期和 UTC 日期是否相等。然后，使用 `TimeSpan` 方法检查它们之间的间隔（如果有的话）。接下来，打印本地时间和 UTC 时间之间的差异，并打印当前日期两天后的日期（在这种情况下为 `31/12/ 2020`）。
 
 1.  保存文件。在命令行中，输入以下内容：
 
-    [PRE43]
+    ```cs
+    dotnet run --project Exercise1_05
+    ```
 
 您应该看到以下输出：
 
-[PRE44]
+```cs
+Are the local and utc dates equal? True
+If the dates are equal, does it mean there's no TimeSpan interval between them? True
+Difference between the Local Time and Utc Time: 0:0 hours
+If we jump two days to the future on 31/12/2020 we'll be on 02/01/2021
+```
 
 注意
 
-您可以在 [https://packt.link/WIScZ](https://packt.link/WIScZ) 找到用于此练习的代码。
+您可以在 [`packt.link/WIScZ`](https://packt.link/WIScZ) 找到用于此练习的代码。
 
 注意，根据您的时区，您可能会看到不同的输出。
 
@@ -452,21 +635,36 @@ C# 将其数值类型分为两大类——整型数和浮点型数。整型数�
 
 您还可以将 `DateTime` 值格式化为本地化字符串。这意味着根据 C# 语言中称为“文化”的特殊概念来格式化 `DateTime` 实例，它是您本地时间的表示。例如，不同国家的日期表示方式不同。现在请看以下示例，其中日期以法国和美国使用的格式输出：
 
-[PRE45]
+```cs
+var frenchDate = new DateTime(2008, 3, 1, 7, 0, 0);
+Console.WriteLine(frenchDate.ToString(System.Globalization.CultureInfo.
+  CreateSpecificCulture("fr-FR")));
+// Displays 01/03/2008 07:00:00
+var usDate = new DateTime(2008, 3, 1, 7, 0, 0);
+Console.WriteLine(frenchDate.ToString(System.Globalization.CultureInfo.CreateSpecificCulture("en-US")));
+// For en-US culture, displays 3/1/2008 7:00:00 AM
+```
 
 您也可以显式定义您希望日期输出的格式，如下例所示，其中传递了 `yyyyMMddTHH:mm:ss` 值，表示您希望日期以年、月、日、时、分（带冒号）和秒（也带冒号）的顺序输出：
 
-[PRE46]
+```cs
+var date1 = new DateTime(2008, 3, 1, 7, 0, 0);
+Console.WriteLine(date1.ToString("yyyyMMddTHH:mm:ss"));
+```
 
 将显示以下输出：
 
-[PRE47]
+```cs
+     20080301T07:00:00
+```
 
 # 逻辑运算符和布尔表达式
 
 您已经熟悉这些了。回想一下，在前面的练习中，您做了以下比较：
 
-[PRE48]
+```cs
+var now = DateTime.Now.Date == DateTime.UtcNow.Date;
+```
 
 这个输出将 `true` 值赋给 `now` 如果日期相等。但正如你所知，它们可能并不一定相同。因此，如果日期不同，将分配一个 `false` 值。这两个值是这种布尔表达式的结果，被称为布尔值。这就是为什么 `now` 变量的类型是 `bool`。
 
@@ -474,15 +672,23 @@ C# 将其数值类型分为两大类——整型数和浮点型数。整型数�
 
 +   将检查 `a` 是否大于 `b` 的比较结果赋值：
 
-    [PRE49]
+    ```cs
+    var basicComparison = a > b;
+    ```
 
 +   将检查 `b` 是否大于或等于 `a` 的比较结果赋值：
 
-    [PRE50]
+    ```cs
+    bool anotherBasicComparison = b >= a; 
+    ```
 
 +   检查两个字符串是否相等，并将此比较的结果赋值给变量：
 
-    [PRE51]
+    ```cs
+    var animal1 = "Leopard";
+    var animal2 = "Lion";
+    bool areTheseAnimalsSame = animal1 == animal2;
+    ```
 
 显然，前一个比较的结果将是 `false`，并将这个值赋给 `areTheseAnimalsSame` 变量。
 
@@ -490,15 +696,25 @@ C# 将其数值类型分为两大类——整型数和浮点型数。整型数�
 
 +   `&&`（与）运算符：这个运算符将执行相等比较。如果两者相等则返回 `true`，如果不相等则返回 `false`。考虑以下示例，其中你检查两个字符串的长度是否为 `0`：
 
-    [PRE52]
+    ```cs
+    bool areTheseStringsWithZeroLength = "".Length == 0 && " ".Length == 0; 
+    Console.WriteLine(areTheseStringsWithZeroLength);// will return false
+    ```
 
 +   `||`（或）运算符：这个运算符将检查被比较的值中是否至少有一个是 `true`。例如，在这里你检查至少有一个字符串的长度为零：
 
-    [PRE53]
+    ```cs
+    bool isOneOfTheseStringsWithZeroLength = "".Length == 0 || " ".Length == 0;
+    Console.WriteLine(isOneOfTheseStringsWithZeroLength); // will return true
+    ```
 
 +   `!`（非）运算符：这个运算符取一个布尔表达式或值并取反；也就是说，它返回相反的值。例如，考虑以下示例，其中你取反了一个检查字符串长度是否为零的比较结果：
 
-    [PRE54]
+    ```cs
+    bool isOneOfTheseStringsWithZeroLength = "".Length == 0 || " ".Length == 0; 
+    bool areYouReallySure = !isOneOfTheseStringsWithZeroLength;
+    Console.WriteLine(areYouReallySure); // will return false
+    ```
 
 ## 使用 if-else 语句
 
@@ -514,21 +730,51 @@ C# 将其数值类型分为两大类——整型数和浮点型数。整型数�
 
 以下步骤将帮助你完成这个练习：
 
-1.  在VS Code集成终端中，创建一个名为`Exercise1_06`的新控制台项目：
+1.  在 VS Code 集成终端中，创建一个名为`Exercise1_06`的新控制台项目：
 
-    [PRE55]
+    ```cs
+    dotnet new console -n Exercise1_06
+    ```
 
 1.  在`Main`方法中，添加以下代码以请求用户输入用户名，并将值分配给一个变量：
 
-    [PRE56]
+    ```cs
+    Console.WriteLine("Please type a username. It must have at least 6 characters: ");
+    var username = Console.ReadLine();
+    ```
 
 1.  接下来，程序需要检查用户名是否超过六个字符，如果不是，则将错误信息写入控制台：
 
-    [PRE57]
+    ```cs
+    if (username.Length < 6)
+    {
+    Console.WriteLine($"The username {username} is not valid.");
+    }
+    ```
 
 1.  现在，在`else`子句中，你将继续验证并要求用户输入密码。一旦用户输入了密码，需要检查三个点。第一个条件是检查密码是否至少有六个字符，然后是否有至少一个数字。然后，如果这些条件中的任何一个失败，控制台应该显示错误信息；否则，应该显示成功信息。为此，添加以下代码：
 
-    [PRE58]
+    ```cs
+    else
+    {
+    Console.WriteLine("Now type a 
+    password. It must have a length of at least 6 characters and also contain a number.");
+    var password = Console.ReadLine();
+
+    if (password.Length < 6)
+         {
+         		Console.WriteLine("The password must have at least 6 characters.");
+    }
+         else if (!password.Any(c => char.IsDigit©))
+         {
+         		Console.WriteLine("The password must contain at least one number.");
+    }
+    else
+         {
+                 Console.WriteLine("User successfully registered.");
+    }
+    }
+    ```
 
 从前面的代码片段中，你可以看到如果用户输入的字符少于六个，会显示错误信息`The password must have at least 6 characters.`。如果密码不包含任何数字但满足前面的条件，则会显示另一个错误信息`The password must contain at least one number.`。
 
@@ -536,19 +782,27 @@ C# 将其数值类型分为两大类——整型数和浮点型数。整型数�
 
 1.  使用`dotnet run`运行程序。你应该会看到以下输出：
 
-    [PRE59]
+    ```cs
+    Please type a username. It must have at least 6 characters:
+    thekingjames
+    Now type a password. It must have at least 6 characters and a number.
+    James123!"#
+    User successfully registered
+    ```
 
     注意
 
-    你可以在[https://packt.link/3Q7oK](https://packt.link/3Q7oK)找到这个练习所使用的代码。
+    你可以在[`packt.link/3Q7oK`](https://packt.link/3Q7oK)找到这个练习所使用的代码。
 
-在这个练习中，你使用了if-else分支语句来实现一个简单的用户注册程序。
+在这个练习中，你使用了 if-else 分支语句来实现一个简单的用户注册程序。
 
 ## 三元操作符
 
 另一个简单易用且有效的决策操作符是三元操作符。它允许你根据布尔比较设置变量的值。例如，考虑以下示例：
 
-[PRE60]
+```cs
+var gift = person.IsChild() ? "Toy" : "Clothes";
+```
 
 在这里，你使用 `?` 符号来检查它之前放置的布尔条件是否有效。编译器为 `person` 对象运行 `IsChild` 函数。如果该方法返回 `true`，则第一个值（在 `:` 符号之前）将被分配给 `gift` 变量。如果该方法返回 `false`，则第二个值（在 `:` 符号之后）将被分配给 `gift` 变量。
 
@@ -578,21 +832,55 @@ C# 中有两种类型的变量，即引用类型和值类型。值类型变量�
 
 例如，考虑以下处理整数的代码。这里，你声明一个名为 `a` 的 `int` 变量并将其值设置为 `100`。稍后，你创建另一个名为 `b` 的 `int` 变量并将 `a` 的值赋给它。最后，你修改 `b`，将其增加 `100`：
 
-[PRE61]
+```cs
+using System;
+int a = 100;
+Console.WriteLine($"Original value of a: {a}");
+int b = a;
+Console.WriteLine($"Original value of b: {b}");
+b = b + 100;
+Console.WriteLine($"Value of a after modifying b: {a}");
+Console.WriteLine($"Value of b after modifying b: {b}");
+```
 
 `a` 和 `b` 的值将在以下输出中显示：
 
-[PRE62]
+```cs
+Original value of a: 100
+Original value of b: 100
+Value of a after modifying b: 100
+Value of b after modifying b: 200
+```
 
 在这个例子中，`a` 的值被复制到 `b` 中。从这一点开始，你对 `b` 所做的任何其他修改都只会反映在 `b` 上，而 `a` 将继续保持其原始值。
 
 现在，如果你将引用类型作为方法参数传递，会发生什么？考虑以下程序。这里，你有一个名为 `Car` 的类，具有两个属性——`Name` 和 `GearType`。在程序中有一个名为 `UpgradeGearType` 的方法，它接收 `Car` 类型的对象并将其 `GearType` 更改为 `Automatic`：
 
-[PRE63]
+```cs
+using System;
+var car = new Car();
+car.Name = "Super Brand New Car";
+car.GearType = "Manual";
+Console.WriteLine($"This is your current configuration for the car {car.Name}: Gea–Type - {car.GearType}");
+UpgradeGearType(car);
+Console.WriteLine($"You have upgraded your car {car.Name} for the GearType {car.GearType}");
+void UpgradeGearType(Car car)
+{
+    car.GearType = "Automatic";
+}
+class Car
+{
+    public string Name { get; set; }
+    public string GearType { get; set; }
+}
+```
 
 在创建 `Car` 的 `UpgradeGearType()` 方法后，输出将如下所示：
 
-[PRE64]
+```cs
+This is your current configuration for the car Super Brand New Car: GearType – Manual
+You have upgraded your car Super Brand New Car for the GearType Automatic
+```
 
 因此，你可以看到，如果你将一个 `car`（在这种情况下）作为参数传递给一个方法（例如示例中的 `UpgradeGearType`），在这个 **对象** 内部所做的任何更改都会在方法调用之后和外部反映出来。这是因为引用类型引用内存中的特定位置。
 
@@ -602,77 +890,143 @@ C# 中有两种类型的变量，即引用类型和值类型。值类型变量�
 
 1.  在 VS Code 中，打开集成终端并输入以下内容：
 
-    [PRE65]
+    ```cs
+    dotnet new console -n Exercise1_07
+    ```
 
 1.  打开 `Program.cs` 文件。在同一文件中，创建一个名为 `GoldenRetriever` 的结构体，具有 `Name` 属性，如下所示：
 
-    [PRE66]
+    ```cs
+    struct GoldenRetriever
+    {
+        public string Name { get; set; }
+    }
+    ```
 
 1.  仍然在同一文件中，创建一个名为 `BorderCollie` 的另一个类，具有类似的 `Name` 属性：
 
-    [PRE67]
+    ```cs
+    class BorderCollie
+    {
+        public string Name { get; set; }
+    }
+    ```
 
 1.  还必须创建一个最终的类，一个名为 `Bernese` 的类，也具有 `Name` 属性，但额外重写了原生的 `Equals` 方法：
 
-    [PRE68]
+    ```cs
+    class Bernese
+    {
+        public string Name { get; set; }
+        public override bool Equals(object obj)
+        {
+            if (obj is Bernese borderCollie && obj != null)
+            {
+                return this.Name == borderCollie.Name;
+            }
+            return false;
+        }
+    }
+    ```
 
 在这里，`this` 关键字用于引用当前的 `borderCollie` 类。
 
 1.  最后，在 `Program.cs` 文件中，你将为这些类型创建一些对象。请注意，由于你正在使用 **顶层语句**，这些声明应该在类和结构体声明之上：
 
-    [PRE69]
+    ```cs
+            var aGolden = new GoldenRetriever() { Name = "Aspen" };
+            var anotherGolden = new GoldenRetriever() { Name = "Aspen" };
+            var aBorder = new BorderCollie() { Name = "Aspen" };
+            var anotherBorder = new BorderCollie() { Name = "Aspen" };
+            var aBernese = new Bernese() { Name = "Aspen" };
+            var anotherBernese = new Bernese() { Name = "Aspen" };
+    ```
 
 1.  现在，在之前的声明之后，使用 `Equals` 方法比较这些值并将结果赋给一些变量：
 
-    [PRE70]
+    ```cs
+    var goldenComparison = aGolden.Equals(anotherGolden) ? "These Golden Retrievers have the same name." : "These Goldens have different names.";
+    var borderComparison = aBorder.Equals(anotherBorder) ? "These Border Collies have the same name." : "These Border Collies have different names.";
+    var berneseComparison = aBernese.Equals(anotherBernese) ? "These Bernese dogs have the same name." : "These Bernese dogs have different names.";
+    ```
 
 1.  最后，使用以下代码将比较结果打印到控制台：
 
-    [PRE71]
+    ```cs
+              Console.WriteLine(goldenComparison);
+              Console.WriteLine(borderComparison);
+              Console.WriteLine(berneseComparison);
+    ```
 
 1.  使用 `dotnet run` 从命令行运行程序，你将看到以下输出：
 
-    [PRE72]
+    ```cs
+    These Golden Retrievers have the same name.
+    These Border Collies have different names.
+    These Bernese dogs have the same name.
+    ```
 
     注意
 
-    你可以在 [https://packt.link/xcWN9](https://packt.link/xcWN9) 找到用于此练习的代码。
+    你可以在 [`packt.link/xcWN9`](https://packt.link/xcWN9) 找到用于此练习的代码。
 
 如前所述，结构体是值类型。因此，当两个相同结构体的对象使用 `Equals` 进行比较时，.NET 内部会检查所有结构体属性。如果这些属性的值相等，则返回 `true`。以 `Golden Retrievers` 为例，如果你有一个 `FamilyName` 属性，并且这个属性在两个对象之间不同，则相等比较的结果将是 `false`。
 
 对于类和所有其他引用类型，相等比较相当不同。默认情况下，在相等比较时检查对象引用。如果引用不同（除非两个变量被分配到同一个对象），相等比较将返回`false`。这解释了示例中`Border Collies`的结果，即两个实例的引用是不同的。
 
-然而，可以在引用类型中实现一个名为`Equals`的方法。给定两个对象，`Equals`方法可以用于在方法内部放置的逻辑之后的比较。这正是Bernese dogs示例中发生的情况。
+然而，可以在引用类型中实现一个名为`Equals`的方法。给定两个对象，`Equals`方法可以用于在方法内部放置的逻辑之后的比较。这正是 Bernese dogs 示例中发生的情况。
 
 ### 默认值类型
 
-现在你已经处理了值和引用类型，你将简要探索默认值类型。在C#中，每个类型都有一个默认值，如下表所示：
+现在你已经处理了值和引用类型，你将简要探索默认值类型。在 C#中，每个类型都有一个默认值，如下表所示：
 
-![图1.4：默认值类型表](img/B16835_01_04.jpg)
+![图 1.4：默认值类型表](img/B16835_01_04.jpg)
 
-图1.4：默认值类型表
+图 1.4：默认值类型表
 
 这些默认值可以使用`default`关键字分配给变量。要在变量声明中使用此词，必须在变量名称之前显式声明变量类型。例如，考虑以下代码片段，其中你将`default`值分配给两个`int`变量：
 
-[PRE73]
+```cs
+int a = default;
+int b = default;
+```
 
 在这种情况下，`a`和`b`都将被分配值为`0`。请注意，在这种情况下不能使用`var`。这是因为，对于隐式声明的变量，编译器需要将值分配给变量以推断其类型。因此，以下代码片段将导致错误，因为没有设置类型，无论是通过显式声明还是通过变量赋值：
 
-[PRE74]
+```cs
+var a = default;
+var b = default;
+```
 
 ## 使用`switch`语句增强决策
 
-当需要测试单个表达式与三个或更多条件时，`switch`语句通常用作if-else结构的替代方案，即当你想要执行多个代码部分中的一个时，如下所示：
+当需要测试单个表达式与三个或更多条件时，`switch`语句通常用作 if-else 结构的替代方案，即当你想要执行多个代码部分中的一个时，如下所示：
 
-[PRE75]
+```cs
+switch (matchingExpression) 
+{
+  case firstCondition:
+    // code section
+    break;
+  case secondCondition:
+    // code section
+    break;
+  case thirdCondition:
+    // code section
+    break;
+  default:
+    // code section
+    break;
+}
+```
 
-匹配表达式应该返回以下类型之一：`char`、`string`、`bool`、`numbers`、`enum`和`object`。然后，这个值将在匹配的某个case子句或默认子句中进行评估，如果它不匹配任何先前的子句。
+匹配表达式应该返回以下类型之一：`char`、`string`、`bool`、`numbers`、`enum`和`object`。然后，这个值将在匹配的某个 case 子句或默认子句中进行评估，如果它不匹配任何先前的子句。
 
 重要的是要说明，在`switch`语句中，只有一个`switch`部分会被执行。C#不允许从一个`switch`部分继续执行到下一个。然而，`switch`语句本身并不知道如何停止。你可以使用`break`关键字，如果你只想执行某些操作而不返回，或者如果需要返回某些值。
 
 此外，`switch`语句上的`default`关键字是如果没有匹配其他选项，执行将去的地方。在下一个练习中，你将使用`switch`语句创建一个餐厅菜单应用程序。
 
-## 练习1.08：使用`switch`来点餐
+## 练习 1.08：使用`switch`来点餐
 
 在这个练习中，您将创建一个控制台应用程序，允许用户从餐厅提供的菜单中选择食物项目。应用程序应显示订单的确认收据。您将使用`switch`语句来实现逻辑。
 
@@ -682,33 +1036,88 @@ C# 中有两种类型的变量，即引用类型和值类型。值类型变量�
 
 1.  现在，创建一个`System.Text.StringBuilder`。这是一个帮助以多种方式构建字符串的类。在这里，您是逐行构建字符串，以便它们可以在控制台上正确显示：
 
-    [PRE76]
+    ```cs
+    var menuBuilder = new System.Text.StringBuilder();
+    menuBuilder.AppendLine("Welcome to the Burger Joint. ");
+    menuBuilder.AppendLine(string.Empty);
+    menuBuilder.AppendLine("1) Burgers and Fries - 5 USD");
+    menuBuilder.AppendLine("2) Cheeseburger - 7 USD");
+    menuBuilder.AppendLine("3) Double-cheeseburger - 9 USD");
+    menuBuilder.AppendLine("4) Coke - 2 USD");
+    menuBuilder.AppendLine(string.Empty);
+    menuBuilder.AppendLine("Note that every burger option comes with fries and ketchup!");
+    ```
 
 1.  在控制台上显示菜单，并要求用户选择一个选项：
 
-    [PRE77]
+    ```cs
+    Console.WriteLine(menuBuilder.ToString());
+    Console.WriteLine("Please type one of the following options to order:");
+    ```
 
 1.  读取用户按下的键并将其分配给一个变量，使用`Console.ReadKey()`方法。此方法与您之前使用的`ReadLine()`方法类似，区别在于它读取方法调用后立即按下的键。为此添加以下代码：
 
-    [PRE78]
+    ```cs
+    var option = Console.ReadKey();
+    ```
 
 1.  现在是时候使用`switch`语句了。在此处将`option.KeyChar.ToString()`用作`switch`子句的匹配表达式。键`1`、`2`、`3`和`4`应分别导致接受`汉堡`、`芝士汉堡`、`双层芝士汉堡`和`可乐`的订单：
 
-    [PRE79]
+    ```cs
+    switch (option.KeyChar.ToString())
+    {
+        case "1":
+            {
+                Console.WriteLine("\nAlright, some burgers on the go. Please pay the cashier.");
+                break;
+            }
+        case "2":
+            {
+                Console.WriteLine("\nThank you for ordering cheeseburgers. Please pay the cashier.");
+                break;
+            }
+        case "3":
+            {
+                Console.WriteLine("\nThank you for ordering double cheeseburgers, hope you enjoy them. Please pay the cashier!");
+    ```
 
 然而，任何其他输入都应被视为无效，并显示一条消息，告知您已选择无效选项：
 
-[PRE80]
+```cs
+            break;
+        }
+    case "4":
+        {
+            Console.WriteLine("\nThank you for ordering Coke. Please pay the cashier.");
+            break;
+        }
+    default:
+        {
+            Console.WriteLine("\nSorry, you chose an invalid option.");
+            break;
+        }
+}
+```
 
 1.  最后，使用`dotnet run --project Exercise1_08`运行程序，并与控制台交互以查看可能的输出。例如，如果您输入`1`，您应该看到以下输出：
 
-    [PRE81]
+    ```cs
+    Welcome to the Burger Joint. 
+    1) Burgers and Fries – 5 USD
+    2) Cheeseburger – 7 USD
+    3) Double-cheeseburger – 9 USD
+    4) Coke – 2 USD
+    Note that every burger option comes with fries and ketchup!
+    Please type one of the follow options to order:
+    1
+    Alright, some burgers on the go! Please pay on the following cashier!
+    ```
 
     注意
 
-    您可以在[https://packt.link/x1Mvn](https://packt.link/x1Mvn)找到用于此练习的代码。
+    您可以在[`packt.link/x1Mvn`](https://packt.link/x1Mvn)找到用于此练习的代码。
 
-类似地，您还应该获取其他选项的输出。您已经学习了C#中的分支语句。在用C#编程时，您还会经常使用另一种类型的语句，称为迭代语句。下一节将详细介绍这一主题。
+类似地，您还应该获取其他选项的输出。您已经学习了 C#中的分支语句。在用 C#编程时，您还会经常使用另一种类型的语句，称为迭代语句。下一节将详细介绍这一主题。
 
 ## 迭代语句
 
@@ -716,43 +1125,76 @@ C# 中有两种类型的变量，即引用类型和值类型。值类型变量�
 
 ### while
 
-您将考虑的第一个迭代语句是`while`语句。此语句允许C#程序在某个布尔表达式评估为`true`时执行一系列指令。它具有最基本的结构之一。考虑以下代码片段：
+您将考虑的第一个迭代语句是`while`语句。此语句允许 C#程序在某个布尔表达式评估为`true`时执行一系列指令。它具有最基本的结构之一。考虑以下代码片段：
 
-[PRE82]
+```cs
+int i = 0;
+while (i < 10)
+{
+Console.WriteLine(i);
+i = i +1;
+}
+```
 
 前面的代码片段展示了如何使用`while`语句。请注意，`while`关键字后面跟着一对括号，括号内包含一个逻辑条件；在这种情况下，条件是`i`的值必须小于`10`。大括号内编写的代码将在该条件为`true`时执行。
 
 因此，前面的代码将打印从`0`开始的`i`的值，直到`10`。这是一段相当简单的代码；在下一个练习中，您将使用`while`语句进行一些更复杂的操作，例如检查您输入的数字是否为质数。
 
-## 练习1.09：使用`while`循环检查数字是否为质数
+## 练习 1.09：使用`while`循环检查数字是否为质数
 
 在这个练习中，您将使用`while`循环来检查您输入的数字是否为质数。为此，`while`循环将检查计数器是否小于或等于数字除以`2`的整数结果。当这个条件满足时，您检查数字除以计数器的余数是否为`0`。如果不是，您增加计数器并继续，直到循环条件不满足。如果满足，这意味着数字不是`false`，循环可以停止。
 
 执行以下步骤以完成此练习：
 
-1.  在VS Code集成终端中，创建一个名为`Exercise1_09`的新控制台项目。
+1.  在 VS Code 集成终端中，创建一个名为`Exercise1_09`的新控制台项目。
 
 1.  在`Program.cs`文件中，创建以下方法，该方法将执行您在练习开始时引入的逻辑：
 
-    [PRE83]
+    ```cs
+    static bool IsPrime(int number)
+    {
+    if (number ==0 || number ==1) return false;
+    bool isPrime = true;
+    int counter = 2;
+    while (counter <= Math.Sqrt(number))
+         {
+         		if (number % counter == 0)
+               {
+               	isPrime = false;
+                    break;
+    }
+    counter++;
+    }
+         return isPrime;
+    }
+    ```
 
 1.  现在，输入一个数字，这样您就可以检查它是否为质数：
 
-    [PRE84]
+    ```cs
+    Console.Write("Enter a number to check whether it is Prime: ");
+    var input = int.Parse(Console.ReadLine());
+    ```
 
 1.  现在，检查数字是否为质数并打印结果：
 
-    [PRE85]
+    ```cs
+    Console.WriteLine($"{input} is prime? {IsPrime(input)}.");
+    ```
 
-1.  最后，在VS Code集成终端中，调用`dotnet run --project Exercise1_09`并与程序交互。例如，尝试输入`29`作为输入：
+1.  最后，在 VS Code 集成终端中，调用`dotnet run --project Exercise1_09`并与程序交互。例如，尝试输入`29`作为输入：
 
-    [PRE86]
+    ```cs
+    Enter a number to check whether it is Prime:
+    29
+    29 is prime? True
+    ```
 
 如预期，`29`的结果为`true`，因为它是一个质数。
 
 注意
 
-您可以在[https://packt.link/5oNg5](https://packt.link/5oNg5)找到用于此练习的代码。
+您可以在[`packt.link/5oNg5`](https://packt.link/5oNg5)找到用于此练习的代码。
 
 前面的练习旨在向您展示一个带有一些更复杂逻辑的`while`循环的简单结构。它检查一个数字（命名为`input`）并打印它是否为质数。在这里，您再次看到了`break`关键字被用来停止程序执行。现在继续学习跳转语句。
 
@@ -760,17 +1202,68 @@ C# 中有两种类型的变量，即引用类型和值类型。值类型变量�
 
 在循环中还有一些其他重要的关键字也值得提及。这些关键字被称为跳转语句，用于将程序执行转移到另一个部分。例如，您可以按如下方式重写`IsPrime`方法：
 
-[PRE87]
+```cs
+static bool IsPrimeWithContinue(int number)
+        {
+        if (number == 0 || number ==1) return false;
+            bool isPrime = true;
+            int counter = 2;
+            while (counter <= Math.Sqrt(number))
+            {
+                if (number % counter != 0)
+                {
+                    counter++;
+                    continue;
+                }
+                isPrime = false;
+                break;
+            }
+            return isPrime;
+        }
+```
 
 在这里，您反转了逻辑检查。您不是检查余数是否为零然后中断程序执行，而是检查余数是否不为零，如果是这样，就使用`continue`语句将执行传递到下一个迭代。
 
 现在，看看您如何使用另一个特殊关键字`goto`来重写它：
 
-[PRE88]
+```cs
+static bool IsPrimeWithGoTo(int number)
+        {
+        if (number == 0 || number ==1) return false;
+bool isPrime = true;
+            int counter = 2;
+            while (counter <= Math.Sqrt(number))
+            {
+                if (number % counter == 0)
+                {
+                    isPrime = false;
+                    goto isNotAPrime; 
+                }
+                counter++;
+            }
+            isNotAPrime:
+            return isPrime;
+        }
+```
 
 可以使用`goto`关键字从一个代码部分跳转到另一个由所谓的标签定义的部分。在这种情况下，标签被命名为`isNotAPrime`。最后，看看另一种编写这种逻辑的方法：
 
-[PRE89]
+```cs
+static bool IsPrimeWithReturn(int number)
+        {
+        if (number == 0 || number ==1) return false;
+            int counter = 2;
+            while (counter <= Math.Sqrt(number))
+            {
+                if (number % counter == 0)
+                {
+                    return false;
+                }
+                counter ++;
+            }
+            return true;
+        }
+```
 
 现在，您不是使用`break`或`continue`来停止程序执行，而是简单地使用`return`来中断循环执行，因为您已经找到了您要找的结果。
 
@@ -778,7 +1271,14 @@ C# 中有两种类型的变量，即引用类型和值类型。值类型变量�
 
 `do-while` 循环与之前类似，但有一个细微的区别：它至少执行一次逻辑，而简单的 `while` 语句如果首次执行时条件不满足，可能永远不会执行。它具有以下结构：
 
-[PRE90]
+```cs
+int t = 0;
+do
+{
+    Console.WriteLine(t);
+    t++;
+} while (t < 5);
+```
 
 在这个例子中，你从 `0` 开始写入 `t` 的值，并在它小于 `5` 时持续递增。在深入研究下一类循环之前，了解一个新概念，即数组。
 
@@ -786,11 +1286,15 @@ C# 中有两种类型的变量，即引用类型和值类型。值类型变量�
 
 数组是一种用于存储许多相同类型对象的数据结构。例如，以下示例是一个声明为整数数组变量的变量：
 
-[PRE91]
+```cs
+int[] numbers = { 1, 2, 3, 4, 5 };
+```
 
 关于数组的一个重要注意事项是它们具有固定容量。这意味着数组在其创建时将定义长度，并且这个长度不能改变。长度可以通过各种方式确定。在前面的例子中，长度是通过计算数组中的对象数量来推断的。然而，创建数组的另一种方式如下：
 
-[PRE92]
+```cs
+var numbers = new int[5];
+```
 
 在这里，你正在创建一个容量为 `5` 个整数的数组，但你没有为数组元素指定任何值。当创建任何数据类型的数组而不向其中添加元素时，该值类型的默认值将设置为数组的每个位置。例如，考虑以下图示：
 
@@ -812,19 +1316,30 @@ C# 中有两种类型的变量，即引用类型和值类型。值类型变量�
 
 `for` 循环在布尔表达式匹配指定条件时执行一系列指令。就像 `while` 循环一样，可以使用跳转语句来停止循环执行。它具有以下结构：
 
-[PRE93]
+```cs
+for (initializer; condition; iterator)
+{
+	[statements]
+}
+```
 
 初始化语句在循环开始之前执行。它用于声明并分配一个仅用于循环作用域内的局部变量。
 
 但在更复杂的场景中，它也可以用来组合其他语句表达式。条件指定了一个布尔条件，指示循环何时继续或退出。迭代器通常用于在初始化部分创建的变量中增加或减少。以下是一个例子，其中使用`for`循环打印整数数组的元素：
 
-[PRE94]
+```cs
+int[] array = { 1, 2, 3, 4, 5 };
+for (int j = 0; j < array.Length - 1; j++)
+{
+Console.WriteLine(array[j]);
+}
+```
 
 在这个例子中，已经创建了一个初始化变量`j`，其初始值为`0`。`for`循环将在`j`小于数组长度减`1`时持续执行（记住索引总是从`0`开始）。在每次迭代后，`j`的值增加`1`。这样，`for`循环就会遍历整个数组并执行给定的操作，即打印当前数组元素的值。
 
 C#还允许使用**嵌套循环**，即**循环中的循环**，你将在下一个练习中看到。
 
-## 练习1.10：使用冒泡排序对数组进行排序
+## 练习 1.10：使用冒泡排序对数组进行排序
 
 在这个练习中，你将执行一种最简单的排序算法。冒泡排序包括遍历数组中的每一对元素，并在它们未排序时交换它们。最终，期望得到一个按升序排列的数组。你将使用嵌套的`for`循环来实现这个算法。
 
@@ -834,49 +1349,90 @@ C#还允许使用**嵌套循环**，即**循环中的循环**，你将在下一�
 
 1.  使用以下命令创建一个新的控制台项目：
 
-    [PRE95]
+    ```cs
+    dotnet new console -n Exercise1_10
+    ```
 
 1.  在`Program.cs`文件中，创建一个方法来实现排序算法。添加以下代码：
 
-    [PRE96]
+    ```cs
+    static int[] BubbleSort(int[] array)
+    {
+        int temp;
+        // Iterate over the array
+        for (int j = 0; j < array.Length - 1; j++)
+        {
+            // If the last j elements are already ordered, skip them
+            for (int i = 0; i < array.Length - j - 1; i++)
+            {
+                if (array[i] > array[i + 1])
+                {
+                    temp = array[i + 1];
+                    array[i + 1] = array[i];
+                    array[i] = temp;
+                }
+            }
+        }
+        return array;
+    }
+    ```
 
 1.  现在创建一个包含一些数字的**数组**，如下所示：
 
-    [PRE97]
+    ```cs
+    int[] randomNumbers = { 123, 22, 53, 91, 787, 0, -23, 5 };
+    ```
 
 1.  调用`BubbleSort`方法，将数组作为参数传递，并将结果赋给一个变量，如下所示：
 
-    [PRE98]
+    ```cs
+    int[] sortedArray = BubbleSort(randomNumbers);
+    ```
 
 1.  最后，你需要打印出数组已排序的消息。为此，遍历数组，打印数组元素：
 
-    [PRE99]
+    ```cs
+    Console.WriteLine("Sorted:");
+    for (int i = 0; i < sortedArray.Length; i++)
+    {
+        Console.Write(sortedArray[i] + " ");
+    }
+    ```
 
 1.  使用 `dotnet run --project Exercise1_10` 命令运行程序。你应该会在屏幕上看到以下输出：
 
-    [PRE100]
+    ```cs
+    Sorted:
+    -23 0 5 22 53 91 123 787
+    ```
 
     注意
 
-    你可以在[https://packt.link/cJs8y](https://packt.link/cJs8y)找到这个练习使用的代码。
+    你可以在[`packt.link/cJs8y`](https://packt.link/cJs8y)找到这个练习使用的代码。
 
-在这个练习中，你使用了在上一节学到的两个概念：数组和for循环。你操作数组，通过索引访问它们的值，并使用for循环遍历这些索引。
+在这个练习中，你使用了在上一节学到的两个概念：数组和 for 循环。你操作数组，通过索引访问它们的值，并使用 for 循环遍历这些索引。
 
 有另一种方法可以遍历数组或`foreach`语句的每个元素。你将在下一节中探索这一点。
 
-### foreach语句
+### foreach 语句
 
 `foreach`语句为集合中的每个元素执行一组指令。就像`for`循环一样，`break`、`continue`、`goto`和`return`关键字也可以与`foreach`语句一起使用。考虑以下示例，其中你遍历数组的每个元素并将其写入控制台作为输出：
 
-[PRE101]
+```cs
+var items = new int[] { 1, 2, 3, 4, 5 };
+foreach (int element in items)
+{
+Console.WriteLine(element);
+}
+```
 
-前面的代码片段将数字从`1`到`5`打印到控制台。你可以使用`foreach`语句与比数组更多的东西一起使用；它们还可以与列表、集合和span一起使用，这些是将在后续章节中介绍的其他数据结构。
+前面的代码片段将数字从`1`到`5`打印到控制台。你可以使用`foreach`语句与比数组更多的东西一起使用；它们还可以与列表、集合和 span 一起使用，这些是将在后续章节中介绍的其他数据结构。
 
 ## 文件处理
 
-到目前为止，你一直在创建主要与CPU和内存交互的程序。本节将重点介绍I/O操作，即物理磁盘上的输入和输出操作。文件处理是这类操作的一个很好的例子。
+到目前为止，你一直在创建主要与 CPU 和内存交互的程序。本节将重点介绍 I/O 操作，即物理磁盘上的输入和输出操作。文件处理是这类操作的一个很好的例子。
 
-C#有几个类可以帮助你执行I/O操作。其中一些如下：
+C#有几个类可以帮助你执行 I/O 操作。其中一些如下：
 
 +   `File`：这个类提供了对文件进行操作的方法，即读取、写入、创建、删除、复制和移动磁盘上的文件。
 
@@ -886,13 +1442,13 @@ C#有几个类可以帮助你执行I/O操作。其中一些如下：
 
 +   `DriveInfo`：提供有关磁盘驱动器的信息，例如`Name`、`DriveType`、`VolumeLabel`和`DriveFormat`。
 
-你已经知道文件主要是一些数据集合，它们位于硬盘的某个位置，可以通过某些程序打开进行读取或写入。当你在一个C#应用程序中打开一个文件时，你的程序通过一个通信通道将文件作为一系列字节读取。这个通信通道被称为流。流有两种类型：
+你已经知道文件主要是一些数据集合，它们位于硬盘的某个位置，可以通过某些程序打开进行读取或写入。当你在一个 C#应用程序中打开一个文件时，你的程序通过一个通信通道将文件作为一系列字节读取。这个通信通道被称为流。流有两种类型：
 
 +   输入流用于读取操作。
 
 +   输出流用于写入操作。
 
-`Stream`类是C#中的一个抽象类，它使你可以执行与这种字节流相关的常见操作。对于硬盘上的文件处理，你将使用专门为此目的设计的`FileStream`类。以下是这个类两个重要的属性：`FileAccess`和`FileMode`。
+`Stream`类是 C#中的一个抽象类，它使你可以执行与这种字节流相关的常见操作。对于硬盘上的文件处理，你将使用专门为此目的设计的`FileStream`类。以下是这个类两个重要的属性：`FileAccess`和`FileMode`。
 
 ### FileAccess
 
@@ -926,21 +1482,53 @@ C#有几个类可以帮助你执行I/O操作。其中一些如下：
 
 1.  打开命令提示符并输入以下内容：
 
-    [PRE102]
+    ```cs
+    dotnet new console -n Exercise1_11
+    ```
 
 1.  在你的计算机中 `Exercise1_11` 项目文件夹位置，创建一个名为 `products.csv` 的文件，并将以下内容粘贴到其中：
 
-    [PRE103]
+    ```cs
+    Model;Memory;Storage;USB Ports;Screen;Condition;Price USD
+    Macbook Pro Mid 2012;8GB;500GB HDD;USB 2.0x2;13" screen;Refurbished;400
+    Macbook Pro Mid 2014;8GB;512GB SSD;USB 3.0x3;15" screen;Refurbished;750
+    Macbook Pro Late 2019;16GB;512GB SSD;USB 3.0x3;15" screen;Refurbished;1250
+    ```
 
 1.  打开 `Program.cs` 文件，并用以下内容替换其内容：
 
-    [PRE104]
+    ```cs
+    using System;
+    using System.IO;
+    using System.Threading.Tasks;
+    namespace Exercise1_11
+    {
+        public class Program
+        {
+            public static async Task Main()
+            {
+            using (var fileStream = new FileStream("products.csv", FileMode.Open, FileAccess.Read))
+            {
+                using (var reader = new StreamReader(fileStream))
+                {
+                    var content = await reader.ReadToEndAsync();
+                    var lines = content.Split(Environment.NewLine);
+                    foreach (var line in lines)
+                    {
+                        Console.WriteLine(line);
+                    }
+                }
+            }
+            }
+        }
+    }
+    ```
 
 1.  在命令提示符中调用 `dotnet run`，你将得到一个输出，其内容与您创建的 CSV 文件内容相同。
 
     注意
 
-    你可以在 [https://packt.link/5flid](https://packt.link/5flid) 找到用于此练习的代码。
+    你可以在 [`packt.link/5flid`](https://packt.link/5flid) 找到用于此练习的代码。
 
 此练习有一些相当有趣的结果，你将逐步了解。首先，你使用 `FileStream` 类打开了一个文件。这允许你从文件开始流式传输字节，具有两个特殊属性，即 `FileMode` 和 `FileAccess`。它将返回一个 `StreamReader` 类。此类使你能够将这些字节作为文本字符读取。
 
@@ -964,81 +1552,171 @@ C# 中对象使用的内存由称为垃圾回收器的东西来处理。默认�
 
 1.  打开 VS Code 集成终端并输入以下内容：
 
-    [PRE105]
+    ```cs
+    dotnet new console -n Exercise1_12
+    ```
 
 1.  在你的计算机上的一个合适位置，将上一个练习中的 `products.csv` 文件复制并粘贴到这个练习的文件夹中。
 
 1.  在 `Program.cs` 中创建一个名为 `ReadFile` 的方法，该方法将接收一个 `FileStream` 文件并遍历文件行，将结果输出到控制台：
 
-    [PRE106]
+    ```cs
+    static async Task ReadFile(FileStream fileStream)
+        {
+            using (var reader = new StreamReader(fileStream))
+            {
+                var content = await reader.ReadToEndAsync();
+                var lines = content.Split(Environment.NewLine);
+                foreach (var line in lines)
+                {
+                    Console.WriteLine(line);
+                }
+            }
+        }
+    ```
 
 1.  现在，在你的程序中，使用 `StreamWriter` 打开 `products.csv` 文件，并向其中添加更多信息，如下所示：
 
-    [PRE107]
+    ```cs
+            using (var file = new StreamWriter("products.csv", append: true))
+            {
+                file.Write("\nOne more macbook without details.");
+            }
+    ```
 
 1.  最后，修改文件后读取文件内容：
 
-    [PRE108]
+    ```cs
+    using (var fileStream = new FileStream("products.csv", FileMode.Open,
+                FileAccess.Read))
+            {
+                await ReadFile(fileStream);
+            }
+    ```
 
 1.  在 VS Code 集成终端中调用 `dotnet run --project Exercise1_12`，你将能够看到你刚刚创建的 CSV 文件的内容，以及你刚刚追加的行：
 
-    [PRE109]
+    ```cs
+    Model;Memory;Storage;USB Ports;Screen;Condition;Price USD
+    Macbook Pro Mid 2012;8GB;500GB HDD;USB 2.0x2;13" screen;Refurbished;400
+    Macbook Pro Mid 2014;8GB;512GB SSD;USB 3.0x3;15" screen;Refurbished;750
+    Macbook Pro Late 2019;16GB;512GB SSD;USB 3.0x3;15" screen;Refurbished;1250
+    One more macbook without details.
+    ```
 
 注意，对于每次运行，程序将追加一行，所以你会看到更多行被添加。
 
 注意
 
-你可以在 [https://packt.link/dUk2z](https://packt.link/dUk2z) 找到用于此练习的代码。
+你可以在 [`packt.link/dUk2z`](https://packt.link/dUk2z) 找到用于此练习的代码。
 
 有时你的程序可能在某个点失败并无法提供输出。这种情况被称为异常错误。下一节将详细介绍此类错误。
 
 ## 异常
 
-异常表示程序在某些原因下未能执行，可能由代码本身或.NET运行时引发。通常，异常是一个严重的失败，甚至可能终止程序的执行。幸运的是，C# 提供了一种特殊的方式来处理异常，即 `try/catch` 块：
+异常表示程序在某些原因下未能执行，可能由代码本身或.NET 运行时引发。通常，异常是一个严重的失败，甚至可能终止程序的执行。幸运的是，C# 提供了一种特殊的方式来处理异常，即 `try/catch` 块：
 
-[PRE110]
+```cs
+try
+{
+// some logic that might throw an exception
+}
+catch
+{
+// error handling
+}
+```
 
 在`try`块中，你调用可能会抛出异常的代码，而在`catch`块中，你可以处理所抛出的异常。例如，考虑以下示例：
 
-[PRE111]
+```cs
+double Divide(int a, int b) => a/b;
+```
 
 此方法接受两个整数并返回它们之间的除法结果。然而，如果`b`是`0`会发生什么？在这种情况下，运行时会抛出`System.DivideByZeroException`，表示无法执行除法。你如何在现实世界的程序中处理这个异常？你将在下一个练习中探索这个问题。
 
-## 练习1.13：使用try/catch处理无效用户输入
+## 练习 1.13：使用 try/catch 处理无效用户输入
 
 在这个练习中，你将创建一个控制台应用程序，该程序从你那里接收两个输入，将第一个数字除以第二个数字，并输出结果。如果你输入了无效字符，应用程序应该抛出异常，并且所有这些都应该在程序逻辑中处理。
 
 执行以下步骤以完成此练习：
 
-1.  在VS Code集成终端中，创建一个名为`Exercise1_13`的新控制台应用程序。
+1.  在 VS Code 集成终端中，创建一个名为`Exercise1_13`的新控制台应用程序。
 
 1.  在`Program.cs`文件中创建以下方法：
 
-    [PRE112]
+    ```cs
+    static double Divide(int a, int b)
+    {
+        return a / b;
+    }
+    ```
 
 1.  现在，创建一个布尔变量来指示除法是否正确执行。将其初始值设置为`false`：
 
-    [PRE113]
+    ```cs
+    bool divisionExecuted = false;
+    ```
 
 1.  编写一个`while`循环，检查除法是否成功执行。如果成功了，程序应该终止。如果没有，程序应该提示你输入有效数据并再次执行除法。添加以下代码来完成此操作：
 
-    [PRE114]
+    ```cs
+    while (!divisionExecuted)
+    {
+        try
+        {
+            Console.WriteLine("Please input a number");
+            var a = int.Parse(Console.ReadLine());
+            Console.WriteLine("Please input another number");
+            var b = int.Parse(Console.ReadLine());
+            var result = Divide(a, b);
+            Console.WriteLine($"Result: {result}");
+            divisionExecuted = true;
+        }
+        catch (System.FormatException)
+        {
+            Console.WriteLine("You did not input a number. Let's start again ... \n");
+            continue;
+        }
+        catch (System.DivideByZeroException)
+        {
+            Console.WriteLine("Tried to divide by zero. Let's start again ... \n");
+            continue;
+        }
+    }
+    ```
 
 1.  最后，使用`dotnet run`命令执行程序并与控制台交互。尝试插入字符串而不是数字，看看你会得到什么输出。以下是一个示例输出：
 
-    [PRE115]
+    ```cs
+    Please input a number
+    5
+    Please input another number
+    0
+    Tried to divide by zero. Let's start again …
+    Please input a number
+    5
+    Please input another number
+    s
+    You did not input a number. Let's start again …
+    Please input a number
+    5
+    Please input another number
+    1
+    Result: 5
+    ```
 
     注意
 
-    你可以在[https://packt.link/EVsrJ](https://packt.link/EVsrJ)找到用于此练习的代码。
+    你可以在[`packt.link/EVsrJ`](https://packt.link/EVsrJ)找到用于此练习的代码。
 
 在这个练习中，你处理了两种类型的异常，如下所示：
 
 +   当无法将`string`变量转换为整数时，`int.Parse(string str)`方法会抛出`System.FormatException`异常。
 
-+   当`double Divide(int a, int b)`方法中的`b`为0时，会抛出`System.DivideByZeroException`异常。
++   当`double Divide(int a, int b)`方法中的`b`为 0 时，会抛出`System.DivideByZeroException`异常。
 
-现在你已经看到了如何处理异常，重要的是要注意一个经验法则，这将有助于你在C#的学习之旅中，那就是*你应该只捕获你可以处理或需要处理的异常*。只有在少数情况下，异常处理才是真正必要的，如下所示：
+现在你已经看到了如何处理异常，重要的是要注意一个经验法则，这将有助于你在 C#的学习之旅中，那就是*你应该只捕获你可以处理或需要处理的异常*。只有在少数情况下，异常处理才是真正必要的，如下所示：
 
 +   当你想**抑制**异常，即捕获它并假装什么都没发生时。这被称为异常抑制。这应该在抛出的异常不会影响程序流程时发生。
 
@@ -1048,7 +1726,17 @@ C# 中对象使用的内存由称为垃圾回收器的东西来处理。默认�
 
 `throw` 关键字也可以用于在特定情况下故意停止程序执行流程。例如，考虑你正在创建一个 `Person` 对象，并且 `Name` 属性在创建时不应为 `null`。你可以在这个类上强制执行 `System.ArgumentException` 或 `System.ArgumentNullException`，如下面的代码片段所示，它使用 `ArgumentNullException` 来执行此操作：
 
-[PRE116]
+```cs
+class Person
+{
+Person(string name)
+     {
+if (string.IsNullOrWhiteSpace(name)) throw new ArgumentNullException(nameof(name));
+Name = name;
+     }
+    String Name { get ; set; }
+}
+```
 
 在这里，如果 `name` 参数的值为 `null` 或如果你只输入空格字符，则会抛出 `ArgumentNullException` 异常，程序无法成功执行。null/空格条件是通过 `IsNullOrWhiteSpace` 函数检查的，该函数可用于字符串变量。
 
@@ -1056,7 +1744,7 @@ C# 中对象使用的内存由称为垃圾回收器的东西来处理。默认�
 
 ## 活动 1.01：创建一个猜数字游戏
 
-要完成这个活动，你需要使用在本章中学习并实践过的概念来创建一个猜数字游戏。在这个游戏中，首先，必须生成一个1到10之间的随机数，但不能输出到控制台。然后，控制台应提示用户输入一个数字并猜测哪个随机数已被生成，用户最多有五次机会。
+要完成这个活动，你需要使用在本章中学习并实践过的概念来创建一个猜数字游戏。在这个游戏中，首先，必须生成一个 1 到 10 之间的随机数，但不能输出到控制台。然后，控制台应提示用户输入一个数字并猜测哪个随机数已被生成，用户最多有五次机会。
 
 每次输入错误时，应显示一个警告消息，让用户知道他们还剩下多少次机会，如果所有五次机会都因猜测错误而耗尽，则程序终止。然而，一旦用户猜对了，在程序终止之前应显示一个成功消息。
 
@@ -1064,7 +1752,9 @@ C# 中对象使用的内存由称为垃圾回收器的东西来处理。默认�
 
 1.  创建一个名为 `numberToBeGuessed` 的变量，将其分配给 C# 中的随机数。你可以使用以下代码片段来完成此操作：
 
-    [PRE117]
+    ```cs
+    new Random().Next(0, 10)
+    ```
 
 这会为你生成一个介于 `0` 和 `10` 之间的随机数。如果你想使游戏稍微困难一些，可以将 `10` 替换为一个更大的数字，或者为了使游戏更容易，可以替换为一个更小的数字，但在这个活动中，你将使用 `10` 作为最大值。
 
@@ -1078,11 +1768,11 @@ C# 中对象使用的内存由称为垃圾回收器的东西来处理。默认�
 
     注意
 
-    本活动的解决方案可以在[https://packt.link/qclbF](https://packt.link/qclbF)找到。
+    本活动的解决方案可以在[`packt.link/qclbF`](https://packt.link/qclbF)找到。
 
 # 摘要
 
-本章为你概述了C#的基础知识以及如何用它来编写程序。你探索了从变量声明、数据类型、基本算术和逻辑运算符到文件和异常处理的各个方面。你还了解了C#在处理值和引用类型时如何分配内存。
+本章为你概述了 C#的基础知识以及如何用它来编写程序。你探索了从变量声明、数据类型、基本算术和逻辑运算符到文件和异常处理的各个方面。你还了解了 C#在处理值和引用类型时如何分配内存。
 
 在本章的练习和活动中，你能够解决一些现实世界的问题，并思考出可以用这种语言及其资源实现解决方案。你学习了如何在控制台应用程序中提示用户输入，如何处理系统中的文件，以及最后如何通过异常处理来处理意外的输入。
 

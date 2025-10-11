@@ -14,11 +14,11 @@
 
 本章的代码文件可以在 GitHub 上找到：
 
-[https://github.com/PacktPublishing/DotNET-Standard-2-Cookbook/tree/master/Chapter12/Chapter12.Azure.WebAppCore](https://github.com/PacktPublishing/DotNET-Standard-2-Cookbook/tree/master/Chapter12/Chapter12.Azure.WebAppCore)
+[`github.com/PacktPublishing/DotNET-Standard-2-Cookbook/tree/master/Chapter12/Chapter12.Azure.WebAppCore`](https://github.com/PacktPublishing/DotNET-Standard-2-Cookbook/tree/master/Chapter12/Chapter12.Azure.WebAppCore)
 
 查看以下视频以查看代码的实际操作：
 
-[https://goo.gl/syvoGK](https://goo.gl/syvoGK)
+[`goo.gl/syvoGK`](https://goo.gl/syvoGK)
 
 # 简介
 
@@ -70,15 +70,15 @@ Azure 门户
 
 # 准备工作
 
-确保您已安装并更新了最新的Visual Studio 2017版本，并且已经完成了上一章的内容。
+确保您已安装并更新了最新的 Visual Studio 2017 版本，并且已经完成了上一章的内容。
 
 # 如何操作...
 
-1.  打开Visual Studio 2017。
+1.  打开 Visual Studio 2017。
 
-1.  点击文件 | 新建 | 项目，然后在Visual C#下的右侧窗格中选择Web。
+1.  点击文件 | 新建 | 项目，然后在 Visual C#下的右侧窗格中选择 Web。
 
-1.  在右侧窗格中选择ASP.NET Core Web应用程序：
+1.  在右侧窗格中选择 ASP.NET Core Web 应用程序：
 
 ![](img/30d03149-771d-4e4d-8f7a-aee357ececfe.png)
 
@@ -88,7 +88,7 @@ Azure 门户
 
 1.  点击确定。
 
-1.  在新的ASP.NET Core Web应用程序对话框中，选择空，其他字段保持不变：
+1.  在新的 ASP.NET Core Web 应用程序对话框中，选择空，其他字段保持不变：
 
 ![](img/2b88c6c4-e3bc-44af-8013-682216552b0c.png)
 
@@ -100,9 +100,9 @@ Azure 门户
 
 1.  现在，右键单击依赖项标签。
 
-1.  选择`管理NuGet包`**。**
+1.  选择`管理 NuGet 包`**。**
 
-1.  点击浏览，并在搜索框中输入您在上传时选择的包ID。
+1.  点击浏览，并在搜索框中输入您在上传时选择的包 ID。
 
 1.  在这种情况下，输入`Packt_DotNetStandard_CookBook_Chap1`并按*Enter*键：
 
@@ -122,7 +122,7 @@ Azure 门户
 
 ![](img/8062d9a7-e09e-4739-ae6f-847f4ec8b910.png)
 
-1.  现在，在解决方案资源管理器中，展开依赖项| NuGet选项卡，你应该在那里看到我们的库：
+1.  现在，在解决方案资源管理器中，展开依赖项| NuGet 选项卡，你应该在那里看到我们的库：
 
 ![](img/ad592a4c-8417-485b-83b3-802c583b38a8.png)
 
@@ -132,13 +132,21 @@ Azure 门户
 
 1.  在`using`指令的末尾添加以下指令：
 
-[PRE0]
+```cs
+      using Chapter11.Packaging.CalcLib;
+```
 
 1.  现在，向下滚动，直到到达`Configure()`方法内的`app.Run()`方法。
 
 1.  用以下代码替换：
 
-[PRE1]
+```cs
+      var calculator = new Calculator();
+      var answer = calculator.Add(10, 50);
+
+      await context.Response.WriteAsync($"Answer for 10+50 
+          is {answer}");
+```
 
 1.  按*F5*进行调试。
 
@@ -148,21 +156,21 @@ Azure 门户
 
 # 它是如何工作的...
 
-在步骤1到9中，我们创建了一个ASP.NET核心项目。我们为这个食谱选择了一个空项目。之后，在步骤10到17中，我们安装了上一章创建的库。我们使用NuGet包管理器安装它，并确认库已成功安装。
+在步骤 1 到 9 中，我们创建了一个 ASP.NET 核心项目。我们为这个食谱选择了一个空项目。之后，在步骤 10 到 17 中，我们安装了上一章创建的库。我们使用 NuGet 包管理器安装它，并确认库已成功安装。
 
-在步骤20中，我们使用`using`指令引用了库。最后，在步骤22中，我们创建了一个`Calculator`类的实例并将其存储在一个变量中。最后，我们使用`WriteAsync()`方法将输出发送到浏览器。在步骤24中，我们在浏览器中测试了我们的应用程序。
+在步骤 20 中，我们使用`using`指令引用了库。最后，在步骤 22 中，我们创建了一个`Calculator`类的实例并将其存储在一个变量中。最后，我们使用`WriteAsync()`方法将输出发送到浏览器。在步骤 24 中，我们在浏览器中测试了我们的应用程序。
 
-# 将应用程序部署到Azure云
+# 将应用程序部署到 Azure 云
 
-在本食谱中，我们将探讨如何将我们的应用程序部署到Azure。我们将使用Visual Studio 2017将应用程序部署到Azure App Service。
+在本食谱中，我们将探讨如何将我们的应用程序部署到 Azure。我们将使用 Visual Studio 2017 将应用程序部署到 Azure App Service。
 
 # 准备工作
 
-确保您有一个Azure账户。如果没有，您可以在 `azure.microsoft.com` 创建一个免费账户。此外，请确保您已经完成了之前的食谱。我们将需要带有最新更新的Visual Studio 2017。让我们开始吧。
+确保您有一个 Azure 账户。如果没有，您可以在 `azure.microsoft.com` 创建一个免费账户。此外，请确保您已经完成了之前的食谱。我们将需要带有最新更新的 Visual Studio 2017。让我们开始吧。
 
 # 如何操作...
 
-1.  打开Visual Studio 2017。
+1.  打开 Visual Studio 2017。
 
 1.  现在，打开之前食谱中的解决方案。点击文件 | 打开 | 打开项目/解决方案，或者按 *Ctrl* + *Shift* + *O*，并选择 `Chapter12.Azure.WebAppCore` 解决方案。
 
@@ -184,7 +192,7 @@ Azure 门户
 
 1.  点击创建。
 
-1.  这将部署您的应用程序到Azure。
+1.  这将部署您的应用程序到 Azure。
 
 1.  如果一切顺利，您应该在浏览器中看到这个：
 
@@ -192,15 +200,15 @@ Azure 门户
 
 # 它是如何工作的...
 
-在步骤1、2和3中，我们打开了之前食谱中创建的现有解决方案。我们进行了快速构建以检查任何语法错误并确认一切正常。在步骤5中，我们使用Visual Studio工具将应用程序发布到Azure。在这种情况下，我们选择了一个新的应用程序服务。在下一屏幕的步骤7中，我们必须使用与您的登录绑定的Azure订阅。这应该是您在之前的食谱中创建的账户。您在这里可以选择一个现有的资源组，或者通过点击新建链接创建一个新的资源组。您将看到一个类似于这样的对话框：
+在步骤 1、2 和 3 中，我们打开了之前食谱中创建的现有解决方案。我们进行了快速构建以检查任何语法错误并确认一切正常。在步骤 5 中，我们使用 Visual Studio 工具将应用程序发布到 Azure。在这种情况下，我们选择了一个新的应用程序服务。在下一屏幕的步骤 7 中，我们必须使用与您的登录绑定的 Azure 订阅。这应该是您在之前的食谱中创建的账户。您在这里可以选择一个现有的资源组，或者通过点击新建链接创建一个新的资源组。您将看到一个类似于这样的对话框：
 
 ![图片](img/be0bfcff-20f9-4d37-9402-5db9198e56c2.png)
 
-您必须为您的资源组命名并点击确定。资源组是您在Azure中分类资源的一种方式。再次提醒，您可以通过点击新建链接选择一个新的托管计划。再次提醒，您应该看到一个类似于这样的屏幕来选择您的新计划：
+您必须为您的资源组命名并点击确定。资源组是您在 Azure 中分类资源的一种方式。再次提醒，您可以通过点击新建链接选择一个新的托管计划。再次提醒，您应该看到一个类似于这样的屏幕来选择您的新计划：
 
 ![图片](img/ccda37dc-0f67-47ed-a5b7-3594e278b250.png)
 
-位置和大小下拉列表提供了不同的选项供您选择。位置将帮助您选择靠近您客户的区域。这将帮助您快速访问您的网站。此外，大小将告诉您将为这个应用程序服务使用什么处理器和RAM。最后，您点击创建按钮，Visual Studio 将负责整个过程。这包括将您的文件上传到Azure、打开浏览器并显示最终结果。在Azure门户中，您的应用程序服务应该像这样出现在列表中：
+位置和大小下拉列表提供了不同的选项供您选择。位置将帮助您选择靠近您客户的区域。这将帮助您快速访问您的网站。此外，大小将告诉您将为这个应用程序服务使用什么处理器和 RAM。最后，您点击创建按钮，Visual Studio 将负责整个过程。这包括将您的文件上传到 Azure、打开浏览器并显示最终结果。在 Azure 门户中，您的应用程序服务应该像这样出现在列表中：
 
 ![图片](img/70949f05-25f9-424f-b0f7-93c403b8219c.png)
 

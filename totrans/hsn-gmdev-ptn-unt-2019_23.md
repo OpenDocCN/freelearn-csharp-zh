@@ -28,11 +28,11 @@
 
 本章的代码文件可以在 GitHub 上找到：
 
-[https://github.com/PacktPublishing/Hands-On-Game-Development-Patterns-with-Unity-2018](https://github.com/PacktPublishing/Hands-On-Game-Development-Patterns-with-Unity-2018)
+[`github.com/PacktPublishing/Hands-On-Game-Development-Patterns-with-Unity-2018`](https://github.com/PacktPublishing/Hands-On-Game-Development-Patterns-with-Unity-2018)
 
 查看以下视频以查看代码的实际应用：
 
-[http://bit.ly/2Oww7WM](http://bit.ly/2Oww7WM)
+[`bit.ly/2Oww7WM`](http://bit.ly/2Oww7WM)
 
 # 依赖注入概述
 
@@ -60,7 +60,7 @@ UML 图并不是描述 DI 模式目的的最佳工具，但让我们回顾一个
 
 当然，DI 并非没有缺点，你将在下一节中看到。
 
-DI 遵循 IoC 的核心原则，即反转系统的控制流。在 DI 的情况下，这是关于反转依赖管理的过程。遵循 IoC 原则的另一个模式是服务定位器，你可以在第 16 章[服务定位器](56a2aeed-924d-4d95-b44b-b10ac7595d4a.xhtml)中查阅。
+DI 遵循 IoC 的核心原则，即反转系统的控制流。在 DI 的情况下，这是关于反转依赖管理的过程。遵循 IoC 原则的另一个模式是服务定位器，你可以在第十六章服务定位器中查阅。
 
 # 优点和缺点
 
@@ -76,37 +76,138 @@ DI 遵循 IoC 的核心原则，即反转系统的控制流。在 DI 的情况�
 
 缺点如下：
 
-+   **争议**：DI是一种在团队中引起很多争论的模式，因为最佳方法并不总是清晰的，尤其是在考虑更高级的DI形式，如IoC注入容器时。
++   **争议**：DI 是一种在团队中引起很多争论的模式，因为最佳方法并不总是清晰的，尤其是在考虑更高级的 DI 形式，如 IoC 注入容器时。
 
-+   **框架依赖**：DI的基本形式非常有限；一旦达到一定程度的复杂性，就必需实现第三方IoC框架以可配置的方式管理依赖注入。因此，代码库通常变得依赖于框架，并且难以轻易移除。
++   **框架依赖**：DI 的基本形式非常有限；一旦达到一定程度的复杂性，就必需实现第三方 IoC 框架以可配置的方式管理依赖注入。因此，代码库通常变得依赖于框架，并且难以轻易移除。
 
 +   **意大利面代码**：过度使用依赖注入（DI）和相关最佳实践可能导致代码库过度封装，并拆分成过多的单个类，这使得理解起来变得困难。
 
-为了测试应聘者对技术主题的辩论能力，面试官通常会要求应聘者对一个有争议的模式，如DI和Singleton，提出自己的看法。作为一个面试者，展示对任何问题的平衡观点，考虑到其优点和缺点，是一种良好的做法。
+为了测试应聘者对技术主题的辩论能力，面试官通常会要求应聘者对一个有争议的模式，如 DI 和 Singleton，提出自己的看法。作为一个面试者，展示对任何问题的平衡观点，考虑到其优点和缺点，是一种良好的做法。
 
 # 用例示例
 
-假设我们正在开发一个设定在未来的赛车游戏，其中有超级摩托车。我们必须快速实现一个功能，玩家可以在比赛开始前从可用选项中选择引擎和驾驶员来自定义他们的自行车。换句话说，我们的自行车对象有两个特定的依赖项：一个引擎和一个驾驶员。使用DI模式，我们将管理这些依赖项，而不会给我们的代码库增加不必要的复杂性。
+假设我们正在开发一个设定在未来的赛车游戏，其中有超级摩托车。我们必须快速实现一个功能，玩家可以在比赛开始前从可用选项中选择引擎和驾驶员来自定义他们的自行车。换句话说，我们的自行车对象有两个特定的依赖项：一个引擎和一个驾驶员。使用 DI 模式，我们将管理这些依赖项，而不会给我们的代码库增加不必要的复杂性。
 
-首先，我们将查看在类中管理依赖关系的错误方法，以便您能够理解与相反方法相比DI的优点。
+首先，我们将查看在类中管理依赖关系的错误方法，以便您能够理解与相反方法相比 DI 的优点。
 
-# 没有DI的错误方法
+# 没有 DI 的错误方法
 
 在进入我们用例的实现阶段之前，让我们首先回顾一个使用考虑不周的初始化和管理依赖关系的类的示例：
 
-[PRE0]
+```cs
+using UnityEngine;
+
+public class Bike : MonoBehaviour
+{
+    public enum EngineType
+    {
+        Jet,
+        Turbo,
+        Nitro
+    };
+
+    public enum DriverType
+    {
+        Human,
+        Android
+    };
+
+    private Engine m_Engine;
+    private Driver m_Driver;
+
+    public void SetEngine(EngineType type)
+    {
+        switch (type)
+        {
+            case EngineType.Jet:
+                m_Engine = new JetEngine();
+                break;
+            case EngineType.Turbo:
+                m_Engine = new TurboEngine();
+            case EngineType.Nitro:
+                m_Engine = new NitroEngine();
+        }
+
+        Debug.Log("The bike is running with the engine: " + m_Engine);
+    }
+
+    public void SetDriver(DriverType type)
+    {
+        switch (type)
+        {
+            case DriverType.Human:
+                m_Driver = new HumanDriver();
+                break;
+            case DriverType.Android:
+                m_Driver = new AndroidDriver();
+        }
+
+        Debug.Log("The driver of the bike is a: " + driver);
+    }
+
+    public void StartEngine()
+    {
+        if (m_Engine != null)
+        {
+            // Start the bike's engine
+            m_Engine.Start();
+            // Give control of the bike to the driver
+            m_Driver.Control(this);
+        }
+    }
+}
+```
 
 初看，这似乎是一种合理的做法，但让我们想象一下，我们正在一个游戏程序员团队中工作，每个人都在实现新的引擎行为类型。如果我们想让`Bike`类支持这些行为，我们需要修改`EngineType`枚举，并更新`SetEngine()`方法体内的`switch`案例。如果多个程序员同时在这个类上工作，这种方法可能会随着时间的推移变得非常麻烦。
 
-我们在`SetDriver()`函数上也遇到了同样的问题；在这种安排下，添加新的驾驶员类型将变得很麻烦，并且可能会容易出错。所以，让我们通过逐步使用DI作为基础来实现相同的类。
+我们在`SetDriver()`函数上也遇到了同样的问题；在这种安排下，添加新的驾驶员类型将变得很麻烦，并且可能会容易出错。所以，让我们通过逐步使用 DI 作为基础来实现相同的类。
 
-# 使用DI的正确方法
+# 使用 DI 的正确方法
 
-DI的实现相当直接，这也是它的主要优点。因此，本节应该不会令人痛苦：
+DI 的实现相当直接，这也是它的主要优点。因此，本节应该不会令人痛苦：
 
 1.  让我们从编写我们的 `Bike` 类开始；我们可以说它是这个依赖注入（DI）模式示例中的实际客户端，主要是因为它是那个在注入过程中依赖接收依赖项的类：
 
-[PRE1]
+```cs
+using UnityEngine;
+
+public class Bike : MonoBehaviour
+{
+    private IEngine m_Engine;
+    private IDriver m_Driver;
+
+    // Setter injection
+    public void SetEngine(IEngine engine)
+    {
+        m_Engine = engine;
+    }
+
+    // Setter injection
+    public void SetDriver(IDriver driver)
+    {
+        m_Driver = driver;
+    }
+
+    public void StartEngine()
+    {
+        // Starting the engine
+        m_Engine.StartEngine();
+
+        // Giving control of the bike to a driver (AI or player)
+        m_Driver.Control(this);
+    }
+
+    public void TurnLeft()
+    {
+        Debug.Log("The bike is turning left");
+    }
+
+    public void TurnRight()
+    {
+        Debug.Log("The bike is turning right");
+    }
+}
+```
 
 正如你所见，`SetEngine()` 和 `SetDriver()` 函数并不知道它们接收到的具体是哪种引擎或驱动器——它们只知道它们期望的是它们的通用类型。换句话说，`Bike` 类不再负责其依赖项的初始化过程。这种方法非常灵活；我们可以编写无限数量的引擎类，每个类都有其特定的行为，如果我们保持与 `IEngine` 接口实现合同的兼容性，我们就不需要直接修改 `Bike` 类以使其适合使用新的引擎。
 
@@ -118,37 +219,158 @@ DI的实现相当直接，这也是它的主要优点。因此，本节应该不
 
 +   `IEngine` 接口如下所示：
 
-[PRE2]
+```cs
+public interface IEngine
+{
+    void StartEngine();
+}
+```
 
 +   `IDriver` 接口如下所示：
 
-[PRE3]
+```cs
+public interface IDriver
+{
+    void Control(Bike bike);
+}
+```
 
 1.  在接下来的步骤中，我们将为我们的自行车需要正确运行的每种主要类型的组件编写所有具体的类：
 
 +   `JetEngine` 类如下所示：
 
-[PRE4]
+```cs
+using UnityEngine;
+
+public class JetEngine : IEngine
+{
+    public void StartEngine()
+    {
+        ActivateJetStream();
+        Debug.Log("Engine started");
+    }
+
+    private void ActivateJetStream()
+    {
+        Debug.Log("The jet stream is activated");
+    }
+}
+```
 
 +   `NitroEngine` 类如下所示：
 
-[PRE5]
+```cs
+using UnityEngine;
+
+public class NitroEngine : IEngine
+{
+    public void StartEngine()
+    {
+        OpenNitroValve();
+        Debug.Log("Engine started");
+    }
+
+    private void OpenNitroValve()
+    {
+        Debug.Log("The nitro valve is open");
+    }
+}
+```
 
 需要注意的是，每个引擎都封装了其内部机制，同时保持与 `IEngine` 接口实现的兼容性。正是这种一致的方法允许了依赖注入（DI）。
 
 +   `HumanDriver` 类如下所示：
 
-[PRE6]
+```cs
+using UnityEngine;
+
+public class HumanDriver : IDriver
+{
+    private Bike m_Bike;
+
+    public void Control(Bike bike)
+    {
+        m_Bike = bike;
+        Debug.Log("A human (player) will control the bike");
+    }
+}
+```
 
 +   `AndroidDriver` 类如下所示：
 
-[PRE7]
+```cs
+using UnityEngine;
+
+public class AndroidDriver : IDriver
+{
+    private Bike m_Bike;
+
+    public void Control(Bike bike)
+    {
+        m_Bike = bike;
+        Debug.Log("This bike will be controlled by an AI");
+    }
+}
+```
 
 `HumanDriver` 类旨在将 `Bike` 的控制权交给玩家，我们将在即将到来的 `Client` 类中实现这一点。`AndroidDriver` 类旨在支持一个能够驾驶 `Bike` 并在比赛中作为玩家对手的 AI 实体。
 
 1.  最后，我们的 `Client` 类，我们将用它来测试我们的系统，如下所示：
 
-[PRE8]
+```cs
+using UnityEngine;
+
+namespace Pattern.DependencyInjection
+{
+    public class Client : MonoBehaviour
+    {
+        // Bike controlled by the player
+        public Bike m_PlayerBike;
+
+        // Bike controlled by an android (AI)
+        public Bike m_AndroidBike;
+
+        void Awake()
+        {
+            // Set up a bike with a human driver and jet engine
+            IEngine jetEngine = new JetEngine();
+            IDriver humanDriver = new HumanDriver();
+
+            m_PlayerBike.SetEngine(jetEngine);
+            m_PlayerBike.SetDriver(humanDriver);
+            m_PlayerBike.StartEngine();
+
+            // Set up a bike with a AI driver and a nitro engine
+            IEngine nitroEngine = new NitroEngine();
+            IDriver androidDriver = new AndroidDriver();
+
+            m_PlayerBike.SetEngine(jetEngine);
+            m_PlayerBike.SetDriver(humanDriver);
+            m_PlayerBike.StartEngine();
+        }
+
+        void Update()
+        {
+            if (Input.GetKeyDown(KeyCode.A))
+            {
+                m_PlayerBike.TurnLeft();
+            }
+
+            if (Input.GetKeyDown(KeyCode.D))
+            {
+                m_PlayerBike.TurnRight();
+            }
+        }
+
+        void OnGUI()
+        {
+            GUI.color = Color.black;
+            GUI.Label(new Rect(10, 10, 500, 20), "Press A to turn LEFT and D to turn RIGHT");
+            GUI.Label(new Rect(10, 30, 500, 20), "Output displayed in the debug console");
+        }
+    }
+}
+```
 
 我们的 `Client` 类相当简单；在 `Awake()` 函数中，我们将依赖项注入到两个 `Bike` 类的实例中：`m_PlayerBike` 和 `m_AndroidBike`。在 `Update()` 函数中，我们监听玩家的输入，允许他们控制 `m_PlayerBike` 实例。
 
@@ -182,20 +404,20 @@ IoC 容器通常以框架的形式出现；它们的主要职责是自动化 DI 
 
 # 实践练习
 
-作为一项实际练习，我建议使用一个流行的IoC容器框架编写一个C#应用程序。因为大多数框架与Unity引擎不兼容，我建议使用原生方式，在Visual Studio中编写一个简单的Windows应用程序。
+作为一项实际练习，我建议使用一个流行的 IoC 容器框架编写一个 C#应用程序。因为大多数框架与 Unity 引擎不兼容，我建议使用原生方式，在 Visual Studio 中编写一个简单的 Windows 应用程序。
 
-在 *进一步阅读* 部分，我添加了一个流行的IoC容器框架列表。
+在 *进一步阅读* 部分，我添加了一个流行的 IoC 容器框架列表。
 
 # 进一步阅读
 
 以下是一些可能用作参考的书籍：
 
-+   *《.NET中的依赖注入》* by Mark Seemann: [https://www.manning.com/books/dependency-injection-in-dot-net](https://www.manning.com/books/dependency-injection-in-dot-net)
++   *《.NET 中的依赖注入》* by Mark Seemann: [`www.manning.com/books/dependency-injection-in-dot-net`](https://www.manning.com/books/dependency-injection-in-dot-net)
 
-+   *《依赖注入原理、实践和模式》* by Steven van Deursen 和 Mark Seemann: [https://www.manning.com/books/dependency-injection-principles-practices-patterns](https://www.manning.com/books/dependency-injection-principles-practices-patterns)
++   *《依赖注入原理、实践和模式》* by Steven van Deursen 和 Mark Seemann: [`www.manning.com/books/dependency-injection-principles-practices-patterns`](https://www.manning.com/books/dependency-injection-principles-practices-patterns)
 
-以下是一些可以考虑的IoC框架：
+以下是一些可以考虑的 IoC 框架：
 
-+   Ninject:[http://www.ninject.org](http://www.ninject.org)
++   Ninject:[`www.ninject.org`](http://www.ninject.org)
 
-+   Castle Windsor:[https://github.com/castleproject/Windsor](https://github.com/castleproject/Windsor)
++   Castle Windsor:[`github.com/castleproject/Windsor`](https://github.com/castleproject/Windsor)

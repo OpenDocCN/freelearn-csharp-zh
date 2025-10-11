@@ -20,11 +20,11 @@
 
 本章的代码文件可以在 GitHub 上找到：
 
-[https://github.com/PacktPublishing/DotNET-Standard-2-Cookbook/tree/master/Chapter04](https://github.com/PacktPublishing/DotNET-Standard-2-Cookbook/tree/master/Chapter04)
+[`github.com/PacktPublishing/DotNET-Standard-2-Cookbook/tree/master/Chapter04`](https://github.com/PacktPublishing/DotNET-Standard-2-Cookbook/tree/master/Chapter04)
 
 查看以下视频，以查看代码的实际运行情况：
 
-[https://goo.gl/yeUdkd](https://goo.gl/yeUdkd)
+[`goo.gl/yeUdkd`](https://goo.gl/yeUdkd)
 
 # 简介
 
@@ -34,7 +34,16 @@
 
 简而言之，这意味着你将能够将函数用作其他函数的输入和输出。你还可以将它们分配给变量并将它们存储在集合中。看看以下代码，它解释了我们刚才讨论的内容：
 
-[PRE0]
+```cs
+Func<int, int> addNumbers = n => n + 1;
+var answer = addNumbers(1);
+
+answer // 2
+
+var range = Enumerable.Range(1, 5);
+var answers = range.Select(addNumbers);
+answers // 2, 3, 4, 5, 6
+```
 
 再次，当我们遵循函数范式时，我们必须避免状态突变。这意味着当一个对象被创建时，它永远不会改变；变量不应被重新分配。函数式编程已经存在了一段时间，C# 对其支持得很好。尽管如此，如果你正在考虑函数式编程，F# 也是一个不错的选择。
 
@@ -88,31 +97,37 @@
 
 1.  在`Helper.cs`的代码窗口中，在类的花括号内输入以下代码：
 
-[PRE1]
+```cs
+      public Func<int, int> AddOne = n => n + 1;
+
+      public Func<int, bool> IsZero = n => n == 0;
+```
 
 1.  让我们按*Ctrl* + *Shift* + *B*进行快速构建，以检查语法是否正确。
 
 # 它是如何工作的...
 
-在步骤1到5中，我们添加了一个空白解决方案。这是我们在本菜谱和下一个菜谱中添加编码的基础。之后，我们在步骤7到11中添加了一个.NET Standard 2.0库。在步骤12和13中，我们将模板生成的默认类重命名了。你总是可以删除这个默认类模板，并使用新名称向项目中添加一个新类。
+在步骤 1 到 5 中，我们添加了一个空白解决方案。这是我们在本菜谱和下一个菜谱中添加编码的基础。之后，我们在步骤 7 到 11 中添加了一个.NET Standard 2.0 库。在步骤 12 和 13 中，我们将模板生成的默认类重命名了。你总是可以删除这个默认类模板，并使用新名称向项目中添加一个新类。
 
-在第15步中，我们向`Helper`类中添加了代码。在第一行，我们创建了一个函数，该函数接受一个整数作为输入并返回一个整数作为输出。在输出之前，我们给输入加上了1。使用`Func<>`来创建函数。第一个`int`被视为输入，最后一个被视为输出。你可以添加很多参数，但最后一个总是被视为输出类型。例如：
+在第 15 步中，我们向`Helper`类中添加了代码。在第一行，我们创建了一个函数，该函数接受一个整数作为输入并返回一个整数作为输出。在输出之前，我们给输入加上了 1。使用`Func<>`来创建函数。第一个`int`被视为输入，最后一个被视为输出。你可以添加很多参数，但最后一个总是被视为输出类型。例如：
 
-[PRE2]
+```cs
+Func<string, string, int>
+```
 
-前面的函数接受两个`string`输入并返回一个`int`作为输出。在第15步中，代码的第二行检查输入数字是否为零，并返回一个布尔值作为输出。如果数字为零，它总是返回`true`，否则返回`false`。
+前面的函数接受两个`string`输入并返回一个`int`作为输出。在第 15 步中，代码的第二行检查输入数字是否为零，并返回一个布尔值作为输出。如果数字为零，它总是返回`true`，否则返回`false`。
 
-# 创建一个.NET Core控制台应用程序以使用库
+# 创建一个.NET Core 控制台应用程序以使用库
 
-在这个菜谱中，我们将创建一个.NET Core 2.0控制台应用程序来使用我们在上一个菜谱中构建的库。
+在这个菜谱中，我们将创建一个.NET Core 2.0 控制台应用程序来使用我们在上一个菜谱中构建的库。
 
 # 准备工作
 
-确保你已经完成了上一个菜谱中构建的.NET Standard 2.0库。如果你已经完成了，找到它，并使用Visual Studio 2017打开它。使用*Ctrl* + *Shift* + *B*进行快速构建以检查语法。
+确保你已经完成了上一个菜谱中构建的.NET Standard 2.0 库。如果你已经完成了，找到它，并使用 Visual Studio 2017 打开它。使用*Ctrl* + *Shift* + *B*进行快速构建以检查语法。
 
 # 如何操作...
 
-1.  打开Visual Studio 2017。
+1.  打开 Visual Studio 2017。
 
 1.  现在，打开我们之前构建的解决方案。
 
@@ -126,7 +141,7 @@
 
 1.  从菜单中选择添加 | 新项目。
 
-1.  在新建项目对话框中，展开Visual C#节点，并在左侧窗格中选择.NET Core。
+1.  在新建项目对话框中，展开 Visual C#节点，并在左侧窗格中选择.NET Core。
 
 1.  在右侧窗格中，选择控制台应用程序 (.NET Core):
 
@@ -158,11 +173,24 @@
 
 1.  在所有`using`指令的末尾添加以下`using`指令：
 
-[PRE3]
+```cs
+      using System.Linq;
+      using Chapter4.Functions.FuncLib;
+```
 
 1.  现在，向下滚动到主方法，将模板生成的默认代码替换为以下内容：
 
-[PRE4]
+```cs
+      var helper = new Helper();
+
+      Console.WriteLine(helper.AddOne(5));
+
+      int[] numbers = new int[] { 1, 0, 10, 0, 5, 0 };
+      Console.WriteLine($"We have found {numbers.Count(helper.IsZero)} 
+          zeros.");
+
+      Console.ReadLine();
+```
 
 1.  现在，确保`Chapter4.Functions.CoreConsoleApp`项目设置为启动项目，然后按*F5*执行。
 
@@ -172,21 +200,23 @@
 
 # 它是如何工作的...
 
-在步骤1到5中，我们打开了之前构建.NET Standard 2.0库的食谱中的解决方案。然后，我们进行了快速构建以检查语法错误。这是一个非常好的实践；在我们进一步之前，检查之前构建的代码的语法。然后，在步骤6到10中，我们将.NET Core 2.0控制台应用程序添加到项目中。在步骤12到14中，我们将构建的库作为依赖项添加到.NET Core 2.0控制台应用程序中。
+在步骤 1 到 5 中，我们打开了之前构建.NET Standard 2.0 库的食谱中的解决方案。然后，我们进行了快速构建以检查语法错误。这是一个非常好的实践；在我们进一步之前，检查之前构建的代码的语法。然后，在步骤 6 到 10 中，我们将.NET Core 2.0 控制台应用程序添加到项目中。在步骤 12 到 14 中，我们将构建的库作为依赖项添加到.NET Core 2.0 控制台应用程序中。
 
-你必须添加此引用才能在控制台应用程序中使用库的功能。然后，我们在第18步中添加了两个`using`语句。第一个将允许你在代码中使用LINQ功能，第二个将允许你使用库中可用的方法。
+你必须添加此引用才能在控制台应用程序中使用库的功能。然后，我们在第 18 步中添加了两个`using`语句。第一个将允许你在代码中使用 LINQ 功能，第二个将允许你使用库中可用的方法。
 
-然后，在第19步中，我们添加了使用库中方法的代码。在第一行，我们创建了一个`Helper`类的实例并将其存储在一个变量中。然后，我们使用了`AddOne`函数并将输出写入控制台。在第三行，我们创建了一个整数数组并存储了一些数字。最后，我们使用了LINQ中可用的count函数来使用我们创建的函数。count函数将遍历数组中的每个数字，将其传递给我们的`IsZero`函数，并返回输出。
+然后，在第 19 步中，我们添加了使用库中方法的代码。在第一行，我们创建了一个`Helper`类的实例并将其存储在一个变量中。然后，我们使用了`AddOne`函数并将输出写入控制台。在第三行，我们创建了一个整数数组并存储了一些数字。最后，我们使用了 LINQ 中可用的 count 函数来使用我们创建的函数。count 函数将遍历数组中的每个数字，将其传递给我们的`IsZero`函数，并返回输出。
 
-最后，在第21步中，我们执行了应用程序以查看输出。
+最后，在第 21 步中，我们执行了应用程序以查看输出。
 
-# 创建一个使用元组的.NET Standard 2.0库
+# 创建一个使用元组的.NET Standard 2.0 库
 
-在这个食谱中，我们将使用C#元组与我们的库。元组允许你在单个语句中将多个不同类型的变量赋值组合在一起。例如，你可以在一行代码中这样做：
+在这个食谱中，我们将使用 C#元组与我们的库。元组允许你在单个语句中将多个不同类型的变量赋值组合在一起。例如，你可以在一行代码中这样做：
 
-[PRE5]
+```cs
+(string firstName, string lastName, int yearsOfExperience) = ("Fiqri", "Ismail", 15);
+```
 
-让我们看看如何在.NET Standard 2.0库中使用元组。
+让我们看看如何在.NET Standard 2.0 库中使用元组。
 
 # 准备工作
 
@@ -234,7 +264,17 @@
 
 1.  在代码窗口中，在 `Employee` 类的大括号内添加以下代码：
 
-[PRE6]
+```cs
+      public (string, string, int) GetBasicDetails()
+      {
+
+          string firstName = "Fiqri";
+          string lastName = "Ismail";
+          int experience = 15;
+
+          return (firstName, lastName, experience);
+      }
+```
 
 1.  按 *Ctrl* + *Shift* + *B* 进行快速构建以检查语法。
 
@@ -250,11 +290,11 @@
 
 # 准备工作
 
-确保您已安装最新版本的Visual Studio 2017和.NET Core 2.0，并且您有权访问我们之前菜谱中构建的解决方案。进行快速*Ctrl* + *Shift* + *B*以检查一切是否完好无损且正常工作。
+确保您已安装最新版本的 Visual Studio 2017 和.NET Core 2.0，并且您有权访问我们之前菜谱中构建的解决方案。进行快速*Ctrl* + *Shift* + *B*以检查一切是否完好无损且正常工作。
 
 # 如何操作...
 
-1.  打开Visual Studio 2017。
+1.  打开 Visual Studio 2017。
 
 1.  现在，打开我们之前菜谱中构建的解决方案。
 
@@ -268,9 +308,9 @@
 
 1.  从菜单中选择“添加 | 新建项目”。
 
-1.  在“新建项目”对话框中，展开Visual C#节点，并在左侧窗格中选择.NET Core。
+1.  在“新建项目”对话框中，展开 Visual C#节点，并在左侧窗格中选择.NET Core。
 
-1.  在右侧窗格中，选择ASP.NET Core Web应用程序：
+1.  在右侧窗格中，选择 ASP.NET Core Web 应用程序：
 
 ![图片](img/940630cc-e081-43c9-94c6-7084983d27b4.png)
 
@@ -280,7 +320,7 @@
 
 1.  点击“确定”。
 
-1.  现在，在“新建ASP.NET Core Web应用程序”对话框中，从模板列表中选择Web应用程序（确保您已从下拉列表中选择.NET Core和ASP.NET Core 2.0）：
+1.  现在，在“新建 ASP.NET Core Web 应用程序”对话框中，从模板列表中选择 Web 应用程序（确保您已从下拉列表中选择.NET Core 和 ASP.NET Core 2.0）：
 
 ![图片](img/eb316942-5828-433f-aa7e-03f81bc732e7.png)
 
@@ -304,39 +344,56 @@
 
 1.  现在，展开“页面”节点。
 
-1.  右键单击“页面”标签，然后选择“添加 | Razor页面”。
+1.  右键单击“页面”标签，然后选择“添加 | Razor 页面”。
 
-1.  在“添加模板”对话框中，从模板列表中选择Razor页面：
+1.  在“添加模板”对话框中，从模板列表中选择 Razor 页面：
 
 ![图片](img/1435bdca-0a84-43b6-bf2d-206ee1831830.png)
 
 1.  点击“添加”。
 
-1.  在“添加Razor页面”对话框中，在Razor页面名称：文本框中键入`Employee`：
+1.  在“添加 Razor 页面”对话框中，在 Razor 页面名称：文本框中键入`Employee`：
 
 ![图片](img/ef52928d-995f-4e16-ace1-09270ddd2f0a.png)
 
 1.  点击“添加”。
 
-1.  默认情况下，Visual Studio将向您展示`Employee.chtml.cs`文件。如果没有，您始终可以展开`Employee.chtml`文件的节点，然后双击`Employee.chtml.cs`标签。
+1.  默认情况下，Visual Studio 将向您展示`Employee.chtml.cs`文件。如果没有，您始终可以展开`Employee.chtml`文件的节点，然后双击`Employee.chtml.cs`标签。
 
 1.  现在，向上滚动直到到达`using`指令。
 
 1.  在`using`指令的末尾，添加对我们库的引用：
 
-[PRE7]
+```cs
+      using Chapter4.Tuples.TupleLib;
+```
 
 1.  现在，向下滚动直到到达`OnGet()`方法。
 
 1.  在`OnGet()`方法的括号内添加以下代码：
 
-[PRE8]
+```cs
+      var employee = new Employee();
 
-1.  现在，单击`Employee.cshtml`选项卡以进入Razor页面。
+      (string FirstName, string LastName, int YearsOfExperience) 
+          newEmployee = employee.GetBasicDetails();
+
+      ViewData["FirstName"] = newEmployee.FirstName;
+      ViewData["LastName"] = newEmployee.LastName;
+      ViewData["YearsOfExperience "] = newEmployee.YearsOfExperience;
+```
+
+1.  现在，单击`Employee.cshtml`选项卡以进入 Razor 页面。
 
 1.  在页面末尾添加以下代码：
 
-[PRE9]
+```cs
+      <p>
+          <h2>@ViewData["FirstName"] @ViewData["LastName"]</h2> 
+          <h3>(@ViewData["YearsOfExperience "] years of experience)
+          </h3>
+      </p>
+```
 
 1.  现在，保存您的作品。
 
@@ -346,7 +403,7 @@
 
 ![图片](img/98dd83f3-b9a9-4229-b777-546628725f0a.png)
 
-1.  点击地址栏。在URL的末尾键入`Employee`并按*Enter*键。（整个URL应如下所示：`localhost:<yourportnumber>/Employee`）：
+1.  点击地址栏。在 URL 的末尾键入`Employee`并按*Enter*键。（整个 URL 应如下所示：`localhost:<yourportnumber>/Employee`）：
 
 ![](img/f46c6a0f-6d6f-4235-9da7-1a7b058df6cd.png)
 
@@ -416,31 +473,46 @@
 
 1.  将以下`using`指令添加到代码顶部：
 
-[PRE10]
+```cs
+      using System.Linq;
+```
 
 1.  现在，在`Calculator`类的花括号之间向下滚动，并添加以下代码：
 
-[PRE11]
+```cs
+      public delegate string Message(string msg);
+      public string AddTwoNumbers(int n1, int n2, Message msg)
+      {
+          return msg($"The answer is : {n1 + n2}");
+      }
+```
 
 1.  现在，在`AddTwoNumbers()`方法的末尾花括号旁边添加以下代码：
 
-[PRE12]
+```cs
+      public string CountScoresMoreThan80(int[] scores)
+      {
+          var count = scores.Where(s => s > 80).Count();
+
+          return $"There are {count} scores more than 80";
+      }
+```
 
 1.  通过按*Ctrl* + *Shift* + *B*进行快速构建，并确认所有语法都正确。
 
 # 它是如何工作的...
 
-我们在步骤1到5中创建了一个空白解决方案。在步骤7到10中，我们将.NET Standard 2.0类库项目添加到解决方案中。在这些步骤中，我们为项目赋予了有意义的名称。我们在步骤12和13中重命名了模板生成的默认类名。我们在步骤14中添加了LINQ的`using`语句。这是必要的，以便解释使用LINQ的lambda表达式。
+我们在步骤 1 到 5 中创建了一个空白解决方案。在步骤 7 到 10 中，我们将.NET Standard 2.0 类库项目添加到解决方案中。在这些步骤中，我们为项目赋予了有意义的名称。我们在步骤 12 和 13 中重命名了模板生成的默认类名。我们在步骤 14 中添加了 LINQ 的`using`语句。这是必要的，以便解释使用 LINQ 的 lambda 表达式。
 
-在步骤16中，我们添加了代码来创建一个委托和一个方法，以便将委托作为参数使用。委托`Message`接受一个`string`类型的参数，并返回一个`string`类型的输出。然后，我们添加了一个方法来添加两个数字，并以消息的形式返回答案作为字符串。正如你所看到的，`AddTwoNumbers()`方法有三个参数。前两个是整数，最后一个参数是我们创建的委托。
+在步骤 16 中，我们添加了代码来创建一个委托和一个方法，以便将委托作为参数使用。委托`Message`接受一个`string`类型的参数，并返回一个`string`类型的输出。然后，我们添加了一个方法来添加两个数字，并以消息的形式返回答案作为字符串。正如你所看到的，`AddTwoNumbers()`方法有三个参数。前两个是整数，最后一个参数是我们创建的委托。
 
-在步骤17中，我们创建了一个新方法来计算整数数组中数字的出现次数。在`CountScoresMoreThan80()`方法的第1行，我们使用了LINQ提供的`Where()`方法。在`Where()`方法内部，我们使用lambda表达式检查大于`80`的数字。然后，我们使用`Count()`方法来计算通过`Where()`方法过滤后的出现次数，并将答案作为`string`返回。
+在步骤 17 中，我们创建了一个新方法来计算整数数组中数字的出现次数。在`CountScoresMoreThan80()`方法的第 1 行，我们使用了 LINQ 提供的`Where()`方法。在`Where()`方法内部，我们使用 lambda 表达式检查大于`80`的数字。然后，我们使用`Count()`方法来计算通过`Where()`方法过滤后的出现次数，并将答案作为`string`返回。
 
 最后，我们执行了快速构建以确认语法正确。
 
-# 创建一个.NET控制台应用程序以使用库
+# 创建一个.NET 控制台应用程序以使用库
 
-在这个菜谱中，我们将构建一个基于.NET控制台的应用程序来测试我们的库。我们将使用完整的.NET Framework，它仅适用于Windows。
+在这个菜谱中，我们将构建一个基于.NET 控制台的应用程序来测试我们的库。我们将使用完整的.NET Framework，它仅适用于 Windows。
 
 # 准备工作
 
@@ -448,7 +520,7 @@
 
 # 如何做到这一点...
 
-1.  打开Visual Studio 2017。
+1.  打开 Visual Studio 2017。
 
 1.  现在，打开之前菜谱中构建的解决方案。
 
@@ -494,15 +566,32 @@
 
 1.  在所有`using`指令的末尾添加以下`using`指令：
 
-[PRE13]
+```cs
+      using Chapter4.Delegates.DelegateLib;
+```
 
 1.  现在，在`Main()`方法的末尾花括号旁边，添加以下代码：
 
-[PRE14]
+```cs
+      static string DelegateMessage(string msg)
+      {
+          return msg;
+      }
+```
 
 1.  现在，向下滚动到`Main()`方法，并在`Main()`方法的括号之间添加以下代码：
 
-[PRE15]
+```cs
+      var calculator = new Calculator();
+
+      Calculator.Message message = DelegateMessage;
+      Console.WriteLine(calculator.AddTwoNumbers(10, 20, message));
+
+      int[] scores = new int[] { 10, 90, 50, 85, 30, 100, 45, 60 };
+      Console.WriteLine(calculator.CountScoresMoreThan80(scores));
+
+      Console.ReadLine();
+```
 
 1.  让我们按 *F5* 执行程序。
 
@@ -514,10 +603,10 @@
 
 # 它是如何工作的...
 
-在步骤1到5中，我们从上一个菜谱中打开了解决方案并进行了快速构建。这将确保代码语法正确。如果构建失败，你可能需要检查任何拼写错误并更正它们。在关闭解决方案或将其发送到源代码控制之前确保代码成功构建总是一个好习惯。在步骤6到10中，我们在解决方案中添加了一个新项目。我们选择了控制台应用程序模板，该模板在Windows下支持完整的.NET Framework。
+在步骤 1 到 5 中，我们从上一个菜谱中打开了解决方案并进行了快速构建。这将确保代码语法正确。如果构建失败，你可能需要检查任何拼写错误并更正它们。在关闭解决方案或将其发送到源代码控制之前确保代码成功构建总是一个好习惯。在步骤 6 到 10 中，我们在解决方案中添加了一个新项目。我们选择了控制台应用程序模板，该模板在 Windows 下支持完整的.NET Framework。
 
-然后，在步骤12到15中，我们将.NET Standard 2.0库的引用添加到我们的控制台应用程序中。这将允许你访问库中所有可用的功能。在步骤18中，我们添加了对库的引用。我们使用了`using`语句。然后，在步骤19中，我们添加了一个用于库中委托的方法。
+然后，在步骤 12 到 15 中，我们将.NET Standard 2.0 库的引用添加到我们的控制台应用程序中。这将允许你访问库中所有可用的功能。在步骤 18 中，我们添加了对库的引用。我们使用了`using`语句。然后，在步骤 19 中，我们添加了一个用于库中委托的方法。
 
-在步骤20中，第一行我们创建了一个Calculator类的实例并将其存储在一个变量中，然后，在第二行中，我们在类内部使用了代理，并将其从步骤19中创建的方法中赋值。接着，我们使用`AddTwoNumbers()`方法，传入两个整数值和代理变量作为参数，并将输出打印到控制台窗口。在第四行，我们创建了一个整数数组，存储了一些值，使用`CountScoresMoreThan80()`方法，将整数数组作为参数传递，并将输出打印到控制台。
+在步骤 20 中，第一行我们创建了一个 Calculator 类的实例并将其存储在一个变量中，然后，在第二行中，我们在类内部使用了代理，并将其从步骤 19 中创建的方法中赋值。接着，我们使用`AddTwoNumbers()`方法，传入两个整数值和代理变量作为参数，并将输出打印到控制台窗口。在第四行，我们创建了一个整数数组，存储了一些值，使用`CountScoresMoreThan80()`方法，将整数数组作为参数传递，并将输出打印到控制台。
 
-最后，在步骤21和22中，我们执行了代码并检查了输出结果。
+最后，在步骤 21 和 22 中，我们执行了代码并检查了输出结果。

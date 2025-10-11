@@ -1,46 +1,46 @@
-# XML和数据
+# XML 和数据
 
 在本章中，我们将探讨以下食谱：
 
-+   创建一个读取和写入XML文件的库
++   创建一个读取和写入 XML 文件的库
 
-+   创建一个用于使用XMLLib库的ASP.NET MVC应用程序
++   创建一个用于使用 XMLLib 库的 ASP.NET MVC 应用程序
 
-+   使用LINQ to XML处理XML文件
++   使用 LINQ to XML 处理 XML 文件
 
-+   创建一个用于使用库的.NET Core控制台应用程序
++   创建一个用于使用库的.NET Core 控制台应用程序
 
 # 技术要求
 
-读者应具备基本的C#知识。他们还应具备使用Visual Studio、使用NuGet安装包以及在其他项目中引用库的基本知识。
+读者应具备基本的 C#知识。他们还应具备使用 Visual Studio、使用 NuGet 安装包以及在其他项目中引用库的基本知识。
 
-本章的代码文件可以在GitHub上找到：
+本章的代码文件可以在 GitHub 上找到：
 
-[https://github.com/PacktPublishing/DotNET-Standard-2-Cookbook/tree/master/Chapter05](https://github.com/PacktPublishing/DotNET-Standard-2-Cookbook/tree/master/Chapter05)
+[`github.com/PacktPublishing/DotNET-Standard-2-Cookbook/tree/master/Chapter05`](https://github.com/PacktPublishing/DotNET-Standard-2-Cookbook/tree/master/Chapter05)
 
 查看以下视频以查看代码的实际操作：
 
-[https://goo.gl/uQTMeB](https://goo.gl/uQTMeB)
+[`goo.gl/uQTMeB`](https://goo.gl/uQTMeB)
 
 # 简介
 
-XML代表可扩展标记语言，类似于HTML。XML用于存储和读取数据。主要来说，XML是一个数据存储系统，也用于传输数据。C#使用`System.XML`命名空间在语言内部支持XML。您将能够使用此命名空间读取、写入和解析XML数据。有了LINQ的支持，处理基于XML的数据变得更加容易。
+XML 代表可扩展标记语言，类似于 HTML。XML 用于存储和读取数据。主要来说，XML 是一个数据存储系统，也用于传输数据。C#使用`System.XML`命名空间在语言内部支持 XML。您将能够使用此命名空间读取、写入和解析 XML 数据。有了 LINQ 的支持，处理基于 XML 的数据变得更加容易。
 
-# 创建一个读取和写入XML文件的库
+# 创建一个读取和写入 XML 文件的库
 
-在这个食谱中，我们将使用.NET Standard 2.0库来创建和写入XML文件。我们还将使用相同的库将数据写入XML文件。
+在这个食谱中，我们将使用.NET Standard 2.0 库来创建和写入 XML 文件。我们还将使用相同的库将数据写入 XML 文件。
 
 # 准备工作
 
-让我们启动Visual Studio 2017并完成任务。请确保您已安装Visual Studio 2017的最新版本。
+让我们启动 Visual Studio 2017 并完成任务。请确保您已安装 Visual Studio 2017 的最新版本。
 
 # 如何操作...
 
-1.  打开Visual Studio 2017。
+1.  打开 Visual Studio 2017。
 
 1.  点击“文件”|“新建”|“项目”以创建项目。
 
-1.  在“新建项目”对话框中，展开左侧窗格中的“其他项目类型”节点，并选择“Visual Studio解决方案”。在右侧窗格中，选择“空白解决方案”。
+1.  在“新建项目”对话框中，展开左侧窗格中的“其他项目类型”节点，并选择“Visual Studio 解决方案”。在右侧窗格中，选择“空白解决方案”。
 
 1.  在“名称：”文本框中，键入`Chapter5.XmlDoc`，并在“位置：”文本框中，从下拉框中选择路径或点击“浏览...”按钮定位路径：
 
@@ -76,49 +76,177 @@ XML代表可扩展标记语言，类似于HTML。XML用于存储和读取数据�
 
 1.  向上滚动，直到到达`using`指令，并在最后一个`using`指令的末尾添加以下内容：
 
-[PRE0]
+```cs
+        using System.Xml;
+        using System.IO;
+        using System.Xml.Linq;
+        using System.Collections.Generic;
+        using System.Linq;
+```
 
 1.  现在，向下滚动并在`XMLLog`类上方添加以下类变量：
 
-[PRE1]
+```cs
+        private string _xmlFile;
+```
 
 1.  让我们为`XMLLog`类添加构造函数：
 
-[PRE2]
+```cs
+        public XMLLog(string xmlFile)
+        {
+          _xmlFile = xmlFile;
+        }
+```
 
 1.  在类的构造函数之后添加以下公共方法：
 
-[PRE3]
+```cs
+        public void WriteToLog(string message)
+        {
+
+          if (!File.Exists(_xmlFile))
+          {
+            using (XmlWriter xmlWriter = XmlWriter.Create(_xmlFile))
+            {
+              xmlWriter.WriteStartDocument();
+              xmlWriter.WriteStartElement("Log");
+              xmlWriter.WriteStartElement("LogEntry");
+              xmlWriter.WriteElementString("LogDate", DateTime.Now.ToString());
+              xmlWriter.WriteElementString("Message", message);
+              xmlWriter.WriteEndElement();
+              xmlWriter.WriteEndElement();
+              xmlWriter.WriteEndDocument();
+
+              xmlWriter.Flush();
+              xmlWriter.Close();
+            }
+          }
+          else
+          {
+            XDocument xDoc = XDocument.Load(_xmlFile);
+            XElement root = xDoc.Element("Log");
+            IEnumerable<XElement> rows = root.Descendants("LogEntry");
+
+            XElement lastRow = rows.Last();
+            lastRow.AddAfterSelf(
+              new XElement("LogEntry",
+              new XElement("LogDate", DateTime.Now.ToString()),
+              new XElement("Message", message)));
+
+            xDoc.Save(_xmlFile);
+          }
+        }
+```
 
 1.  现在，在`WriteToLog()`方法旁边添加以下代码：
 
-[PRE4]
+```cs
+        public Dictionary<string, string> ReadLog()
+        {
+
+          var xmlOutPut = new Dictionary<string, string>();
+          var line = 0;
+
+          if (File.Exists(_xmlFile))
+          {
+            using (XmlReader xmlReader = XmlReader.Create(_xmlFile))
+            {
+              while(xmlReader.Read())
+              {
+
+                if (xmlReader.IsStartElement())
+                {
+
+                  switch (xmlReader.Name)
+                  {
+                    case "LogDate":
+                      xmlOutPut.Add($"LogDate - {line}", xmlReader.ReadElementContentAsString());
+                      break;
+                    case "Message":
+                      xmlOutPut.Add($"Message - {line}", xmlReader.ReadElementContentAsString());
+                      break;    
+                  }
+                }
+                line++;
+              }
+            }
+
+            return xmlOutPut;
+          }
+        }
+```
 
 1.  让我们按*Ctrl* + *Shift* + *B*进行快速构建。
 
 # 它是如何工作的...
 
-在步骤1到5中，我们创建了一个空白解决方案，并为解决方案赋予了合适的名称。然后，在步骤6到10中，我们将一个.NET Standard 2.0库项目添加到解决方案中。在步骤11、12和13中，我们将Visual Studio生成的默认类模板重命名。
+在步骤 1 到 5 中，我们创建了一个空白解决方案，并为解决方案赋予了合适的名称。然后，在步骤 6 到 10 中，我们将一个.NET Standard 2.0 库项目添加到解决方案中。在步骤 11、12 和 13 中，我们将 Visual Studio 生成的默认类模板重命名。
 
-在步骤15中，我们为我们的库添加了所有必需的命名空间。`System.Xml`和`System.Xml.Linq`是我们将要关注的两个命名空间。`System.Xml`提供了创建和维护XML文档的功能。`System.Xml.Linq`是LINQ的扩展，用于操作XML数据。
+在步骤 15 中，我们为我们的库添加了所有必需的命名空间。`System.Xml`和`System.Xml.Linq`是我们将要关注的两个命名空间。`System.Xml`提供了创建和维护 XML 文档的功能。`System.Xml.Linq`是 LINQ 的扩展，用于操作 XML 数据。
 
-在步骤16中，我们创建了一个类级别的私有变量来存储XML文件的路径。在步骤17中，我们为类创建了一个构造函数，该构造函数接受一个字符串参数。该参数是带有XML文件路径的文件名。它还填充了步骤16中创建的私有变量。在步骤18中，我们添加了一个公共方法来写入XML文件。
+在步骤 16 中，我们创建了一个类级别的私有变量来存储 XML 文件的路径。在步骤 17 中，我们为类创建了一个构造函数，该构造函数接受一个字符串参数。该参数是带有 XML 文件路径的文件名。它还填充了步骤 16 中创建的私有变量。在步骤 18 中，我们添加了一个公共方法来写入 XML 文件。
 
-在代码的第一行，我们检查XML文件是否存在。如果它不存在，以下代码块将接管：
+在代码的第一行，我们检查 XML 文件是否存在。如果它不存在，以下代码块将接管：
 
-[PRE5]
+```cs
+using (XmlWriter xmlWriter = XmlWriter.Create(_xmlFile))
+{
+    xmlWriter.WriteStartDocument();
+    xmlWriter.WriteStartElement("Log");
+    xmlWriter.WriteStartElement("LogEntry");
+    xmlWriter.WriteElementString("LogDate", DateTime.Now.ToString());
+    xmlWriter.WriteElementString("Message", message);
+    xmlWriter.WriteEndElement();
+    xmlWriter.WriteEndElement();
+    xmlWriter.WriteEndDocument();
 
-我们使用了`XmlWriter`类及其`Create`方法来创建XML文件。在这种情况下，它被包含在一个`using`关键字中。如果类实现了`IDisposable`接口，并且其生命周期限制在方法内，这是一个好的实践。`using`语句以正确的方式调用对象的`Dispose`方法，并且一旦调用`Dispose`，对象本身就会超出作用域。最后，`XmlWriter`类的`Flush()`方法将清除缓冲区，而`Close()`方法将关闭写入流。
+    xmlWriter.Flush();
+    xmlWriter.Close();
+}
+```
 
-在接下来的几行代码中，我们开始编写文档，并最终澄清了问题并关闭了`XmlWriter`。如果文件存在，我们编写了一些代码来处理现有的XML文档并将其数据附加到它上。代码如下：
+我们使用了`XmlWriter`类及其`Create`方法来创建 XML 文件。在这种情况下，它被包含在一个`using`关键字中。如果类实现了`IDisposable`接口，并且其生命周期限制在方法内，这是一个好的实践。`using`语句以正确的方式调用对象的`Dispose`方法，并且一旦调用`Dispose`，对象本身就会超出作用域。最后，`XmlWriter`类的`Flush()`方法将清除缓冲区，而`Close()`方法将关闭写入流。
 
-[PRE6]
+在接下来的几行代码中，我们开始编写文档，并最终澄清了问题并关闭了`XmlWriter`。如果文件存在，我们编写了一些代码来处理现有的 XML 文档并将其数据附加到它上。代码如下：
 
-在这段代码中，我们创建了一个`XDocument`类来处理现有的XML文件。这个类是从`System.Xml.Linq`命名空间引用的。在第一行，我们加载了现有的XML文件。在第二行，我们查找文档的根元素。我们从根元素的子元素中选取所有后代，并从该列表中选取最后一个元素。这就是我们将添加新数据的位置。我们使用了`AddAfterSelf()`方法将新条目添加到XML文档中，并最终保存了文档。
+```cs
+XDocument xDoc = XDocument.Load(_xmlFile);
+XElement root = xDoc.Element("Log");
+IEnumerable<XElement> rows = root.Descendants("LogEntry");
+
+XElement lastRow = rows.Last();
+lastRow.AddAfterSelf(
+    new XElement("LogEntry",
+        new XElement("LogDate", DateTime.Now.ToString()),
+            new XElement("Message", message)));
+
+xDoc.Save(_xmlFile);
+```
+
+在这段代码中，我们创建了一个`XDocument`类来处理现有的 XML 文件。这个类是从`System.Xml.Linq`命名空间引用的。在第一行，我们加载了现有的 XML 文件。在第二行，我们查找文档的根元素。我们从根元素的子元素中选取所有后代，并从该列表中选取最后一个元素。这就是我们将添加新数据的位置。我们使用了`AddAfterSelf()`方法将新条目添加到 XML 文档中，并最终保存了文档。
 
 在第 19 步中，我们创建了一个读取现有 XML 文档的方法。在第一行，我们创建了一个字典来存储我们从 XML 文档中读取的数据。然后，我们检查文件是否存在以进行读取，并创建了读取文件的代码。这次我们使用了 `XmlReader()` 类来读取数据并将其存储在字典中：
 
-[PRE7]
+```cs
+while(xmlReader.Read())
+{
+    if (xmlReader.IsStartElement())
+    {
+
+        switch (xmlReader.Name)
+        {
+            case "LogDate":
+                xmlOutPut.Add($"LogDate - {line}", xmlReader.ReadElementContentAsString());
+                break;
+            case "Message":
+                xmlOutPut.Add($"Message - {line}", xmlReader.ReadElementContentAsString());
+                break;    
+        }
+     }
+     line++;
+ }
+```
 
 我们使用了一个 `while` 循环来遍历 XML 文档的每一行，并使用 `switch` 语句来检查正确的元素并将其存储在字典中。如您所见，通过使用 `counter` (`line`) 变量，我们还为字典创建了一个唯一的键。最后，我们返回了已填充的字典。在第 20 步中，我们执行了快速构建以检查语法是否正确。
 
@@ -196,11 +324,20 @@ XML代表可扩展标记语言，类似于HTML。XML用于存储和读取数据�
 
 1.  将此`using`指令添加到代码的顶部，紧邻指令的最后一行：
 
-[PRE8]
+```cs
+        using Chapter5.XmlDoc.XmlLib;
+```
 
 1.  现在，让我们将此代码添加到`Index()`方法中，并在`return`语句之前：
 
-[PRE9]
+```cs
+        var xmlFile = $"{Server.MapPath("~")}/testlog.xml";
+
+        var xmlLog = new XMLLog(xmlFile);
+        xmlLog.WriteToLog("Start at the Index() method");
+        xmlLog.WriteToLog("Another log entry here");
+        xmlLog.WriteToLog("Before the return statement");
+```
 
 1.  按*F5*测试我们的代码，你应该得到如下输出：
 
@@ -220,15 +357,36 @@ XML代表可扩展标记语言，类似于HTML。XML用于存储和读取数据�
 
 1.  现在，让我们点击`HomeController.cs`标签页，并在`Index()`方法旁边添加此代码：
 
-[PRE10]
+```cs
+        public ActionResult Display()
+        {
+
+            var xmlFile = $"{Server.MapPath("~")}/testlog.xml";
+            var xmlLog = new XMLLog(xmlFile);
+
+            ViewBag.LogDetails = xmlLog.ReadLog();
+
+            return View();
+        }
+```
 
 1.  现在，右键单击`Display()`方法名称并选择添加视图。
 
-1.  按照步骤22添加视图。
+1.  按照步骤 22 添加视图。
 
 1.  现在，在`Display.cshtml`中，在`<h2>`标签旁边添加以下代码：
 
-[PRE11]
+```cs
+        @{ 
+
+            var xmlLogDetails = (Dictionary<string, string>)ViewBag.LogDetails;
+
+            foreach (var log in xmlLogDetails)
+            {
+                <p>@log.Key.Split('-')[0]: @log.Value.Split('-')[0]</p>
+            }
+        }
+```
 
 1.  现在，让我们按*F5*来调试代码。默认情况下，这应该在浏览器中加载`Display.chtml`；如果不是，请输入`http://locahost<portnumber>/Home/Display`并按*Enter*。
 
@@ -240,33 +398,37 @@ XML代表可扩展标记语言，类似于HTML。XML用于存储和读取数据�
 
 # 它是如何工作的...
 
-在步骤1到10中，我们打开了一个包含用于读取和写入XML文件库的现有解决方案。然后，在这些步骤中，我们向该解决方案添加了一个ASP.NET MVC项目。在步骤13中，我们添加了对之前菜谱中构建的库的引用。这将允许你访问库中的可用方法。
+在步骤 1 到 10 中，我们打开了一个包含用于读取和写入 XML 文件库的现有解决方案。然后，在这些步骤中，我们向该解决方案添加了一个 ASP.NET MVC 项目。在步骤 13 中，我们添加了对之前菜谱中构建的库的引用。这将允许你访问库中的可用方法。
 
-在步骤16到20中，我们向项目中添加了一个控制器，并将其命名为`HomeController`。在步骤24中，我们添加了一个`using`指令来引用库。在步骤25中，我们编写了创建`XMLLog`类实例的代码，并在创建和写入XML文档的方法中使用它。在以下代码行中，我们提供了我们的XML文件的路径和名称：
+在步骤 16 到 20 中，我们向项目中添加了一个控制器，并将其命名为`HomeController`。在步骤 24 中，我们添加了一个`using`指令来引用库。在步骤 25 中，我们编写了创建`XMLLog`类实例的代码，并在创建和写入 XML 文档的方法中使用它。在以下代码行中，我们提供了我们的 XML 文件的路径和名称：
 
-[PRE12]
+```cs
+var xmlFile = $"{Server.MapPath("~")}/testlog.xml";
+```
 
-`Server.MapPath("~")`确保文件被创建在我们的Web文件夹的根目录。在步骤26到29中，我们确认了我们的代码正在工作，并且XML文件已创建并包含日志条目。在步骤30中，我们为`HomeController`创建了一个新的操作。我们创建了一个`XMLLog`类的实例，并在方法中使用它来从日志文件中读取信息。然后我们将值存储在`ViewBag`中：
+`Server.MapPath("~")`确保文件被创建在我们的 Web 文件夹的根目录。在步骤 26 到 29 中，我们确认了我们的代码正在工作，并且 XML 文件已创建并包含日志条目。在步骤 30 中，我们为`HomeController`创建了一个新的操作。我们创建了一个`XMLLog`类的实例，并在方法中使用它来从日志文件中读取信息。然后我们将值存储在`ViewBag`中：
 
-[PRE13]
+```cs
+ViewBag.LogDetails = xmlLog.ReadLog();
+```
 
-在步骤32中，我们为`Display`操作创建了一个视图，就像我们在步骤22中所做的那样。然后在步骤32中为视图添加了代码，将`ViewBag`转换为字典并显示其内容。最后，我们在步骤34和35中测试了输出。
+在步骤 32 中，我们为`Display`操作创建了一个视图，就像我们在步骤 22 中所做的那样。然后在步骤 32 中为视图添加了代码，将`ViewBag`转换为字典并显示其内容。最后，我们在步骤 34 和 35 中测试了输出。
 
-# 使用LINQ to XML处理XML文件
+# 使用 LINQ to XML 处理 XML 文件
 
-在本食谱中，我们将构建一个.NET Standard 2.0库，该库使用LINQ to XML读取XML数据。LINQ to XML是一个启用LINQ的内存编程接口。它允许你使用你喜欢的.NET语言处理XML。本书使用C#来描述代码。在本食谱中，我们将主要查看使用LINQ to XML查询XML文档。我们在“A library that reads and writes to an XML file”食谱中使用了LINQ to XML来写入XML文件。
+在本食谱中，我们将构建一个.NET Standard 2.0 库，该库使用 LINQ to XML 读取 XML 数据。LINQ to XML 是一个启用 LINQ 的内存编程接口。它允许你使用你喜欢的.NET 语言处理 XML。本书使用 C#来描述代码。在本食谱中，我们将主要查看使用 LINQ to XML 查询 XML 文档。我们在“A library that reads and writes to an XML file”食谱中使用了 LINQ to XML 来写入 XML 文件。
 
 # 准备工作
 
-本食谱假设你已经使用了LINQ。我们专注于使用XML文档的LINQ。让我们启动Visual Studio并开始吧。
+本食谱假设你已经使用了 LINQ。我们专注于使用 XML 文档的 LINQ。让我们启动 Visual Studio 并开始吧。
 
 # 如何操作...
 
-1.  打开Visual Studio 2017。
+1.  打开 Visual Studio 2017。
 
 1.  点击文件 | 新建 | 项目以创建项目。
 
-1.  在“新建项目”对话框中，展开左侧窗格中的“其他项目类型”节点，并选择Visual Studio解决方案。在右侧窗格中选择空白解决方案。
+1.  在“新建项目”对话框中，展开左侧窗格中的“其他项目类型”节点，并选择 Visual Studio 解决方案。在右侧窗格中选择空白解决方案。
 
 1.  在“名称”文本框中，输入`Chapter5.XmlLinq`，在“位置”文本框中，从下拉框中选择路径或点击浏览...按钮定位路径：
 
@@ -280,7 +442,7 @@ XML代表可扩展标记语言，类似于HTML。XML用于存储和读取数据�
 
 1.  现在，在解决方案资源管理器中的`Chapter5.XmlLinq`标签上右键单击，并选择添加 | 新项目。
 
-1.  在“新建项目”对话框中，展开Visual C#节点。
+1.  在“新建项目”对话框中，展开 Visual C#节点。
 
 1.  在左侧窗格中选择.NET Standard，在右侧窗格中选择类库(.NET Standard)：
 
@@ -302,19 +464,46 @@ XML代表可扩展标记语言，类似于HTML。XML用于存储和读取数据�
 
 1.  在列表中的最后一个指令旁边添加以下`using`指令：
 
-[PRE14]
+```cs
+        using System.Collections.Generic;
+        using System.Xml;
+        using System.Xml.Linq;
+```
 
-1.  添加以下私有变量以存储XML文件名：
+1.  添加以下私有变量以存储 XML 文件名：
 
-[PRE15]
+```cs
+        private string _xmlFile;
+```
 
 1.  创建如下默认构造函数：
 
-[PRE16]
+```cs
+        public XmlBooks(string xmlFile)
+        {
+            _xmlFile = xmlFile;
+        }
+```
 
-1.  现在添加以下方法来读取XML文件：
+1.  现在添加以下方法来读取 XML 文件：
 
-[PRE17]
+```cs
+        public List<string> GetBookTitles()
+        {
+
+            var titles = new List<string>();
+            XDocument xDoc = XDocument.Load(_xmlFile);
+
+            var books = xDoc.Descendants("book"); 
+
+            foreach (var book in books)
+            {
+                titles.Add(book.Element("title").Value);
+            }
+
+            return titles;
+        }
+```
 
 1.  现在，让我们按*Ctrl* + *Shift* + *B*进行快速构建，以检查所有语法是否正确。
 
@@ -334,7 +523,61 @@ XML代表可扩展标记语言，类似于HTML。XML用于存储和读取数据�
 
 让我们通过查看之前构建的 .NET Standard 2.0 库来做好准备，该库用于读取 XML 文件。请确保您已经在项目中创建了此 XML 文件。我们将使用此文件进行读取。此示例来自 MSDN 库本身：
 
-[PRE18]
+```cs
+<?xml version="1.0"?>
+<catalog>
+   <book id="bk101">
+      <author>Gambardella, Matthew</author>
+      <title>XML Developer's Guide</title>
+      <genre>Computer</genre>
+      <price>44.95</price>
+      <publish_date>2000-10-01</publish_date>
+      <description>An in-depth look at creating applications 
+      with XML.</description>
+   </book>
+   <book id="bk102">
+      <author>Ralls, Kim</author>
+      <title>Midnight Rain</title>
+      <genre>Fantasy</genre>
+      <price>5.95</price>
+      <publish_date>2000-12-16</publish_date>
+      <description>A former architect battles corporate zombies, 
+      an evil sorceress, and her own childhood to become queen 
+      of the world.</description>
+   </book>
+   <book id="bk103">
+      <author>Corets, Eva</author>
+      <title>Maeve Ascendant</title>
+      <genre>Fantasy</genre>
+      <price>5.95</price>
+      <publish_date>2000-11-17</publish_date>
+      <description>After the collapse of a nanotechnology 
+      society in England, the young survivors lay the 
+      foundation for a new society.</description>
+   </book>
+   <book id="bk104">
+      <author>Corets, Eva</author>
+      <title>Oberon's Legacy</title>
+      <genre>Fantasy</genre>
+      <price>5.95</price>
+      <publish_date>2001-03-10</publish_date>
+      <description>In post-apocalypse England, the mysterious 
+      agent known only as Oberon helps to create a new life 
+      for the inhabitants of London. Sequel to Maeve 
+      Ascendant.</description>
+   </book>
+   <book id="bk105">
+      <author>Corets, Eva</author>
+      <title>The Sundered Grail</title>
+      <genre>Fantasy</genre>
+      <price>5.95</price>
+      <publish_date>2001-09-10</publish_date>
+      <description>The two daughters of Maeve, half-sisters, 
+      battle one another for control of England. Sequel to 
+      Oberon's Legacy.</description>
+   </book>
+</catalog>
+```
 
 # 如何操作...
 
@@ -384,7 +627,61 @@ XML代表可扩展标记语言，类似于HTML。XML用于存储和读取数据�
 
 1.  现在将现有代码替换为以下内容：
 
-[PRE19]
+```cs
+        <?xml version="1.0"?>
+        <catalog>
+          <book id="bk101">
+              <author>Gambardella, Matthew</author>
+              <title>XML Developer's Guide</title>
+              <genre>Computer</genre>
+              <price>44.95</price>
+              <publish_date>2000-10-01</publish_date>
+              <description>An in-depth look at creating applications 
+              with XML.</description>
+           </book>
+           <book id="bk102">
+              <author>Ralls, Kim</author>
+              <title>Midnight Rain</title>
+              <genre>Fantasy</genre>
+              <price>5.95</price>
+              <publish_date>2000-12-16</publish_date>
+              <description>A former architect battles corporate zombies, 
+               an evil sorceress, and her own childhood to become queen 
+               of the world.</description>
+           </book>
+           <book id="bk103">
+              <author>Corets, Eva</author>
+              <title>Maeve Ascendant</title>
+              <genre>Fantasy</genre>
+              <price>5.95</price>
+              <publish_date>2000-11-17</publish_date>
+              <description>After the collapse of a nanotechnology 
+              society in England, the young survivors lay the 
+              foundation for a new society.</description>
+           </book>
+           <book id="bk104">
+              <author>Corets, Eva</author>
+              <title>Oberon's Legacy</title>
+              <genre>Fantasy</genre>
+              <price>5.95</price>
+              <publish_date>2001-03-10</publish_date>
+              <description>In post-apocalypse England, the mysterious 
+              agent known only as Oberon helps to create a new life 
+              for the inhabitants of London. Sequel to Maeve 
+              Ascendant.</description>
+           </book>
+           <book id="bk105">
+              <author>Corets, Eva</author>
+              <title>The Sundered Grail</title>
+              <genre>Fantasy</genre>
+              <price>5.95</price>
+              <publish_date>2001-09-10</publish_date>
+              <description>The two daughters of Maeve, half-sisters, 
+              battle one another for control of England. Sequel to 
+              Oberon's Legacy.</description>
+           </book>
+        </catalog>
+```
 
 1.  现在双击 `Program.cs` 以打开代码窗口。
 
@@ -392,11 +689,26 @@ XML代表可扩展标记语言，类似于HTML。XML用于存储和读取数据�
 
 1.  在 `using` 指令的最后一条语句旁边，添加以下 `using` 指令：
 
-[PRE20]
+```cs
+        using Chapter5.XmlLinq.XmlLinqLib;
+```
 
 1.  现在将 `Main()` 方法中的现有代码替换为以下代码：
 
-[PRE21]
+```cs
+        var xmlFile = @"C:\Projects\Chapter5\Chapter5.XmlLinq\Chapter5.XmlLinq.XmlCore\books.xml";
+
+        var books = new XmlBooks(xmlFile);
+        var titles = books.GetBookTitles();
+
+        foreach (var title in titles)
+        {
+
+            Console.WriteLine(title);
+        }
+
+        Console.ReadLine();
+```
 
 1.  按 *F5* 查看输出，它应该看起来像这样：
 

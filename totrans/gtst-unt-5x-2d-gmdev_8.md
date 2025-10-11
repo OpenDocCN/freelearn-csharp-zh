@@ -1,4 +1,4 @@
-# 第8章. 蛋糕之外是什么？
+# 第八章. 蛋糕之外是什么？
 
 > **"从五彩缤纷的纸杯蛋糕到美味的甜点，发现如何挑逗消费者的味蕾！"**
 
@@ -6,7 +6,7 @@
 
 在本章的后面部分，我们将发现蛋糕之外的东西。事实上，游戏开发不仅限于游戏本身；还有许多围绕它构建的东西你应该考虑。这些事情可能包括团队合作、测试、营销和本地化！当然，这不是一本关于视频游戏营销的书，但它为你提供了开始超越游戏本身的起点！
 
-最后，我必须说，你应该为自己感到骄傲，因为你已经走到了这一步！事实上，你不仅完成了一个**塔防**游戏，还学到了很多关于Unity的知识，而且你还在这里，站在最后一章！所以，为了保持你的动力，在继续阅读最后一章之前，去拿一块蛋糕吧。
+最后，我必须说，你应该为自己感到骄傲，因为你已经走到了这一步！事实上，你不仅完成了一个**塔防**游戏，还学到了很多关于 Unity 的知识，而且你还在这里，站在最后一章！所以，为了保持你的动力，在继续阅读最后一章之前，去拿一块蛋糕吧。
 
 # 增强和改进你的游戏
 
@@ -18,7 +18,7 @@
 
 ### 射击策略
 
-回到[第2章](part0028.xhtml#aid-QMFO1 "第2章. 烘焙纸杯蛋糕塔")，*烘焙纸杯蛋糕塔*，我们实现了第一个射击塔附近熊猫的纸杯蛋糕塔。然而，这并不是你可以选择的唯一策略。实际上，你也可以允许玩家选择一个更适合他们策略的选项。
+回到第二章，*烘焙纸杯蛋糕塔*，我们实现了第一个射击塔附近熊猫的纸杯蛋糕塔。然而，这并不是你可以选择的唯一策略。实际上，你也可以允许玩家选择一个更适合他们策略的选项。
 
 这些策略可能包括：
 
@@ -50,7 +50,7 @@
 
 +   **爆炸**：它们不仅会伤害它们击中的熊猫，还会伤害周围的熊猫。
 
-+   **暴击**：即使熊猫剩余生命值不多，洒水器也有可能杀死熊猫的概率。但例如，这并不适用于Boss，在暴击中它们只会受到双倍伤害。
++   **暴击**：即使熊猫剩余生命值不多，洒水器也有可能杀死熊猫的概率。但例如，这并不适用于 Boss，在暴击中它们只会受到双倍伤害。
 
 随意添加您自己的内容。
 
@@ -86,13 +86,13 @@
 
 ## 改进用户界面
 
-此外，我们游戏的用户界面可以改进，例如，一个通知告诉玩家他/她还有多少波要击败。添加这类信息可能非常有用。下一步是确定在哪里？这是一个需要考虑的设计选择，因为它可能会影响我们在[第3章](part0043.xhtml#aid-190861 "第3章。与玩家沟通——用户界面")中设计当前UI时达到的平衡，*与玩家沟通——用户界面*。
+此外，我们游戏的用户界面可以改进，例如，一个通知告诉玩家他/她还有多少波要击败。添加这类信息可能非常有用。下一步是确定在哪里？这是一个需要考虑的设计选择，因为它可能会影响我们在第三章中设计当前 UI 时达到的平衡，*与玩家沟通——用户界面*。
 
 因此，一个好的练习就是通过考虑尽可能多的因素（包括在交易系统中显示价格和成本；在上一章中有一个关于这个的练习）来迭代整个游戏界面的设计。
 
 ### 注意
 
-一本关于如何设计用户界面的非常好的书是Jeff Johnson的《Designing with the Mind in Mind》，但这只是众多书籍中的一本，所以请确保查看其他关于游戏UI的更具体书籍。
+一本关于如何设计用户界面的非常好的书是 Jeff Johnson 的《Designing with the Mind in Mind》，但这只是众多书籍中的一本，所以请确保查看其他关于游戏 UI 的更具体书籍。
 
 ## 提高关卡质量
 
@@ -128,7 +128,19 @@
 
 因此，你可以创建许多不同的航点，它们继承自航点的父类。在分叉的情况下，你可以随机选择将熊猫发送到哪个地方。以下是一个代码片段，以供参考，当路径在两点之间分叉时：
 
-[PRE0]
+```cs
+[SerializeField] 
+private Waypoint waypoint1, waypoint2; 
+
+public override Waypoint GetNextWaypoint() { 
+  if(Random.Range(0,2) == 0) { 
+    return waypoint1; 
+  }else { 
+    return waypoint2; 
+  } 
+} 
+
+```
 
 但你真的可以实现你心中的任何想法，只要你的思考是基于航点的！你还可以让`GetNextWaypoint()`接受一些参数，比如熊猫本身，然后根据熊猫决定将熊猫发送到哪个航点！基本上，可能性很多，将航点作为单个实体来构建的结构允许我们这样做。
 
@@ -138,13 +150,13 @@
 
 你甚至可以考虑给他们不同的能力，并且再次你可以使用继承的概念来实现从`PandaScript`派生的其他熊猫类。然而，请记住，你还需要考虑改变繁殖系统！
 
-### 多阶段Boss
+### 多阶段 Boss
 
-在不同种类的熊猫中，你可以在关卡结束时添加一个Boss，用来击败头上戴着王冠的巨型熊猫：
+在不同种类的熊猫中，你可以在关卡结束时添加一个 Boss，用来击败头上戴着王冠的巨型熊猫：
 
-![多阶段Boss](img/image00608.jpeg)
+![多阶段 Boss](img/image00608.jpeg)
 
-Boss的不同阶段可以用有限状态机来构建，不同的转换由其健康量或它离玩家蛋糕的远近触发。它也可能有变得非常愤怒并偏离轨道去吃一个纸杯蛋糕塔的可能性！
+Boss 的不同阶段可以用有限状态机来构建，不同的转换由其健康量或它离玩家蛋糕的远近触发。它也可能有变得非常愤怒并偏离轨道去吃一个纸杯蛋糕塔的可能性！
 
 ### 一个更好的繁殖系统
 
@@ -152,13 +164,13 @@ Boss的不同阶段可以用有限状态机来构建，不同的转换由其健�
 
 ![一个更好的繁殖系统](img/image00609.jpeg)
 
-你可能想知道是否真的可以在Unity检查器中做到这一点。答案是肯定的；实际上，Unity编辑器可以被扩展（我们将在本章后面看到）。
+你可能想知道是否真的可以在 Unity 检查器中做到这一点。答案是肯定的；实际上，Unity 编辑器可以被扩展（我们将在本章后面看到）。
 
 ### 运行时切换难度
 
 另一种可能使游戏适应更广泛受众的绝佳方式可能是根据玩家的表现运行时切换游戏的难度。实际上，你可能希望通过提高难度级别来保持寻求挑战的玩家参与，如果他们在游戏中相对容易地前进，或者帮助那些遇到困难的玩家。
 
-有不同的方法可以做到这一点。最简单的一种包括基于玩家分数的if链，以增加或降低难度；而最复杂的一种包括自适应学习算法。
+有不同的方法可以做到这一点。最简单的一种包括基于玩家分数的 if 链，以增加或降低难度；而最复杂的一种包括自适应学习算法。
 
 ### 小贴士
 
@@ -166,13 +178,13 @@ Boss的不同阶段可以用有限状态机来构建，不同的转换由其健�
 
 无论你的方式是什么，首先要做的是将你的整个游戏链接到一个难度参数，可能是在`游戏管理器`中。每当这个参数改变时，所有依赖于它的游戏部分都会改变（参考*关于脚本间通信的更多内容*部分）。然后在另一个脚本中，你可以实现你的自适应算法，该算法通过接收游戏的不同状态，可以确定是否增加或降低难度。
 
-# 训练和扩展你的Unity技能，成为一名更好的游戏开发者
+# 训练和扩展你的 Unity 技能，成为一名更好的游戏开发者
 
-在本节中，我们将提供一些关于如何提高你的Unity技能和整体改进任何游戏（包括这个*塔防*游戏）的想法。
+在本节中，我们将提供一些关于如何提高你的 Unity 技能和整体改进任何游戏（包括这个*塔防*游戏）的想法。
 
 ## 让其他团队成员的工作更简单
 
-当你在Unity中编写脚本时，你需要记住你的代码将被不同的团队成员使用（我们将在本章后面了解更多关于团队合作的内容）。因此，请记住以下几点：
+当你在 Unity 中编写脚本时，你需要记住你的代码将被不同的团队成员使用（我们将在本章后面了解更多关于团队合作的内容）。因此，请记住以下几点：
 
 +   通过文档（我们将在*团队合作*部分稍后看到）提高你代码的可读性，以便你的程序员同事。
 
@@ -184,11 +196,31 @@ Boss的不同阶段可以用有限状态机来构建，不同的转换由其健�
 
 实际上，你可以在你的代码中添加这个库：
 
-[PRE1]
+```cs
+using UnityEngine.Events; 
+
+```
 
 因此，你将能够以下述方式声明和触发事件：
 
-[PRE2]
+```cs
+*//Float variable just for test. Can be set in the Inspector.* 
+public float myFloat; 
+
+*//Declaration of the event class. It has a float as parameter to pass.* 
+[System.Serializable] 
+public class OnEveryFrame : UnityEvent<float> { } 
+
+*//Declare the variable event which will be shown in the Inspector* 
+public OnEveryFrame OnEveryFrameEvent; 
+
+*//Function that is called every frame* 
+void Update() { 
+ * //fire the event at every frame* 
+  OnEveryFrameEvent.Invoke(myFloat); 
+} 
+
+```
 
 这就是它在**检查器**中的样子：
 
@@ -198,17 +230,17 @@ Boss的不同阶段可以用有限状态机来构建，不同的转换由其健�
 
 ## 糖霜池
 
-在Unity中实例化一个游戏对象是一个缓慢的操作；因此，每当纸杯塔射击时，就会实例化一个新的糖霜，然后从游戏中移除。
+在 Unity 中实例化一个游戏对象是一个缓慢的操作；因此，每当纸杯塔射击时，就会实例化一个新的糖霜，然后从游戏中移除。
 
-一个更好的解决方案是进行对象池化，这是一种优化技术（我们在[第2章](part0028.xhtml#aid-QMFO1 "第2章。烘焙纸杯蛋糕塔")中提前提到了这一点，“烘焙纸杯蛋糕塔”）。其概念是在开始时实例化一定数量的糖霜并保持它们在屏幕之外。当一个纸杯蛋糕塔射击糖霜时，它只是从这个池中取出一个糖霜并射击。当糖霜应该被销毁时，相反，它被移回到屏幕外的池中，以便另一个塔楼可以再次拾取。
+一个更好的解决方案是进行对象池化，这是一种优化技术（我们在第二章中提前提到了这一点，“烘焙纸杯蛋糕塔”）。其概念是在开始时实例化一定数量的糖霜并保持它们在屏幕之外。当一个纸杯蛋糕塔射击糖霜时，它只是从这个池中取出一个糖霜并射击。当糖霜应该被销毁时，相反，它被移回到屏幕外的池中，以便另一个塔楼可以再次拾取。
 
 在存在许多塔楼射击的场景中，这可以显著提高你的游戏性能，尤其是如果你针对的是移动平台。
 
 ## 保存你的数据
 
-我们还没有讨论保存游戏数据（遗憾的是我们无法在这本书中涵盖所有内容）。然而，Unity提供了一个名为`PlayerPrefs`的类（官方文档：[https://docs.unity3d.com/ScriptReference/PlayerPrefs.html](https://docs.unity3d.com/ScriptReference/PlayerPrefs.html)），它非常适合在游戏会话之间保存一些值，例如分数。
+我们还没有讨论保存游戏数据（遗憾的是我们无法在这本书中涵盖所有内容）。然而，Unity 提供了一个名为`PlayerPrefs`的类（官方文档：[`docs.unity3d.com/ScriptReference/PlayerPrefs.html`](https://docs.unity3d.com/ScriptReference/PlayerPrefs.html)），它非常适合在游戏会话之间保存一些值，例如分数。
 
-如果你需要保存很多东西，你应该通过保存自己的文件来实现自己的解决方案。文件使用什么格式由你决定。Unity从许多版本开始就内置了对XML的支持，最近Unity也增加了对JSON文件的内建支持。
+如果你需要保存很多东西，你应该通过保存自己的文件来实现自己的解决方案。文件使用什么格式由你决定。Unity 从许多版本开始就内置了对 XML 的支持，最近 Unity 也增加了对 JSON 文件的内建支持。
 
 最后，你还应该考虑将数据保存到云端，例如在线数据库。
 
@@ -216,21 +248,24 @@ Boss的不同阶段可以用有限状态机来构建，不同的转换由其健�
 
 错误修复很棘手，但你有一个非常强大的盟友：控制台。不要低估这个工具的价值。这是因为它将帮助你摆脱许多困境，尽管一开始它所记录的内容可能看起来没有意义，但随着时间的推移，你会学会如何解释这些消息并快速纠正错误。
 
-另一种使用控制台的好方法是插入调试日志。在Unity中，它们可以通过`Debug`类打印出来。以下是一个示例：
+另一种使用控制台的好方法是插入调试日志。在 Unity 中，它们可以通过`Debug`类打印出来。以下是一个示例：
 
-[PRE3]
+```cs
+Debug.Log("This is a string that will be printed on the console"); 
+
+```
 
 将此行代码放置在战略位置可以帮助你识别错误并最终纠正它。
 
 ### 远程日志
 
-如果你的目标是其他平台，Unity提供了使用你的强大盟友（控制台）远程操作的可能性。例如，对于Android设备，你可以阅读这篇文档（它实际上允许你不仅通过ADB连接使用控制台，还可以使用调试器）：
+如果你的目标是其他平台，Unity 提供了使用你的强大盟友（控制台）远程操作的可能性。例如，对于 Android 设备，你可以阅读这篇文档（它实际上允许你不仅通过 ADB 连接使用控制台，还可以使用调试器）：
 
-[https://docs.unity3d.com/Manual/AttachingMonoDevelopDebuggerToAnAndroidDevice.html](https://docs.unity3d.com/Manual/AttachingMonoDevelopDebuggerToAnAndroidDevice.html)
+[`docs.unity3d.com/Manual/AttachingMonoDevelopDebuggerToAnAndroidDevice.html`](https://docs.unity3d.com/Manual/AttachingMonoDevelopDebuggerToAnAndroidDevice.html)
 
 否则，你可以实现自己的解决方案来显示控制台日志或查看其他人的代码。例如，你可能想看看这个免费资源：
 
-[https://www.assetstore.unity3d.com/en/#!/content/12294](https://www.assetstore.unity3d.com/en/#!/content/12294)
+[`www.assetstore.unity3d.com/en/#!/content/12294`](https://www.assetstore.unity3d.com/en/#!/content/12294)
 
 ### 清理发布版本
 
@@ -238,11 +273,27 @@ Boss的不同阶段可以用有限状态机来构建，不同的转换由其健�
 
 处理调试语句的一个好方法是创建另一个类来打印调试信息。如果你包含了`Diagnostics`库，你可以定义一个条件属性，如下面的类：
 
-[PRE4]
+```cs
+using UnityEngine; 
+using System.Diagnostics; *//Needed for the Conditional attribute* 
+
+public class myDebug : MonoBehaviour { 
+
+  [Conditional("DEBUG_MODE")] *// Conditional attribute* 
+  public static void Log(string message) { 
+   * //Print the message in the console* 
+    UnityEngine.Debug.Log(message); 
+  } 
+} 
+
+```
 
 因此，你可以使用以下代码行，而不是之前的那个：
 
-[PRE5]
+```cs
+myDebug.Log("Hello World"); 
+
+```
 
 只有当你的游戏中定义了`DEBUG_MODE`属性时，这一行才会被编译。你可以通过导航到**编辑 | 项目设置 | 玩家**来检查你的游戏中存在哪些属性。在下面的屏幕截图中，你会找到定义此类属性/符号的位置，如图所示，我已经添加了`DEBUG_MODE`属性（你应该在发布游戏之前将其删除）：
 
@@ -250,23 +301,23 @@ Boss的不同阶段可以用有限状态机来构建，不同的转换由其健�
 
 ### 小贴士
 
-对于这个系统的非常棒的实现，你可以查看这个链接中的代码：[https://gist.github.com/kimsama/4123043](https://gist.github.com/kimsama/4123043)。
+对于这个系统的非常棒的实现，你可以查看这个链接中的代码：[`gist.github.com/kimsama/4123043`](https://gist.github.com/kimsama/4123043)。
 
 ## 更多关于脚本间通信的内容
 
-在上一章中，我们看到了脚本之间可以相互通信的许多方式。然而，Unity提供了许多其他方式。其中之一是通过消息来触发函数。实际上，你可以向一个游戏对象发送消息，要求触发某个函数，如果该函数存在于该游戏对象附加的任何脚本中。
+在上一章中，我们看到了脚本之间可以相互通信的许多方式。然而，Unity 提供了许多其他方式。其中之一是通过消息来触发函数。实际上，你可以向一个游戏对象发送消息，要求触发某个函数，如果该函数存在于该游戏对象附加的任何脚本中。
 
 然而，这是一种从计算角度来看代价高昂的脚本间通信方法，并且只有在必要时才应该使用。
 
-此外，Unity提供了不止一个消息系统，每个系统都有其优点和缺点。
+此外，Unity 提供了不止一个消息系统，每个系统都有其优点和缺点。
 
-在任何情况下，这些系统都可以用来创建你自己的消息系统，这是一个在特定事件发生时向许多脚本广播消息的绝佳方式，例如，当你需要在运行时切换难度，许多脚本都应该知道这个变化时（参考*运行时切换难度*部分，获取更多信息）*。你可以在网上找到许多实现，例如[http://wiki.unity3d.com/index.php/Advanced_CSharp_Messenger](http://wiki.unity3d.com/index.php/Advanced_CSharp_Messenger)，但我强烈建议你创建自己的，因为这样你一定会学到更多。例如，你可以遵循这个教程：[https://unity3d.com/learn/tutorials/topics/scripting/events-creating-simple-messaging-system](https://unity3d.com/learn/tutorials/topics/scripting/events-creating-simple-messaging-system)。
+在任何情况下，这些系统都可以用来创建你自己的消息系统，这是一个在特定事件发生时向许多脚本广播消息的绝佳方式，例如，当你需要在运行时切换难度，许多脚本都应该知道这个变化时（参考*运行时切换难度*部分，获取更多信息）*。你可以在网上找到许多实现，例如[`wiki.unity3d.com/index.php/Advanced_CSharp_Messenger`](http://wiki.unity3d.com/index.php/Advanced_CSharp_Messenger)，但我强烈建议你创建自己的，因为这样你一定会学到更多。例如，你可以遵循这个教程：[`unity3d.com/learn/tutorials/topics/scripting/events-creating-simple-messaging-system`](https://unity3d.com/learn/tutorials/topics/scripting/events-creating-simple-messaging-system)。
 
 ## 代码文档化
 
 当你在团队中工作时，你需要适当地注释你写的所有代码。有一些工具可以帮助你自动生成文档，但你需要付出努力来注释每一件事！
 
-使用摘要标签可能也是值得的，我在创建塔防项目时没有使用它，以提高本书代码的可读性：[https://msdn.microsoft.com/library/2d6dt3kf.aspx](https://msdn.microsoft.com/library/2d6dt3kf.aspx)。
+使用摘要标签可能也是值得的，我在创建塔防项目时没有使用它，以提高本书代码的可读性：[`msdn.microsoft.com/library/2d6dt3kf.aspx`](https://msdn.microsoft.com/library/2d6dt3kf.aspx)。
 
 在任何情况下，当您编写代码时，您应该始终在性能和可读性之间保持平衡，这两者往往相互矛盾。如果文档丰富且充分，即使是最复杂的性能优化，也能使代码变得难以阅读，但仍能理解。请记住：在编写代码时保持一定的优雅性应该是您的指导原则。
 
@@ -276,29 +327,29 @@ Boss的不同阶段可以用有限状态机来构建，不同的转换由其健�
 
 ### 注意
 
-在玩家和黑客中都非常受欢迎的（用于游戏的）反盗版系统之一是Denuvo ([www.denuvo.com](http://www.denuvo.com))。尽管Denuvo收到了很多批评，但它阻止了许多游戏立即被破解，并为破解其他游戏提供了困难。您可以在维基百科上找到使用此系统保护的游戏列表（无论它们是否已被破解）：[https://en.wikipedia.org/wiki/Denuvo](https://en.wikipedia.org/wiki/Denuvo)。
+在玩家和黑客中都非常受欢迎的（用于游戏的）反盗版系统之一是 Denuvo ([www.denuvo.com](http://www.denuvo.com))。尽管 Denuvo 收到了很多批评，但它阻止了许多游戏立即被破解，并为破解其他游戏提供了困难。您可以在维基百科上找到使用此系统保护的游戏列表（无论它们是否已被破解）：[`en.wikipedia.org/wiki/Denuvo`](https://en.wikipedia.org/wiki/Denuvo)。
 
-对于最好奇的您，Denuvo是一种反篡改系统，而不是**数字版权管理**（**DRM**）系统（它将游戏合法副本绑定到用户）。反篡改使得逆向工程DRM系统以绕过它变得更加困难。
+对于最好奇的您，Denuvo 是一种反篡改系统，而不是**数字版权管理**（**DRM**）系统（它将游戏合法副本绑定到用户）。反篡改使得逆向工程 DRM 系统以绕过它变得更加困难。
 
 然而，如果您决定为您的游戏包含某种保护措施，但没有时间开发自己的系统，您可以从资产商店购买价格低廉且有用的安全工具，例如这些：*反作弊工具包* ([www.assetstore.unity3d.com/en/#!/content/10395](http://www.assetstore.unity3d.com/en/#!/content/10395)) 或 *PlayerPrefs Elite* ([www.assetstore.unity3d.com/en/#!/content/18920](http://www.assetstore.unity3d.com/en/#!/content/18920))。
 
 ### 注意
 
-对于更高级的保护系统（例如上述的Denuvo），当然价格会上升，这使得独立游戏开发者难以负担其中之一。总之，在您将部分预算用于保护系统之前，仔细考虑它是否对您的游戏是必要的。
+对于更高级的保护系统（例如上述的 Denuvo），当然价格会上升，这使得独立游戏开发者难以负担其中之一。总之，在您将部分预算用于保护系统之前，仔细考虑它是否对您的游戏是必要的。
 
 ### 注意
 
-这里有一个简短、有趣且易于理解的历史概述：[https://www.youtube.com/watch?v=HjEbpMgiL7U](https://www.youtube.com/watch?v=HjEbpMgiL7U)。
+这里有一个简短、有趣且易于理解的历史概述：[`www.youtube.com/watch?v=HjEbpMgiL7U`](https://www.youtube.com/watch?v=HjEbpMgiL7U)。
 
 ## 为多个平台构建
 
 当你考虑在不同平台上发布你的游戏时，你应该记住你将要针对的不同平台。它们有触摸输入吗？它们支持控制器吗？基于此，你需要修改你的应用程序中的代码，以便它可以在多个平台上运行。
 
-Unity提供了插入一些汇编指令的可能性，以便以某种方式编译代码。例如，你可能希望在为Android构建游戏而不是Windows时以某种方式编译一小部分代码。以下是文档链接：[https://docs.unity3d.com/Manual/PlatformDependentCompilation.html](https://docs.unity3d.com/Manual/PlatformDependentCompilation.html)。
+Unity 提供了插入一些汇编指令的可能性，以便以某种方式编译代码。例如，你可能希望在为 Android 构建游戏而不是 Windows 时以某种方式编译一小部分代码。以下是文档链接：[`docs.unity3d.com/Manual/PlatformDependentCompilation.html`](https://docs.unity3d.com/Manual/PlatformDependentCompilation.html)。
 
 ### 小贴士
 
-在设备上进行快速原型设计时，你应该考虑一些模拟器（我们将在本章后面看到）。然而，Unity为Android设备提供了一个名为Unity Remote的应用程序（你可以在Play Store中找到它：[https://play.google.com/store/apps/details?id=com.unity3d.genericremote](https://play.google.com/store/apps/details?id=com.unity3d.genericremote))，它允许你通过USB连接直接从Unity编辑器测试你的游戏。
+在设备上进行快速原型设计时，你应该考虑一些模拟器（我们将在本章后面看到）。然而，Unity 为 Android 设备提供了一个名为 Unity Remote 的应用程序（你可以在 Play Store 中找到它：[`play.google.com/store/apps/details?id=com.unity3d.genericremote`](https://play.google.com/store/apps/details?id=com.unity3d.genericremote))，它允许你通过 USB 连接直接从 Unity 编辑器测试你的游戏。
 
 ### 输入/输出设备
 
@@ -310,17 +361,17 @@ Unity提供了插入一些汇编指令的可能性，以便以某种方式编译
 
     +   控制器（有线、无线）
 
-    +   各种外设（麦克风、DJ控制站、吉他等）
+    +   各种外设（麦克风、DJ 控制站、吉他等）
 
 +   PlayStation（1、2、3、4）：
 
-    +   Move控制器
+    +   Move 控制器
 
     +   EyeToy
 
     +   控制器（有线、无线）
 
-    +   各种外设（麦克风、DJ控制站、吉他等）
+    +   各种外设（麦克风、DJ 控制站、吉他等）
 
 +   Wii：
 
@@ -330,7 +381,7 @@ Unity提供了插入一些汇编指令的可能性，以便以某种方式编译
 
     +   平衡板
 
-    +   各种外设和附加设备（麦克风、DJ控制站、吉他、方向盘、体育设备等）
+    +   各种外设和附加设备（麦克风、DJ 控制站、吉他、方向盘、体育设备等）
 
 +   Mac/PC：
 
@@ -388,59 +439,62 @@ Unity提供了插入一些汇编指令的可能性，以便以某种方式编译
 
     +   蓝牙
 
-+   虚拟现实（VR）头戴式设备（如Oculus Rift或HTC Vive）：
++   虚拟现实（VR）头戴式设备（如 Oculus Rift 或 HTC Vive）：
 
     +   头部追踪
 
     +   触控控制器
 
-    +   Oculus远程控制（仅适用于Oculus Rift）
+    +   Oculus 远程控制（仅适用于 Oculus Rift）
 
-    +   相机（仅适用于HTC Vive）
+    +   相机（仅适用于 HTC Vive）
 
 +   Leap motion：
 
     +   手和手势追踪
 
-+   脑电图（EEG）头戴式设备（如Emotiv头戴式设备）：
++   脑电图（EEG）头戴式设备（如 Emotiv 头戴式设备）：
 
     +   脑电图（EEG）
 
-### Unity中的虚拟现实
+### Unity 中的虚拟现实
 
-Unity的最近版本支持虚拟现实设备（如Oculus Rift、HTC Vive或Samsung Gear）。
+Unity 的最近版本支持虚拟现实设备（如 Oculus Rift、HTC Vive 或 Samsung Gear）。
 
-要开始在Unity中开发虚拟现实，你应该首先下载适当的SDK并安装它。然后，从顶部菜单栏选择**编辑 | 项目设置 | 玩家**。在**其他设置**下，有**支持虚拟现实**选项。一旦勾选，你可以在选项下面的菜单中检查哪些SDK可以用于，如下面的截图所示（在这个例子中，有Oculus SDK）：
+要开始在 Unity 中开发虚拟现实，你应该首先下载适当的 SDK 并安装它。然后，从顶部菜单栏选择**编辑 | 项目设置 | 玩家**。在**其他设置**下，有**支持虚拟现实**选项。一旦勾选，你可以在选项下面的菜单中检查哪些 SDK 可以用于，如下面的截图所示（在这个例子中，有 Oculus SDK）：
 
-![Unity中的虚拟现实](img/image00612.jpeg)
+![Unity 中的虚拟现实](img/image00612.jpeg)
 
 ## 平衡游戏
 
 不要忘记平衡游戏。这非常重要，可以决定你游戏的成功与否。为了正确平衡你的游戏，你需要进行大量的游戏测试（我们将在后面看到更多关于这一点的内容）。
 
-想象一下我们正在玩一个合作游戏，我有一根魔法棒，特殊的能力和无敌状态。而你，则有一盏手电筒。除非手电筒是你所拥有的所有东西的紧凑版，不幸的是，它不是，否则这显然是不平衡的。现在，这不仅仅是在两人或多人游戏中是一个问题，在单人游戏中也是如此，AI非常强大，只是为了击败他们，就会耗尽你的所有资源，如果你能击败他们的话。同样，当你有限的机会获得升级时，而其他玩家显然没有这个问题。
+想象一下我们正在玩一个合作游戏，我有一根魔法棒，特殊的能力和无敌状态。而你，则有一盏手电筒。除非手电筒是你所拥有的所有东西的紧凑版，不幸的是，它不是，否则这显然是不平衡的。现在，这不仅仅是在两人或多人游戏中是一个问题，在单人游戏中也是如此，AI 非常强大，只是为了击败他们，就会耗尽你的所有资源，如果你能击败他们的话。同样，当你有限的机会获得升级时，而其他玩家显然没有这个问题。
 
-平衡游戏对于许多原因来说都很重要，因为它提供了一个公平的竞技场，并给每个人提供了赢、输和进步的机会。随着你游戏的每一次迭代和每一次后续更新（尤其是如果你改变了某些重要的事情），确保你的游戏是平衡的。对于单人和合作游戏，这将是通过游戏测试来解决的问题。对于大规模的MMO游戏，你可以进行游戏测试，但很可能会出现不平衡的问题，随着人们玩得时间越长，探索世界，发展并升级他们的角色，以及在世界中前进，这些问题就会显现出来。
+平衡游戏对于许多原因来说都很重要，因为它提供了一个公平的竞技场，并给每个人提供了赢、输和进步的机会。随着你游戏的每一次迭代和每一次后续更新（尤其是如果你改变了某些重要的事情），确保你的游戏是平衡的。对于单人和合作游戏，这将是通过游戏测试来解决的问题。对于大规模的 MMO 游戏，你可以进行游戏测试，但很可能会出现不平衡的问题，随着人们玩得时间越长，探索世界，发展并升级他们的角色，以及在世界中前进，这些问题就会显现出来。
 
 接近游戏平衡的许多方法之一是通过成本分析的方法。在这种方法中，你可以从添加、删除和替换你游戏中不同的功能开始。例如，而不是添加一个新角色，你可以使一个现有的角色变得更强大，或者用更强大的版本替换它。所以，而不是一个*特殊巫师*，你可以用*史诗巫师*来替换它。或者，你可以完全删除*特殊巫师*，或者添加另一种类型，比如*元素巫师*。在每种情况下，他们的能力都会改变（或被删除），结果这将影响游戏的总体动态，包括其他角色将如何与之战斗。一些现实生活中的例子可以在像*Clash of Clans*和*Clash Royale*这样的游戏中找到，这些游戏定期进行调整，以平衡游戏玩法。
 
 ### 注意事项
 
-想要进一步阅读，请查看以下链接：[https://gamedesignconcepts.wordpress.com/2009/08/20/level-16-game-balance](https://gamedesignconcepts.wordpress.com/2009/08/20/level-16-game-balance).
+想要进一步阅读，请查看以下链接：[`gamedesignconcepts.wordpress.com/2009/08/20/level-16-game-balance`](https://gamedesignconcepts.wordpress.com/2009/08/20/level-16-game-balance).
 
 ## 扩展 Unity 编辑器
 
 Unity 编辑器实际上是可以扩展的。实际上，一些脚本可以使用 Unity 编辑器库来访问所有与编辑器相关的功能。你可以在这些脚本的开始处添加以下代码行来导入它：
 
-[PRE6]
+```cs
+using UnityEditor; 
+
+```
 
 这是一个非常强大的工具，因为你可以通过它实现自定义功能，或者为你的脚本提供简单的接口。
 
-这里是官方文档的链接：[https://docs.unity3d.com/Manual/ExtendingTheEditor.html](https://docs.unity3d.com/Manual/ExtendingTheEditor.html).
+这里是官方文档的链接：[`docs.unity3d.com/Manual/ExtendingTheEditor.html`](https://docs.unity3d.com/Manual/ExtendingTheEditor.html).
 
 然而，由于这是一个非常广泛的话题，我建议你阅读一些博客文章中的教程，或者购买一些特定的书籍，例如，Angelo Tadres 编著的 *Extending Unity with Editor Scripting*，Packt Publishing 出版，你可以在这里找到它：
 
-[https://www.packtpub.com/game-development/extending-unity-editor-scripting](https://www.packtpub.com/game-development/extending-unity-editor-scripting).
+[`www.packtpub.com/game-development/extending-unity-editor-scripting`](https://www.packtpub.com/game-development/extending-unity-editor-scripting).
 
 ## 多玩家和网络
 
@@ -450,19 +504,19 @@ Unity 提供了许多内置的多玩家游戏功能，但它们并不像你预�
 
 在任何情况下，编写多人游戏都不是一件容易的事情，因为有许多不同的部分（如服务器、客户端、安全协议等）应该完美地协同工作，而这并不简单。因此，多玩家和网络是游戏开发中最难面对的话题之一（尽管是可能的，否则你不会看到周围有这么多在线游戏）。
 
-要开始理解多人编程的原理，最好的方法是阅读相关的书籍，并且（如果你使用 Unity 的内置功能）阅读官方文档，你可以在这里找到它：[https://docs.unity3d.com/Manual/UNet.html](https://docs.unity3d.com/Manual/UNet.html).
+要开始理解多人编程的原理，最好的方法是阅读相关的书籍，并且（如果你使用 Unity 的内置功能）阅读官方文档，你可以在这里找到它：[`docs.unity3d.com/Manual/UNet.html`](https://docs.unity3d.com/Manual/UNet.html).
 
 ## 熟能生巧
 
-没有人天生就懂得游戏编程或 Unity。你需要通过努力工作来获得它，而且无论你的经验水平如何，总有新的东西可以学习（正如我们在[第 1 章](part0016.xhtml#aid-F8901 "第 1 章。Unity 中的平坦世界")中提到的，《Unity 中的平坦世界》）。
+没有人天生就懂得游戏编程或 Unity。你需要通过努力工作来获得它，而且无论你的经验水平如何，总有新的东西可以学习（正如我们在第一章中提到的，《Unity 中的平坦世界》）。
 
 为了成为一名游戏开发专家，你需要不断练习（就像生活中的每一件事一样），因为每个角落都有东西可以学习。挑战自己，参与项目，给自己布置家庭作业。实际上，在这本书中，我已经为你提供了一些家庭作业，但通常你需要自己成为自己的老师，并强迫自己完成家庭作业来提高你的技能。
 
-在做这件事的时候，不要忘记向那些在我们之前的人学习，他们已经找到了一些在大多数情况下都很有用的方法和技巧。实际上，你应该学习和发展你自己的最佳实践。在Unity的情况下，你可以从访问这个链接开始：[https://docs.unity3d.com/Manual/BestPracticeGuides.html](https://docs.unity3d.com/Manual/BestPracticeGuides.html)。
+在做这件事的时候，不要忘记向那些在我们之前的人学习，他们已经找到了一些在大多数情况下都很有用的方法和技巧。实际上，你应该学习和发展你自己的最佳实践。在 Unity 的情况下，你可以从访问这个链接开始：[`docs.unity3d.com/Manual/BestPracticeGuides.html`](https://docs.unity3d.com/Manual/BestPracticeGuides.html)。
 
 # 改善游戏氛围
 
-你是否曾经玩过一款游戏或看过一部电影，感觉就像你就在那里，你感到着迷，沉浸其中，完全成为世界的一部分……那一刻？这一切都与氛围有关。创造正确的情绪需要许多不同的事情，不仅仅是外观，还有声音；它也有一种向玩家传达信息的方式。不幸的是，我们目前还不能利用触觉（尽管有很多关于触觉界面的研究），味觉或嗅觉（除了Ubisoft创建的原型设备Nosulus；可以在[http://nosulusrift.ubisoft.com](http://nosulusrift.ubisoft.com)找到)）。因此，它们的外观和声音对于氛围至关重要！
+你是否曾经玩过一款游戏或看过一部电影，感觉就像你就在那里，你感到着迷，沉浸其中，完全成为世界的一部分……那一刻？这一切都与氛围有关。创造正确的情绪需要许多不同的事情，不仅仅是外观，还有声音；它也有一种向玩家传达信息的方式。不幸的是，我们目前还不能利用触觉（尽管有很多关于触觉界面的研究），味觉或嗅觉（除了 Ubisoft 创建的原型设备 Nosulus；可以在[`nosulusrift.ubisoft.com`](http://nosulusrift.ubisoft.com)找到)）。因此，它们的外观和声音对于氛围至关重要！
 
 ## 视觉效果
 
@@ -472,13 +526,13 @@ Unity 提供了许多内置的多玩家游戏功能，但它们并不像你预�
 
 色彩代表情绪，任何上过艺术课的人都会很快学到，色彩有助于向观众表达情感。尽管对色彩没有唯一的解释，但你可以在整个游戏中坚持使用一种惯例。
 
-开发色彩方案的一个很好的工具（如我们在[第3章](part0043.xhtml#aid-190861 "第3章。与玩家沟通——用户界面")中提到的，*与玩家沟通——用户界面*）是Adobe Color CC，你可以在[https://color.adobe.com](https://color.adobe.com)找到：
+开发色彩方案的一个很好的工具（如我们在第三章中提到的，*与玩家沟通——用户界面*）是 Adobe Color CC，你可以在[`color.adobe.com`](https://color.adobe.com)找到：
 
 ![色彩方案](img/image00613.jpeg)
 
 ### 注意
 
-你知道颜色与我们的情感相关的概念起源于一个名叫罗伯特·普鲁奇克*的人，他在1980年创建了第一个情感色彩轮吗？
+你知道颜色与我们的情感相关的概念起源于一个名叫罗伯特·普鲁奇克*的人，他在 1980 年创建了第一个情感色彩轮吗？
 
 #### 家庭作业
 
@@ -486,25 +540,25 @@ Unity 提供了许多内置的多玩家游戏功能，但它们并不像你预�
 
 ### 灯光
 
-当您走进一个充满光线的房间时，可能会感到清新、充满活力和积极。相反，想象一下走进一个没有任何光线可以判断里面有什么，或者有多大空间的黑暗房间；可能会感到有些令人畏惧。这可能是同一个房间，但两种不同的照明条件提供了两种非常不同的氛围。如果再配上其他感官线索，如声音，可能会使这一切更加恐怖或振奋人心。当然，这些都是您的典型环境；一个明亮的房间并不意味着不会有可怕的东西跳出来，就像一个黑暗的房间并不意味着里面充满了敌人。这些都是需要考虑的事情，尤其是在理解如何传达危险或和平感时，尤其是在3D环境中。
+当您走进一个充满光线的房间时，可能会感到清新、充满活力和积极。相反，想象一下走进一个没有任何光线可以判断里面有什么，或者有多大空间的黑暗房间；可能会感到有些令人畏惧。这可能是同一个房间，但两种不同的照明条件提供了两种非常不同的氛围。如果再配上其他感官线索，如声音，可能会使这一切更加恐怖或振奋人心。当然，这些都是您的典型环境；一个明亮的房间并不意味着不会有可怕的东西跳出来，就像一个黑暗的房间并不意味着里面充满了敌人。这些都是需要考虑的事情，尤其是在理解如何传达危险或和平感时，尤其是在 3D 环境中。
 
-#### Unity中的灯光
+#### Unity 中的灯光
 
-Unity实现了不同类型的灯光，可以在我们的场景中放置。我们没有介绍它们，因为它们与3D游戏紧密相关，尽管您也可以将它们用于UI（因此也可以用于2D游戏）。
+Unity 实现了不同类型的灯光，可以在我们的场景中放置。我们没有介绍它们，因为它们与 3D 游戏紧密相关，尽管您也可以将它们用于 UI（因此也可以用于 2D 游戏）。
 
-如前文所述，您需要将场景中的灯光视为一种艺术表达，以便创造氛围。令人惊讶的是，看起来不错的场景根本不需要逼真的灯光。在游戏开发中，许多事情都存在性能上的权衡，因为通常灯光很昂贵，尤其是如果实时计算的话。实际上，最常用的技术之一是“烘焙”灯光，这意味着预先计算它们。当然，这种方法有很多局限性，这也是为什么还有其他中间解决方案。一个好的关卡设计师应该能够放置正确类型和数量的灯光，以增强场景的外观，而不会过载CPU和GPU，从而导致帧率下降。
+如前文所述，您需要将场景中的灯光视为一种艺术表达，以便创造氛围。令人惊讶的是，看起来不错的场景根本不需要逼真的灯光。在游戏开发中，许多事情都存在性能上的权衡，因为通常灯光很昂贵，尤其是如果实时计算的话。实际上，最常用的技术之一是“烘焙”灯光，这意味着预先计算它们。当然，这种方法有很多局限性，这也是为什么还有其他中间解决方案。一个好的关卡设计师应该能够放置正确类型和数量的灯光，以增强场景的外观，而不会过载 CPU 和 GPU，从而导致帧率下降。
 
-![Unity中的灯光](img/image00614.jpeg)
+![Unity 中的灯光](img/image00614.jpeg)
 
-图片由Divine Unity Shrine，Shadowood Productions提供，Unity中灯光使用的示例
+图片由 Divine Unity Shrine，Shadowood Productions 提供，Unity 中灯光使用的示例
 
 我们不会进一步深入细节，但您可以在以下链接中了解更多信息：
 
-+   [Unity灯光概述](https://unity3d.com/learn/tutorials/topics/graphics/lighting-overview)
++   [Unity 灯光概述](https://unity3d.com/learn/tutorials/topics/graphics/lighting-overview)
 
-+   [Unity灯光概述](https://docs.unity3d.com/Manual/LightingOverview.html)
++   [Unity 灯光概述](https://docs.unity3d.com/Manual/LightingOverview.html)
 
-+   [Unity光照和渲染简介](https://unity3d.com/learn/tutorials/topics/graphics/introduction-lighting-and-rendering)
++   [Unity 光照和渲染简介](https://unity3d.com/learn/tutorials/topics/graphics/introduction-lighting-and-rendering)
 
 #### 作业
 
@@ -554,43 +608,43 @@ Unity 提供了一个强大的内置粒子系统，可以用于在场景中创�
 
 +   爆竹
 
-当然，这只是一些建议，实际上，任何东西都可以成为粒子效果。谁知道呢，也许在合适的环境下，Pandas也可以变得那样。
+当然，这只是一些建议，实际上，任何东西都可以成为粒子效果。谁知道呢，也许在合适的环境下，Pandas 也可以变得那样。
 
 请记住，粒子系统通常不是计算成本低的添加到你的游戏中的元素，但它们确实是一种增强你游戏视觉方面的方法。
 
 ![粒子系统](img/image00617.jpeg)
 
-图片来自Unity 5.5的烟花展示视频：使用粒子系统在Unity中制作的烟花
+图片来自 Unity 5.5 的烟花展示视频：使用粒子系统在 Unity 中制作的烟花
 
 ### 注意
 
-值得注意的是，从Unity 5.5开始，实现了一个新的光照模块。因此，粒子系统中的粒子现在可以投射光线，有机会创造出惊人的效果。因此，我建议你观看以下三个来自Unity 5.5测试版展示的视频，这些视频展示了粒子系统的新功能：
+值得注意的是，从 Unity 5.5 开始，实现了一个新的光照模块。因此，粒子系统中的粒子现在可以投射光线，有机会创造出惊人的效果。因此，我建议你观看以下三个来自 Unity 5.5 测试版展示的视频，这些视频展示了粒子系统的新功能：
 
-烟花：[https://www.youtube.com/watch?v=xAzmNo2fxWA](https://www.youtube.com/watch?v=xAzmNo2fxWA)
+烟花：[`www.youtube.com/watch?v=xAzmNo2fxWA`](https://www.youtube.com/watch?v=xAzmNo2fxWA)
 
-灰烬：[https://www.youtube.com/watch?v=copE2b_XfTc](https://www.youtube.com/watch?v=copE2b_XfTc)
+灰烬：[`www.youtube.com/watch?v=copE2b_XfTc`](https://www.youtube.com/watch?v=copE2b_XfTc)
 
-烟雾：[https://www.youtube.com/watch?v=rQpgaP-r_lc](https://www.youtube.com/watch?v=rQpgaP-r_lc)
+烟雾：[`www.youtube.com/watch?v=rQpgaP-r_lc`](https://www.youtube.com/watch?v=rQpgaP-r_lc)
 
-你可以在这里找到有关粒子系统的官方文档：[https://docs.unity3d.com/Manual/ParticleSystems.html](https://docs.unity3d.com/Manual/ParticleSystems.html)。
+你可以在这里找到有关粒子系统的官方文档：[`docs.unity3d.com/Manual/ParticleSystems.html`](https://docs.unity3d.com/Manual/ParticleSystems.html)。
 
-而在这里，有一个入门教程可以帮助你开始（尽管它是针对Unity的旧版本，但其中许多概念也适用于Unity的新版本）：[https://unity3d.com/learn/tutorials/topics/graphics/particle-system](https://unity3d.com/learn/tutorials/topics/graphics/particle-system)。
+而在这里，有一个入门教程可以帮助你开始（尽管它是针对 Unity 的旧版本，但其中许多概念也适用于 Unity 的新版本）：[`unity3d.com/learn/tutorials/topics/graphics/particle-system`](https://unity3d.com/learn/tutorials/topics/graphics/particle-system)。
 
 #### 后处理
 
-后处理效果可以在相对较低的计算成本下极大地增强你游戏的外观。以下是一个从Unity官方文档中摘取的例子；它展示了没有后处理和有后处理的场景之间的差异：
+后处理效果可以在相对较低的计算成本下极大地增强你游戏的外观。以下是一个从 Unity 官方文档中摘取的例子；它展示了没有后处理和有后处理的场景之间的差异：
 
 ![后处理](img/image00618.jpeg)![后处理](img/image00619.jpeg)
 
-图片来自Unity的官方文档
+图片来自 Unity 的官方文档
 
 你甚至可以编写自己的后处理效果。你可以从这里开始：
 
-[https://docs.unity3d.com/Manual/WritingImageEffects.html](https://docs.unity3d.com/Manual/WritingImageEffects.html)
+[`docs.unity3d.com/Manual/WritingImageEffects.html`](https://docs.unity3d.com/Manual/WritingImageEffects.html)
 
-因此，你绝对应该考虑在你的游戏中添加一些后处理效果，因为它们真的可以帮助你实现你心中的外观。无论如何，Unity中后处理的完整文档可以在以下位置找到：
+因此，你绝对应该考虑在你的游戏中添加一些后处理效果，因为它们真的可以帮助你实现你心中的外观。无论如何，Unity 中后处理的完整文档可以在以下位置找到：
 
-[https://docs.unity3d.com/Manual/comp-ImageEffects.html](https://docs.unity3d.com/Manual/comp-ImageEffects.html)
+[`docs.unity3d.com/Manual/comp-ImageEffects.html`](https://docs.unity3d.com/Manual/comp-ImageEffects.html)
 
 #### 其他视觉效果
 
@@ -612,7 +666,7 @@ Unity 提供了其他可以在 3D 世界中放置的渲染效果。这包括绘�
 
 ![其他视觉效果](img/image00621.jpeg)
 
-由《战地3》提供图片（DICE，2011）：视频游戏中使用的闪光镜头示例
+由《战地 3》提供图片（DICE，2011）：视频游戏中使用的闪光镜头示例
 
 ## 音频
 
@@ -708,21 +762,21 @@ Unity 提供了其他可以在 3D 世界中放置的渲染效果。这包括绘�
 
 请记住，你不必只玩游戏；观看电影甚至电视剧也可以很有用，看看场景/电影中何时以及是否添加了任何元素（惊吓、代表快乐）。
 
-### Unity中的音频
+### Unity 中的音频
 
-音频是Unity中的另一个广泛的话题，从Unity 5.x版本开始有了很大的改进。不幸的是，我们没有足够的时间专门写一整章关于如何在Unity中处理音频。然而，基础概念是存在一个作为监听器的组件。每个场景中应该只有一个（活跃）监听器，否则Unity会给你一个警告，并且保持这种方式是一种良好的实践。然后，还有一个作为音频源的组件，它可以产生声音或播放一些音乐。此外，音频源可以被设置为3D模式，这意味着它们可以被放置在环境中，以便产生空间声音（玩家离音频源越近，音频源的音量就越高）。
+音频是 Unity 中的另一个广泛的话题，从 Unity 5.x 版本开始有了很大的改进。不幸的是，我们没有足够的时间专门写一整章关于如何在 Unity 中处理音频。然而，基础概念是存在一个作为监听器的组件。每个场景中应该只有一个（活跃）监听器，否则 Unity 会给你一个警告，并且保持这种方式是一种良好的实践。然后，还有一个作为音频源的组件，它可以产生声音或播放一些音乐。此外，音频源可以被设置为 3D 模式，这意味着它们可以被放置在环境中，以便产生空间声音（玩家离音频源越近，音频源的音量就越高）。
 
-在官方网站上，有一系列关于如何在Unity中使用音频的视频教程，可以在以下链接找到：[https://unity3d.com/learn/tutorials/topics/audio](https://unity3d.com/learn/tutorials/topics/audio)
+在官方网站上，有一系列关于如何在 Unity 中使用音频的视频教程，可以在以下链接找到：[`unity3d.com/learn/tutorials/topics/audio`](https://unity3d.com/learn/tutorials/topics/audio)
 
 ### 外部音频系统
 
-如果你志向高远，而Unity内置的音频系统不足以满足你的游戏需求，你可以将一些第三方软件集成到Unity中。
+如果你志向高远，而 Unity 内置的音频系统不足以满足你的游戏需求，你可以将一些第三方软件集成到 Unity 中。
 
-最常用的一个叫做FMOD ([www.fmod.org](http://www.fmod.org))，它是一个将空间声音集成到你的游戏中的完整解决方案。
+最常用的一个叫做 FMOD ([www.fmod.org](http://www.fmod.org))，它是一个将空间声音集成到你的游戏中的完整解决方案。
 
-另一个类似的工具，由于其高昂的价格而较少使用，但提供了许多功能，是Wwise ([https://www.audiokinetic.com/products/wwise](https://www.audiokinetic.com/products/wwise))。你可能在你玩的一些游戏中见过它的标志。
+另一个类似的工具，由于其高昂的价格而较少使用，但提供了许多功能，是 Wwise ([`www.audiokinetic.com/products/wwise`](https://www.audiokinetic.com/products/wwise))。你可能在你玩的一些游戏中见过它的标志。
 
-FMOD和Wwise都是非常强大的工具，但为了欣赏它们的功能，你应该看到它们在实际中的应用。网上有很多视频，我鼓励你查看它们。
+FMOD 和 Wwise 都是非常强大的工具，但为了欣赏它们的功能，你应该看到它们在实际中的应用。网上有很多视频，我鼓励你查看它们。
 
 # 团队合作
 
@@ -746,13 +800,13 @@ FMOD和Wwise都是非常强大的工具，但为了欣赏它们的功能，你�
 
 +   **艺术家**：负责创造游戏的外观，从角色的概念艺术、资产和关卡，到它们的模型和纹理。如果你能的话，拥有不止一个艺术家是理想的，尤其是如果你的游戏规模较大。艺术需要时间，尤其是如果你想让你的游戏在美学上具有魔法般的效果。
 
-+   **程序员**：就像项目的手臂一样；没有他们，你很可能难以让你的精彩想法变为现实。说到这里，如果你不幸没有程序员在你的团队中（或者人数不足以开发你可能想要的全部功能），许多游戏引擎提供了可视化脚本，允许你将命令链接起来以创建动作。一个很好的例子是Unreal Engine中的Blueprints，如这里所示：![这不仅关乎你，还关乎团队合作](img/image00622.jpeg)
++   **程序员**：就像项目的手臂一样；没有他们，你很可能难以让你的精彩想法变为现实。说到这里，如果你不幸没有程序员在你的团队中（或者人数不足以开发你可能想要的全部功能），许多游戏引擎提供了可视化脚本，允许你将命令链接起来以创建动作。一个很好的例子是 Unreal Engine 中的 Blueprints，如这里所示：![这不仅关乎你，还关乎团队合作](img/image00622.jpeg)
 
-    图片由Unreal Engine提供，蓝图可视化脚本([https://docs.unrealengine.com/latest/INT/Engine/Blueprints](https://docs.unrealengine.com/latest/INT/Engine/Blueprints))
+    图片由 Unreal Engine 提供，蓝图可视化脚本([`docs.unrealengine.com/latest/INT/Engine/Blueprints`](https://docs.unrealengine.com/latest/INT/Engine/Blueprints))
 
 +   **声音设计师/作曲家**：让游戏听起来很棒的人。声音设计师确保每个动作都有某种形式的音频反馈。游戏中的音频包括音效和背景音乐。声音设计师通过让游戏听起来生动来贡献氛围。即使是微小的效果，例如当玩家靠近某个黑暗和危险房间时，也能唤起各种各样的情绪。
 
-+   **质量保证(QA)测试员**：负责确保游戏正常运行的人（或人们）。这可能包括朋友、家人、专业游戏玩家和质量保证测试员。理想情况下，你希望QA测试员不参与你项目的创建，因为尽管你自己也会进行测试，但很容易忽略可能影响整体游戏体验的游戏方面。
++   **质量保证(QA)测试员**：负责确保游戏正常运行的人（或人们）。这可能包括朋友、家人、专业游戏玩家和质量保证测试员。理想情况下，你希望 QA 测试员不参与你项目的创建，因为尽管你自己也会进行测试，但很容易忽略可能影响整体游戏体验的游戏方面。
 
 +   **作者**：通常负责开发游戏故事的人。故事元素可以包括整体情节、角色、背景以及其他叙事元素，如对话和叙事路径，例如不同的结局。本质上，作者负责确保故事不仅能够吸引和吸引玩家，让他们渴望更多，还要营造氛围并增强整体游戏体验。此外，作者还必须确保故事合理、逻辑清晰且具有解释性。最后，需要记住的一点是，为游戏写作需要与电影或阅读文本不同的方法，因为它是互动的。
 
@@ -778,9 +832,9 @@ FMOD和Wwise都是非常强大的工具，但为了欣赏它们的功能，你�
 
 +   **电子邮件**：电子蜗牛邮件非常适合保持对话的线索，但它可能变得相当难以管理。在这些情况下，定期（例如，每周或每月）进度更新会非常理想。给它一个截止日期和模板。例如，一个他们需要涵盖的事项清单，如目前正在进行的任务、问题和未来的工作。这样，你就能跟上每个人的进度，其他人也是如此。为了使整个过程更容易管理，大多数（如果不是所有）电子邮件软件都有诸如标记和过滤等功能。在这些情况下，与指定标准相关的电子邮件，如电子邮件地址或主题，将被定向到特定的文件夹，并/或添加标签，以便以后更容易检索。
 
-+   **WhatsApp**：你很可能有其他团队成员的电话号码，无论是个人还是商务号码。因此，像WhatsApp这样的电话信息服务是保持联系和进行通话的绝佳方式，无论他们身在何处。
++   **WhatsApp**：你很可能有其他团队成员的电话号码，无论是个人还是商务号码。因此，像 WhatsApp 这样的电话信息服务是保持联系和进行通话的绝佳方式，无论他们身在何处。
 
-+   **社交媒体群组和聊天，如Facebook**。使用Facebook，你可以通过多种方式保持沟通渠道畅通。你可以创建一个消息组或一个私人组。两者之间的区别很小，因为它们的功能几乎相同，你可以上传文档并进行讨论。然而，一个群组的功能与Facebook页面非常相似。所以如果你上传一张图片，它将创建一个单独的帖子，而不是在聊天中，它只是作为对话中下一部分的对话添加。创建Facebook群组的优点是，在查找某些项目方面更容易管理，并且可以使对话更具体地针对帖子（或主题）。
++   **社交媒体群组和聊天，如 Facebook**。使用 Facebook，你可以通过多种方式保持沟通渠道畅通。你可以创建一个消息组或一个私人组。两者之间的区别很小，因为它们的功能几乎相同，你可以上传文档并进行讨论。然而，一个群组的功能与 Facebook 页面非常相似。所以如果你上传一张图片，它将创建一个单独的帖子，而不是在聊天中，它只是作为对话中下一部分的对话添加。创建 Facebook 群组的优点是，在查找某些项目方面更容易管理，并且可以使对话更具体地针对帖子（或主题）。
 
 +   **Skype/Google Hangouts 等工具：节省打字时间，并通过电话与人沟通。永远不要低估语音/视频通话的力量。虽然有时，尤其是在远程工作时，保持超越文本通信的联系很重要。它为工作关系增添了更多个人化的层面，并且您能更好地了解对方，而不是试图从字里行间解读。**
 
@@ -802,7 +856,7 @@ Git 是一个免费且开源的版本控制程序。您可以通过访问 Git �
 
 有一些可视化工具可以更轻松地管理 Git。其中最完整的一个是 Atlassian 的 SourceTree ([www.sourcetreeapp.com](http://www.sourcetreeapp.com))。然而，如果您是新手，可能发现使用 Axosoft 的 GitKraken ([www.gitkraken.com](http://www.gitkraken.com)) 更容易。
 
-此外，如果你想学习 Git，这里有一个快速且有趣的交互式教程：[https://try.github.io](https://try.github.io)。
+此外，如果你想学习 Git，这里有一个快速且有趣的交互式教程：[`try.github.io`](https://try.github.io)。
 
 ## 制定 GDD 并坚持执行
 
@@ -852,7 +906,7 @@ Git 是一个免费且开源的版本控制程序。您可以通过访问 Git �
 
     +   系统限制将解释所使用技术的局限性，向非程序员团队成员说明（实际上，更详细的限制在技术设计文档中）。就像管道概述一样，这份文档为程序员、设计师和艺术家之间提供了一个桥梁。
 
-1.  **游戏流程**：简要说明游戏将如何进行。从一个关卡/剪辑场景/等等，到下一个。与叙事流程类似，游戏流程讨论了随着玩家在叙事中前进，他们将在游戏中做什么。例如，他们将会去地图的A部分，杀死20条龙，然后发现神奇的药水，接着是剪辑场景揭示他父亲的真相，然后玩家被传送到一个魔法岛屿去探索家族档案。通过这样做，你开始看到你的游戏和/或故事中的漏洞，并能够确保它不仅合理，而且进度以玩家会喜欢的速度进行；也就是说，游戏既不会太快也不会无聊和令人困惑。
+1.  **游戏流程**：简要说明游戏将如何进行。从一个关卡/剪辑场景/等等，到下一个。与叙事流程类似，游戏流程讨论了随着玩家在叙事中前进，他们将在游戏中做什么。例如，他们将会去地图的 A 部分，杀死 20 条龙，然后发现神奇的药水，接着是剪辑场景揭示他父亲的真相，然后玩家被传送到一个魔法岛屿去探索家族档案。通过这样做，你开始看到你的游戏和/或故事中的漏洞，并能够确保它不仅合理，而且进度以玩家会喜欢的速度进行；也就是说，游戏既不会太快也不会无聊和令人困惑。
 
 1.  **时间线**：它指的是你的游戏从开始到结束所需的时间，以及所有进度里程碑和截止日期，以确保你的游戏能够达到发布日期：
 
@@ -876,11 +930,11 @@ Slack ([www.slack.com](http://www.slack.com)) 是最有效的团队管理工具�
 
 +   该应用使得在移动中管理 Slack 变得更加容易。它允许你在组成员上传和/或发布任何内容时接收实时更新。此外，它还允许你随时随地与 Slack 进行互动。例如，你得到一个很好的想法，或者你可能看到对你正在开发的概念有用的东西，使用 Slack 应用，你只需要发布或捕捉你的想法并将其提交到频道。你可以把频道想象成群组。
 
-+   Slack 的应用目录允许你将其他应用程序（其中一些我们将在稍后探讨）集成到 Slack 中，使其成为终极项目管理软件。你可以在 [https://slack.com/apps](https://slack.com/apps) 找到应用目录。
++   Slack 的应用目录允许你将其他应用程序（其中一些我们将在稍后探讨）集成到 Slack 中，使其成为终极项目管理软件。你可以在 [`slack.com/apps`](https://slack.com/apps) 找到应用目录。
 
 ![Slack](img/image00623.jpeg)
 
-图片由 Slack 教程视频提供 ([https://slack.com/is](https://slack.com/is))
+图片由 Slack 教程视频提供 ([`slack.com/is`](https://slack.com/is))
 
 ### HacknPlan
 
@@ -888,11 +942,11 @@ Slack ([www.slack.com](http://www.slack.com)) 是最有效的团队管理工具�
 
 ![HacknPlan](img/image00624.jpeg)
 
-图片由 Press Kit 提供 ([http://hacknplan.com/press/#!](http://hacknplan.com/press/#!))
+图片由 Press Kit 提供 ([`hacknplan.com/press/#!`](http://hacknplan.com/press/#!))
 
 ### Drive
 
-Google Drive ([https://drive.google.com](https://drive.google.com))，以及其整个程序套件，作为一个公共资源非常灵活且有用。它不仅提供了类似于其他知名商业产品的程序，而且还具有使整个过程更加容易的共享功能。你可以轻松地创建和共享文档、文件和文件夹，无论是与许多人还是少数人共享，都可以通过私有链接或通过权限进行。你可以以多种方式控制对文件的访问权限（从编辑到只读）；这都将取决于最初分享它们的目的。
+Google Drive ([`drive.google.com`](https://drive.google.com))，以及其整个程序套件，作为一个公共资源非常灵活且有用。它不仅提供了类似于其他知名商业产品的程序，而且还具有使整个过程更加容易的共享功能。你可以轻松地创建和共享文档、文件和文件夹，无论是与许多人还是少数人共享，都可以通过私有链接或通过权限进行。你可以以多种方式控制对文件的访问权限（从编辑到只读）；这都将取决于最初分享它们的目的。
 
 ![Drive](img/image00625.jpeg)
 
@@ -900,43 +954,43 @@ Google Drive ([https://drive.google.com](https://drive.google.com))，以及其�
 
 ### 小贴士
 
-在文件和文档创建方面，Drive的一些替代品是Apache OpenOffice ([www.openoffice.org](http://www.openoffice.org)) 和 ONLYOFFICE ([www.onlyoffice.com](http://www.onlyoffice.com))。
+在文件和文档创建方面，Drive 的一些替代品是 Apache OpenOffice ([www.openoffice.org](http://www.openoffice.org)) 和 ONLYOFFICE ([www.onlyoffice.com](http://www.onlyoffice.com))。
 
 ### Dropbox
 
-与Google Drive类似，但增加了其他软件，Dropbox ([www.dropbox.com](http://www.dropbox.com))提供了一个用于管理项目文件的灵活工具。它允许你上传文件、创建文件夹，并共享它们以及其中的文件。因此，在文件共享方面，它是Drive的一个很好的替代品。此外，对于Word文件等文档，它允许你与其他团队成员实时编辑它们，同时显示正在进行的或已完成的编辑。
+与 Google Drive 类似，但增加了其他软件，Dropbox ([www.dropbox.com](http://www.dropbox.com))提供了一个用于管理项目文件的灵活工具。它允许你上传文件、创建文件夹，并共享它们以及其中的文件。因此，在文件共享方面，它是 Drive 的一个很好的替代品。此外，对于 Word 文件等文档，它允许你与其他团队成员实时编辑它们，同时显示正在进行的或已完成的编辑。
 
 ![Dropbox](img/image00626.jpeg)
 
-图片由Dropbox新闻稿 ([http://tinyurl.com/DropboxPressKitScreenshot](http://tinyurl.com/DropboxPressKitScreenshot)) 提供
+图片由 Dropbox 新闻稿 ([`tinyurl.com/DropboxPressKitScreenshot`](http://tinyurl.com/DropboxPressKitScreenshot)) 提供
 
 ### Trello
 
-Trello ([www.trello.com](http://www.trello.com))某种程度上类似于任务管理的虚拟图钉板。它允许你创建一个看板，其中保存了所有任务。每个看板都有不同的面板，展示任务。当然，这些面板的顺序可以根据你打算用Trello做什么样的流程来调整。例如，创建一个管道风格的Trello看板可能包括艺术、设计、编程和音频等不同区域；所有这些区域都分配了特定于其领域的任务。例如，艺术部分可能包括主菜单的概念或公主塔的概念艺术等任务。每个任务也可以分配给特定的人，或者留给小组中的任何人参与。一旦任务完成，它可以被移动到另一个区域，当然，这个区域被恰当地命名为“完成”或简单地留在列表底部。你如何使用Trello完全取决于你，但它确实有助于使流程更加流畅。
+Trello ([www.trello.com](http://www.trello.com))某种程度上类似于任务管理的虚拟图钉板。它允许你创建一个看板，其中保存了所有任务。每个看板都有不同的面板，展示任务。当然，这些面板的顺序可以根据你打算用 Trello 做什么样的流程来调整。例如，创建一个管道风格的 Trello 看板可能包括艺术、设计、编程和音频等不同区域；所有这些区域都分配了特定于其领域的任务。例如，艺术部分可能包括主菜单的概念或公主塔的概念艺术等任务。每个任务也可以分配给特定的人，或者留给小组中的任何人参与。一旦任务完成，它可以被移动到另一个区域，当然，这个区域被恰当地命名为“完成”或简单地留在列表底部。你如何使用 Trello 完全取决于你，但它确实有助于使流程更加流畅。
 
 ![Trello](img/image00627.jpeg)
 
-图片由Trello之旅 ([https://trello.com/tour](https://trello.com/tour)) 提供
+图片由 Trello 之旅 ([`trello.com/tour`](https://trello.com/tour)) 提供
 
 ### Redbooth
 
-另一个选项，某种程度上是Trello和Dropbox的结合，是Redbooth ([https://redbooth.com](https://redbooth.com))，也被称为Teambox。Redbooth允许用户分享文件，分配任务给团队成员，并发送直接消息。像我们在这里查看的许多其他应用程序一样，它也会在项目状态更新时提醒你。
+另一个选项，某种程度上是 Trello 和 Dropbox 的结合，是 Redbooth ([`redbooth.com`](https://redbooth.com))，也被称为 Teambox。Redbooth 允许用户分享文件，分配任务给团队成员，并发送直接消息。像我们在这里查看的许多其他应用程序一样，它也会在项目状态更新时提醒你。
 
 ![Redbooth](img/image00628.jpeg)
 
-图片由Redbooth ([https://redbooth.com/?ref=teambox#!/dash](https://redbooth.com/?ref=teambox#!/dash)) 提供
+图片由 Redbooth ([`redbooth.com/?ref=teambox#!/dash`](https://redbooth.com/?ref=teambox#!/dash)) 提供
 
 ### GitHub
 
-之前我们讨论了版本控制。然而，你仍然需要一个地方来存放你的仓库。GitHub ([www.github.com](http://www.github.com)) 为Git仓库提供托管服务。对于公共仓库是免费的，这意味着每个人都可以看到你上传的内容（这个选择是为了鼓励开源软件）。否则，它为你的仓库提供付费托管计划。
+之前我们讨论了版本控制。然而，你仍然需要一个地方来存放你的仓库。GitHub ([www.github.com](http://www.github.com)) 为 Git 仓库提供托管服务。对于公共仓库是免费的，这意味着每个人都可以看到你上传的内容（这个选择是为了鼓励开源软件）。否则，它为你的仓库提供付费托管计划。
 
 ![GitHub](img/image00629.jpeg)
 
-图片由GitHub提供
+图片由 GitHub 提供
 
 ### BitBucket
 
-Bitbucket ([https://bitbucket.org](https://bitbucket.org)) 是一个与 GitHub 非常相似的服务，用于托管你的 Git 仓库。在这里，你可以免费拥有私有仓库，但限制在于用户数量。最多五个用户是免费的（这对于小型团队来说非常完美）；否则，你需要切换到付费计划。
+Bitbucket ([`bitbucket.org`](https://bitbucket.org)) 是一个与 GitHub 非常相似的服务，用于托管你的 Git 仓库。在这里，你可以免费拥有私有仓库，但限制在于用户数量。最多五个用户是免费的（这对于小型团队来说非常完美）；否则，你需要切换到付费计划。
 
 ![BitBucket](img/image00630.jpeg)
 
@@ -948,7 +1002,7 @@ Bitbucket ([https://bitbucket.org](https://bitbucket.org)) 是一个与 GitHub �
 
 ![日历](img/image00631.jpeg)
 
-图片由 Google 日历 ([https://play.google.com/store/apps/details?id=com.google.android.calendar&hl=en](https://play.google.com/store/apps/details?id=com.google.android.calendar&hl=en))
+图片由 Google 日历 ([`play.google.com/store/apps/details?id=com.google.android.calendar&hl=en`](https://play.google.com/store/apps/details?id=com.google.android.calendar&hl=en))
 
 ### Pinterest
 
@@ -966,7 +1020,7 @@ Bitbucket ([https://bitbucket.org](https://bitbucket.org)) 是一个与 GitHub �
 
 ![Hootsuite](img/image00633.jpeg)
 
-图片由 Hootsuite 提供 ([http://signupnow.hootsuite.com](http://signupnow.hootsuite.com))
+图片由 Hootsuite 提供 ([`signupnow.hootsuite.com`](http://signupnow.hootsuite.com))
 
 # 精炼你的游戏
 
@@ -978,9 +1032,9 @@ Bitbucket ([https://bitbucket.org](https://bitbucket.org)) 是一个与 GitHub �
 
 ### 笔记
 
-Unity为优化移动平台提供了丰富的资源，例如特定的优化，如脚本和图形。你可以在以下链接找到它们：[https://docs.unity3d.com/Manual/MobileOptimizationPracticalGuide.html](https://docs.unity3d.com/Manual/MobileOptimizationPracticalGuide.html)。
+Unity 为优化移动平台提供了丰富的资源，例如特定的优化，如脚本和图形。你可以在以下链接找到它们：[`docs.unity3d.com/Manual/MobileOptimizationPracticalGuide.html`](https://docs.unity3d.com/Manual/MobileOptimizationPracticalGuide.html)。
 
-不同的设备都有自己的问题需要克服。就像我们的大脑一样，移动设备（以及一般的计算机）可以一次处理大量的信息。因此，这最终会影响你游戏的整体性能。例如，图形（2D和3D）或代码效率低下等问题可能会非常消耗资源。最终，这会影响游戏的运行，导致卡顿。除了设备之外，根据你设计的维度（2D或3D），还需要考虑不同的因素，我们将在下一节中探讨。
+不同的设备都有自己的问题需要克服。就像我们的大脑一样，移动设备（以及一般的计算机）可以一次处理大量的信息。因此，这最终会影响你游戏的整体性能。例如，图形（2D 和 3D）或代码效率低下等问题可能会非常消耗资源。最终，这会影响游戏的运行，导致卡顿。除了设备之外，根据你设计的维度（2D 或 3D），还需要考虑不同的因素，我们将在下一节中探讨。
 
 ### 检查构建大小
 
@@ -998,17 +1052,17 @@ Unity为优化移动平台提供了丰富的资源，例如特定的优化，如
 
 ![检查构建大小](img/image00636.jpeg)
 
-如你所见，我们游戏的大部分大小都是由**纹理**占用的，这在2D游戏中很常见。让我们在下一节中探讨如何减小纹理的大小。
+如你所见，我们游戏的大部分大小都是由**纹理**占用的，这在 2D 游戏中很常见。让我们在下一节中探讨如何减小纹理的大小。
 
 ### 纹理优化
 
-一些图像格式可能会出现问题，例如文件大小。幸运的是，在Unity中，你可以通过多种方式减小文件大小：
+一些图像格式可能会出现问题，例如文件大小。幸运的是，在 Unity 中，你可以通过多种方式减小文件大小：
 
 1.  改变图像分辨率。
 
-1.  改变Unity处理该特定图像的方式。
+1.  改变 Unity 处理该特定图像的方式。
 
-在Unity中，你可以在导入设置中更改这些设置。要这样做，只需从你的**项目**文件夹中选择一个**资产**，然后会出现以下屏幕：
+在 Unity 中，你可以在导入设置中更改这些设置。要这样做，只需从你的**项目**文件夹中选择一个**资产**，然后会出现以下屏幕：
 
 ![纹理优化](img/image00637.jpeg)
 
@@ -1016,13 +1070,13 @@ Unity为优化移动平台提供了丰富的资源，例如特定的优化，如
 
 ### 小贴士
 
-如您从之前的截图中所见，有一个关于POT纹理的警告。那是什么？**2的幂**（**POT**）纹理是边长为2的幂的方形图像（例如2、4、8、16、32、64、128、256、512、1024、2048、4092等等）。由于我们拥有的硬件运行在二进制系统上，2的幂非常重要，因为某些技术允许以某种方式处理它。因此，性能可以得到提升。在特定情况下，警告指出需要压缩成DXT5格式。因此，尽管很难让所有纹理都成为POT纹理，但您应该考虑尽可能多地使用它们。
+如您从之前的截图中所见，有一个关于 POT 纹理的警告。那是什么？**2 的幂**（**POT**）纹理是边长为 2 的幂的方形图像（例如 2、4、8、16、32、64、128、256、512、1024、2048、4092 等等）。由于我们拥有的硬件运行在二进制系统上，2 的幂非常重要，因为某些技术允许以某种方式处理它。因此，性能可以得到提升。在特定情况下，警告指出需要压缩成 DXT5 格式。因此，尽管很难让所有纹理都成为 POT 纹理，但您应该考虑尽可能多地使用它们。
 
-如您从之前的截图中所读到的，我们的熊猫精灵图集是一个**NPOT**（**非2的幂**）纹理，因为这张精灵图集是为了清晰度而设计的，用于在[第4章](part0056.xhtml#aid-1LCVG1 "第4章。不再孤单——甜味熊猫出击")*不再孤单——甜味熊猫出击*中学习动画，而不是为了优化。
+如您从之前的截图中所读到的，我们的熊猫精灵图集是一个**NPOT**（**非 2 的幂**）纹理，因为这张精灵图集是为了清晰度而设计的，用于在第四章*不再孤单——甜味熊猫出击*中学习动画，而不是为了优化。
 
 为了提高游戏性能，最重要的参数是：**生成** **Mip Maps**、**过滤模式**、**最大尺寸**、**压缩**和**格式**。为了便于理解，它们已在之前的截图中被突出显示：
 
-+   **生成Mip Maps**: 这是一个选项，如果选中，将创建纹理/精灵的小版本。因此，当精灵相对于相机较远或较小时，将渲染较小的版本。因此，在运行时可以获得性能提升，但可能会增加构建的大小。
++   **生成 Mip Maps**: 这是一个选项，如果选中，将创建纹理/精灵的小版本。因此，当精灵相对于相机较远或较小时，将渲染较小的版本。因此，在运行时可以获得性能提升，但可能会增加构建的大小。
 
 +   **过滤模式**: 允许您对图像应用过滤器，特别是使边缘略微模糊。当处理像素艺术时，一些过滤器可能很有用。这是因为过滤器使您的资产不那么像素化。**过滤模式**选择当纹理被变换拉伸时如何过滤纹理：
 
@@ -1030,7 +1084,7 @@ Unity为优化移动平台提供了丰富的资源，例如特定的优化，如
 
     +   **双线性插值**: 纹理在近距离时变得模糊
 
-    +   **三线性插值**: 这类似于**双线性插值**，但纹理也会在不同的Mip级别之间模糊
+    +   **三线性插值**: 这类似于**双线性插值**，但纹理也会在不同的 Mip 级别之间模糊
 
 +   **最大尺寸**: 如其名所示，对图像在该特定平台上的最大尺寸进行限制。实际上，虽然高分辨率图片或图形可以增强体验，但从性能角度来看，对于应用程序来说并不总是最佳选择。此选项允许您在牺牲质量的情况下，大幅减少构建大小，以防出现相关问题。
 
@@ -1044,23 +1098,23 @@ Unity为优化移动平台提供了丰富的资源，例如特定的优化，如
 
 ### 统计数据和性能分析
 
-在创建你的游戏时，优化将变得困难，尤其是如果你直到最后一刻才开始担心这个问题。主要问题之一（至少在3D游戏中）是多边形计数，这是你的3D资产拥有的面数。例如，如果你想到一个立方体，每个面都是一个多边形，因此立方体将总共拥有六个多边形（一些显卡不支持四边形，因此立方体的六个面应该分成两个三角形，总共12个多边形）。说到这里，需要考虑的是累积的总数。如果太低，你的游戏看起来可能会相对粗糙；如果太多，尤其是对于移动设备，很可能会出现卡顿。要检查Unity场景中的多边形计数，请转到**游戏**视图的右上角，并检查**统计数据**选项，如图中所示：
+在创建你的游戏时，优化将变得困难，尤其是如果你直到最后一刻才开始担心这个问题。主要问题之一（至少在 3D 游戏中）是多边形计数，这是你的 3D 资产拥有的面数。例如，如果你想到一个立方体，每个面都是一个多边形，因此立方体将总共拥有六个多边形（一些显卡不支持四边形，因此立方体的六个面应该分成两个三角形，总共 12 个多边形）。说到这里，需要考虑的是累积的总数。如果太低，你的游戏看起来可能会相对粗糙；如果太多，尤其是对于移动设备，很可能会出现卡顿。要检查 Unity 场景中的多边形计数，请转到**游戏**视图的右上角，并检查**统计数据**选项，如图中所示：
 
 ![统计数据和性能分析](img/image00638.jpeg)
 
-为了更好地了解你应该如何建模，在Unity的用户手册中，有一页解释了如何建模资产和角色以便进行优化。你可以在这里阅读：[http://polycount.com/discussion/130371/polygon-count-for-smartphone-applications](http://polycount.com/discussion/130371/polygon-count-for-smartphone-applications)。
+为了更好地了解你应该如何建模，在 Unity 的用户手册中，有一页解释了如何建模资产和角色以便进行优化。你可以在这里阅读：[`polycount.com/discussion/130371/polygon-count-for-smartphone-applications`](http://polycount.com/discussion/130371/polygon-count-for-smartphone-applications)。
 
-完成此操作后，应该会出现如图所示的弹出窗口。此弹出窗口中的统计数据显示了与不同事物性能相关的信息，例如绘制调用。此外，它还指示当前场景视图中有多少多边形。实际上，这个S**统计数据**屏幕的一个巨大优点是，当你按下播放时，你可以实时使用它，这样你就可以观察游戏中的哪些部分比其他部分更占用资源（我们之前在[第2章](part0028.xhtml#aid-QMFO1 "第2章。烘焙纸杯蛋糕塔")中提到过，*烘焙纸杯蛋糕塔*）：
+完成此操作后，应该会出现如图所示的弹出窗口。此弹出窗口中的统计数据显示了与不同事物性能相关的信息，例如绘制调用。此外，它还指示当前场景视图中有多少多边形。实际上，这个 S**统计数据**屏幕的一个巨大优点是，当你按下播放时，你可以实时使用它，这样你就可以观察游戏中的哪些部分比其他部分更占用资源（我们之前在第二章中提到过，*烘焙纸杯蛋糕塔*）：
 
 ![统计数据和性能分析](img/image00639.jpeg)
 
 最重要的参数要检查（如图中所示）是：
 
-+   **FPS** (每秒帧数): 如其名所示，这显示了你的游戏每秒可以产生多少帧。当然，这个值可能会因不同设备和/或计算机的硬件而大幅变化。你应该确保你的游戏能够在每个目标平台上至少以50/60 FPS运行。
++   **FPS** (每秒帧数): 如其名所示，这显示了你的游戏每秒可以产生多少帧。当然，这个值可能会因不同设备和/或计算机的硬件而大幅变化。你应该确保你的游戏能够在每个目标平台上至少以 50/60 FPS 运行。
 
     ### 注意
 
-    在某些情况下，你可能想限制最大FPS值，原因有两个：
+    在某些情况下，你可能想限制最大 FPS 值，原因有两个：
 
     一些显示器具有有限的刷新率
 
@@ -1082,31 +1136,31 @@ Unity为优化移动平台提供了丰富的资源，例如特定的优化，如
 
 ### 注意
 
-你可以在官方文档[https://docs.unity3d.com/Manual/Profiler.html](https://docs.unity3d.com/Manual/Profiler.html)中或从官方网站[https://unity3d.com/learn/tutorials/topics/interface-essentials/introduction-profiler](https://unity3d.com/learn/tutorials/topics/interface-essentials/introduction-profiler)的视频教程中了解更多关于Profiler的信息。
+你可以在官方文档[`docs.unity3d.com/Manual/Profiler.html`](https://docs.unity3d.com/Manual/Profiler.html)中或从官方网站[`unity3d.com/learn/tutorials/topics/interface-essentials/introduction-profiler`](https://unity3d.com/learn/tutorials/topics/interface-essentials/introduction-profiler)的视频教程中了解更多关于 Profiler 的信息。
 
-此外，你还可以进行远程分析；在[https://docs.unity3d.com/Manual/ProfilerWindow.html](https://docs.unity3d.com/Manual/ProfilerWindow.html)中，接近页面底部，你会找到一个名为*远程分析*的部分。它解释了如何根据你想要远程分析的平台进行操作。
+此外，你还可以进行远程分析；在[`docs.unity3d.com/Manual/ProfilerWindow.html`](https://docs.unity3d.com/Manual/ProfilerWindow.html)中，接近页面底部，你会找到一个名为*远程分析*的部分。它解释了如何根据你想要远程分析的平台进行操作。
 
 ### 其他优化技巧
 
-另一种优化游戏的方法是限制3D资产上的材质数量（这是Unity在游戏对象上应用着色器的方式）。例如，有时你可以将许多不同的材质（和贴图）应用到对象上，以产生一系列酷炫的效果；然而，少即是多。对于在电脑或游戏机上玩的游戏，这并不是一个大问题，但需要考虑。对于移动设备上的游戏，重要的是要记住，它们能够处理一些酷炫的效果，但一切都有极限。在游戏开发的早期阶段考虑到这一点，如果需要调整游戏的一些组件，将有助于减少后期阶段的工作量和压力。有些材质在计算上可能非常昂贵。有一些着色器可以很好地近似酷炫效果，但针对移动设备进行了优化（例如我们之前讨论过的光晕效果）。
+另一种优化游戏的方法是限制 3D 资产上的材质数量（这是 Unity 在游戏对象上应用着色器的方式）。例如，有时你可以将许多不同的材质（和贴图）应用到对象上，以产生一系列酷炫的效果；然而，少即是多。对于在电脑或游戏机上玩的游戏，这并不是一个大问题，但需要考虑。对于移动设备上的游戏，重要的是要记住，它们能够处理一些酷炫的效果，但一切都有极限。在游戏开发的早期阶段考虑到这一点，如果需要调整游戏的一些组件，将有助于减少后期阶段的工作量和压力。有些材质在计算上可能非常昂贵。有一些着色器可以很好地近似酷炫效果，但针对移动设备进行了优化（例如我们之前讨论过的光晕效果）。
 
-在这个小段落中探讨的想法只是从图形角度优化应用程序的冰山一角。然而，你可以在这里继续阅读：[https://docs.unity3d.com/Manual/OptimizingGraphicsPerformance.html](https://docs.unity3d.com/Manual/OptimizingGraphicsPerformance.html)。
+在这个小段落中探讨的想法只是从图形角度优化应用程序的冰山一角。然而，你可以在这里继续阅读：[`docs.unity3d.com/Manual/OptimizingGraphicsPerformance.html`](https://docs.unity3d.com/Manual/OptimizingGraphicsPerformance.html)。
 
 另一种优化游戏的方法是关注你的代码。
 
-在Unity的早期版本（5.0之前），需要缓存Transform组件。正如你可以在本文末尾的[https://blogs.unity3d.com/2014/06/23/unity5-api-changes-automatic-script-updating](https://blogs.unity3d.com/2014/06/23/unity5-api-changes-automatic-script-updating)中读到的那样，现在不再需要这样做。然而，仍有开发者在使用它；现在应该避免使用，因为它会大大降低代码的可读性，从而影响开发过程。无论如何，你仍然应该将其他组件缓存到变量中，就像我们在[第3章](part0043.xhtml#aid-190861 "第3章. 与玩家通信 – 用户界面")中为UI所做的那样，*与玩家通信 – 用户界面*。
+在 Unity 的早期版本（5.0 之前），需要缓存 Transform 组件。正如你可以在本文末尾的[`blogs.unity3d.com/2014/06/23/unity5-api-changes-automatic-script-updating`](https://blogs.unity3d.com/2014/06/23/unity5-api-changes-automatic-script-updating)中读到的那样，现在不再需要这样做。然而，仍有开发者在使用它；现在应该避免使用，因为它会大大降低代码的可读性，从而影响开发过程。无论如何，你仍然应该将其他组件缓存到变量中，就像我们在第三章中为 UI 所做的那样，*与玩家通信 – 用户界面*。
 
 ### 注意
 
-如果你正在使用Unity的旧版本，或者你只是想了解Transform组件的缓存是什么，请查看以下代码行：
+如果你正在使用 Unity 的旧版本，或者你只是想了解 Transform 组件的缓存是什么，请查看以下代码行：
 
 `transform.position = Vector3.zero;`
 
-在过去版本的Unity中编译时，它相当于：
+在过去版本的 Unity 中编译时，它相当于：
 
 `GetComponent<Transform>().position = Vector3.zero;`
 
-此外，正如我们在各个章节中已经提到的，`GetComponent()` 函数运行缓慢，在可能的情况下应该避免使用。因此，你应该考虑将 Transform 组件缓存到一个变量中（就像我们在[第 3 章](part0043.xhtml#aid-190861 "第 3 章。与玩家通信 – 用户界面")中做的那样，*与玩家通信 – 用户界面*，我们将 UI 组件的引用存储到变量中）。因此，在 Transform 的情况下，你可以在 `Start()` 或 `Awake()` 函数中执行以下代码行（当然，在声明了 `thisTransform` 变量类型为 Transform 之后）:`thisTransform = GetComponent<Transform>();`
+此外，正如我们在各个章节中已经提到的，`GetComponent()` 函数运行缓慢，在可能的情况下应该避免使用。因此，你应该考虑将 Transform 组件缓存到一个变量中（就像我们在第三章中做的那样，*与玩家通信 – 用户界面*，我们将 UI 组件的引用存储到变量中）。因此，在 Transform 的情况下，你可以在 `Start()` 或 `Awake()` 函数中执行以下代码行（当然，在声明了 `thisTransform` 变量类型为 Transform 之后）:`thisTransform = GetComponent<Transform>();`
 
 其他技巧涉及字符串，在 Unity 中到处都广泛使用。然而，除非你正在进行特定的字符串操作，否则你应该避免对字符串进行这里提出的优化，因为性能提升可能不值得花费的时间和代码可读性的降低。以下是一些技巧：
 
@@ -1114,13 +1168,16 @@ Unity为优化移动平台提供了丰富的资源，例如特定的优化，如
 
 +   比较不同字符串的方法有很多。然而，最快的方法是以下这种方法：
 
-[PRE7]
+```cs
+        firstString.Equals(secondString, StringComparison.Ordinal); 
+
+```
 
 +   原因是算法只需要遍历两个字符串（这里的单个字符被视为数字，因此这种方法是区分大小写的）来查看是否有任何差异。
 
 ## 游戏测试
 
-测试，测试，再测试！不仅要在你的目标设备和受众中进行测试，还要与他们一起测试，测试，再测试！这看起来可能是游戏开发过程中的一个明显部分，但在这一阶段，即使你自己和你的团队成员进行测试，这也是绝对关键的。确保游戏在高性能和低性能设备上都能运行，这些设备都在你的规格范围内。一个很好的视频是关于游戏测试的额外学分视频，可以在以下链接找到：[http://tinyurl.com/PlaytestingExtraCredits](http://tinyurl.com/PlaytestingExtraCredits)。
+测试，测试，再测试！不仅要在你的目标设备和受众中进行测试，还要与他们一起测试，测试，再测试！这看起来可能是游戏开发过程中的一个明显部分，但在这一阶段，即使你自己和你的团队成员进行测试，这也是绝对关键的。确保游戏在高性能和低性能设备上都能运行，这些设备都在你的规格范围内。一个很好的视频是关于游戏测试的额外学分视频，可以在以下链接找到：[`tinyurl.com/PlaytestingExtraCredits`](http://tinyurl.com/PlaytestingExtraCredits)。
 
 不要假设如果你的游戏在你的或你的朋友的设备上运行良好，它就会在每个人的设备上运行。已经有过游戏在某些手机型号上无法运行的情况。鉴于这种情况，尽可能多地测试。然而，幸运的是，如果你无法获取一系列不同的设备，你可以使用模拟器来模拟它在特定设备（或设备）上运行。Genymotion ([www.genymotion.com](http://www.genymotion.com)) 是一款提供模拟不同设备优秀方式的产品。
 
@@ -1148,7 +1205,7 @@ Unity为优化移动平台提供了丰富的资源，例如特定的优化，如
 
 这等同于询问你的试玩测试是公开还是私密的。在这个阶段，你需要问自己游戏是否包含可能影响发布的敏感成分。因此，你可能需要玩家签署一份**保密协议**（**NDA**），这阻止他们公开讨论游戏、分享截图，以及因此产生的法律后果。相比之下，他们在试玩后可能可以自由地、公开地与任何人谈论游戏。
 
-在试玩者开始注册之前，这一点非常重要。你不想在Facebook或Twitter上登录时，看到人们发布关于你还在开发中的应用程序的截图。其他考虑因素可以要求试玩者不要在测试期间拍摄任何视频或照片，包括自拍、签到和社交媒体帖子。在某些情况下，打印屏幕选项被禁用就是为了这个目的。当然，人们很聪明，他们会找到许多解决方案来解决这个问题。但如果你有某些措施和后果，确保参与者在试玩前遵守一套规则，并承认这些规则（例如，签署协议），你就可以避免之后出现任何不希望的宣传。
+在试玩者开始注册之前，这一点非常重要。你不想在 Facebook 或 Twitter 上登录时，看到人们发布关于你还在开发中的应用程序的截图。其他考虑因素可以要求试玩者不要在测试期间拍摄任何视频或照片，包括自拍、签到和社交媒体帖子。在某些情况下，打印屏幕选项被禁用就是为了这个目的。当然，人们很聪明，他们会找到许多解决方案来解决这个问题。但如果你有某些措施和后果，确保参与者在试玩前遵守一套规则，并承认这些规则（例如，签署协议），你就可以避免之后出现任何不希望的宣传。
 
 #### 寻求家人和朋友的帮助
 
@@ -1194,7 +1251,7 @@ Unity为优化移动平台提供了丰富的资源，例如特定的优化，如
 
 #### 一点一滴，意义重大
 
-你将在游戏测试期间为你的测试者提供什么，以及/或者为他们提供的时间？如果你无法补偿他们，确保提供食物和饮料。这并不是说你需要找一个提供蛋糕和三明治的供应商，但提供一些茶和咖啡以及一些小吃（切一些水果、薯片、糖果、饼干，甚至自己制作三明治）将有助于保持他们的清醒，尤其是如果他们待的时间很长。在长时间的游戏测试期间安排休息也很重要，因为你不想让他们坐几个小时。每45分钟休息一次也是一个很好的方式，可以检查他们的进展情况。
+你将在游戏测试期间为你的测试者提供什么，以及/或者为他们提供的时间？如果你无法补偿他们，确保提供食物和饮料。这并不是说你需要找一个提供蛋糕和三明治的供应商，但提供一些茶和咖啡以及一些小吃（切一些水果、薯片、糖果、饼干，甚至自己制作三明治）将有助于保持他们的清醒，尤其是如果他们待的时间很长。在长时间的游戏测试期间安排休息也很重要，因为你不想让他们坐几个小时。每 45 分钟休息一次也是一个很好的方式，可以检查他们的进展情况。
 
 ### 如何
 
@@ -1236,7 +1293,7 @@ Unity为优化移动平台提供了丰富的资源，例如特定的优化，如
 
 ### 奖励参与度
 
-像Kickstarter、Indiegogo和其他众筹平台为项目支持者提供一定承诺级别的奖励。即使你选择不与这些平台之一互动，你也可以采用类似的方法来开发和最终发布你的游戏：
+像 Kickstarter、Indiegogo 和其他众筹平台为项目支持者提供一定承诺级别的奖励。即使你选择不与这些平台之一互动，你也可以采用类似的方法来开发和最终发布你的游戏：
 
 +   **竞赛**：举办竞赛是让人们参与的好方法。如果你没有资金创建产品，提供折扣、提前访问或（免费）完整版本的游戏。另一个选择是创建一些独家艺术品/壁纸，如果可能的话，让它们由你的团队打印并签名。
 
@@ -1256,15 +1313,15 @@ Unity为优化移动平台提供了丰富的资源，例如特定的优化，如
 
 ### Twitter
 
-你有没有读过一个非常吸引人的标题，让你想要继续阅读？嗯，微博平台是吸引你受众的绝佳方式，方式几乎相同。Twitter ([www.twitter.com](http://www.twitter.com)) 是一个很好的例子，因为它限制了你的字符数在140个或更少。所以你必须直截了当，否则你会被截断，没有人喜欢这样。
+你有没有读过一个非常吸引人的标题，让你想要继续阅读？嗯，微博平台是吸引你受众的绝佳方式，方式几乎相同。Twitter ([www.twitter.com](http://www.twitter.com)) 是一个很好的例子，因为它限制了你的字符数在 140 个或更少。所以你必须直截了当，否则你会被截断，没有人喜欢这样。
 
-**推文**，在发布关于你的应用的更新时，有一些事情需要你注意，比如时区。然而，Twitter使用了一些关键的互动方法：
+**推文**，在发布关于你的应用的更新时，有一些事情需要你注意，比如时区。然而，Twitter 使用了一些关键的互动方法：
 
 +   **回复**：正如其名所示，它允许用户回复你所发布的内容。这让你可以与那些对你所说内容表示兴趣的人互动。
 
-+   **转发**：这是Twitter的分享版本。所以如果有人发了一条你喜欢的推文，你可以转发它，让你的粉丝也能看到。
++   **转发**：这是 Twitter 的分享版本。所以如果有人发了一条你喜欢的推文，你可以转发它，让你的粉丝也能看到。
 
-+   **收藏**：这类似于Facebook上的“赞”或YouTube上的点赞。
++   **收藏**：这类似于 Facebook 上的“赞”或 YouTube 上的点赞。
 
 +   **标签**：在分享内容时，这是需要牢记的最基本的事情之一。它们就像一个过滤系统，用于对信息进行分类。使用独特的标签可以帮助你跟踪与你的游戏相关的内容分布，同时也使得在众多推文中被听到变得更加容易。
 
@@ -1272,23 +1329,23 @@ Unity为优化移动平台提供了丰富的资源，例如特定的优化，如
 
 确保你有一个独特的标签的好方法是使用它之前先搜索一下。
 
-一些有用的链接，帮助你开始在Twitter上做广告：
+一些有用的链接，帮助你开始在 Twitter 上做广告：
 
-+   [https://business.twitter.com/en/advertising.html](https://business.twitter.com/en/advertising.html)
++   [`business.twitter.com/en/advertising.html`](https://business.twitter.com/en/advertising.html)
 
-+   [https://marketing.twitter.com/na/en.html](https://marketing.twitter.com/na/en.html)
++   [`marketing.twitter.com/na/en.html`](https://marketing.twitter.com/na/en.html)
 
-+   [https://business.twitter.com/en/help/troubleshooting/how-twitter-ads-work.html](https://business.twitter.com/en/help/troubleshooting/how-twitter-ads-work.html)
++   [`business.twitter.com/en/help/troubleshooting/how-twitter-ads-work.html`](https://business.twitter.com/en/help/troubleshooting/how-twitter-ads-work.html)
 
-+   [https://business.twitter.com/en/advertising/campaign-types.html](https://business.twitter.com/en/advertising/campaign-types.html)
++   [`business.twitter.com/en/advertising/campaign-types.html`](https://business.twitter.com/en/advertising/campaign-types.html)
 
 #### 练习
 
-如果你在将内容浓缩成简短版本时遇到困难，试着给自己设定一个限制。例如，先陈述你的整个想法，然后尝试在15秒、10秒和5秒内表达出来。你会发现，每次尝试表达你的想法时，核心概念会变得更加明显，时间越短，你的解释就会越高效、越简洁。我们常常觉得需要包含一切，认为每一条信息都同等重要，但现实中这往往只是对概念的填充。
+如果你在将内容浓缩成简短版本时遇到困难，试着给自己设定一个限制。例如，先陈述你的整个想法，然后尝试在 15 秒、10 秒和 5 秒内表达出来。你会发现，每次尝试表达你的想法时，核心概念会变得更加明显，时间越短，你的解释就会越高效、越简洁。我们常常觉得需要包含一切，认为每一条信息都同等重要，但现实中这往往只是对概念的填充。
 
 ### Instagram
 
-虽然Twitter是一个微博平台，但Instagram ([www.instagram.com](http://www.instagram.com))可以通过一张简单的图片（和标题）讲述一千个字。它的工作方式与Twitter类似，你可以添加标签，与更广泛的受众建立联系，也许还能关注一些关键人物（可选）。
+虽然 Twitter 是一个微博平台，但 Instagram ([www.instagram.com](http://www.instagram.com))可以通过一张简单的图片（和标题）讲述一千个字。它的工作方式与 Twitter 类似，你可以添加标签，与更广泛的受众建立联系，也许还能关注一些关键人物（可选）。
 
 ### Facebook
 
@@ -1314,7 +1371,7 @@ Facebook ([www.facebook.com](http://www.facebook.com))在创建一个地方来�
 
 众筹活动有多个不同的平台，每个平台都有其独特的功能。然而，它们共同的基本点是它们都旨在为你提供一个聚集追随者和筹集所需资金或展示你的创造的平台。不同的众筹平台出于不同的原因运营。例如，有些是关于事业（自然、人权或贫困），某些类型的产品（服装、音乐），创意（产品或虚拟商品），以及个人（医疗治疗）。你的游戏可能符合多个标准，特别是对于创意项目，因此建议你花些时间看看你的游戏可能吸引到哪些最感兴趣的人。
 
-众筹平台的工作方式是开发者（或任何产品或想法的创造者）展示他们的想法、他们需要资金的原因、资金的分配方式以及对于支持者（最终将给你钱的人）的好处。一般来说，你将为你产品的支持者（在这种情况下，游戏）提供不同级别的支持机会。例如，如果一个支持者捐赠了1美元，那么他们可以在游戏网站的信用名单上列出他们的名字，甚至可以在游戏中列出。如果他们给你50美元，那么他们可以获取你游戏的签名副本，800美元将获得两份副本和一张手写的感谢信，依此类推。在设定每个级别的金额时要小心。太多的话你不会得到支持者；太少的话你会破坏你的预算。最后要考虑的一点是，在某些情况下，众筹平台不仅会从你筹集的总资金中提取一定比例，还会向支持者的捐赠中添加费用。
+众筹平台的工作方式是开发者（或任何产品或想法的创造者）展示他们的想法、他们需要资金的原因、资金的分配方式以及对于支持者（最终将给你钱的人）的好处。一般来说，你将为你产品的支持者（在这种情况下，游戏）提供不同级别的支持机会。例如，如果一个支持者捐赠了 1 美元，那么他们可以在游戏网站的信用名单上列出他们的名字，甚至可以在游戏中列出。如果他们给你 50 美元，那么他们可以获取你游戏的签名副本，800 美元将获得两份副本和一张手写的感谢信，依此类推。在设定每个级别的金额时要小心。太多的话你不会得到支持者；太少的话你会破坏你的预算。最后要考虑的一点是，在某些情况下，众筹平台不仅会从你筹集的总资金中提取一定比例，还会向支持者的捐赠中添加费用。
 
 因此，在你决定选择众筹平台之前，请确保它将适合你，并且适合你想要筹集的资金。
 
@@ -1338,17 +1395,17 @@ Facebook ([www.facebook.com](http://www.facebook.com))在创建一个地方来�
 
 +   CrowdRise: [www.crowdrise.com](http://www.crowdrise.com)
 
-## 在Unity中构建
+## 在 Unity 中构建
 
 第一件事是实际编译游戏。否则，你将无法将其放置在任何地方！
 
-要在Unity中构建游戏，你需要在顶部菜单栏中导航并选择**文件 | 构建设置…**。在那里，你有以下屏幕，你可以选择你想要的目标平台（以及你想要包含的场景）：
+要在 Unity 中构建游戏，你需要在顶部菜单栏中导航并选择**文件 | 构建设置…**。在那里，你有以下屏幕，你可以选择你想要的目标平台（以及你想要包含的场景）：
 
-![在Unity中构建](img/image00641.jpeg)
+![在 Unity 中构建](img/image00641.jpeg)
 
-如果你点击**玩家设置…**按钮，你将进入构建的具体选项。在这里，你可以找到更多关于它的信息：[https://docs.unity3d.com/Manual/class-PlayerSettings.html](https://docs.unity3d.com/Manual/class-PlayerSettings.html)。
+如果你点击**玩家设置…**按钮，你将进入构建的具体选项。在这里，你可以找到更多关于它的信息：[`docs.unity3d.com/Manual/class-PlayerSettings.html`](https://docs.unity3d.com/Manual/class-PlayerSettings.html)。
 
-一旦你点击**构建**，Unity实际上会构建游戏，你可以喘口气（并且休息一下）。但在这里，这只是第二阶段的开始，在这个阶段，你需要实际发布和推广游戏！
+一旦你点击**构建**，Unity 实际上会构建游戏，你可以喘口气（并且休息一下）。但在这里，这只是第二阶段的开始，在这个阶段，你需要实际发布和推广游戏！
 
 ## 澄清事实
 
@@ -1356,21 +1413,21 @@ Facebook ([www.facebook.com](http://www.facebook.com))在创建一个地方来�
 
 ## 接受条款和条件
 
-现在既然你的团队都准备好了，你需要确保你即将向世界展示的内容也遵守你将要针对的平台条款和条件。例如，如果你计划为Android设备发布，确保你已经满足了他们的条款和条件；对于苹果的App Store以及你打算发布的任何其他平台也是如此。
+现在既然你的团队都准备好了，你需要确保你即将向世界展示的内容也遵守你将要针对的平台条款和条件。例如，如果你计划为 Android 设备发布，确保你已经满足了他们的条款和条件；对于苹果的 App Store 以及你打算发布的任何其他平台也是如此。
 
 # 本地化
 
-当你面向全球发布时，你需要本地化你的游戏。许多开发者认为仅用英语发布应该足够，因为大多数玩家都能理解英语。然而，如果你查看市场和下载图表，很明显英语只占市场的20%。因此，你绝对应该考虑将你的游戏本地化到其他受众。
+当你面向全球发布时，你需要本地化你的游戏。许多开发者认为仅用英语发布应该足够，因为大多数玩家都能理解英语。然而，如果你查看市场和下载图表，很明显英语只占市场的 20%。因此，你绝对应该考虑将你的游戏本地化到其他受众。
 
 但本地化远不止于将你的游戏翻译成其他语言或添加字幕。有许多事情你应该考虑。以下是一些众多原因中的几个：
 
 +   在某些语言中，如德语，一些单词非常长，它们可能会被截断或从用户界面溢出。
 
-+   一些语言，如阿拉伯语，是以不同的方向书写的，例如从右到左或从上到下。因此，你可能需要调整你的UI设计以支持界面将产生的视觉影响。
++   一些语言，如阿拉伯语，是以不同的方向书写的，例如从右到左或从上到下。因此，你可能需要调整你的 UI 设计以支持界面将产生的视觉影响。
 
 +   如果你拥有对话系统，或者代码中使用字符串连接的用户界面，请注意，在其他语言中，如果它们不够灵活，它们需要重写！一个例子是当你想在单词前放置一个形容词时。在其他一些语言中，它可能发生在相反的方向。例如，英语句子“the *red hat*”在意大利语中变为“*il cappello rosso*”，其中“rosso”意为红色。因此，形容词在单词之后而不是之前，这与英语不同。另一个（实用的）例子如下：你为你的物品预留一个额外的字符在末尾以添加一个“*s*”使其变为复数（“*potion*”可以变为“*potions*”）。在意大利语中，你不需要额外的字符，只需更改最后一个字符（“*pozione*”变为复数形式“*pozioni*”）。此外，在意大利语中，最后一个更改的字符取决于对象是女性还是男性（这是一个在英语中不存在的概念，因为对象没有性别）。因此，你为预留字符的解决方案结构不足以支持意大利语。想象一下将这种解决方案应用到所有其他语言，你很快就会意识到仅通过添加几个变量来本地化你的游戏并不容易。
 
-+   在某些文化中，数字中逗号和点的角色是颠倒的（例如，数字3,218可以解释为三千二百一十八，也可以解释为三点二一八，就像在意大利一样）。
++   在某些文化中，数字中逗号和点的角色是颠倒的（例如，数字 3,218 可以解释为三千二百一十八，也可以解释为三点二一八，就像在意大利一样）。
 
 +   在某些文化中，某些概念可能不受欢迎，因此应该被审查或删除。这通常与暴力游戏或包含某些类型成人内容的游戏有关。
 
@@ -1386,17 +1443,17 @@ Facebook ([www.facebook.com](http://www.facebook.com))在创建一个地方来�
 
 # 伦理考量
 
-电子游戏是一种技术，就像所有技术一样，它们可能是有害的，会伤害人们。它们可以被用作伤害人的武器。不幸的是，游戏的这一伦理方面往往被忽视。因此，我想引用Jesse Schell在他的书中（《游戏设计艺术：透镜之书》）所写的内容：
+电子游戏是一种技术，就像所有技术一样，它们可能是有害的，会伤害人们。它们可以被用作伤害人的武器。不幸的是，游戏的这一伦理方面往往被忽视。因此，我想引用 Jesse Schell 在他的书中（《游戏设计艺术：透镜之书》）所写的内容：
 
 > *"如果你正在设计一款涉及陌生人交谈的游戏，你必须对可能导致的后果负责。这是罕见的情况之一，你的游戏设计选择可能会拯救或失去生命。你可能认为你的游戏中发生危险的可能性只有百万分之一，但如果这是真的，并且你的游戏非常成功，有五百万人在玩，那么那个危险的事情就会发生五次。"*
 
 作为游戏开发者，你有责任尽你所能确保这种情况永远不会发生。如果你不愿意承担这样的责任，可能最好不要制作任何游戏。
 
-在我个人的观点中，这也与Jesse Schell的观点一致，正如你可以从他的书中读到的那样，你有潜力做一些好事，并利用电子游戏作为提升人类生活的工具。你应该被像“我正在开发的游戏是否在做一些好事？”和“我的游戏能否以某种方式改善玩家的生活？”这样的问题所激励。当然，这些问题并不是游戏公司关心的，但你作为游戏开发者应该关心，并在内心深处回答这些问题。然后，尝试让你的游戏成为对人们更好的游戏。
+在我个人的观点中，这也与 Jesse Schell 的观点一致，正如你可以从他的书中读到的那样，你有潜力做一些好事，并利用电子游戏作为提升人类生活的工具。你应该被像“我正在开发的游戏是否在做一些好事？”和“我的游戏能否以某种方式改善玩家的生活？”这样的问题所激励。当然，这些问题并不是游戏公司关心的，但你作为游戏开发者应该关心，并在内心深处回答这些问题。然后，尝试让你的游戏成为对人们更好的游戏。
 
 ### 注意
 
-同样的论点，但解释得更详细，可以在Jesse Schell的书中找到专门的章节。
+同样的论点，但解释得更详细，可以在 Jesse Schell 的书中找到专门的章节。
 
 请以你自己的方式，让这个世界变得更美好！
 
@@ -1404,7 +1461,7 @@ Facebook ([www.facebook.com](http://www.facebook.com))在创建一个地方来�
 
 在这一章中，我们遇到了许多主题，探索了许多领域，所以让我们重新组织我们的想法。
 
-在开始时，我们讨论了我们塔防游戏的潜在改进以及它们实施的一些提示。从那里，我们将改进扩展到了Unity的整体，通过提供更多我们没有时间详细覆盖的游戏开发领域，但如果你希望提高自己的技能，这些领域需要你的关注。
+在开始时，我们讨论了我们塔防游戏的潜在改进以及它们实施的一些提示。从那里，我们将改进扩展到了 Unity 的整体，通过提供更多我们没有时间详细覆盖的游戏开发领域，但如果你希望提高自己的技能，这些领域需要你的关注。
 
 在游戏开发过程中，你通常并不孤单，而是身处一个团队中，并且每个团队成员都像是一个整体（就像人体一样）那样工作，这对于实现最佳结果非常重要。因此，我们强调了某些协作工具，这样你就可以自由尝试并选择最适合你团队的工具。
 
@@ -1422,7 +1479,7 @@ Facebook ([www.facebook.com](http://www.facebook.com))在创建一个地方来�
 
 如果你非法下载了这本书但真的很喜欢它，请考虑购买它。我努力提供高质量的内容，这需要时间。如果你负担不起这本书，你总是可以给我一杯咖啡([www.francescosapio.com/BuyMeACoffee](http://www.francescosapio.com/BuyMeACoffee))，或者通过在社交媒体上分享购买链接（而不是通过种子和下载）来支持这本书。
 
-我还写了其他可能对你旅程有所帮助的书籍，包括 *Unity UI 美术设计手册*，Packt 出版 ([www.packtpub.com/game-development/unity-ui-cookbook](http://www.packtpub.com/game-development/unity-ui-cookbook)) 和 *Unity 5.x 2D 游戏开发蓝图*，Packt 出版 ([www.packtpub.com/game-development/unity-5x-2d-game-development-blueprints](http://www.packtpub.com/game-development/unity-5x-2d-game-development-blueprints))). 此外，这里还有我在 [第 1 章](part0016.xhtml#aid-F8901 "第 1 章。Unity 中的平坦世界") 中引用的迷你指南，*Unity 中的平坦世界*：*你需要了解的 Unity 5 知识*，Packt 出版 ([www.packtpub.com/packt/free-ebook/what-you-need-know-about-unity-5](http://www.packtpub.com/packt/free-ebook/what-you-need-know-about-unity-5))。
+我还写了其他可能对你旅程有所帮助的书籍，包括 *Unity UI 美术设计手册*，Packt 出版 ([www.packtpub.com/game-development/unity-ui-cookbook](http://www.packtpub.com/game-development/unity-ui-cookbook)) 和 *Unity 5.x 2D 游戏开发蓝图*，Packt 出版 ([www.packtpub.com/game-development/unity-5x-2d-game-development-blueprints](http://www.packtpub.com/game-development/unity-5x-2d-game-development-blueprints))). 此外，这里还有我在 第一章 中引用的迷你指南，*Unity 中的平坦世界*：*你需要了解的 Unity 5 知识*，Packt 出版 ([www.packtpub.com/packt/free-ebook/what-you-need-know-about-unity-5](http://www.packtpub.com/packt/free-ebook/what-you-need-know-about-unity-5))。
 
 最后，网络交流、结识他人和分享想法是扩展你的知识和技能的绝佳方式。所以请随时联系我：
 

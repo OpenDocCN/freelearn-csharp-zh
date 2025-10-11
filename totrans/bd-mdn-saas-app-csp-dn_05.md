@@ -1,64 +1,64 @@
 # 5
 
-# 构建RESTful API
+# 构建 RESTful API
 
-在当今以在线为中心的数字景观中，**应用程序编程接口**（**APIs**）在**软件即服务**（**SaaS**）应用程序的开发中变得无处不在。它们允许不同的系统和应用程序相互通信并共享数据。在众多类型的API中，**表征状态转移**（**REST**）API已成为最广泛使用和接受的标准，这也是本章我们将关注的重点。
+在当今以在线为中心的数字景观中，**应用程序编程接口**（**APIs**）在**软件即服务**（**SaaS**）应用程序的开发中变得无处不在。它们允许不同的系统和应用程序相互通信并共享数据。在众多类型的 API 中，**表征状态转移**（**REST**）API 已成为最广泛使用和接受的标准，这也是本章我们将关注的重点。
 
-本章将向您介绍构建RESTful API的基础以及指导其设计的核心原则。您将了解RESTful API的关键组件，例如资源、表示和主要的HTTP动词（`GET`、`POST`、`PUT`、`PATCH`和`DELETE`）。
+本章将向您介绍构建 RESTful API 的基础以及指导其设计的核心原则。您将了解 RESTful API 的关键组件，例如资源、表示和主要的 HTTP 动词（`GET`、`POST`、`PUT`、`PATCH`和`DELETE`）。
 
-此外，您还将了解各种版本RESTful API的策略，例如URL版本控制、自定义头版本控制、媒体类型版本控制和弃用及停用。
+此外，您还将了解各种版本 RESTful API 的策略，例如 URL 版本控制、自定义头版本控制、媒体类型版本控制和弃用及停用。
 
 本章涵盖的主要主题如下：
 
-+   什么是RESTful API？
++   什么是 RESTful API？
 
-+   将API操作与HTTP动词匹配
++   将 API 操作与 HTTP 动词匹配
 
-+   使用REST设计得更好
++   使用 REST 设计得更好
 
-+   公共API版本控制
++   公共 API 版本控制
 
-+   测试API
++   测试 API
 
-到本章结束时，您将对构建RESTful API的关键原则和策略有扎实的理解，并且将准备好设计、开发和测试它们。
+到本章结束时，您将对构建 RESTful API 的关键原则和策略有扎实的理解，并且将准备好设计、开发和测试它们。
 
 # 技术要求
 
-本章中所有代码均可在[https://github.com/PacktPublishing/Building-Modern-SaaS-Applications-with-C-and-.NET/tree/main/Chapter-5](https://github.com/PacktPublishing/Building-Modern-SaaS-Applications-with-C-and-.NET/tree/main/Chapter-5)找到。
+本章中所有代码均可在[`github.com/PacktPublishing/Building-Modern-SaaS-Applications-with-C-and-.NET/tree/main/Chapter-5`](https://github.com/PacktPublishing/Building-Modern-SaaS-Applications-with-C-and-.NET/tree/main/Chapter-5)找到。
 
-# 什么是RESTful API？
+# 什么是 RESTful API？
 
-REST是由Roy Fielding在2000年于加州大学欧文分校的博士论文中提出的。在他的论文中，Fielding定义了构成RESTful系统基础的架构约束，并描述了如何使用REST来构建可扩展和灵活的Web服务。他在论文中概述的概念自那时起已被广泛采用，并作为构建许多现代Web API的基础。
+REST 是由 Roy Fielding 在 2000 年于加州大学欧文分校的博士论文中提出的。在他的论文中，Fielding 定义了构成 RESTful 系统基础的架构约束，并描述了如何使用 REST 来构建可扩展和灵活的 Web 服务。他在论文中概述的概念自那时起已被广泛采用，并作为构建许多现代 Web API 的基础。
 
-RESTful API是一种基于Web的接口，允许不同软件系统之间的通信。它们利用REST架构定义的标准约束和原则，在客户端和服务器之间交换数据。资源通过唯一的URL进行标识，对这些资源的行为由使用的HTTP方法定义。RESTful API通常用于构建可扩展和灵活的Web服务，可以以不同的格式返回数据，如JSON或XML。它们为不同的软件系统在互联网上交互和交换数据提供了一种简单灵活的方式。
+RESTful API 是一种基于 Web 的接口，允许不同软件系统之间的通信。它们利用 REST 架构定义的标准约束和原则，在客户端和服务器之间交换数据。资源通过唯一的 URL 进行标识，对这些资源的行为由使用的 HTTP 方法定义。RESTful API 通常用于构建可扩展和灵活的 Web 服务，可以以不同的格式返回数据，如 JSON 或 XML。它们为不同的软件系统在互联网上交互和交换数据提供了一种简单灵活的方式。
 
-让我们来分解一下REST这个缩写的含义！
+让我们来分解一下 REST 这个缩写的含义！
 
-**表示**指的是RESTful API中每个资源都由一个唯一的标识符（如URL）表示，并且可以用多种格式表示，例如JSON或XML。资源的表示是其当前状态的快照，客户端可以使用它来操作资源。
+**表示**指的是 RESTful API 中每个资源都由一个唯一的标识符（如 URL）表示，并且可以用多种格式表示，例如 JSON 或 XML。资源的表示是其当前状态的快照，客户端可以使用它来操作资源。
 
-你可以将资源视为一个对象，例如系统中用户描述。用户通常会有一个唯一的ID，用于引用该用户。在REST系统中，ID为123的用户*资源*可以通过以下URL表示：
+你可以将资源视为一个对象，例如系统中用户描述。用户通常会有一个唯一的 ID，用于引用该用户。在 REST 系统中，ID 为 123 的用户*资源*可以通过以下 URL 表示：
 
 `https://www.a-system.com/api/v1/users/123`
 
-用户可以通过使用此URL检索、修改或删除。该URL*代表*在消费**PAI**的任何外部系统上的用户。
+用户可以通过使用此 URL 检索、修改或删除。该 URL*代表*在消费**PAI**的任何外部系统上的用户。
 
 `GET`、`POST`、`PUT`和`DELETE`。
 
-如果你向前面的虚拟URL发出`GET`请求，你会收到该URL所表示对象的*状态*。
+如果你向前面的虚拟 URL 发出`GET`请求，你会收到该 URL 所表示对象的*状态*。
 
-**传输**指的是将资源的表示从服务器传输到客户端，反之亦然。传输通常通过HTTP协议执行，并基于无状态和统一资源标识的原则。在RESTful API中，状态的传输用于在服务器上创建、读取、更新和删除资源。
+**传输**指的是将资源的表示从服务器传输到客户端，反之亦然。传输通常通过 HTTP 协议执行，并基于无状态和统一资源标识的原则。在 RESTful API 中，状态的传输用于在服务器上创建、读取、更新和删除资源。
 
-RESTful API不一定要通过HTTP进行通信，尽管它们通常是这样。它们可以使用任何其他可能的通信协议，例如**远程过程调用**（**RPCs**）。然而，绝大多数RESTful API使用HTTP作为选择的通信机制，这是我们本章将考虑的全部内容。如果你有使用替代通信协议的用例，那么我希望本章中的信息在更广泛的意义上是有用的！
+RESTful API 不一定要通过 HTTP 进行通信，尽管它们通常是这样。它们可以使用任何其他可能的通信协议，例如**远程过程调用**（**RPCs**）。然而，绝大多数 RESTful API 使用 HTTP 作为选择的通信机制，这是我们本章将考虑的全部内容。如果你有使用替代通信协议的用例，那么我希望本章中的信息在更广泛的意义上是有用的！
 
-在我们深入探讨构建RESTful API的细节之前，有一些一般性的观点需要考虑，这将有助于我们理解随后将出现的某些更复杂的概念。
+在我们深入探讨构建 RESTful API 的细节之前，有一些一般性的观点需要考虑，这将有助于我们理解随后将出现的某些更复杂的概念。
 
 ## 幂等性
 
-在RESTful API的上下文中，幂等性是API端点的一个属性，它允许多个相同的请求产生与单个请求相同的效果。这意味着，无论相同的请求被发出多少次，最终结果都应该是相同的。
+在 RESTful API 的上下文中，幂等性是 API 端点的一个属性，它允许多个相同的请求产生与单个请求相同的效果。这意味着，无论相同的请求被发出多少次，最终结果都应该是相同的。
 
 幂等性请求无论执行多少次，都会从服务器产生相同的响应。这个属性在向同一端点发出多个请求时非常有用，尤其是在处理网络连接问题或其他类型的故障时，可以减少错误和冲突的可能性。
 
-考虑到幂等的HTTP方法最常见的是`GET`、`PUT`、`DELETE`和某些类型的`POST`请求。另一方面，非幂等的方法，如未指定幂等语义的`POST`，如果多次重复执行，可能会产生意外的副作用。
+考虑到幂等的 HTTP 方法最常见的是`GET`、`PUT`、`DELETE`和某些类型的`POST`请求。另一方面，非幂等的方法，如未指定幂等语义的`POST`，如果多次重复执行，可能会产生意外的副作用。
 
 这意味着你可以根据需要多次从 URL 获取资源，并且每次的响应都将相同。`GET` 请求是幂等的。
 
@@ -122,7 +122,7 @@ HTTP 状态码有很多，我只会简要地引用我认为对构建 RESTful API
 
 日志记录是指捕获和记录有关 API 行为和性能的信息，并将这些信息持久化存储在数据存储中，以便以后可以搜索以识别问题和排除故障。日志记录是任何 API 运营基础设施的重要组成部分，因为它记录了系统上发生的事情。
 
-本章将重点介绍 API 实现，但我们没有忘记日志记录和监控——我们将在[第 9 章](B19343_09.xhtml#_idTextAnchor219)中详细介绍这两者！
+本章将重点介绍 API 实现，但我们没有忘记日志记录和监控——我们将在第九章中详细介绍这两者！
 
 ## JSON 数据格式化
 
@@ -130,7 +130,18 @@ HTTP 状态码有很多，我只会简要地引用我认为对构建 RESTful API
 
 以下是一些以 JSON 格式表示的信息示例：
 
-[PRE0]
+```cs
+{
+    "name": "Roger Waters",
+    "age": 79,
+    "isBassist": true,
+    "numbers": [90, 80, 85, 95],
+    "address": {
+        "street": "123 Main St",
+        "city": "A Town",
+    }
+}
+```
 
 JSON 数据采用键值对的形式，其中每个键都是字符串，每个值可以是字符串、数字、布尔值、null、数组或另一个 JSON 对象。嵌套 JSON 对象的能力允许以这种方式表示复杂类型。
 
@@ -186,23 +197,57 @@ HTTP 动词描述了您可以通过 HTTP “执行”的事情！使用了五个
 
 DTOs 在 RESTful API 中特别有用，因为它们提供了一个在客户端和服务器之间发送和接收请求时表示数据的标准方式。在设计 RESTful API 时，使用 DTOs 允许 API 定义交换数据的结构，而无需将 API 的实现与数据的结构紧密耦合。这种解耦使得 API 更容易进化，并且可以在不影响 API 客户端的情况下对底层数据模型进行更改。此外，使用 DTOs 可以使 API 修改返回的数据以更好地满足客户端的需求，减少通过网络传输的数据量，并提高性能。此外，DTOs 还可以用来验证客户端和服务器之间传递的数据，确保只接受和处理有效数据。
 
-在本章中，我们将看到的第一个 DTO 集将非常类似于我们在 [*第 3 章*](B19343_03.xhtml#_idTextAnchor082) 和 [*第 4 章*](B19343_04.xhtml#_idTextAnchor102) 中为数据库定义的实体类型，并且它们将与我们可能希望对数据库执行的操作相关。例如，以下实体类型代表了数据库中的 `Habit`：
+在本章中，我们将看到的第一个 DTO 集将非常类似于我们在 *第三章* 和 *第四章* 中为数据库定义的实体类型，并且它们将与我们可能希望对数据库执行的操作相关。例如，以下实体类型代表了数据库中的 `Habit`：
 
-[PRE1]
+```cs
+[Index(nameof(Id), nameof(UserId))]
+public class GoodHabit : IHasTenant
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = default!;
+    public int UserId { get; set; }
+    public virtual User User { get; set; } = default!;
+    public virtual ICollection<Progress> ProgressUpdates {
+      get; set; } = default!;
+    public virtual ICollection<Reminder> Reminders { get;
+      set; } = default!;
+    public virtual Goal Goal { get; set; } = default!;
+    public Duration Duration { get; set; }
+    public string TenantName { get; set; } = default!;
+}
+```
 
 假设我们想要创建一个简单的 `Habit`，它只包含一个已填充的 `Name` 属性，并且与某个 `User` 相关联。我们可以发送以下 DTO：
 
-[PRE2]
+```cs
+    public class CreateHabitDto {
+        public string Name { get; set; }
+        public int UserId { get; set; }
+    }
+```
 
 这可以被后端用来在数据库中创建一个简单的 `GoodHabit` 对象。
 
 如果我们只想检索具有名称和 ID 属性的 `GoodHabit` 对象，我们可以使用一个看起来像这样的 DTO：
 
-[PRE3]
+```cs
+    public class GetGoodHabitDto {
+        public int Id { get; set; }
+        public string Name { get; set; }
+    }
+```
 
 如果我们需要比仅仅名称和 ID 更多的信息，我们可以进一步定义另一个看起来像这样的 DTO：
 
-[PRE4]
+```cs
+    public class GetGoodHabitDetailDto {
+        public int Id { get; set; }
+        public string Name { get; set; }
+        public string UserName { get; set; }
+        public string GoalName { get; set; }
+        public string Duration { get; set; }
+    }
+```
 
 您可以看到我们如何从一个具有大量数据库特定信息的实体类型开始，并且我们可以根据不同的用例选择性地以不同的方式建模这些数据。
 
@@ -236,41 +281,77 @@ DTOs 在 RESTful API 中特别有用，因为它们提供了一个在客户端�
 
 ## 一个示例 API 设计
 
-你可能会记得，在 [*第3章*](B19343_03.xhtml#_idTextAnchor082) 中，我们开始构建 `HabitService` API，并添加了一些端点。我们将从 [*第3章*](B19343_03.xhtml#_idTextAnchor082) 中我们停止的地方开始，但我们将向控制器添加更多功能！
+你可能会记得，在 *第三章* 中，我们开始构建 `HabitService` API，并添加了一些端点。我们将从 *第三章* 中我们停止的地方开始，但我们将向控制器添加更多功能！
 
 我们已经添加的三个端点是以下这些：
 
 一个 `GET` 端点，根据传入的 ID 获取单个习惯：
 
-[PRE5]
+```cs
+public async Task<IActionResult> GetAsync(int id) => Ok(await _habitService.GetById(id));
+```
 
 另一个 `GET` 端点，用于返回所有习惯：
 
-[PRE6]
+```cs
+public async Task<IActionResult> GetAsync() => Ok(await _habitService.GetAll());
+```
 
 最后，一个用于在数据库中创建新习惯的 `POST` 端点：
 
-[PRE7]
+```cs
+public async Task<IActionResult> CreateAsync(CreateHabitDto request) => Ok(await _habitService.Create(request.Name, request.Description));
+```
 
 在本节中，我们将为本章讨论的五个主要 HTTP 动词中的每一个添加一个端点。我们已经有 `GET` 和 `POST`，所以我们将添加 `PUT`、`PATCH` 和 `DELETE`。
 
 ### DTOs
 
-但是，在我们编写端点之前，我们首先会添加 DTOs。我们已经在 [*第3章*](B19343_03.xhtml#_idTextAnchor082) 中添加了 `CreateHabitDto`。从根目录运行以下脚本，或者手动添加文件：
+但是，在我们编写端点之前，我们首先会添加 DTOs。我们已经在 *第三章* 中添加了 `CreateHabitDto`。从根目录运行以下脚本，或者手动添加文件：
 
-[PRE8]
+```cs
+cd GoodHabits.HabitService/Dtos; \
+touch HabitDetailDto.cs; \
+touch HabitDto.cs; \
+touch UpdateHabitDto.cs; \
+cd ..;
+```
 
 将以下内容复制到 `HabitDetailDto` 类中：
 
-[PRE9]
+```cs
+namespace GoodHabits.HabitService.Dtos;
+public class HabitDetailDto {
+    public int Id { get; set; }
+    public string Name { get; set; } = default!;
+    public string UserName { get; set; } = default!;
+    public string GoalName { get; set; } = default!;
+    public string Duration { get; set; } = default!;
+}
+```
 
 然后将以下内容添加到 `HabitDto` 类中：
 
-[PRE10]
+```cs
+namespace GoodHabits.HabitService.Dtos;
+public class HabitDto
+{
+    public int Id { get; set; } = default!;
+    public string Name { get; set; } = default!;
+    public string Description { get; set; } = default!;
+}
+```
 
 最后，将以下内容添加到 `UpdateHabitDto` 类中：
 
-[PRE11]
+```cs
+namespace GoodHabits.HabitService.Dtos;
+public class UpdateHabitDto
+{
+    public string Name { get; set; } = default!;
+    public string Description { get; set; } = default!;
+}
+```
 
 对于 DTOs，这就足够了。当我们开始构建端点时，我们将使用这些。
 
@@ -296,11 +377,13 @@ AutoMapper 可以通过减少在不同类型之间转换所需的重复、样板
 
 要开始使用 AutoMapper，请在 API 项目中使用以下命令安装工具：
 
-[PRE12]
+```cs
+dotnet add package AutoMapper.Extensions.Microsoft.DependencyInjection
+```
 
 如前代码片段所示，更新了包后，我们可以开始为创建的数据库类型创建映射。
 
-您会记得我们在数据库项目中添加了一个名为“Habit”的实体类型，在 [*第 3 章*](B19343_03.xhtml#_idTextAnchor082) 中，我们还在 [*第 4 章*](B19343_04.xhtml#_idTextAnchor102) 中为该对象添加了多个附加属性。如果您运行 `HabitService` 并使用 Thunder Client 打击返回所有习惯的端点，您将看到返回的数据包括所有这些附加属性。
+您会记得我们在数据库项目中添加了一个名为“Habit”的实体类型，在 *第三章* 中，我们还在 *第四章* 中为该对象添加了多个附加属性。如果您运行 `HabitService` 并使用 Thunder Client 打击返回所有习惯的端点，您将看到返回的数据包括所有这些附加属性。
 
 这个习惯类代表了一个数据库实体。它非常具体于数据库，并且非常适合代表特定用例中良好习惯的概念。但是，它不适合将数据传输到 UI。
 
@@ -312,7 +395,15 @@ AutoMapper 可以通过减少在不同类型之间转换所需的重复、样板
 
 我们创建的 DTO 看起来是这样的：
 
-[PRE13]
+```cs
+namespace GoodHabits.HabitService.Dtos;
+public class HabitDto
+{
+    public int Id { get; set; } = default!;
+    public string Name { get; set; } = default!;
+    public string Description { get; set; } = default!;
+}
+```
 
 在这个例子中，我们直接从实体类型中获取习惯的 ID、名称和描述，但更复杂的转换也是可能的。
 
@@ -320,25 +411,51 @@ AutoMapper 可以通过减少在不同类型之间转换所需的重复、样板
 
 首先，进入 `Program.cs` 类并添加 `AutoMapper` 服务：
 
-[PRE14]
+```cs
+builder.Services.AddAutoMapper(AppDomain.CurrentDomain.GetAssemblies());
+```
 
 接下来，打开 `HabitsController` 类，并在 `using` 语句中添加以下内容：`using AutoMapper`。
 
 然后，在类定义中添加以下内容：
 
-[PRE15]
+```cs
+private readonly IMapper _mapper;
+```
 
 接下来，添加 `using` 语句：
 
-[PRE16]
+```cs
+using AutoMapper;
+```
 
 接下来，修改构造函数以接受映射器，如下所示：
 
-[PRE17]
+```cs
+    public HabitsController(
+        ILogger<HabitsController> logger,
+        IHabitService goodHabitsService,
+        IMapper mapper
+        )
+    {
+        _logger = logger;
+        _habitService = goodHabitsService;
+        _mapper = mapper;
+    }
+```
 
 最后，修改控制器中现有的两个 `GET` 端点以使用 `AutoMapper`，如下所示：
 
-[PRE18]
+```cs
+    [HttpGet("{id}")]
+    public async Task<IActionResult> GetAsync(int id) =>
+      Ok(_mapper.Map<HabitDto>(await
+      _habitService.GetById(id)));
+    [HttpGet]
+    public async Task<IActionResult> GetAsync() =>
+      Ok(_mapper.Map<ICollection<HabitDto>>(await
+      _habitService.GetAll()));
+```
 
 在之前，控制器只是简单地从数据库返回实体对象，现在该对象正在自动映射到一个 DTO，该 DTO 由控制器返回。但这确实需要一点配置。
 
@@ -346,11 +463,28 @@ AutoMapper 可以通过减少在不同类型之间转换所需的重复、样板
 
 在 `HabitService` 项目中添加一个名为 `Mappers` 的文件夹和一个名为 `HabitMapper.cs` 的类。您可以使用以下脚本：
 
-[PRE19]
+```cs
+mkdir Mappers; \
+cd Mappers; \
+touch HabitMapper.cs; \
+cd ..;
+```
 
 在这个类中，添加以下内容：
 
-[PRE20]
+```cs
+using AutoMapper;
+using GoodHabits.HabitService.Dtos;
+using GoodHabits.Database.Entities;
+namespace GoodHabits.HabitService.Mappers;
+public class HabitMapper : Profile
+{
+    public HabitMapper()
+    {
+        CreateMap<Habit, HabitDto>();
+    }
+}
+```
 
 `CreateMap` 方法指示 `AutoMapper` 在两种类型之间进行映射。
 
@@ -360,23 +494,55 @@ AutoMapper 可以通过减少在不同类型之间转换所需的重复、样板
 
 图 5.2 – 成功的响应
 
-本节展示了我们如何自动在数据库类型和数据传输类型之间进行转换。这是API拼图中的一个非常关键的组成部分，理解如何操作AutoMapper将帮助你编写更好的代码，并减少API和任何连接的客户端之间传输的数据量。
+本节展示了我们如何自动在数据库类型和数据传输类型之间进行转换。这是 API 拼图中的一个非常关键的组成部分，理解如何操作 AutoMapper 将帮助你编写更好的代码，并减少 API 和任何连接的客户端之间传输的数据量。
 
 ### 修改服务
 
-在我们可以在API上构建更新和删除习惯的额外端点之前，我们需要在服务类中添加一些功能。我们已经在[*第3章*](B19343_03.xhtml#_idTextAnchor082)中创建了服务类和接口，但我们将在这里扩展其功能。
+在我们可以在 API 上构建更新和删除习惯的额外端点之前，我们需要在服务类中添加一些功能。我们已经在*第三章*中创建了服务类和接口，但我们将在这里扩展其功能。
 
 将以下内容添加到接口中：
 
-[PRE21]
+```cs
+using GoodHabits.Database.Entities;
+using GoodHabits.HabitService.Dtos;
+namespace GoodHabits.HabitService;
+public interface IHabitService
+{
+Task<Habit> Create(string name, string description);
+Task<Habit> GetById(int id);
+Task<IReadOnlyList<Habit>> GetAll();
+Task DeleteById(int id);
+Task<Habit?> UpdateById(int id, UpdateHabitDto request);
+}
+```
 
 实现前面接口的`HabitService`类需要添加两个方法来删除和更新存储在数据库中的习惯。将以下两个方法添加到`HabitService`类中：
 
-[PRE22]
+```cs
+    public async Task DeleteById(int id)
+    {
+        var habit = await _dbContext.Habits!.FindAsync(id)
+          ?? throw new ArgumentException("User not found");
+        _dbContext.Habits.Remove(habit);
+        await _dbContext.SaveChangesAsync();
+    }
+    public async Task<Habit?> UpdateById(int id,
+      UpdateHabitDto request)
+    {
+        var habit = await _dbContext.Habits!.FindAsync(id);
+        if (habit == null) return null;
+        habit.Name = request.Name;
+        habit.Description = request.Description;
+        await _dbContext.SaveChangesAsync();
+        return habit;
+    }
+```
 
 你还需要在服务类中添加一个`using`语句：
 
-[PRE23]
+```cs
+using GoodHabits.HabitService.Dtos;
+```
 
 服务层中所需的所有内容都已添加。
 
@@ -384,49 +550,97 @@ AutoMapper 可以通过减少在不同类型之间转换所需的重复、样板
 
 ### 添加到控制器
 
-我们已经通过添加DTOs、配置AutoMapper和构建服务层完成了大部分繁重的工作。我们需要在控制器中添加三个额外的端点。让我们从`DELETE`端点开始：
+我们已经通过添加 DTOs、配置 AutoMapper 和构建服务层完成了大部分繁重的工作。我们需要在控制器中添加三个额外的端点。让我们从`DELETE`端点开始：
 
-[PRE24]
+```cs
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> DeleteAsync(int id)
+    {
+        await _habitService.DeleteById(id);
+        return NoContent();
+    }
+```
 
 这非常直接。它使用服务方法来删除数据库中的条目，然后返回`NoContent`——这是删除方法的最佳实践。
 
 接下来，添加使用`PUT`动词更新对象的端点：
 
-[PRE25]
+```cs
+    [HttpPut("{id}")]
+    public async Task<IActionResult> UpdateAsync(int id,
+      UpdateHabitDto request)
+    {
+        var habit = await _habitService.UpdateById(id,
+          request);
+        if (habit == null)
+        {
+            return NotFound();
+        }
+        return Ok(habit);
+    }
+```
 
 这里有一些错误处理，如果客户端尝试更新一个不存在的条目，它将返回`404`。
 
 最后，添加使用`PATCH`动词更新对象的端点：
 
-[PRE26]
+```cs
+    [HttpPatch("{id}")]
+    public async Task<IActionResult> UpdateAsync(int id,
+      [FromBody] JsonPatchDocument<UpdateHabitDto> patch)
+    {
+        var habit = await _goodHabitsService.GetById(id);
+        if (habit == null) return NotFound();
+        var updateHabitDto = new UpdateHabitDto { Name =
+          habit.Name, Description = habit.Description };
+        try
+        {
+            patch.ApplyTo(updateHabitDto, ModelState);
+            if (!TryValidateModel(updateHabitDto)) return
+              ValidationProblem(ModelState);
+            await _goodHabitsService.UpdateById(id,
+              updateHabitDto);
+            return NoContent();
+        }
+        catch (JsonPatchException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+```
 
 这部分内容稍微复杂一些，因为它使用了`JsonPatchDocument`来修改对象。你还需要添加两个`using`语句：
 
-[PRE27]
+```cs
+using Microsoft.AspNetCore.JsonPatch;
+using Microsoft.AspNetCore.JsonPatch.Exceptions;
+```
 
-到目前为止，我们只需要做这些。现在我们有一个很好的例子，展示了五种最常见的HTTP动词。在我们继续之前，我们应该测试这些是否都正常工作。我们将使用Thunder Client进行测试。
+到目前为止，我们只需要做这些。现在我们有一个很好的例子，展示了五种最常见的 HTTP 动词。在我们继续之前，我们应该测试这些是否都正常工作。我们将使用 Thunder Client 进行测试。
 
 ### 测试
 
 为了测试我们刚刚添加的端点，我们需要一个测试客户端。遵循使用**Visual Studio Code**（**VS Code**）的主题，我们将向代码中添加一个扩展，以便我们可以在一个地方完成所有操作。我们已经提到了这个工具几次，但我们将在本节中对其进行详细探讨。
 
-你将在扩展工具栏上看到Thunder Client图标：
+你将在扩展工具栏上看到 Thunder Client 图标：
 
-![图5.3 – Thunder Client图标](img/B19343_05_03.jpg)
+![图 5.3 – Thunder Client 图标](img/B19343_05_03.jpg)
 
-图5.3 – Thunder Client图标
+图 5.3 – Thunder Client 图标
 
-使用Thunder Client，你可以直接从VS Code中调用你的API并检查其是否按预期运行。我们现在就做这个。通过在VS Code的终端中启动API，导航到API项目，并输入以下内容来启动API：
+使用 Thunder Client，你可以直接从 VS Code 中调用你的 API 并检查其是否按预期运行。我们现在就做这个。通过在 VS Code 的终端中启动 API，导航到 API 项目，并输入以下内容来启动 API：
 
-[PRE28]
+```cs
+dotnet run
+```
 
-这将构建项目并启动API。现在我们可以开始添加测试了！
+这将构建项目并启动 API。现在我们可以开始添加测试了！
 
-#### 添加一个GET请求
+#### 添加一个 GET 请求
 
 现在，完成以下步骤：
 
-1.  点击Thunder Client图标（如果你在左侧菜单中看不到它，退出并重新启动* *Docker环境*）。
+1.  点击 Thunder Client 图标（如果你在左侧菜单中看不到它，退出并重新启动* *Docker 环境*）。
 
 1.  点击`GoodHabits`。
 
@@ -434,67 +648,75 @@ AutoMapper 可以通过减少在不同类型之间转换所需的重复、样板
 
 你的集合应该看起来像这样：
 
-![图5.4 – Thunder Client集合](img/B19343_05_04.jpg)
+![图 5.4 – Thunder Client 集合](img/B19343_05_04.jpg)
 
-图5.4 – Thunder Client集合
+图 5.4 – Thunder Client 集合
 
-1.  点击带有`CloudSphere`值的`tenant`键（你会记得从[*第3章*](B19343_03.xhtml#_idTextAnchor082)中，我们需要为多租户指定租户）。
+1.  点击带有`CloudSphere`值的`tenant`键（你会记得从*第三章*中，我们需要为多租户指定租户）。
 
 当你完成时，它应该看起来像这样：
 
-![图5.5 – 配置的请求](img/B19343_05_05.jpg)
+![图 5.5 – 配置的请求](img/B19343_05_05.jpg)
 
-图5.5 – 配置的请求
+图 5.5 – 配置的请求
 
 前面的截图显示了一个正确配置的`GET`请求，它应该返回数据库中的所有习惯。
 
 最后，点击`GET`请求并测试端点。你会看到以下内容：
 
-![图5.6 – 返回的习惯](img/B19343_05_06.jpg)
+![图 5.6 – 返回的习惯](img/B19343_05_06.jpg)
 
-图5.6 – 返回的习惯
+图 5.6 – 返回的习惯
 
-我们为了达到这个阶段投入了相当多的工作！我们正在展示数据库项目中`SeedData`文件的数据，这些数据是从我们的`HabitsService`返回的。我们很快将构建一个UI来展示这些信息。
+我们为了达到这个阶段投入了相当多的工作！我们正在展示数据库项目中`SeedData`文件的数据，这些数据是从我们的`HabitsService`返回的。我们很快将构建一个 UI 来展示这些信息。
 
-#### 添加一个POST请求
+#### 添加一个 POST 请求
 
-重复前面的步骤，构建一个`POST`用户请求。在这种情况下，我们需要在正文中以JSON格式指定习惯详情：
+重复前面的步骤，构建一个`POST`用户请求。在这种情况下，我们需要在正文中以 JSON 格式指定习惯详情：
 
-![图5.7 – 配置的POST请求](img/B19343_05_07.jpg)
+![图 5.7 – 配置的 POST 请求](img/B19343_05_07.jpg)
 
-图5.7 – 配置的POST请求
+图 5.7 – 配置的 POST 请求
 
-你可以看到指定的JSON与`CreateHabitDto`类匹配。
+你可以看到指定的 JSON 与`CreateHabitDto`类匹配。
 
 不要忘记在头部设置租户并将请求类型更改为`POST`！点击**发送**将确认习惯已被创建。
 
 到目前为止，我们已经测试了`get all`端点和`POST`端点。添加另一个`GET`来测试`get-by-id`端点也是一个有用的练习！
 
-#### 添加一个DELETE请求
+#### 添加一个 DELETE 请求
 
 我们可能想要从数据库中删除一个习惯，因此我们已经向服务和控制器中添加了所需的方法。我们可以以同样的方式再次测试：
 
-![图5.8 – 配置的DELETE请求](img/B19343_05_08.jpg)
+![图 5.8 – 配置的 DELETE 请求](img/B19343_05_08.jpg)
 
-图5.8 – 配置的DELETE请求
+图 5.8 – 配置的 DELETE 请求
 
 前面的截图显示在正文中不需要任何内容。但不要忘记添加租户头部！
 
-#### 添加一个PUT请求
+#### 添加一个 PUT 请求
 
 测试我们添加的`PUT`端点是相当直接的。配置一个像这样的`PUT`请求：
 
-![图5.9 – 配置的PUT请求](img/B19343_05_09.jpg)
+![图 5.9 – 配置的 PUT 请求](img/B19343_05_09.jpg)
 
-图5.9 – 配置的PUT请求
+图 5.9 – 配置的 PUT 请求
 
-前面的图示显示了如何配置一个`PUT`请求。这将更改`id=103`的习惯的名称和描述。如果你在过程中对数据进行过更改，可能需要更改URL中的ID。你可以通过再次点击`get-by-id`端点来检查是否已进行了更改。
+前面的图示显示了如何配置一个`PUT`请求。这将更改`id=103`的习惯的名称和描述。如果你在过程中对数据进行过更改，可能需要更改 URL 中的 ID。你可以通过再次点击`get-by-id`端点来检查是否已进行了更改。
 
-#### 添加一个PATCH请求
+#### 添加一个 PATCH 请求
 
 测试 `PATCH` 端点稍微有些棘手。您会记得，我们在控制器中构建的 `PATCH` 端点期望一个 `JsonPatchDocument` 对象，因此这就是我们必须提供的。一个 `Patch` 文档可能看起来像这样：
 
-[PRE29]
+```cs
+[
+    {
+        "op": "replace",
+        "path": "/Name",
+        "value": "A New Name"
+    }
+]
+```
 
 上述代码使用 `replace` 操作符来更改 `Name` 变量的值。我们可以这样设置请求：
 
@@ -522,7 +744,16 @@ AutoMapper 可以通过减少在不同类型之间转换所需的重复、样板
 
 我们将从修改 `GET` 方法开始，该方法接受一个 `id` 参数，如下所示：
 
-[PRE30]
+```cs
+    [HttpGet("{id}")]
+    public async Task<IActionResult> GetAsync(int id)
+    {
+        var habit = await _habitService.GetById(id);
+        if (habit == null) return NotFound();
+        return Ok(_mapper.Map<HabitDto>(await
+          _habitService.GetById(id)));
+    }
+```
 
 我们只是添加了一个检查，看看用户对象是否为 `null`，如果是，则返回 `NotFound()`，这将返回 `404` 状态码。
 
@@ -536,7 +767,18 @@ AutoMapper 可以通过减少在不同类型之间转换所需的重复、样板
 
 接下来，让我们修复创建新用户的 HTTP 状态码。将 `Create` 端点修改如下：
 
-[PRE31]
+```cs
+    [HttpPost]
+    public async Task<IActionResult>
+      CreateAsync(CreateHabitDto request)
+    {
+        var habit = await _habitService
+          .Create(request.Name, request.Description);
+        var habitDto = _mapper.Map<HabitDto>(habit);
+       return CreatedAtAction("Get", "Habits", new { id =
+         habitDto.Id }, habitDto);
+    }
+```
 
 我们已经将返回值从 `Ok()` 更改为 `CreatedAtAction(…)`。这将返回 `201 – Created` 以及新创建的资源位置给用户。
 
@@ -552,7 +794,7 @@ AutoMapper 可以通过减少在不同类型之间转换所需的重复、样板
 
 如果你查看`PATCH`端点，你会看到它执行以下操作：
 
-+   它会检查提供的ID是否有效，如果不是，则返回`404 –` `Not Found`。
++   它会检查提供的 ID 是否有效，如果不是，则返回`404 –` `Not Found`。
 
 +   它会检查更新的模型是否有效，如果不是，则返回一个验证问题（`400` `Bad Request`的一个子集）。
 
@@ -560,67 +802,89 @@ AutoMapper 可以通过减少在不同类型之间转换所需的重复、样板
 
 +   如果没有问题，它返回`204` `No Content`。
 
-使用`No Content` HTTP状态码（`204`）来表示服务器已成功处理请求，并且没有响应体需要返回。在`PATCH`请求的情况下，`No Content`状态码用于表示服务器已成功处理对资源的更新，但在响应中未返回任何内容。其理念是客户端已经知道更新后的资源看起来是什么样子，因此没有必要在响应中返回更新后的资源信息。客户端可以简单地假设更新已成功，并且资源已按请求更新。
+使用`No Content` HTTP 状态码（`204`）来表示服务器已成功处理请求，并且没有响应体需要返回。在`PATCH`请求的情况下，`No Content`状态码用于表示服务器已成功处理对资源的更新，但在响应中未返回任何内容。其理念是客户端已经知道更新后的资源看起来是什么样子，因此没有必要在响应中返回更新后的资源信息。客户端可以简单地假设更新已成功，并且资源已按请求更新。
 
-# 公共API的版本控制
+# 公共 API 的版本控制
 
-版本控制公共RESTful API是创建和维护多个API版本的过程，以适应更改和新功能。这确保了现有客户端不会受到对API所做的更改的影响，并且新客户端可以利用新功能。
+版本控制公共 RESTful API 是创建和维护多个 API 版本的过程，以适应更改和新功能。这确保了现有客户端不会受到对 API 所做的更改的影响，并且新客户端可以利用新功能。
 
-版本控制是API开发和维护的关键方面，因为它使得API随着时间的推移而演变，同时保持与现有客户端的兼容性。这在API被多个客户端使用的情况下尤为重要，因为破坏性更改会影响这些客户端的功能。通过版本控制，可以同时存在多个API版本，客户端可以选择升级到最新版本或继续使用满足其需求的早期版本。这样，版本控制为API随着时间的推移而演变和改进提供了必要的灵活性，而不会破坏现有集成的稳定性。
+版本控制是 API 开发和维护的关键方面，因为它使得 API 随着时间的推移而演变，同时保持与现有客户端的兼容性。这在 API 被多个客户端使用的情况下尤为重要，因为破坏性更改会影响这些客户端的功能。通过版本控制，可以同时存在多个 API 版本，客户端可以选择升级到最新版本或继续使用满足其需求的早期版本。这样，版本控制为 API 随着时间的推移而演变和改进提供了必要的灵活性，而不会破坏现有集成的稳定性。
 
-有几种策略可以用于版本控制RESTful API，每种策略都有其自身的优缺点：
+有几种策略可以用于版本控制 RESTful API，每种策略都有其自身的优缺点：
 
 +   `/v1/users`或`/v2/users`。这种方法易于实现和理解，但随着版本数量的增加，可能难以维护和扩展。
 
-+   `X-API-Version`。这种方法允许更大的灵活性，因为URI不需要改变，但它可能更复杂来实现，并且可能不被所有客户端支持。
++   `X-API-Version`。这种方法允许更大的灵活性，因为 URI 不需要改变，但它可能更复杂来实现，并且可能不被所有客户端支持。
 
-+   `application/vnd.example.v1+json` 或 `application/vnd.example.v2+json`。这种方法提供了更大的灵活性，因为URI和头信息不需要更改，但实现起来可能更复杂，并且可能不被所有客户端支持。
++   `application/vnd.example.v1+json` 或 `application/vnd.example.v2+json`。这种方法提供了更大的灵活性，因为 URI 和头信息不需要更改，但实现起来可能更复杂，并且可能不被所有客户端支持。
 
-+   **弃用和停用**：这种策略涉及将API的旧版本标记为弃用，并最终将其停用。这种方法允许逐步过渡，并为客户端提供时间在旧版本被移除之前更新他们的代码。
++   **弃用和停用**：这种策略涉及将 API 的旧版本标记为弃用，并最终将其停用。这种方法允许逐步过渡，并为客户端提供时间在旧版本被移除之前更新他们的代码。
 
-值得注意的是，最合适的版本控制策略将取决于API及其客户端的具体需求。向API的客户端传达版本控制策略和旧版本弃用的时间表，以最小化中断并允许他们相应地规划，这是非常重要的。
+值得注意的是，最合适的版本控制策略将取决于 API 及其客户端的具体需求。向 API 的客户端传达版本控制策略和旧版本弃用的时间表，以最小化中断并允许他们相应地规划，这是非常重要的。
 
-为API进行版本控制最常见的方式是将版本号包含在API端点的URL中。例如，API端点的URL可能看起来像这样：
+为 API 进行版本控制最常见的方式是将版本号包含在 API 端点的 URL 中。例如，API 端点的 URL 可能看起来像这样：
 
-[PRE32]
+```cs
+https://api.example.com/v1/resources
+```
 
-这种方法允许不同版本的API共存，并且通过简单地更改URL中的版本号，就可以轻松地管理API随时间的变化。这也允许客户端选择他们希望在应用程序中使用的API版本，并有助于防止API的破坏性更改影响现有的客户端应用程序。
+这种方法允许不同版本的 API 共存，并且通过简单地更改 URL 中的版本号，就可以轻松地管理 API 随时间的变化。这也允许客户端选择他们希望在应用程序中使用的 API 版本，并有助于防止 API 的破坏性更改影响现有的客户端应用程序。
 
 如果创建了前面示例的第二版本，它可以在以下链接中找到：
 
-[PRE33]
+```cs
+https://api.example.com/v2/resources
+```
 
 这个好处是，两个版本可以同时存在，并且那些仍然期望`v1`版本的客户端用户可以无缝地继续工作。当然，支持多个版本可能很困难，理想情况下，这应该是一个过渡状态，目的是在某个时候弃用`v1`版本。
 
-## 示例代码展示如何对API进行版本控制
+## 示例代码展示如何对 API 进行版本控制
 
-在本章的前面部分，我们构建了一个控制器来管理用户，并向其添加了多个端点。尽管如此，我们还没有为API添加任何版本控制；请注意，我们使用Thunder Client测试的URL没有与它们关联的版本，如下所示：
+在本章的前面部分，我们构建了一个控制器来管理用户，并向其添加了多个端点。尽管如此，我们还没有为 API 添加任何版本控制；请注意，我们使用 Thunder Client 测试的 URL 没有与它们关联的版本，如下所示：
 
-[PRE34]
+```cs
+http://localhost:5100/api/habits
+```
 
 让我们改变一下！
 
 首先打开控制台，并将版本控制包添加到`HabitService`项目中：
 
-[PRE35]
+```cs
+dotnet add package Microsoft.AspNetCore.Mvc.Versioning
+```
 
 将`using`语句添加到`Program.cs`文件中：
 
-[PRE36]
+```cs
+using Microsoft.AspNetCore.Mvc.Versioning;
+```
 
 接下来，将以下内容复制到`Program.cs`文件中：
 
-[PRE37]
+```cs
+builder.Services.AddApiVersioning(opt =>
+    {
+        opt.DefaultApiVersion = new
+          Microsoft.AspNetCore.Mvc.ApiVersion(1,0);
+        opt.AssumeDefaultVersionWhenUnspecified = true;
+        opt.ReportApiVersions = true;
+        opt.ApiVersionReader = ApiVersionReader.Combine(new
+          UrlSegmentApiVersionReader(),
+          new HeaderApiVersionReader("x-api-version"),
+          new MediaTypeApiVersionReader("x-api-version"));
+    });
+```
 
 让我们详细回顾一下前面的代码：
 
-+   第一个标志设置默认的API版本。这允许客户端在无需指定版本的情况下与API一起工作。
++   第一个标志设置默认的 API 版本。这允许客户端在无需指定版本的情况下与 API 一起工作。
 
 +   第二个标志指示应用程序在没有指定任何内容时使用默认版本。这是一个防御性编程的例子——你的用户会感谢你的！
 
 +   第三个标志是返回选项——这会在响应头中返回可用的版本，以便调用客户端可以看到该方法有可用的选项。
 
-+   最后，`ApiVersionReader`使客户端能够选择是否将版本放在URL中或请求头中。再次强调，给API的消费者选择是很好的。
++   最后，`ApiVersionReader`使客户端能够选择是否将版本放在 URL 中或请求头中。再次强调，给 API 的消费者选择是很好的。
 
 现在，我们需要更新`HabitsController`以支持多个版本。
 
@@ -628,23 +892,51 @@ AutoMapper 可以通过减少在不同类型之间转换所需的重复、样板
 
 将`HabitsController`类的属性更改为以下内容：
 
-[PRE38]
+```cs
+[ApiController]
+[Route("api/[controller]")]
+[Route("api/v{version:apiVersion}/[controller]")]
+[ApiVersion("1.0")]
+```
 
 让我们通过向控制器添加一个端点并将其映射到`version 1.0`来证明我们所做的工作，如下所示：
 
-[PRE39]
+```cs
+    [MapToApiVersion("1.0")]
+    [HttpGet("version")]
+    public virtual async Task<IActionResult> GetVersion()
+    {
+        return Ok("Response from version 1.0");
+    }
+```
 
 我们已将此方法标记为虚拟，以便我们可以在后续版本中覆盖它。
 
 创建一个名为`HabitsControllerv2.cs`的文件，并将其添加以下内容：
 
-[PRE40]
+```cs
+using Microsoft.AspNetCore.Mvc;
+namespace GoodHabits.HabitService.Controllers.v2;
+[ApiController]
+[Route("api/[controller]")]
+[Route("api/v{version:apiVersion}/[controller]")]
+[ApiVersion("2.0")]
+public class HabitsController : ControllerBase
+{
+    [MapToApiVersion("2.0")]
+    [HttpGet("version")]
+    public virtual IActionResult GetVersion()
+    {
+        return Ok("Response from version 2.0");
+    }
+}
+```
 
-注意，这将`version`端点映射到`v2` API。您可以在Thunder Client中按常规方式测试它，您将看到更改URL中提供的版本将更改您收到的响应。
+注意，这将`version`端点映射到`v2` API。您可以在 Thunder Client 中按常规方式测试它，您将看到更改 URL 中提供的版本将更改您收到的响应。
 
 此外，请注意，我们已两次指定`Route`属性——一次包含版本，一次不包含。这允许在`Program.cs`中指定的默认版本生效。
 
-在Thunder Client中运行三个测试——一个没有版本，一个有`v1`，一个有`v2`：
+在 Thunder Client 中运行三个测试——一个没有版本，一个有`v1`，一个有`v2`：
 
 +   没有版本：http://localhost:5100/api/Habits/version
 
@@ -654,53 +946,53 @@ AutoMapper 可以通过减少在不同类型之间转换所需的重复、样板
 
 您将看到第一个返回`v1`，因为这是默认版本，您将看到其他两个按预期执行。
 
-您还应该注意，我们在Thunder Client中之前设置的所有请求继续按预期运行。从API消费者的角度来看，这是非常好的。我们刚刚引入了版本控制并添加了`v2`，而没有破坏任何现有功能！
+您还应该注意，我们在 Thunder Client 中之前设置的所有请求继续按预期运行。从 API 消费者的角度来看，这是非常好的。我们刚刚引入了版本控制并添加了`v2`，而没有破坏任何现有功能！
 
-# 测试API
+# 测试 API
 
-在本章中，我们广泛地展示了如何使用Thunder Client测试您的API。测试API（以及一般测试）是一个巨大的主题，可以成为一本单独的书的主题。如果您感兴趣，我在以下部分提供了一些进一步阅读的指南！
+在本章中，我们广泛地展示了如何使用 Thunder Client 测试您的 API。测试 API（以及一般测试）是一个巨大的主题，可以成为一本单独的书的主题。如果您感兴趣，我在以下部分提供了一些进一步阅读的指南！
 
-以下列表提供了一些测试类型示例，以确保您的API正常运行。单元测试涉及测试API的各个组件以确保它们按预期工作。这通常使用单元测试框架，如NUnit，并且可以自动化：
+以下列表提供了一些测试类型示例，以确保您的 API 正常运行。单元测试涉及测试 API 的各个组件以确保它们按预期工作。这通常使用单元测试框架，如 NUnit，并且可以自动化：
 
-+   功能测试涉及端到端测试API以确保所有组件都正确协同工作。这可以手动完成或使用自动化测试工具，如Selenium或TestComplete。
++   功能测试涉及端到端测试 API 以确保所有组件都正确协同工作。这可以手动完成或使用自动化测试工具，如 Selenium 或 TestComplete。
 
-+   集成测试涉及在与其他系统（如数据库或其他API）结合的情况下测试API。这可以通过使用集成测试框架，如Cucumber或FitNesse来完成。
++   集成测试涉及在与其他系统（如数据库或其他 API）结合的情况下测试 API。这可以通过使用集成测试框架，如 Cucumber 或 FitNesse 来完成。
 
-+   性能测试包括测试一个API以确保其能够处理预期的负载并表现最佳。
++   性能测试包括测试一个 API 以确保其能够处理预期的负载并表现最佳。
 
-+   安全测试包括测试一个API以确保其安全且不受常见安全威胁的影响，例如SQL注入或跨站脚本攻击。这可以通过使用安全测试工具，如Nessus或OWASP ZAP来实现。
++   安全测试包括测试一个 API 以确保其安全且不受常见安全威胁的影响，例如 SQL 注入或跨站脚本攻击。这可以通过使用安全测试工具，如 Nessus 或 OWASP ZAP 来实现。
 
-+   可用性测试包括测试一个API以确保其易于使用和理解。这可以手动进行或使用可用性测试工具，如UserTesting或Crazy Egg。
++   可用性测试包括测试一个 API 以确保其易于使用和理解。这可以手动进行或使用可用性测试工具，如 UserTesting 或 Crazy Egg。
 
-+   Postman是测试RESTful API的流行工具。它允许开发者轻松创建、发送和分析HTTP请求。它具有用户友好的界面，支持各种功能，如请求和响应验证、环境变量和自动化测试。它还允许我们测试端到端场景，并且可以与其他工具如Jenkins集成。
++   Postman 是测试 RESTful API 的流行工具。它允许开发者轻松创建、发送和分析 HTTP 请求。它具有用户友好的界面，支持各种功能，如请求和响应验证、环境变量和自动化测试。它还允许我们测试端到端场景，并且可以与其他工具如 Jenkins 集成。
 
-值得注意的是，测试RESTful API是一个持续的过程，应该在开发过程中始终进行，而不仅仅是最后。这将有助于确保API按预期工作，并且任何问题都能迅速识别和解决。
+值得注意的是，测试 RESTful API 是一个持续的过程，应该在开发过程中始终进行，而不仅仅是最后。这将有助于确保 API 按预期工作，并且任何问题都能迅速识别和解决。
 
-在本章中，我们展示了如何在VS Code中使用Thunder Client测试API。这是一个非常有用的工具，其优点是定义的测试被保存在仓库中，并与代码进行比对。
+在本章中，我们展示了如何在 VS Code 中使用 Thunder Client 测试 API。这是一个非常有用的工具，其优点是定义的测试被保存在仓库中，并与代码进行比对。
 
 # 摘要
 
-本章我们涵盖了很多内容！希望它没有让你感到不知所措！我们从REST的定义开始，然后介绍了HTTP状态码和HTTP动词，以提供一些关于REST API底层基础知识的背景。
+本章我们涵盖了很多内容！希望它没有让你感到不知所措！我们从 REST 的定义开始，然后介绍了 HTTP 状态码和 HTTP 动词，以提供一些关于 REST API 底层基础知识的背景。
 
-然后，我们查看了一个示例，介绍了五个最重要的HTTP动词（`GET`、`POST`、`DELETE`、`PUT`和`PATCH`），并展示了我们如何在VS Code中直接使用Thunder Client构建和测试它们！
+然后，我们查看了一个示例，介绍了五个最重要的 HTTP 动词（`GET`、`POST`、`DELETE`、`PUT`和`PATCH`），并展示了我们如何在 VS Code 中直接使用 Thunder Client 构建和测试它们！
 
-我们还研究了`AutoMapper`以及如何简化对象转换以从实体类型创建DTO。
+我们还研究了`AutoMapper`以及如何简化对象转换以从实体类型创建 DTO。
 
-最后，我们通过一个示例演示了如何对API进行版本控制，并探讨了额外的测试技术。
+最后，我们通过一个示例演示了如何对 API 进行版本控制，并探讨了额外的测试技术。
 
 在下一章中，我们将考虑微服务，并探讨如何将此应用程序拆分为多个较小的微服务！
 
 # 进一步阅读
 
-+   HTTP响应状态码：[https://developer.mozilla.org/en-US/docs/Web/HTTP/Status](https://developer.mozilla.org/en-US/docs/Web/HTTP/Status)
++   HTTP 响应状态码：[`developer.mozilla.org/en-US/docs/Web/HTTP/Status`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Status)
 
-+   使用HTTP方法进行RESTful服务：[https://www.restapitutorial.com/lessons/httpmethods.html](https://www.restapitutorial.com/lessons/httpmethods.html)
++   使用 HTTP 方法进行 RESTful 服务：[`www.restapitutorial.com/lessons/httpmethods.html`](https://www.restapitutorial.com/lessons/httpmethods.html)
 
-+   HATEOAS及其在RESTful API中的必要性 [https://www.geeksforgeeks.org/hateoas-and-why-its-needed-in-restful-api/](https://www.geeksforgeeks.org/hateoas-and-why-its-needed-in-restful-api/)
++   HATEOAS 及其在 RESTful API 中的必要性 [`www.geeksforgeeks.org/hateoas-and-why-its-needed-in-restful-api/`](https://www.geeksforgeeks.org/hateoas-and-why-its-needed-in-restful-api/)
 
-+   测试一个API：[https://learning.postman.com/docs/designing-and-developing-your-api/testing-an-api/](https://learning.postman.com/docs/designing-and-developing-your-api/testing-an-api/)
++   测试一个 API：[`learning.postman.com/docs/designing-and-developing-your-api/testing-an-api/`](https://learning.postman.com/docs/designing-and-developing-your-api/testing-an-api/)
 
-+   如何在 ASP.NET Core Web API 中使用 API 版本控制并将其与 .NET 6 集成：[https://blog.christian-schou.dk/how-to-use-api-versioning-in-net-core-web-api/](https://blog.christian-schou.dk/how-to-use-api-versioning-in-net-core-web-api/)
++   如何在 ASP.NET Core Web API 中使用 API 版本控制并将其与 .NET 6 集成：[`blog.christian-schou.dk/how-to-use-api-versioning-in-net-core-web-api/`](https://blog.christian-schou.dk/how-to-use-api-versioning-in-net-core-web-api/)
 
 # 问题
 

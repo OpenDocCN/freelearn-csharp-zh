@@ -1,4 +1,4 @@
-# *第 16 章*：实现多租户
+# *第十六章*：实现多租户
 
 多租户是创建 **软件即服务**（**SaaS**）解决方案的常见模式，其中单个部署可以同时为多个客户提供服务。多租户是 ABP 框架的基本设计原则之一，因此所有其他框架功能都是多租户兼容的。
 
@@ -18,7 +18,7 @@
 
 如果您想跟随本章中的示例，您需要一个支持 ASP.NET Core 开发的 IDE/编辑器。
 
-您可以从以下 GitHub 仓库下载示例应用程序：[https://github.com/PacktPublishing/Mastering-ABP-Framework](https://github.com/PacktPublishing/Mastering-ABP-Framework)。它包含本章中给出的一些示例。
+您可以从以下 GitHub 仓库下载示例应用程序：[`github.com/PacktPublishing/Mastering-ABP-Framework`](https://github.com/PacktPublishing/Mastering-ABP-Framework)。它包含本章中给出的一些示例。
 
 # 理解多租户
 
@@ -82,25 +82,35 @@ ABP 通过允许每个租户拥有单独的数据库连接字符串，在框架�
 
 图 16.1 – ABP 框架多租户概述
 
-ABP框架的目标是尽可能自动化与多租户相关的逻辑，并使您的应用程序代码不感知多租户。ABP从HTTP请求中解析当前租户。它可以从域名（或子域名）、cookie、HTTP头和其他参数中确定租户。然后，它使用当前租户信息自动选择正确的连接，如果租户有单独的连接字符串。如果租户使用共享数据库，它将自动过滤数据，以确保租户不会意外访问另一个租户的数据。
+ABP 框架的目标是尽可能自动化与多租户相关的逻辑，并使您的应用程序代码不感知多租户。ABP 从 HTTP 请求中解析当前租户。它可以从域名（或子域名）、cookie、HTTP 头和其他参数中确定租户。然后，它使用当前租户信息自动选择正确的连接，如果租户有单独的连接字符串。如果租户使用共享数据库，它将自动过滤数据，以确保租户不会意外访问另一个租户的数据。
 
-现在我们可以开始使用ABP多租户基础设施了，因为我们已经了解了多租户和ABP的基本多租户逻辑。
+现在我们可以开始使用 ABP 多租户基础设施了，因为我们已经了解了多租户和 ABP 的基本多租户逻辑。
 
-# 与ABP多租户基础设施一起工作
+# 与 ABP 多租户基础设施一起工作
 
-在本节中，我们将探讨ABP多租户系统的基本基础设施和功能。您将了解ABP如何理解当前租户并隔离租户数据，如何获取有关当前租户的信息，以及如何在租户之间切换。但首先，我们将从如何在不使用它的情况下禁用多租户开始。
+在本节中，我们将探讨 ABP 多租户系统的基本基础设施和功能。您将了解 ABP 如何理解当前租户并隔离租户数据，如何获取有关当前租户的信息，以及如何在租户之间切换。但首先，我们将从如何在不使用它的情况下禁用多租户开始。
 
 ## 启用和禁用多租户
 
-ABP启动解决方案模板默认启用多租户。启动解决方案有一个单点，您可以使用它轻松地启用或禁用多租户。在`.Domain.Shared`项目中找到`MultiTenancyConsts`类：
+ABP 启动解决方案模板默认启用多租户。启动解决方案有一个单点，您可以使用它轻松地启用或禁用多租户。在`.Domain.Shared`项目中找到`MultiTenancyConsts`类：
 
-[PRE0]
+```cs
+public static class MultiTenancyConsts
+{
+    public const bool IsEnabled = true;
+}
+```
 
 您可以将`IsEnabled`值设置为`false`来禁用多租户功能。此常量在解决方案的几个地方被使用。它用于在`.Domain`项目模块类中设置`AbpMultiTenancyOptions.IsEnabled`选项：
 
-[PRE1]
+```cs
+Configure<AbpMultiTenancyOptions>(options =>
+{
+    options.IsEnabled = MultiTenancyConsts.IsEnabled;
+});
+```
 
-ABP使用`AbpMultiTenancyOptions.IsEnabled`来启用或禁用与多租户相关的功能、页面和组件。如果您将`MultiTenancyConsts.IsEnabled`设置为`false`并运行应用程序，您将不再在登录表单上看到租户切换框和在主菜单上的租户管理页面。然而，与多租户相关的数据库表不会被删除。下一节将解释如何进行删除。
+ABP 使用`AbpMultiTenancyOptions.IsEnabled`来启用或禁用与多租户相关的功能、页面和组件。如果您将`MultiTenancyConsts.IsEnabled`设置为`false`并运行应用程序，您将不再在登录表单上看到租户切换框和在主菜单上的租户管理页面。然而，与多租户相关的数据库表不会被删除。下一节将解释如何进行删除。
 
 ### 删除多租户表
 
@@ -108,67 +118,106 @@ ABP使用`AbpMultiTenancyOptions.IsEnabled`来启用或禁用与多租户相关�
 
 如果您不想在数据库中保留与多租户相关的表，请在`.EntityFramework`项目的`DbContext`类中找到以下行并将其删除：
 
-[PRE2]
+```cs
+builder.ConfigureTenantManagement();
+```
 
 然后，从您的`DbContext`类中删除`ITenantManagementDbContext`接口的实现。您需要从类中删除`Tenants`和`TenantConnectionStrings` `DbSet`属性。最后，从`DbContext`类声明中删除`[ReplaceDbContext(typeof(ITenantManagementDbContext))]`属性。这些更改将租户管理模块的表从您的数据库模式中删除。
 
 您可以在`.EntityFramework`项目的根目录中运行以下命令来添加一个新的数据库迁移，以从数据库中删除表：
 
-[PRE3]
+```cs
+dotnet ef migrations add Removed_TenantManagement
+```
 
 然后，运行以下命令以将更改应用到数据库：
 
-[PRE4]
+```cs
+dotnet ef database update
+```
 
-这样，您的数据库将不会包含与多租户相关的表。您还可以从解决方案中的项目以及使用这些包的代码部分中删除`Volo.Abp.TenantManagement.*` NuGet包。然而，这些都是可选的。我建议您保留它们，如果您认为您可能以后会为您的应用程序启用多租户，因为只要将`AbpMultiTenancyOptions.IsEnabled`选项设置为`false`，它们就没有任何功能。
+这样，您的数据库将不会包含与多租户相关的表。您还可以从解决方案中的项目以及使用这些包的代码部分中删除`Volo.Abp.TenantManagement.*` NuGet 包。然而，这些都是可选的。我建议您保留它们，如果您认为您可能以后会为您的应用程序启用多租户，因为只要将`AbpMultiTenancyOptions.IsEnabled`选项设置为`false`，它们就没有任何功能。
 
-正如您所看到的，使用ABP框架启用/禁用多租户只需一行更改。如果您决定将应用程序作为多租户启用来开发，您可以继续下一节，了解ABP如何从HTTP请求中确定当前租户。
+正如您所看到的，使用 ABP 框架启用/禁用多租户只需一行更改。如果您决定将应用程序作为多租户启用来开发，您可以继续下一节，了解 ABP 如何从 HTTP 请求中确定当前租户。
 
 ## 确定当前租户
 
-如果您再次查看*图16.1*，您将看到所有来自用户的请求在执行应用程序代码之前都通过了租户解析组件。这样，当前租户就可在您的应用程序中知道了。
+如果您再次查看*图 16.1*，您将看到所有来自用户的请求在执行应用程序代码之前都通过了租户解析组件。这样，当前租户就可在您的应用程序中知道了。
 
-使用ABP的多租户中间件组件拦截传入的请求。启动解决方案模板中的所有托管项目在ABP模块类的`OnApplicationInitialization`方法中都包含以下行：
+使用 ABP 的多租户中间件组件拦截传入的请求。启动解决方案模板中的所有托管项目在 ABP 模块类的`OnApplicationInitialization`方法中都包含以下行：
 
-[PRE5]
+```cs
+if (MultiTenancyConsts.IsEnabled)
+{
+    app.UseMultiTenancy();
+}
+```
 
-此中间件是在身份验证中间件之后（因为用户身份验证票据用于租户解析）和授权中间件之前（因为ABP根据用户的租户授权用户）添加的。
+此中间件是在身份验证中间件之后（因为用户身份验证票据用于租户解析）和授权中间件之前（因为 ABP 根据用户的租户授权用户）添加的。
 
-多租户中间件从HTTP请求中解析当前租户，并设置用于获取当前租户信息的`ICurrentTenant`属性。`ICurrentTenant`接口将在下一节中解释，但我们应该首先了解ABP如何从HTTP请求中确定当前租户。
+多租户中间件从 HTTP 请求中解析当前租户，并设置用于获取当前租户信息的`ICurrentTenant`属性。`ICurrentTenant`接口将在下一节中解释，但我们应该首先了解 ABP 如何从 HTTP 请求中确定当前租户。
 
-当前租户信息是通过以下顺序使用当前HTTP请求中的请求参数获得的：
+当前租户信息是通过以下顺序使用当前 HTTP 请求中的请求参数获得的：
 
-1.  如果用户（或客户端）已通过身份验证，则当前租户的ID和名称将从身份验证票据中的声明中提取（根据身份验证方法，可能在cookie中或在header中）。
+1.  如果用户（或客户端）已通过身份验证，则当前租户的 ID 和名称将从身份验证票据中的声明中提取（根据身份验证方法，可能在 cookie 中或在 header 中）。
 
 1.  如果已配置`AbpTenantResolveOptions`，则从域名（或子域名）中确定租户的名称。
 
-1.  如果当前HTTP请求包含该参数，则使用`__tenant`查询字符串参数来获取租户的名称或ID。
+1.  如果当前 HTTP 请求包含该参数，则使用`__tenant`查询字符串参数来获取租户的名称或 ID。
 
-1.  如果当前HTTP请求包含该参数，则使用`__tenant`路由参数来获取租户的名称或ID。
+1.  如果当前 HTTP 请求包含该参数，则使用`__tenant`路由参数来获取租户的名称或 ID。
 
-1.  如果当前HTTP请求包含该参数，则使用`__tenant` HTTP头获取租户的名称或ID。
+1.  如果当前 HTTP 请求包含该参数，则使用`__tenant` HTTP 头获取租户的名称或 ID。
 
-1.  如果当前HTTP请求包含该参数，则使用`__tenant` cookie的值获取租户的名称或ID。
+1.  如果当前 HTTP 请求包含该参数，则使用`__tenant` cookie 的值获取租户的名称或 ID。
 
-如果ABP在之前的任何步骤中确定了租户，它不会像您预期的那样继续到其他步骤。如果HTTP请求中没有找到任何信息，那么就假设当前用户是主机用户。所有选项在您创建新解决方案时都已经预先配置并正常工作，所以您通常不需要为您的解决方案进行很多配置。您应该只关注域名解析，这在生产环境中是建议的。
+如果 ABP 在之前的任何步骤中确定了租户，它不会像您预期的那样继续到其他步骤。如果 HTTP 请求中没有找到任何信息，那么就假设当前用户是主机用户。所有选项在您创建新解决方案时都已经预先配置并正常工作，所以您通常不需要为您的解决方案进行很多配置。您应该只关注域名解析，这在生产环境中是建议的。
 
 以下示例展示了如何在模块类的`ConfigureServices`方法中配置域名解析器：
 
-[PRE6]
+```cs
+Configure<AbpTenantResolveOptions>(options =>
+{
+    options.AddDomainTenantResolver("{0}.yourdomain.com");
+});
+```
 
-`AddDomainTenantResolver`方法接受一个域名格式，其中`{0}`部分与租户名称匹配。这意味着如果您的租户名称（`Tenant`类的`Name`属性）是`acme`，那么`acme`用户应该使用`acme.yourdomain.com` URL来进入应用程序。
+`AddDomainTenantResolver`方法接受一个域名格式，其中`{0}`部分与租户名称匹配。这意味着如果您的租户名称（`Tenant`类的`Name`属性）是`acme`，那么`acme`用户应该使用`acme.yourdomain.com` URL 来进入应用程序。
 
-一旦ABP解决了租户问题，我们就可以像下一节中解释的那样与当前租户一起工作。
+一旦 ABP 解决了租户问题，我们就可以像下一节中解释的那样与当前租户一起工作。
 
 ## 与当前租户一起工作
 
-ABP在执行我们的应用程序代码之前就确定了租户，正如我们在上一节中学到的。我们可以使用`ICurrentTenant`服务来获取当前租户的信息。以下示例演示了如何在任意类中使用`ICurrentTenant`服务：
+ABP 在执行我们的应用程序代码之前就确定了租户，正如我们在上一节中学到的。我们可以使用`ICurrentTenant`服务来获取当前租户的信息。以下示例演示了如何在任意类中使用`ICurrentTenant`服务：
 
-[PRE7]
+```cs
+public class MyService : ITransientDependency
+{
+    private readonly ICurrentTenant _currentTenant;
+    public MyService(ICurrentTenant currentTenant)
+    {
+        _currentTenant = currentTenant;
+    }
 
-在示例方法中，我们已经注入了`ICurrentTenant`服务并访问了`Id`和`Name`属性。如果当前用户是主机用户（这意味着租户不可用），`Id`和`Name`属性将返回`null`。一些ABP基类已经预先注入了`ICurrentTenant`服务，因此您可以直接使用`CurrentTenant`属性，如下面的示例所示：
+    public async Task DoItAsync()
+    {
+        Guid? tenantId = _currentTenant.Id;
+        string tenantName = _currentTenant.Name;
+    }
+}
+```
 
-[PRE8]
+在示例方法中，我们已经注入了`ICurrentTenant`服务并访问了`Id`和`Name`属性。如果当前用户是主机用户（这意味着租户不可用），`Id`和`Name`属性将返回`null`。一些 ABP 基类已经预先注入了`ICurrentTenant`服务，因此您可以直接使用`CurrentTenant`属性，如下面的示例所示：
+
+```cs
+public class MyAppService : ApplicationService
+{
+    public async Task DoItAsync()
+    {
+        Guid? tenantId = CurrentTenant.Id;
+    }
+}
+```
 
 由于`ApplicationService`基类已经具有`CurrentTenant`属性（`ICurrentTenant`类型），我们可以直接使用它，无需手动注入。
 
@@ -178,11 +227,25 @@ ABP在执行我们的应用程序代码之前就确定了租户，正如我们�
 
 ## 在租户之间切换
 
-`ICurrentTenant`服务也被ABP框架用于自动隔离当前租户的数据，这样您就不会意外地访问其他租户的数据。然而，在某些情况下，您可能需要在同一HTTP请求中处理另一个租户的数据并临时切换租户。`ICurrentTenant`服务不仅用于获取当前租户的信息，还用于切换到所需的租户。请参阅以下示例：
+`ICurrentTenant`服务也被 ABP 框架用于自动隔离当前租户的数据，这样您就不会意外地访问其他租户的数据。然而，在某些情况下，您可能需要在同一 HTTP 请求中处理另一个租户的数据并临时切换租户。`ICurrentTenant`服务不仅用于获取当前租户的信息，还用于切换到所需的租户。请参阅以下示例：
 
-[PRE9]
+```cs
+public class MyAppService : ApplicationService
+{
+    public async Task DoItAsync(Guid tenantId)
+    {
+        // Before the using block
+        using (CurrentTenant.Change(tenantId))
+        {
+            // Inside the using block
+            // CurrentTenant.Id equals to tenantId 
+        }
+        // After the using block
+    }
+}
+```
 
-如果在`using`块之前使用`CurrentTenant.Id`属性，您将获得已解析的租户ID，如“确定当前租户”部分中所述。`CurrentTenant.Change`方法将当前租户更改为给定值，因此在`using`块内部使用`CurrentTenant.Id`属性时，您将获得所需的租户ID。例如，如果您在`using`块内部从共享数据库中执行数据库查询，ABP将检索所需的租户数据而不是多租户中间件解析的租户数据。一旦`using`块完成，`CurrentTenant.Id`将自动恢复到之前的值。当您很少需要时，可以安全地以嵌套方式使用`CurrentTenant.Change`方法。如果您想切换到主机上下文，可以将`null`值传递给`Change`方法。始终像在这个示例中一样使用`using`块与`Change`方法一起使用，以避免影响您的方法的周围上下文。
+如果在`using`块之前使用`CurrentTenant.Id`属性，您将获得已解析的租户 ID，如“确定当前租户”部分中所述。`CurrentTenant.Change`方法将当前租户更改为给定值，因此在`using`块内部使用`CurrentTenant.Id`属性时，您将获得所需的租户 ID。例如，如果您在`using`块内部从共享数据库中执行数据库查询，ABP 将检索所需的租户数据而不是多租户中间件解析的租户数据。一旦`using`块完成，`CurrentTenant.Id`将自动恢复到之前的值。当您很少需要时，可以安全地以嵌套方式使用`CurrentTenant.Change`方法。如果您想切换到主机上下文，可以将`null`值传递给`Change`方法。始终像在这个示例中一样使用`using`块与`Change`方法一起使用，以避免影响您的方法的周围上下文。
 
 除了切换到所需的租户之外，还可以完全禁用租户隔离。
 
@@ -190,9 +253,28 @@ ABP在执行我们的应用程序代码之前就确定了租户，正如我们�
 
 数据隔离在多租户应用程序中至关重要。它保证了只查询当前租户的数据。然而，在某些情况下，您的应用程序可能需要查询整个数据库，包括所有租户的数据。
 
-我们在[*第8章*](B17287_08_Epub_AM.xhtml#_idTextAnchor249)的“使用数据过滤系统”部分中探讨了ABP的数据过滤系统，*使用ABP的功能和服务*。ABP使用相同的数据过滤系统来过滤当前租户的数据。因此，我们可以使用相同的数据过滤API临时禁用多租户过滤器：
+我们在*第八章*的“使用数据过滤系统”部分中探讨了 ABP 的数据过滤系统，*使用 ABP 的功能和服务*。ABP 使用相同的数据过滤系统来过滤当前租户的数据。因此，我们可以使用相同的数据过滤 API 临时禁用多租户过滤器：
 
-[PRE10]
+```cs
+public class ProductAppService : ApplicationService
+{
+    private readonly IRepository<Product, Guid>
+        _productRepository;
+    public ProductAppService(
+        IRepository<Product, Guid> productRepository)
+    {
+        _productRepository = productRepository;
+    }
+    public async Task<long> GetTotalProductCountAsync()
+    {
+        using (DataFilter.Disable<IMultiTenant>())
+        {
+            return await
+                _productRepository.GetCountAsync();
+        }
+    }
+}
+```
 
 在这个示例中，我们正在获取数据库中所有租户拥有的产品总数。在`using`块中禁用了多租户数据过滤器，因此存储库与数据库中的所有记录一起工作。
 
@@ -204,25 +286,55 @@ ABP在执行我们的应用程序代码之前就确定了租户，正如我们�
 
 ## 将域设计为多租户
 
-ABP旨在使你的应用程序代码不感知多租户，并在可能的情况下自动化处理。将实体类设计为多租户非常简单。只需为你的实体实现`IMultiTenant`接口，如下面的示例所示：
+ABP 旨在使你的应用程序代码不感知多租户，并在可能的情况下自动化处理。将实体类设计为多租户非常简单。只需为你的实体实现`IMultiTenant`接口，如下面的示例所示：
 
-[PRE11]
+```cs
+public class Product : AggregateRoot<Guid>, IMultiTenant
+{
+    public Guid? TenantId { get; set; }
+    public string Name { get; set; }
+}
+```
 
-本例中的`Product`聚合根实体实现了`IMultiTenant`接口，并定义了一个`TenantId`属性。在ABP框架中，租户标识类型始终是`Guid`。`TenantId`属性是可空的，这使得`Product`实体既可用于租户端，也可用于主机端。如果`TenantId`属性为`null`，则该实体属于主机端。这也允许我们轻松地将我们的应用程序转换为单租户、本地应用程序，其中`TenantId`属性始终为`null`。
+本例中的`Product`聚合根实体实现了`IMultiTenant`接口，并定义了一个`TenantId`属性。在 ABP 框架中，租户标识类型始终是`Guid`。`TenantId`属性是可空的，这使得`Product`实体既可用于租户端，也可用于主机端。如果`TenantId`属性为`null`，则该实体属于主机端。这也允许我们轻松地将我们的应用程序转换为单租户、本地应用程序，其中`TenantId`属性始终为`null`。
 
-当你创建一个新的实体对象（例如，一个`Product`对象）时，ABP会自动使用`ICurrentTenant.Id`属性设置`TenantId`值。ABP还负责将其保存到正确的数据库，或从正确的数据库查询，或者如果你使用的是单个数据库，则过滤租户数据。
+当你创建一个新的实体对象（例如，一个`Product`对象）时，ABP 会自动使用`ICurrentTenant.Id`属性设置`TenantId`值。ABP 还负责将其保存到正确的数据库，或从正确的数据库查询，或者如果你使用的是单个数据库，则过滤租户数据。
 
-我们已经学习了使用ABP框架构建多租户解决方案的基本要点。下一节介绍了ABP特性系统，它可以用来限制租户的应用程序功能。
+我们已经学习了使用 ABP 框架构建多租户解决方案的基本要点。下一节介绍了 ABP 特性系统，它可以用来限制租户的应用程序功能。
 
 # 使用特性系统
 
-大多数SaaS解决方案为顾客提供不同的套餐。每个套餐都有一组不同的应用程序特性，并且以不同的价格订阅。ABP提供了一个用于定义此类应用程序特性的特性系统，然后为单个租户禁用或启用这些特性。让我们先定义一个特性。
+大多数 SaaS 解决方案为顾客提供不同的套餐。每个套餐都有一组不同的应用程序特性，并且以不同的价格订阅。ABP 提供了一个用于定义此类应用程序特性的特性系统，然后为单个租户禁用或启用这些特性。让我们先定义一个特性。
 
 ## 定义特性
 
 在使用之前需要定义一个特性。创建一个新的类，从`FeatureDefinitionProvider`类派生（通常在启动解决方案中的`.Application.Contracts`项目中），并重写`Define`方法，如下面的示例所示：
 
-[PRE12]
+```cs
+public class MyAppFeatureDefinitionProvider :
+    FeatureDefinitionProvider
+{
+    public override void Define(
+        IFeatureDefinitionContext context)
+    {
+        var myGroup = context.AddGroup("MyApp");        
+        myGroup.AddFeature(
+            "MyApp.StockManagement",
+            defaultValue: "false",
+            displayName: L("StockManagement"),
+            isVisibleToClients: true);        
+        myGroup.AddFeature(
+            "MyApp.MaxProductCount", 
+            defaultValue: "100",
+            displayName: L("MaxProductCount"));
+    }
+    private ILocalizableString L(string name)
+    {
+        return 
+            LocalizableString.Create<MtDemoResource>(name);
+    }
+}
+```
 
 特性被分组以创建更模块化的系统（其中每个模块定义其自己的组）。在这个例子中，我为最终应用程序创建了一个特性组。然后，我在该组下定义了两个特性。本例定义了这两个特性：
 
@@ -232,7 +344,7 @@ ABP旨在使你的应用程序代码不感知多租户，并在可能的情况�
 
 特性值实际上是字符串，例如本例中的`false`和`100`。然而，根据惯例，布尔值（`true`和`false`）可以用于条件检查。
 
-ABP会自动发现从`FeatureDefinitionProvider`类派生的类，因此你不需要在某个地方注册它。定义特性后，我们可以检查当前租户的特性值（我们将在*管理租户特性*部分中看到如何将特性分配给租户）。
+ABP 会自动发现从`FeatureDefinitionProvider`类派生的类，因此你不需要在某个地方注册它。定义特性后，我们可以检查当前租户的特性值（我们将在*管理租户特性*部分中看到如何将特性分配给租户）。
 
 ## 检查特性
 
@@ -244,13 +356,29 @@ ABP会自动发现从`FeatureDefinitionProvider`类派生的类，因此你不�
 
 以下示例使用 `RequiresFeature` 属性来限制当前租户对类的使用：
 
-[PRE13]
+```cs
+[RequiresFeature("MyApp.StockManagement")]
+public class StockAppService : ApplicationService,
+    IStockAppService
+{
+}
+```
 
 这样，`MyApp.StockManagement` 功能的值会在每次调用 `StockAppService` 服务的 `StockAppService` 方法时自动检查，并且对于未经授权的访问会抛出异常。
 
 `RequiresFeature` 属性也可以用于方法上。请参见以下示例：
 
-[PRE14]
+```cs
+public class ProductAppService : ApplicationService
+{
+    ...    
+    [RequiresFeature("MyApp.StockManagement")]
+    public async Task<long> GetStockCountAsync()
+    {
+        return await _productRepository.GetCountAsync();
+    }
+}
+```
 
 在这种情况下，只有 `GetStockCountAsync` 方法受到限制，而 `ProductAppService` 的其他没有 `RequiresFeature` 属性的方法不受影响。
 
@@ -260,11 +388,27 @@ ABP会自动发现从`FeatureDefinitionProvider`类派生的类，因此你不�
 
 `IFeatureChecker` 服务允许我们以编程方式获取和检查功能值。您可以像注入任何其他服务一样注入它。以下示例检查 `MyApp.StockManagement` 功能是否为当前租户启用：
 
-[PRE15]
+```cs
+public async Task<long> GetStockCountAsync()
+{
+    if (await FeatureChecker
+             .IsEnabledAsync("MyApp.StockManagement"))
+    {
+        return await _productRepository.GetCountAsync();
+    }
+    // TODO: Your fallback logic or error message
+}
+```
 
 `IsEnabled` 方法仅在功能值为 `true`（作为 `string`）时返回 `true`。如果您有回退逻辑（当租户未启用该功能时），则使用 `IsEnabledAsync` 是一个好的方法。但是，如果您只想检查功能是否启用，并在其他情况下抛出异常，请使用 `CheckEnabledAsync` 方法，如下所示：
 
-[PRE16]
+```cs
+public async Task<long> GetStockCountAsync()
+{
+    await FeatureChecker.CheckEnabledAsync("MyApp.StockManagement");
+    return await _productRepository.GetCountAsync();
+}
+```
 
 `CheckEnabledAsync` 方法如果给定的功能对于当前租户未启用，则会抛出 `AbpAuthorizationException`。然而，如果您需要在方法开始时简单地检查一个功能是否启用或禁用，使用 `RequiresFeature` 属性会更简单。
 
@@ -272,7 +416,21 @@ ABP会自动发现从`FeatureDefinitionProvider`类派生的类，因此你不�
 
 以下示例在创建新产品之前检查当前租户允许的最大产品数量：
 
-[PRE17]
+```cs
+public async Task CreateAsync(string name)
+{
+    var currentProductCount = await
+        _productRepository.GetCountAsync();
+    var maxProductCount = await
+           FeatureChecker.GetAsync<int>(
+               "MyApp.MaxProductCount");
+    if (currentProductCount >= maxProductCount)
+    {
+        // TODO: Throw a business exception
+    }    
+    // TODO: Continue to create the product
+}
+```
 
 `FeatureChecker.GetAsync<T>` 方法通过转换为给定的泛型类型参数来返回给定功能的值。在这里，`MyApp.MaxProductCount` 是一个数值功能，所以我将其转换为 `int` 并与当前租户的产品数量进行比较。`IFeatureChecker` 还定义了 `GetOrNullAsync` 方法，该方法返回功能的字符串值，如果该功能未为当前租户定义值，则返回 `null`。
 
@@ -288,11 +446,16 @@ ABP会自动发现从`FeatureDefinitionProvider`类派生的类，因此你不�
 
 ABP 提供了多个 UI 选项，每个选项都提供了一个不同的 API 来在客户端检查功能。例如，ABP MVC/Razor Pages UI 提供了全局的 `abp.features` JavaScript API 来检查功能，如下面的代码块所示：
 
-[PRE18]
+```cs
+if (abp.features.isEnabled('MyApp.StockManagement'))
+{
+  // TODO: ...
+}
+```
 
-请参阅 [*第 12 章*](B17287_12_Epub_AM.xhtml#_idTextAnchor356) 的 *检查租户功能* 部分，*使用 MVC/Razor Pages*，以了解更多关于 `abp.features` JavaScript API 的详细信息。
+请参阅 *第十二章* 的 *检查租户功能* 部分，*使用 MVC/Razor Pages*，以了解更多关于 `abp.features` JavaScript API 的详细信息。
 
-另一方面，ABP Blazor UI 在客户端使用相同的 `IFeatureChecker` 服务。对于其他 UI 类型，请参阅 ABP 的文档：[https://docs.abp.io/en/abp/latest/Features](https://docs.abp.io/en/abp/latest/Features)。
+另一方面，ABP Blazor UI 在客户端使用相同的 `IFeatureChecker` 服务。对于其他 UI 类型，请参阅 ABP 的文档：[`docs.abp.io/en/abp/latest/Features`](https://docs.abp.io/en/abp/latest/Features)。
 
 你现在已经学会了如何获取和检查当前租户的功能值。下一节将解释如何为租户设置功能的值。
 
@@ -300,23 +463,36 @@ ABP 提供了多个 UI 选项，每个选项都提供了一个不同的 API 来�
 
 在框架层面，ABP 不关心功能值存储在哪里以及如何更改。它只定义了一个接口，`IFeatureStore`，可以用来获取功能的当前值。然而，将其实现留给每个开发者并不是一个好的选择，因为大多数情况下，实现将是相似的，我们不希望浪费时间一次又一次地重新实现它。
 
-ABP框架提供了`IFeatureStore`接口，并提供了UI和API来修改租户的特征值。当您使用ABP的启动解决方案模板创建新解决方案时，特征管理模块已经安装。以下部分解释了特征管理UI模态和用于管理特征值的API。
+ABP 框架提供了`IFeatureStore`接口，并提供了 UI 和 API 来修改租户的特征值。当您使用 ABP 的启动解决方案模板创建新解决方案时，特征管理模块已经安装。以下部分解释了特征管理 UI 模态和用于管理特征值的 API。
 
-### 使用特征管理UI模态
+### 使用特征管理 UI 模态
 
 特征管理模块可以自动创建设置特征值的模态对话框。然而，我们需要为每个特征定义值类型。返回到`MyFeatureDefinitionProvider`并更新特征定义如下：
 
-[PRE19]
+```cs
+myGroup.AddFeature(
+    "MyApp.StockManagement",
+    defaultValue: "false",
+    displayName: L("StockManagement"),
+    isVisibleToClients: true,
+    valueType: new ToggleStringValueType());
+myGroup.AddFeature(
+    "MyApp.MaxProductCount", 
+    defaultValue: "100",
+    displayName: L("MaxProductCount"),
+    valueType: new FreeTextStringValueType(
+                   new NumericValueValidator()));
+```
 
 我在`AddFeature`方法中添加了`valueType`参数。第一个是`ToggleStringValueType`，表示该特征具有开/关风格的（布尔）值。第二个是`FreeTextStringValueType`，表示该特征具有应通过文本框更改的值。`NumericValueValidator`指定了值的验证规则。
 
-一旦我们正确地定义了值类型，特征管理模块可以自动渲染设置特征值所需的UI。要打开特征管理对话框，以授权主机用户身份登录应用程序，从主菜单导航到租户管理页面，点击**操作**按钮，然后选择**特征**操作，如图所示：
+一旦我们正确地定义了值类型，特征管理模块可以自动渲染设置特征值所需的 UI。要打开特征管理对话框，以授权主机用户身份登录应用程序，从主菜单导航到租户管理页面，点击**操作**按钮，然后选择**特征**操作，如图所示：
 
 ![Figure 16.2 – The Features action on the tenant management page
 
 ![img/Figure_16.2_B17287.jpg]
 
-图16.2 – 租户管理页面上的特征操作
+图 16.2 – 租户管理页面上的特征操作
 
 此操作将打开一个模态对话框，如图所示：
 
@@ -324,37 +500,57 @@ ABP框架提供了`IFeatureStore`接口，并提供了UI和API来修改租户的
 
 ![img/Figure_16.3_B17287.jpg]
 
-图16.3 – 特征管理对话框
+图 16.3 – 特征管理对话框
 
-我们可以在左侧看到组名（您也可以本地化组的显示名称）。当我们点击**MyApp**组时，我们可以看到设置特征值的表单元素。UI界面是由特征管理模块动态创建的。
+我们可以在左侧看到组名（您也可以本地化组的显示名称）。当我们点击**MyApp**组时，我们可以看到设置特征值的表单元素。UI 界面是由特征管理模块动态创建的。
 
-`MyApp.StockManagement`特征在UI上显示为一个复选框，而`MyApp.MaxProductCount`特征则显示为数字文本框。这样，您可以轻松地为任何租户设置特征值。除了UI之外，还可以使用特征管理API编程设置特征值。
+`MyApp.StockManagement`特征在 UI 上显示为一个复选框，而`MyApp.MaxProductCount`特征则显示为数字文本框。这样，您可以轻松地为任何租户设置特征值。除了 UI 之外，还可以使用特征管理 API 编程设置特征值。
 
-### 使用特征管理API
+### 使用特征管理 API
 
 特征管理模块提供了`IFeatureManager`服务，可以通过编程方式为租户设置特征值。以下示例为指定的租户启用了`MyApp.StockManagement`特征：
 
-[PRE20]
+```cs
+public class MyCustomerService : DomainService
+{
+    private readonly IFeatureManager _featureManager;
+    public MyCustomerService(IfeatureManager
+                             featureManager)
+    {
+        _featureManager = featureManager;
+    }
+
+    public async Task EnableStockManagementAsync(Guid
+                                                 tenantId)
+    {
+        await _featureManager.SetForTenantAsync(
+            tenantId,
+            "MyApp.StockManagement",
+            "true"
+        );
+    }
+}
+```
 
 我们在我们的类构造函数中注入了`IFeatureManager`服务，就像注入任何其他服务一样。然后，我们使用`SetForTenantAsync`方法将给定租户的值设置为`true`。
 
 # 何时使用多租户
 
-多租户是一个创建SaaS解决方案的优秀模式，ABP框架提供了一个完整的基础设施来创建多租户应用程序。然而，并非所有应用程序都应该是SaaS，也并非所有SaaS应用程序都应该是多租户。ABP的多租户系统有一些假设，我们在构建它时做出了一些设计决策。在本节中，我想讨论这些假设和决策，以帮助你决定ABP的多租户系统是否适合你的解决方案。
+多租户是一个创建 SaaS 解决方案的优秀模式，ABP 框架提供了一个完整的基础设施来创建多租户应用程序。然而，并非所有应用程序都应该是 SaaS，也并非所有 SaaS 应用程序都应该是多租户。ABP 的多租户系统有一些假设，我们在构建它时做出了一些设计决策。在本节中，我想讨论这些假设和决策，以帮助你决定 ABP 的多租户系统是否适合你的解决方案。
 
-ABP的多租户应用程序应该假设每个租户都将有一个分离和隔离的生产环境来开发。如果你做出这个假设，那么你将有一些限制。以下是一些示例限制：
+ABP 的多租户应用程序应该假设每个租户都将有一个分离和隔离的生产环境来开发。如果你做出这个假设，那么你将有一些限制。以下是一些示例限制：
 
 +   你不应该同时从多个租户执行数据库查询。如果你这样做，你假设你将有一个共享的租户数据库，因为从不同（可能隔离的）环境中查询多个数据库在技术上并不直接。
 
-+   租户的用户不能使用另一个租户登录到系统中。这意味着你不能将多个租户分配给单个用户，因为用户是完全隔离的。ABP允许在不同的租户中使用相同的电子邮件地址或用户名，但实际上它们将是数据库中具有不同密码和标识符的不同用户，没有任何关联。
++   租户的用户不能使用另一个租户登录到系统中。这意味着你不能将多个租户分配给单个用户，因为用户是完全隔离的。ABP 允许在不同的租户中使用相同的电子邮件地址或用户名，但实际上它们将是数据库中具有不同密码和标识符的不同用户，没有任何关联。
 
 +   你不能在不同租户之间共享角色（及其权限）。
 
-如果你假设两个租户有不同的生产环境并且不能访问彼此的环境，这些限制是自然的。ABP假设同一个应用程序可以在不进行任何代码更改的情况下（除了`AbpMultiTenancyOptions.IsEnabled`选项）在客户的本地部署上运行。
+如果你假设两个租户有不同的生产环境并且不能访问彼此的环境，这些限制是自然的。ABP 假设同一个应用程序可以在不进行任何代码更改的情况下（除了`AbpMultiTenancyOptions.IsEnabled`选项）在客户的本地部署上运行。
 
 这些假设并不意味着租户不能共享数据。如果一个实体没有实现`IMultiTenant`接口，它将自然地在所有租户之间共享，并且始终存储在中央（主机）数据库中。此外，你可以切换租户以临时访问另一个租户用户的数据。然而，你应该考虑这种逻辑如何在本地环境中工作，或者你可以从你的解决方案中删除本地部署支持。
 
-大多数混淆都来自于只从技术角度考虑多租户，而没有考虑其设计目的。例如，考虑一个电子市场，其中卖家管理和销售他们的产品。个人客户列出和搜索产品，添加到购物车，并完成支付。如果你假设卖家有自己的产品，并且卖家后台用户管理这些产品，这个应用程序可能看起来像是一个多租户系统。如果你使用ABP的多租户系统，所有的隔离都将自动完成，对吗？
+大多数混淆都来自于只从技术角度考虑多租户，而没有考虑其设计目的。例如，考虑一个电子市场，其中卖家管理和销售他们的产品。个人客户列出和搜索产品，添加到购物车，并完成支付。如果你假设卖家有自己的产品，并且卖家后台用户管理这些产品，这个应用程序可能看起来像是一个多租户系统。如果你使用 ABP 的多租户系统，所有的隔离都将自动完成，对吗？
 
 虽然从技术角度来看，它有一些类似于多租户系统的要求，但市场可能包含作为统一平台集成的部分。在多租户系统中，客户（租户）表现得好像拥有整个系统。在市场中，供应商不是租户。它不会像在本地系统那样独立使用应用程序。因此，如果您从多租户开始，您将不得不后来处理数据共享和集成的问题，因为共享/集成部分比这种系统中的隔离部分要多得多。
 

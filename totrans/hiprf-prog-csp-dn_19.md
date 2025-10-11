@@ -1,10 +1,10 @@
-# *第16章*：异步编程
+# *第十六章*：异步编程
 
 在本章中，你将学习关于`async`、`await`和`WhenAll`的内容。你还将了解不同的返回类型并提取所需的结果。此外，你将学习如何正确地取消异步操作以及执行异步文件读写。
 
 在本章中，我们将涵盖以下主题：
 
-+   **理解TAP模型**：在本节中，我们提供了一个关于TAP模型的概述。
++   **理解 TAP 模型**：在本节中，我们提供了一个关于 TAP 模型的概述。
 
 +   `Task.Run`)并异步执行。
 
@@ -18,7 +18,7 @@
 
 完成本章后，你将在以下领域具备技能：
 
-+   理解TAP模型
++   理解 TAP 模型
 
 +   异步处理网络资源
 
@@ -28,11 +28,11 @@
 
 # 技术要求
 
-你需要Visual Studio来处理本章中展示的代码。
+你需要 Visual Studio 来处理本章中展示的代码。
 
-本章的所有代码都放置在GitHub上，地址为[https://github.com/PacktPublishing/High-Performance-Programming-in-CSharp-and-.NET/tree/master/CH16](https://github.com/PacktPublishing/High-Performance-Programming-in-CSharp-and-.NET/tree/master/CH16)。
+本章的所有代码都放置在 GitHub 上，地址为[`github.com/PacktPublishing/High-Performance-Programming-in-CSharp-and-.NET/tree/master/CH16`](https://github.com/PacktPublishing/High-Performance-Programming-in-CSharp-and-.NET/tree/master/CH16)。
 
-# 理解TAP模型
+# 理解 TAP 模型
 
 在我们开始之前，值得注意的是，处理异步编程有三种不同的模型。具体如下：
 
@@ -42,17 +42,17 @@
 
 +   **任务并行库**（**TPL**）
 
-APM使用`BeginMethod`启动异步过程，使用`EndMethod`完成异步过程。EAP使用`MethodAsync`启动异步过程，使用`CancelAsync`处理异步操作的取消，以及使用完成的事件处理器处理完成的异步操作。这两种执行异步操作的方式在C# 4.5中被TPL所取代。
+APM 使用`BeginMethod`启动异步过程，使用`EndMethod`完成异步过程。EAP 使用`MethodAsync`启动异步过程，使用`CancelAsync`处理异步操作的取消，以及使用完成的事件处理器处理完成的异步操作。这两种执行异步操作的方式在 C# 4.5 中被 TPL 所取代。
 
-TPL使用`async`和`await`模式。异步方法名称以`async`结尾。异步方法通常返回一个可等待的`Task`或`Task<Result>`。从.NET 4.5开始，建议使用TPL而不是使用APM和EAP。
+TPL 使用`async`和`await`模式。异步方法名称以`async`结尾。异步方法通常返回一个可等待的`Task`或`Task<Result>`。从.NET 4.5 开始，建议使用 TPL 而不是使用 APM 和 EAP。
 
-TAP的基础类型是`System.Thread.Tasks`命名空间，以及通过异步操作提供的`Task`和`Task<Tresult>`类。Microsoft建议在开始新项目时使用TAP。
+TAP 的基础类型是`System.Thread.Tasks`命名空间，以及通过异步操作提供的`Task`和`Task<Tresult>`类。Microsoft 建议在开始新项目时使用 TAP。
 
 ## 命名、参数和返回类型
 
-使用TAP模型的异步方法在方法签名前缀为`async Task`（对于无返回值的方法），或`async Task<Tresult>`、`async ValueTask`或`async ValueTask<Tresult>`（对于返回值的方法）。不返回值的异步方法名称应以动词开头，如`Begin`或`Process`。
+使用 TAP 模型的异步方法在方法签名前缀为`async Task`（对于无返回值的方法），或`async Task<Tresult>`、`async ValueTask`或`async ValueTask<Tresult>`（对于返回值的方法）。不返回值的异步方法名称应以动词开头，如`Begin`或`Process`。
 
-TAP方法参数应与同步对应方法的参数匹配，并且顺序相同。您应避免完全使用免于遵守此规则的`out`和`ref`参数。如果您需要返回数据，请使用`Task<Tresult>`返回的`Tresult`。使用数据结构来适应多种返回类型。还值得考虑将取消令牌添加到TAP方法参数中，即使同步方法对应者没有这样的令牌也是如此。
+TAP 方法参数应与同步对应方法的参数匹配，并且顺序相同。您应避免完全使用免于遵守此规则的`out`和`ref`参数。如果您需要返回数据，请使用`Task<Tresult>`返回的`Tresult`。使用数据结构来适应多种返回类型。还值得考虑将取消令牌添加到 TAP 方法参数中，即使同步方法对应者没有这样的令牌也是如此。
 
 当意图明确时，与多个任务一起工作的组合方法不必遵循此命名模式。`WhenAll`和`WhenAny`是组合方法的例子。
 
@@ -124,31 +124,63 @@ TAP方法参数应与同步对应方法的参数匹配，并且顺序相同。�
 
 1.  添加一个名为 `Benchmarks` 的新类，并在该类中添加以下方法：
 
-    [PRE0]
+    ```cs
+    public static void LengthyTask()
+    {
+         int y = 0;
+         for (int x = 0; x < 10; x++)
+              y++;
+    }
+    ```
 
-此方法是我们的工作方法。它所做的只是将`y`变量增加1，重复十次。
+此方法是我们的工作方法。它所做的只是将`y`变量增加 1，重复十次。
 
 1.  将`SynchronousMethod`添加到类中：
 
-    [PRE1]
+    ```cs
+    [Benchmark]
+    public void SychronousMethod()
+    {
+          LengthyTask();
+    }
+    ```
 
 此方法同步调用`LengthyTask`方法，并作为一个基准测试。
 
 1.  将`TaskMethod`添加到类中：
 
-    [PRE2]
+    ```cs
+    [Benchmark]
+    public void TaskMethod()
+    {
+         Task.Run(new Action(LengthyTask));
+    }
+    ```
 
 此方法将`LengthyTask`方法作为一个新的`Action`运行，该`Action`被排队在`ThreadPool`上运行。该方法返回一个`Task`或`Task<Tresult>`句柄。
 
 1.  将`AsynchronousTaskMethod`添加到类中：
 
-    [PRE3]
+    ```cs
+    [Benchmark]
+    public void AsynchronousTaskMethod()
+    {
+         var data = async () => await Task.Run(new   
+             Action(LengthyTask));
+    }
+    ```
 
 此方法以异步方式使用`Task.Run`运行`LengthyTask`方法，并在继续之前等待方法完成。
 
 1.  我们现在已经完成了基准测试类。因此，在`Program.cs`文件中，将代码替换为以下内容：
 
-    [PRE4]
+    ```cs
+    using BenchmarkDotNet.Running;
+    using CH16_AsynchronousProgramming;
+    Console.WriteLine("CH16 - Asynchronous Programming");
+    var summary = BenchmarkRunner.Run<Benchmarks>();
+    Console.ReadLine();
+    ```
 
 此代码将运行我们的基准测试并为我们生成报告。
 
@@ -158,27 +190,25 @@ TAP方法参数应与同步对应方法的参数匹配，并且顺序相同。�
 
 1.  打开命令窗口，并在`bin\Release\net6.0`文件夹中执行名为`CH16_AsynchronousProgramming.exe`的编译后的可执行文件。
 
-1.  基准测试应该开始运行，一旦完成，您应该看到一个类似于*图16.1*所示的报告：
+1.  基准测试应该开始运行，一旦完成，您应该看到一个类似于*图 16.1*所示的报告：
 
-![图16.1 – BenchmarkDotNet报告，针对我们的CH16_AsynchronusProgramming项目
+![图 16.1 – BenchmarkDotNet 报告，针对我们的 CH16_AsynchronusProgramming 项目](img/B16617_Figure_16.1.jpg)
 
-](img/B16617_Figure_16.1.jpg)
+图 16.1 – BenchmarkDotNet 报告，针对我们的 CH16_AsynchronusProgramming 项目
 
-图16.1 – BenchmarkDotNet报告，针对我们的CH16_AsynchronusProgramming项目
-
-如您在*图16.1*中可以看到，同步运行`LengthyTask`方法耗时`7.3220 ns`完成。使用`Task.Run`运行耗时最长，为`112.4494 ns`。而运行代码最快的方式是异步，只需`0.9982ns`即可完成。
+如您在*图 16.1*中可以看到，同步运行`LengthyTask`方法耗时`7.3220 ns`完成。使用`Task.Run`运行耗时最长，为`112.4494 ns`。而运行代码最快的方式是异步，只需`0.9982ns`即可完成。
 
 我们可以从这些时间中清楚地看到，运行我们的代码异步确实有明显的性能优势，因为我们的代码完成所需的总时间更少。
 
 在下一节中，我们将比较`await`与`GetAwaiter.GetResult()`、`.Result`和`.Wait`的性能。我们将涵盖`Task`和`ValueTask`。
 
-# 对Task和ValueTask的GetAwaiter.GetResult()、.Result和.Wait进行基准测试
+# 对 Task 和 ValueTask 的 GetAwaiter.GetResult()、.Result 和.Wait 进行基准测试
 
 在本节中，我们将编写一些代码来基准测试`GetAwaiter.GetResult()`、`.Result`和`.Wait`方法，以查看哪种方法最适合获取`Task`和`ValueTask`的返回值。
 
-在[https://github.com/dotnet/BenchmarkDotNet/issues/236](https://github.com/dotnet/BenchmarkDotNet/issues/236)，`BenchmarkDotNet`的维护者*adamsitnik*回复了*@i3arnon*：
+在[`github.com/dotnet/BenchmarkDotNet/issues/236`](https://github.com/dotnet/BenchmarkDotNet/issues/236)，`BenchmarkDotNet`的维护者*adamsitnik*回复了*@i3arnon*：
 
-“@i3arnon 谢谢提示！我已经测量了`.Result`与`.Wait`与`GetAwaiter.GetResult()`的比较，对于`Tasks`来说，`GetAwaiter.GetResult()`似乎也是最快的方式。另一方面，对于`ValueTask`来说，它要慢得多，所以我继续使用`.Result`来处理VT。”
+“@i3arnon 谢谢提示！我已经测量了`.Result`与`.Wait`与`GetAwaiter.GetResult()`的比较，对于`Tasks`来说，`GetAwaiter.GetResult()`似乎也是最快的方式。另一方面，对于`ValueTask`来说，它要慢得多，所以我继续使用`.Result`来处理 VT。”
 
 因此，从我们将要编写的代码中，我们应该看到`.Result`在处理`ValueTask`时应该提供给我们最佳的性能。而`GetAwaiter.GetResult()`在处理`Task`时应该提供给我们最佳的性能。
 
@@ -190,31 +220,66 @@ TAP方法参数应与同步对应方法的参数匹配，并且顺序相同。�
 
 1.  添加以下返回 `int` 的方法：
 
-    [PRE5]
+    ```cs
+    public static int LengthyTaskReturnsInt()
+    {
+         int y = 0;
+         for (int x = 0; x < 10; x++)
+             y++;
+          return y;
+    }
+    ```
 
 在此代码中，我们增加 `y` 变量并返回结果。
 
 1.  添加 `GetAwaiterGetResult` 方法：
 
-    [PRE6]
+    ```cs
+    [Benchmark]
+    public void GetAwaiterGetResult()
+    {
+         int value = Task.Run(() => 
+             LengthyTaskReturnsInt()).GetAwaiter()
+               .GetResult();
+    }
+    ```
 
 此方法基准测试了使用 `GetAwaiter().GetResult()` 从方法返回 `int` 所花费的时间。
 
 1.  添加 `Result` 方法：
 
-    [PRE7]
+    ```cs
+    [Benchmark]
+    public async Task Result()
+    {
+         int value = await Task.Run(() => 
+           LengthyTaskReturnsInt()).ConfigureAwait(false);
+    }
+    ```
 
 此方法基准测试了等待方法返回 `int` 所花费的时间。
 
 1.  添加 `Wait` 方法：
 
-    [PRE8]
+    ```cs
+    [Benchmark]
+    public void Wait()
+    {
+         Task.Run(() => LengthyTask()).Wait();
+    }
+    ```
 
 此方法运行一个长时间的任务，并在它完成之前等待。
 
 1.  添加 `GetAwaiter` 方法：
 
-    [PRE9]
+    ```cs
+    [Benchmark]
+    public void GetAwaiter()
+    {
+             Task.Run(() => LengthyTask()).GetAwaiter();
+    }
+    ```
 
 此方法获取一个用于等待任务完成的等待者。
 
@@ -240,33 +305,58 @@ TAP方法参数应与同步对应方法的参数匹配，并且顺序相同。�
 
 1.  在 `Benchmarks` 类中，添加以下异步方法，该方法等待 `300` 毫秒然后返回一个 `int`：
 
-    [PRE10]
+    ```cs
+    private async Task<int> TaskOne()
+    {
+         await Task.Delay(300);
+         return 100;
+    }
+    ```
 
 `TaskOne` 方法是我们将要由基准测试运行的方法之一。
 
 1.  添加我们的第二个异步方法：
 
-    [PRE11]
+    ```cs
+    private async Task<string> TaskTwo()
+    {
+         await Task.Delay(300);
+         return "TaskTwo";
+    }
+    ```
 
 `TaskTwo` 方法等待 `300` 毫秒然后返回一个 `string`。
 
 1.  首先，我们将基准测试同步运行异步任务：
 
-    [PRE12]
+    ```cs
+    [Benchmark]
+    public async Task SynchronousAwait()
+    {
+         int intValue = await TaskOne();
+         string stringValue = await TaskTwo(); 
+    } 
+    ```
 
 在这里，我们有两个任务，我们需要等待它们都完成后再继续。
 
 1.  现在，我们将添加一个方法，它将利用 `WhenAll`：
 
-    [PRE13]
+    ```cs
+    [Benchmark]
+    public async Task AsynchynchronousWhenAll()
+    {
+         var taskOne = TaskOne();
+         var taskTwo = TaskTwo();
+         await Task.WhenAll(taskOne, taskTwo);
+    }
+    ```
 
 在此方法中，我们创建了我们的两个任务，然后将它们作为参数传递给 `WhenAll` 方法。我们不会继续，直到所有任务都完成。
 
 1.  通过命令行构建和运行您的可执行文件。您应该会看到类似 *图 16.3* 的内容：
 
-![图 16.3 – 多个异步调用的同步和异步执行结果
-
-](img/B16617_Figure_16.3.jpg)
+![图 16.3 – 多个异步调用的同步和异步执行结果](img/B16617_Figure_16.3.jpg)
 
 图 16.3 – 多个异步调用的同步和异步执行结果
 
@@ -284,31 +374,80 @@ TAP方法参数应与同步对应方法的参数匹配，并且顺序相同。�
 
 1.  添加以下两个成员变量：
 
-    [PRE14]
+    ```cs
+    private const string _website = 
+        "https://docs.microsoft.com";
+    private static readonly CancellationTokenSource 
+        _cancellationTokenSource = new();
+    ```
 
 `_website` 变量持有我们将返回其页面文本的网站的 URL。`CancellationTokenSource` 将用于向 `CancellationToken` 发送取消信号。
 
 1.  添加以下方法：
 
-    [PRE15]
+    ```cs
+    private static readonly HttpClient HttpClient = new()
+    {
+         MaxResponseContentBufferSize = 1000000
+    };
+    ```
 
 在这里，我们声明一个方法，该方法返回用于我们的 HTTP 请求的 `HttpClient`。`MaxResponseContentBufferSize` 设置在读取响应内容时缓冲的字节数。
 
 1.  现在添加 `ReturnWebsiteTextAsync` 方法：
 
-    [PRE16]
+    ```cs
+    private static async Task<string> 
+        ReturnWebsiteTextAsync()
+    {
+         HttpResponseMessage response = await HttpClient
+                 .GetAsync(
+                 _website, 
+                 _cancellationTokenSource.Token)
+               .ConfigureAwait(false);
+         byte[] contentAsByteArray = await response
+             .Content
+             .ReadAsByteArrayAsync(
+                 _cancellationTokenSource.Token)
+               .ConfigureAwait(false);
+         return Encoding.ASCII.GetString(
+             contentAsByteArray
+         );
+    }
+    ```
 
 在此方法中，我们声明 `HttpResponseMessage`，它等待一个异步任务，该任务返回网页的内容。然后读取响应并将其转换为字节数组。然后，这个字节数组被转换成 ASCII 字符串并返回。
 
 1.  现在添加 `Start` 方法：
 
-    [PRE17]
+    ```cs
+    public static async Task Start()
+    {
+         Console.WriteLine("Task started.");
+         try {
+             _cancellationTokenSource.CancelAfter(3000);
+               await ReturnWebsiteTextAsync()
+                 .ConfigureAwait(false);
+         }
+         catch (OperationCanceledException) {
+           Console.WriteLine(
+           "\nThe task has timed out and been cancelled.
+             \n");
+         }
+         finally {
+             _cancellationTokenSource.Dispose();
+         }
+         Console.WriteLine("Task completed.");
+    }
+    ```
 
 在 `Start` 方法中，我们写入一个控制台消息，表明任务已开始。然后我们将 `cancellationTokenSource` 的取消时间设置为 30 秒，即 3000 毫秒。然后我们 `await` 调用 `ReturnWebsiteTextAsync`。如果在设置的超时时间后进程超时，将引发 `OperationCanceledException`，它将在控制台输出一条消息。最后，`cancellationTokenSource` 被释放，并输出一条控制台消息，表明任务已完成。
 
 1.  在 `Program.cs` 文件中注释掉基准运行代码，并添加以下行：
 
-    [PRE18]
+    ```cs
+    TaskCancellation.Start().GetAwaiter();
+    ```
 
 1.  运行项目，并尝试使用不同的超时时间多次运行，以测试代码成功完成并返回文本，以及测试操作超时并引发异常。
 
@@ -330,7 +469,28 @@ TAP方法参数应与同步对应方法的参数匹配，并且顺序相同。�
 
 1.  添加以下方法：
 
-    [PRE19]
+    ```cs
+    public static async Task WriteTextAsync()
+    {
+    string filePath = @"C:\Temp\Greetings.txt";
+    string text = "Hello, World!";
+    byte[] encodedText = 
+         Encoding.Unicode.GetBytes(text);
+    using (FileStream fileStream = new FileStream(
+                        filePath,
+                        FileMode.Append, 
+                        FileAccess.Write, 
+                        FileShare.None,
+                        bufferSize: 4096, 
+                        useAsync: true
+                    )
+                )
+    {
+             await fileStream.WriteAsync(
+                 encodedText, 0, encodedText.Length); 
+    };
+    }
+    ```
 
 在`WriteTextAsync`方法中，我们声明一个文本文件的文件路径和一个包含要写入文件的文本的变量。要写入的文本被转换为字节数组。然后以追加模式打开一个可写的异步文件流。然后我们将文本写入文件流并关闭它。
 
@@ -344,31 +504,67 @@ TAP方法参数应与同步对应方法的参数匹配，并且顺序相同。�
 
 1.  在`FileReadWriteAsync`类中，添加以下方法：
 
-    [PRE20]
+    ```cs
+    public static async Task<string> ReadTextAsync()
+    {
+         string filePath = @"C:\Temp\Greetings.txt";
+         using (FileStream fileStream = new FileStream(
+                 filePath,
+                   FileMode.Open, 
+                   FileAccess.Read, 
+                   FileShare.Read,
+                   bufferSize: 4096, 
+                   useAsync: true
+             )
+         )
+         {
+             StringBuilder sb = new StringBuilder();
+             byte[] buffer = new byte[0x1000];
+             int numRead;
+             while (( numRead = await fileStream
+               .ReadAsync(buffer, 0, buffer.Length)) != 0
+             )
+             {
+                 string text = Encoding.Unicode
+                     .GetString(buffer, 0, numRead);
+                 sb.Append(text);
+             }
+             return sb.ToString();
+         }
+    }
+    ```
 
-在这里，我们定义了需要读取的文件的路径。然后我们以读取模式打开一个文件流，具有读取访问权限。接下来，我们定义`StringBuilder`和字节数组，它们将作为我们的缓冲区来存储读取的数据。然后我们读取流，直到读取完成。在每次读取迭代中，我们从文件中读取文本，将其编码为Unicode，然后将其追加到`StringBuilder`。然后，一旦循环完成并退出，我们从方法中返回字符串。
+在这里，我们定义了需要读取的文件的路径。然后我们以读取模式打开一个文件流，具有读取访问权限。接下来，我们定义`StringBuilder`和字节数组，它们将作为我们的缓冲区来存储读取的数据。然后我们读取流，直到读取完成。在每次读取迭代中，我们从文件中读取文本，将其编码为 Unicode，然后将其追加到`StringBuilder`。然后，一旦循环完成并退出，我们从方法中返回字符串。
 
 1.  打开`Program.cs`类。
 
 1.  注释掉以下行：
 
-    [PRE21]
+    ```cs
+    //var summary = BenchmarkRunner.Run<Benchmarks>();
+    // TaskCancellation.Start().GetAwaiter();
+    ```
 
 当我们运行代码时，我们不需要这些行。
 
 1.  添加以下代码行：
 
-    [PRE22]
+    ```cs
+    FileReadWriteAsync.WriteTextAsync().GetAwaiter();
+    string data = FileReadWriteAsync.ReadTextAsync()
+        .GetAwaiter().GetResult();
+    Console.WriteLine(data);
+    ```
 
 在此代码中，我们调用将文本异步写入文件的方法，异步地将文本读取到变量中，然后将变量的内容打印到控制台。
 
-1.  运行代码，你应该会看到类似于*图16.3*的内容：
+1.  运行代码，你应该会看到类似于*图 16.3*的内容：
 
 ![Figure 16.4 – 我们异步写入和读取代码的结果]
 
 ![img/B16617_Figure_16.4.jpg]
 
-图16.4 – 我们异步写入和读取代码的结果
+图 16.4 – 我们异步写入和读取代码的结果
 
 如从截图所示，我们已经成功地将文本异步写入文件，从该文件异步读取，并将内容打印到控制台窗口。
 
@@ -392,7 +588,7 @@ TAP方法参数应与同步对应方法的参数匹配，并且顺序相同。�
 
 # 问题
 
-1.  TAP代表什么？
+1.  TAP 代表什么？
 
 1.  哪种参数类型标识异步操作可以被取消？
 
@@ -406,12 +602,12 @@ TAP方法参数应与同步对应方法的参数匹配，并且顺序相同。�
 
 # 进一步阅读
 
-+   异步编程；APM与EAP的比较：[https://stackoverflow.com/questions/11276314/asynchronous-programming-apm-vs-eap](https://stackoverflow.com/questions/11276314/asynchronous-programming-apm-vs-eap)
++   异步编程；APM 与 EAP 的比较：[`stackoverflow.com/questions/11276314/asynchronous-programming-apm-vs-eap`](https://stackoverflow.com/questions/11276314/asynchronous-programming-apm-vs-eap)
 
-+   异步编程：[https://docs.microsoft.com/en-us/dotnet/csharp/async](https://docs.microsoft.com/en-us/dotnet/csharp/async)
++   异步编程：[`docs.microsoft.com/en-us/dotnet/csharp/async`](https://docs.microsoft.com/en-us/dotnet/csharp/async)
 
-+   C#中异步编程的介绍：[https://auth0.com/blog/introduction-to-async-programming-in-csharp/](https://auth0.com/blog/introduction-to-async-programming-in-csharp/)
++   C#中异步编程的介绍：[`auth0.com/blog/introduction-to-async-programming-in-csharp/`](https://auth0.com/blog/introduction-to-async-programming-in-csharp/)
 
-+   C# 中异步方法的性能特性：[https://devblogs.microsoft.com/premier-developer/the-performance-characteristics-of-async-methods/](https://devblogs.microsoft.com/premier-developer/the-performance-characteristics-of-async-methods/)
++   C# 中异步方法的性能特性：[`devblogs.microsoft.com/premier-developer/the-performance-characteristics-of-async-methods/`](https://devblogs.microsoft.com/premier-developer/the-performance-characteristics-of-async-methods/)
 
-+   异常处理（任务并行库）：[https://docs.microsoft.com/en-us/dotnet/standard/parallel-programming/exception-handling-task-parallel-library](https://docs.microsoft.com/en-us/dotnet/standard/parallel-programming/exception-handling-task-parallel-library)
++   异常处理（任务并行库）：[`docs.microsoft.com/en-us/dotnet/standard/parallel-programming/exception-handling-task-parallel-library`](https://docs.microsoft.com/en-us/dotnet/standard/parallel-programming/exception-handling-task-parallel-library)

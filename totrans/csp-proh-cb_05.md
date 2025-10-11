@@ -1,10 +1,10 @@
-# 第5章：在 Azure Service Fabric 上创建微服务
+# 第五章：在 Azure Service Fabric 上创建微服务
 
 本章涉及令人兴奋的微服务世界和**Azure Service Fabric**。在本章中，我们将涵盖以下食谱：
 
 +   下载和安装 Service Fabric
 
-+   使用无状态actor服务创建 Service Fabric 应用程序
++   使用无状态 actor 服务创建 Service Fabric 应用程序
 
 +   使用 Service Fabric Explorer
 
@@ -14,41 +14,41 @@
 
 微服务是一种旨在解决单体应用程序和传统应用程序开发方式问题的技术。使用微服务，你可以将应用程序分解成更小的部分（服务），这些服务可以独立运行，不依赖于其他任何服务。这些较小的服务可以是无状态的或是有状态的，在功能规模上也比较小，这使得它们更容易开发、测试和部署。你还可以独立于其他服务对每个微服务进行版本控制。如果一个微服务比其他微服务接收更多的负载，你可以仅将该服务扩展以满足其需求。对于单体应用程序，你必须尝试扩展整个应用程序以满足应用程序中单个组件的需求。
 
-以一个流行的在线网店为例，其运作可能包括购物车、购物者资料、订单管理、后端登录、库存管理、计费、退货等更多功能。传统上，会创建一个单独的Web应用程序来提供所有这些服务。使用微服务，你可以将每个服务隔离为独立的、自包含的功能和代码库。你也可以指派一个开发团队专注于网店的一个部分。如果这个团队负责库存管理微服务，他们将处理其所有方面。例如，这意味着从编写代码和增强功能到测试和部署的每一个环节。
+以一个流行的在线网店为例，其运作可能包括购物车、购物者资料、订单管理、后端登录、库存管理、计费、退货等更多功能。传统上，会创建一个单独的 Web 应用程序来提供所有这些服务。使用微服务，你可以将每个服务隔离为独立的、自包含的功能和代码库。你也可以指派一个开发团队专注于网店的一个部分。如果这个团队负责库存管理微服务，他们将处理其所有方面。例如，这意味着从编写代码和增强功能到测试和部署的每一个环节。
 
 微服务的另一个优秀副作用是它允许你轻松隔离可能遇到的任何故障。最后，你还可以使用任何你想要的任何技术（C#、Java、VB.NET）创建微服务，因为它们是语言无关的。
 
-Azure Service Fabric允许您轻松扩展微服务并提高应用程序的可用性，因为它实现了故障转移。当与Fabric一起使用时，微服务成为一项非常强大的技术。将Azure Service Fabric视为**平台即服务**（**PaaS**）解决方案，您的微服务位于其上。我们称微服务所在的集合为Service Fabric集群。每个微服务都位于一个虚拟机上，在Service Fabric集群中被称为节点。这个Service Fabric集群可以存在于云中或本地机器上。如果某个节点因任何原因变得不可用，Service Fabric集群将自动将微服务重新分配到其他节点，以确保应用程序保持可用。
+Azure Service Fabric 允许您轻松扩展微服务并提高应用程序的可用性，因为它实现了故障转移。当与 Fabric 一起使用时，微服务成为一项非常强大的技术。将 Azure Service Fabric 视为**平台即服务**（**PaaS**）解决方案，您的微服务位于其上。我们称微服务所在的集合为 Service Fabric 集群。每个微服务都位于一个虚拟机上，在 Service Fabric 集群中被称为节点。这个 Service Fabric 集群可以存在于云中或本地机器上。如果某个节点因任何原因变得不可用，Service Fabric 集群将自动将微服务重新分配到其他节点，以确保应用程序保持可用。
 
 最后，关于有状态和无状态微服务的区别，这里有一句话要说。您可以将微服务创建为有状态或无状态。当一个微服务依赖于外部数据存储来持久化数据时，它本质上是无状态的。这仅仅意味着微服务不内部维护其状态。另一方面，有状态的微服务通过在它所在的本地服务器上存储来维护其状态。
 
-# 下载和安装Service Fabric
+# 下载和安装 Service Fabric
 
-在您能够创建和测试Service Fabric应用程序之前，您必须在您的PC上安装和设置一个本地Service Fabric集群。
+在您能够创建和测试 Service Fabric 应用程序之前，您必须在您的 PC 上安装和设置一个本地 Service Fabric 集群。
 
 ## 准备工作
 
-我们将从Azure网站下载并安装**软件开发工具包**（**SDK**），这将允许我们在您的本地开发机器上创建一个本地Service Fabric集群。
+我们将从 Azure 网站下载并安装**软件开发工具包**（**SDK**），这将允许我们在您的本地开发机器上创建一个本地 Service Fabric 集群。
 
 ## 如何操作…
 
-1.  从Microsoft Azure网站下载SDK，并通过Service Fabric学习路径访问其他资源，例如文档，请访问[https://azure.microsoft.com/en-us/documentation/learning-paths/service-fabric/](https://azure.microsoft.com/en-us/documentation/learning-paths/service-fabric/)：![如何操作…](img/B05391_05_01.jpg)
+1.  从 Microsoft Azure 网站下载 SDK，并通过 Service Fabric 学习路径访问其他资源，例如文档，请访问[`azure.microsoft.com/en-us/documentation/learning-paths/service-fabric/`](https://azure.microsoft.com/en-us/documentation/learning-paths/service-fabric/)：![如何操作…](img/B05391_05_01.jpg)
 
 1.  在安装开始之前，您需要接受许可条款：![如何操作…](img/B05391_05_02.jpg)
 
-1.  然后Web平台安装程序开始下载Microsoft Azure Service Fabric运行时。请允许此过程完成：![如何操作…](img/B05391_05_03.jpg)
+1.  然后 Web 平台安装程序开始下载 Microsoft Azure Service Fabric 运行时。请允许此过程完成：![如何操作…](img/B05391_05_03.jpg)
 
 1.  下载完成后，安装过程将开始：![如何操作…](img/B05391_05_04.jpg)
 
 1.  安装完成后，以下产品将被安装，这也在下面的屏幕截图中显而易见：
 
-    +   Microsoft Azure Service Fabric运行时
+    +   Microsoft Azure Service Fabric 运行时
 
-    +   Microsoft Azure Service Fabric Core SDK预览版
+    +   Microsoft Azure Service Fabric Core SDK 预览版
 
-    +   Microsoft Azure Service Fabric Visual Studio 2015工具预览版
+    +   Microsoft Azure Service Fabric Visual Studio 2015 工具预览版
 
-    +   Microsoft Azure Service Fabric SDK预览版
+    +   Microsoft Azure Service Fabric SDK 预览版
 
     ![如何操作…](img/B05391_05_05.jpg)
 
@@ -84,9 +84,9 @@ Azure Service Fabric允许您轻松扩展微服务并提高应用程序的可用
 
 简单来说，如果您想创建一个应该向任何时间点上的许多应用程序用户公开的服务，一个可靠服务可能是一个不错的选择。想象一下，一个公开最新汇率的服务，可以被许多用户或应用程序同时消费。
 
-再次，回顾本章的引言部分，我们使用了在线网店和购物车的例子。可靠的演员可以很好地适应每个购买商品的客户，因此你可以有一个购物车演员。作为服务框架框架的一部分，可靠的演员基于虚拟演员模式。查看有关虚拟演员模式的文章，请访问[http://research.microsoft.com/en-us/projects/orleans/](http://research.microsoft.com/en-us/projects/orleans/)。
+再次，回顾本章的引言部分，我们使用了在线网店和购物车的例子。可靠的演员可以很好地适应每个购买商品的客户，因此你可以有一个购物车演员。作为服务框架框架的一部分，可靠的演员基于虚拟演员模式。查看有关虚拟演员模式的文章，请访问[`research.microsoft.com/en-us/projects/orleans/`](http://research.microsoft.com/en-us/projects/orleans/)。
 
-为了展示使用无状态演员服务作为示例创建微服务是多么容易，我们将使用Visual Studio将服务发布到服务框架集群，并从控制台（客户端）应用程序调用该服务。
+为了展示使用无状态演员服务作为示例创建微服务是多么容易，我们将使用 Visual Studio 将服务发布到服务框架集群，并从控制台（客户端）应用程序调用该服务。
 
 ## 准备工作
 
@@ -94,9 +94,9 @@ Azure Service Fabric允许您轻松扩展微服务并提高应用程序的可用
 
 ## 如何做…
 
-1.  在Visual Studio中，通过转到**文件** | **新建** | **项目**来创建一个新的项目。![如何做…](img/B05391_05_13.jpg)
+1.  在 Visual Studio 中，通过转到**文件** | **新建** | **项目**来创建一个新的项目。![如何做…](img/B05391_05_13.jpg)
 
-1.  从**Visual C#**节点展开节点，直到你看到**云**节点。当你点击它时，你会看到Visual Studio现在列出了一个名为**服务框架应用程序**的新模板。选择**服务框架应用程序**模板，命名为`sfApp`，然后点击**确定**。![如何做…](img/B05391_05_14.jpg)
+1.  从**Visual C#**节点展开节点，直到你看到**云**节点。当你点击它时，你会看到 Visual Studio 现在列出了一个名为**服务框架应用程序**的新模板。选择**服务框架应用程序**模板，命名为`sfApp`，然后点击**确定**。![如何做…](img/B05391_05_14.jpg)
 
 1.  接下来，从弹出的**创建服务**窗口中选择**无状态可靠** **演员**。我们将其命名为`UtilitiesActor`：![如何做…](img/B05391_05_15.jpg)
 
@@ -112,7 +112,15 @@ Azure Service Fabric允许您轻松扩展微服务并提高应用程序的可用
 
 1.  我们将首先修改`IUtilitiesActor`接口。这个接口将简单地要求`UtilitiesActor`实现一个名为`ValidateEmailAsync`的方法，该方法接受一个电子邮件地址作为参数，并返回一个布尔值，表示它是否是一个有效的电子邮件地址：
 
-    [PRE0]
+    ```cs
+    namespace UtilitiesActor.Interfaces
+    {
+        public interface IUtilitiesActor : IActor
+        {
+            Task<bool> ValidateEmailAsync(string emailToValidate);
+        }
+    }
+    ```
 
 1.  接下来，打开你的`UtilitiesActor`项目并查看类。它将用红色波浪线标记，因为它没有实现接口成员`ValidateEmailAsync()`：![如何做…](img/B05391_05_16.jpg)
 
@@ -120,13 +128,34 @@ Azure Service Fabric允许您轻松扩展微服务并提高应用程序的可用
 
 1.  为您插入的实现接口代码应如下所示。目前，它只包含`NotImplementedException`。这就是我们将实现代码以验证电子邮件地址的地方：
 
-    [PRE1]
+    ```cs
+    namespace UtilitiesActor
+    {
+        internal class UtilitiesActor : StatelessActor, IUtilitiesActor
+        {
+            public Task<bool> ValidateEmailAsync(string emailToValidate)
+            {
+                throw new NotImplementedException();
+            }        
+        }
+    }
+    ```
 
 1.  我们将使用正则表达式来验证通过参数传递给此方法的电子邮件地址。正则表达式非常强大。然而，在我的编程生涯中，我从未自己编写过表达式。这些在互联网上很容易找到，并且您可以为您的项目创建一个实用工具类（或扩展方法类）以供重用。您可以使用正则表达式和其他常用代码。
 
     最后，您将注意到 `ActorEventSource` 代码。这只是为了创建 **Windows 事件跟踪** (**ETW**) 事件，这些事件将帮助您从 Visual Studio 的诊断事件窗口中查看应用程序中的情况。要打开诊断事件窗口，请转到 **视图**，**其他窗口**，然后单击 **诊断事件查看器**：
 
-    [PRE2]
+    ```cs
+    internal class UtilitiesActor : StatelessActor, IUtilitiesActor
+    {
+        public async Task<bool> ValidateEmailAsync(string emailToValidate)
+        {
+            ActorEventSource.Current.ActorMessage(this, "Email Validation");
+
+            return await Task.FromResult(Regex.IsMatch(emailToValidate, @"\A(?:[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0- 9!#$%&'*+/=?^_`{|}~-]+)*@(?:a-z0-9?\.)+a-z0-9?)\Z", RegexOptions.IgnoreCase));
+        }        
+    }
+    ```
 
 1.  一定要添加对 `System.Text.RegularExpressions` 命名空间的引用。没有它，您将无法使用正则表达式。如果您在代码中添加了正则表达式而没有添加引用，Visual Studio 将在 `Regex` 方法下显示一条红色的波浪线：![如何操作…](img/B05391_05_18.jpg)
 
@@ -146,27 +175,48 @@ Azure Service Fabric允许您轻松扩展微服务并提高应用程序的可用
 
 1.  在您的控制台应用程序的 `Program.cs` 文件中，您需要在 `Main` 方法中添加以下代码：
 
-    [PRE3]
+    ```cs
+    namespace sfApp.Client
+    {
+        class Program
+        {
+            static void Main(string[] args)
+            {
+                var actProxy = ActorProxy.Create<IUtilitiesActor> (ActorId.NewId(), "fabric:/sfApp");
+
+                WriteLine("Utilities Actor {0} - Valid Email?: {1}", actProxy.GetActorId(), actProxy.ValidateEmailAsync ("validemail@gmail.com").Result);
+                WriteLine("Utilities Actor {0} - Valid Email?: {1}", actProxy.GetActorId(), actProxy.ValidateEmailAsync ("invalid@email@gmail.com").Result);
+                ReadLine();
+            }
+        }
+    }
+    ```
 
     我们所做的一切只是为我们的演员创建一个代理，并将电子邮件验证的输出写入控制台窗口。您的客户端应用程序现在已准备就绪。
 
 1.  在我们能够运行客户端应用程序之前，然而，我们首先需要发布我们的服务。在**解决方案资源管理器**中，右键单击`sfApp`服务，然后从上下文菜单中选择**发布**：![如何操作…](img/B05391_05_26.jpg)
 
-1.  现在，将显示**发布Service Fabric应用程序**窗口。单击**连接端点**文本框旁边的**选择…**按钮：![如何操作…](img/B05391_05_27.jpg)
+1.  现在，将显示**发布 Service Fabric 应用程序**窗口。单击**连接端点**文本框旁边的**选择…**按钮：![如何操作…](img/B05391_05_27.jpg)
 
 1.  将**连接端点**选择为**本地集群**，然后单击**确定**：![如何操作…](img/B05391_05_28.jpg)
 
 1.  将**目标配置文件**和**应用程序参数文件**更改为`Local.xml`。完成后，单击**发布**按钮：![如何操作…](img/B05391_05_30.jpg)
 
-1.  如果你导航到`http://localhost:19080/Explorer`，你会注意到你创建的服务已经发布到你的本地Service Fabric集群中：![如何操作…](img/B05391_05_31.jpg)
+1.  如果你导航到`http://localhost:19080/Explorer`，你会注意到你创建的服务已经发布到你的本地 Service Fabric 集群中：![如何操作…](img/B05391_05_31.jpg)
 
 1.  现在，你已准备好运行你的客户端应用程序。右键单击`sfApp.Client`项目，然后从上下文菜单中选择**调试**和**启动新实例**：![如何操作…](img/B05391_05_32.jpg)
 
 1.  控制台应用程序调用验证方法来检查电子邮件地址，并将结果显示在控制台窗口中。结果符合预期：![如何操作…](img/B05391_05_33.jpg)
 
-1.  然而，在创建actor ID时，我们可以更加具体。我们可以给它一个特定的名称。修改你的代理代码，并创建一个新的`ActorId`方法，并给它任何字符串值：
+1.  然而，在创建 actor ID 时，我们可以更加具体。我们可以给它一个特定的名称。修改你的代理代码，并创建一个新的`ActorId`方法，并给它任何字符串值：
 
-    [PRE4]
+    ```cs
+    var actProxy = ActorProxy.Create<IUtilitiesActor>(new ActorId("Utilities"), "fabric:/sfApp");
+
+    WriteLine("Utilities Actor {0} - Valid Email?: {1}", actProxy.GetActorId(), actProxy.ValidateEmailAsync("validemail@gmail.com").Result) ;
+    WriteLine("Utilities Actor {0} - Valid Email?: {1}", actProxy.GetActorId(), actProxy.ValidateEmailAsync("invalid@email@gmail.com").Resu lt);
+    ReadLine();
+    ```
 
     ### 注意
 
@@ -176,11 +226,11 @@ Azure Service Fabric允许您轻松扩展微服务并提高应用程序的可用
 
 ## 它是如何工作的…
 
-创建你的Service Fabric应用程序并在本地发布是一个在将其发布到云之前测试应用程序的完美解决方案。创建小型独立的微服务可以让开发者获得许多与测试、调试和部署高效且健壮的代码相关的优势，这些代码可以让你的应用程序利用以确保最大可用性。
+创建你的 Service Fabric 应用程序并在本地发布是一个在将其发布到云之前测试应用程序的完美解决方案。创建小型独立的微服务可以让开发者获得许多与测试、调试和部署高效且健壮的代码相关的优势，这些代码可以让你的应用程序利用以确保最大可用性。
 
-# 使用Service Fabric Explorer
+# 使用 Service Fabric Explorer
 
-你还可以使用另一个工具来可视化Service Fabric集群。这是一个独立的工具，你可以通过导航到本地安装路径`%Program Files%\Microsoft SDKs\Service Fabric\Tools\ServiceFabricExplorer`并单击`ServiceFabricExplorer.exe`来找到它。当你运行应用程序时，它将自动连接到你的本地Service Fabric集群。它可以显示有关集群中的应用程序、集群节点、应用程序和节点的健康状态以及集群中应用程序的任何负载的丰富信息。
+你还可以使用另一个工具来可视化 Service Fabric 集群。这是一个独立的工具，你可以通过导航到本地安装路径`%Program Files%\Microsoft SDKs\Service Fabric\Tools\ServiceFabricExplorer`并单击`ServiceFabricExplorer.exe`来找到它。当你运行应用程序时，它将自动连接到你的本地 Service Fabric 集群。它可以显示有关集群中的应用程序、集群节点、应用程序和节点的健康状态以及集群中应用程序的任何负载的丰富信息。
 
 ## 准备工作
 

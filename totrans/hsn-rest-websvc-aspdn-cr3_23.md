@@ -22,33 +22,98 @@ OpenAPI 创新是 Linux 基金会的一部分，并定义了 **OpenAPI** **规�
 
 Swagger 的主要目标是自动生成并公开一个名为 `swagger.json` 的文档，也称为 **Swagger 规范**。Swagger 规范是 API 的自动生成文档，提供了关于 Web 服务公开的每个单独路由的信息。以下代码展示了示例 `swagger.json` 文件的结构：
 
-[PRE0]
+```cs
+{
+  "x-generator": "NSwag v12.0.12.0 (NJsonSchema v9.13.15.0 (Newtonsoft.Json v12.0.0.0))",
+  "swagger": "2.0",
+  "host": "localhost:5000",
+  "schemes": [
+    "http"
+  ],
+  "consumes": [
+    "application/json"
+  ],
+  "paths": {
+    "/api/artist": {
+      "get": {
+        "tags": [
+          "Artist"
+        ],
+        "operationId": "Artist_Get",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "artistId",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "schema": {
+              "type": "file"
+            }
+          }
+        }
+...
+```
 
-上述代码片段描述了在**目录服务**API中定义的一些路由。正如你所见，在JSON的第一级中，有一些关于服务的一般信息，例如服务的`apiVersion`、`title`和`basePath`。此外，我们还可以看到一个名为`paths`的节点，它包含我们服务的所有路径。对于每个路由，它描述了不同的响应类型、不同的HTTP动词以及服务接受的全部有效负载信息。由于我们有一个独特的标准来描述我们的API，因此也可以定义一个独特的用户界面，以便我们可以查询并向服务发送信息；这就是**Swagger UI**的作用。Swagger UI是一个使用`swagger.json`文件提供用户友好UI的工具：
+上述代码片段描述了在**目录服务**API 中定义的一些路由。正如你所见，在 JSON 的第一级中，有一些关于服务的一般信息，例如服务的`apiVersion`、`title`和`basePath`。此外，我们还可以看到一个名为`paths`的节点，它包含我们服务的所有路径。对于每个路由，它描述了不同的响应类型、不同的 HTTP 动词以及服务接受的全部有效负载信息。由于我们有一个独特的标准来描述我们的 API，因此也可以定义一个独特的用户界面，以便我们可以查询并向服务发送信息；这就是**Swagger UI**的作用。Swagger UI 是一个使用`swagger.json`文件提供用户友好 UI 的工具：
 
 ![图片](img/68000202-f3d8-455b-928f-d5a3f0a2952f.png)
 
-上一张截图显示了我们可以用来浏览API公开的不同路由的有用UI示例。此外，它还允许消费者立即全面了解API提供的数据。现在，让我们学习如何在ASP.NET Core中实现OpenAPI。
+上一张截图显示了我们可以用来浏览 API 公开的不同路由的有用 UI 示例。此外，它还允许消费者立即全面了解 API 提供的数据。现在，让我们学习如何在 ASP.NET Core 中实现 OpenAPI。
 
-# 在ASP.NET Core服务中实现OpenAPI
+# 在 ASP.NET Core 服务中实现 OpenAPI
 
-我们可以使用两个不同的包在ASP.NET Core中实现OpenAPI：
+我们可以使用两个不同的包在 ASP.NET Core 中实现 OpenAPI：
 
-+   **Swashbuckle**: [https://docs.microsoft.com/en-us/aspnet/core/tutorials/getting-started-with-swashbuckle?view=aspnetcore-2.2](https://docs.microsoft.com/en-us/aspnet/core/tutorials/getting-started-with-swashbuckle?view=aspnetcore-2.2)
++   **Swashbuckle**: [`docs.microsoft.com/en-us/aspnet/core/tutorials/getting-started-with-swashbuckle?view=aspnetcore-2.2`](https://docs.microsoft.com/en-us/aspnet/core/tutorials/getting-started-with-swashbuckle?view=aspnetcore-2.2)
 
-+   **NSwag**: [https://docs.microsoft.com/en-us/aspnet/core/tutorials/getting-started-with-nswag?view=aspnetcore-2.2](https://docs.microsoft.com/en-us/aspnet/core/tutorials/getting-started-with-nswag?view=aspnetcore-2.2)
++   **NSwag**: [`docs.microsoft.com/en-us/aspnet/core/tutorials/getting-started-with-nswag?view=aspnetcore-2.2`](https://docs.microsoft.com/en-us/aspnet/core/tutorials/getting-started-with-nswag?view=aspnetcore-2.2)
 
-这两个都使用中间件来生成和提供`swagger.json`文件，并允许用户界面浏览服务定义。在本节中，我们将讨论如何将NSwag集成到我们的vinyl目录服务中。以下架构显示了NSwag是如何集成到我们的ASP.NET Core服务中的：
+这两个都使用中间件来生成和提供`swagger.json`文件，并允许用户界面浏览服务定义。在本节中，我们将讨论如何将 NSwag 集成到我们的 vinyl 目录服务中。以下架构显示了 NSwag 是如何集成到我们的 ASP.NET Core 服务中的：
 
 ![图片](img/9316aeb8-6ddc-4e23-b63f-140dc116b563.png)
 
 让我们从通过以下命令将`NSwag.AspNetCore`添加到`Catalog*.*API`项目开始：
 
-[PRE1]
+```cs
+dotnet add package NSwag.AspNetCore
+```
 
-之后，我们可以通过结合生成和提供OpenAPI规范的中介件以及初始化UI的中介件来继续操作。正如我们在[第3章](77d18c37-0c9d-4b2b-82f5-74fd874c0e0f.xhtml)“与中介件管道一起工作”中看到的，我们需要使用在`Startup`类中实现的`Configure`和`ConfigureServices`方法：
+之后，我们可以通过结合生成和提供 OpenAPI 规范的中介件以及初始化 UI 的中介件来继续操作。正如我们在第三章“与中介件管道一起工作”中看到的，我们需要使用在`Startup`类中实现的`Configure`和`ConfigureServices`方法：
 
-[PRE2]
+```cs
+...
+    public class Startup
+    {
+
+        public void ConfigureServices(IServiceCollection services)
+        {
+            services
+                .AddCatalogContext(Configuration.
+                GetSection("DataSource:ConnectionString").Value);
+
+            services
+               ..
+                .AddOpenApiDocument(settings =>{
+                                       settings.Title = "Catalog API";
+                                       settings.DocumentName = "v3";
+                                       settings.Version = "v3";                                   
+                                    });
+        }
+
+        public void Configure(IApplicationBuilder app, 
+        IHostingEnvironment env)
+        {
+            ...
+             app
+                .UseOpenApi()
+ .UseSwaggerUi3();
+        }
+    }
+}
+```
 
 `AddOpenApiDocument` 添加了生成 OpenAPI 3.0 所需的服务。`UseOpenApi` 添加了 OpenAPI/Swagger 生成器，它使用 API 描述来执行 Swagger 生成，而 `UseSwaggerUi3` 创建并实例化提供 Swagger UI 的中间件。由于我们已经将 OpenAPI 中间件集成到我们的服务中，我们可以通过运行我们的服务并使用我们首选的浏览器浏览 `https://localhost/swagger` URL 来继续操作。
 
@@ -56,9 +121,9 @@ NSwag 和 Swashbuckle 使用反射来浏览我们控制器内的操作方法。�
 
 NSwag 还提供了一些有用的工具，以便我们可以在我们的 Web 服务上执行代码生成，例如以下这些：
 
-+   `NSwag.CodeGeneration.CSharp` ([https://www.nuget.org/packages/NSwag.CodeGeneration.CSharp/](https://www.nuget.org/packages/NSwag.CodeGeneration.CSharp/))
++   `NSwag.CodeGeneration.CSharp` ([`www.nuget.org/packages/NSwag.CodeGeneration.CSharp/`](https://www.nuget.org/packages/NSwag.CodeGeneration.CSharp/))
 
-+   `NSwag.CodeGeneration.TypeScript` ([https://www.nuget.org/packages/NSwag.CodeGeneration.TypeScript/](https://www.nuget.org/packages/NSwag.CodeGeneration.TypeScript/))
++   `NSwag.CodeGeneration.TypeScript` ([`www.nuget.org/packages/NSwag.CodeGeneration.TypeScript/`](https://www.nuget.org/packages/NSwag.CodeGeneration.TypeScript/))
 
 这些允许我们分别为 C# 和 Typescript 自动生成客户端类。
 
@@ -68,15 +133,71 @@ NSwag 还提供了一些有用的工具，以便我们可以在我们的 Web 服
 
 Swagger UI 的默认响应类型会产生一些错误信息。如果我们查看响应部分，我们会看到响应代码是不正确的，并且它与由 Web 服务返回的实际 HTTP 代码不对应。当使用 ASP.NET Core 2.2 或更高版本时，可以使用约定来指定响应类型：
 
-[PRE3]
+```cs
+..
+    [ApiController]
+    public class ItemController : ControllerBase
+    {
+        [HttpGet]
+        [ApiConventionMethod(typeof(DefaultApiConventions), 
+        nameof(DefaultApiConventions.Get))]
+        public async Task<IActionResult> Get([FromQuery] int pageSize = 
+        10, [FromQuery] int pageIndex = 0)
+
+        [HttpGet("{id:guid}")]
+        [ApiConventionMethod(typeof(DefaultApiConventions), 
+        nameof(DefaultApiConventions.Get))]
+        public async Task<IActionResult> GetById(Guid id)
+      ...
+```
 
 例如，前面的代码使用 `ApiConventionMethod` 属性传递一个自定义类型和方法名称。`ApiConventionMethod` 属性是 `Microsoft.AspNetCore.Mvc` 命名空间的一部分，并使用 `DefaultApiConventions` 静态类，它为通用 API 中的每个操作提供一组默认约定。同样，我们还可以将此属性添加到 `ItemController` 的写入方法中，例如 `Create`、`Update` 和 `Delete` 方法：
 
-[PRE4]
+```cs
+        ...
+
+        [HttpPost]
+        [ApiConventionMethod(typeof(DefaultApiConventions), 
+        nameof(DefaultApiConventions.Create))]
+        public async Task<IActionResult> Create(AddItemRequest request)
+
+        [HttpPut("{id:guid}")]
+        [ApiConventionMethod(typeof(DefaultApiConventions), 
+        nameof(DefaultApiConventions.Update))]
+        public async Task<IActionResult> Update(Guid id, 
+        EditItemRequest request)
+
+        [HttpDelete("{id:guid}")]
+        [ApiConventionMethod(typeof(DefaultApiConventions), 
+        nameof(DefaultApiConventions.Delete))]
+        public async Task<IActionResult> Delete(Guid id)
+    }
+}
+```
 
 这种方法是一种快捷方式，我们可以用它来声明操作方法响应，而无需显式使用 `ProducesResponseType` 属性。让我们看看 `DefaultApiConventions` 静态类，如果我们声明一些静态 void 方法，它将提供一组默认响应类型：
 
-[PRE5]
+```cs
+using Microsoft.AspNetCore.Mvc.ApiExplorer;
+
+namespace Microsoft.AspNetCore.Mvc
+{
+  public static class DefaultApiConventions
+  {
+    [ProducesResponseType(200)]
+ [ProducesResponseType(404)]
+ [ProducesDefaultResponseType]
+ [ApiConventionNameMatch(ApiConventionNameMatchBehavior.Prefix)]
+ public static void Get([ApiConventionNameMatch
+    (ApiConventionNameMatchBehavior.Suffix), ApiConventionTypeMatch(
+    ApiConventionTypeMatchBehavior.Any)] object id)
+ {
+ }
+
+    ...
+  }
+}
+```
 
 例如，对于 `Get` 方法，它声明了 `HTTP 200 OK` 响应和 `HTTP 404 Not found`。通过这样做，我们可以轻松地为每个操作声明适当的响应类型。`DefaultApiConventions` 类是 `Microsoft.AspNetCore.Mvc` 命名空间的一部分。
 
@@ -84,11 +205,44 @@ Swagger UI 的默认响应类型会产生一些错误信息。如果我们查看
 
 `DefaultApiConvention` 类并不总是适合我们的控制器。此外，它过于通用，操作方法通常过于具体，不适合 `DefaultApiConvention` 类。因此，ASP.NET Core 允许我们根据我们的需求创建自定义的 API 约定。要声明一个新的约定，我们需要创建一个新的静态类，其中包含相应的静态方法，如下所示：
 
-[PRE6]
+```cs
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ApiExplorer;
+
+namespace Catalog.API.Conventions
+{
+    public static class ItemApiConvention
+    {
+
+        [ProducesResponseType(200)]
+        [ProducesResponseType(404)]
+        [ProducesResponseType(400)]
+        [ProducesDefaultResponseType]
+        [ApiConventionNameMatch(ApiConventionNameMatchBehavior.Prefix)]
+        public static void Get([ApiConventionNameMatch
+        (ApiConventionNameMatchBehavior.Suffix),
+                                ApiConventionTypeMatch
+                                (ApiConventionTypeMatchBehavior.Any)]
+                                 object id)
+        {
+        }
+
+        ...
+    }
+}
+```
 
 我们在这里实现的约定描述了 `ItemController` 的 `Get` 操作方法。如您所见，此方法产生以下 HTTP 响应：`200`、`404` 和 `400`。这种方法还允许我们生成和扩展由路由返回的响应类型。此外，我们可以通过以下方式应用属性来分配和使用这些约定：
 
-[PRE7]
+```cs
+[HttpGet]
+[ApiConventionMethod(typeof(ItemApiConvention), nameof(ItemApiConvention.Get))]
+public async Task<IActionResult> Get([FromQuery] int pageSize = 10, [FromQuery] int pageIndex = 0)
+{
+
+    ...
+}
+```
 
 这种方法使我们能够将 API 约定自定义并分组到一个独特的类中，并完全自定义 API 的合同。同样的方法也可以用于您服务中控制器类中存在的其他操作方法。
 

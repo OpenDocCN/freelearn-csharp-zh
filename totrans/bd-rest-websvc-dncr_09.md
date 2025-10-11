@@ -1,12 +1,12 @@
-# 扩展RESTful服务（Web服务的性能）
+# 扩展 RESTful 服务（Web 服务的性能）
 
 在网络世界中，每个人要么在编写，要么在寻找一个网络应用程序。随着需求的增加，每个网络应用程序都需要能够服务更多的请求——有时每天成千上万的请求。因此，应用程序应该编写成能够处理这些大量请求。
 
-例如，假设你是一个开发和支持团队的一员，负责开发公司的旗舰产品FlixOne Store。这个产品很受欢迎，并且获得了关注，导致你的电子商务网站（FlixOne）被消费者流量淹没。你系统中的支付服务很慢，这几乎使整个系统崩溃，导致你失去了客户。虽然这是一个虚构的场景，但在现实生活中确实可能发生，并可能导致业务损失。为了避免这种情况，你应该考虑FlixOne应用程序的可扩展性。
+例如，假设你是一个开发和支持团队的一员，负责开发公司的旗舰产品 FlixOne Store。这个产品很受欢迎，并且获得了关注，导致你的电子商务网站（FlixOne）被消费者流量淹没。你系统中的支付服务很慢，这几乎使整个系统崩溃，导致你失去了客户。虽然这是一个虚构的场景，但在现实生活中确实可能发生，并可能导致业务损失。为了避免这种情况，你应该考虑 FlixOne 应用程序的可扩展性。
 
 可扩展性是关键系统最重要的非功能性需求之一。为几百个用户提供数百笔交易与为几百万用户提供几百万笔交易的服务并不相同。
 
-在本章中，我们将讨论一般性的可扩展性。我们还将讨论如何扩展RESTful服务，设计它们时需要考虑的因素，以及如何使用不同的模式来避免级联故障，包括技术、库和工具，这些也可以帮助我们的常规应用程序。
+在本章中，我们将讨论一般性的可扩展性。我们还将讨论如何扩展 RESTful 服务，设计它们时需要考虑的因素，以及如何使用不同的模式来避免级联故障，包括技术、库和工具，这些也可以帮助我们的常规应用程序。
 
 到本章结束时，你将了解以下内容：
 
@@ -34,11 +34,11 @@
 
 在前面的图中，您可以看到负载均衡器在其典型环境中，系统通过互联网从不同来源接受多个请求，然后由负载均衡器从多个服务器进行管理。
 
-在.NET中，这种配置也被称为Web农场 ([https://www.codeproject.com/Articles/114910/What-is-the-difference-between-Web-Farm-and-Web-Ga](https://www.codeproject.com/Articles/114910/What-is-the-difference-between-Web-Farm-and-Web-Ga))。
+在.NET 中，这种配置也被称为 Web 农场 ([`www.codeproject.com/Articles/114910/What-is-the-difference-between-Web-Farm-and-Web-Ga`](https://www.codeproject.com/Articles/114910/What-is-the-difference-between-Web-Farm-and-Web-Ga))。
 
 负载均衡器使用各种算法，也称为负载均衡方法：最少连接方法、轮询方法、最少响应时间方法、最少带宽方法、最少数据包方法、自定义负载方法等。
 
-负载均衡器在应用程序的可扩展性中扮演着重要角色，因为它确保应用程序的服务器能够处理服务器请求。请注意，您可能需要在代码不变的情况下安排您的硬件基础设施以适应负载均衡器（尽管，有些情况下可能需要代码更改）。市场上有很多负载均衡器，例如Incapsula ([https://www.incapsula.com/](https://www.incapsula.com/))、F5 ([https://www.f5.com/](https://www.f5.com/))、Citrix Netscaler ([https://www.citrix.com/](https://www.citrix.com/))、Dyn ([https://dyn.com/](https://dyn.com/))）、Amazon Elastic Load Balancing和Amazon ELB ([https://aws.amazon.com/](https://aws.amazon.com/))。
+负载均衡器在应用程序的可扩展性中扮演着重要角色，因为它确保应用程序的服务器能够处理服务器请求。请注意，您可能需要在代码不变的情况下安排您的硬件基础设施以适应负载均衡器（尽管，有些情况下可能需要代码更改）。市场上有很多负载均衡器，例如 Incapsula ([`www.incapsula.com/`](https://www.incapsula.com/))、F5 ([`www.f5.com/`](https://www.f5.com/))、Citrix Netscaler ([`www.citrix.com/`](https://www.citrix.com/))、Dyn ([`dyn.com/`](https://dyn.com/))）、Amazon Elastic Load Balancing 和 Amazon ELB ([`aws.amazon.com/`](https://aws.amazon.com/))。
 
 在接下来的部分中，我们将探讨您可以扩展系统的不同方法。
 
@@ -46,9 +46,9 @@
 
 每个应用程序都有其自己的服务请求能力。应用程序的能力指的是其性能以及当负载增加时如何满足其目标。
 
-许多Web应用程序将此称为在规定时间内的请求数量。
+许多 Web 应用程序将此称为在规定时间内的请求数量。
 
-在设计您的Web应用程序时做出正确的设计决策非常重要；设计决策会影响您服务的可扩展性。确保找到正确的平衡点，以便您的方案不仅考虑服务，还要考虑其基础设施，以及任何扩展需求。
+在设计您的 Web 应用程序时做出正确的设计决策非常重要；设计决策会影响您服务的可扩展性。确保找到正确的平衡点，以便您的方案不仅考虑服务，还要考虑其基础设施，以及任何扩展需求。
 
 性能和可扩展性是系统的两个不同特性。性能涉及系统的吞吐量，而可扩展性涉及为更多用户或更多交易处理所需吞吐量。
 
@@ -56,21 +56,21 @@
 
 **向内扩展**或**向上扩展**（也称为**垂直扩展**）是通过向同一机器添加更多资源（如内存或更快的处理器）来实现可扩展性的方法。这并不总是适用于所有应用程序，因为成本也是考虑垂直扩展时的一个因素。
 
-您也可以升级资源或硬件，而不是向机器添加新资源。例如，如果您有8 GB的RAM，您可以将其升级到16 GB，同样的情况也适用于处理器和其他资源。不幸的是，随着硬件的升级，机器的可扩展性有一定的限制。这可能会导致仅仅是将瓶颈转移，而不是解决提高可扩展性的真正问题。
+您也可以升级资源或硬件，而不是向机器添加新资源。例如，如果您有 8 GB 的 RAM，您可以将其升级到 16 GB，同样的情况也适用于处理器和其他资源。不幸的是，随着硬件的升级，机器的可扩展性有一定的限制。这可能会导致仅仅是将瓶颈转移，而不是解决提高可扩展性的真正问题。
 
-您也可以将应用程序迁移到完全不同的机器上，例如简单地迁移到更强大的MacOS，例如。
+您也可以将应用程序迁移到完全不同的机器上，例如简单地迁移到更强大的 MacOS，例如。
 
-垂直扩展不涉及任何代码更改，因此这是一个简单的任务，但它涉及额外的成本，因为这是一种相当昂贵的技巧。Stack Overflow是那些罕见的基于.NET的系统之一，它进行了垂直扩展。
+垂直扩展不涉及任何代码更改，因此这是一个简单的任务，但它涉及额外的成本，因为这是一种相当昂贵的技巧。Stack Overflow 是那些罕见的基于.NET 的系统之一，它进行了垂直扩展。
 
 # 扩展（横向扩展）
 
 扩展（向上扩展）、扩展（向外扩展）或横向扩展是通过添加更多服务器或节点来服务请求，而不是资源。如果您不想扩展应用程序，总有一种方法可以将其扩展。
 
-当应用程序代码不依赖于其运行的服务器时，横向扩展是一种成功的策略。然而，如果需要在一个特定的服务器上执行请求，即如果应用程序代码具有服务器亲和性，那么横向扩展将会很困难。在无状态代码的情况下，在任何服务器上执行都更容易。因此，当无状态代码在横向扩展的机器或集群上运行时，可扩展性得到了提高。由于横向扩展的性质，这在整个行业中是一种常用的方法。有许多大型可扩展系统以这种方式管理，例如Google、Amazon和Microsoft。
+当应用程序代码不依赖于其运行的服务器时，横向扩展是一种成功的策略。然而，如果需要在一个特定的服务器上执行请求，即如果应用程序代码具有服务器亲和性，那么横向扩展将会很困难。在无状态代码的情况下，在任何服务器上执行都更容易。因此，当无状态代码在横向扩展的机器或集群上运行时，可扩展性得到了提高。由于横向扩展的性质，这在整个行业中是一种常用的方法。有许多大型可扩展系统以这种方式管理，例如 Google、Amazon 和 Microsoft。
 
 # 线性可扩展性
 
-线性可扩展性指的是应用阿姆达尔定律（[https://en.wikipedia.org/wiki/Amdahl%27s_law](https://en.wikipedia.org/wiki/Amdahl%27s_law)）来垂直扩展应用程序。在这里，您也可以考虑并行计算。
+线性可扩展性指的是应用阿姆达尔定律（[`en.wikipedia.org/wiki/Amdahl%27s_law`](https://en.wikipedia.org/wiki/Amdahl%27s_law)）来垂直扩展应用程序。在这里，您也可以考虑并行计算。
 
 并行计算是一种计算架构，它表明通过执行多个处理器来实现同时处理。
 
@@ -84,7 +84,7 @@
 
 # 分布式缓存
 
-通过分布式缓存技术，我们可以提高我们RESTful Web服务的可扩展性（Web API）。分布式缓存可以存储在集群的多个节点上。分布式缓存提高了Web服务的吞吐量，因为缓存不再需要任何I/O跳转到任何外部资源。
+通过分布式缓存技术，我们可以提高我们 RESTful Web 服务的可扩展性（Web API）。分布式缓存可以存储在集群的多个节点上。分布式缓存提高了 Web 服务的吞吐量，因为缓存不再需要任何 I/O 跳转到任何外部资源。
 
 这种方法有以下优点：
 
@@ -100,11 +100,11 @@
 
 # 一级缓存
 
-这是一个由EF Core启用的内置会话缓存。从服务的第一个请求开始，从数据库中检索一个对象并将其存储在EF Core会话中。换句话说，EF Object Context和DbContext维护它们所管理的实体的状态信息。一旦上下文不再可用，其状态信息也随之消失。
+这是一个由 EF Core 启用的内置会话缓存。从服务的第一个请求开始，从数据库中检索一个对象并将其存储在 EF Core 会话中。换句话说，EF Object Context 和 DbContext 维护它们所管理的实体的状态信息。一旦上下文不再可用，其状态信息也随之消失。
 
 # 二级缓存
 
-对于主要采用分布式方式开发的应用或需要持久化数据的长时间运行请求，如Web应用，二级缓存非常重要。二级缓存存在于事务或应用范围之外，这些缓存对任何上下文或实例都可用。你可以使用应用提供的缓存机制，而不是编写自己的代码，例如Memcached。
+对于主要采用分布式方式开发的应用或需要持久化数据的长时间运行请求，如 Web 应用，二级缓存非常重要。二级缓存存在于事务或应用范围之外，这些缓存对任何上下文或实例都可用。你可以使用应用提供的缓存机制，而不是编写自己的代码，例如 Memcached。
 
 # 应用缓存
 
@@ -112,23 +112,23 @@
 
 # CacheCow
 
-当你想在客户端和服务器上实现HTTP缓存时，CacheCow就派上用场。这是一个轻量级库，目前支持ASP.NET Web API。CacheCow是开源的，并附带MIT许可证，可在GitHub上找到（[https://github.com/aliostad/CacheCow](https://github.com/aliostad/CacheCow)）。
+当你想在客户端和服务器上实现 HTTP 缓存时，CacheCow 就派上用场。这是一个轻量级库，目前支持 ASP.NET Web API。CacheCow 是开源的，并附带 MIT 许可证，可在 GitHub 上找到（[`github.com/aliostad/CacheCow`](https://github.com/aliostad/CacheCow)）。
 
-要开始使用CacheCow，你需要通过以下步骤为服务器和客户端做好准备：
+要开始使用 CacheCow，你需要通过以下步骤为服务器和客户端做好准备：
 
-1.  在你的ASP.NET Web API项目中安装`Install-Package CacheCow.Server` NuGet包；这将是你服务器。
+1.  在你的 ASP.NET Web API 项目中安装`Install-Package CacheCow.Server` NuGet 包；这将是你服务器。
 
-1.  在你的客户端项目中安装`Install-Package CacheCow.Client` NuGet包；客户端应用将是WPF、Windows Form、控制台或任何其他Web应用。
+1.  在你的客户端项目中安装`Install-Package CacheCow.Client` NuGet 包；客户端应用将是 WPF、Windows Form、控制台或任何其他 Web 应用。
 
 1.  创建一个缓存存储。你需要创建一个
 
     存储
 
-    在服务器端存储缓存元数据的缓存存储（[https://github.com/aliostad/CacheCow/wiki/Getting-started#cache-store](https://github.com/aliostad/CacheCow/wiki/Getting-started#cache-store)）。
+    在服务器端存储缓存元数据的缓存存储（[`github.com/aliostad/CacheCow/wiki/Getting-started#cache-store`](https://github.com/aliostad/CacheCow/wiki/Getting-started#cache-store)）。
 
 # Memcached
 
-Memcached是一个可定制的开源项目；你可以使用源代码，并根据你的需求对其进行添加和更新。Memcached由其官方页面（[https://memcached.org/](https://memcached.org/））定义为：
+Memcached 是一个可定制的开源项目；你可以使用源代码，并根据你的需求对其进行添加和更新。Memcached 由其官方页面（[`memcached.org/`](https://memcached.org/））定义为：
 
 "一个用于存储来自数据库调用、API 调用或页面渲染结果的任意数据小块（字符串、对象）的内存中键值存储。"
 
@@ -136,19 +136,19 @@ Memcached是一个可定制的开源项目；你可以使用源代码，并根�
 
 # Azure Redis Cache
 
-Azure Redis Cache建立在名为Redis的开源存储之上([https://github.com/antirez/redis](https://github.com/antirez/redis))，这是一个内存数据库，数据持久化在磁盘上。根据Microsoft的描述([https://azure.microsoft.com/en-in/services/cache/](https://azure.microsoft.com/en-in/services/cache/))：
+Azure Redis Cache 建立在名为 Redis 的开源存储之上([`github.com/antirez/redis`](https://github.com/antirez/redis))，这是一个内存数据库，数据持久化在磁盘上。根据 Microsoft 的描述([`azure.microsoft.com/en-in/services/cache/`](https://azure.microsoft.com/en-in/services/cache/))：
 
-“Azure Redis Cache基于流行的开源Redis缓存。它为您提供了访问由Microsoft管理的安全、专用的Redis缓存，并且可以从Azure中的任何应用程序访问。”
+“Azure Redis Cache 基于流行的开源 Redis 缓存。它为您提供了访问由 Microsoft 管理的安全、专用的 Redis 缓存，并且可以从 Azure 中的任何应用程序访问。”
 
-如果您按照以下步骤操作，开始使用Azure Redis Cache非常简单：
+如果您按照以下步骤操作，开始使用 Azure Redis Cache 非常简单：
 
-1.  创建一个Web API项目。参考我们之前章节中的代码示例。
+1.  创建一个 Web API 项目。参考我们之前章节中的代码示例。
 
-1.  实现Redis。参考点为[https://github.com/StackExchange/StackExchange.Redis](https://github.com/StackExchange/StackExchange.Redis)。同时，安装`Install-Package StackExchange.Redis` NuGet包。
+1.  实现 Redis。参考点为[`github.com/StackExchange/StackExchange.Redis`](https://github.com/StackExchange/StackExchange.Redis)。同时，安装`Install-Package StackExchange.Redis` NuGet 包。
 
-1.  更新您的CacheConnection配置文件([https://docs.microsoft.com/en-us/azure/redis-cache/cache-dotnet-how-to-use-azure-redis-cache#NuGet](https://docs.microsoft.com/en-us/azure/redis-cache/cache-dotnet-how-to-use-azure-redis-cache#NuGet))。
+1.  更新您的 CacheConnection 配置文件([`docs.microsoft.com/en-us/azure/redis-cache/cache-dotnet-how-to-use-azure-redis-cache#NuGet`](https://docs.microsoft.com/en-us/azure/redis-cache/cache-dotnet-how-to-use-azure-redis-cache#NuGet))。
 
-1.  然后，在Azure上发布([https://docs.microsoft.com/en-us/azure/redis-cache/cache-web-app-howto#publish-and-run-in-azure](https://docs.microsoft.com/en-us/azure/redis-cache/cache-web-app-howto#publish-and-run-in-azure))。
+1.  然后，在 Azure 上发布([`docs.microsoft.com/en-us/azure/redis-cache/cache-web-app-howto#publish-and-run-in-azure`](https://docs.microsoft.com/en-us/azure/redis-cache/cache-web-app-howto#publish-and-run-in-azure))。
 
 # 通信（异步）
 
@@ -160,11 +160,11 @@ Azure Redis Cache建立在名为Redis的开源存储之上([https://github.com/a
 
 +   一个与组件（内部或外部）通信的服务
 
-这种通信通过HTTP协议进行，消息或数据通过网络传输。
+这种通信通过 HTTP 协议进行，消息或数据通过网络传输。
 
 您应用程序的性能会影响服务之间如何通信。
 
-异步通信是帮助扩展应用程序的方法之一。在ASP.NET Core中，我们可以通过使用异步HTTP调用（异步编程）来实现这一点：[https://docs.microsoft.com/en-us/dotnet/standard/asynchronous-programming-patterns/](https://docs.microsoft.com/en-us/dotnet/standard/asynchronous-programming-patterns/)
+异步通信是帮助扩展应用程序的方法之一。在 ASP.NET Core 中，我们可以通过使用异步 HTTP 调用（异步编程）来实现这一点：[`docs.microsoft.com/en-us/dotnet/standard/asynchronous-programming-patterns/`](https://docs.microsoft.com/en-us/dotnet/standard/asynchronous-programming-patterns/)
 
 在处理异步通信时，你应该小心操作，例如，在添加带有图片的新产品时。系统被设计成可以创建不同尺寸的图片缩略图。这是一个耗时任务，如果处理不当可能会导致性能下降。从设计角度来看，异步操作在这种情况下是不可行的。在这里，你应该实现一个带有回调的任务，告诉系统何时完成工作。有时，你可能还需要中间件来处理请求。
 

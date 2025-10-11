@@ -16,17 +16,15 @@
 
 # 技术要求
 
-本章使用的代码可以在以下位置找到：[https://github.com/PacktPublishing/Enterprise-Application-Development-with-C-10-and-.NET-6-Second-Edition/tree/main/Chapter05](https://github.com/PacktPublishing/Enterprise-Application-Development-with-C-10-and-.NET-6-Second-Edition/tree/main/Chapter05)。
+本章使用的代码可以在以下位置找到：[`github.com/PacktPublishing/Enterprise-Application-Development-with-C-10-and-.NET-6-Second-Edition/tree/main/Chapter05`](https://github.com/PacktPublishing/Enterprise-Application-Development-with-C-10-and-.NET-6-Second-Edition/tree/main/Chapter05)。
 
 # 什么是 DI？
 
-DI 是一种技术，其中对象接收它所依赖的对象。DI 模式实现了作为 **单一职责原则、开闭原则、里氏替换原则、接口隔离原则和依赖倒置原则**（**SOLID**）设计原则一部分的 DI 原则，如 [*第一章*](B18507_01_Epub.xhtml#_idTextAnchor020)，*设计和架构企业应用程序* 中所述。使用 DI，代码将更易于维护、阅读、测试和扩展。
+DI 是一种技术，其中对象接收它所依赖的对象。DI 模式实现了作为 **单一职责原则、开闭原则、里氏替换原则、接口隔离原则和依赖倒置原则**（**SOLID**）设计原则一部分的 DI 原则，如 *第一章*，*设计和架构企业应用程序* 中所述。使用 DI，代码将更易于维护、阅读、测试和扩展。
 
 DI 是帮助实现更易于维护代码的最知名方法之一。DI 涉及三个实体，如下面的图所示：
 
-![图 5.1 – DI 关系
-
-](img/Figure_5.1_B18507.jpg)
+![图 5.1 – DI 关系](img/Figure_5.1_B18507.jpg)
 
 图 5.1 – DI 关系
 
@@ -42,23 +40,72 @@ DI 是帮助实现更易于维护代码的最知名方法之一。DI 涉及三�
 
 +   `IWeatherProvider` 依赖项通过构造函数参数注入：
 
-    [PRE0]
+    ```cs
+        public class WeatherService
+        {
+            private readonly IweatherProvider
+                weatherProvider;
+            public WeatherService(IWeatherProvider
+                weatherProvider)
+                    => this.weatherProvider =
+                        weatherProvider;
+            public WeatherForecast GetForecast(string
+                location) =>
+                this.weatherProvider.
+                    GetForecastOfLocation (location);   
+        }
+    ```
 
 在前面的示例中，`WeatherService` 依赖于 `IWeatherProvider`，它通过构造函数参数注入。
 
 注意
 
-对于 `WeatherProvider` 服务的实现，请参考 GitHub 上的示例代码，该代码可在以下链接找到：[https://github.com/PacktPublishing/Enterprise-Application-Development-with-C-10-and-.NET-6-Second-Edition/blob/main/Chapter05/DITypes/Service/WeatherProvider.cs](https://github.com/PacktPublishing/Enterprise-Application-Development-with-C-10-and-.NET-6-Second-Edition/blob/main/Chapter05/DITypes/Service/WeatherProvider.cs)。
+对于 `WeatherProvider` 服务的实现，请参考 GitHub 上的示例代码，该代码可在以下链接找到：[`github.com/PacktPublishing/Enterprise-Application-Development-with-C-10-and-.NET-6-Second-Edition/blob/main/Chapter05/DITypes/Service/WeatherProvider.cs`](https://github.com/PacktPublishing/Enterprise-Application-Development-with-C-10-and-.NET-6-Second-Edition/blob/main/Chapter05/DITypes/Service/WeatherProvider.cs)。
 
 在初始化 `WeatherService2` 时，`IWeatherProvider` 依赖项未设置。它是在对象初始化后通过 `WeatherProvider` 属性设置的：
 
-[PRE1]
+```cs
+    public class WeatherService2
+    {
+        private IWeatherProvider _weatherProvider;
+        public IWeatherProvider WeatherProvider
+        {
+            get => _weatherProvider == null ?
+                        throw new
+                            InvalidOperationException(
+                            "WeatherService is not
+                            initialized")
+                    : _weatherProvider;
+            set => _weatherProvider = value;
+        }
+        public WeatherForecast GetForecast(string
+            location) =>
+            this.WeatherProvider.
+                GetForecastOfLocation(location);
+    }
+```
 
 +   `IWeatherProvider` 依赖项作为所需的方法参数进行注入。
 
 在以下代码片段中，`IWeatherProvider` 服务通过 `GetForecast` 方法注入到 `WeatherService` 中：
 
-[PRE2]
+```cs
+    public class WeatherService
+    {
+       public WeatherForecast GetForecast(
+           string location, IWeatherProvider
+           weatherProvider)
+        {
+            if(weatherProvider == null)
+            {
+                throw new ArgumentNullException(
+                    nameof(weatherProvider));
+            }
+            return weatherProvider.
+                GetForecastOfLocation (location);
+        }
+    }
+```
 
 以下是一些建议，可以帮助选择依赖注入的类型：
 
@@ -92,15 +139,23 @@ DI 是帮助实现更易于维护代码的最知名方法之一。DI 涉及三�
 
 +   我们在上一节中使用的 `IWeatherProvider` 服务
 
-为了使应用程序启动，ASP.NET Core 6 框架注入了一些依赖项，这些依赖项被称为 `WebApplicationBuilder` 注入所需的框架服务，如 `IConfiguration` 和 `IWebHostEnvironment`。当您尝试打印已注册的服务时，如下代码片段所示（参考 [https://github.com/PacktPublishing/Enterprise-Application-Development-with-C-10-and-.NET-6-Second-Edition/blob/main/Chapter05/DITypes/Program.cs#L16](https://github.com/PacktPublishing/Enterprise-Application-Development-with-C-10-and-.NET-6-Second-Edition/blob/main/Chapter05/DITypes/Program.cs#L16) 中的代码），我们可以列出已注册的框架服务：
+为了使应用程序启动，ASP.NET Core 6 框架注入了一些依赖项，这些依赖项被称为 `WebApplicationBuilder` 注入所需的框架服务，如 `IConfiguration` 和 `IWebHostEnvironment`。当您尝试打印已注册的服务时，如下代码片段所示（参考 [`github.com/PacktPublishing/Enterprise-Application-Development-with-C-10-and-.NET-6-Second-Edition/blob/main/Chapter05/DITypes/Program.cs#L16`](https://github.com/PacktPublishing/Enterprise-Application-Development-with-C-10-and-.NET-6-Second-Edition/blob/main/Chapter05/DITypes/Program.cs#L16) 中的代码），我们可以列出已注册的框架服务：
 
-[PRE3]
+```cs
+foreach(var i in builder.Services.AsEnumerable())
+```
 
-[PRE4]
+```cs
+{
+```
 
-[PRE5]
+```cs
+    Console.WriteLine($"{i.Lifetime} - {i.ServiceType.ToString()}");
+```
 
-[PRE6]
+```cs
+}
+```
 
 在 ASP.NET Core 6.0 中，`IWebHostEnvironment` 框架服务可通过 `builder.Environment` 属性获取。同样，配置可通过 `builder.Configuration` 属性获取。
 
@@ -108,13 +163,15 @@ ASP.NET Core 6 运行时实例化所有必需的框架服务并将它们注册�
 
 应用程序服务是由开发人员注入到容器中的服务。这些服务将使用 `WebApplicationBuilder` 的 `Services` 属性进行注册。以下代码片段展示了如何将 `IWeatherProvider` 应用程序服务注册到容器中：
 
-[PRE7]
+```cs
+builder.Services.AddScoped<IWeatherProvider, WeatherProvider>();
+```
 
 在下一节中，我们将了解这些服务的生命周期以及它们是如何被管理的。
 
 注意
 
-请参阅[*第10章*](B18507_10_Epub.xhtml#_idTextAnchor1040)，*创建 ASP.NET Core 6 Web API*，了解 `Program.cs` 文件中的代码。
+请参阅*第十章*，*创建 ASP.NET Core 6 Web API*，了解 `Program.cs` 文件中的代码。
 
 ## 理解服务生命周期
 
@@ -122,7 +179,10 @@ ASP.NET Core 6 运行时实例化所有必需的框架服务并将它们注册�
 
 +   `AddTransient` 扩展方法用于注册此生命周期，如下代码片段所示：
 
-    [PRE8]
+    ```cs
+    public static IServiceCollection AddTransient(this
+     IServiceCollection services, Type serviceType);
+    ```
 
     注意
 
@@ -130,11 +190,17 @@ ASP.NET Core 6 运行时实例化所有必需的框架服务并将它们注册�
 
 +   `ServiceProvider` 在应用程序关闭时被销毁。使用 `AddSingleton` 扩展方法注册此生命周期，如下代码片段所示：
 
-    [PRE9]
+    ```cs
+    public static IServiceCollection AddSingleton(this
+     IServiceCollection services, Type serviceType);
+    ```
 
 +   `DbContext` 使用作用域生命周期进行注册。使用 `AddScoped` 扩展方法注册到作用域生命周期范围，如下代码片段所示：
 
-    [PRE10]
+    ```cs
+    public static IServiceCollection AddScoped(this
+     IServiceCollection services, Type serviceType);
+    ```
 
 在应用程序开发中，需要明智地选择生命周期类型。一个服务不应依赖于生命周期比其短的服务；例如，注册为单例的服务不应依赖于注册为瞬时的服务。以下表格显示了哪些生命周期可以安全地依赖于哪些其他生命周期范围：
 
@@ -146,7 +212,9 @@ ASP.NET Core 6 运行时实例化所有必需的框架服务并将它们注册�
 
 作为开发者，你不需要担心范围验证。内置的范围验证在 ASP.NET Core 6 中完成，当环境设置为 `InvalidOperationException` 时抛出。这可以通过在注册 `ServiceProvider` 时为所有环境配置启用 `ValidateScopes` 选项来显式打开。在此代码片段中，当创建主机构建器时，`ValidateScopes` 设置为 `true` 以打开范围验证：
 
-[PRE11]
+```cs
+builder.Host.UseDefaultServiceProvider(opt => { opt.ValidateScopes = true; }); 
+```
 
 让我们创建一个 ASP.NET Core 6 Web 应用程序来了解服务生命周期。我们将创建不同的服务并将它们注册为单例、作用域和瞬态生命周期范围，并观察它们的行为。按照以下步骤进行：
 
@@ -154,25 +222,50 @@ ASP.NET Core 6 运行时实例化所有必需的框架服务并将它们注册�
 
 1.  创建一个名为 `Services` 的新项目文件夹，并添加三个类：`ScopedService`、`SingletonService` 和 `TransientService`。添加以下代码（所有这些服务都将相同，其中没有任何实际代码；我们只是根据它们的名称将它们注册为不同的生命周期范围）：（所有这些服务都将相同，其中没有任何实际代码；我们只是根据它们的名称将它们注册为不同的生命周期范围）
 
-    [PRE12]
+    ```cs
+    public interface IScopedService {     }
+    public class ScopedService : IScopedService {    }
+    ```
 
 1.  `SingletonService.cs`：此类将使用单例生命周期范围进行注册，如下代码片段所示：
 
-    [PRE13]
+    ```cs
+    public interface ISingletonService   {    }
+    public class SingletonService : ISingletonService {  }
+    ```
 
 1.  `TransientService.cs`：此类将使用瞬态生命周期范围进行注册，如下代码片段所示：
 
-    [PRE14]
+    ```cs
+    public interface ITransientService   {    }
+    public class TransientService : ITransientService{   }
+    ```
 
 1.  现在，在 `Program.cs` 中使用 `IServiceCollection` 注册这些服务，如下所示：
 
-    [PRE15]
+    ```cs
+    //Register as Scoped
+    builder.Services.AddScoped<IScopedService,ScopedService>();
+    //Register as Singleton
+    builder.Services.AddSingleton<ISingletonService,SingletonService>();
+    //Register as Transient
+    builder.Services.AddTransient<ITransientService,TransientService>();
+    ```
 
 服务描述符集合 `IServiceCollection` 通过 `WebApplicationBuilder` 的 `Services` 属性公开。
 
 1.  现在，在 `Models` 文件夹下添加 `HomeViewModel` 模型类，该类将用于显示从先前注册的服务检索到的数据。以下代码片段说明了如何进行此操作：
 
-    [PRE16]
+    ```cs
+    public class HomeViewModel
+    {
+            public int Singleton { get; set; }
+            public int Scoped { get; set; }
+            public int Scoped2 { get; internal set; }
+            public int Transient { get; set; }
+            public int Transient2 { get; internal set; }
+    }
+    ```
 
 由于我们已使用 ASP.NET Core 6 IoC 容器注册了 `ScopedService`、`SingletonService` 和 `TransientService`，我们将通过构造函数注入获取这些服务。
 
@@ -190,75 +283,153 @@ ASP.NET Core 6 运行时实例化所有必需的框架服务并将它们注册�
 
 1.  修改`HomeController`的构造函数以接受已注册的服务，并定义私有字段以引用服务实例，如下所示：
 
-    [PRE17]
+    ```cs
+    private readonly ILogger<HomeController> _logger;
+    private readonly IScopedService scopedService;
+    private readonly IScopedService scopedService2;
+    private readonly ISingletonService singletonService;
+    private readonly ITransientService transientService;
+    private readonly ITransientService transientService2;
+    public HomeController(ILogger<HomeController> logger,
+    IScopedService scopedService,
+    IScopedService scopedService2,
+    ISingletonService singletonService,
+    ITransientService transientService,
+    ITransientService transientService2)
+    {
+         this._logger = logger;
+         this.scopedService = scopedService;
+         this.scopedService2 = scopedService2;
+         this.singletonService = singletonService;
+         this.transientService = transientService;
+         this.transientService2 = transientService2;
+    }
+    ```
 
 1.  现在，修改`HomeController`下的`Index`方法，设置`HomeViewModel`，如下所示：
 
-    [PRE18]
+    ```cs
+    public IActionResult Index()
+    {
+          var viewModel = new HomeViewModel
+         {
+             Scoped = scopedService.GetHashCode(),
+             Scoped2 = scopedService2.GetHashCode(),
+             Singleton = singletonService.GetHashCode(),
+             Transient = transientService.GetHashCode(),
+             Transient2 = transientService2.GetHashCode(),
+          };
+          return View(viewModel);
+    }
+    ```
 
 1.  接下来，修改`~/Views/Home`文件夹下的`Index.cshtml`，以在页面上显示`HomeViewModel`，如下所示：
 
-    [PRE19]
+    ```cs
+    @model HomeViewModel
+    @{
+        ViewData["Title"] = "Home Page";
+    }
+    <h2 class="text-success">Singleton.</h2>
+    <p>
+            <strong>ID:</strong> <code>@Model.Singleton
+    </code>
+    </p>
+    <h2 class="text-success">Scoped instance 1</h2>
+    <p>
+            <strong>ID:</strong> <code>@Model.Scoped</code>
+    </p>
+    <h2 class="text-success">Scoped instance 2</h2>
+    <p>
+            <strong>ID:</strong> <code>@Model.Scoped2</code>
+    </p>
+    <h2 class="text-success">Transient instance 1</h2>
+    <p>
+            <strong>ID:</strong> <code>@Model.Transient</code>
+    </p>
+    <h2 class="text-success">Transient instance 2</h2>
+    <p>
+            <strong>ID:</strong> <code>@Model.Transient2</code>
+    </p>
+    ```
 
 1.  现在，运行应用程序。你会看到如下输出：
 
-![图5.3 – 第一次运行的示例输出
+![图 5.3 – 第一次运行的示例输出](img/Figure_5.3_B18507.jpg)
 
-](img/Figure_5.3_B18507.jpg)
+图 5.3 – 第一次运行的示例输出
 
-图5.3 – 第一次运行的示例输出
+如果我们观察输出，`ScopedService`是相同的。这是因为对于每个请求作用域，只为`IScopedService`创建一个对象。请注意，当你运行代码时，ID 可能不同，因为它们是在运行时生成的。
 
-如果我们观察输出，`ScopedService`是相同的。这是因为对于每个请求作用域，只为`IScopedService`创建一个对象。请注意，当你运行代码时，ID可能不同，因为它们是在运行时生成的。
-
-临时服务的ID对于两个服务都是不同的。正如我们所学的，这是因为每次对IoC容器的请求都会创建一个新的实例。
+临时服务的 ID 对于两个服务都是不同的。正如我们所学的，这是因为每次对 IoC 容器的请求都会创建一个新的实例。
 
 1.  现在，再次刷新页面。你会看到类似如下输出：
 
-![图5.4 – 第二次运行的示例输出
+![图 5.4 – 第二次运行的示例输出](img/Figure_5.4_B18507.jpg)
 
-](img/Figure_5.4_B18507.jpg)
+图 5.4 – 第二次运行的示例输出
 
-图5.4 – 第二次运行的示例输出
-
-如果我们比较图5.3和图5.4中的输出，我们会注意到`SingletonService`的ID没有改变——这是因为应用程序的生命周期中，对于单例对象只创建一个对象。到目前为止，我们已经看到了如何根据注册来管理服务生命周期。了解何时销毁对象也同样重要。在下一节中，我们将学习关于服务销毁的内容。
+如果我们比较图 5.3 和图 5.4 中的输出，我们会注意到`SingletonService`的 ID 没有改变——这是因为应用程序的生命周期中，对于单例对象只创建一个对象。到目前为止，我们已经看到了如何根据注册来管理服务生命周期。了解何时销毁对象也同样重要。在下一节中，我们将学习关于服务销毁的内容。
 
 ### 服务销毁
 
-如我们在本章前面所学，对象的销毁是IoC容器框架的责任。容器会调用实现`IDisposable`接口的服务的`Dispose`方法。由容器创建的服务不应被开发者显式销毁。同样，开发者负责销毁他们创建的实例。
+如我们在本章前面所学，对象的销毁是 IoC 容器框架的责任。容器会调用实现`IDisposable`接口的服务的`Dispose`方法。由容器创建的服务不应被开发者显式销毁。同样，开发者负责销毁他们创建的实例。
 
 考虑以下代码片段，其中`SingletonService`实例以单例作用域注册：
 
-[PRE20]
+```cs
+var _disposableSingletonService= new DisposableSingletonService();
+```
 
-[PRE21]
+```cs
+// Registering an instance of a class with singleton lifetime
+```
 
-[PRE22]
+```cs
+builder.Services.AddSingleton<IDisposableSingletonService>(_disposableSingletonService);
+```
 
 注意
 
-对于`DisposableSingletonService`的简单实现，请参考以下链接中的代码：[https://github.com/PacktPublishing/Enterprise-Application-Development-with-C-10-and-.NET-6-Second-Edition/blob/main/Chapter05/DISampleWeb/Services/DisposableSingletonService.cs](https://github.com/PacktPublishing/Enterprise-Application-Development-with-C-10-and-.NET-6-Second-Edition/blob/main/Chapter05/DISampleWeb/Services/DisposableSingletonService.cs)。
+对于`DisposableSingletonService`的简单实现，请参考以下链接中的代码：[`github.com/PacktPublishing/Enterprise-Application-Development-with-C-10-and-.NET-6-Second-Edition/blob/main/Chapter05/DISampleWeb/Services/DisposableSingletonService.cs`](https://github.com/PacktPublishing/Enterprise-Application-Development-with-C-10-and-.NET-6-Second-Edition/blob/main/Chapter05/DISampleWeb/Services/DisposableSingletonService.cs)。
 
 在前面的代码片段中，我们创建了一个 `DisposableSingletonService` 的对象，并将其注册到 IoC 容器中。服务实例不是由容器创建的。在这种情况下，IoC 容器不会释放该对象；开发者有责任释放它。我们可以在 `IHostApplicationLifetime` 的 `ApplicationStopping` 事件触发时释放对象，该事件通过 `WebApplication` 的 `Lifetime` 属性公开，如下面的代码片段所示：
 
-[PRE23]
+```cs
+app.Lifetime.ApplicationStopping.Register(() => {
+```
 
-[PRE24]
+```cs
+    _disposableSingletonService.Dispose();
+```
 
-[PRE25]
+```cs
+});
+```
 
 在前面的代码片段中，`IHostApplicationLifetime` 由运行时注入到 `WebApplication` 中。此接口允许消费者接收 `ApplicationStarted`、`ApplicationStopped` 和 `ApplicationStopping` 应用程序生命周期事件的通知。为了释放单例对象，我们将通过注册到 `ApplicationStopping` 生命周期事件来调用 Dispose() 方法。
 
 .NET 6 中 DI 的新增功能是对作用域的 `IAsyncDisposable` 支持。在 `IServiceProvider` 中添加了一个新的 `CreateAsyncScope` 扩展方法来支持异步服务作用域的创建，并添加了一个 `AsyncServiceScope` 包装器，它实现了 `IAsyncDisposable`。以下代码展示了如何异步地释放作用域：
 
-[PRE26]
+```cs
+// Refer AsyncDisposableScope sample code for the implementation
+```
 
-[PRE27]
+```cs
+await using (var scope = provider.CreateAsyncScope())
+```
 
-[PRE28]
+```cs
+{
+```
 
-[PRE29]
+```cs
+    var foo = scope.ServiceProvider.GetRequiredService<IWeatherProviderAsync>();
+```
 
-[PRE30]
+```cs
+} 
+```
 
 从现在开始，如果你在手动创建作用域的地方使用依赖 `CreateAsyncScope`。
 
@@ -266,7 +437,7 @@ ASP.NET Core 6 运行时实例化所有必需的框架服务并将它们注册�
 
 请参考以下 Microsoft 文档以了解更多关于 DI 指南的信息：
 
-[https://docs.microsoft.com/en-us/dotnet/core/extensions/dependency-injection-guidelines](https://docs.microsoft.com/en-us/dotnet/core/extensions/dependency-injection-guidelines)
+[`docs.microsoft.com/en-us/dotnet/core/extensions/dependency-injection-guidelines`](https://docs.microsoft.com/en-us/dotnet/core/extensions/dependency-injection-guidelines)
 
 到目前为止，我们已经探讨了服务生命周期以及它们在 .NET 6 中的释放方式。在下一节中，我们将学习如何管理应用程序服务。
 
@@ -282,23 +453,31 @@ ASP.NET Core 6 运行时实例化所有必需的框架服务并将它们注册�
 
 有时，我们不想在控制器的所有操作中都有依赖服务可用。在这种情况下，可以通过方法注入来注入服务。这通过创建一个带有`[FromServices]`属性的参数来完成，如下面的示例所示：
 
-[PRE31]
+```cs
+public IActionResult Index([FromServices] ISingletonService singletonService2)
+```
 
-[PRE32]
+```cs
+{
+```
 
-[PRE33]
+```cs
+}
+```
 
-ASP.NET Core 6中引入的最小API允许我们在路由处理程序中请求DI服务，而无需显式使用`[FromServices]`属性，如下所示：
+ASP.NET Core 6 中引入的最小 API 允许我们在路由处理程序中请求 DI 服务，而无需显式使用`[FromServices]`属性，如下所示：
 
-[PRE34]
+```cs
+app.MapGet("/", (ISingletonService service) => service.DoAction());
+```
 
-你可能想知道运行时如何区分注入的服务和其他参数。为了实现这一点，.NET6引入了一个新的`IServiceProviderIsService`接口，它有助于识别给定的服务类型已注册在DI容器中，而不需要创建其实例。
+你可能想知道运行时如何区分注入的服务和其他参数。为了实现这一点，.NET6 引入了一个新的`IServiceProviderIsService`接口，它有助于识别给定的服务类型已注册在 DI 容器中，而不需要创建其实例。
 
 在下一节中，我们将看到同一服务类型的多个实例的注册以及如何访问它们。
 
 ### 注册多个实例
 
-对于给定的接口，我们可以使用IoC容器注册多个实现。
+对于给定的接口，我们可以使用 IoC 容器注册多个实现。
 
 注意
 
@@ -306,53 +485,87 @@ ASP.NET Core 6中引入的最小API允许我们在路由处理程序中请求DI�
 
 考虑以下服务注册，其中`IWeatherForecastService`服务注册了两个实现——`WeatherForecastService`和`WeatherForecastServiceV2`：
 
-[PRE35]
+```cs
+services.AddScoped<IWeatherForecastService, WeatherForecastService>();
+```
 
-[PRE36]
+```cs
+services.AddScoped<IWeatherForecastService, WeatherForecastServiceV2>();
+```
 
 现在，当从控制器请求`IWeatherForecastService`的实例时，将提供`WeatherForecastServiceV2`的实例，如下面的代码片段所示：
 
-[PRE37]
+```cs
+private readonly IWeatherForecastService weatherForecastService;
+```
 
-[PRE38]
+```cs
+public WeatherForecastController(ILogger<WeatherForecastController> logger, IWeatherForecastService weatherForecastService)
+```
 
-[PRE39]
+```cs
+{
+```
 
-[PRE40]
+```cs
+      _logger = logger;
+```
 
-[PRE41]
+```cs
+      this.weatherForecastService = weatherForecastService;
+```
 
-[PRE42]
+```cs
+}
+```
 
-在前面的示例中，可能看起来`WeatherForecastV2`的注册覆盖了`WeatherForecastService`的先前注册。然而，ASP.NET Core 6的IoC容器将包含所有`IWeatherForecastService`的注册。要获取所有注册，请按如下方式获取服务作为`IEnumerable`：
+在前面的示例中，可能看起来`WeatherForecastV2`的注册覆盖了`WeatherForecastService`的先前注册。然而，ASP.NET Core 6 的 IoC 容器将包含所有`IWeatherForecastService`的注册。要获取所有注册，请按如下方式获取服务作为`IEnumerable`：
 
-[PRE43]
+```cs
+private readonly IEnumerable<IWeatherForecastService> weatherForecastServices;
+```
 
-[PRE44]
+```cs
+public WeatherForecastController(
+```
 
-[PRE45]
+```cs
+ILogger<WeatherForecastController> logger, IEnumerable<IWeatherForecastService> weatherForecastServices)
+```
 
-[PRE46]
+```cs
+{
+```
 
-[PRE47]
+```cs
+   _logger = logger;
+```
 
-[PRE48]
+```cs
+   this.weatherForecastServices = weatherForecastServices;
+```
 
-[PRE49]
+```cs
+}
+```
 
 这在执行`WebApplicationBuilder`的`Services`属性等场景中可能很有用。因此，在未来，当添加或删除现有规则时，更改将仅限于向`Services`属性注入新的服务。
 
-### 使用TryAdd
+### 使用 TryAdd
 
 在本节中，我们将了解如何避免意外覆盖已注册的服务。
 
 `TryAdd`扩展方法仅在不存在相同服务的注册时注册服务。`TryAdd`扩展方法对所有生命周期范围（`TryAddScoped`、`TryAddSingleton`和`TryAddTransient`）都可用。
 
-如以下代码片段所示，使用服务注册时，当请求`IWeatherForecastService`时，IoC容器提供`WeatherForecastService`，而不是`WeatherForecastServiceV2`：
+如以下代码片段所示，使用服务注册时，当请求`IWeatherForecastService`时，IoC 容器提供`WeatherForecastService`，而不是`WeatherForecastServiceV2`：
 
-[PRE50]
+```cs
+services.AddScoped<IWeatherForecastService, WeatherForecastService>();
+```
 
-[PRE51]
+```cs
+services.TryAddScoped<IWeatherForecastService, WeatherForecastServiceV2>();
+```
 
 为了克服可能因重复注册而产生的副作用，始终建议使用`TryAdd`扩展方法来注册服务。
 
@@ -362,21 +575,35 @@ ASP.NET Core 6中引入的最小API允许我们在路由处理程序中请求DI�
 
 ASP.NET Core 6 IoC 容器提供了一种替换现有注册的方法。在下面的示例中，`IWeatherForecastService` 首先使用 `WeatherForecastService` 进行注册。然后它被替换为 `WeatherForecastServiceV2`：
 
-[PRE52]
+```cs
+builder.Services.TryAddScoped<IWeatherForecastService, WeatherForecastService>();
+```
 
-[PRE53]
+```cs
+builder.Services.Replace(ServiceDescriptor.Scoped<IWeatherForecastService, WeatherForecastServiceV2>());
+```
 
 与 `WeatherForecastServiceV2` 的 `Replace` 实例一样，一个实现被提供给 `WeatherForecastController` 构造函数。在下面的代码片段中，与 *注册多个实例* 部分不同，我们将在 `weatherForecastService` 构造函数变量中只看到一个对象：
 
-[PRE54]
+```cs
+public WeatherForecastController(ILogger<WeatherForecastController> logger, IEnumerable<IWeatherForecastService> weatherForecastService)
+```
 
-[PRE55]
+```cs
+{
+```
 
-[PRE56]
+```cs
+      _logger = logger;
+```
 
-[PRE57]
+```cs
+      this.weatherForecastService = weatherForecastService;
+```
 
-[PRE58]
+```cs
+}
+```
 
 到目前为止，在本节中，我们已经学习了如何使用 IoC 容器注册和替换服务。有时我们可能需要删除当前的注册。考虑这样一个场景，你希望利用库中的服务和注册，但你没有访问其源代码的权限。如果你重新实现了该库的一些接口并将它们重新注册到容器中，你可能会看到一些意外的行为。在下一节中，我们将了解如何删除已注册的服务。
 
@@ -384,19 +611,25 @@ ASP.NET Core 6 IoC 容器提供了一种替换现有注册的方法。在下面�
 
 要删除现有注册，ASP.Net Core 6 IoC 容器提供了 `Remove` 扩展方法。你可以使用 `RemoveAll` 方法删除与某个服务相关的所有注册，如下面的代码片段所示：
 
-[PRE59]
+```cs
+services.RemoveAll<IWeatherForecastService>();
+```
 
 在下面的代码片段中，`Remove` 方法从容器中移除了 `WeatherForecastService` 实现的注册：
 
-[PRE60]
+```cs
+//Removes the first registration of IWeatherForecastService           
+```
 
-[PRE61]
+```cs
+Builder.Services.Remove(ServiceDescriptor.Scoped<IWeatherForecastService, WeatherForecastService>());
+```
 
 到目前为止，我们已经看到了如何处理复杂的服务，但当涉及到泛型开放类型时，注册每个构造的泛型类型将会变得困难。在下一节中，我们将学习如何处理泛型开放类型服务。
 
 注意
 
-要了解更多关于泛型类型的信息，你可以参考以下网站：[https://docs.microsoft.com/en-us/dotnet/csharp/language-reference/language-specification/types](https://docs.microsoft.com/en-us/dotnet/csharp/language-reference/language-specification/types)。
+要了解更多关于泛型类型的信息，你可以参考以下网站：[`docs.microsoft.com/en-us/dotnet/csharp/language-reference/language-specification/types`](https://docs.microsoft.com/en-us/dotnet/csharp/language-reference/language-specification/types)。
 
 ### 注册泛型
 
@@ -404,11 +637,13 @@ ASP.NET Core 6 IoC 容器提供了一种替换现有注册的方法。在下面�
 
 对于泛型类型，为每种正在使用的实现类型注册服务是没有意义的。ASP.NET Core 6 IoC 容器提供了一种简化泛型类型注册的方法。框架本身已经提供的一个此类类型是 `ILogger`，如下面的代码片段所示：
 
-[PRE62]
+```cs
+Builder.Services.TryAdd(ServiceDescriptor.Singleton(typeof(ILogger<>), typeof(Logger<>))); 
+```
 
 注意
 
-为了方便参考，你可以访问以下链接：[https://github.com/dotnet/runtime/blob/main/src/libraries/Microsoft.Extensions.Logging/src/LoggingBuilderExtensions.cs](https://github.com/dotnet/runtime/blob/main/src/libraries/Microsoft.Extensions.Logging/src/LoggingBuilderExtensions.cs)。
+为了方便参考，你可以访问以下链接：[`github.com/dotnet/runtime/blob/main/src/libraries/Microsoft.Extensions.Logging/src/LoggingBuilderExtensions.cs`](https://github.com/dotnet/runtime/blob/main/src/libraries/Microsoft.Extensions.Logging/src/LoggingBuilderExtensions.cs)。
 
 泛型的一个用例是与数据访问层一起使用的泛型仓储模式。
 
@@ -420,31 +655,55 @@ ASP.NET Core 6 框架遵循的使代码看起来更易读的模式是创建一�
 
 在下面的代码片段中，使用 `AddNotificationServices` 注册了与通知相关的服务：
 
-[PRE63]
+```cs
+namespace Microsoft.Extensions.DependencyInjection
+```
 
-[PRE64]
+```cs
+{
+```
 
-[PRE65]
+```cs
+public static class NotificationServicesServiceCollectionExtension
+```
 
-[PRE66]
+```cs
+{
+```
 
-[PRE67]
+```cs
+   public static IServiceCollection AddNotificationServices(this IServiceCollection services)
+```
 
-[PRE68]
+```cs
+  {
+```
 
-[PRE69]
+```cs
+       services.TryAddScoped<INotificationService, EmailNotificationService>();
+```
 
-[PRE70]
+```cs
+       services.TryAddScoped<INotificationService, SMSNotificationService>();
+```
 
-[PRE71]
+```cs
+        return services;
+```
 
-[PRE72]
+```cs
+   }
+```
 
-[PRE73]
+```cs
+}
+```
 
 现在扩展方法已经创建，我们可以使用 `AddNotificationServices` 方法在 `ConfigureServices` 下注册通知服务。这将使 `ConfigureServices` 更易于阅读。代码如下所示：
 
-[PRE74]
+```cs
+builder.Services.AddNotificationServices();
+```
 
 我们已经看到了如何将服务注入到控制器和其他类中。在下一节中，我们将学习如何将服务注入到视图中。
 
@@ -454,37 +713,67 @@ MVC 中视图的目的是显示数据。大多数情况下，在视图中显示�
 
 要了解如何将服务注入到视图中，让我们修改在前几章中创建的 `DISampleWeb` 应用程序。我们将修改 `DISampleWeb` 应用程序，以便在设置飞行标志的情况下在主页上显示额外内容。将 `isFlightOn` 配置添加到 `appsettings.json` 中，如下面的代码片段所示：
 
-[PRE75]
+```cs
+{
+```
 
-[PRE76]
+```cs
+  "AllowedHosts": "*",
+```
 
-[PRE77]
+```cs
+  "isFlightOn": "true"
+```
 
-[PRE78]
+```cs
+}
+```
 
 现在，修改 `Home` 下的索引视图以显示 `Flight` 下的内容，如下面的代码片段所示：
 
-[PRE79]
+```cs
+@using Microsoft.Extensions.Configuration
+```
 
-[PRE80]
+```cs
+@inject Iconfiguration Configuration
+```
 
-[PRE81]
+```cs
+@{
+```
 
-[PRE82]
+```cs
+   string isFlightOn = Configuration["isFlightOn"];
+```
 
-[PRE83]
+```cs
+   if (string.Equals(isFlightOn, "true", StringComparison.OrdinalIgnoreCase))
+```
 
-[PRE84]
+```cs
+   {
+```
 
-[PRE85]
+```cs
+       <h1>
+```
 
-[PRE86]
+```cs
+        <strong>Flight content</strong>
+```
 
-[PRE87]
+```cs
+       </h1>
+```
 
-[PRE88]
+```cs
+   }
+```
 
-[PRE89]
+```cs
+}
+```
 
 在这里，提供读取配置文件功能的 `IConfiguration` 服务通过 `@inject` 关键字注入到 Razor 视图中。注入的配置服务用于获取配置并基于设置显示额外内容。我们可以使用 `@inject` 关键字将任何已注册到 `IServiceCollection` 的服务注入到 Razor 视图中。
 
@@ -496,83 +785,118 @@ MVC 中视图的目的是显示数据。大多数情况下，在视图中显示�
 
 让我们更详细地看看框架是如何连接服务的。当 `Startup` 类在 `Program.cs` 中与 `HostBuilder` 注册时，.NET 框架使用反射来识别并调用 `Configure` 和 `ConfigureServices` 方法。
 
-下面是从ASP.NET Core 6的`StartupLoader`类的`LoadMethods`方法中摘录的一段代码（请参阅[https://github.com/dotnet/aspnetcore/blob/main/src/Hosting/Hosting/src/Internal/StartupLoader.cs](https://github.com/dotnet/aspnetcore/blob/main/src/Hosting/Hosting/src/Internal/StartupLoader.cs)中的代码）：
+下面是从 ASP.NET Core 6 的`StartupLoader`类的`LoadMethods`方法中摘录的一段代码（请参阅[`github.com/dotnet/aspnetcore/blob/main/src/Hosting/Hosting/src/Internal/StartupLoader.cs`](https://github.com/dotnet/aspnetcore/blob/main/src/Hosting/Hosting/src/Internal/StartupLoader.cs)中的代码）：
 
-[PRE90]
+```cs
+public static StartupMethods LoadMethods(IServiceProvider hostingServiceProvider, [DynamicallyAccessedMembers(StartupLinkerOptions.Accessibility)] Type startupType, string environmentName, object? instance = null)
+```
 
-[PRE91]
+```cs
+{ 
+```
 
-[PRE92]
+```cs
+    var configureMethod = FindConfigureDelegate(startupType, environmentName);
+```
 
-[PRE93]
+```cs
+    var servicesMethod = FindConfigureServicesDelegate(startupType, environmentName);
+```
 
-[PRE94]
+```cs
+    var configureContainerMethod = FindConfigureContainerDelegate(startupType, environmentName);
+```
 
-[PRE95]
+```cs
+     -----------------------
+```
 
-[PRE96]
+```cs
+}
+```
 
 从前面的代码片段中，我们可以看到前两个方法，`FindConfigureDelegate`和`FindConfigureServicesDelegate`，是为了找到`Configure`和`ConfigureServices`方法。
 
 最后一行是用于`ConfigureContainer`的。我们可以在`Startup`类中定义一个`ConfigureContainer`方法来配置服务到第三方容器中。
 
-下面是可用于ASP.NET Core 6的一些流行的DI框架：
+下面是可用于 ASP.NET Core 6 的一些流行的 DI 框架：
 
-+   **Unity**: Unity最初由微软构建，目前是开源的。这是.NET中最古老的DI容器之一。文档可在以下链接找到：[http://unitycontainer.org/](http://unitycontainer.org/).
++   **Unity**: Unity 最初由微软构建，目前是开源的。这是.NET 中最古老的 DI 容器之一。文档可在以下链接找到：[`unitycontainer.org/`](http://unitycontainer.org/).
 
-+   **Autofac**: 这是最受欢迎的DI容器之一。它提供了全面的文档，可在以下链接找到：[https://autofaccn.readthedocs.io/en/latest/index.html](https://autofaccn.readthedocs.io/en/latest/index.html).
++   **Autofac**: 这是最受欢迎的 DI 容器之一。它提供了全面的文档，可在以下链接找到：[`autofaccn.readthedocs.io/en/latest/index.html`](https://autofaccn.readthedocs.io/en/latest/index.html).
 
-+   **Simple Injector**: 这是列表中较晚出现的一个。文档可在以下链接找到：[https://simpleinjector.readthedocs.io/en/latest/index.html](https://simpleinjector.readthedocs.io/en/latest/index.html).
++   **Simple Injector**: 这是列表中较晚出现的一个。文档可在以下链接找到：[`simpleinjector.readthedocs.io/en/latest/index.html`](https://simpleinjector.readthedocs.io/en/latest/index.html).
 
-+   **Castle Windsor**: 这是.NET中可用的最古老的DI框架之一。可在以下链接查看其文档：[http://www.castleproject.org/projects/windsor/](http://www.castleproject.org/projects/windsor/).
++   **Castle Windsor**: 这是.NET 中可用的最古老的 DI 框架之一。可在以下链接查看其文档：[`www.castleproject.org/projects/windsor/`](http://www.castleproject.org/projects/windsor/).
 
 虽然这些框架之间存在一些差异，但通常功能是相同的。大多数情况下，开发者的体验决定了框架的选择。
 
-在下一节中，我们将看看如何利用Autofac第三方IoC容器。
+在下一节中，我们将看看如何利用 Autofac 第三方 IoC 容器。
 
-### Autofac IoC容器
+### Autofac IoC 容器
 
-Autofac是开发者社区中最受欢迎的IoC容器之一。与其他任何IoC容器一样，它管理类之间的依赖关系，以便随着应用程序复杂性和规模的增加，应用程序仍然易于更改。让我们学习如何使用Autofac注册我们在本章前面使用过的相同`WeatherProvider`服务。按照以下步骤进行：
+Autofac 是开发者社区中最受欢迎的 IoC 容器之一。与其他任何 IoC 容器一样，它管理类之间的依赖关系，以便随着应用程序复杂性和规模的增加，应用程序仍然易于更改。让我们学习如何使用 Autofac 注册我们在本章前面使用过的相同`WeatherProvider`服务。按照以下步骤进行：
 
-1.  使用ASP.NET Core Web API模板创建一个新的项目，并将其命名为`AutofacSample`。
+1.  使用 ASP.NET Core Web API 模板创建一个新的项目，并将其命名为`AutofacSample`。
 
-1.  将`Autofac.Extensions.DependencyInjection` NuGet包引用添加到`AutofacSample`项目中，如图所示：
+1.  将`Autofac.Extensions.DependencyInjection` NuGet 包引用添加到`AutofacSample`项目中，如图所示：
 
-![Figure 5.5 – 添加Autofac.Extensions.DependencyInjection NuGet包
+![Figure 5.5 – 添加 Autofac.Extensions.DependencyInjection NuGet 包](img/Figure_5.5_B18507.jpg)
 
-](img/Figure_5.5_B18507.jpg)
+Figure 5.5 – 添加 Autofac.Extensions.DependencyInjection NuGet 包
 
-Figure 5.5 – 添加Autofac.Extensions.DependencyInjection NuGet包
+1.  我们需要将`AutofacServiceProviderFactory`与`ConfigureHostBuilder`注册，以便运行时使用 Autofac IoC 容器。在`Program.cs`中，注册 Autofac SP 工厂，如下面的代码片段所示：
 
-1.  我们需要将`AutofacServiceProviderFactory`与`ConfigureHostBuilder`注册，以便运行时使用Autofac IoC容器。在`Program.cs`中，注册Autofac SP工厂，如下面的代码片段所示：
+    ```cs
+    builder.Host.UseServiceProviderFactory(new AutofacServiceProviderFactory());
+    ```
 
-    [PRE97]
+1.  现在，让我们将我们在*DI 类型*部分使用的`IWeatherProvider`服务注册到 Autofac 容器中。在`Program.cs`中，通过`WebApplicationBuilder`的`ConfigureHostBuilder`属性的`ConfigureContainer`方法将`IWeatherProvider`与`WeatherProvider`实现注册，如下所示：
 
-1.  现在，让我们将我们在*DI类型*部分使用的`IWeatherProvider`服务注册到Autofac容器中。在`Program.cs`中，通过`WebApplicationBuilder`的`ConfigureHostBuilder`属性的`ConfigureContainer`方法将`IWeatherProvider`与`WeatherProvider`实现注册，如下所示：
+    ```cs
+    builder.Host.ConfigureContainer<ContainerBuilder>(builder =>
+    {
+        builder.RegisterType<WeatherProvider>()
+                        .As<IWeatherProvider>();
+    });
+    ```
 
-    [PRE98]
+1.  与默认.NET IoC 容器类似，我们将`IWeatherForecast`服务注入到`WeatherForecastController`控制器中，如下面的代码片段所示：
 
-1.  与默认.NET IoC容器类似，我们将`IWeatherForecast`服务注入到`WeatherForecastController`控制器中，如下面的代码片段所示：
-
-    [PRE99]
+    ```cs
+    public class WeatherForecastController : ControllerBase
+    {
+            private readonly ILogger<WeatherForecastController> _logger;
+            private readonly IWeatherProvider weatherProvider;
+            public WeatherForecastController( ILogger<WeatherForecastController> logger,
+    IWeatherProvider weatherProvider)
+            {
+                _logger = logger;
+                this.weatherProvider = weatherProvider;
+            }
+            [HttpGet]
+            public IEnumerable<WeatherForecast> Get()
+            {
+                return weatherProvider.GetForecast();
+            }
+    }
+    ```
 
 现在，当你运行项目并导航到`https://localhost:7184/WeatherForecast` **统一资源标识符** (**URI**)时，你将在浏览器中看到以下输出：
 
-![图5.6 – 容器的最终输出
+![图 5.6 – 容器的最终输出![图片](img/Figure_5.6_B18507.jpg)
 
-![图片](img/Figure_5.6_B18507.jpg)
+图 5.6 – 容器的最终输出
 
-图5.6 – 容器的最终输出
-
-在上一个示例中，我们看到了使用第三方Autofac IoC容器代替.NET 6提供的默认容器。
+在上一个示例中，我们看到了使用第三方 Autofac IoC 容器代替.NET 6 提供的默认容器。
 
 # 摘要
 
-本章向您介绍了DI的概念，这有助于编写松散耦合、更易于测试和更易于阅读的代码。本章涵盖了DI的类型以及它们如何在ASP.NET Core 6中得到支持。我们还看到了如何使用不同类型的注册来管理对象的生命周期。本章还向您介绍了一些流行的第三方IoC容器，以进一步探索。我们将使用本章学到的概念来构建我们的电子商务应用程序。在[*第15章*](B18507_15_Epub.xhtml#_idTextAnchor1803)的*测试*中，我们还将看到DI如何帮助提高可测试性。
+本章向您介绍了 DI 的概念，这有助于编写松散耦合、更易于测试和更易于阅读的代码。本章涵盖了 DI 的类型以及它们如何在 ASP.NET Core 6 中得到支持。我们还看到了如何使用不同类型的注册来管理对象的生命周期。本章还向您介绍了一些流行的第三方 IoC 容器，以进一步探索。我们将使用本章学到的概念来构建我们的电子商务应用程序。在*第十五章*的*测试*中，我们还将看到 DI 如何帮助提高可测试性。
 
-如[*第1章*](B18507_01_Epub.xhtml#_idTextAnchor020)中建议的，在*关注点分离/单一责任架构*部分，我们总是尝试通过接口注册服务。这将有助于在任何时候更改具体实现，而不会更改客户端实现。
+如*第一章*中建议的，在*关注点分离/单一责任架构*部分，我们总是尝试通过接口注册服务。这将有助于在任何时候更改具体实现，而不会更改客户端实现。
 
-在下一章中，我们将学习如何配置.NET 6并了解不同的配置，同时学习如何构建自定义配置。
+在下一章中，我们将学习如何配置.NET 6 并了解不同的配置，同时学习如何构建自定义配置。
 
 # 问题
 
@@ -588,7 +912,7 @@ d. `IWebHostEnvironment`
 
 **答案：c**
 
-1.  真或假：DI是实现IoC的一种机制。
+1.  真或假：DI 是实现 IoC 的一种机制。
 
 a. 真的
 
@@ -604,7 +928,7 @@ b. 假的
 
 **答案：b**
 
-1.  以下哪个不是ASP.NET Core 6 IoC容器的有效生命周期范围？
+1.  以下哪个不是 ASP.NET Core 6 IoC 容器的有效生命周期范围？
 
 a. 作用域
 

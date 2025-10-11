@@ -1,4 +1,4 @@
-# 第9章。正则表达式
+# 第九章。正则表达式
 
 **正则表达式**（**regex**）对许多开发者来说仍然是一个谜。我们承认，我们经常使用它们，这足以证明深入了解它们的工作原理是必要的。另一方面，互联网上有许多经过测试的正则表达式模式，直接重用现有的模式通常比尝试自己创建一个更容易。正则表达式的主题远比本书单章所能解释的要多。
 
@@ -16,17 +16,17 @@
 
 正则表达式是通过使用表示特定文本匹配的特殊字符来描述字符串的模式。正则表达式的使用在编程中不是一个新概念。为了使正则表达式工作，它们需要使用正则表达式引擎来完成所有繁重的工作。
 
-在.NET框架中，Microsoft 为正则表达式的使用提供了支持。要使用正则表达式，您需要将 `System.Text.RegularExpressions` 程序集导入到您的项目中。这将允许编译器使用您的正则表达式模式并将其应用于您需要匹配的特定文本。
+在.NET 框架中，Microsoft 为正则表达式的使用提供了支持。要使用正则表达式，您需要将 `System.Text.RegularExpressions` 程序集导入到您的项目中。这将允许编译器使用您的正则表达式模式并将其应用于您需要匹配的特定文本。
 
 其次，正则表达式有一组特定的元字符，这些字符对正则表达式引擎具有特殊意义。这些字符是 `[ ]`、`{ }`、`( )`、`*`、`+`、`\`、`?`、`|`、`$`、`.` 和 `^`。
 
 使用花括号 `{ }`，例如，允许开发者指定特定字符集需要出现的次数。另一方面，使用方括号定义需要精确匹配的内容。
 
-例如，如果我们指定了 `[abc]`，则模式将寻找小写的A、B和C。因此，正则表达式还允许您定义一个范围，例如 `[a-c]`，它被解释得与 `[abc]` 模式完全相同。
+例如，如果我们指定了 `[abc]`，则模式将寻找小写的 A、B 和 C。因此，正则表达式还允许您定义一个范围，例如 `[a-c]`，它被解释得与 `[abc]` 模式完全相同。
 
-正则表达式还允许您使用 `^` 字符定义要排除的字符。因此，键入 `[^a-c]` 将找到小写字母D到Z，因为模式告诉正则表达式引擎排除小写字母A、B和C。
+正则表达式还允许您使用 `^` 字符定义要排除的字符。因此，键入 `[^a-c]` 将找到小写字母 D 到 Z，因为模式告诉正则表达式引擎排除小写字母 A、B 和 C。
 
-正则表达式还定义了 `\d` 和 `\D` 作为 `[0-9]` 和 `[^0-9]` 的快捷类型。因此，`\d` 匹配所有数值，`\D` 匹配所有非数值。另一个快捷类型是 `\w` 和 `\W`，它们匹配从小写字母A到Z的所有字符，不考虑大小写，以及从0到9的所有数值和下划线字符。因此，`\w` 是 `[a-zA-Z0-9_]`，而 `\W` 是 `[^a-zA-Z0-9_]`。
+正则表达式还定义了 `\d` 和 `\D` 作为 `[0-9]` 和 `[⁰-9]` 的快捷类型。因此，`\d` 匹配所有数值，`\D` 匹配所有非数值。另一个快捷类型是 `\w` 和 `\W`，它们匹配从小写字母 A 到 Z 的所有字符，不考虑大小写，以及从 0 到 9 的所有数值和下划线字符。因此，`\w` 是 `[a-zA-Z0-9_]`，而 `\W` 是 `[^a-zA-Z0-9_]`。
 
 正则表达式的基础知识相对容易理解，但你可以用正则表达式做更多的事情。
 
@@ -56,11 +56,21 @@
 
 1.  在 `Recipes` 类中添加以下 `using` 语句，以便我们可以在 .NET 中使用正则表达式程序集：
 
-    [PRE0]
+    ```cs
+    using System.Text.RegularExpressions;
+    ```
 
 1.  完成所有这些后，你的 `Chapter9` 类应该看起来像这样：
 
-    [PRE1]
+    ```cs
+    using System.Text.RegularExpressions;
+    namespace Chapter9
+    {
+        public class Recipes
+        {
+        }
+    }
+    ```
 
 ## 工作原理…
 
@@ -74,29 +84,61 @@
 
 确保你已经将正确的程序集添加到你的类中。如果你的代码文件顶部还没有，请添加以下代码行：
 
-[PRE2]
+```cs
+using System.Text.RegularExpressions;
+```
 
 ## 如何操作…
 
 1.  创建一个名为 `ValidDate()` 的新方法，它接受一个字符串作为参数。这个字符串将是我们要验证的日期模式：
 
-    [PRE3]
+    ```cs
+    public void ValidDate(string stringToMatch)
+    {
+
+    }
+    ```
 
 1.  将以下正则表达式模式添加到你的方法中，到一个方法变量中：
 
-    [PRE4]
+    ```cs
+    string pattern = $@"^(19|20)\d\d-./- ./$";
+    ```
 
 1.  最后，添加正则表达式来匹配提供的字符串参数：
 
-    [PRE5]
+    ```cs
+    if (Regex.IsMatch(stringToMatch, pattern))
+        Console.WriteLine($"The string {stringToMatch} contains a valid date.");
+    else
+        Console.WriteLine($"The string {stringToMatch} DOES NOT contain a valid date.");
+    ```
 
 1.  完成此操作后，你的方法应该看起来像这样：
 
-    [PRE6]
+    ```cs
+    public void ValidDate(string stringToMatch)
+    {
+        string pattern = $@"^(19|20)\d\d-./- ./$";
+
+        if (Regex.IsMatch(stringToMatch, pattern))
+            Console.WriteLine($"The string {stringToMatch} contains a valid date.");
+        else
+            Console.WriteLine($"The string {stringToMatch} DOES NOT contain a valid date.");            
+    }
+    ```
 
 1.  返回到你的控制台应用程序，添加以下代码并通过点击 **开始** 来调试你的应用程序：
 
-    [PRE7]
+    ```cs
+    Chapter9.Recipes oRecipe = new Chapter9.Recipes();
+    oRecipe.ValidDate("1912-12-31");
+    oRecipe.ValidDate("2018-01-01");
+    oRecipe.ValidDate("1800-01-21");
+                oRecipe.ValidDate($"{DateTime.Now.Year}.{DateTime.Now.Month }.{DateTime.Now.Day}");
+    oRecipe.ValidDate("2016-21-12"); 
+    Read();
+    ```
 
     ### 注意
 
@@ -104,7 +146,7 @@
 
 1.  日期字符串被传递到正则表达式，模式与参数中的日期字符串进行匹配。输出在控制台应用程序中显示：![如何做到这一点…](img/B05391_09_08.jpg)
 
-1.  如果仔细查看输出，您会注意到有一个错误。我们正在验证的日期字符串格式为 yyyy-mm-dd, yyyy/mm/dd, 和 yyyy.mm.dd。如果我们使用这种逻辑，我们的正则表达式错误地将一个有效日期标记为无效。这是日期 `2016.4.10`，即2016年4月10日，实际上是非常有效的。
+1.  如果仔细查看输出，您会注意到有一个错误。我们正在验证的日期字符串格式为 yyyy-mm-dd, yyyy/mm/dd, 和 yyyy.mm.dd。如果我们使用这种逻辑，我们的正则表达式错误地将一个有效日期标记为无效。这是日期 `2016.4.10`，即 2016 年 4 月 10 日，实际上是非常有效的。
 
     ### 注意
 
@@ -112,7 +154,9 @@
 
 1.  回到你的 `ValidDate()` 方法，将正则表达式更改为以下内容：
 
-    [PRE8]
+    ```cs
+    string pattern = $@"^(19|20)\d\d-./-./$";
+    ```
 
 1.  再次运行控制台应用程序并查看输出：![如何做到这一点…](img/B05391_09_09.jpg)
 
@@ -124,7 +168,7 @@
 
 ![如何工作…](img/B05391_09_10.jpg)
 
-在我们解释这个更改意味着什么之前，让我们分解表达式并查看各个组成部分。我们的正则表达式基本上表示我们必须匹配所有以19或20开头并具有以下分隔符的字符串日期：
+在我们解释这个更改意味着什么之前，让我们分解表达式并查看各个组成部分。我们的正则表达式基本上表示我们必须匹配所有以 19 或 20 开头并具有以下分隔符的字符串日期：
 
 +   破折号 (`-`)
 
@@ -142,16 +186,16 @@
 | --- |
 | `&#124;` | 这表示“或”元字符。 |
 | **年份部分** |
-| `(19&#124;20)` | 只允许19或20。 |
-| `\d\d` | 匹配0到9之间的两个单个数字。要匹配0到9之间的单个数字，您将使用 `\d`。 |
+| `(19&#124;20)` | 只允许 19 或 20。 |
+| `\d\d` | 匹配 0 到 9 之间的两个单个数字。要匹配 0 到 9 之间的单个数字，您将使用 `\d`。 |
 | **有效的分隔符字符集** |
 | `[-./]` | 匹配字符集中以下任意字符。这些是我们有效的分隔符。要匹配空格日期分隔符，您需要将其更改为 `[- ./]`，其中您可以在字符集中添加空格。我们在破折号和十进制之间添加了空格。 |
 | **月份和日期的有效数字** |
-| `0[1-9]` | 匹配以零开头，后跟1到9之间任意数字的部分。这将匹配01, 02, 03, 04, 05, 06, 07, 08和09。 |
-| `1[0-2]` | 匹配以1开头，后跟0到2之间的任何数字的任何部分。这将匹配10, 11或12。 |
-| `[1-9]` | 匹配1到9之间的任何数字。 |
-| `[12][0-9]` | 匹配以1或2开头，后跟0到9之间的任何数字的任何部分。这将匹配所有介于10到29之间的数字字符串。 |
-| `3[01]` | 匹配以3开头，后跟0或1的任何部分。这将匹配30或31。 |
+| `0[1-9]` | 匹配以零开头，后跟 1 到 9 之间任意数字的部分。这将匹配 01, 02, 03, 04, 05, 06, 07, 08 和 09。 |
+| `1[0-2]` | 匹配以 1 开头，后跟 0 到 2 之间的任何数字的任何部分。这将匹配 10, 11 或 12。 |
+| `[1-9]` | 匹配 1 到 9 之间的任何数字。 |
+| `[12][0-9]` | 匹配以 1 或 2 开头，后跟 0 到 9 之间的任何数字的任何部分。这将匹配所有介于 10 到 29 之间的数字字符串。 |
+| `3[01]` | 匹配以 3 开头，后跟 0 或 1 的任何部分。这将匹配 30 或 31。 |
 | **字符串的开始和结束** |
 | `^` | 告诉正则表达式引擎从给定字符串的开始处开始匹配。 |
 | `$` | 告诉正则表达式引擎在给定字符串的末尾停止匹配。 |
@@ -160,63 +204,72 @@
 
 +   `^`: 从字符串的开始处开始匹配。
 
-+   `(19|20)`: 检查字符串是否以19或20开头。
++   `(19|20)`: 检查字符串是否以 19 或 20 开头。
 
-+   `\d\d`: 在检查之后，跟随两个0到9之间的单个数字。
++   `\d\d`: 在检查之后，跟随两个 0 到 9 之间的单个数字。
 
 +   `[-./]`: 年份部分结束，随后是日期分隔符。
 
-+   `(0[1-9]|1[0-2])`: 通过查找以0开头，后跟1到9之间的任何数字，或者以1开头，后跟0到2之间的任何数字的逻辑来找到月份。
++   `(0[1-9]|1[0-2])`: 通过查找以 0 开头，后跟 1 到 9 之间的任何数字，或者以 1 开头，后跟 0 到 2 之间的任何数字的逻辑来找到月份。
 
 +   `[-./]`: 月份逻辑结束，随后是日期分隔符。
 
-+   `(0[1-9]|[12][0-9]|3[01])`: 然后，通过查找以0开头，后跟1到9之间的任何数字，或者以1或2开头，后跟0到9之间的任何数字，或者以3开头，后跟0到1之间的任何数字的逻辑来找到日期。
++   `(0[1-9]|[12][0-9]|3[01])`: 然后，通过查找以 0 开头，后跟 1 到 9 之间的任何数字，或者以 1 或 2 开头，后跟 0 到 9 之间的任何数字，或者以 3 开头，后跟 0 到 1 之间的任何数字的逻辑来找到日期。
 
 +   `$`: 继续这样做，直到字符串的末尾。
 
-我们的第一个正则表达式是错误的，因为我们的月份逻辑是错误的。我们的月份逻辑指示通过查找以0开头，后跟1到9之间的任何数字，或者以1开头，后跟0到2之间的任何数字`(0[1-9]|1[0-2])`来找到月份逻辑。
+我们的第一个正则表达式是错误的，因为我们的月份逻辑是错误的。我们的月份逻辑指示通过查找以 0 开头，后跟 1 到 9 之间的任何数字，或者以 1 开头，后跟 0 到 2 之间的任何数字`(0[1-9]|1[0-2])`来找到月份逻辑。
 
-这将找到01, 02, 03, 04, 05, 06, 07, 08, 09或10, 11, 12。没有匹配的日期是`2016.4.10`（这里的日期分隔符没有影响）。这是因为我们的月份是一个单独的数字，而我们寻找的是以0开头的月份。为了解决这个问题，我们必须修改月份逻辑的表达式，以包括1到9之间的单个数字。我们通过在表达式的末尾添加`[1-9]`来实现这一点。
+这将找到 01, 02, 03, 04, 05, 06, 07, 08, 09 或 10, 11, 12。没有匹配的日期是`2016.4.10`（这里的日期分隔符没有影响）。这是因为我们的月份是一个单独的数字，而我们寻找的是以 0 开头的月份。为了解决这个问题，我们必须修改月份逻辑的表达式，以包括 1 到 9 之间的单个数字。我们通过在表达式的末尾添加`[1-9]`来实现这一点。
 
 修改后的正则表达式如下所示：
 
 +   `^`: 从字符串的开始处开始匹配。
 
-+   `(19|20)`: 检查字符串是否以19或20开头。
++   `(19|20)`: 检查字符串是否以 19 或 20 开头。
 
-+   `\d\d`: 在检查之后，跟随两个0到9之间的单个数字。
++   `\d\d`: 在检查之后，跟随两个 0 到 9 之间的单个数字。
 
 +   `[-./]`: 年份部分结束，随后是日期分隔符。
 
-+   `(0[1-9]|1[0-2])`: 通过查找以0开头，后跟1到9之间的任何数字，或者以1开头，后跟0到2之间的任何数字，或者任何单个数字（1到9）的逻辑来找到月份。
++   `(0[1-9]|1[0-2])`: 通过查找以 0 开头，后跟 1 到 9 之间的任何数字，或者以 1 开头，后跟 0 到 2 之间的任何数字，或者任何单个数字（1 到 9）的逻辑来找到月份。
 
 +   `[-./]`: 月份逻辑结束，随后是日期分隔符。
 
-+   `(0[1-9]|[12][0-9]|3[01])`: 然后，通过寻找以0开头的数字，后面跟着一个1到9之间的数字，或者以1或2开头的数字，后面跟着任何0到9之间的数字，或者一个匹配3的数字，后面跟着任何0到1之间的数字来找到天逻辑
++   `(0[1-9]|[12][0-9]|3[01])`: 然后，通过寻找以 0 开头的数字，后面跟着一个 1 到 9 之间的数字，或者以 1 或 2 开头的数字，后面跟着任何 0 到 9 之间的数字，或者一个匹配 3 的数字，后面跟着任何 0 到 1 之间的数字来找到天逻辑
 
 +   `$`: 一直做到字符串的末尾
 
-这是一个基本的正则表达式，我们称之为基本，因为我们还可以做更多的事情来使表达式更好。我们可以包括逻辑来考虑其他日期格式，例如 mm-dd-yyyy 或 dd-mm-yyyy。我们可以添加逻辑来检查二月，并验证它是否只包含28天，除非它是闰年，在这种情况下，我们需要允许二月的第二十九天。此外，我们还可以扩展正则表达式来检查一月、三月、五月、七月、八月、十月和十二月有31天，而四月、六月、九月和十一月只有30天。
+这是一个基本的正则表达式，我们称之为基本，因为我们还可以做更多的事情来使表达式更好。我们可以包括逻辑来考虑其他日期格式，例如 mm-dd-yyyy 或 dd-mm-yyyy。我们可以添加逻辑来检查二月，并验证它是否只包含 28 天，除非它是闰年，在这种情况下，我们需要允许二月的第二十九天。此外，我们还可以扩展正则表达式来检查一月、三月、五月、七月、八月、十月和十二月有 31 天，而四月、六月、九月和十一月只有 30 天。
 
 # 清理输入
 
-有时，你需要清理输入。这可能是为了防止SQL注入或确保输入的URL有效。在这个菜谱中，我们将查看用星号替换字符串中的脏话。我们确信有更多优雅且代码效率更高的方法来编写清理逻辑使用正则表达式（特别是当我们有一个大量的黑名单单词集合时），但在这里我们想要说明一个概念。
+有时，你需要清理输入。这可能是为了防止 SQL 注入或确保输入的 URL 有效。在这个菜谱中，我们将查看用星号替换字符串中的脏话。我们确信有更多优雅且代码效率更高的方法来编写清理逻辑使用正则表达式（特别是当我们有一个大量的黑名单单词集合时），但在这里我们想要说明一个概念。
 
 ## 准备工作
 
 确保你已经将正确的程序集添加到你的类中。如果你还没有这样做，请在你的代码文件顶部添加以下代码行：
 
-[PRE9]
+```cs
+using System.Text.RegularExpressions;
+```
 
 ## 如何操作…
 
 1.  在你的 `Recipes.cs` 类中创建一个新的方法，命名为 `SanitizeInput()`，并让它接受一个字符串参数：
 
-    [PRE10]
+    ```cs
+    public string SanitizeInput(string input)
+    {
+
+    }
+    ```
 
 1.  在包含我们想要从输入中移除的脏话的方法中添加一个类型为 `List<string>` 的列表：
 
-    [PRE11]
+    ```cs
+    List<string> lstBad = new List<string>(new string[] { "BadWord1", "BadWord2", "BadWord3" });
+    ```
 
     ### 注意
 
@@ -224,19 +277,45 @@
 
 1.  开始构建我们将用来查找黑名单单词的正则表达式。使用 `|`（或）元字符连接单词，以便正则表达式可以匹配任何单词。当列表完成时，你可以在正则表达式的两边添加 `\b` 表达式。这表示单词边界，因此只会匹配整个单词：
 
-    [PRE12]
+    ```cs
+    string pattern = "";
+    foreach (string badWord in lstBad)
+        pattern += pattern.Length == 0 ? $"{badWord}" : $"|{badWord}";
+
+    pattern = $@"\b({pattern})\b";
+    ```
 
 1.  最后，我们将添加 `Regex.Replace()` 方法，该方法接受输入并查找模式中定义的单词的出现，同时忽略大小写并将脏话替换为 `*****`：
 
-    [PRE13]
+    ```cs
+    return Regex.Replace(input, pattern, "*****", RegexOptions.IgnoreCase);
+    ```
 
 1.  完成此操作后，你的 `SanitizeInput()` 方法将看起来像这样：
 
-    [PRE14]
+    ```cs
+    public string SanitizeInput(string input)
+    {
+        List<string> lstBad = new List<string>(new string[] { "BadWord1", "BadWord2", "BadWord3" });
+        string pattern = "";
+        foreach (string badWord in lstBad)
+            pattern += pattern.Length == 0 ? $"{badWord}" : $"|{badWord}";
+
+        pattern = $@"\b({pattern})\b";
+
+        return Regex.Replace(input, pattern, "*****", RegexOptions.IgnoreCase);            
+    }
+    ```
 
 1.  在控制台应用程序中，添加以下代码来调用 `SanitizeInput()` 方法并运行你的应用程序：
 
-    [PRE15]
+    ```cs
+    string textToSanitize = "This is a string that contains a badword1, another Badword2 and a third badWord3";
+    Chapter9.Recipes oRecipe = new Chapter9.Recipes();
+    textToSanitize = oRecipe.SanitizeInput(textToSanitize);
+    WriteLine(textToSanitize);
+    Read();
+    ```
 
 1.  当你运行你的应用程序时，你将在控制台窗口中看到以下内容：![如何操作…](img/B05391_09_11.jpg)
 
@@ -250,15 +329,17 @@
 
 ![如何工作…](img/B05391_09_12.jpg)
 
-然后，我们创建了一个简单的循环，使用OR元字符创建要匹配的单词列表。在`foreach`循环完成后，我们得到了`BadWord1|BadWord2|BadWord3`的模式。然而，这仍然不是一个有效的正则表达式：
+然后，我们创建了一个简单的循环，使用 OR 元字符创建要匹配的单词列表。在`foreach`循环完成后，我们得到了`BadWord1|BadWord2|BadWord3`的模式。然而，这仍然不是一个有效的正则表达式：
 
 ![如何工作…](img/B05391_09_13.jpg)
 
-为了完成有效的正则表达式模式，我们需要在模式两侧添加`\b`表达式，告诉正则表达式引擎只匹配整个单词。正如你所看到的，我们正在使用字符串插值。字符串插值将在[第1章](ch01.html "第1章。C# 6.0的新特性")中详细介绍，*C#6的新特性*。
+为了完成有效的正则表达式模式，我们需要在模式两侧添加`\b`表达式，告诉正则表达式引擎只匹配整个单词。正如你所看到的，我们正在使用字符串插值。字符串插值将在第一章中详细介绍，*C#6 的新特性*。
 
 然而，在这里我们需要非常小心。首先编写代码来完成没有`@`符号的模式，如下所示：
 
-[PRE16]
+```cs
+pattern = $"\b({pattern})\b";
+```
 
 如果你运行你的控制台应用程序，你会看到坏词没有被匹配和过滤掉。这是因为我们没有在`b`之前转义`\`字符。因此，编译器解释这一行代码：
 
@@ -268,7 +349,9 @@
 
 为了纠正这个问题，我们需要在字符串前添加`@`符号，告诉编译器将字符串视为字面量。这意味着任何转义序列都会被忽略。正确格式的代码行看起来像这样：
 
-[PRE17]
+```cs
+pattern = $@"\b({pattern})\b";
+```
 
 一旦你这样做，编译器就会逐字解释模式字符串，并生成正确的正则表达式模式：
 
@@ -286,7 +369,7 @@
 
 # 动态正则表达式匹配
 
-动态正则表达式匹配是什么意思呢？嗯，这不是一个官方术语，但我们用它来解释在运行时使用变量生成特定表达式的正则表达式。假设你正在为一个名为Acme Corporation的公司工作的文档管理系统，该系统需要实现文档的版本控制。为此，系统会验证文档是否具有有效的文件名。
+动态正则表达式匹配是什么意思呢？嗯，这不是一个官方术语，但我们用它来解释在运行时使用变量生成特定表达式的正则表达式。假设你正在为一个名为 Acme Corporation 的公司工作的文档管理系统，该系统需要实现文档的版本控制。为此，系统会验证文档是否具有有效的文件名。
 
 一项业务规则规定，在特定一天上传的任何文件的文件名必须以前缀 `acm`（代表 Acme）和今天的日期（格式为 yyyy-mm-dd）开头。只能有文本文件、Word 文档（仅 `.docx`）和 Excel 文档（仅 `.xlsx`）。任何不符合此文件格式的文档将由另一个方法处理，该方法负责归档和无效文档。
 
@@ -300,49 +383,119 @@
 
 确保您已将正确的程序集添加到您的类中。如果您还没有这样做，请在代码文件顶部添加以下行：
 
-[PRE18]
+```cs
+using System.Text.RegularExpressions;
+```
 
 ## 如何操作…
 
 1.  一种非常好的方法是使用扩展方法。这样，您可以直接在文件名变量上调用扩展方法，并对其进行验证。在您的 `Recipes.cs` 文件中，首先添加一个名为 `CustomRegexHelper` 的新类，并使用 `public static` 修饰符：
 
-    [PRE19]
+    ```cs
+    public static class CustomRegexHelper
+    {
+
+    }
+    ```
 
 1.  将常规扩展方法代码添加到 `CustomRegexHelper` 类，并调用 `ValidAcmeCompanyFilename` 方法：
 
-    [PRE20]
+    ```cs
+    public static bool ValidAcmeCompanyFilename(this String value)
+    {
+
+    }
+    ```
 
 1.  在您的 `ValidAcmeCompanyFilename` 方法内部，添加以下正则表达式。我们将在本食谱的 *工作原理…* 部分解释此正则表达式的构成：
 
-    [PRE21]
+    ```cs
+    return Regex.IsMatch(value, $@"^acm[_]{DateTime.Now.Year}__(.txt|.docx|.xlsx)$");
+    ```
 
 1.  完成此操作后，您的扩展方法应如下所示：
 
-    [PRE22]
+    ```cs
+    public static class CustomRegexHelper
+    {
+        public static bool ValidAcmeCompanyFilename(this String value)
+        {
+            return Regex.IsMatch(value, $@"^acm[_]{DateTime.Now.Year}[_] ({DateTime.Now.Month}|0[{DateTime.Now.Month}]) _ (.txt|.docx|.xlsx)$");
+        }
+    }
+    ```
 
 1.  回到 `Recipes` 类，创建一个名为 `DemoExtendionMethod()` 的 `void` 返回类型的方法：
 
-    [PRE23]
+    ```cs
+    public void DemoExtendionMethod()
+    {
+
+    }
+    ```
 
 1.  添加一些输出文本以显示当前日期和有效的文件名类型：
 
-    [PRE24]
+    ```cs
+    Console.WriteLine($"Today's date is: {DateTime.Now.Year}- {DateTime.Now.Month}-{DateTime.Now.Day}");
+    Console.WriteLine($"The file must match: acm_{DateTime.Now.Year}_{DateTime.Now.Month}_{DateTime.Now. Day}.txt including leading month and day zeros");
+    Console.WriteLine($"The file must match: acm_{DateTime.Now.Year}_{DateTime.Now.Month}_{DateTime.Now. Day}.docx including leading month and day zeros");
+    Console.WriteLine($"The file must match: acm_{DateTime.Now.Year}_{DateTime.Now.Month}_{DateTime.Now. Day}.xlsx including leading month and day zeros");
+    ```
 
 1.  然后，添加文件名检查代码：
 
-    [PRE25]
+    ```cs
+    string filename = "acm_2016_04_10.txt";
+    if (filename.ValidAcmeCompanyFilename())
+        Console.WriteLine($"{filename} is a valid file name");
+    else
+        Console.WriteLine($"{filename} is not a valid file name");
+
+    filename = "acm-2016_04_10.txt";
+    if (filename.ValidAcmeCompanyFilename())
+        Console.WriteLine($"{filename} is a valid file name");
+    else
+        Console.WriteLine($"{filename} is not a valid file name");
+    ```
 
 1.  您会注意到 `if` 语句包含对包含文件名的变量的扩展方法的调用：
 
-    [PRE26]
+    ```cs
+    filename.ValidAcmeCompanyFilename()
+    ```
 
 1.  如果您已完成此操作，您的方法应如下所示：
 
-    [PRE27]
+    ```cs
+    public void DemoExtendionMethod()
+    {
+        Console.WriteLine($"Today's date is: {DateTime.Now.Year}-{DateTime.Now.Month}- {DateTime.Now.Day}");
+        Console.WriteLine($"The file must match: acm_{DateTime.Now.Year}_{DateTime.Now.Month}_ {DateTime.Now.Day}.txt including leading month and day zeros");
+        Console.WriteLine($"The file must match: acm_{DateTime.Now.Year}_{DateTime.Now.Month}_ {DateTime.Now.Day}.docx including leading month and day zeros");
+        Console.WriteLine($"The file must match: acm_{DateTime.Now.Year}_{DateTime.Now.Month} _{DateTime.Now.Day}.xlsx including leading month and day zeros");
+
+        string filename = "acm_2016_04_10.txt";
+        if (filename.ValidAcmeCompanyFilename())
+            Console.WriteLine($"{filename} is a valid file name");
+        else
+            Console.WriteLine($"{filename} is not a valid file name");
+
+        filename = "acm-2016_04_10.txt";
+        if (filename.ValidAcmeCompanyFilename())
+            Console.WriteLine($"{filename} is a valid file name");
+        else
+            Console.WriteLine($"{filename} is not a valid file name");
+    }
+    ```
 
 1.  回到控制台应用程序，添加以下代码，该代码仅调用 `void` 方法。这只是为了模拟之前提到的版本化方法：
 
-    [PRE28]
+    ```cs
+    Chapter9.Recipes oRecipe = new Chapter9.Recipes();
+    oRecipe.DemoExtendionMethod();
+    Read();
+    ```
 
 1.  完成后，运行您的控制台应用程序：![如何操作…](img/B05391_09_18.jpg)
 
@@ -350,7 +503,9 @@
 
 让我们更仔细地看看生成的正则表达式。我们正在查看的是扩展方法中的 `return` 语句：
 
-[PRE29]
+```cs
+return Regex.IsMatch(value, $@"^acm[_]{DateTime.Now.Year}__(.txt|.do cx|.xlsx)$");
+```
 
 为了理解正在发生的事情，我们需要将这个表达式分解成不同的组件：
 

@@ -10,9 +10,9 @@
 
 # 技术要求
 
-这是一个实践章节，因此你需要对Unity和C#有基本的了解。
+这是一个实践章节，因此你需要对 Unity 和 C#有基本的了解。
 
-我们将使用以下具体的Unity引擎和C#语言概念：
+我们将使用以下具体的 Unity 引擎和 C#语言概念：
 
 +   单例
 
@@ -20,13 +20,13 @@
 
 如果你对这些概念不熟悉，请在开始本章之前复习它们。
 
-本章的代码文件可以在GitHub上找到：
+本章的代码文件可以在 GitHub 上找到：
 
-[https://github.com/PacktPublishing/Hands-On-Game-Development-Patterns-with-Unity-2018](https://github.com/PacktPublishing/Hands-On-Game-Development-Patterns-with-Unity-2018)
+[`github.com/PacktPublishing/Hands-On-Game-Development-Patterns-with-Unity-2018`](https://github.com/PacktPublishing/Hands-On-Game-Development-Patterns-with-Unity-2018)
 
 查看以下视频，了解代码的实际应用：
 
-[http://bit.ly/2I30suS](http://bit.ly/2I30suS)
+[`bit.ly/2I30suS`](http://bit.ly/2I30suS)
 
 # 外观模式概述
 
@@ -52,7 +52,7 @@
 
 +   **隐藏混乱变得更容易**：拥有过多的门面类可以使程序员更容易通过使他们的架构看起来简单易用来掩盖糟糕的代码，同时将潜在的长远架构问题掩盖起来。
 
-+   **过多的管理者**：门面类在Unity开发者中很受欢迎，他们通常通过结合单例和门面模式来实现它们。这种方法会导致一个成为全局可访问管理者的大量集合的架构。这种类型的设计变得非常难以测试和管理，因为所有管理者类都相互依赖。
++   **过多的管理者**：门面类在 Unity 开发者中很受欢迎，他们通常通过结合单例和门面模式来实现它们。这种方法会导致一个成为全局可访问管理者的大量集合的架构。这种类型的设计变得非常难以测试和管理，因为所有管理者类都相互依赖。
 
 门面建立了一个新的接口，而适配器则回收了一个旧的接口。在实现看起来和听起来可能相似的模式时，记住它们的目的不一定相同是很重要的。
 
@@ -78,33 +78,155 @@
 
 +   `Player`：这个类代表我们的玩家组件：
 
-[PRE0]
+```cs
+using UnityEngine;
+
+public class Player
+{
+    public int GetHealth()
+    {
+        return 10;
+    }
+
+    public int GetPlayerID()
+    {
+        return 007;
+    }
+}
+```
 
 +   `ScoreManager`：这个类负责管理评分系统；它将返回当前玩家的分数：
 
-[PRE1]
+```cs
+using UnityEngine;
+
+public class ScoreManager
+{
+    public int GetScore(int playerId)
+    {
+        Debug.Log("Returning player score.");
+        return 0;
+    }
+}
+```
 
 +   `CloudManager`：这个类负责管理当前玩家的云账户，包括上传他们的本地存档数据：
 
-[PRE2]
+```cs
+using UnityEngine;
 
-+   `UIManager`：最后，UI管理器负责显示UI组件：
+public class CloudManager
+{
+    public void UploadSaveGame(string playerData)
+    {
+        Debug.Log("Uploading save data.");
+    }
+}
+```
 
-[PRE3]
++   `UIManager`：最后，UI 管理器负责显示 UI 组件：
+
+```cs
+using UnityEngine;
+
+public class UIManager
+{
+    public void DisplaySaveIcon()
+    {
+        Debug.Log("Displaying the save icon.");
+    }
+}
+```
 
 1.  我们下一个重要的类是一个容器，它将保存我们想要保存的当前玩家的属性。请注意，它是`Serializable`——这是因为当我们将其保存到磁盘时，我们将序列化这个类的实例：
 
-[PRE4]
+```cs
+[System.Serializable]
+class PlayerData
+{
+    public int score;
+    public int playerID;
+    public float health;
+}
+```
 
 1.  接下来是我们将作为外观实际使用的类。为了避免有一个长达十页的代码示例，我们将只专注于编写一个基本的`SaveManager`类：
 
-[PRE5]
+```cs
+using System.IO;
+using UnityEngine;
+using System.Runtime.Serialization.Formatters.Binary;
+
+public class SaveManager : Singleton<SaveManager>
+{
+    private UIManager m_UIManager;
+    private PlayerData m_PlayerData;
+    private ScoreManager m_ScoreManager;
+    private CloudManager m_CloudManager;
+
+    public void SaveGame(Player player)
+    {
+        // 1 - Show the save icon on the corner of the screen.
+        m_UIManager = new UIManager();
+        m_UIManager.DisplaySaveIcon();
+
+        // 2 - Initializing a new Player Data.
+        m_PlayerData = new PlayerData();
+        m_PlayerData.health = player.GetHealth();
+        m_PlayerData.playerID = player.GetPlayerID();
+
+        // 3 - Getting the player's high score.
+        m_ScoreManager = new ScoreManager();
+        m_PlayerData.score = m_ScoreManager.GetScore(player.GetPlayerID());
+
+        // 4 - Let's serialize the player data.
+        SerializePlayerData(m_PlayerData, true);
+    }
+
+    private void SerializePlayerData(PlayerData playerData, bool isCloudSave)
+    {
+        // Serializing the PlayerData instance      
+        BinaryFormatter bf = new BinaryFormatter();
+        FileStream file = File.Create(Application.persistentDataPath + "/playerInfo.dat");
+        bf.Serialize(file, playerData);
+        file.Close();
+
+        // Uploading the serialized playerInfo.dat file 
+        if (isCloudSave)
+        {
+            m_CloudManager = new CloudManager();
+            m_CloudManager.UploadSaveGame(Application.persistentDataPath + "/playerInfo.dat");
+        }
+    }
+}
+```
 
 正如我们所看到的，这个`SaveManager`类的简单示例展示了一个核心问题：保存玩家的进度有许多步骤和依赖。想象一下，如果我们每次想要触发保存游戏时都必须手动编写这些步骤，这将非常难以维护和调试。
 
 1.  我们可以在下面的`Client`类中看到外观模式在实际中的好处：
 
-[PRE6]
+```cs
+using UnityEngine;
+
+public class Client : MonoBehaviour
+{
+    private Player m_Player;
+
+    void Start()
+    {
+        m_Player = new Player();
+    }
+
+    void Update()
+    {
+        if (Input.GetKeyDown(KeyCode.S))
+        {
+            // Save the current player instance.
+            SaveManager.Instance.SaveGame(m_Player);
+        }
+    }
+}
+```
 
 现在，我们只需一行代码就可以从任何地方保存当前玩家的状态。这种好处之所以可能，是因为我们的`SaveManager`正在充当外观，为更大的代码库提供一个简化的接口。我们还本地化了整个保存游戏过程，这样我们就可以轻松地维护它。
 
@@ -120,4 +242,4 @@
 
 # 进一步阅读
 
-+   《游戏编程模式》由Robert Nystrom所著，可在以下链接找到：[http://gameprogrammingpatterns.com](http://gameprogrammingpatterns.com/)
++   《游戏编程模式》由 Robert Nystrom 所著，可在以下链接找到：[`gameprogrammingpatterns.com`](http://gameprogrammingpatterns.com/)

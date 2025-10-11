@@ -1,6 +1,6 @@
 # 对象组合
 
-在[第4章](06d5c629-d866-4319-b2d3-1a5120d1f6d2.xhtml)，“ASP.NET Core中的依赖注入”，我们了解了.NET Core和ASP.NET Core的依赖注入以及默认DI容器。我们探讨了如何将DI应用于应用程序的不同组件，如控制器和视图。现在是时候深入探讨依赖注入背后的实际基础了。
+在第四章，“ASP.NET Core 中的依赖注入”，我们了解了.NET Core 和 ASP.NET Core 的依赖注入以及默认 DI 容器。我们探讨了如何将 DI 应用于应用程序的不同组件，如控制器和视图。现在是时候深入探讨依赖注入背后的实际基础了。
 
 在继续讨论主要主题之前，我们首先需要了解为什么我们要关心阅读这个主题。编程世界充满了对象及其交互。我们通过从我们为两个基本原因生成的类中获取帮助来实现某些解决方案或构建功能，这两个基本原因是**代码重用**和**可维护性**。
 
@@ -26,7 +26,7 @@
 
 +   对象组合在依赖注入中的重要性
 
-+   .NET Core 2.0控制台和MVC应用中的对象组合
++   .NET Core 2.0 控制台和 MVC 应用中的对象组合
 
 # 理解对象关系
 
@@ -44,7 +44,43 @@
 
 让我们考虑以下代码片段来理解类之间的关系：
 
-[PRE0]
+```cs
+    class Organisation
+    {
+      public Organisation() { }
+      public string Name { get; set; }
+      public string OfficialFacebookLink { get; set; }
+    }
+
+    class Packt : Organisation
+    {
+      public Packt() { }
+      public int TotalBooksPublished { get; set; }
+
+      public void PrintPacktInfo()
+      {
+        Console.WriteLine($"This is {Name}!\n" +
+            $"Our official facebook page link is 
+              {OfficialFacebookLink}.\n" +
+            $"We have published {TotalBooksPublished} books.\n");
+
+        Account account = new Account();
+        account.PrintAcountInfo(1, "Packt Account");
+      }
+    }
+
+    public class Account
+    {
+      public int AccountId { get; set; }
+      public string AccountName { get; set; }
+
+      public void PrintAcountInfo(int accId, string accName) 
+      {
+        Console.WriteLine("Account Id: " + accId + "
+            and Account Name: " + accName);
+      }
+    }
+```
 
 我们有一个`Organisation`类，而`Packt`作为一个组织，从父类`Organisation`派生。这种关系表示为“是一个”关系，因为`Packt`是一个组织。`Account`是一个类，它可以成为`Packt`类的一部分。因此，`Packt`和`Account`之间存在另一种关系。这种关系的名称是“一部分”。**
 
@@ -52,7 +88,20 @@
 
 `Main`方法如下所示，我们创建一个`Packt`实例，并通过属性提供任何必要的详细信息，然后调用`PrintPacktInfo()`：
 
-[PRE1]
+```cs
+    static void Main(string[] args)
+    {
+      Packt packt = new Packt
+      {
+         Name = "Packt Publications",
+         OfficialFacebookLink = "https://www.facebook.com/PacktPub/",
+         TotalBooksPublished = 5000
+      };
+
+      packt.PrintPacktInfo(); // Prints the Account information.
+      Console.ReadKey();
+    }
+```
 
 代码产生以下输出：
 
@@ -112,27 +161,53 @@
 
 我们最喜欢的`Student`类：
 
-[PRE2]
+```cs
+    public class Student
+    {
+      private int Id { get; set; }
+      private string Name { get; set; }
+      private DateTime Dob { get; set; }
+      private Address Address { get; set; }
+      private ICollection<Book> Books { get; set; }
+
+      public void PrintStudent()
+      {
+        Console.WriteLine("Student: " + Name);
+        Console.WriteLine("City: " + Address.City + "");
+        Console.WriteLine("-----------------------");
+      }
+    }
+```
 
 来吧，别这么惊讶，现在也请不要责怪我。我知道这看起来像是一个非常基础的课程，但这就是组合的本质，简而言之。你不信？好吧，让我用这个`Student`类来匹配这些关系：
 
-+   **规则1：复杂类的一部分**：你可以看到类成员具有不同的类型，例如`Integer`、`string`、`DateTime`、`Class`和`List<Class>`类型。`Integer`、`string`和`DateTime`是.NET Framework中`System`命名空间内已经定义的数据类型，而`Address`和`Book`类是用户定义的类。所有这些都是复杂类`Student`的一部分。因此，第一个条件得到了满足。
++   **规则 1：复杂类的一部分**：你可以看到类成员具有不同的类型，例如`Integer`、`string`、`DateTime`、`Class`和`List<Class>`类型。`Integer`、`string`和`DateTime`是.NET Framework 中`System`命名空间内已经定义的数据类型，而`Address`和`Book`类是用户定义的类。所有这些都是复杂类`Student`的一部分。因此，第一个条件得到了满足。
 
-+   **规则2：成员应属于一个对象**：如果我创建一个`Student`类的实例，带有构造函数，那么这些成员在那个时刻只属于学生对象。它们不能成为另一个实例的成员。此外，成员是私有的，这阻止了它们被任何其他类使用。
++   **规则 2：成员应属于一个对象**：如果我创建一个`Student`类的实例，带有构造函数，那么这些成员在那个时刻只属于学生对象。它们不能成为另一个实例的成员。此外，成员是私有的，这阻止了它们被任何其他类使用。
 
-[PRE3]
+```cs
+        Student student = new Student(1, "Bhagirathi Panda", 
+          new DateTime(1990, 4, 23));
+```
 
 构造函数看起来如下：
 
-[PRE4]
+```cs
+        public Student(int id, string name, DateTime dob)
+        {
+          Id = id;
+          Name = name;
+          Dob = dob;
+        }
+```
 
-+   **规则3：成员通过复杂类获得生命（死亡关系）**：正如你所见，成员在没有实例化`Student`类之前并不存在，当对象死亡时它们也会被销毁；这证明了我们的规则3。
++   **规则 3：成员通过复杂类获得生命（死亡关系）**：正如你所见，成员在没有实例化`Student`类之前并不存在，当对象死亡时它们也会被销毁；这证明了我们的规则 3。
 
-+   **规则4：成员不知道复杂对象的存在（单向关系）：**成员非常听话。他们只存储分配给他们的任何值，甚至不关心是谁以及为什么分配给他们。复杂实例是他们的父级，但这些成员表现得像孤儿一样，不认识它。同样，我们不在乎他们在做什么，因为我们的规则4已经得到证明。
++   **规则 4：成员不知道复杂对象的存在（单向关系）：**成员非常听话。他们只存储分配给他们的任何值，甚至不关心是谁以及为什么分配给他们。复杂实例是他们的父级，但这些成员表现得像孤儿一样，不认识它。同样，我们不在乎他们在做什么，因为我们的规则 4 已经得到证明。
 
 这里需要注意的另一件重要的事情是，复杂类可以有一个乘法成员，例如`List<Book> Books`。
 
-你知道创建构造函数的快捷键吗？只需在你想创建构造函数的行中输入**ctor**，然后按两次*Tab*键。你会看到一个空构造函数块可供使用。此外，Visual Studio的提示信息会告诉你如何处理这个命令：
+你知道创建构造函数的快捷键吗？只需在你想创建构造函数的行中输入**ctor**，然后按两次*Tab*键。你会看到一个空构造函数块可供使用。此外，Visual Studio 的提示信息会告诉你如何处理这个命令：
 
 ![](img/211734ba-9e84-4120-bcf5-997859ff6c4a.png)
 
@@ -154,11 +229,40 @@
 
 所以，而不是以下内容：
 
-[PRE5]
+```cs
+    public class Student
+    {
+      // Other properties.
+
+      int AddressId {get; set;}
+      string City {get; set;}
+      string State {get; set;}
+      string Country {get; set;}
+    }
+```
 
 我们就是这样做的。基本上，我们只是将地址属性分离到一个名为`Address`的容器类中。以下代码块展示了我们如何提取出`Address`类：
 
-[PRE6]
+```cs
+    public class Student
+    {
+      // Other properties.
+      private Address Address { get; set; }
+    }
+    public class Address
+    {
+      public int AddressId { get; set; }
+      public string City { get; set; }
+      public string State { get; set; }
+      public string Country { get; set; }
+
+      // Constructor. Just initialising City for now.
+      public Address(string city)
+      {
+        City = city;
+      }
+    }
+```
 
 这些是使用子类而不是直接将它们添加到组合类中的优点之一：
 
@@ -180,7 +284,7 @@
 
 这是将现有对象组合成新对象的过程。起初，它看起来与组合相似。但事实上，它有区别。要成为聚合，复杂对象及其部分必须满足以下关系：
 
-+   **部分（成员）是对象（类）的组成部分**：它与组合类似。这意味着较小的对象是复杂对象的一部分。例如，一个人有一个Google Drive文件夹。
++   **部分（成员）是对象（类）的组成部分**：它与组合类似。这意味着较小的对象是复杂对象的一部分。例如，一个人有一个 Google Drive 文件夹。
 
 +   **部分（成员）可以同时属于多个对象（类）**：与组合不同，这里的成员与类是独立的。它可能同时被其他类引用。例如，一个驱动器文件夹可以同时被许多用户共享。
 
@@ -192,7 +296,15 @@
 
 现在，我们将尝试修改在组合课程中展示的`Student`类。我这样做是因为那里有一个`Address`属性。看看构造函数是如何更新的，以便将地址作为参数：
 
-[PRE7]
+```cs
+    public Student(int id, string name, DateTime dob, Address address)
+    {
+        Id = id;
+        Name = name;
+        Dob = dob;
+        Address = address;
+    }
+```
 
 这对你来说并不陌生。让我们试着详细说明一下。我们只是将`Address`对象传递给构造函数，然后它被分配给复合类`Student`的`Address`属性。
 
@@ -200,15 +312,35 @@
 
 `Student`类的初始化也将按以下方式修改：
 
-[PRE8]
+```cs
+    static void Main(string[] args)
+    {
+      Address add = new Address("Dhenkanal");
+      Student pallu = new Student(1, "Pallavi Praharaj", 
+        new DateTime(1990, 6, 12), add);
+    }
+```
 
 让我们分析一下这种变化如何被视为聚合。
 
-+   **规则1：部分（成员）是对象（类）的组成部分**：`Address`属性在`Student`类中被引用，因此它成为了一个部分。
++   **规则 1：部分（成员）是对象（类）的组成部分**：`Address`属性在`Student`类中被引用，因此它成为了一个部分。
 
-+   **规则2：部分（成员）可以同时属于多个对象（类）**：我向构造函数传递了一个`Address`对象，它在复合类内部被用于进一步操作。然而，对象`add`相当独立，因为它是由例程（如前述代码中的`Main`）创建的。让我允许它也被另一个`Student`使用：
++   **规则 2：部分（成员）可以同时属于多个对象（类）**：我向构造函数传递了一个`Address`对象，它在复合类内部被用于进一步操作。然而，对象`add`相当独立，因为它是由例程（如前述代码中的`Main`）创建的。让我允许它也被另一个`Student`使用：
 
-[PRE9]
+```cs
+        static void Main(string[] args)
+        {
+          Address add = new Address("Nayagarh");
+          Student rinu = new Student(1, "Jayashree Satapathy", 
+            new DateTime(1995, 11, 14), add);    
+          Student gudy = new Student(2, "Lipsa Rath", 
+            new DateTime(1995, 4, 23), add);
+
+         rinu.PrintStudent();
+         gudy.PrintStudent();
+         Console.ReadKey();
+       }
+```
 
 我知道你可能对它是否有效有所保留。以下是为你提供的输出：
 
@@ -216,9 +348,9 @@
 
 很直接，不是吗！`Main`方法是创建者，因此它可以在其作用域内任何地方使用，直到它被它或垃圾收集器销毁。`add`对象被作为引用传递给两个学生。从这些事实中，我们可以推断出`Jayashree`和`Lipsa`是住在同一地址的两个学生。
 
-+   **规则3：部分（成员）的存在不由对象（类）管理**：因为它被包裹在`Main`方法中，组合对象无法销毁它。顺便说一下，它也没有创建它。是`Main`让它诞生的。
++   **规则 3：部分（成员）的存在不由对象（类）管理**：因为它被包裹在`Main`方法中，组合对象无法销毁它。顺便说一下，它也没有创建它。是`Main`让它诞生的。
 
-+   **规则4：部分（成员）不知道对象（类）的存在**：`Address`对象对这些学生对象没有任何了解。它在`Main`块内部是自主的。
++   **规则 4：部分（成员）不知道对象（类）的存在**：`Address`对象对这些学生对象没有任何了解。它在`Main`块内部是自主的。
 
 # 组合与聚合
 
@@ -264,13 +396,57 @@
 
 让我们以一个板球运动员和板为例。考虑以下内容：
 
-[PRE10]
+```cs
+    public class CricketPlayer
+    {
+      public string PlayerName { get; set; }
+
+      public CricketPlayer(string name)
+      {
+        PlayerName = name;
+      }
+
+      public void Play(Bat bat)
+      {
+        bat.StartPlay(this);
+      }
+
+      public string GetPlayerName()
+      {
+        return PlayerName;
+      }
+    }
+
+    public class Bat
+    {
+      public string BrandName { get; set; }
+
+      public void StartPlay(CricketPlayer player)
+      {
+        // Do something with the player.
+        Console.WriteLine("Player Named as " + player.PlayerName
+           + " is playing.");
+        Console.ReadLine();
+      }
+
+      public string GetBrandName()
+      {
+        return "Some Brand Name";
+      }
+    }
+```
 
 # 上述代码的解释
 
 我们有两个不同的类，`CricketPlayer`和`Bat`。现在让我按照以下方式创建对象：
 
-[PRE11]
+```cs
+    var cPlayer = new CricketPlayer("Hardik Pandya");
+    Bat bat = new Bat();
+
+    cPlayer.Play(bat);
+    bat.StartPlay(cPlayer);
+```
 
 输出如下所示：
 
@@ -284,15 +460,25 @@
 
 +   **规则 2：关联的对象（成员）可以同时属于多个对象（类）**：板可以被团队中的许多其他球员使用，而不仅仅是其中一个球员。
 
-+   **规则3：关联的对象（成员）的存在不由另一个对象（类）管理**：球员不负责管理球拍。它是在球员加入球队之前就创建的。同样，球拍也不会导致球员出生或死亡，除非球员用球拍打自己，这是不可能发生的。
++   **规则 3：关联的对象（成员）的存在不由另一个对象（类）管理**：球员不负责管理球拍。它是在球员加入球队之前就创建的。同样，球拍也不会导致球员出生或死亡，除非球员用球拍打自己，这是不可能发生的。
 
-+   **规则4：关联的对象（成员）可能知道也可能不知道对象（类）的存在**：球员知道球拍，因为球拍作为参数传递给了`Play`方法。同样，球拍知道球员，因为它被传递给了`StartPlay`方法。
++   **规则 4：关联的对象（成员）可能知道也可能不知道对象（类）的存在**：球员知道球拍，因为球拍作为参数传递给了`Play`方法。同样，球拍知道球员，因为它被传递给了`StartPlay`方法。
 
 如果你稍微了解一点板球，你必须知道球员使用球拍来击球。这意味着它依赖于球拍对象。然而，球拍对象可以被团队中的任何一名击球手使用，这导致了`Bat`类中的`StartPlay`方法。显然，球拍对象需要与一个球员关联，这最终开始了比赛。
 
 这两个对象相互依赖，以便开始比赛。它们仍然作为独立对象存在。假设你没有调用`Play`和`StartPlay`方法，什么都不会改变。代码将编译。这定义了它们为了共同目的而相互关联：
 
-[PRE12]
+```cs
+    CricketPlayer cPlayer = new CricketPlayer("Hardik Pandya");
+    Bat bat = new Bat();
+
+    //cPlayer.Play(bat);
+    //bat.StartPlay(cPlayer);
+
+    Console.WriteLine($"Name of the Player is: { 
+        cPlayer.GetPlayerName() }");
+    Console.WriteLine($"Brand of Bat is: { bat.GetBrandName() }");
+```
 
 在这里，我只是注释掉了代码以供玩耍。这并没有对对象产生影响，它们仍然存在。然后我使用它们来调用其他方法，如`GetPlayerName`和`GetBrandName`。
 
@@ -306,7 +492,19 @@
 
 当两个相同类型的对象相互关联时，这种关联被称为**自反关联**。让我们考虑一下`Medicine`类：
 
-[PRE13]
+```cs
+    public class Medicine
+    {
+      public string Name { get; set; }
+      public Medicine AlternateMedicine { get; set; }
+
+      public Medicine(string name, Medicine altMedicine)
+      {
+        Name = name;
+        AlternateMedicine = altMedicine;
+      }   
+    }
+```
 
 在许多场景中，当我们有相同实体的依赖关系时，这非常有用。我们知道一种药物可能有一种替代药物，而这种替代药物又可能有另一种替代药物，依此类推。
 
@@ -314,7 +512,60 @@
 
 当关联通过其他方式形成，而不是直接在两个对象之间时，这种关联被称为**间接关联**。我们将通过以下示例来尝试理解这个概念：
 
-[PRE14]
+```cs
+    public class SoftwareEngineer
+    {
+        public string Name { get; set; }
+        public int LaptopId { get; set; }
+
+        public SoftwareEngineer(string name, int laptopId)
+        {
+                Name = name;
+                LaptopId = laptopId;
+        }
+     }
+
+     public class Laptop
+     {
+        public int LaptopId { get; set; }
+        public string LaptopName { get; set; }
+
+        public Laptop(int id, string name)
+        {
+           LaptopId = id;
+           LaptopName = name;
+        }
+      }
+
+      public class AvailableLaptops
+      {
+        public static List<Laptop> Laptops { get; set; }
+        static AvailableLaptops()
+        {
+          Laptops = new List<Laptop>
+          {
+            new Laptop(1, "Laptop1"),
+            new Laptop(2, "Laptop2"),
+            new Laptop(3, "Laptop3"),
+            new Laptop(4, "Laptop4"),
+          };
+        }
+
+        public static Laptop GetLaptop(int id)
+        {
+          return Laptops.Find(l => l.LaptopId == id);
+        }
+      }
+      static void Main(string[] args)
+      {
+        SoftwareEngineer softEng = new SoftwareEngineer("Tworit Dash", 3);
+        // Get the Laptop object from AvailableLaptops class by id.
+        Laptop usedLaptop = AvailableLaptops.GetLaptop(3);
+        Console.WriteLine(softEng.Name + " is using " + 
+          usedLaptop.LaptopName);
+        Console.ReadLine();
+      }
+```
 
 我们有两个类名为`SoftwareEngineer`和`Laptop`，它们应该相互关联。在这种情况下，我们试图通过一个静态类`AvailableLaptops`间接地将它们联系起来，这个类包含一个包含它们的`Id`和`Name`的`Laptop`对象列表。
 
@@ -392,7 +643,49 @@
 
 让我们看看如何实现继承。
 
-[PRE15]
+```cs
+    public abstract class User
+    {
+        public int Id { get; set; }
+        public int RoleId { get; set; }
+        public string Name { get; set; }
+        public string EmailId { get; set; }
+        public string MobileNumber { get; set; }
+
+        public int SaveUser(int userId)
+        {
+           // Database operation to save the user.
+           return userId;
+        }
+      }
+
+      public class Admin : User
+      {
+        public string CompanyDepartment { get; set; }
+        public Admin()
+        {
+          RoleId = 1;
+        }
+      }
+
+      public class Manager : User
+      {
+        public List<TeamLead> TeamLeads { get; set; }
+        public Manager()
+        {
+          RoleId = 2;
+        }
+      }
+
+      public class TeamLead : User
+      {
+        public List<string> Projects { get; set; }
+        public TeamLead()
+        {
+          RoleId = 3;
+        }
+      }
+```
 
 在我们公司中，有不同类型的用户，例如`Admin`、`Manager`、`TeamLeads`、`HR`等。尽管这些实体是不同的，但它们有一些共同的属性。它们必须有一个`Id`、`RoleId`、`Name`、`EmailId`、`MobileNumber`等。
 
@@ -410,9 +703,28 @@
 
 我们也可以在这些子类中定义针对它们的特定方法。当我们尝试创建对象，换句话说，创建一个`Admin`和一个`Manager`时，它看起来会像以下这样：
 
-[PRE16]
+```cs
+    static void Main(string[] args)
+    {
+        Admin admin = new Admin()
+        {
+          Id = 12
+        };
+        admin.SaveUser(admin.Id);
 
-你可以看到我们正在创建每种类型的用户，然后将它们的ID发送到保存方法以进行进一步的数据库处理。`RoleId`在每种类型的`User`类的构造函数中分配。输出如下：
+        Manager manager = new Manager
+        {
+          Id = 13
+        };
+        manager.SaveUser(manager.Id);
+         Console.WriteLine("Admin (Role Id: {0}) with UserId {1} 
+            is saved", admin.RoleId, admin.Id);
+        Console.WriteLine("Manager (Role Id: {0}) with UserId {1}
+            is saved", manager.RoleId, manager.Id);
+    }
+```
+
+你可以看到我们正在创建每种类型的用户，然后将它们的 ID 发送到保存方法以进行进一步的数据库处理。`RoleId`在每种类型的`User`类的构造函数中分配。输出如下：
 
 ![图片](img/095ed841-57ce-4638-903f-e14c08a99c8b.png)
 
@@ -420,9 +732,9 @@
 
 公司决定有一个新的员工类型，名为“配送经理”，他将拥有某些特权，但不是全部。这个角色将从`Manager`和`TeamLead`那里承担部分责任。
 
-配送经理可以`CreateProject`（像TeamLead一样）和`AssignProjectToTeamLead`（像Manager一样）。在执行所有这些操作时，他/她还可以`SendNotificationToCto`，这是一个新方法。因此，这两个方法将包含不是直接从`Manager`和`TeamLead`类复制过来的额外代码：
+配送经理可以`CreateProject`（像 TeamLead 一样）和`AssignProjectToTeamLead`（像 Manager 一样）。在执行所有这些操作时，他/她还可以`SendNotificationToCto`，这是一个新方法。因此，这两个方法将包含不是直接从`Manager`和`TeamLead`类复制过来的额外代码：
 
-![图片](img/e6bad7a4-a498-4945-95b5-7839807fdeef.png)**多重继承**是一种特定于语言的特性，它允许一个类继承多个父类的特性。这个特性可能会在设计上引入复杂性，而支持这种特性的语言也有它们自己处理此类场景的方式。C#、Java、Swift等语言不支持多重继承，但它们允许实现多个协议，这些协议被称为**接口**。我只是想向你展示，我们必须采取一些替代方法来解决问题，而不是像上面那样从多个类中继承，因为C#本身就不支持这种做法。
+![图片](img/e6bad7a4-a498-4945-95b5-7839807fdeef.png)**多重继承**是一种特定于语言的特性，它允许一个类继承多个父类的特性。这个特性可能会在设计上引入复杂性，而支持这种特性的语言也有它们自己处理此类场景的方式。C#、Java、Swift 等语言不支持多重继承，但它们允许实现多个协议，这些协议被称为**接口**。我只是想向你展示，我们必须采取一些替代方法来解决问题，而不是像上面那样从多个类中继承，因为 C#本身就不支持这种做法。
 
 # 我们遇到的问题
 
@@ -438,21 +750,89 @@ VolksTaditToy 现在结合了这两款汽车的功能。但在我的程序中，
 
 组合在这里是我们的救星。让我们看看我们如何利用这种关系来解决这个问题。我们将引入一个 `Role` 类。显然！`Manager`、`TeamLead` 和 `DeliveryManager` 是员工扮演的不同角色：
 
-[PRE17]
+```cs
+    public class Role
+    {
+        public int RoleId { get; set; }
+        public string RoleName { get; set; }
+    }
+```
 
 现在所有的其他用户类型类都将从这个类派生：
 
-[PRE18]
+```cs
+    public class Admin : Role
+    {
+        public string CompanyDepartment { get; set; }
+        public Admin()
+        {
+          RoleId = 1;
+        }
+    }
+
+    public class Manager : Role
+    {
+        public List<TeamLead> TeamLeads { get; set; }
+        public Manager()
+        {
+          RoleId = 2;
+        }
+    }
+    public class TeamLead : Role
+    {
+        public List<string> Projects { get; set; }
+        public TeamLead()
+        {
+          RoleId = 3;
+        }
+    }
+    public class DeliveryHead : Role
+    {
+       public DeliveryHead()
+        {
+          RoleId = 4;
+        }
+    }
+```
 
 好吧，下一步是什么？剩下的类是 `User`。我们需要对其进行一些修改，如下所示：
 
-[PRE19]
+```cs
+    public class User
+    {
+        public int Id { get; set; }
+        public List<Role> RoleIds { get; set; }
+        public string Name { get; set; }
+        public string EmailId { get; set; }
+        public string MobileNumber { get; set; }
+
+        public int SaveUser(int userId)
+        {
+           // Database operation to save the user.
+           return userId;
+        }
+    }
+```
 
 第一个修改是移除抽象关键字，因为我们现在将创建这个类的对象。接下来是拥有一个属性 `public List<Role> RoleIds { get; set; }` 而不是 `public int RoleId { get; set; }`。我们这样做是为了允许给用户/员工分配多个角色。
 
 观察，我们如何在以下主方法中创建具有多个角色的用户：
 
-[PRE20]
+```cs
+    static void Main(string[] args)
+    {
+        User deliveryManager = new User()
+        {
+            RoleIds = new List<Role>
+            {
+               new Manager(),
+               new TeamLead()
+            }
+        };
+        Console.WriteLine(string.Format("User has Roles:\n\n\t- 
+           {0}", string.Join("\n\t- ", deliveryManager.RoleIds)));
+    }
+```
 
 在创建 `DeliveryManager` 类型的 `User` 时，我们通过创建 `Manager` 和 `TeamLead` 类型的列表来给用户分配多个角色。由于它们继承自 `Role` 基类，所以 `RoleIds` 能够识别这些类型。
 
@@ -464,9 +844,25 @@ VolksTaditToy 现在结合了这两款汽车的功能。但在我的程序中，
 
 # 对象组合在依赖注入中的作用
 
-现在我们已经理解了对象组合的概念，让我们分析一个实际的软件项目问题，以及如何使用对象组合来陷入困境。在这个过程中，我们将发现这个概念在DI（依赖注入）环境中的重要性：
+现在我们已经理解了对象组合的概念，让我们分析一个实际的软件项目问题，以及如何使用对象组合来陷入困境。在这个过程中，我们将发现这个概念在 DI（依赖注入）环境中的重要性：
 
-[PRE21]
+```cs
+    class Mail
+    {
+      protected bool SendMail(string mailId, string message)
+      {   
+         // Logic to send an email
+         return true;
+      }
+    }
+    class Notification : Mail
+    {
+       void SendNotification(string mailId, string message)
+       {
+          SendMail(mailId, message);
+       }
+    }
+```
 
 因此，`Notification`类继承了`Mail`类，以便它可以调用`SendMail()`。这种结构本身并没有错，但将来可能会产生复杂性。
 
@@ -474,7 +870,56 @@ VolksTaditToy 现在结合了这两款汽车的功能。但在我的程序中，
 
 为了解决这个问题，我们可以轻松地使用对象组合与依赖注入。让我们首先修改代码。如下所示：
 
-[PRE22]
+```cs
+    interface IMail
+    {
+        bool SendMail(string mailId, string message);
+    }
+
+    interface ISms
+    {
+        bool SendSms(string mobile, string message);
+    }
+
+    public class Mail : IMail
+    {
+       public bool SendMail(string mailId, string message)
+       {
+          // Logic to send an email
+          Console.WriteLine("SendMail Called");
+          return true;
+       }
+     }
+
+     public class Sms : ISms
+     {
+        public bool SendSms(string mailId, string message)
+        {
+          // Logic to send a Sms
+          Console.WriteLine("SendSms Called");
+          return true;
+        }
+      }
+
+      class Notification
+      {
+         private readonly IMail _mail;
+         private readonly ISms _sms;
+
+         public Notification(IMail mail, ISms sms)
+         {
+           _mail = mail;
+           _sms = sms;
+         }
+
+        public void SendNotification(string mailId, string mobile,
+           string message)
+        {
+           _mail.SendMail(mailId, message);
+           _sms.SendSms(mobile, message);
+        }
+      }
+```
 
 `IEmail`和`ISms`是具有`SendMail()`和`SendSms()`方法的接口。接下来，我们需要在`Mail`和`Sms`类中实现这些接口。我们将在这些类实现的方法中编写我们的发送逻辑。
 
@@ -482,13 +927,40 @@ VolksTaditToy 现在结合了这两款汽车的功能。但在我的程序中，
 
 那么优势在哪里呢？我们不是写了更多的代码吗？这里的关键点非常有趣。如果你查看实例化`Notification`类的代码，你会得到一些提示。让我们看看那个：
 
-[PRE23]
+```cs
+    static void Main(string[] args)
+    {
+        Notification notify = new Notification(new Mail(),
+           new Sms());
+        notify.SendNotification("taditdash@gmail.com", 
+          "9132994288", "Hello Tadit!");
+        Console.ReadLine();
+    }
+```
 
 看到了提示吗？让我来解释一下。我们将`Mail`和`Sms`类的实例注入到`Notification`构造函数中，这些实例被分配给属性`_mail`和`_sms`。它会自动调用`Mail`和`Sms`类内部的方法。因此，我们使用`IMail`和`ISms`引用组合了`Notification`类。这就是对象组合与依赖注入出现的地方。
 
 假设你在某个时间点想包含另一个用于邮件发送的类（比如`SmtpMail`），你只需编写一个实现相同`IMail`接口的类，并定义`SendMail`方法。就这样，完成了。不再需要让`Notification`类变得复杂。它将按预期工作。
 
-[PRE24]
+```cs
+    public class SmtpMail : IMail
+    {
+       public bool SendMail(string mailId, string message)
+       {
+          // Logic to send an email
+          Console.WriteLine("SmtpMail Called");
+          return true;
+       }
+    }
+    static void Main(string[] args)
+    {
+        Notification notify = new Notification(new SmtpMail(),
+            new Sms());
+        notify.SendNotification("taditdash@gmail.com", 
+           "9132994288", "Hello Tadit!");
+        Console.ReadLine();
+    }
+```
 
 正如你所见，我只是声明了新的类，并像`new SmtpMail()`一样注入对象，而不是在`Notification`类内部直接引用它。这就是唯一的改变。其余的将按预期工作，因为我已经注入了对象，而不是在`Notification`类内部直接引用它。
 
@@ -508,27 +980,55 @@ VolksTaditToy 现在结合了这两款汽车的功能。但在我的程序中，
 
 组合根（Composition Root）组合了应用程序的所有独立模块。在运行时，对象组合是任何其他操作之前的第一件事。一旦对象图与依赖项连接，对象组合就完成了，然后与应用程序相关的组件可以接管。对象组合应该尽可能接近应用程序的入口点。
 
-在.NET Core 2.0控制台应用程序和ASP.NET Core 2.0 MVC应用程序中，入口点是相同的，都在`Program.cs`类的`Main`方法内部。.NET Core 2.0控制台应用程序的`Main`方法很简洁，但另一方面，ASP.NET Core 2.0 MVC在`Main`方法内部有一些启动代码。然而，我们通常在`ConfigureServices`方法中编写组合代码，这个方法可以在`Main`方法内部调用。
+在.NET Core 2.0 控制台应用程序和 ASP.NET Core 2.0 MVC 应用程序中，入口点是相同的，都在`Program.cs`类的`Main`方法内部。.NET Core 2.0 控制台应用程序的`Main`方法很简洁，但另一方面，ASP.NET Core 2.0 MVC 在`Main`方法内部有一些启动代码。然而，我们通常在`ConfigureServices`方法中编写组合代码，这个方法可以在`Main`方法内部调用。
 
-当你在Visual Studio 2017中执行File | New | Project | .NET Core | Console App (.NET Core)时，你将在`Main`方法中看到以下内容：
+当你在 Visual Studio 2017 中执行 File | New | Project | .NET Core | Console App (.NET Core)时，你将在`Main`方法中看到以下内容：
 
-[PRE25]
+```cs
+    namespace PacktConsoleApp
+    {
+      class Program
+      {
+        static void Main(string[] args)
+        {
+ // We will do all Object Composition here directly or 
+              calling a ConfigureServices method.
+          Console.WriteLine("Hello World!");
+        }
+      }
+    }
+```
 
-在ASP.NET Core 2.0 MVC应用程序的情况下，当你选择File | New | Project | Web | ASP.NET Core Web Application（在下一个屏幕中，选择合适的模板）时，Web应用程序模板会在`Program`类中生成`Main`方法，而`Startup`看起来如下所示：
+在 ASP.NET Core 2.0 MVC 应用程序的情况下，当你选择 File | New | Project | Web | ASP.NET Core Web Application（在下一个屏幕中，选择合适的模板）时，Web 应用程序模板会在`Program`类中生成`Main`方法，而`Startup`看起来如下所示：
 
 ![图片](img/b43a5769-7a5c-4917-b9c0-ffc24875d597.png)
 
-我们在上一个章节中创建`Notification`对象的方式被称为**穷人版依赖注入（DI**）。而不是这样做，我们应该在该位置应用DI容器来组合和管理对象。
+我们在上一个章节中创建`Notification`对象的方式被称为**穷人版依赖注入（DI**）。而不是这样做，我们应该在该位置应用 DI 容器来组合和管理对象。
 
-对象组合是DI的基本构建块，也是最容易理解的一个，因为我们已经通过许多例子知道了如何组合对象。现在，我们需要学习在框架能力的影响下，组合对象时会面临哪些挑战。这些问题与框架有关，与对象组合的概念无关。让我们在接下来的章节中找出答案。
+对象组合是 DI 的基本构建块，也是最容易理解的一个，因为我们已经通过许多例子知道了如何组合对象。现在，我们需要学习在框架能力的影响下，组合对象时会面临哪些挑战。这些问题与框架有关，与对象组合的概念无关。让我们在接下来的章节中找出答案。
 
-# 组合.NET Core 2.0控制台应用程序
+# 组合.NET Core 2.0 控制台应用程序
 
-在`Main`方法内部，我们可以轻松地使用内置的DI容器组合对象。如果你还记得，我们已经讨论过从容器初始化、将对象注册到容器、解析依赖项到最后从容器中释放组件，所有这些都应该在组合根内部发生，在这里被认为是`Main`方法。
+在`Main`方法内部，我们可以轻松地使用内置的 DI 容器组合对象。如果你还记得，我们已经讨论过从容器初始化、将对象注册到容器、解析依赖项到最后从容器中释放组件，所有这些都应该在组合根内部发生，在这里被认为是`Main`方法。
 
 考虑一个控制台应用程序中的`Main`方法示例：
 
-[PRE26]
+```cs
+    static void Main(string[] args)
+    {
+      // Setup container and register dependencies.
+      var serviceProvider = new ServiceCollection()
+      .AddTransient<IEmployeeService, EmployeeService>()
+      .BuildServiceProvider();
+
+      // Get the service instance from the container and 
+      do actual operation.
+      var emp = serviceProvider.GetService<IEmployeeService>();
+      emp.HelloEmployee();
+
+      Console.ReadKey();
+    }
+```
 
 这段代码很简单，它利用了可用的扩展方法`Add***`来将依赖项注册到容器中。然后我们使用`GetService`方法通过接口获取实现类型。有了这个实例，我们就可以在应用程序中做任何我们想做的事情。
 
@@ -536,9 +1036,29 @@ VolksTaditToy 现在结合了这两款汽车的功能。但在我的程序中，
 
 当然，你可以引入另一个方法，你可以将其命名为 `ConfigureServices`（如下所示）以获得更清晰的代码结构。你可以给方法起任何名字，但这个名字与我们在上一节中看到的 ASP.NET Core MVC 应用程序中专门用于依赖注入配置的方法的名称相似。新添加的方法如下代码片段所示：
 
-[PRE27]
+```cs
+    static void Main(string[] args)
+    {
+ ConfigureServices(new ServiceCollection());
+      Console.ReadKey();
+    }
 
-注意，我们没有手动释放对象或容器。原因是释放会根据你决定的生存周期自动由 DI 容器处理。`AddTransient`、`AddSingleton` 和 `AddScoped` 是现成的方法，可以帮助执行不同类型的对象生存周期。我们将在 [第 6 章](72113d11-0af8-431f-91d0-ced4cb35af21.xhtml) 中更深入地探讨对象生存周期，*对象生存周期*。
+    public static void ConfigureServices(IServiceCollection 
+      serviceCollection)
+    {
+      // Setup container and register dependencies.
+      var serviceProvider = serviceCollection
+      .AddTransient<IEmployeeService, EmployeeService>()
+      .BuildServiceProvider();
+
+      // Get the service instance from the container and
+         do actual operation.
+      var emp = serviceProvider.GetService<IEmployeeService>();
+      emp.HelloEmployee();
+    }
+```
+
+注意，我们没有手动释放对象或容器。原因是释放会根据你决定的生存周期自动由 DI 容器处理。`AddTransient`、`AddSingleton` 和 `AddScoped` 是现成的方法，可以帮助执行不同类型的对象生存周期。我们将在 第六章 中更深入地探讨对象生存周期，*对象生存周期*。
 
 # ASP.NET Core MVC 2.0 的对象组合
 
@@ -550,11 +1070,69 @@ MVC 的核心在于控制器。控制器处理请求，处理它们，并将响�
 
 `IControllerFactory` 是 `Microsoft.AspNetCore.Mvc.Controllers` 命名空间中的一个接口，它使我们能够创建和释放控制器。该接口包含两个方法，如下所示：
 
-[PRE28]
+```cs
+    namespace Microsoft.AspNetCore.Mvc.Controllers
+    {
+      /// <summary>
+      /// Provides methods for creation and disposal of controllers.
+      /// </summary>
+      public interface IControllerFactory
+      {
+        object CreateController(ControllerContext context);
+        void ReleaseController(ControllerContext context,
+         object controller);
+      }
+    }
+```
 
 ASP.NET Core MVC 2.0 内置了一个 `DefaultControlFactory`，它实现了这个接口。让我们看看源代码：
 
-[PRE29]
+```cs
+    namespace Microsoft.AspNetCore.Mvc.Controllers
+    {
+      /// <summary>
+      /// Default implementation for <see cref="IControllerFactory"/>.
+      /// </summary>
+      public class DefaultControllerFactory : IControllerFactory
+      {
+        private readonly IControllerActivator _controllerActivator;
+        private readonly IControllerPropertyActivator[]
+            _propertyActivators;
+ public DefaultControllerFactory(
+ IControllerActivator controllerActivator,
+ IEnumerable<IControllerPropertyActivator> propertyActivators)
+            {
+              if (controllerActivator == null)
+              {
+                throw new ArgumentNullException(nameof(
+                 controllerActivator));
+              }
+
+              if (propertyActivators == null)
+               {
+                throw 
+                  new ArgumentNullException(nameof(propertyActivators));
+               }
+
+               _controllerActivator = controllerActivator;
+               _propertyActivators = propertyActivators.ToArray();
+            }
+            public virtual object CreateController
+              (ControllerContext context)
+            {
+               // Codes removed just for book.
+                   You can find codes in Github.
+             }
+
+             public virtual void ReleaseController(ControllerContext
+               context, object controller)
+            {
+              // Codes removed just for book. You can
+                  find codes in Github.
+            }
+      }
+    }
+```
 
 `DefaultControllerFactory` 具有构造函数注入，用于提供 `ControllerActivator` 和 `PropertyActivators` 所需的依赖项。因此，这个工厂由激活器组成。就像一个工厂一样，还有一个名为 `IControllerActivator` 的 `Activator` 接口。分别有名为 `ControllerFactoryProvider` 和 `ControllerActivatorProvider` 的工厂和激活器提供者。
 
@@ -576,4 +1154,4 @@ ASP.NET Core MVC 2.0 内置了一个 `DefaultControlFactory`，它实现了这�
 
 然后，我们讨论了对象组合在依赖注入中扮演的重要角色。我们还看到了这种模式如何在 ASP.NET Core MVC 2.0 中遵循。
 
-是时候看看对象是如何创建的，它们是如何生存的，然后又是如何被销毁的，在[第6章](72113d11-0af8-431f-91d0-ced4cb35af21.xhtml)，*对象生命周期*中。我们将对象生命周期与我们在这章中学到的知识联系起来。
+是时候看看对象是如何创建的，它们是如何生存的，然后又是如何被销毁的，在第六章，*对象生命周期*中。我们将对象生命周期与我们在这章中学到的知识联系起来。

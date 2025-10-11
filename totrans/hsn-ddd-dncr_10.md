@@ -2,7 +2,7 @@
 
 你应该已经理解了什么是领域事件，为什么它们很重要，以及如何找到和编码它们。现在，我们将探讨事件的其他用途。希望阅读完这一章后，你会明白为什么我们需要使用事件来更新聚合状态。在此之前，我们只在聚合内部使用事件，将事件提升并单独在`When`方法中进行状态转换可能看起来有些过度。
 
-这次，你将学习如何使用事件来持久化对象的状态，而不是使用传统的持久化机制，如SQL或文档数据库。这并不是一件容易掌握的事情，但回报是令人满意的。使用事件来表示系统行为并推导出任何给定时间点的状态有许多优点。当然，没有银弹，在决定事件溯源是否适合你之前，了解可能的缺点是至关重要的。
+这次，你将学习如何使用事件来持久化对象的状态，而不是使用传统的持久化机制，如 SQL 或文档数据库。这并不是一件容易掌握的事情，但回报是令人满意的。使用事件来表示系统行为并推导出任何给定时间点的状态有许多优点。当然，没有银弹，在决定事件溯源是否适合你之前，了解可能的缺点是至关重要的。
 
 我们将继续使用更多的事件处理器来开发我们的聚合。同时，我们还将介绍事件流的概念以及流与聚合之间的关系。我们将使用事件存储在流中持久化我们的聚合，并将它们加载回来。
 
@@ -20,15 +20,17 @@
 
 # 技术要求
 
-在本章中，我们将使用事件存储（[https://eventstore.org](https://eventstore.org/)），这是一个开源数据库。
+在本章中，我们将使用事件存储（[`eventstore.org`](https://eventstore.org/)），这是一个开源数据库。
 
-运行事件存储最简单的方法是使用Docker。我们在前面的章节中使用了`docker-compose`，所以使用事件存储会有同样的体验。
+运行事件存储最简单的方法是使用 Docker。我们在前面的章节中使用了`docker-compose`，所以使用事件存储会有同样的体验。
 
 本章的代码包含一个`docker-compose.yml`文件，允许你通过执行以下命令来使用事件存储：
 
-[PRE0]
+```cs
+docker-compose up
+```
 
-Docker将从Docker Hub拉取最新镜像并启动一个命名容器。此命令将两个端口从容器映射到你的机器：`2113`和`1113`。端口`2113`用于通过HTTP访问事件存储，端口`1113`用于TCP连接。
+Docker 将从 Docker Hub 拉取最新镜像并启动一个命名容器。此命令将两个端口从容器映射到你的机器：`2113`和`1113`。端口`2113`用于通过 HTTP 访问事件存储，端口`1113`用于 TCP 连接。
 
 容器启动后，你可以在浏览器中打开`http://localhost:2113`来检查其状态。你将得到以下登录提示：
 
@@ -38,11 +40,11 @@ Docker将从Docker Hub拉取最新镜像并启动一个命名容器。此命令�
 
 ![图片](img/125ecde9-c70f-4a12-929e-56405d528a8b.png)
 
-产品版本和菜单项可能因Event Store的最新版本而有所不同。
+产品版本和菜单项可能因 Event Store 的最新版本而有所不同。
 
 # 为什么事件溯源
 
-在本节中，我们不仅将讨论为什么有人可能想要使用事件溯源——我们还将探讨这个模式的定义及其背后的历史。就像Greg Young经常说的那样，“*事件溯源并不新鲜*”，我们将探讨一些历史，这应该有助于你更好地理解这个概念。
+在本节中，我们不仅将讨论为什么有人可能想要使用事件溯源——我们还将探讨这个模式的定义及其背后的历史。就像 Greg Young 经常说的那样，“*事件溯源并不新鲜*”，我们将探讨一些历史，这应该有助于你更好地理解这个概念。
 
 之后，我们将探讨*为什么*。有了对其历史的了解，理解为什么这种存储数据的方式变得越来越流行就不会很难。
 
@@ -54,13 +56,32 @@ Docker将从Docker Hub拉取最新镜像并启动一个命名容器。此命令�
 
 领域模型中的每个动作，作为聚合中的方法表示，都会在系统状态中引起变化。我们还让我们的聚合使用事件来描述这些变化。当这种变化发生时，我们随后使用模式匹配代码在将其持久化到数据库之前修改聚合状态。
 
-现在，让我们假设我们不是像在[第8章](4eea9289-d77e-4568-a9c0-c5e1265e3b4e.xhtml) *CQRS - 读取侧*中做的那样将聚合状态保存到数据库中，相反，我们将收集在执行动作时生成的新事件。例如，在我们的`ClassifiedAd`聚合代码中，我们有一个`UpdatePrice`方法：
+现在，让我们假设我们不是像在第八章 *CQRS - 读取侧*中做的那样将聚合状态保存到数据库中，相反，我们将收集在执行动作时生成的新事件。例如，在我们的`ClassifiedAd`聚合代码中，我们有一个`UpdatePrice`方法：
 
-[PRE1]
+```cs
+public void UpdatePrice(Price price) =>  
+    Apply(new Events.ClassifiedAdPriceUpdated  
+    {  
+        Id = Id,  
+        Price = price.Amount,  
+        CurrencyCode = price.Currency.CurrencyCode  
+    });
+```
 
 当我们从应用程序服务调用它时，这种方法已经创建了一个新的事件。我们还有一个`When`方法用于将事件投影到聚合状态，因此当我们调用`Apply`方法，例如在前面的代码片段中，聚合状态会相应地改变：
 
-[PRE2]
+```cs
+protected override void When(object @event)  
+{  
+    switch (@event)  
+    {  
+        // only a part of the When method is shown  
+        case Events.ClassifiedAdPriceUpdated e:  
+            Price = new Price(e.Price, e.CurrencyCode);  
+            break;  
+    }  
+}
+```
 
 因此，如果我们观察聚合状态随时间的变化，当我们按时间线对其应用不同的事件时，它将看起来像这样：
 
@@ -82,13 +103,13 @@ Docker将从Docker Hub拉取最新镜像并启动一个命名容器。此命令�
 
 任何曾经陷入这种困境的人都会记得，通常与无法找到原因相关联的绝望程度。我们最终只能处理后果，根据我们最好的知识修复系统状态。有时这些问题存在数月甚至数年，开发者都无法确定问题的原因。这是因为他们不知道系统中发生的事件序列，导致了这种无效状态。
 
-Mathias Verraes 在他 2014 年的博客文章 *Domain-Driven Design is Linguistic* ([http://verraes.net/2014/01/domain-driven-design-is-linguistic/](http://verraes.net/2014/01/domain-driven-design-is-linguistic/)) 中很好地描述了保持导致特定状态的事件历史的重要性。
+Mathias Verraes 在他 2014 年的博客文章 *Domain-Driven Design is Linguistic* ([`verraes.net/2014/01/domain-driven-design-is-linguistic/`](http://verraes.net/2014/01/domain-driven-design-is-linguistic/)) 中很好地描述了保持导致特定状态的事件历史的重要性。
 
 正如你所读到的，拥有五十万欧元是最终的系统状态。然而，之前的事件序列可能会让我们对系统状态的某些其他方面得出不同的结论，这是我们之前没有考虑到的。如果我们想将我们的主题的情感状态或幸福水平添加到系统状态中，如果我们没有存储事件的历史，我们将无法获取这些信息。
 
 对于收集变更历史，无论是为了报告还是调试，通常可以通过引入一个人工的变更日志来解决。这样，似乎所有变更都被捕获以供未来分析。同时，事件处理与审计日志中的记录之间将没有直接关系。这可能导致某些变更不会被记录。
 
-仅保留最新状态的问题的另一个问题是，要获取关于系统的任何信息，我们只能依赖于我们用来持久化聚合的表或文档。当然，如果我们有一个具有两个数据库的CQRS系统，我们将从读取端获取信息。但对于那些需要在新屏幕中包含来自不同现有读取模型的数据的情况，我们唯一能做的就是执行一个复杂的带有连接的查询来获取所需的数据。随着时间的推移，这可能会削弱使用CQRS的优势，因为我们以前为了优化读取而优化的东西现在不再调整，考虑到一段时间前看起来完美无瑕的模型，现在却有一系列新的查询跨越了它。
+仅保留最新状态的问题的另一个问题是，要获取关于系统的任何信息，我们只能依赖于我们用来持久化聚合的表或文档。当然，如果我们有一个具有两个数据库的 CQRS 系统，我们将从读取端获取信息。但对于那些需要在新屏幕中包含来自不同现有读取模型的数据的情况，我们唯一能做的就是执行一个复杂的带有连接的查询来获取所需的数据。随着时间的推移，这可能会削弱使用 CQRS 的优势，因为我们以前为了优化读取而优化的东西现在不再调整，考虑到一段时间前看起来完美无瑕的模型，现在却有一系列新的查询跨越了它。
 
 # 什么是事件溯源？
 
@@ -106,17 +127,17 @@ Mathias Verraes 在他 2014 年的博客文章 *Domain-Driven Design is Linguist
 
 这种方法解决了为不同目的保留历史数据的问题——作为一个审计日志、作为一个账本、作为一个需要从过去获取数据的报告来源，以及作为一个可能帮助找到导致系统进入无效状态的路径。
 
-事件源的一个显著优势是它消除了阻抗不匹配。我们曾在[第7章](1c04605e-ffe3-49fb-94c6-2bb6e4fe269d.xhtml)“一致性边界”中讨论过这个问题，当时我们谈到将聚合体持久化到关系数据库和文档数据库。自从使用事件源以来，我们完全停止了以原样持久化对象，阻抗不匹配就变得无关紧要了。还记得对象和数据库之间映射可能多么复杂吗？能够从软件开发过程中移除这一负担是使用事件持久化对象的宝贵特性。
+事件源的一个显著优势是它消除了阻抗不匹配。我们曾在第七章“一致性边界”中讨论过这个问题，当时我们谈到将聚合体持久化到关系数据库和文档数据库。自从使用事件源以来，我们完全停止了以原样持久化对象，阻抗不匹配就变得无关紧要了。还记得对象和数据库之间映射可能多么复杂吗？能够从软件开发过程中移除这一负担是使用事件持久化对象的宝贵特性。
 
 # 周围的事件源
 
 尽管事件源可能看起来是一种新技术，但它并不是。
 
-回到2007年，格雷格·杨（Greg Young）开始将事件源塑造成我们现在的形式。但是，正如格雷格多次提到的，我们可以将这些类似的技术追溯到古代美索不达米亚。文字的起源与会计有关，楔形文字，已知的第一种文字，最初是为了会计目的而开发的。我们知道，从公元前3500年左右开始，书记员在泥板上记录商业交易。这些泥板随后被晾干，形成永久、不可更改的记录。
+回到 2007 年，格雷格·杨（Greg Young）开始将事件源塑造成我们现在的形式。但是，正如格雷格多次提到的，我们可以将这些类似的技术追溯到古代美索不达米亚。文字的起源与会计有关，楔形文字，已知的第一种文字，最初是为了会计目的而开发的。我们知道，从公元前 3500 年左右开始，书记员在泥板上记录商业交易。这些泥板随后被晾干，形成永久、不可更改的记录。
 
 会计自美索不达米亚和苏美尔时代以来已经发生了很大变化。尽管如此，现代会计原则与事件源相似。复式记账法中的每一笔交易至少记录两次——一次在借方账户上，一次在贷方账户上。这两条记录构成一笔交易。一笔交易中金额的总和必须为零。在账户表中没有账户的状态概念。运行余额是期初余额和该账户上任何记录的金额之和。因此，要获取当前余额，我们需要读取该账户的所有记录。
 
-同样的技术在金融的许多领域都被使用。我们都很熟悉的例子是银行业务。银行账户遵循与簿记中账户相同的规则。在名为`Accounts`的大SQL表中，没有存储在名为`Balance`的字段中的*账户余额*。在发生任何争议的情况下，银行无法证明余额是正确的。因此，余额是通过计算该账户所有交易的金额总和来计算的。当然，对于非常频繁使用的账户，这样的总和可能需要太长时间才能计算出来。在这种情况下，银行会偶尔制作账户快照。我们大多数人都熟悉财政年度的概念。在财政年度结束的那一天，所有余额都会固定下来，所有会计工作都会重新开始，只是将上一年度的余额转移过来。
+同样的技术在金融的许多领域都被使用。我们都很熟悉的例子是银行业务。银行账户遵循与簿记中账户相同的规则。在名为`Accounts`的大 SQL 表中，没有存储在名为`Balance`的字段中的*账户余额*。在发生任何争议的情况下，银行无法证明余额是正确的。因此，余额是通过计算该账户所有交易的金额总和来计算的。当然，对于非常频繁使用的账户，这样的总和可能需要太长时间才能计算出来。在这种情况下，银行会偶尔制作账户快照。我们大多数人都熟悉财政年度的概念。在财政年度结束的那一天，所有余额都会固定下来，所有会计工作都会重新开始，只是将上一年度的余额转移过来。
 
 在任何情况下，在现实世界的应用中，如会计和银行业务，都观察到了事件源的两个常见原则：
 
@@ -134,9 +155,9 @@ Mathias Verraes 在他 2014 年的博客文章 *Domain-Driven Design is Linguist
 
 到目前为止，在所有图表中，我们只看到了一个聚合体的事件。当然，这样的系统是没有用的，我们需要找到一种方法来存储不同聚合体的事件，以便使系统功能化。这里的主要要求是我们需要能够检索单个聚合体的事件，最好是单次读取。当然，如果有成千上万的事件，我们需要将读取分成多个批次，但这目前不在我们的范围内。为了实现只读取单个聚合体事件的这种能力，我们需要写入带有一些元数据的事件，这些元数据指示聚合体标识符。第二个要求是事件需要按照它们被写入的严格顺序读取；当我们将更改作为事件写入数据库时，这些事件需要按照我们发送到数据库的确切顺序写入。
 
-按照特定顺序进入系统的事件形成事件流。为了实现事件源，最舒适的解决方案是拥有一个数据库，允许我们为每个聚合体创建一个单独的事件流。在这种情况下，我们将向一个已知的流中写入并从中读取。流名称将是聚合体类型和聚合体标识符的组合；例如，对于我们的`ClassifiedAd`聚合体，其ID为`e99460470a7b4133827d06f32dd4714e`，流名称将是`ClassifiedAd-e99460470a7b4133827d06f32dd4714e`。一个聚合体流包含在聚合体生命周期中发生的所有事件。当我们决定系统不再需要聚合体时，我们可以删除整个流或写入一个最终事件，例如`ClassifiedAdRemoved`。
+按照特定顺序进入系统的事件形成事件流。为了实现事件源，最舒适的解决方案是拥有一个数据库，允许我们为每个聚合体创建一个单独的事件流。在这种情况下，我们将向一个已知的流中写入并从中读取。流名称将是聚合体类型和聚合体标识符的组合；例如，对于我们的`ClassifiedAd`聚合体，其 ID 为`e99460470a7b4133827d06f32dd4714e`，流名称将是`ClassifiedAd-e99460470a7b4133827d06f32dd4714e`。一个聚合体流包含在聚合体生命周期中发生的所有事件。当我们决定系统不再需要聚合体时，我们可以删除整个流或写入一个最终事件，例如`ClassifiedAdRemoved`。
 
-数据库的一个关键特性，我们可以用它来持久化事件，是除了单个流之外，还有一个包含系统中所有事件的单一流。这不会是最理想的，但我们可以通过控制流ID元数据属性来推断聚合流，以防我们的数据库不支持原生分离的流。然而，拥有包含所有事件的单一流是绝对必要的。在整个本书的过程中，我们将把这个主流称为`$all`流，因为在Event Store（我们将用于示例的数据库）中，它就是这样被称呼的。
+数据库的一个关键特性，我们可以用它来持久化事件，是除了单个流之外，还有一个包含系统中所有事件的单一流。这不会是最理想的，但我们可以通过控制流 ID 元数据属性来推断聚合流，以防我们的数据库不支持原生分离的流。然而，拥有包含所有事件的单一流是绝对必要的。在整个本书的过程中，我们将把这个主流称为`$all`流，因为在 Event Store（我们将用于示例的数据库）中，它就是这样被称呼的。
 
 理解这一点至关重要，当我们处理`$all`流和聚合流时，我们指的是相同的事件。你可以这样理解，所有事件始终存在于`$all`流中，但除此之外，还有一个对这些事件建立的索引。这个索引告诉系统一个事件属于哪个单个流。
 
@@ -144,7 +165,7 @@ Mathias Verraes 在他 2014 年的博客文章 *Domain-Driven Design is Linguist
 
 ![](img/1f044552-bfa3-4849-8969-33e13ed65e55.png)
 
-聚合流和$all流
+聚合流和$all 流
 
 到目前为止，我们已经能够制定出我们可以用来持久化我们的聚合为事件流的数据库的要求。现在，我们将查看此类数据库的具体示例。
 
@@ -152,20 +173,20 @@ Mathias Verraes 在他 2014 年的博客文章 *Domain-Driven Design is Linguist
 
 在上一节中，我们讨论了为了将数据库视为事件存储，我们需要确保这个数据库可以存储事件和元数据，并在元数据上建立索引。我们不能在事件上建立任何索引，因为事件对象没有单一的公因数；它们都是不同的。然而，元数据是以已知的方式结构化的。例如，流名称必须在所有事件的元数据中存在。
 
-这样的定义可能会让我们得出结论，任何支持通过流ID查询事件的数据库都可以用作事件存储。这是真的。在这里，你可以找到不同数据库如何用作事件存储的例子：
+这样的定义可能会让我们得出结论，任何支持通过流 ID 查询事件的数据库都可以用作事件存储。这是真的。在这里，你可以找到不同数据库如何用作事件存储的例子：
 
 | 数据库 | 如何存储事件 | 如何读取单个流 |
 | --- | --- | --- |
-| 关系数据库管理系统（SQL Server、PostgreSQL等） | 使用单个表；为流名称添加一个列，为事件负载添加一个列。一行是一个事件。 | 选择所有流名称是我们想要的行。 |
+| 关系数据库管理系统（SQL Server、PostgreSQL 等） | 使用单个表；为流名称添加一个列，为事件负载添加一个列。一行是一个事件。 | 选择所有流名称是我们想要的行。 |
 | 文档数据库（MongoDB、Azure Cosmos DB、RavenDB） | 使用文档集合。每个文档都应该有一个元数据对象和一个用于存储负载的字段。一个文档就是一个事件。 | 查询所有流名称（元数据的一部分）是我们需要的所有文档。 |
 | 分区表（Azure Table Storage、AWS DynamoDB） | 使用单个表；添加一个用于流名称（或 ID）的字段，作为分区键，并添加另一个字段作为行键（Azure）或排序键（DynamoDB）。第三个字段将包含事件负载。一条记录代表一个事件。 | 查询所有分区键为正在读取的流名称的记录。 |
 | 专用数据库（事件存储） | 原生支持流。 | 从单个流中读取所有事件。 |
 
-注意，对于某些关系型数据库，存在一些工具和库可以帮助存储事件源系统的数据。例如，Marten 框架([http://jasperfx.github.io/marten/](http://jasperfx.github.io/marten/))利用原生 PostgreSQL 功能在 JSONB 类型的列中存储非结构化数据，并基于该数据库实现了一个事件存储。SQL Stream Store ([https://github.com/SQLStreamStore/SQLStreamStore](https://github.com/SQLStreamStore/SQLStreamStore))也可以帮助你使用各种关系型数据库，包括 Microsoft SQL Server 和 PostgreSQL，作为事件存储。这两个开源工具在全球的生产系统中被积极使用，并且背后都有活跃的社区支持。
+注意，对于某些关系型数据库，存在一些工具和库可以帮助存储事件源系统的数据。例如，Marten 框架([`jasperfx.github.io/marten/`](http://jasperfx.github.io/marten/))利用原生 PostgreSQL 功能在 JSONB 类型的列中存储非结构化数据，并基于该数据库实现了一个事件存储。SQL Stream Store ([`github.com/SQLStreamStore/SQLStreamStore`](https://github.com/SQLStreamStore/SQLStreamStore))也可以帮助你使用各种关系型数据库，包括 Microsoft SQL Server 和 PostgreSQL，作为事件存储。这两个开源工具在全球的生产系统中被积极使用，并且背后都有活跃的社区支持。
 
 到目前为止，我们一直专注于将单个聚合体作为事件流进行持久化，并从数据库中读取单个聚合体的所有事件。然而，这并不是我们需要关注的事件存储的唯一特性。如果你还没有注意到，我们还没有涉及到查询部分，当我们需要根据某些标准读取某些聚合体的数据时。我们对事件存储的主要要求并不包括通过流名称查询任何内容的能力。显然，像`ClassifiedAdsPendingReview`这样的查询是不可能的，因为我们可能需要读取所有分类广告的所有事件（可能数百万），然后在内存中进行查询。这种方法对于生产环境来说并不可行，尽管它可能对原型设计非常有用。为了解决这个问题，我们需要回到 CQRS，这次我们需要使用领域事件来构建我们的读取模型。在事件源系统中，我们将不得不使用一个传统的数据库，SQL 或 NoSQL，它可以被查询，以处理 CQRS 的查询方面，而这个查询方面只能从事件中构建。因此，我们需要有一种可靠的方法，从事件存储实时（或接近实时）地获取所有新事件的信息，并将其传递给我们的读取模型构建者。如果我们使用传统的关系型数据库来存储事件，我们几乎不可避免地会转向频繁轮询。一些 NoSQL 数据库，如 Azure Cosmos DB、RavenDB 和 AWS DynamoDB，允许我们订阅变更流，并获取所有数据库操作的信息。当我们讨论这个特性时，我们将使用术语“订阅”。
 
-对于本书中的所有示例，我们将使用事件存储库（[https://eventstore.org](https://eventstore.org)，）因为它包含了其创建者，CQRS的*之父*，长期倡导事件源模式的Greg Young，以及支持该产品的公司以及开源开发者社区多年的经验。此外，此产品是免费的，您只需付费即可获得生产级支持。事件存储库原生支持存储事件，并具有事务性写入；我们可以订阅事件流以获取所有新的（和现有的）事件，等等。
+对于本书中的所有示例，我们将使用事件存储库（[`eventstore.org`](https://eventstore.org)，）因为它包含了其创建者，CQRS 的*之父*，长期倡导事件源模式的 Greg Young，以及支持该产品的公司以及开源开发者社区多年的经验。此外，此产品是免费的，您只需付费即可获得生产级支持。事件存储库原生支持存储事件，并具有事务性写入；我们可以订阅事件流以获取所有新的（和现有的）事件，等等。
 
 在继续之前，请确保您已经完成了*技术要求*部分中描述的步骤。
 
@@ -173,69 +194,195 @@ Mathias Verraes 在他 2014 年的博客文章 *Domain-Driven Design is Linguist
 
 现在，我们将编写一些代码，使我们能够使用事件来持久化我们的聚合。
 
-在[第9章](6f50ee65-024a-4c46-89c8-343183b05b8f.xhtml)，*CQRS - 读取侧*中，我们使用存储库来存储聚合，但现在，我们将做些不同的事情。将事件追加到`ClassifiedAd`聚合的流中与对`UserProfile`聚合做同样的事情没有区别。因此，存储库的具体细节消失了，关于持久化聚合和检索它们的所有事情都是完全以相同的方式进行。因此，我们可以使用一个接口，`IAggregateStore`，它将处理任何类型聚合的持久化。
+在第九章，*CQRS - 读取侧*中，我们使用存储库来存储聚合，但现在，我们将做些不同的事情。将事件追加到`ClassifiedAd`聚合的流中与对`UserProfile`聚合做同样的事情没有区别。因此，存储库的具体细节消失了，关于持久化聚合和检索它们的所有事情都是完全以相同的方式进行。因此，我们可以使用一个接口，`IAggregateStore`，它将处理任何类型聚合的持久化。
 
 现在，让我们开始实现一些低级代码，以将事件写入事件存储库流并读取它们。它将包括序列化、分页、类型处理和乐观并发。
 
-在本章中，当我们谈论可以写入事件到流并读取它们的地方时，我们将使用术语**事件存储库**。当我们使用术语Event Store时，我们将指的是您应该能够通过遵循*技术要求*部分来执行的产品。
+在本章中，当我们谈论可以写入事件到流并读取它们的地方时，我们将使用术语**事件存储库**。当我们使用术语 Event Store 时，我们将指的是您应该能够通过遵循*技术要求*部分来执行的产品。
 
 # 写入事件存储库
 
-在任何读取之前，必须有一个写入，所以这就是我们将开始的地方。让我们看看事件存储库API来写入事件到流。我们最可能使用的方法是以下这个：
+在任何读取之前，必须有一个写入，所以这就是我们将开始的地方。让我们看看事件存储库 API 来写入事件到流。我们最可能使用的方法是以下这个：
 
-[PRE3]
+```cs
+Task<WriteResult> AppendToStreamAsync(string stream, long expectedVersion, IEnumerable<EventData> events)
+```
 
 这里所有的参数都很清晰：一个流名称和要保存到流中的事件列表。此外，我们还需要提供聚合版本以处理乐观并发。它将防止其他人通过处理同一聚合的另一个命令并行进行的更改被覆盖。事件存储库默认支持流版本控制，我们只需在尝试将新事件保存到流中时提供预期的版本即可。
 
 我们将通过向`Marketplace.Framework`项目添加以下接口来开始编写代码：
 
-[PRE4]
+```cs
+using System.Threading.Tasks;
 
-你可以将它与我们在[第8章](4eea9289-d77e-4568-a9c0-c5e1265e3b4e.xhtml)，“聚合持久化”中使用的存储库接口进行比较，你会发现新的接口是一种通用的存储库。尽管我们讨论了为什么通常使用通用存储库不是一个好主意，但在我们的情况下，这是完全可以接受的，因为所有聚合的持久化方面都以相同的方式处理。
+namespace Marketplace.Framework
+{
+    public interface IAggregateStore
+    {
+        Task<bool> Exists<T, TId>(TId aggregateId);
 
-序列化代码需要安装一些外部依赖项。在前面提供的代码片段中，我们使用了`JsonConvert`类将事件序列化为JSON。因此，我们需要将`Newtonsoft.Json`包添加到我们的`Marketplace.Framework`项目中。为了获取事件存储API，我们还需要`EventStore.ClientAPI.NetCore`包。我们可以通过项目上的“管理NuGet包”上下文菜单，或者在终端窗口中运行以下两个命令来完成：
+        Task Save<T, TId>(T aggregate) where T : AggregateRoot<TId>;
 
-[PRE5]
+        Task<T> Load<T, TId>(TId aggregateId) 
+            where T : AggregateRoot<TId>;
+    }
+}
+```
+
+你可以将它与我们在第八章，“聚合持久化”中使用的存储库接口进行比较，你会发现新的接口是一种通用的存储库。尽管我们讨论了为什么通常使用通用存储库不是一个好主意，但在我们的情况下，这是完全可以接受的，因为所有聚合的持久化方面都以相同的方式处理。
+
+序列化代码需要安装一些外部依赖项。在前面提供的代码片段中，我们使用了`JsonConvert`类将事件序列化为 JSON。因此，我们需要将`Newtonsoft.Json`包添加到我们的`Marketplace.Framework`项目中。为了获取事件存储 API，我们还需要`EventStore.ClientAPI.NetCore`包。我们可以通过项目上的“管理 NuGet 包”上下文菜单，或者在终端窗口中运行以下两个命令来完成：
+
+```cs
+dotnet add Marketplace.Framework package Newtonsoft.Json
+dotnet add Marketplace.Framework package EventStore.ClientAPI.NetCore
+```
 
 现在，我们可以在一个新的类`EsAggregateStore`中开始实现这个接口，我们将把这个类添加到`Marketplace`项目的`Infrastructure`文件夹中。
 
-首先，是流名称。在本章的开头，我们已经讨论了事件流的概念，并且由于写入一个流是一个事务，流就成为了我们的事务边界，连同聚合边界一起。我们将使用聚合-流策略，因此我们可以安全地将流名称从我们的聚合名称派生出来。但是，我们的聚合名称是什么呢？嗯，我们可以从CRL类型开始，比如`Marketplace.Domain.ClassifiedAd`。然后，我们需要使这些名称唯一。为此，一个明显的解决方案是添加一个聚合ID。我想讨论两种创建流ID的情况：当我们需要持久化一个聚合时，以及当我们只想加载一个聚合的ID时。为了做到这一点，我将在`EsAggregateStore`类中添加两个方法：
+首先，是流名称。在本章的开头，我们已经讨论了事件流的概念，并且由于写入一个流是一个事务，流就成为了我们的事务边界，连同聚合边界一起。我们将使用聚合-流策略，因此我们可以安全地将流名称从我们的聚合名称派生出来。但是，我们的聚合名称是什么呢？嗯，我们可以从 CRL 类型开始，比如`Marketplace.Domain.ClassifiedAd`。然后，我们需要使这些名称唯一。为此，一个明显的解决方案是添加一个聚合 ID。我想讨论两种创建流 ID 的情况：当我们需要持久化一个聚合时，以及当我们只想加载一个聚合的 ID 时。为了做到这一点，我将在`EsAggregateStore`类中添加两个方法：
 
-[PRE6]
+```cs
+private static string GetStreamName<T, TId>(TId aggregateId)
+    => $"{typeof(T).Name}-{aggregateId.ToString()}";
+
+private static string GetStreamName<T, TId>(T aggregate)
+    where T : AggregateRoot<TId>
+    => $"{typeof(T).Name}-{aggregate.Id.ToString()}";
+```
 
 进一步查看`AppendToStreamAsync`方法的参数列表，这个方法不接受`IEnumerable<object>`，而是期望一个具有`EventData`类型的对象集合。这个类有以下公共成员：
 
-[PRE7]
+```cs
+public sealed class EventData
+{
+    public readonly Guid EventId;
+    public readonly string Type;
+    public readonly bool IsJson;
+    public readonly byte[] Data;
+    public readonly byte[] Metadata;
+}
+```
 
-对于我们来说，重要的是要理解我们需要将事件类型保存为字符串，这样我们才能将事件反序列化回事件CLR类型的对象。在保存事件时，我们还需要将事件对象转换为字节数组，在读取事件时将字节数组转换为对象。因此，对于`Type`，我们再次可以使用事件对象的CLR类型名称。对于有效载荷（`Data`），我们可以使用任何有用的序列化方式。
+对于我们来说，重要的是要理解我们需要将事件类型保存为字符串，这样我们才能将事件反序列化回事件 CLR 类型的对象。在保存事件时，我们还需要将事件对象转换为字节数组，在读取事件时将字节数组转换为对象。因此，对于`Type`，我们再次可以使用事件对象的 CLR 类型名称。对于有效载荷（`Data`），我们可以使用任何有用的序列化方式。
 
-然而，事件存储有一个不错的用户界面，可以显示事件的内容，但它只会在事件被序列化为JSON格式时这样做。这正是`IsJson`布尔属性的作用所在。对于大多数不需要通过使用更紧凑的表示和更快的序列化过程（如protobuf）来优化性能的应用程序，使用JSON就足够了，这正是我们打算做的。
+然而，事件存储有一个不错的用户界面，可以显示事件的内容，但它只会在事件被序列化为 JSON 格式时这样做。这正是`IsJson`布尔属性的作用所在。对于大多数不需要通过使用更紧凑的表示和更快的序列化过程（如 protobuf）来优化性能的应用程序，使用 JSON 就足够了，这正是我们打算做的。
 
-由于我们需要将我们的对象转换为字节数组并仍然使用JSON，我们可以创建一个方法来帮助我们完成这个任务：
+由于我们需要将我们的对象转换为字节数组并仍然使用 JSON，我们可以创建一个方法来帮助我们完成这个任务：
 
-[PRE8]
+```cs
+private static byte[] Serialize(object data)
+    => Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(data));
+```
 
 然后，我们需要考虑如何从一个聚合中获取新事件的列表，并构建一个表示这些事件的`EventData`对象集合。
 
 从我们应用的早期版本开始，我们就有了`GetChanges`方法。最初，它在`Entity`基类中，后来我们将其重命名为`AggregateRoot`。我们最终可以开始使用这个方法来获取作为命令执行一部分生成的新事件。以下是获取聚合的所有更改并构建一个`EventData`对象集合的代码，正如我们调用`AppendToStreamAsync`方法所需的那样：
 
-[PRE9]
+```cs
+var changes = aggregate.GetChanges()
+    .Select(@event => new EventData(
+        eventId: Guid.NewGuid(),
+        type: @event.GetType().Name,
+        isJson: true,
+        data: Serialize(@event),
+        metadata: null));
+```
 
-在前面的代码片段中，我们指定了要作为事件类型在事件存储中使用的短事件类型名称。它可能类似于`ClassifiedAdRenamed`。但是，当我们开始加载事件时，我们需要将JSON字符串反序列化为具体的事件类型。`Newtonsoft.Json`库不会理解短类型；它需要知道**完全限定类名**（**FQCN**）。如果事件定义在不同的程序集（assembly）中，我们还需要包含程序集信息。如果我们使用FQCN作为事件存储的事件类型，那么在事件存储UI中我们会看到一个相当丑陋的画面，因为它会被所有关于命名空间和程序集名称的技术信息所污染。我不喜欢这样，因此我仍然会使用短类型名称。然而，我们需要一种方法来告诉反序列化器具体的事件类型。存储关于事件的技术信息的最佳位置是元数据，这正是我将要做的。首先，我将添加一个私有的嵌套类，我们将用它来存储事件元数据：
+在前面的代码片段中，我们指定了要作为事件类型在事件存储中使用的短事件类型名称。它可能类似于`ClassifiedAdRenamed`。但是，当我们开始加载事件时，我们需要将 JSON 字符串反序列化为具体的事件类型。`Newtonsoft.Json`库不会理解短类型；它需要知道**完全限定类名**（**FQCN**）。如果事件定义在不同的程序集（assembly）中，我们还需要包含程序集信息。如果我们使用 FQCN 作为事件存储的事件类型，那么在事件存储 UI 中我们会看到一个相当丑陋的画面，因为它会被所有关于命名空间和程序集名称的技术信息所污染。我不喜欢这样，因此我仍然会使用短类型名称。然而，我们需要一种方法来告诉反序列化器具体的事件类型。存储关于事件的技术信息的最佳位置是元数据，这正是我将要做的。首先，我将添加一个私有的嵌套类，我们将用它来存储事件元数据：
 
-[PRE10]
+```cs
+private class EventMetadata
+{
+    public string ClrType { get; set; }
+}
+```
 
-现在，我可以修改前面的代码片段，将FQCN与事件一起作为元数据保留：
+现在，我可以修改前面的代码片段，将 FQCN 与事件一起作为元数据保留：
 
-[PRE11]
+```cs
+var changes = aggregate.GetChanges()
+    .Select(@event => 
+        new EventData(
+            eventId: Guid.NewGuid(),
+            type: @event.GetType().Name,
+            isJson: true,
+            data: Serialize(@event),
+            metadata: Serialize(new EventMetadata
+                {ClrType = @event.GetType().AssemblyQualifiedName})
+        ))
+    .ToArray();
+```
 
-使用事件CLR类型名称作为事件名称和在事件元数据中的FQCN是一个临时解决方案。对于生产系统，我建议使用**类型映射器**的概念，它将CLR类型转换为字符串，然后再转换回来。这种方法给你一些灵活性，在需要的情况下更改命名空间，而不会破坏过去持久化的事件的反序列化能力。我不会详细介绍如何使用类型映射器，但你将在[第13章](https://www.packtpub.com/sites/default/files/downloads/Splitting_the_System.pdf)的代码库中找到工作代码，*Splitting the System*。
+使用事件 CLR 类型名称作为事件名称和在事件元数据中的 FQCN 是一个临时解决方案。对于生产系统，我建议使用**类型映射器**的概念，它将 CLR 类型转换为字符串，然后再转换回来。这种方法给你一些灵活性，在需要的情况下更改命名空间，而不会破坏过去持久化的事件的反序列化能力。我不会详细介绍如何使用类型映射器，但你将在[第十三章](https://www.packtpub.com/sites/default/files/downloads/Splitting_the_System.pdf)的代码库中找到工作代码，*Splitting the System*。
 
 让我们将这段代码放入我们的新`EsAggregateStore`类中：
 
-[PRE12]
+```cs
+using System;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using EventStore.ClientAPI;
+using Newtonsoft.Json;
 
-我们之前没有涉及到的唯一一件事是 `IEventStoreConnection`。我们应用程序和事件存储之间的所有读取和写入操作都需要在打开到事件存储集群的TCP连接上执行，这也可以是一个通过运行Docker镜像创建的单节点集群。我们的应用程序将在启动时建立连接，我们需要在应用程序停止时关闭连接。我们将把这个基础设施代码添加到我们的可执行项目中。
+namespace Marketplace.Infrastructure
+{
+    public class EsAggregateStore : IAggregateStore
+    {
+        private readonly IEventStoreConnection _connection;
+
+        public EsAggregateStore(IEventStoreConnection connection)
+        {
+            _connection = connection;
+        }
+
+        public async Task Save<T, TId>(T aggregate) 
+            where T :  Aggregate<TId>
+        {
+            if (aggregate == null)
+                throw new ArgumentNullException(nameof(aggregate));
+
+            var changes = aggregate.GetChanges()
+                .Select(@event =>
+                    new EventData(
+                        eventId: Guid.NewGuid(),
+                        type: @event.GetType().Name,
+                        isJson: true,
+                        data: Serialize(@event),
+                        metadata: Serialize(new EventMetadata
+                            {ClrType = 
+                             @event.GetType().AssemblyQualifiedName})
+                    ))
+                .ToArray();
+
+            if (!changes.Any()) return;
+
+            var streamName = GetStreamName<T, TId>(aggregate);
+
+            await _connection.AppendToStreamAsync(
+                streamName,
+                aggregate.Version,
+                changes);
+
+            aggregate.ClearChanges();
+        }
+
+        private static byte[] Serialize(object data)
+            => Encoding.UTF8.GetBytes(
+                JsonConvert.SerializeObject(data));
+
+        private static string GetStreamName<T, TId>(TId aggregateId)
+            => $"{typeof(T).Name}-{aggregateId.ToString()}";
+
+        private static string GetStreamName<T, TId>(T aggregate) 
+            where T : Aggregate<TId>
+            => $"{typeof(T).Name}-{aggregate.Id.ToString()}";
+    }
+}
+```
+
+我们之前没有涉及到的唯一一件事是 `IEventStoreConnection`。我们应用程序和事件存储之间的所有读取和写入操作都需要在打开到事件存储集群的 TCP 连接上执行，这也可以是一个通过运行 Docker 镜像创建的单节点集群。我们的应用程序将在启动时建立连接，我们需要在应用程序停止时关闭连接。我们将把这个基础设施代码添加到我们的可执行项目中。
 
 # 从事件存储中读取
 
@@ -251,11 +398,37 @@ Mathias Verraes 在他 2014 年的博客文章 *Domain-Driven Design is Linguist
 
 在代码中，我们将在 `EsAggregateStore` 类的 `Load` 方法中执行所有这些步骤：
 
-[PRE13]
+```cs
+public async Task<T> Load<T, TId>(TId aggregateId)
+    where T : AggregateRoot<TId>
+{
+    if (aggregateId == null)
+        throw new ArgumentNullException(nameof(aggregateId));
+
+    var stream = GetStreamName<T, TId>(aggregateId);
+    var aggregate = (T) Activator.CreateInstance(typeof(T), true);
+
+    var page = await _connection.ReadStreamEventsForwardAsync(
+        stream, 0, 1024, false);
+
+    aggregate.Load(page.Events.Select(resolvedEvent =>
+    {
+        var meta = JsonConvert.DeserializeObject<EventMetadata>(
+            Encoding.UTF8.GetString(resolvedEvent.Event.Metadata));
+        var dataType = Type.GetType(meta.ClrType);
+        var jsonData = 
+            Encoding.UTF8.GetString(resolvedEvent.Event.Data);
+        var data = JsonConvert.DeserializeObject(jsonData, dataType);
+        return data;
+    }).ToArray());
+
+    return aggregate;
+}
+```
 
 让我们通过 `Load` 方法来了解这些步骤。按步骤，它执行以下操作：
 
-1.  确保聚合ID参数不为空
+1.  确保聚合 ID 参数不为空
 
 1.  获取给定聚合类型的流名称
 
@@ -275,7 +448,16 @@ Mathias Verraes 在他 2014 年的博客文章 *Domain-Driven Design is Linguist
 
 最后一件事情是 `AggregateRoot` 抽象类中缺失的 `Load` 方法。我们之前不需要这个方法，因为我们没有使用事件溯源。`Load` 方法将完成聚合恢复序列的最后一步，遍历所有事件并为每个事件调用匹配的 `When`。让我们看看我们如何在 `AggregateRoot` 类中实现这个方法：
 
-[PRE14]
+```cs
+public void Load(IEnumerable<object> history)
+{
+    foreach (var e in history)
+    {
+        When(e);
+        Version++;
+    }
+}
+```
 
 如您所见，这是一段非常简单的代码，本质上，它代表了事件溯源是什么。我们获取我们之前存储的事件集合，然后从这些事件中重建我们的领域对象的状态。`When` 方法知道如何为集合中的每个事件更改聚合状态，所以当我们为历史中的每个事件调用它时，我们就可以得到我们的聚合回到最后一个已知的状态。
 
@@ -283,7 +465,14 @@ Mathias Verraes 在他 2014 年的博客文章 *Domain-Driven Design is Linguist
 
 最后一件我需要用来最终实现 `IAggregateStore` 接口的事情是 `Exists` 方法。没有简单的方法来询问 Event Store 是否存在一个流，但我们可以通过尝试从一个给定的流中读取一个事件来轻松克服这个问题：
 
-[PRE15]
+```cs
+public async Task<bool> Exists<T, TId>(TId aggregateId)
+{
+    var stream = GetStreamName<T, TId>(aggregateId);
+    var result = await _connection.ReadEventAsync(stream, 1, false);
+    return result.Status != EventReadStatus.NoStream;
+}
+```
 
 到现在为止，我们应该有一个使用事件的工作实现聚合持久化。
 
@@ -293,23 +482,100 @@ Mathias Verraes 在他 2014 年的博客文章 *Domain-Driven Design is Linguist
 
 首先，我们需要通过使用 .NET Core 配置扩展来配置我们的应用程序。我们将从添加一个简单的 `appsettings.json` 配置文件开始。目前，这个文件的内容将只是一个本地运行的 Event Store 的连接字符串：
 
-[PRE16]
+```cs
+{
+  "eventStore": {
+    "connectionString": "ConnectTo=tcp://admin:changeit@localhost:1113; 
+     DefaultUserCredentials=admin:changeit;"
+  }
+}
+```
 
 然后，我们需要读取这个配置，这样我们就可以访问这些值。为此，我们将更改我们的 `Program` 类的 `BuildConfiguration` 方法：
 
-[PRE17]
+```cs
+private static IConfiguration BuildConfiguration(string[] args)
+    => new ConfigurationBuilder()
+        .SetBasePath(CurrentDirectory)
+        .AddJsonFile("appsettings.json", false, false)
+        .Build();
+```
 
 为了将`settings`文件复制到应用程序输出目录，我们需要在`Marketplace.csproj`文件中更改其属性，以确保项目文件有如下这些行：
 
-[PRE18]
+```cs
+<ItemGroup>
+  <Content Update="appsettings.json" 
+    CopyToOutputDirectory="Always" 
+    CopyToPublishDirectory="Always" />
+</ItemGroup>
+```
 
 当我们的应用程序启动时，需要打开到事件存储的连接，并在关闭应用程序时关闭。为了启用此功能，我们将使用名为`HostedService`的新类实现`Microsoft.Extensions.Hosting.IHostedService`接口。为此，我们将向可执行项目添加一个名为`HostedService.cs`的新文件：
 
-[PRE19]
+```cs
+using System.Threading;
+using System.Threading.Tasks;
+using EventStore.ClientAPI;
+using Microsoft.Extensions.Hosting;
+
+namespace Marketplace
+{
+    public class HostedService : IHostedService
+    {
+        private readonly IEventStoreConnection _esConnection;
+
+        public HostedService(IEventStoreConnection esConnection)
+        {
+            _esConnection = esConnection;
+        }
+
+        public Task StartAsync(CancellationToken cancellationToken)
+            => _esConnection.ConnectAsync();
+
+        public Task StopAsync(CancellationToken cancellationToken)
+        {
+            _esConnection.Close();
+            return Task.CompletedTask;
+        }
+    }
+}
+```
 
 最终的连接发生在`Startup.cs`文件中，我们需要更改`ConfigureServices`方法，使其包括事件存储连接和`EsAggregateStore`注册。此外，我们需要注册我们的`HostingService`，以便网络主机知道它需要在启动和关闭时运行某些操作。`Startup.ConfigureServices`的新版本如下所示：
 
-[PRE20]
+```cs
+public void ConfigureServices(IServiceCollection services)
+{
+    var esConnection = EventStoreConnection.Create(
+        Configuration["eventStore:connectionString"],
+        ConnectionSettings.Create().KeepReconnecting(),
+        Environment.ApplicationName);
+
+    var store = new EsAggregateStore(esConnection);
+    var purgomalumClient = new PurgomalumClient();
+
+    services.AddSingleton(esConnection);
+    services.AddSingleton<IAggregateStore>(store);
+
+    services.AddSingleton(new ClassifiedAdsApplicationService(
+        store, new FixedCurrencyLookup()));
+    services.AddSingleton(new UserProfileApplicationService(
+        store, t => purgomalumClient.CheckForProfanity(t)));
+
+    services.AddSingleton<IHostedService, HostedService>();
+    services.AddMvc();
+    services.AddSwaggerGen(c =>
+    {
+        c.SwaggerDoc("v1",
+            new Info
+            {
+                Title = "ClassifiedAds",
+                Version = "v1"
+            });
+    });
+}
+```
 
 在这里，我们创建了一个新的连接实例，并将其作为单例注册到服务集合中。然后，它将被注入到`HostedService`构造函数中，并在应用程序启动时打开它。我们还将更改`IAggregateStore`的注册，使其使用我们新的`EsAggregateStore`类。然后，我们将注册`HostedService`。
 
@@ -319,27 +585,240 @@ Mathias Verraes 在他 2014 年的博客文章 *Domain-Driven Design is Linguist
 
 对应用程序服务的更改相当小。为了使工作更加舒适，我为`IApplicationService`接口创建了一个小的扩展，允许我们用一行代码处理命令。我们之前已经这样做过了，通过在每个应用程序服务中使用一个私有方法`HandleUpdate`。现在，由于我们使用`IAggregateStore`接口而不是存储库，我们可以抽象该方法，使其不依赖于特定的基础设施。因此，我们可以将其放置在`Marketplace.Framework`项目中。以下是代码：
 
-[PRE21]
+```cs
+using System;
+using System.Threading.Tasks;
+
+namespace Marketplace.Framework
+{
+    public static class ApplicationServiceExtensions
+    {
+        public static async Task HandleUpdate<T, TId>(
+            this IApplicationService service,
+            IAggregateStore store, TId aggregateId, 
+            Action<T> operation)
+            where T : AggregateRoot<TId>
+        {
+            var aggregate = await store.Load<T, TId>(aggregateId);
+            if (aggregate == null)
+                throw new InvalidOperationException(
+                    $"Entity with id {aggregateId.ToString()} cannot be 
+                    found");
+
+            operation(aggregate);
+            await store.Save<T, TId>(aggregate);
+        }
+    }
+}
+```
 
 然后，我们需要将应用程序服务类中的存储库依赖项替换为`IAggregateStore`并更改所有调用。这项工作有点无聊，我已经为你全部完成了，所以以下是`ClassifiedAdApplicationService`的新代码：
 
-[PRE22]
+```cs
+using System;
+using System.Threading.Tasks;
+using Marketplace.Domain.ClassifiedAd;
+using Marketplace.Domain.Shared;
+using Marketplace.Framework;
+using static Marketplace.ClassifiedAd.Contracts;
 
-如您所见，更改相当小。我们调用`_store.Save`，由于我们不执行多个聚合的操作，因此不需要提交，因为我们没有显式的单元工作。否则，我们会违反事务边界内聚合的规则，从而没有单元工作，这不是问题。我们也没有检测更改的问题，因为我们的更改始终以事件的形式表示，我们不需要任何ORM魔法来找出我们需要更新什么。
+namespace Marketplace.ClassifiedAd
+{
+    public class ClassifiedAdsApplicationService : IApplicationService
+    {
+        private readonly ICurrencyLookup _currencyLookup;
+        private readonly IAggregateStore _store;
+
+        public ClassifiedAdsApplicationService(
+            IAggregateStore store, ICurrencyLookup currencyLookup
+        )
+        {
+            _currencyLookup = currencyLookup;
+            _store = store;
+        }
+
+        public Task Handle(object command) =>
+            command switch
+            {
+                V1.Create cmd =>
+                    HandleCreate(cmd),
+                V1.SetTitle cmd =>
+                    HandleUpdate(
+                        cmd.Id,
+                        c => c.SetTitle(
+                            ClassifiedAdTitle
+                                .FromString(cmd.Title)
+                        )
+                    ),
+                V1.UpdateText cmd =>
+                    HandleUpdate(
+                        cmd.Id,
+                        c => c.UpdateText(
+                            ClassifiedAdText
+                                .FromString(cmd.Text)
+                        )
+                    ),
+                V1.UpdatePrice cmd =>
+                    HandleUpdate(
+                        cmd.Id,
+                        c => c.UpdatePrice(
+                            Price.FromDecimal(
+                                cmd.Price,
+                                cmd.Currency,
+                                _currencyLookup
+                            )
+                        )
+                    ),
+                V1.RequestToPublish cmd =>
+                    HandleUpdate(
+                        cmd.Id,
+                        c => c.RequestToPublish()
+                    ),
+                V1.Publish cmd =>
+                    HandleUpdate(
+                        cmd.Id,
+                        c => c.Publish(new UserId(cmd.ApprovedBy))
+                    ),
+                _ => Task.CompletedTask
+            };
+
+        private async Task HandleCreate(V1.Create cmd)
+        {
+            if (await _store.Exists<Domain.ClassifiedAd.ClassifiedAd, 
+                ClassifiedAdId>(
+                new ClassifiedAdId(cmd.Id)
+            ))
+                throw new InvalidOperationException(
+                    $"Entity with id {cmd.Id} already exists");
+
+            var classifiedAd = new Domain.ClassifiedAd.ClassifiedAd(
+                new ClassifiedAdId(cmd.Id),
+                new UserId(cmd.OwnerId)
+            );
+
+            await _store.Save<Domain.ClassifiedAd.ClassifiedAd, 
+                ClassifiedAdId>(classifiedAd);
+        }
+
+        private Task HandleUpdate(
+            Guid id,
+            Action<Domain.ClassifiedAd.ClassifiedAd> update
+        ) =>
+            this.HandleUpdate(
+                _store,
+                new ClassifiedAdId(id),
+                update
+            );
+    }
+}
+```
+
+如您所见，更改相当小。我们调用`_store.Save`，由于我们不执行多个聚合的操作，因此不需要提交，因为我们没有显式的单元工作。否则，我们会违反事务边界内聚合的规则，从而没有单元工作，这不是问题。我们也没有检测更改的问题，因为我们的更改始终以事件的形式表示，我们不需要任何 ORM 魔法来找出我们需要更新什么。
 
 按照相同的风格，以下是新的`UserProfileApplicationService`类：
 
-[PRE23]
+```cs
+using System;
+using System.Threading.Tasks;
+using Marketplace.Domain.Shared;
+using Marketplace.Domain.UserProfile;
+using Marketplace.Framework;
+using static Marketplace.UserProfile.Contracts;
+
+namespace Marketplace.UserProfile
+{
+    public class UserProfileApplicationService
+        : IApplicationService
+    {
+        private readonly IAggregateStore _store;
+        private readonly CheckTextForProfanity _checkText;
+
+        public UserProfileApplicationService(
+            IAggregateStore store,
+            CheckTextForProfanity checkText
+        )
+        {
+            _store = store;
+            _checkText = checkText;
+        }
+
+        public Task Handle(object command) =>
+            command switch
+            {
+                V1.RegisterUser cmd =>
+                    HandleCreate(cmd),
+                V1.UpdateUserFullName cmd =>
+                    HandleUpdate(
+                        cmd.UserId,
+                        profile => profile.UpdateFullName(
+                            FullName.FromString(cmd.FullName)
+                        )
+                    ),
+                V1.UpdateUserDisplayName cmd =>
+                    HandleUpdate(
+                        cmd.UserId,
+                        profile => profile.UpdateDisplayName(
+                            DisplayName.FromString(
+                                cmd.DisplayName,
+                                _checkText
+                            )
+                        )
+                    ),
+                V1.UpdateUserProfilePhoto cmd =>
+                    HandleUpdate(
+                        cmd.UserId,
+                        profile => profile
+                            .UpdateProfilePhoto(
+                                new Uri(cmd.PhotoUrl)
+                            )
+                    ),
+                _ => Task.CompletedTask
+            };
+
+        private async Task HandleCreate(V1.RegisterUser cmd)
+        {
+            if (await _store
+                .Exists<Domain.UserProfile.UserProfile, UserId>(
+                    new UserId(cmd.UserId)
+                ))
+                throw new InvalidOperationException(
+                    $"Entity with id {cmd.UserId} already exists"
+                );
+
+            var userProfile = new Domain.UserProfile.UserProfile(
+                new UserId(cmd.UserId),
+                FullName.FromString(cmd.FullName),
+                DisplayName.FromString(cmd.DisplayName, _checkText)
+            );
+
+            await _store
+                .Save<Domain.UserProfile.UserProfile, UserId>(
+                    userProfile
+                );
+        }
+
+        private Task HandleUpdate(
+            Guid id,
+            Action<Domain.UserProfile.UserProfile> update
+        ) =>
+            this.HandleUpdate(
+                _store,
+                new UserId(id),
+                update
+            );
+    }
+}
+```
 
 就这样；我们不需要对事件源应用程序做任何其他操作！现在让我们看看它是如何工作的。
 
 # 运行事件源应用程序
 
-最后，我们可以尝试一些操作，看看我们如何使用我们的API执行命令，该API与第9章[Chapter 9](6f50ee65-024a-4c46-89c8-343183b05b8f.xhtml)中的内容保持一致，即*CQRS - The Read Side*。然而，您可能已经注意到，查询API以及与读取模型相关的所有代码都没有包含在本章中。这是因为CQRS的读取部分与我们用于文档和关系型持久化的方式大相径庭。
+最后，我们可以尝试一些操作，看看我们如何使用我们的 API 执行命令，该 API 与第九章 Chapter 9 中的内容保持一致，即*CQRS - The Read Side*。然而，您可能已经注意到，查询 API 以及与读取模型相关的所有代码都没有包含在本章中。这是因为 CQRS 的读取部分与我们用于文档和关系型持久化的方式大相径庭。
 
-当您启动应用程序并访问`http://localhost:5000`上的Swagger UI时，您将得到的屏幕与之前完全相同。当然，Event Store必须在此期间运行，无论是作为Docker容器还是可执行文件。在*技术要求*部分描述了如何使用`docker-compose`运行Event Store。我使用了两个新的GUID作为新的分类广告ID和所有者ID，以便创建一个新的广告。因此，我调用了`POST`端点并得到了`200 OK`的结果。紧接着，我通过使用相同ID和一些标题文本执行`rename`命令来执行`PUT`请求。这些操作与我们之前所做的是一样的。
+当您启动应用程序并访问`http://localhost:5000`上的 Swagger UI 时，您将得到的屏幕与之前完全相同。当然，Event Store 必须在此期间运行，无论是作为 Docker 容器还是可执行文件。在*技术要求*部分描述了如何使用`docker-compose`运行 Event Store。我使用了两个新的 GUID 作为新的分类广告 ID 和所有者 ID，以便创建一个新的广告。因此，我调用了`POST`端点并得到了`200 OK`的结果。紧接着，我通过使用相同 ID 和一些标题文本执行`rename`命令来执行`PUT`请求。这些操作与我们之前所做的是一样的。
 
-现在，我们可以查看我们在新存储中执行这些操作的结果。为此，我们需要通过访问`http://localhost:2113`上的Event Store Web UI并使用`admin`用户名和`changeit`密码登录。从那里，我们需要转到流浏览器页面，在右侧面板中有一个最近更改的流列表。在这个列表中，我们可以看到我们新的分类广告的新流：
+现在，我们可以查看我们在新存储中执行这些操作的结果。为此，我们需要通过访问`http://localhost:2113`上的 Event Store Web UI 并使用`admin`用户名和`changeit`密码登录。从那里，我们需要转到流浏览器页面，在右侧面板中有一个最近更改的流列表。在这个列表中，我们可以看到我们新的分类广告的新流：
 
 ![图片](img/72963d6d-37f8-463c-934a-070468bf1b77.png)
 
@@ -351,7 +830,7 @@ Mathias Verraes 在他 2014 年的博客文章 *Domain-Driven Design is Linguist
 
 流中的两个新事件
 
-在这里，我们可以看到在我执行了两个命令之后添加到流中的两个事件。我可以通过使用API继续运行命令，直到广告发布。当我查看执行后的Event Store流时，我会看到更多添加到其中的事件：
+在这里，我们可以看到在我执行了两个命令之后添加到流中的两个事件。我可以通过使用 API 继续运行命令，直到广告发布。当我查看执行后的 Event Store 流时，我会看到更多添加到其中的事件：
 
 ![图片](img/58b83135-38cd-4894-8b2b-12181fa2dbee.png)
 
@@ -359,27 +838,27 @@ Mathias Verraes 在他 2014 年的博客文章 *Domain-Driven Design is Linguist
 
 这看起来非常好。每个命令都会触发状态转换，但我们不是用新状态覆盖旧状态，而是可以看到由事件表示的完整变更历史。例如，我们可以多次更改价格，但我们总是会了解广告过去所有的价格。
 
-现在，让我们看看一个事件看起来像什么。我将通过点击事件名称来打开编号为1的事件，该事件具有`ClassifiedAdTitleChanged`类型。以下是我在浏览器中看到的内容：
+现在，让我们看看一个事件看起来像什么。我将通过点击事件名称来打开编号为 1 的事件，该事件具有`ClassifiedAdTitleChanged`类型。以下是我在浏览器中看到的内容：
 
 ![图片](img/c051c6cd-96a3-4982-beec-0730e01efdbd.png)
 
-事件内容作为JSON
+事件内容作为 JSON
 
-如你所见，事件数据代表我们的领域事件类——它具有聚合ID和标题。元数据只有一个字段，我们决定用于反序列化的目的——事件类型的完全限定名（FQCN）。你可以查看其他事件的内容，看看那里存储了什么。
+如你所见，事件数据代表我们的领域事件类——它具有聚合 ID 和标题。元数据只有一个字段，我们决定用于反序列化的目的——事件类型的完全限定名（FQCN）。你可以查看其他事件的内容，看看那里存储了什么。
 
-在每个事件中都包含聚合ID可能看起来有些冗余，因为流名称已经包含了ID，而且从事件中恢复聚合状态时，我们总是只读取一个流。当我们开始构建读取模型时，我们将看到每个事件内部的这个ID是如何被使用的。
+在每个事件中都包含聚合 ID 可能看起来有些冗余，因为流名称已经包含了 ID，而且从事件中恢复聚合状态时，我们总是只读取一个流。当我们开始构建读取模型时，我们将看到每个事件内部的这个 ID 是如何被使用的。
 
-你还可以在用户配置文件命令API上执行一些命令，以查看要在具有不同名称的流中存储的不同类型的聚合。当然，现在可以向系统中添加更多广告和用户，并查看所有这些事件进入Event Store。
+你还可以在用户配置文件命令 API 上执行一些命令，以查看要在具有不同名称的流中存储的不同类型的聚合。当然，现在可以向系统中添加更多广告和用户，并查看所有这些事件进入 Event Store。
 
-恭喜；我们刚刚将我们的应用程序转换为使用事件溯源而不是更传统的持久化方式。正如你可能已经注意到的，我们不需要对我们的领域对象进行任何更改来使其工作。我们甚至可以移除聚合和值对象属性的setter，并将这些属性设置为私有以提高封装性。这些更改都不会对使用事件存储聚合的存储和加载方式产生影响。这是因为对于这种类型的持久化，阻抗不匹配已经不存在了。我们所有的事件都是简单的、普通的对象，其属性具有原始或简单类型。这意味着这些领域事件可以轻松序列化，这就是我们为了使事件溯源工作需要确保的唯一事情。顺便说一句，Event Store使用JSON序列化并不是一个要求。你当然可以使用诸如protobuf之类的其他东西。然而，在这种情况下，你将失去在UI中检查事件内容的能力，因为UI只理解JSON。因此，我们使用了`EventData`类的`IsJson`属性来告诉Event Store，我们的事件实际上是JSON字符串。Event Store还集成了使用JavaScript执行操作的投影引擎，以便在存储中处理事件以生成新事件或运行查询。这个特性也要求事件以JSON格式存储，因为这是JavaScript代码可以轻松解释的格式。我们将在本章中不涉及投影主题，但将在第11章[投影和查询](c4156d9d-9130-4225-b205-ef76cb4bcca3.xhtml)中回到这个话题。
+恭喜；我们刚刚将我们的应用程序转换为使用事件溯源而不是更传统的持久化方式。正如你可能已经注意到的，我们不需要对我们的领域对象进行任何更改来使其工作。我们甚至可以移除聚合和值对象属性的 setter，并将这些属性设置为私有以提高封装性。这些更改都不会对使用事件存储聚合的存储和加载方式产生影响。这是因为对于这种类型的持久化，阻抗不匹配已经不存在了。我们所有的事件都是简单的、普通的对象，其属性具有原始或简单类型。这意味着这些领域事件可以轻松序列化，这就是我们为了使事件溯源工作需要确保的唯一事情。顺便说一句，Event Store 使用 JSON 序列化并不是一个要求。你当然可以使用诸如 protobuf 之类的其他东西。然而，在这种情况下，你将失去在 UI 中检查事件内容的能力，因为 UI 只理解 JSON。因此，我们使用了`EventData`类的`IsJson`属性来告诉 Event Store，我们的事件实际上是 JSON 字符串。Event Store 还集成了使用 JavaScript 执行操作的投影引擎，以便在存储中处理事件以生成新事件或运行查询。这个特性也要求事件以 JSON 格式存储，因为这是 JavaScript 代码可以轻松解释的格式。我们将在本章中不涉及投影主题，但将在第十一章投影和查询中回到这个话题。
 
 # 摘要
 
 在本章中，你学习了如何在聚合（aggregate）内部将状态转换表示为事件。我故意从开始就使用这种代码风格，尽管我可以想象这可能会让你感到一些困惑。最终，为什么你需要将每个操作拆分为`Apply`和`When`？采用这种方法是为了让读者为这一章做好准备。使用领域事件（domain events）是一种良好的实践。即使你不使用事件源（Event Sourcing），你也应该考虑使用领域事件在聚合之间，甚至在不同的边界上下文（Bounded Contexts）之间进行更新通信，并且使用领域事件进行状态转换会使它变得容易，因为你会始终有一个包含新事件的更改列表。
 
-由于我们已经有了这个集合，我们只需要弄清楚如何将这些更改以原样存储在表示单个聚合的事件流中，并且还需要引入`Load`方法来遍历我们从该流中读取的所有事件，以便在我们需要在该聚合上执行新操作时恢复聚合状态。这并不难。我们使用了一些代码来了解我们的基础设施将如何工作，并且我们需要正确配置序列化。我们仍然在事件元数据中保留了FQCN（完全限定类名），以便能够将事件反序列化为C#对象，但我们将在未来修复它。
+由于我们已经有了这个集合，我们只需要弄清楚如何将这些更改以原样存储在表示单个聚合的事件流中，并且还需要引入`Load`方法来遍历我们从该流中读取的所有事件，以便在我们需要在该聚合上执行新操作时恢复聚合状态。这并不难。我们使用了一些代码来了解我们的基础设施将如何工作，并且我们需要正确配置序列化。我们仍然在事件元数据中保留了 FQCN（完全限定类名），以便能够将事件反序列化为 C#对象，但我们将在未来修复它。
 
-事件存储（Event Store）是处理事件源和存储事件流的一个非常高效的产品。与Kafka不同，这个产品允许我们创建数百万个流。由于我们的存储聚合的方法是将每个聚合的事件保存在单独的流中，这个解决方案非常适合我们。如果你的公司存在一些问题，比如作为数据库使用的预批准产品数量有限，并且你目前还不能使用事件存储（Event Store），你可以查看一些库，例如SQL Stream Store ([https://github.com/SQLStreamStore/SQLStreamStore](https://github.com/SQLStreamStore/SQLStreamStore))，它在一个关系数据库上实现了事件存储，包括Microsoft SQL Server；或者Marten ([http://jasperfx.github.io/marten/](http://jasperfx.github.io/marten/))，它使用PostgreSQL的JSONB类型字段来实现文档数据库和事件存储类型的持久化。
+事件存储（Event Store）是处理事件源和存储事件流的一个非常高效的产品。与 Kafka 不同，这个产品允许我们创建数百万个流。由于我们的存储聚合的方法是将每个聚合的事件保存在单独的流中，这个解决方案非常适合我们。如果你的公司存在一些问题，比如作为数据库使用的预批准产品数量有限，并且你目前还不能使用事件存储（Event Store），你可以查看一些库，例如 SQL Stream Store ([`github.com/SQLStreamStore/SQLStreamStore`](https://github.com/SQLStreamStore/SQLStreamStore))，它在一个关系数据库上实现了事件存储，包括 Microsoft SQL Server；或者 Marten ([`jasperfx.github.io/marten/`](http://jasperfx.github.io/marten/))，它使用 PostgreSQL 的 JSONB 类型字段来实现文档数据库和事件存储类型的持久化。
 
 在下一章中，我们将探讨查询事件源系统所面临的挑战，并通过使用单独的读取模型和投影来解决这些挑战。
 
@@ -387,12 +866,12 @@ Mathias Verraes 在他 2014 年的博客文章 *Domain-Driven Design is Linguist
 
 # 进一步阅读
 
-目前关于事件源（Event Sourcing）的文献并不多，但我可以推荐观看Greg Young的一些演讲，他提出了CQRS的概念，并将事件源（Event Sourcing）介绍给了全世界：
+目前关于事件源（Event Sourcing）的文献并不多，但我可以推荐观看 Greg Young 的一些演讲，他提出了 CQRS 的概念，并将事件源（Event Sourcing）介绍给了全世界：
 
-+   *《十年的DDD、CQRS、事件源》*，作者Greg Young，DDD Europe 2016：[https://www.youtube.com/watch?v=LDW0QWie21s](https://www.youtube.com/watch?v=LDW0QWie21s)
++   *《十年的 DDD、CQRS、事件源》*，作者 Greg Young，DDD Europe 2016：[`www.youtube.com/watch?v=LDW0QWie21s`](https://www.youtube.com/watch?v=LDW0QWie21s)
 
-+   *事件源*，格雷格·杨，GOTO 会议 2014: [https://www.youtube.com/watch?v=8JKjvY4etTY](https://www.youtube.com/watch?v=8JKjvY4etTY)
++   *事件源*，格雷格·杨，GOTO 会议 2014: [`www.youtube.com/watch?v=8JKjvY4etTY`](https://www.youtube.com/watch?v=8JKjvY4etTY)
 
 如果你已经在这个主题上进行了探索，你可能已经遇到了一些关于事件源阴暗面的博客文章，这主要涉及到事件版本和最终一致性方面的问题。我们将在下一章中介绍最终一致性，并且还会简要提及事件的版本控制；对于事件版本主题的更深入探讨，请参考格雷格的书籍：
 
-+   *事件源系统中的版本控制*，格雷格·杨，LeanPub 2017: [https://leanpub.com/esversioning](https://leanpub.com/esversioning)
++   *事件源系统中的版本控制*，格雷格·杨，LeanPub 2017: [`leanpub.com/esversioning`](https://leanpub.com/esversioning)

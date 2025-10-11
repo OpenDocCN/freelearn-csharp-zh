@@ -52,7 +52,7 @@
 
 +   可选：Visual Basic 6
 
-本章的代码文件可以在本书的 GitHub 仓库中找到：[https://github.com/PacktPublishing/High-Performance-Programming-in-CSharp-and-.NET/tree/master/CH02](https://github.com/PacktPublishing/High-Performance-Programming-in-CSharp-and-.NET/tree/master/CH02)。
+本章的代码文件可以在本书的 GitHub 仓库中找到：[`github.com/PacktPublishing/High-Performance-Programming-in-CSharp-and-.NET/tree/master/CH02`](https://github.com/PacktPublishing/High-Performance-Programming-in-CSharp-and-.NET/tree/master/CH02)。
 
 注意
 
@@ -64,7 +64,7 @@
 
 P/Invoke 是 **通用语言基础设施**（**CLI**）的一个功能，它允许托管应用程序调用本地代码。本地代码不受 **通用语言运行时**（**CLR**）的管理，因此，代码的安全性牢牢掌握在程序员手中。
 
-在托管代码中，垃圾回收器自动清理内存中的对象，并负责为对象分配代数。我们将在 [*第 4 章*](B16617_04_Final_SB_Epub.xhtml#_idTextAnchor072)，*内存管理*中更详细地介绍垃圾回收器。新对象在大小小于 80,000 字节时总是以零代开始其生命周期，并将放置在小型对象堆上。大小等于或大于 80,000 字节的对象放置在大型对象堆上。在零代中存活的对象会被垃圾回收器提升到一代。最后，在一代中存活的对象会被提升到二代。
+在托管代码中，垃圾回收器自动清理内存中的对象，并负责为对象分配代数。我们将在 *第四章*，*内存管理*中更详细地介绍垃圾回收器。新对象在大小小于 80,000 字节时总是以零代开始其生命周期，并将放置在小型对象堆上。大小等于或大于 80,000 字节的对象放置在大型对象堆上。在零代中存活的对象会被垃圾回收器提升到一代。最后，在一代中存活的对象会被提升到二代。
 
 注意
 
@@ -78,55 +78,93 @@ P/Invoke 是 **通用语言基础设施**（**CLI**）的一个功能，它允�
 
 为了提醒程序员确保代码安全性的责任，未管理代码被包裹在一个使用`unsafe`关键字标记的代码块中。不安全代码利用指针来引用内存中的位置。
 
-**不安全代码**为程序员提供了访问C#中指针类型的权限，这在他们与底层操作系统、系统驱动程序或需要以最短时间执行的时间关键代码工作时是必要的。
+**不安全代码**为程序员提供了访问 C#中指针类型的权限，这在他们与底层操作系统、系统驱动程序或需要以最短时间执行的时间关键代码工作时是必要的。
 
-尽管我们说处理指针的代码是不安全代码，但它是安全的。这样的代码用`unsafe`关键字标记。尽管被称为不安全，但这种代码在托管代码中是安全的——它只是没有经过CLR的验证。因此，可能会引入安全风险和/或指针错误。你可以有一个不安全的`pointer_type`、`value_type`或`reference_type`。
+尽管我们说处理指针的代码是不安全代码，但它是安全的。这样的代码用`unsafe`关键字标记。尽管被称为不安全，但这种代码在托管代码中是安全的——它只是没有经过 CLR 的验证。因此，可能会引入安全风险和/或指针错误。你可以有一个不安全的`pointer_type`、`value_type`或`reference_type`。
 
 注意
 
-不安全代码的主题很深，所以如果你想了解更多，请查看讨论不安全代码的语言规范，网址为https://docs.microsoft.com/dotnet/csharp/language-reference/language-specification/unsafe-code。
+不安全代码的主题很深，所以如果你想了解更多，请查看讨论不安全代码的语言规范，网址为 https://docs.microsoft.com/dotnet/csharp/language-reference/language-specification/unsafe-code。
 
-在本节中，我们将编写一个控制台应用程序，将各种不安全代码机制付诸实践。你可以在[https://github.com/PacktPublishing/C-9-and-.NET-5-High-Performance/tree/master/CH02/CH02_UnsafeCode](https://github.com/PacktPublishing/C-9-and-.NET-5-High-Performance/tree/master/CH02/CH02_UnsafeCode)查看项目的源代码。
+在本节中，我们将编写一个控制台应用程序，将各种不安全代码机制付诸实践。你可以在[`github.com/PacktPublishing/C-9-and-.NET-5-High-Performance/tree/master/CH02/CH02_UnsafeCode`](https://github.com/PacktPublishing/C-9-and-.NET-5-High-Performance/tree/master/CH02/CH02_UnsafeCode)查看项目的源代码。
 
 考虑以下计算机程序：
 
-[PRE0]
+```cs
+namespace CH02_UnsafeCode
+```
 
-[PRE1]
+```cs
+{
+```
 
-[PRE2]
+```cs
+    using System;
+```
 
-[PRE3]
+```cs
+    class Program
+```
 
-[PRE4]
+```cs
+    {
+```
 
-[PRE5]
+```cs
+        static void Main(string[] args)
+```
 
-[PRE6]
+```cs
+        {
+```
 
-[PRE7]
+```cs
+            int[] array = new int[5] { 5, 4, 3, 2, 1 };
+```
 
-[PRE8]
+```cs
+            Console.WriteLine(array[4]);
+```
 
-[PRE9]
+```cs
+            unsafe
+```
 
-[PRE10]
+```cs
+            {
+```
 
-[PRE11]
+```cs
+                int* pointer = stackalloc int[5];
+```
 
-[PRE12]
+```cs
+                int* cpointer = pointer;
+```
 
-[PRE13]
+```cs
+                cpointer += 50;
+```
 
-[PRE14]
+```cs
+                Console.WriteLine(*cpointer);
+```
 
-[PRE15]
+```cs
+            }
+```
 
-[PRE16]
+```cs
+        }
+```
 
-[PRE17]
+```cs
+    }
+```
 
-[PRE18]
+```cs
+}
+```
 
 在前面的代码中，你可以看到我们使用`new`关键字为包含五个`int`值的数组分配内存空间。我们也可以使用不安全代码来完成同样的操作。但是，我们不是使用`new`关键字，而是使用`stackalloc`，并将代码包裹在一个标记为`unsafe`的代码块中。
 
@@ -146,29 +184,49 @@ P/Invoke 是 **通用语言基础设施**（**CLI**）的一个功能，它允�
 
 为了防止这种情况发生，我们可以使用 `fixed` 关键字。`fixed` 关键字告诉垃圾回收器不要单独处理 `arrayPointer` 指向的地址空间。这意味着我们可以确保指针将指向正确的地址空间和数据。以下代码展示了如何使用 `unsafe` 和 `fixed` 关键字来处理数组：
 
-[PRE19]
+```cs
+unsafe 
+```
 
-[PRE20]
+```cs
+{
+```
 
-[PRE21]
+```cs
+     fixed (int* arrayPointer = array)
+```
 
-[PRE22]
+```cs
+     {
+```
 
-[PRE23]
+```cs
+     // Code omitted.
+```
 
-[PRE24]
+```cs
+}
+```
 
-[PRE25]
+```cs
+}
+```
 
 在前面的代码中，因为我们使用了不安全代码，所以我们使用了 `unsafe` 代码块。由于我们不希望数组受到垃圾回收器的影响，我们通过使用 `fixed` 代码块来保持对象在其当前代际。
 
 当使用不安全代码时，你必须注意访问超出范围的数组的影响。在托管代码中访问超出范围的数组时，你会得到 `IndexOutOfBoundsException`。在非托管代码中，你没有这样的奢侈。你必须确保访问正确的索引。如果你意外地访问了数组范围之外的索引，那么你将不会抛出 `IndexOutOfBoundsException`。相反，你会得到该内存地址上的任何内容返回给你。在这种情况下，你可能或可能不会抛出某种类型的异常。以下代码演示了这一点：
 
-[PRE26]
+```cs
+int* pointerToArray = stackalloc int[100];
+```
 
-[PRE27]
+```cs
+Console.WriteLine(pointerToArray[99]);
+```
 
-[PRE28]
+```cs
+Console.WriteLine(pointerToArray[100]);
+```
 
 在这里，数组被添加到栈上。数组在位置 `99` 的值是正确的，但数组位置 `100` 超出了范围，因此返回了一个错误值。这意味着会抛出 `IndexOutOfBoundsException`。这就是为什么在处理索引时必须小心处理非托管代码。
 
@@ -180,15 +238,25 @@ P/Invoke 是 **通用语言基础设施**（**CLI**）的一个功能，它允�
 
 例如，以下代码将无法编译：
 
-[PRE29]
+```cs
+unsafe
+```
 
-[PRE30]
+```cs
+{
+```
 
-[PRE31]
+```cs
+      fixed (TestObject* testObject = new TestObject()) { }
+```
 
-[PRE32]
+```cs
+      fixed (string* text = "Hello, World!") { }
+```
 
-[PRE33]
+```cs
+}
+```
 
 `testObject` 变量是一个引用类型指针，如果构建代码，编译器会抛出异常。此代码返回以下异常：
 
@@ -218,21 +286,21 @@ P/Invoke 允许您使静态入口点对其他应用程序可用。如果您曾�
 
 1.  打开命令行或开发者命令提示符。然后，输入以下命令（注意，您电脑上可能版本不同——使用您拥有的最新版本号）：
 
-    [PRE34]
+    ```cs
+    " C:\Program Files (x86)\Microsoft Visual 
+        Studio\2019\Preview\VC\Tools\MSVC\14.28.29304
+          \bin\Hostx64\x64\dumpbin.exe /exports User32.dll
+    ```
 
 您应该看到以下类似的内容：
 
-![图 2.2 – 命令行显示在 User32.dll 上执行 dumpbin 的结果
-
-](img/Figure_2.2_B16617.jpg)
+![图 2.2 – 命令行显示在 User32.dll 上执行 dumpbin 的结果](img/Figure_2.2_B16617.jpg)
 
 图 2.2 – 命令行显示在 User32.dll 上执行 dumpbin 的结果
 
 1.  让我们编写一个 C++ 库，并将其命名为 `Product`，然后从 C# 使用 P/Invoke 调用它。首先，我们必须创建一个新的空 C++ 项目，如下截图所示：
 
-![图 2.3 – 创建一个新的空 C++ 项目
-
-](img/Figure_2.3_B16617.jpg)
+![图 2.3 – 创建一个新的空 C++ 项目](img/Figure_2.3_B16617.jpg)
 
 图 2.3 – 创建一个新的空 C++ 项目
 
@@ -240,7 +308,32 @@ P/Invoke 允许您使静态入口点对其他应用程序可用。如果您曾�
 
 1.  修改 `Product.cpp` 文件，使其包含以下代码：
 
-    [PRE35]
+    ```cs
+    #include <string>
+    #include <iostream>
+    #include <comdef.h>
+    struct Product {
+    int Id;
+          BSTR Name;
+          void BuyProduct() {
+                std::wcout << "Product.BuyProduct(" << 
+                  Name << ");\n";
+                std::cout << "Id: " << Id;
+                std::cout << "\n";
+          }
+    };
+    extern "C" __declspec(dllexport)  Product 
+        CreateProduct() {
+          Product product = Product();
+          product.Id = 1;
+          product.Name = SysAllocString(L"New Product");
+          return product;
+    }
+    extern "C" __declspec(dllexport) void 
+        BuyProduct(Product product) {
+          product.BuyProduct();
+    }
+    ```
 
 1.  现在，我们必须导入三个库：`string`、`iostream` 和 `comdef.h`。然后，我们必须声明一个包含 `Id` 和 `Name` 值的结构体。在 C++ 中，字符串通常使用 `std::string` 定义，但在 .NET 中，我们按照惯例将字符串声明为 OLE/自动化中的 BSTR 类型。BSTR API 使用 `CoTask*` 内存分配器，这是 Windows 上本机隐含的互操作性合同。在非 Windows 系统上，.NET 5 使用 `malloc`/`free`。我们还有一个名为 `BuyProduct()` 的 void 方法，它将 `Id` 和 `Name` 值以及换行符打印到控制台输出窗口。
 
@@ -248,7 +341,27 @@ P/Invoke 允许您使静态入口点对其他应用程序可用。如果您曾�
 
 1.  添加一个名为 `Greeting` 的新类。删除 `Greeting.h` 文件。更新 `Greeting.cpp` 文件，使其包含以下源代码：
 
-    [PRE36]
+    ```cs
+    #include <iostream>
+    #include <comdef.h>
+    extern "C" __declspec(dllexport) void SendGreeting();
+    extern "C" __declspec(dllexport) int Add(int, int);
+    extern "C" __declspec(dllexport) bool 
+        IsLengthGreaterThan5(const char*);
+    extern "C" __declspec(dllexport) BSTR GetName();
+    void SendGreeting() {
+          std::cout << "Dear C#, C++ says hello!\n";
+    }
+    int Add(int x, int y) {
+          return x + y;
+    }
+    bool IsLengthGreaterThan5(const char* value) {
+          return strlen(value) > 5;
+    }
+    BSTR GetName() {
+          return SysAllocString(L"Packt Publishing");
+    }
+    ```
 
 在这里，我们包含了 `iostream` 和 `comdef.h`。我们有四个方法：`SendGreeting()`、`Add(int x, int y)`、`IsLengthGreaterThan5(const char* value)` 和 `GetName()`。我们将这些方法暴露给外部调用者。
 
@@ -258,13 +371,31 @@ P/Invoke 允许您使静态入口点对其他应用程序可用。如果您曾�
 
 1.  在您的解决方案中添加一个新的 .NET Core 3.1 控制台应用程序项目，并将其设置为启动项目。添加一个名为 `Product` 的类。更新 `Product.cs` 文件的内容，如下所示：
 
-    [PRE37]
+    ```cs
+    using System.Runtime.InteropServices;
+    [StructLayout(LayoutKind.Sequential)]
+    public struct Product
+    {
+          public int Id;
+    [MarshalAs(UnmanagedType.BStr)]
+    public string Name;
+    }
+    ```
 
 在这里，我们已经在我们的 C# 客户端中创建了一个 C++ 结构的镜像，并包含了 `System.Runtime.InteropServices` 库。我们的 C# 结构与我们的 C++ 结构具有相同的两个字段，并且它们的顺序相同。结构本身使用 `[StructLayout(LayoutKind.Sequential)]` 进行了注释，这表示字段顺序必须按顺序处理。这确保了 C++ 库中的字段与 C# 库中的字段相匹配。此外，`Name` 属性是一个字符串，因此需要使用 `[MarshalAs(UnmanagedType.Bstr)]` 注释。这告诉编译器将 C# 字符串视为 C++ BSTR。
 
 1.  按照以下方式修改 `Program.cs` 文件：
 
-    [PRE38]
+    ```cs
+    namespace CH02_Pinvoke {
+        using System;
+        using System.Runtime.InteropServices;
+        class Program {
+            static void Main(string[] _) {
+            }
+        }
+    }
+    ```
 
 在这里，我们导入了 `System` 和 `System.Runtime.InteropServices` 库，然后通过将 `args` 参数的名称替换为默认操作符来修改 `Main(string[] args)` 方法。
 
@@ -272,15 +403,16 @@ P/Invoke 允许您使静态入口点对其他应用程序可用。如果您曾�
 
 1.  将以下行添加到你的 C++ 项目文件的 `PropertyGroup` 部分：
 
-    [PRE39]
+    ```cs
+    <AppendTargetFrameworkToPath>false</AppendTargetFrame
+        workToPath>
+    ```
 
 1.  构建项目。这将生成我们的输出文件夹，我们将在此处放置编译后的 C++ 库。
 
 1.  右键单击 C++ 项目并选择 **属性**。你应该会看到 **CH02_NativeLibrary 属性页** 对话框：
 
-![图 2.4 – CH02_NativeLibrary 属性页
-
-![图片](img/Figure_2.4_B16617.jpg)
+![图 2.4 – CH02_NativeLibrary 属性页![图片](img/Figure_2.4_B16617.jpg)
 
 图 2.4 – CH02_NativeLibrary 属性页
 
@@ -290,11 +422,51 @@ P/Invoke 允许您使静态入口点对其他应用程序可用。如果您曾�
 
 1.  在 `Program` 类中，在 `Main` 方法之上添加以下 DLL 导入：
 
-    [PRE40]
+    ```cs
+    [DllImport("CH02_NativeLibrary.dll",
+          CallingConvention = CallingConvention.StdCall
+    )]
+    [DllImport("CH02_NativeLibrary.dll", EntryPoint = 
+        "Add",CallingConvention = Calling
+            Convention.StdCall
+    )]
+    public static extern int AddIntegers(int x, int y);
+    [DllImport("CH02_NativeLibrary.dll",
+          CallingConvention = CallingConvention.StdCall
+    )]
+    public static extern bool IsLengthGreaterThan5(string 
+        value);
+    [DllImport("CH02_NativeLibrary.dll",
+          CallingConvention = CallingConvention.StdCall
+    )]
+    [return: MarshalAs(UnmanagedType.BStr)]
+    public static extern string GetName();
+    [DllImport("CH02_NativeLibrary.dll",
+          CallingConvention = CallingConvention.StdCall
+    )]
+    public static extern void BuyProduct(Product product);
+    [DllImport("CH02_NativeLibrary.dll")]
+    public static extern Product CreateProduct();
+    ```
 
 1.  这些 `DllImport` 语句使我们的 `CH02_NativeLibrary.dll` 方法对 C# 可用。按照以下方式更新 `Main` 方法：
 
-    [PRE41]
+    ```cs
+    static void Main(string[] _)
+    {
+    SendGreeting();
+        Console.WriteLine($"1 + 2 = {AddIntegers(1, 2)}");
+         var answer = IsLengthGreaterThan5("C# is 
+           awesome!") ? "Yes." : "No.";
+         Console.WriteLine($"Is \"C# is awesome!\" > than 
+           5? {answer}");
+         Console.WriteLine($"Publisher Name: {GetName()}");
+         var product = CreateProduct();
+         Console.WriteLine($"Product: {product.Name}");
+         BuyProduct(product);
+         Console.ReadKey();
+    }
+    ```
 
 我们的 `Main` 方法调用从我们的 `CH02_NativeLibrary.dll` 二进制文件中导入的方法。我们传递值并接收值和结构返回。
 
@@ -316,17 +488,41 @@ Python 代码的设计使得程序员可以比在 C# 中更快地编码任务。
 
 1.  启动一个新的 .NET Core 3.1 控制台应用程序。然后，添加 `IronPython` NuGet 包。这仅适用于 Python 2.x 代码。如果您需要 Python 3.x 支持，则使用 Python.NET，可在 http//pythonnet.github.io 获取。您需要以下 `using` 语句：
 
-    [PRE42]
+    ```cs
+    using System;
+    using IronPython.Hosting;
+    ```
 
 我们需要 `System`，因为我们将在控制台窗口中输出文本。需要 `IronPython.Hosting` 库来在 C# 中托管和执行 Python 代码。
 
 1.  将名为 `welcome.py` 的文件添加到项目中，将其设置为始终 `Copy`，并添加以下代码：
 
-    [PRE43]
+    ```cs
+    print("Welcome to the world of Python integration with 
+        C#!")
+    ```
 
 1.  此 Python 代码将在我们的控制台窗口中打印出文本。将以下代码添加到 `Main` 方法中：
 
-    [PRE44]
+    ```cs
+    Console.WriteLine("Enter a string to be printed from 
+        Python: ");
+    var input = Console.ReadLine();
+         var python = Python.CreateEngine();
+         try
+    {
+    python.Execute("print('From Python: " + input + "')");
+    python.ExecuteFile("welcome.py");
+    }
+    catch (Exception ex)
+    {
+    Console.WriteLine(ex.Message);
+    }
+    finally
+    {
+    Console.ReadKey();
+    }
+    ```
 
 在这里，我们正在提示用户输入一些文本。然后，我们读取用户输入的文本行。创建一个变量，可以用来执行 Python 代码。然后使用 `try`/`catch`/`finally` 块来执行 Python 代码。首先，我们从 C# 中直接执行纯 Python 代码。然后，我们执行在 Python 脚本中执行的代码。任何异常都会捕获到写入控制台窗口的异常消息。最后，我们在退出之前等待用户按下任意键。
 
@@ -340,7 +536,7 @@ Python 代码的设计使得程序员可以比在 C# 中更快地编码任务。
 
 注意
 
-**Visual Studio Tools for Office** (**VSTO**) 仅在 .NET 4.8 及以下版本中可用。它将不支持 C# 9 和 .NET 5.0。因此，我们将使用 .NET 4.8 进行 C# 互操作性。由于微软已经从 VSTO 和 COM 模型转向使用 JavaScript 进行 Excel 的跨平台扩展，因此我们将专注于 .NET 4.8 中的 VSTO。要了解更多关于使用 JavaScript API 扩展 Microsoft Office 的信息，请阅读以下文档：[https://docs.microsoft.com/office/dev/add-ins/develop/understanding-the-javascript-api-for-office](https://docs.microsoft.com/office/dev/add-ins/develop/understanding-the-javascript-api-for-office)。
+**Visual Studio Tools for Office** (**VSTO**) 仅在 .NET 4.8 及以下版本中可用。它将不支持 C# 9 和 .NET 5.0。因此，我们将使用 .NET 4.8 进行 C# 互操作性。由于微软已经从 VSTO 和 COM 模型转向使用 JavaScript 进行 Excel 的跨平台扩展，因此我们将专注于 .NET 4.8 中的 VSTO。要了解更多关于使用 JavaScript API 扩展 Microsoft Office 的信息，请阅读以下文档：[`docs.microsoft.com/office/dev/add-ins/develop/understanding-the-javascript-api-for-office`](https://docs.microsoft.com/office/dev/add-ins/develop/understanding-the-javascript-api-for-office)。
 
 在本节中，我们将提供两个演示。第一个演示将从现有工作表中读取数据。了解如何做这一点是有用的，因为程序员经常有与工作表数据一起工作的业务需求。之后，我们将添加一个 Excel VSTO 扩展程序。为最终用户提供扩展程序，使他们的工作更加便捷和愉快是非常有用的。
 
@@ -352,23 +548,38 @@ Python 代码的设计使得程序员可以比在 C# 中更快地编码任务。
 
 1.  添加一个新的 .NET 4.8 控制台应用程序。使用 NuGet 包管理器添加以下引用以安装最新版本：
 
-    [PRE45]
+    ```cs
+    Microsoft.Office.Interop.Excel
+    Microsoft.VisualStudio.Tools.Applications.Runtime
+    ```
 
 1.  将以下命名空间添加到 `Program` 类中：
 
-    [PRE46]
+    ```cs
+    using System;
+    using Microsoft.Office.Interop.Excel;
+    ```
 
 1.  通过这样，我们就可以从 C# 与 Excel 进行交互。现在，修改 `Main` 方法，如下所示：
 
-    [PRE47]
+    ```cs
+    var excel = new Application();
+    var workbook = excel.Workbooks.Open
+         ("C:\\Temp\\LineCount.xlsx");
+    var worksheet = excel.ActiveSheet as Worksheet;
+    Range userRange = worksheet.UsedRange;
+    int countRecords = userRange.Rows.Count;
+    int add = countRecords + 1;
+    worksheet.Cells[add, 1] = $"Total Rows: {countRecords}";
+    workbook.Close(true, Type.Missing, Type.Missing);
+    excel.Quit();
+    ```
 
 上述代码创建了一个新的 Excel 应用程序。我们之前创建和修改的工作簿已打开。此时，我们可以获取活动工作表上正在使用的范围以及行数。然后将计数保存在新行上，之后我们可以关闭工作簿并退出 Excel。
 
 1.  代码可以运行多次，然后打开电子表格。你应该会看到以下类似的内容：
 
-![Figure 2.5 – Excel showing rows added by C#
-
-](img/Figure_2.5_B16617.jpg)
+![Figure 2.5 – Excel showing rows added by C#](img/Figure_2.5_B16617.jpg)
 
 图 2.5 – Excel 显示由 C# 添加的行
 
@@ -376,7 +587,7 @@ Python 代码的设计使得程序员可以比在 C# 中更快地编码任务。
 
 提示
 
-从数据库结果集填充 Excel 工作表的最高效方式是使用 `Worksheet.Range.CopyFromRecordset(Object, Object, Object)`。请参阅官方 Microsoft 文档 [https://docs.microsoft.com/dotnet/api/microsoft.office.interop.excel.range.copyfromrecordset?view=excel-pia](https://docs.microsoft.com/dotnet/api/microsoft.office.interop.excel.range.copyfromrecordset?view=excel-pia)。
+从数据库结果集填充 Excel 工作表的最高效方式是使用 `Worksheet.Range.CopyFromRecordset(Object, Object, Object)`。请参阅官方 Microsoft 文档 [`docs.microsoft.com/dotnet/api/microsoft.office.interop.excel.range.copyfromrecordset?view=excel-pia`](https://docs.microsoft.com/dotnet/api/microsoft.office.interop.excel.range.copyfromrecordset?view=excel-pia)。
 
 现在，让我们创建一个 Excel 外接程序。
 
@@ -406,7 +617,23 @@ Python 代码的设计使得程序员可以比在 C# 中更快地编码任务。
 
 1.  双击按钮以生成点击事件。更新点击事件如下：
 
-    [PRE48]
+    ```cs
+    private void GetCellValueButton_Click(object sender, 
+        RibbonControlEventArgs e)
+    {
+    CultureInfo originalLanguage = Thread.CurrentThread
+        .CurrentCulture;
+           Thread.CurrentThread.CurrentCulture = new 
+              CultureInfo("en-US");
+           var activeCell = Globals.ThisAddIn.Application
+              .ActiveCell;
+           if (activeCell.Value2 != null)
+                 MessageBox.Show(activeCell.Value2
+                    .ToString());
+                Thread.CurrentThread.CurrentCulture = 
+                    originalLanguage;
+    }
+    ```
 
 1.  在我们的点击事件中，我们保存当前语言并将其更改为美式英语。然后，我们获取活动单元格。`Value2` 属性是动态类型。我们检查活动单元格的值是否为 null。如果单元格不是 null，则我们在消息框中显示活动单元格的值。最后，我们将语言恢复到其原始语言。
 
@@ -418,9 +645,7 @@ Python 代码的设计使得程序员可以比在 C# 中更快地编码任务。
 
 1.  在功能区上，如果 **外接程序** 选项卡不可见，请单击 **自定义快速访问工具栏**，然后单击 **更多命令…** 以打开 **Excel 选项** 对话框，如以下截图所示：
 
-![Figure 2.6 – The Excel Options dialog
-
-](img/Figure_2.6_B16617.jpg)
+![Figure 2.6 – The Excel Options dialog](img/Figure_2.6_B16617.jpg)
 
 图 2.6 – Excel 选项对话框
 
@@ -428,17 +653,13 @@ Python 代码的设计使得程序员可以比在 C# 中更快地编码任务。
 
 1.  点击**确定**关闭对话框。在单元格中输入任何内容，然后点击**添加插件**选项卡。你应该看到以下类似的内容：
 
-![图 2.7 – Excel 显示“插件”选项卡
-
-](img/Image87430.jpg)
+![图 2.7 – Excel 显示“插件”选项卡](img/Image87430.jpg)
 
 图 2.7 – Excel 显示“插件”选项卡
 
 1.  确保你的文本单元格被选中。然后，点击**获取单元格值**功能区项。你应该看到以下类似的消息：
 
-![图 2.8 – Excel 显示活动单元格中的文本
-
-](img/Image87438.jpg)
+![图 2.8 – Excel 显示活动单元格中的文本](img/Image87438.jpg)
 
 图 2.8 – Excel 显示活动单元格中的文本
 
@@ -470,7 +691,7 @@ Python 代码的设计使得程序员可以比在 C# 中更快地编码任务。
 
 ### 进一步的性能改进
 
-有关您可以对 VSTO 插件进行的性能改进的进一步指导，请参阅官方 Microsoft 文档：[https://docs.microsoft.com/en-us/visualstudio/vsto/improving-the-performance-of-a-vsto-add-in?view=vs-2019](https://docs.microsoft.com/en-us/visualstudio/vsto/improving-the-performance-of-a-vsto-add-in?view=vs-2019)。
+有关您可以对 VSTO 插件进行的性能改进的进一步指导，请参阅官方 Microsoft 文档：[`docs.microsoft.com/en-us/visualstudio/vsto/improving-the-performance-of-a-vsto-add-in?view=vs-2019`](https://docs.microsoft.com/en-us/visualstudio/vsto/improving-the-performance-of-a-vsto-add-in?view=vs-2019)。
 
 到目前为止，我们已经探讨了与其他程序和编程语言交互的各种方法。现在，让我们学习如何安全地处理未托管代码。
 
@@ -478,43 +699,67 @@ Python 代码的设计使得程序员可以比在 C# 中更快地编码任务。
 
 当处理未托管资源时，你必须显式地释放它们以释放资源。如果不这样做，可能会导致异常被抛出，或者更糟的是，你的应用程序可能会完全崩溃。你必须确保你的应用程序在遇到异常时不会继续运行并提供错误数据。如果在应用程序继续运行的情况下数据会变得无效，那么退出程序会更好。你还必须确保如果应用程序遇到无法恢复的灾难性异常，则在关闭之前显示消息或进行某种类型的记录。
 
-在C#中，有两种处理非托管资源的方法：使用可处置模式和终结器。我们将通过代码示例在本节中讨论这两种方法。
+在 C#中，有两种处理非托管资源的方法：使用可处置模式和终结器。我们将通过代码示例在本节中讨论这两种方法。
 
-### 理解C#终结化
+### 理解 C#终结化
 
-**终结器**是C#中的析构函数，用于执行任何必要的手动清理操作。你可以在类中使用终结器，但不能在结构体中使用。一个类可以有一个终结器，但不能继承或重载终结器。你不能显式调用终结器，因为它们在类被销毁时自动调用。此外，修饰符不接受修饰符或没有参数。
+**终结器**是 C#中的析构函数，用于执行任何必要的手动清理操作。你可以在类中使用终结器，但不能在结构体中使用。一个类可以有一个终结器，但不能继承或重载终结器。你不能显式调用终结器，因为它们在类被销毁时自动调用。此外，修饰符不接受修饰符或没有参数。
 
 注意
 
-你无法控制终结器何时运行。如果GC运行得太频繁，那么你可能会遇到`OutOfMemory`异常。与其依赖终结器，你应该实现Dispose设计模式的最佳实践，这将在最后作为后备调用终结器。当你正在处理托管和非托管对象时，将终结器代码视为一个错误。
+你无法控制终结器何时运行。如果 GC 运行得太频繁，那么你可能会遇到`OutOfMemory`异常。与其依赖终结器，你应该实现 Dispose 设计模式的最佳实践，这将在最后作为后备调用终结器。当你正在处理托管和非托管对象时，将终结器代码视为一个错误。
 
-在C#中有两种编写终结器的语法方式。第一种是经典方法，如下所示：
+在 C#中有两种编写终结器的语法方式。第一种是经典方法，如下所示：
 
-[PRE49]
+```cs
+public class Third : Second 
+```
 
-[PRE50]
+```cs
+{
+```
 
-[PRE51]
+```cs
+      ~Third() // Destructor/Finalizer
+```
 
-[PRE52]
+```cs
+{
+```
 
-[PRE53]
+```cs
+      // Clean-up code goes here … 
+```
 
-[PRE54]
+```cs
+}
+```
 
-[PRE55]
+```cs
+}
+```
 
 编写终结器的第二种方式如下：
 
-[PRE56]
+```cs
+public class Third : Second 
+```
 
-[PRE57]
+```cs
+{
+```
 
-[PRE58]
+```cs
+      ~Third() => Console.WriteLine("Clean-up goes 
+```
 
-[PRE59]
+```cs
+          here …");
+```
 
-[PRE60]
+```cs
+}
+```
 
 作为一名程序员，你必须知道，尽管使用终结器来清理代码，但你无法控制垃圾回收器何时以及是否调用它们。
 
@@ -524,47 +769,80 @@ Python 代码的设计使得程序员可以比在 C# 中更快地编码任务。
 
 ### 使用可处置模式释放托管和非托管资源
 
-当你处理托管和非托管对象时，实现可处置设计模式是必要的。可处置模式实现了`Dispose(bool disposing)`方法，如GitHub上`CH02_ObjectCleanup`项目的源代码所示。这就是我们在本次演示中要做的。按照以下步骤操作：
+当你处理托管和非托管对象时，实现可处置设计模式是必要的。可处置模式实现了`Dispose(bool disposing)`方法，如 GitHub 上`CH02_ObjectCleanup`项目的源代码所示。这就是我们在本次演示中要做的。按照以下步骤操作：
 
-1.  启动一个新的.NET控制台应用程序。然后，添加一个名为`DisposableBase`的类，如下所示：
+1.  启动一个新的.NET 控制台应用程序。然后，添加一个名为`DisposableBase`的类，如下所示：
 
-    [PRE61]
+    ```cs
+    public abstract class DisposableBase : IDisposable
+    {
+    protected bool _disposed = false;
+    }
+    ```
 
 1.  在这里，我们声明了该类为抽象类并实现了`IDisposable`接口。我们的`_disposed`布尔值将被子类访问，因此我们需要声明它是受保护的。添加`Dispose()`方法，如下所示：
 
-    [PRE62]
+    ```cs
+    public void Dispose()
+    {
+         Dispose(true);
+         GC.SuppressFinalize(this);
+    }
+    ```
 
 1.  此方法调用`Dispose(bool disposing)`方法，它清理了托管和非托管资源。然后，它停止终结器的执行。让我们添加终结器：
 
-    [PRE63]
+    ```cs
+    ~DisposableBase()
+    {
+    Dispose(false);
+    }
+    ```
 
 1.  如果我们的终结器运行了——并且它并不保证一定会运行——当程序员未能调用`Dispose()`方法时，它将调用`Dispose(bool disposing)`方法。现在，让我们添加`DisposableBase`类的最后一部分——即`Disposable(bool disposing)`方法：
 
-    [PRE64]
+    ```cs
+    protected virtual void Dispose(bool disposing)
+    {
+    if (_disposed)
+               return;
+    if (disposing)
+    {
+               // Free up any managed objects here.
+    }
+    // Free up any unmanaged objects here.
+    // Set large fields to null.
+    _disposed = true;
+    }
+    ```
 
-1.  如果我们的类已经被处置，那么我们可以退出方法。如果类尚未被处置，那么我们必须释放托管资源。一旦托管资源被清理，我们可以清理非托管对象并将大字段设置为null。最后，我们必须将`_disposed`布尔值设置为`true`。
+1.  如果我们的类已经被处置，那么我们可以退出方法。如果类尚未被处置，那么我们必须释放托管资源。一旦托管资源被清理，我们可以清理非托管对象并将大字段设置为 null。最后，我们必须将`_disposed`布尔值设置为`true`。
 
 当一个类继承我们的抽象类时，其终结器将调用`Dispose(false)`。子类将重写`Dispose(bool disposing)`方法。
 
 要创建对象和销毁它，你可以使用以下代码：
 
-[PRE65]
+```cs
+var objectThree = new ObjectThree();
+```
 
-[PRE66]
+```cs
+objectThree.Dispose();
+```
 
 这里，`ObjectThree`类被实例化，然后通过调用`Dispose()`方法被处置。
 
-这就结束了本章关于C#互操作性的内容。让我们总结一下我们学到了什么。
+这就结束了本章关于 C#互操作性的内容。让我们总结一下我们学到了什么。
 
 # 摘要
 
-在本章中，我们通过使用指针代码来探讨C#互操作性方面的P/Invoke。我们研究了不安全代码和固定代码。不安全代码是.NET平台未管理的代码，而混合代码是内存中固定的对象，由于使用指针访问，因此不会被垃圾回收器提升。
+在本章中，我们通过使用指针代码来探讨 C#互操作性方面的 P/Invoke。我们研究了不安全代码和固定代码。不安全代码是.NET 平台未管理的代码，而混合代码是内存中固定的对象，由于使用指针访问，因此不会被垃圾回收器提升。
 
-然后，我们学习了如何调用C++ DLL中的方法，包括传递参数和返回结构体。
+然后，我们学习了如何调用 C++ DLL 中的方法，包括传递参数和返回结构体。
 
-接下来，我们学习了如何与Python代码交互。我们学习了如何安装Python，然后添加IronPython NuGet包。这使我们能够直接在C#类中执行Python 2.x代码，并执行位于Python脚本中的Python代码。IronPython 2.7.10库仅支持Python 2.x版本。
+接下来，我们学习了如何与 Python 代码交互。我们学习了如何安装 Python，然后添加 IronPython NuGet 包。这使我们能够直接在 C#类中执行 Python 2.x 代码，并执行位于 Python 脚本中的 Python 代码。IronPython 2.7.10 库仅支持 Python 2.x 版本。
 
-然后，我们通过从Excel电子表格中读取数据学习了如何执行COM互操作性。我们还创建了一个Excel插件，该插件能够读取活动单元格的数据并显示一个消息框。
+然后，我们通过从 Excel 电子表格中读取数据学习了如何执行 COM 互操作性。我们还创建了一个 Excel 插件，该插件能够读取活动单元格的数据并显示一个消息框。
 
 最后，我们学习了如何安全地处理托管和非托管对象。我们创建了一个可重用的抽象类，名为`DisposableBase`。此时，你知道在子类终结器中调用`Disposable(false)`，如果未调用`Dispose()`，以及如何在基类中重写`Disposable(bool disposing)`。
 
@@ -574,9 +852,9 @@ Python 代码的设计使得程序员可以比在 C# 中更快地编码任务。
 
 回答以下问题以测试你对本章知识的掌握：
 
-1.  P/Invoke的缩写是什么？
+1.  P/Invoke 的缩写是什么？
 
-1.  解释P/Invoke是什么。
+1.  解释 P/Invoke 是什么。
 
 1.  `unsafe`关键字用于什么？
 
@@ -586,7 +864,7 @@ Python 代码的设计使得程序员可以比在 C# 中更快地编码任务。
 
 1.  C++的字符串类型是什么？
 
-1.  你需要导入哪个NuGet包来处理Python代码？
+1.  你需要导入哪个 NuGet 包来处理 Python 代码？
 
 1.  你使用什么模式来安全地处理托管和非托管对象？
 
@@ -596,30 +874,30 @@ Python 代码的设计使得程序员可以比在 C# 中更快地编码任务。
 
 要了解更多关于本章所涉及的主题，请查看以下资源：
 
-+   *非安全代码语言规范*: [https://docs.microsoft.com/en-us/dotnet/csharp/language-reference/language-specification/unsafe-code](https://docs.microsoft.com/en-us/dotnet/csharp/language-reference/language-specification/unsafe-code).
++   *非安全代码语言规范*: [`docs.microsoft.com/en-us/dotnet/csharp/language-reference/language-specification/unsafe-code`](https://docs.microsoft.com/en-us/dotnet/csharp/language-reference/language-specification/unsafe-code).
 
-+   *C#入门教程：什么是非安全代码?* [https://www.youtube.com/watch?v=oIqEBMw_Syk](https://www.youtube.com/watch?v=oIqEBMw_Syk).
++   *C#入门教程：什么是非安全代码?* [`www.youtube.com/watch?v=oIqEBMw_Syk`](https://www.youtube.com/watch?v=oIqEBMw_Syk).
 
-+   *与未管理代码交互*: [https://docs.microsoft.com/en-us/dotnet/framework/interop/](https://docs.microsoft.com/en-us/dotnet/framework/interop/).
++   *与未管理代码交互*: [`docs.microsoft.com/en-us/dotnet/framework/interop/`](https://docs.microsoft.com/en-us/dotnet/framework/interop/).
 
-+   *互操作整理*: [https://docs.microsoft.com/en-us/dotnet/framework/interop/interop-marshaling](https://docs.microsoft.com/en-us/dotnet/framework/interop/interop-marshaling).
++   *互操作整理*: [`docs.microsoft.com/en-us/dotnet/framework/interop/interop-marshaling`](https://docs.microsoft.com/en-us/dotnet/framework/interop/interop-marshaling).
 
-+   *使用平台调用整理数据*: [https://docs.microsoft.com/en-us/dotnet/framework/interop/marshaling-data-with-platform-invoke](https://docs.microsoft.com/en-us/dotnet/framework/interop/marshaling-data-with-platform-invoke).
++   *使用平台调用整理数据*: [`docs.microsoft.com/en-us/dotnet/framework/interop/marshaling-data-with-platform-invoke`](https://docs.microsoft.com/en-us/dotnet/framework/interop/marshaling-data-with-platform-invoke).
 
-+   *P/Invoke技巧*: [http://benbowen.blog/post/pinvoke_tips/](http://benbowen.blog/post/pinvoke_tips/).
++   *P/Invoke 技巧*: [`benbowen.blog/post/pinvoke_tips/`](http://benbowen.blog/post/pinvoke_tips/).
 
-+   *调试终结器*: [https://docs.microsoft.com/en-us/archive/msdn-magazine/2007/november/net-matters-debugging-finalizers](https://docs.microsoft.com/en-us/archive/msdn-magazine/2007/november/net-matters-debugging-finalizers).
++   *调试终结器*: [`docs.microsoft.com/en-us/archive/msdn-magazine/2007/november/net-matters-debugging-finalizers`](https://docs.microsoft.com/en-us/archive/msdn-magazine/2007/november/net-matters-debugging-finalizers).
 
-+   *C#中的析构函数*: [https://www.geeksforgeeks.org/destructors-in-c-sharp/](https://www.geeksforgeeks.org/destructors-in-c-sharp/).
++   *C#中的析构函数*: [`www.geeksforgeeks.org/destructors-in-c-sharp/`](https://www.geeksforgeeks.org/destructors-in-c-sharp/).
 
-+   .NET内存性能分析: [https://github.com/Maoni0/mem-doc/blob/master/doc/.NETMemoryPerformanceAnalysis.md#The-effect-of-a-generational-GC](https://github.com/Maoni0/mem-doc/blob/master/doc/.NETMemoryPerformanceAnalysis.md#The-effect-of-a-generational-GC).
++   .NET 内存性能分析: [`github.com/Maoni0/mem-doc/blob/master/doc/.NETMemoryPerformanceAnalysis.md#The-effect-of-a-generational-GC`](https://github.com/Maoni0/mem-doc/blob/master/doc/.NETMemoryPerformanceAnalysis.md#The-effect-of-a-generational-GC).
 
-+   *提高VSTO插件性能*: [https://docs.microsoft.com/en-us/visualstudio/vsto/improving-the-performance-of-a-vsto-add-in?view=vs-2019](https://docs.microsoft.com/en-us/visualstudio/vsto/improving-the-performance-of-a-vsto-add-in?view=vs-2019).
++   *提高 VSTO 插件性能*: [`docs.microsoft.com/en-us/visualstudio/vsto/improving-the-performance-of-a-vsto-add-in?view=vs-2019`](https://docs.microsoft.com/en-us/visualstudio/vsto/improving-the-performance-of-a-vsto-add-in?view=vs-2019).
 
-+   *当你知道的一切都是错误的时候，第一部分*: [https://ericlippert.com/2015/05/18/when-everything-you-know-is-wrong-part-one/](https://ericlippert.com/2015/05/18/when-everything-you-know-is-wrong-part-one/).
++   *当你知道的一切都是错误的时候，第一部分*: [`ericlippert.com/2015/05/18/when-everything-you-know-is-wrong-part-one/`](https://ericlippert.com/2015/05/18/when-everything-you-know-is-wrong-part-one/).
 
-+   *.NET内存性能分析*: [https://github.com/Maoni0/mem-doc/blob/master/doc/.NETMemoryPerformanceAnalysis.md.](https://github.com/Maoni0/mem-doc/blob/master/doc/.NETMemoryPerformanceAnalysis.md.)
++   *.NET 内存性能分析*: [`github.com/Maoni0/mem-doc/blob/master/doc/.NETMemoryPerformanceAnalysis.md.`](https://github.com/Maoni0/mem-doc/blob/master/doc/.NETMemoryPerformanceAnalysis.md.)
 
-+   *OLE/Automation BSTR (字符串操作函数)*: [https://docs.microsoft.com/previous-versions/windows/desktop/automat/string-manipulation-functions](https://docs.microsoft.com/previous-versions/windows/desktop/automat/string-manipulation-functions)
++   *OLE/Automation BSTR (字符串操作函数)*: [`docs.microsoft.com/previous-versions/windows/desktop/automat/string-manipulation-functions`](https://docs.microsoft.com/previous-versions/windows/desktop/automat/string-manipulation-functions)
 
-+   *如何从C#传递对象数组到C++*: [https://alekdavis.blogspot.com/2012/07/how-to-pass-arrays-of-objects-from-c-to.html](https://alekdavis.blogspot.com/2012/07/how-to-pass-arrays-of-objects-from-c-to.html).
++   *如何从 C#传递对象数组到 C++*: [`alekdavis.blogspot.com/2012/07/how-to-pass-arrays-of-objects-from-c-to.html`](https://alekdavis.blogspot.com/2012/07/how-to-pass-arrays-of-objects-from-c-to.html).

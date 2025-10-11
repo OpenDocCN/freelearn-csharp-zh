@@ -1,18 +1,18 @@
 # 2
 
-# 使用SQL Server管理关系数据
+# 使用 SQL Server 管理关系数据
 
-本章是关于管理存储在SQL Server、Azure SQL Database或Azure SQL Edge中的关系数据。首先，您将学习如何使用原生Transact-SQL语句管理数据。接下来，您将学习如何使用ADO.NET库（`Microsoft.Data.SqlClient`）以低级别管理数据。最后，您将使用Dapper来简化与实体模型的工作。
+本章是关于管理存储在 SQL Server、Azure SQL Database 或 Azure SQL Edge 中的关系数据。首先，您将学习如何使用原生 Transact-SQL 语句管理数据。接下来，您将学习如何使用 ADO.NET 库（`Microsoft.Data.SqlClient`）以低级别管理数据。最后，您将使用 Dapper 来简化与实体模型的工作。
 
 本章将涵盖以下主题：
 
 +   理解现代数据库
 
-+   使用Transact-SQL管理数据
++   使用 Transact-SQL 管理数据
 
-+   使用低级API管理SQL Server数据
++   使用低级 API 管理 SQL Server 数据
 
-+   使用Dapper管理SQL Server数据
++   使用 Dapper 管理 SQL Server 数据
 
 +   清理数据资源
 
@@ -20,23 +20,23 @@
 
 存储数据最常见的两个地方是在**关系数据库管理系统**（**RDBMS**）中，如**SQL Server**、**PostgreSQL**、**MySQL**和**SQLite**，或者是在**NoSQL**数据库中，如**Azure Cosmos DB**、**MongoDB**、**Redis**和**Apache Cassandra**。
 
-在本章中，我们将重点关注Windows上最受欢迎的RDBMS，即SQL Server。此产品也有适用于Linux的版本。对于跨平台开发，您可以使用Azure SQL Database，它将数据存储在云中，或者使用Azure SQL Edge，它可以在Windows、macOS或Linux上的Docker容器中运行，无论是在Intel还是ARM架构的CPU上。
+在本章中，我们将重点关注 Windows 上最受欢迎的 RDBMS，即 SQL Server。此产品也有适用于 Linux 的版本。对于跨平台开发，您可以使用 Azure SQL Database，它将数据存储在云中，或者使用 Azure SQL Edge，它可以在 Windows、macOS 或 Linux 上的 Docker 容器中运行，无论是在 Intel 还是 ARM 架构的 CPU 上。
 
 ## 使用示例关系数据库
 
-要学习如何使用.NET管理RDBMS，拥有一个示例数据库会很有用，这样您就可以在一个具有中等复杂性和相当数量的示例记录的数据库上练习。
+要学习如何使用.NET 管理 RDBMS，拥有一个示例数据库会很有用，这样您就可以在一个具有中等复杂性和相当数量的示例记录的数据库上练习。
 
-微软提供了几个示例数据库，其中大多数对我们来说过于复杂，因此，我们将使用一个在20世纪90年代初首次创建的数据库，称为**Northwind**。
+微软提供了几个示例数据库，其中大多数对我们来说过于复杂，因此，我们将使用一个在 20 世纪 90 年代初首次创建的数据库，称为**Northwind**。
 
-让我们花一分钟时间看看Northwind数据库及其八个最重要的表的图表。您可以使用图2.1在本书编写代码和查询时进行参考：
+让我们花一分钟时间看看 Northwind 数据库及其八个最重要的表的图表。您可以使用图 2.1 在本书编写代码和查询时进行参考：
 
 ![](img/B19587_02_01.png)
 
-图2.1：Northwind数据库表和关系
+图 2.1：Northwind 数据库表和关系
 
 注意：
 
-+   每个类别都有一个唯一的标识符、名称、描述和图片。图片以JPEG格式存储为字节数组。
++   每个类别都有一个唯一的标识符、名称、描述和图片。图片以 JPEG 格式存储为字节数组。
 
 +   每个产品都有一个唯一的标识符、名称、单价、库存数量和其他列。
 
@@ -50,39 +50,39 @@
 
 +   每个订单都是由客户下单、由员工接收并由物流公司发货的。
 
-+   每位员工都有一个姓名、地址、联系详情、出生日期和雇佣日期，以及一个指向其经理的引用（除了老板，其`ReportsTo`字段为`null`），并且照片以JPEG格式存储为字节数组。由于一个员工可以管理许多其他员工，因此该表与其自身具有一对一的关系。
++   每位员工都有一个姓名、地址、联系详情、出生日期和雇佣日期，以及一个指向其经理的引用（除了老板，其`ReportsTo`字段为`null`），并且照片以 JPEG 格式存储为字节数组。由于一个员工可以管理许多其他员工，因此该表与其自身具有一对一的关系。
 
-## 连接到SQL Server数据库
+## 连接到 SQL Server 数据库
 
-要连接到SQL Server数据库，我们需要知道以下列表中的多个信息：
+要连接到 SQL Server 数据库，我们需要知道以下列表中的多个信息：
 
-+   服务器（如果它具有默认值以上的名称）的名称。如果通过网络连接，这可能包括协议、IP地址和端口号。
++   服务器（如果它具有默认值以上的名称）的名称。如果通过网络连接，这可能包括协议、IP 地址和端口号。
 
 +   数据库的名称。
 
-+   安全信息，例如用户名和密码，或者是否应自动使用Windows身份验证传递当前登录用户的凭据。
++   安全信息，例如用户名和密码，或者是否应自动使用 Windows 身份验证传递当前登录用户的凭据。
 
 我们在**连接字符串**中指定此信息。
 
-为了向后兼容，我们可以在SQL Server连接字符串中使用多个可能的关键字来表示各种参数，如下所示列表所示：
+为了向后兼容，我们可以在 SQL Server 连接字符串中使用多个可能的关键字来表示各种参数，如下所示列表所示：
 
 +   `Data Source`、`server`或`addr`: 这些关键字是服务器（以及可选的实例）的名称。您可以使用点（`.`）表示本地服务器。
 
-+   `Initial Catalog`或`database`: 这些关键字是初始将处于活动状态的数据库的名称。可以使用以下命令更改SQL语句：`USE <databasename>`。
++   `Initial Catalog`或`database`: 这些关键字是初始将处于活动状态的数据库的名称。可以使用以下命令更改 SQL 语句：`USE <databasename>`。
 
-+   `Integrated Security`或`trusted_connection`: 这些关键字设置为`true`或`SSPI`，以使用Windows身份验证传递线程的当前用户凭据。
++   `Integrated Security`或`trusted_connection`: 这些关键字设置为`true`或`SSPI`，以使用 Windows 身份验证传递线程的当前用户凭据。
 
-+   `User Id`和`Password`: 这些关键字用于使用SQL Server的任何版本进行身份验证。这对于Azure SQL Database或Azure SQL Edge非常重要，因为它们不支持Windows身份验证。Windows上的SQL Server完整版支持用户名和密码以及Windows身份验证。
++   `User Id`和`Password`: 这些关键字用于使用 SQL Server 的任何版本进行身份验证。这对于 Azure SQL Database 或 Azure SQL Edge 非常重要，因为它们不支持 Windows 身份验证。Windows 上的 SQL Server 完整版支持用户名和密码以及 Windows 身份验证。
 
-+   `Authentication`: 这个关键字用于使用Azure AD身份进行身份验证，可以启用无密码身份验证。值可以是`Active Directory Integrated`、`Active Directory Password`和`Sql Password`。
++   `Authentication`: 这个关键字用于使用 Azure AD 身份进行身份验证，可以启用无密码身份验证。值可以是`Active Directory Integrated`、`Active Directory Password`和`Sql Password`。
 
 +   `Persist Security Info`: 如果设置为`false`，此关键字告诉连接在身份验证后从连接字符串中删除`Password`。
 
-+   `Encrypt`: 如果设置为`true`，此关键字告诉连接使用SSL加密客户端和服务器之间的传输。
++   `Encrypt`: 如果设置为`true`，此关键字告诉连接使用 SSL 加密客户端和服务器之间的传输。
 
-+   `TrustServerCertificate`: 如果本地托管并且您收到错误“与服务器成功建立了连接，但在登录过程中发生错误。（提供程序：SSL提供程序，错误：0 - 由不受信任的权威机构签发的证书链。）”，则将其设置为`true`。
++   `TrustServerCertificate`: 如果本地托管并且您收到错误“与服务器成功建立了连接，但在登录过程中发生错误。（提供程序：SSL 提供程序，错误：0 - 由不受信任的权威机构签发的证书链。）”，则将其设置为`true`。
 
-+   `Connection Timeout`: 此关键字默认为30秒。
++   `Connection Timeout`: 此关键字默认为 30 秒。
 
 +   `MultipleActiveResultSets`: 将此关键字设置为`true`以启用单个连接同时用于处理多个表以提高效率。它用于从相关表懒加载行。
 
@@ -108,13 +108,13 @@
 
 如果您没有 Windows 计算机，或者您想使用跨平台的数据库系统，则可以跳到主题 *设置 Azure SQL 数据库*，或者在线部分 *在 Docker 中安装 Azure SQL Edge*，该部分可在以下链接中找到：
 
-[https://github.com/markjprice/apps-services-net8/blob/main/docs/ch02-sql-edge.md](https://github.com/markjprice/apps-services-net8/blob/main/docs/ch02-sql-edge.md)
+[`github.com/markjprice/apps-services-net8/blob/main/docs/ch02-sql-edge.md`](https://github.com/markjprice/apps-services-net8/blob/main/docs/ch02-sql-edge.md)
 
-如果您想在 Linux 上本地安装 SQL Server，您可以在以下链接中找到说明：[https://learn.microsoft.com/en-us/sql/linux/sql-server-linux-setup](https://learn.microsoft.com/en-us/sql/linux/sql-server-linux-setup)。
+如果您想在 Linux 上本地安装 SQL Server，您可以在以下链接中找到说明：[`learn.microsoft.com/en-us/sql/linux/sql-server-linux-setup`](https://learn.microsoft.com/en-us/sql/linux/sql-server-linux-setup)。
 
 ### 安装 Windows 的 SQL Server 开发者版
 
-在 Windows 上，如果您想使用 SQL Server 的完整版而不是简化的 LocalDB 或 Express 版本，您可以在以下链接中找到所有 SQL Server 版本：[https://www.microsoft.com/en-us/sql-server/sql-server-downloads](https://www.microsoft.com/en-us/sql-server/sql-server-downloads)。
+在 Windows 上，如果您想使用 SQL Server 的完整版而不是简化的 LocalDB 或 Express 版本，您可以在以下链接中找到所有 SQL Server 版本：[`www.microsoft.com/en-us/sql-server/sql-server-downloads`](https://www.microsoft.com/en-us/sql-server/sql-server-downloads)。
 
 执行以下步骤：
 
@@ -162,7 +162,7 @@
 
     图 2.3：下载 SQL Server 管理工具 (SSMS)
 
-    下载 SSMS 的直接链接如下：[https://learn.microsoft.com/en-us/sql/ssms/download-sql-server-management-studio-ssms](https://learn.microsoft.com/en-us/sql/ssms/download-sql-server-management-studio-ssms)。
+    下载 SSMS 的直接链接如下：[`learn.microsoft.com/en-us/sql/ssms/download-sql-server-management-studio-ssms`](https://learn.microsoft.com/en-us/sql/ssms/download-sql-server-management-studio-ssms)。
 
 1.  运行 SSMS 安装程序并点击**安装**。
 
@@ -182,7 +182,7 @@
 
 现在我们可以运行数据库脚本，在 Windows 上使用 **SQL Server 管理工具**（**SSMS**）本地创建 Northwind 示例数据库：
 
-1.  如果你之前没有下载或克隆此书的 GitHub 仓库，那么现在使用以下链接进行操作：[https://github.com/markjprice/apps-services-net8/](https://github.com/markjprice/apps-services-net8/)。
+1.  如果你之前没有下载或克隆此书的 GitHub 仓库，那么现在使用以下链接进行操作：[`github.com/markjprice/apps-services-net8/`](https://github.com/markjprice/apps-services-net8/)。
 
 1.  在你的 `apps-services-net8` 文件夹中，创建一个名为 `Chapter02` 的文件夹。
 
@@ -212,15 +212,15 @@
 
 1.  退出 **SQL Server Management Studio**。
 
-我们不必使用 **SQL Server Management Studio** 来执行数据库脚本。我们也可以使用 Visual Studio 2022 中的工具，包括 **SQL Server 对象资源管理器** 和 **服务器资源管理器**，或者跨平台的 SQL Server Visual Studio Code 扩展，或者 **Azure Data Studio**，你可以从以下链接单独下载和安装：[https://aka.ms/getazuredatastudio](https://aka.ms/getazuredatastudio)。
+我们不必使用 **SQL Server Management Studio** 来执行数据库脚本。我们也可以使用 Visual Studio 2022 中的工具，包括 **SQL Server 对象资源管理器** 和 **服务器资源管理器**，或者跨平台的 SQL Server Visual Studio Code 扩展，或者 **Azure Data Studio**，你可以从以下链接单独下载和安装：[`aka.ms/getazuredatastudio`](https://aka.ms/getazuredatastudio)。
 
 ## 设置 Azure SQL 数据库
 
-如果你没有 Windows 计算机，则可以创建一个云托管的 SQL Server 实例。你需要一个 Azure 账户。你可以在以下链接注册：[https://signup.azure.com](https://signup.azure.com)。接下来，你需要执行以下步骤：
+如果你没有 Windows 计算机，则可以创建一个云托管的 SQL Server 实例。你需要一个 Azure 账户。你可以在以下链接注册：[`signup.azure.com`](https://signup.azure.com)。接下来，你需要执行以下步骤：
 
-1.  登录到你的 Azure 账户：[https://portal.azure.com/](https://portal.azure.com/)
+1.  登录到你的 Azure 账户：[`portal.azure.com/`](https://portal.azure.com/)
 
-1.  导航到 [https://portal.azure.com/#create/hub](https://portal.azure.com/#create/hub)。
+1.  导航到 [`portal.azure.com/#create/hub`](https://portal.azure.com/#create/hub)。
 
 1.  搜索 **资源组** 并然后点击 **创建** 按钮。
 
@@ -306,17 +306,27 @@
 
 1.  启动 **记事本** 或你喜欢的纯文本编辑器，粘贴连接字符串，并在每个分号后添加换行符以分隔每个部分，以便更容易处理，如图下文所示：
 
-    [PRE0]
+    ```cs
+    Server=tcp:apps-services-book.database.windows.net,1433;
+    Initial Catalog=Northwind;
+    Persist Security Info=False;
+    User ID=markjprice;
+    Password={your_password};
+    MultipleActiveResultSets=False;
+    Encrypt=True;
+    TrustServerCertificate=False;
+    Connection Timeout=30; 
+    ```
 
     你的`Server`值将不同，因为自定义服务器名称部分，例如，`apps-services-book`是公开的，并且必须是全局唯一的。
 
 1.  可选地，保存记事本文件以供将来参考。
 
-### JetBrains Rider用于处理SQL Server的工具窗口
+### JetBrains Rider 用于处理 SQL Server 的工具窗口
 
-如果你使用任何操作系统的JetBrains Rider，那么你可以使用以下步骤连接到SQL Server数据库：
+如果你使用任何操作系统的 JetBrains Rider，那么你可以使用以下步骤连接到 SQL Server 数据库：
 
-1.  在JetBrains Rider中，选择**视图** | **工具窗口** | **数据库**。
+1.  在 JetBrains Rider 中，选择**视图** | **工具窗口** | **数据库**。
 
 1.  在**数据库**工具窗口中，点击**连接到数据库...**。
 
@@ -328,41 +338,41 @@
 
 1.  将`{your_password}`更改为你选择的密码。
 
-1.  可选地，点击**测试连接**并在必要时纠正任何错误。如果你得到一个**不一致的语言**错误，那么你可以忽略它，因为我们正在使用SQL Server作为方言。
+1.  可选地，点击**测试连接**并在必要时纠正任何错误。如果你得到一个**不一致的语言**错误，那么你可以忽略它，因为我们正在使用 SQL Server 作为方言。
 
 1.  点击**连接到数据库**。
 
-### 在云中创建Northwind示例数据库
+### 在云中创建 Northwind 示例数据库
 
-现在我们可以运行一个数据库脚本，在Azure SQL数据库中创建Northwind示例数据库：
+现在我们可以运行一个数据库脚本，在 Azure SQL 数据库中创建 Northwind 示例数据库：
 
-1.  使用你首选的数据库工具连接到Azure中的SQL服务器：
+1.  使用你首选的数据库工具连接到 Azure 中的 SQL 服务器：
 
-    +   在Visual Studio 2022中，查看**服务器资源管理器**。
+    +   在 Visual Studio 2022 中，查看**服务器资源管理器**。
 
-    +   在Windows上，启动**SQL Server Management Studio**。
+    +   在 Windows 上，启动**SQL Server Management Studio**。
 
-    +   在Visual Studio Code中，查看**SQL Server**工具。
+    +   在 Visual Studio Code 中，查看**SQL Server**工具。
 
-    +   在JetBrains Rider中，导航到**视图** | **工具窗口** | **数据库**，然后点击**连接到数据库…**。
+    +   在 JetBrains Rider 中，导航到**视图** | **工具窗口** | **数据库**，然后点击**连接到数据库…**。
 
-1.  添加数据连接，并在对话框中填写所有必需的连接字符串信息，如图*图2.10*所示：![](img/B19587_02_10.png)
+1.  添加数据连接，并在对话框中填写所有必需的连接字符串信息，如图*图 2.10*所示：![](img/B19587_02_10.png)
 
-    图2.10：从Visual Studio连接到你的Azure SQL数据库
+    图 2.10：从 Visual Studio 连接到你的 Azure SQL 数据库
 
     你可能还会被提示**选择****数据源**。选择**Microsoft SQL Server**。你可以选择一个复选框来始终使用此选择。
 
 1.  右键单击数据连接，选择**新建查询**。
 
-    如果你使用JetBrains Rider，那么右键单击SQL Server，在弹出菜单中选择**SQL脚本** | **运行SQL脚本…**，然后选择`Northwind4AzureSQLdatabase.sql`文件。
+    如果你使用 JetBrains Rider，那么右键单击 SQL Server，在弹出菜单中选择**SQL 脚本** | **运行 SQL 脚本…**，然后选择`Northwind4AzureSQLdatabase.sql`文件。
 
 1.  将`Northwind4AzureSQLdatabase.sql`文件的全部内容复制并粘贴到查询窗口中，并执行它。
 
-    `Northwind4SQLServer.sql`脚本和`Northwind4AzureSQLdatabase.sql`脚本之间的主要区别是，本地SQL Server脚本将删除并重新创建Northwind数据库。Azure SQL数据库脚本不会这样做，因为数据库需要作为Azure资源创建。你可以从以下链接下载SQL脚本文件：[https://github.com/markjprice/apps-services-net8/tree/main/scripts/sql-scripts](https://github.com/markjprice/apps-services-net8/tree/main/scripts/sql-scripts)。
+    `Northwind4SQLServer.sql`脚本和`Northwind4AzureSQLdatabase.sql`脚本之间的主要区别是，本地 SQL Server 脚本将删除并重新创建 Northwind 数据库。Azure SQL 数据库脚本不会这样做，因为数据库需要作为 Azure 资源创建。你可以从以下链接下载 SQL 脚本文件：[`github.com/markjprice/apps-services-net8/tree/main/scripts/sql-scripts`](https://github.com/markjprice/apps-services-net8/tree/main/scripts/sql-scripts)。
 
 1.  等待看到**命令已成功完成**的消息。这可能需要几分钟。
 
-1.  在 **服务器资源管理器** 中，右键单击 **表** 并选择 **刷新**，注意已创建了13个表，例如 **类别**、**客户** 和 **产品**。还要注意，还创建了数十个视图和存储过程。
+1.  在 **服务器资源管理器** 中，右键单击 **表** 并选择 **刷新**，注意已创建了 13 个表，例如 **类别**、**客户** 和 **产品**。还要注意，还创建了数十个视图和存储过程。
 
 你现在在云中有一个正在运行的 Azure SQL 数据库，你可以从 .NET 项目连接到它。
 
@@ -370,9 +380,9 @@
 
 **Transact-SQL** (**T-SQL**) 是 SQL Server 的 **结构化查询语言** (**SQL**) 方言。有些人读作 *tee-sequel*，有些人读作 *tee-es-queue-el*。
 
-与 C# 不同，T-SQL 不区分大小写；例如，你可以使用 `int` 或 `INT` 来指定32位整数数据类型，你也可以使用 `SELECT` 或 `select` 来开始一个查询表达式。存储在 SQL Server 表中的文本数据可以被视为区分大小写或不区分大小写，这取决于配置。
+与 C# 不同，T-SQL 不区分大小写；例如，你可以使用 `int` 或 `INT` 来指定 32 位整数数据类型，你也可以使用 `SELECT` 或 `select` 来开始一个查询表达式。存储在 SQL Server 表中的文本数据可以被视为区分大小写或不区分大小写，这取决于配置。
 
-T-SQL 的完整参考可以在以下链接找到：[https://learn.microsoft.com/en-us/sql/t-sql/language-reference](https://learn.microsoft.com/en-us/sql/t-sql/language-reference)。从该文档起始页面，使用左侧导航查看 **数据类型**、**查询** 和 **语句** 等主题。
+T-SQL 的完整参考可以在以下链接找到：[`learn.microsoft.com/en-us/sql/t-sql/language-reference`](https://learn.microsoft.com/en-us/sql/t-sql/language-reference)。从该文档起始页面，使用左侧导航查看 **数据类型**、**查询** 和 **语句** 等主题。
 
 ## T-SQL 数据类型
 
@@ -388,7 +398,7 @@ T-SQL 有用于列、变量、参数等的数据类型，如 *表 2.2* 所示：
 
 表 2.2：SQL Server 数据类型类别
 
-存在 `xml` 数据类型但没有 JSON 数据类型。使用 `nvarchar` 存储JSON值。T-SQL 还支持空间 `geometry` 和 `geography` 类型。
+存在 `xml` 数据类型但没有 JSON 数据类型。使用 `nvarchar` 存储 JSON 值。T-SQL 还支持空间 `geometry` 和 `geography` 类型。
 
 ## 使用注释进行文档记录
 
@@ -400,7 +410,13 @@ T-SQL 有用于列、变量、参数等的数据类型，如 *表 2.2* 所示：
 
 本地变量名以 `@` 为前缀，并使用 `SET`, `SELECT`, 或 `DECLARE` 定义，如下面的代码所示：
 
-[PRE1]
+```cs
+DECLARE @WholeNumber INT; -- Declare a variable and specify its type.
+SET @WholeNumber = 3; -- Set the variable to a literal value.
+SET @WholeNumber = @WholeNumber + 1; -- Increment the variable.
+SELECT @WholeNumber = COUNT(*) FROM Employees; -- Set to the number of employees.
+SELECT @WholeNumber = EmployeeId FROM Employees WHERE FirstName = 'Janet'; 
+```
 
 全局变量以 `@@` 为前缀。例如，`@@ROWCOUNT` 是一个上下文相关的值，它返回在当前作用域内执行语句影响的行数，例如，更新的或删除的行数。
 
@@ -448,7 +464,7 @@ DML 中最常用的语句是 `SELECT`，它用于从一个或多个表中检索�
 
 表 2.3：示例 SELECT 语句及其描述
 
-**更多信息**：您可以在以下链接中阅读关于 `SELECT` 的完整文档：[https://learn.microsoft.com/en-us/sql/t-sql/queries/select-transact-sql](https://learn.microsoft.com/en-us/sql/t-sql/queries/select-transact-sql).
+**更多信息**：您可以在以下链接中阅读关于 `SELECT` 的完整文档：[`learn.microsoft.com/en-us/sql/t-sql/queries/select-transact-sql`](https://learn.microsoft.com/en-us/sql/t-sql/queries/select-transact-sql).
 
 使用您喜欢的数据库查询工具，例如 Visual Studio 的 **服务器资源管理器** 或 Visual Studio Code 的 `mssql` 扩展，连接到您的 Northwind 数据库并尝试上述查询，如图 2.11 和图 2:12 所示：
 
@@ -496,7 +512,7 @@ DDL 语句更改数据库的结构，包括创建新对象，如表、函数和�
 
 `Microsoft.Data.SqlClient` 包为 .NET 应用程序提供对 SQL Server 的数据库连接。它也被称为 **SQL Server 和 Azure SQL 数据库的 ADO.NET 驱动程序**。
 
-**更多信息**：您可以在以下链接找到 ADO.NET 的 GitHub 仓库：[https://github.com/dotnet/SqlClient](https://github.com/dotnet/SqlClient)。
+**更多信息**：您可以在以下链接找到 ADO.NET 的 GitHub 仓库：[`github.com/dotnet/SqlClient`](https://github.com/dotnet/SqlClient)。
 
 `Microsoft.Data.SqlClient` 包支持以下 .NET 平台：
 
@@ -550,81 +566,323 @@ ADO.NET 定义了代表用于处理数据的最小对象的抽象类型，如 `D
 
 1.  在项目文件中，将警告视为错误，添加对最新版本的 `Microsoft.Data.SqlClient` 的包引用，并静态和全局导入 `System.Console`，如下面的标记所示：
 
-    [PRE2]
+    ```cs
+    <Project Sdk="Microsoft.NET.Sdk">
+      <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <TargetFramework>net8.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+     **<TreatWarningsAsErrors>****true****</TreatWarningsAsErrors>**
+      </PropertyGroup>
+     **<ItemGroup>**
+     **<PackageReference Include=****"Microsoft.Data.SqlClient"** **Version=****"5.1.2"** **/>**
+     **</ItemGroup>**
+     **<ItemGroup>**
+     **<Using Include=****"System.Console"** **Static=****"true"** **/>**
+     **</ItemGroup>**
+    </Project> 
+    ```
 
-    您可以在以下链接中检查该包的最新版本：[https://www.nuget.org/packages/Microsoft.Data.SqlClient#versions-body-tab](https://www.nuget.org/packages/Microsoft.Data.SqlClient#versions-body-tab)。
+    您可以在以下链接中检查该包的最新版本：[`www.nuget.org/packages/Microsoft.Data.SqlClient#versions-body-tab`](https://www.nuget.org/packages/Microsoft.Data.SqlClient#versions-body-tab)。
 
 1.  构建项目以恢复引用的包。
 
 1.  添加一个名为 `Program.Helpers.cs` 的新类文件，并修改其内容以定义一个方法来配置控制台以启用特殊字符，如欧元货币符号，并设置当前区域设置，以及一个方法，该方法将以指定的颜色将一些文本输出到控制台，默认颜色为黑色，如下面的代码所示：
 
-    [PRE3]
+    ```cs
+    using System.Globalization; // To use CultureInfo.
+    partial class Program
+    {
+      private static void ConfigureConsole(string culture = "en-US",
+        bool useComputerCulture = false)
+      {
+        // To enable Unicode characters like Euro symbol in the console.
+        OutputEncoding = System.Text.Encoding.UTF8;
+        if (!useComputerCulture)
+        {
+          CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo(culture);
+        }
+        WriteLine($"CurrentCulture: {CultureInfo.CurrentCulture.DisplayName}");
+      }
+      private static void WriteLineInColor(string value, 
+        ConsoleColor color = ConsoleColor.White)
+      {
+        ConsoleColor previousColor = ForegroundColor;
+        ForegroundColor = color;
+        WriteLine(value);
+        ForegroundColor = previousColor;
+      }
+    } 
+    ```
 
     在前面的代码中，默认的前景色为白色，因为我假设大多数读者的默认背景色为黑色。在我的计算机上，我将控制台的默认背景色设置为白色，以便为这本书截图。请根据您的计算机设置最适合的默认颜色。
 
 1.  添加一个名为 `Program.EventHandlers.cs` 的新类文件，并修改其内容以定义方法，这些方法将作为数据库连接状态变化的事件处理器，通过显示原始和当前状态，以及当数据库发送 `InfoMessage` 时执行，如下面的代码所示：
 
-    [PRE4]
+    ```cs
+    using Microsoft.Data.SqlClient; // To use SqlInfoMessageEventArgs.
+    using System.Data; // To use StateChangeEventArgs.
+    partial class Program
+    {
+      private static void Connection_StateChange(
+        object sender, StateChangeEventArgs e)
+      {
+        WriteLineInColor(
+          $"State change from {e.OriginalState} to {e.CurrentState}.",
+          ConsoleColor.DarkYellow);
+      }
+      private static void Connection_InfoMessage(
+        object sender, SqlInfoMessageEventArgs e)
+      {
+        WriteLineInColor($"Info: {e.Message}.", ConsoleColor.DarkBlue);
+      }
+    } 
+    ```
 
 1.  在 `Program.cs` 中，删除现有的语句。添加语句以连接到本地 SQL Server、Azure SQL 数据库或 SQL Edge，使用 SQL 身份验证（带有用户 ID 和密码）或 Windows 认证（不带用户 ID 和密码），如下面的代码所示：
 
-    [PRE5]
+    ```cs
+    using Microsoft.Data.SqlClient; // To use SqlConnection and so on.
+    ConfigureConsole();
+    #region Set up the connection string builder
+    SqlConnectionStringBuilder builder = new()
+    {
+      InitialCatalog = "Northwind",
+      MultipleActiveResultSets = true,
+      Encrypt = true,
+      TrustServerCertificate = true,
+      ConnectTimeout = 10 // Default is 30 seconds.
+    };
+    WriteLine("Connect to:");
+    WriteLine("  1 - SQL Server on local machine");
+    WriteLine("  2 - Azure SQL Database");
+    WriteLine("  3 – Azure SQL Edge");
+    WriteLine();
+    Write("Press a key: ");
+    ConsoleKey key = ReadKey().Key;
+    WriteLine(); WriteLine();
+    switch (key)
+    {
+      case ConsoleKey.D1 or ConsoleKey.NumPad1:
+        builder.DataSource = ".";
+        break;
+      case ConsoleKey.D2 or ConsoleKey.NumPad2:
+        builder.DataSource = 
+          // Use your Azure SQL Database server name.
+          "tcp:apps-services-book.database.windows.net,1433";
+        break;
+      case ConsoleKey.D3 or ConsoleKey.NumPad3:
+        builder.DataSource = "tcp:127.0.0.1,1433";
+        break;
+      default:
+        WriteLine("No data source selected.");
+        return;
+    }
+    WriteLine("Authenticate using:");
+    WriteLine("  1 – Windows Integrated Security");
+    WriteLine("  2 – SQL Login, for example, sa");
+    WriteLine();
+    Write("Press a key: ");
+    key = ReadKey().Key;
+    WriteLine(); WriteLine();
+    if (key is ConsoleKey.D1 or ConsoleKey.NumPad1)
+    {
+      builder.IntegratedSecurity = true;
+    }
+    else if (key is ConsoleKey.D2 or ConsoleKey.NumPad2)
+    {
+      Write("Enter your SQL Server user ID: ");
+      string? userId = ReadLine();
+      if (string.IsNullOrWhiteSpace(userId))
+      {
+        WriteLine("User ID cannot be empty or null.");
+        return;
+      }
+      builder.UserID = userId;
+      Write("Enter your SQL Server password: ");
+      string? password = ReadLine();
+      if (string.IsNullOrWhiteSpace(password))
+      {
+        WriteLine("Password cannot be empty or null.");
+        return;
+      }
+      builder.Password = password;
+      builder.PersistSecurityInfo = false;
+    }
+    else
+    {
+      WriteLine("No authentication selected.");
+      return;
+    }
+    #endregion
+    #region Create and open the connection
+    SqlConnection connection = new(builder.ConnectionString);
+    WriteLine(connection.ConnectionString);
+    WriteLine();
+    connection.StateChange += Connection_StateChange;
+    connection.InfoMessage += Connection_InfoMessage;
+    try
+    {
+      WriteLine("Opening connection. Please wait up to {0} seconds...", 
+        builder.ConnectTimeout);
+      WriteLine();
+      connection.Open();
+      WriteLine($"SQL Server version: {connection.ServerVersion}");
+    }
+    catch (SqlException ex)
+    {
+      WriteLineInColor($"SQL exception: {ex.Message}", 
+        ConsoleColor.Red);
+      return;
+    }
+    #endregion
+    connection.Close(); 
+    ```
 
     **良好实践**：在这个编码任务中，我们提示用户输入连接到数据库的密码。在实际应用中，您更有可能将密码存储在环境变量或像 Azure Key Vault 这样的安全存储中。您绝对不应该在源代码中存储密码！
 
 1.  运行控制台应用程序，选择与您的 SQL Server 设置兼容的选项，并注意结果，包括以深黄色写入的状态变化事件输出，以便更容易看到，如下面的输出所示：
 
-    [PRE6]
+    ```cs
+    Connect to:
+      1 - SQL Server on local machine
+      2 - Azure SQL Database
+      3 - Azure SQL Edge
+    Press a key: 1
+    Authenticate using:
+      1 - Windows Integrated Security
+      2 - SQL Login, for example, sa
+    Press a key: 1
+    Data Source=.;Initial Catalog=Northwind;Integrated Security=True;Multiple Active Result Sets=True;Connect Timeout=10;Encrypt=True;Trust Server Certificate=True
+    Opening connection. Please wait up to 10 seconds...
+    State change from Closed to Open.
+    SQL Server version: 15.00.2101
+    State change from Open to Closed. 
+    ```
 
     以下步骤展示了连接到 Azure SQL 数据库或 Azure SQL Edge 的经验，这些操作需要用户名和密码。如果您使用 Windows 集成安全连接到本地 SQL Server，则不需要输入密码。
 
-1.  运行控制台应用程序，选择需要用户ID和密码的选项，例如使用Azure SQL数据库，并注意结果，如下所示的部分输出：
+1.  运行控制台应用程序，选择需要用户 ID 和密码的选项，例如使用 Azure SQL 数据库，并注意结果，如下所示的部分输出：
 
-    [PRE7]
+    ```cs
+    Enter your SQL Server user ID: markjprice
+    Enter your SQL Server password: [censored]
+    Data Source=tcp:apps-services-book.database.windows.net,1433;Initial Catalog=Northwind;Persist Security Info=False;User ID=markjprice;Password=[censored];Multiple Active Result Sets=True;Connect Timeout=10;Encrypt=True;Trust Server Certificate=True
+    Opening connection. Please wait up to 10 seconds...
+    State change from Closed to Open.
+    SQL Server version: 12.00.5168
+    State change from Open to Closed. 
+    ```
 
-1.  运行控制台应用程序，选择需要用户ID和密码的选项，输入错误的密码，并注意结果，如下所示的部分输出：
+1.  运行控制台应用程序，选择需要用户 ID 和密码的选项，输入错误的密码，并注意结果，如下所示的部分输出：
 
-    [PRE8]
+    ```cs
+    Enter your SQL Server user ID: markjprice
+    Enter your SQL Server password: 123456
+    Data Source=tcp:apps-services-book.database.windows.net,1433;Initial Catalog=Northwind;Persist Security Info=False;User ID=markjprice;Password=123456;Multiple Active Result Sets=True;Connect Timeout=10;Encrypt=True;Trust Server Certificate=True
+    Opening connection. Please wait up to 10 seconds...
+    SQL exception: Login failed for user 'markjprice'. 
+    ```
 
 1.  在`Program.cs`中，将服务器名称（`DataSource`属性）更改为错误的内容。
 
 1.  运行控制台应用程序并注意结果（根据您的数据库托管位置，异常消息可能略有不同），如下所示：
 
-    [PRE9]
+    ```cs
+    SQL exception: A network-related or instance-specific error occurred while establishing a connection to SQL Server. The server was not found or was not accessible. Verify that the instance name is correct and that SQL Server is configured to allow remote connections. (provider: TCP Provider, error: 0 - No such host is known.) 
+    ```
 
-当打开SQL Server连接时，对于服务器连接问题，默认超时时间为30秒，所以请耐心等待！我们将超时时间更改为10秒，以避免等待时间过长。
+当打开 SQL Server 连接时，对于服务器连接问题，默认超时时间为 30 秒，所以请耐心等待！我们将超时时间更改为 10 秒，以避免等待时间过长。
 
-## 使用ADO.NET执行查询和处理数据读取器
+## 使用 ADO.NET 执行查询和处理数据读取器
 
-现在我们已经成功连接到SQL Server数据库，我们可以运行检索表中的行并使用数据读取器处理结果的命令：
+现在我们已经成功连接到 SQL Server 数据库，我们可以运行检索表中的行并使用数据读取器处理结果的命令：
 
-1.  在`Program.cs`中，导入用于处理ADO.NET命令类型的命名空间，如下所示：
+1.  在`Program.cs`中，导入用于处理 ADO.NET 命令类型的命名空间，如下所示：
 
-    [PRE10]
+    ```cs
+    using System.Data; // To use CommandType. 
+    ```
 
-    **良好实践**：为了节省本书的空间，我将使用`cmd`和`r`来表示SQL命令和SQL数据读取器。在您的代码中，给变量赋予合适的单词名称，如`command`和`reader`。
+    **良好实践**：为了节省本书的空间，我将使用`cmd`和`r`来表示 SQL 命令和 SQL 数据读取器。在您的代码中，给变量赋予合适的单词名称，如`command`和`reader`。
 
-1.  在关闭连接的语句之前，添加定义选择`Products`表中的ID、名称和价格的命令的语句，执行它，并使用数据读取器输出产品ID、名称和价格，如下所示：
+1.  在关闭连接的语句之前，添加定义选择`Products`表中的 ID、名称和价格的命令的语句，执行它，并使用数据读取器输出产品 ID、名称和价格，如下所示：
 
-    [PRE11]
+    ```cs
+    SqlCommand cmd = connection.CreateCommand();
+    cmd.CommandType = CommandType.Text;
+    cmd.CommandText = "SELECT ProductId, ProductName, UnitPrice FROM Products";
+    SqlDataReader r = cmd.ExecuteReader();
+    string horizontalLine = new string('-', 60);
+    WriteLine(horizontalLine);
+    WriteLine("| {0,5} | {1,-35} | {2,10} |", 
+      arg0: "Id", arg1: "Name", arg2: "Price");
+    WriteLine(horizontalLine);
+    while (r.Read())
+    {
+      WriteLine("| {0,5} | {1,-35} | {2,10:C} |",
+        r.GetInt32("ProductId"), 
+        r.GetString("ProductName"),
+        r.GetDecimal("UnitPrice"));
+    }
+    WriteLine(horizontalLine);
+    r.Close(); 
+    ```
 
     我们使用`C`格式来格式化单价，该格式使用当前文化来格式化货币值。调用`ConfigureConsole`将当前文化设置为美国英语，因此所有读者的输出都使用`$`。要测试像使用欧元货币符号的法国这样的替代文化，请修改`Program.cs`文件顶部的调用，如下所示：`ConfigureConsole("fr-FR");`。
 
 1.  运行控制台应用程序并注意结果，如下所示的部分输出：
 
-    [PRE12]
+    ```cs
+    ----------------------------------------------------------
+    |    Id | Name                                |    Price |
+    ----------------------------------------------------------
+    |     1 | Chai                                |   $18.00 |
+    |     2 | Chang                               |   $19.00 |
+    ...
+    |    76 | Lakkalikööri                        |   $18.00 |
+    |    77 | Original Frankfurter grüne Soße     |   $13.00 |
+    ---------------------------------------------------------- 
+    ```
 
-1.  在`Program.cs`中，修改SQL语句以定义一个用于单价的参数，并使用它来过滤结果，以显示单价高于该值的商品，如下所示的高亮代码：
+1.  在`Program.cs`中，修改 SQL 语句以定义一个用于单价的参数，并使用它来过滤结果，以显示单价高于该值的商品，如下所示的高亮代码：
 
-    [PRE13]
+    ```cs
+    **Write(****"Enter a unit price: "****);**
+    **string****? priceText = ReadLine();**
+    **if****(!****decimal****.TryParse(priceText,** **out****decimal** **price))**
+    **{**
+     **WriteLine(****"You must enter a valid unit price."****);**
+    **return****;**
+    **}**
+    SqlCommand cmd = connection.CreateCommand();
+    cmd.CommandType = CommandType.Text;
+    cmd.CommandText = "SELECT ProductId, ProductName, UnitPrice FROM Products" 
+     **+** **" WHERE UnitPrice >= @minimumPrice**";
+    **cmd.Parameters.AddWithValue(****"minimumPrice"****, price);** 
+    ```
 
 1.  运行控制台应用程序，输入一个单价如`50`，并注意结果，如下所示的部分输出：
 
-    [PRE14]
+    ```cs
+    Enter a unit price: 50
+    ----------------------------------------------------------
+    |    Id | Name                                |    Price |
+    ----------------------------------------------------------
+    |     9 | Mishi Kobe Niku                     |   $97.00 |
+    |    18 | Carnarvon Tigers                    |   $62.50 |
+    |    20 | Sir Rodney's Marmalade              |   $81.00 |
+    |    29 | Thüringer Rostbratwurst             |  $123.79 |
+    |    38 | Côte de Blaye                       |  $263.50 |
+    |    51 | Manjimup Dried Apples               |   $53.00 |
+    |    59 | Raclette Courdavault                |   $55.00 |
+    ---------------------------------------------------------- 
+    ```
 
 ## 输出统计数据
 
-ADO.NET连接在其生命周期内可以跟踪有用的统计数据，包括*表2.7*中列出的那些：
+ADO.NET 连接在其生命周期内可以跟踪有用的统计数据，包括*表 2.7*中列出的那些：
 
 | **键** | **描述** |
 | --- | --- |
@@ -641,51 +899,99 @@ ADO.NET连接在其生命周期内可以跟踪有用的统计数据，包括*表
 
 1.  在 `Program.Helpers.cs` 中，导入用于处理 ADO.NET 和常见集合的命名空间，如下所示，代码中高亮显示：
 
-    [PRE15]
+    ```cs
+    using Microsoft.Data.SqlClient; // To use SqlConnection.
+    using System.Collections; // To use IDictionary. 
+    ```
 
 1.  在 `Program.Helpers.cs` 中，在部分 `Program` 类中，添加一个方法来输出有关当前连接的统计信息，使用字符串值数组来控制我们想要输出哪些统计信息，如下所示，代码中高亮显示：
 
-    [PRE16]
+    ```cs
+    private static void OutputStatistics(SqlConnection connection)
+    {
+      // Remove all the string values to see all the statistics.
+      string[] includeKeys = { 
+        "BytesSent", "BytesReceived", "ConnectionTime", "SelectRows" 
+      };
+      IDictionary statistics = connection.RetrieveStatistics();
+      foreach (object? key in statistics.Keys)
+      {
+        if (!includeKeys.Any() || includeKeys.Contains(key))
+        {
+          if (int.TryParse(statistics[key]?.ToString(), out int value))
+          {
+            WriteLineInColor($"{key}: {value:N0}", ConsoleColor.Cyan);
+          }
+        }
+      }
+    } 
+    ```
 
-1.  在 `Program.cs` 中，在将SQL Server版本写入控制台之后，添加一个语句来启用连接的统计信息，如下所示，代码中高亮显示：
+1.  在 `Program.cs` 中，在将 SQL Server 版本写入控制台之后，添加一个语句来启用连接的统计信息，如下所示，代码中高亮显示：
 
-    [PRE17]
+    ```cs
+    WriteLine($"SQL Server version: {connection.ServerVersion}");
+    **connection.StatisticsEnabled =** **true****;** 
+    ```
 
 1.  在 `Program.cs` 中，在关闭连接之前，添加一个语句来输出连接的统计信息，如下所示，代码中高亮显示：
 
-    [PRE18]
+    ```cs
+    **OutputStatistics(connection);**
+    connection.Close(); 
+    ```
 
 1.  运行控制台应用程序并注意统计信息，如下所示的部分输出：
 
-    [PRE19]
+    ```cs
+    BytesReceived: 3,888
+    BytesSent: 336
+    SelectRows: 77
+    ExecutionTime: 25 
+    ```
 
 ## 异步处理 ADO.NET
 
-您可以通过使其异步来提高数据访问代码的响应性。您将在 *第5章*，*多任务和并发* 中看到异步操作如何工作的更多细节。现在，只需按照指示输入代码即可。
+您可以通过使其异步来提高数据访问代码的响应性。您将在 *第五章*，*多任务和并发* 中看到异步操作如何工作的更多细节。现在，只需按照指示输入代码即可。
 
 让我们看看如何将语句改为异步工作：
 
 1.  在 `Program.cs` 中，更改打开连接的语句以使其异步，如下所示，代码中高亮显示：
 
-    [PRE20]
+    ```cs
+    **await** connection.Open**Async**(); 
+    ```
 
 1.  在 `Program.cs` 中，更改执行命令的语句以使其异步，如下所示，代码中高亮显示：
 
-    [PRE21]
+    ```cs
+    SqlDataReader r = **await** cmd.ExecuteReader**Async**(); 
+    ```
 
 1.  在 `Program.cs` 中，更改读取下一行和获取字段值的语句以使其异步，如下所示，代码中高亮显示：
 
-    [PRE22]
+    ```cs
+    while (**await** r.Read**Async**())
+    {
+      WriteLine("| {0,5} | {1,-35} | {2,8:C} |",
+        **await** r.Get**FieldValueAsync<****int****>**("ProductId"),
+        **await** r.Get**FieldValueAsync<****string****>**("ProductName"),
+        **await** r.Get**FieldValueAsync<****decimal****>**("UnitPrice"));
+    } 
+    ```
 
 1.  在 `Program.cs` 中，更改语句以关闭数据读取器和连接，使其异步，如下所示，代码中高亮显示：
 
-    [PRE23]
+    ```cs
+    **await** r.Close**Async**();
+    **await** connection.Close**Async**(); 
+    ```
 
-1.  运行控制台应用程序并确认它具有与之前相同的结果，但它在多线程系统中运行得更好，例如，在GUI应用程序中不会阻塞用户界面，在网站中不会阻塞I/O线程。
+1.  运行控制台应用程序并确认它具有与之前相同的结果，但它在多线程系统中运行得更好，例如，在 GUI 应用程序中不会阻塞用户界面，在网站中不会阻塞 I/O 线程。
 
 ## 使用 ADO.NET 执行存储过程
 
-如果您需要多次执行相同的查询或其他SQL语句，最好创建一个 **存储过程**，通常带有参数，以便它可以预先编译和优化。存储过程参数有一个方向来指示它们是输入、输出还是返回值。
+如果您需要多次执行相同的查询或其他 SQL 语句，最好创建一个 **存储过程**，通常带有参数，以便它可以预先编译和优化。存储过程参数有一个方向来指示它们是输入、输出还是返回值。
 
 让我们看看一个使用所有三种参数方向的示例。首先，我们将在数据库中创建存储过程：
 
@@ -703,7 +1009,21 @@ ADO.NET连接在其生命周期内可以跟踪有用的统计数据，包括*表
 
 1.  修改 SQL 语句以定义一个名为 `GetExpensiveProducts` 的存储过程，该存储过程有两个参数：一个用于最小单位价格的输入参数和一个用于匹配产品行数的输出参数，如下面的代码所示：
 
-    [PRE24]
+    ```cs
+    CREATE PROCEDURE [dbo].[GetExpensiveProducts]
+      @price money,
+      @count int OUT
+    AS
+      PRINT 'Getting expensive products: ' + 
+        TRIM(CAST(@price AS NVARCHAR(10)))
+      SELECT @count = COUNT(*)
+      FROM Products
+    	WHERE UnitPrice >= @price
+      SELECT * 
+      FROM Products
+      WHERE UnitPrice >= @price
+    RETURN 0 
+    ```
 
     存储过程使用两个 `SELECT` 语句。第一个将 `@count` 输出参数设置为匹配产品行的计数。第二个返回匹配的产品行。它还调用了 `PRINT` 命令，这将引发 `InfoMessage` 事件。
 
@@ -721,17 +1041,86 @@ ADO.NET连接在其生命周期内可以跟踪有用的统计数据，包括*表
 
 1.  在 `Program.cs` 中添加语句以允许用户在运行文本命令和存储过程之间进行选择。添加定义存储过程及其参数的语句，然后执行命令，如下面的代码所示（高亮显示）：
 
-    [PRE25]
+    ```cs
+    SqlCommand cmd = connection.CreateCommand();
+    **WriteLine(****"Execute command using:"****);**
+    **WriteLine(****"  1 - Text"****);**
+    **WriteLine(****"  2 - Stored Procedure"****);**
+    **WriteLine();**
+    **Write(****"Press a key: "****);**
+    **key = ReadKey().Key;**
+    **WriteLine(); WriteLine();**
+    **SqlParameter p1, p2 =** **new****(), p3 =** **new****();**
+    **if** **(key** **is** **ConsoleKey.D1** **or** **ConsoleKey.NumPad1)**
+    **{**
+      cmd.CommandType = CommandType.Text;
+      cmd.CommandText = "SELECT ProductId, ProductName, UnitPrice FROM Products"
+        + " WHERE UnitPrice >= @minimumPrice";
+      cmd.Parameters.AddWithValue("minimumPrice", price);
+    **}**
+    **else****if** **(key** **is** **ConsoleKey.D2** **or** **ConsoleKey.NumPad2)**
+    **{**
+     **cmd.CommandType = CommandType.StoredProcedure;**
+     **cmd.CommandText =** **"GetExpensiveProducts"****;**
+     **p1 =** **new****()**
+     **{**
+     **ParameterName =** **"price"****,**
+     **SqlDbType = SqlDbType.Money,**
+     **SqlValue = price**
+     **};**
+     **p2 =** **new****()**
+     **{**
+     **Direction = ParameterDirection.Output,**
+     **ParameterName =** **"count"****,**
+     **SqlDbType = SqlDbType.Int**
+     **};**
+     **p3 =** **new****()**
+     **{**
+     **Direction= ParameterDirection.ReturnValue,**
+     **ParameterName =** **"rv"****,**
+     **SqlDbType = SqlDbType.Int**
+     **};**
+     **cmd.Parameters.AddRange(****new****[] { p1, p2, p3 });**
+    **}**
+    SqlDataReader r = await cmd.ExecuteReaderAsync(); 
+    ```
 
 1.  在关闭数据读取器的语句之后，添加输出输出参数和返回值的语句，如下面的代码所示（高亮显示）：
 
-    [PRE26]
+    ```cs
+    await r.CloseAsync();
+    **if** **(key** **is** **ConsoleKey.D2** **or** **ConsoleKey.NumPad2)**
+    **{**
+     **WriteLine(****$"Output count:** **{p2.Value}****"****);**
+     **WriteLine(****$"Return value:** **{p3.Value}****"****);**
+    **}**
+    await connection.CloseAsync(); 
+    ```
 
     如果存储过程返回结果集以及参数，则必须在读取参数之前关闭结果集的数据读取器。
 
 1.  运行控制台应用程序，并注意如果输入的价格是 `60`，则结果，并注意 `InfoMessage` 事件处理器以深蓝色写入消息，如下面的输出所示：
 
-    [PRE27]
+    ```cs
+    Enter a unit price: 60
+    Execute command using:
+      1 - Text
+      2 - Stored Procedure
+    Press a key: 2
+    Info: Getting expensive products: 60.00.
+    ----------------------------------------------------------
+    |    Id | Name                                |    Price |
+    ----------------------------------------------------------
+    |     9 | Mishi Kobe Niku                     |   $97.00 |
+    |    18 | Carnarvon Tigers                    |   $62.50 |
+    |    20 | Sir Rodney's Marmalade              |   $81.00 |
+    |    29 | Thüringer Rostbratwurst             |  $123.79 |
+    |    38 | Côte de Blaye                       |  $263.50 |
+    ----------------------------------------------------------
+    Output count: 5
+    Return value: 0
+    State change from Open to Closed. 
+    ```
 
 ## 使用数据读取器输出流
 
@@ -739,61 +1128,126 @@ ADO.NET连接在其生命周期内可以跟踪有用的统计数据，包括*表
 
 让我们添加生成 JSON 文件的功能：
 
-1.  在`Program.cs`中，导入用于高效处理JSON的命名空间，并静态导入`Environment`和`Path`类，如下所示代码：
+1.  在`Program.cs`中，导入用于高效处理 JSON 的命名空间，并静态导入`Environment`和`Path`类，如下所示代码：
 
-    [PRE28]
+    ```cs
+    using System.Text.Json; // To use Utf8JsonWriter, JsonSerializer.
+    using static System.Environment;
+    using static System.IO.Path; 
+    ```
 
-1.  在`Program.cs`中，在处理数据读取器的`while`语句之前，添加语句以定义JSON文件的文件路径，创建文件流，并开始一个JSON数组，然后在`while`块中，写入表示每个产品行的JSON对象，最后结束数组并关闭流，如下所示高亮显示的代码：
+1.  在`Program.cs`中，在处理数据读取器的`while`语句之前，添加语句以定义 JSON 文件的文件路径，创建文件流，并开始一个 JSON 数组，然后在`while`块中，写入表示每个产品行的 JSON 对象，最后结束数组并关闭流，如下所示高亮显示的代码：
 
-    [PRE29]
+    ```cs
+    **// Define a file path to write to.**
+    **string** **jsonPath = Combine(CurrentDirectory,** **"products.json"****);**
+    **await****using** **(FileStream jsonStream = File.Create(jsonPath))**
+    **{**
+     **Utf8JsonWriter jsonWriter =** **new****(jsonStream);**
+     **jsonWriter.WriteStartArray();**
+      while (await r.ReadAsync())
+      {
+        WriteLine("| {0,5} | {1,-35} | {2,10:C} |",
+          await r.GetFieldValueAsync<int>("ProductId"),
+          await r.GetFieldValueAsync<string>("ProductName"),
+          await r.GetFieldValueAsync<decimal>("UnitPrice"));
+     **jsonWriter.WriteStartObject();**
+     **jsonWriter.WriteNumber(****"productId"****,** 
+    **await** **r.GetFieldValueAsync<****int****>(****"ProductId"****));**
+     **jsonWriter.WriteString(****"productName"****,** 
+    **await** **r.GetFieldValueAsync<****string****>(****"ProductName"****));**
+     **jsonWriter.WriteNumber(****"unitPrice"****,** 
+    **await** **r.GetFieldValueAsync<****decimal****>(****"UnitPrice"****));**
+     **jsonWriter.WriteEndObject();**
+      }
+     **jsonWriter.WriteEndArray();**
+     **jsonWriter.Flush();**
+     **jsonStream.Close();**
+    **}**
+    **WriteLineInColor(****$"Written to:** **{jsonPath}****"****, ConsoleColor.DarkGreen);** 
+    ```
 
-1.  运行控制台应用程序，输入价格`60`，并注意JSON文件的路径，如下所示输出：
+1.  运行控制台应用程序，输入价格`60`，并注意 JSON 文件的路径，如下所示输出：
 
-    [PRE30]
+    ```cs
+    Written to: C:\apps-services-net8\Chapter02\Northwind.Console.SqlClient\bin\Debug\net8.0\products.json 
+    ```
 
-1.  打开`products.json`文件并注意，JSON没有空格，所以它全部显示在一行上，如下所示文件：
+1.  打开`products.json`文件并注意，JSON 没有空格，所以它全部显示在一行上，如下所示文件：
 
-    [PRE31]
+    ```cs
+    [{"productId":9,"productName":"Mishi Kobe Niku","unitPrice":97.0000},{"productId":18,"productName":"Carnarvon Tigers","unitPrice":62.5000},{"productId":20,"productName":"Sir Rodney\u0027s Marmalade","unitPrice":81.0000},{"productId":29,"productName":"Th\u00FCringer Rostbratwurst","unitPrice":123.7900},{"productId":38,"productName":"C\u00F4te de Blaye","unitPrice":263.5000}] 
+    ```
 
-1.  如果你正在使用Visual Studio 2022，那么你可以右键单击并选择**格式化文档**，并注意现在它更容易阅读，如图*图2.14*所示：
+1.  如果你正在使用 Visual Studio 2022，那么你可以右键单击并选择**格式化文档**，并注意现在它更容易阅读，如图*图 2.14*所示：
 
 ![img/B19587_02_14.png]
 
-图2.14：从数据读取器生成的`products.json`文件
+图 2.14：从数据读取器生成的`products.json`文件
 
 ## 使用数据读取器生成对象
 
-为了获得最大的灵活性，我们可能希望将数据读取器中的行转换为存储在数组或集合中的对象实例。之后，我们可以按需序列化对象图。ADO.NET没有内置将数据读取器行映射到对象的能力，因此我们必须手动完成。
+为了获得最大的灵活性，我们可能希望将数据读取器中的行转换为存储在数组或集合中的对象实例。之后，我们可以按需序列化对象图。ADO.NET 没有内置将数据读取器行映射到对象的能力，因此我们必须手动完成。
 
 让我们看看一个例子：
 
 1.  添加一个名为`Product.cs`的新类文件，并修改其内容以定义一个类，仅表示从`Products`表中的每一行中我们想要的三列，如下所示代码：
 
-    [PRE32]
+    ```cs
+    namespace Northwind.Models;
+    public class Product
+    {
+      public int ProductId { get; set; }
+      public string? ProductName { get; set; }
+      public decimal? UnitPrice { get; set; }
+    } 
+    ```
 
     **良好实践**：在这个任务中，我们将仅使用此类型来表示只读实例，因此我们可以使用不可变的`record`。但稍后我们需要在对象创建后更改属性值，因此我们必须定义一个`class`。
 
 1.  在`Program.cs`的顶部，导入`Northwind.Models`命名空间，以便我们可以使用`Product`。
 
-1.  在`Program.cs`中，在创建文件流之前，实例化一个产品列表，初始存储77个项目（但这不是限制），因为当Northwind数据库首次创建时，有77个产品，如下所示高亮显示的代码：
+1.  在`Program.cs`中，在创建文件流之前，实例化一个产品列表，初始存储 77 个项目（但这不是限制），因为当 Northwind 数据库首次创建时，有 77 个产品，如下所示高亮显示的代码：
 
-    [PRE33]
+    ```cs
+    **List<Product> products =** **new****(capacity:** **77****);**
+    await using (FileStream jsonStream = File.Create(jsonPath)) 
+    ```
 
 1.  在`while`块中，添加语句以针对数据读取器中的每一行实例化`Product`类型并将其添加到列表中，如下所示高亮显示的代码：
 
-    [PRE34]
+    ```cs
+    while (await r.ReadAsync())
+    {
+     **Product product =** **new****()**
+     **{**
+     **ProductId =** **await** **r.GetFieldValueAsync<****int****>(****"ProductId"****),**
+     **ProductName =** **await** **r.GetFieldValueAsync<****string****>(****"ProductName"****),**
+     **UnitPrice =** **await** **r.GetFieldValueAsync<****decimal****>(****"UnitPrice"****)**
+     **};**
+     **products.Add(product);**
+      ...
+    } 
+    ```
 
 1.  在关闭数据读取器之前，添加一个语句以使用`JsonSerializer`类的静态`Serialize`方法将产品列表写入控制台，如下所示高亮显示的代码：
 
-    [PRE35]
+    ```cs
+    **WriteLineInColor(JsonSerializer.Serialize(products),**
+     **ConsoleColor.Magenta);**
+    await r.CloseAsync(); 
+    ```
 
-1.  运行控制台应用程序，输入价格`60`，并注意从产品列表生成的JSON，如下所示输出：
+1.  运行控制台应用程序，输入价格`60`，并注意从产品列表生成的 JSON，如下所示输出：
 
-    [PRE36]
+    ```cs
+    Written to: C:\apps-services-net8\Chapter02\Northwind.Console.SqlClient\bin\Debug\net8.0\products.json
+    [{"ProductId":9,"ProductName":"Mishi Kobe Niku","UnitPrice":97.0000},{"ProductId":18,"ProductName":"Carnarvon Tigers","UnitPrice":62.5000},{"ProductId":20,"ProductName":"Sir Rodney\u0027s Marmalade","UnitPrice":81.0000},{"ProductId":29,"ProductName":"Th\u00FCringer Rostbratwurst","UnitPrice":123.7900},{"ProductId":38,"ProductName":"C\u00F4te de Blaye","UnitPrice":263.5000}] 
+    ```
 
-为了进一步简化，我们不需要手动实例化对象，可以使用简单的**对象关系映射器**（**ORM**）如Dapper。
+为了进一步简化，我们不需要手动实例化对象，可以使用简单的**对象关系映射器**（**ORM**）如 Dapper。
 
-# 使用Dapper管理数据
+# 使用 Dapper 管理数据
 
 当与 SQL Server 一起工作时，Dapper 在底层使用 ADO.NET。因为它是一种高级技术，所以它不如直接使用 ADO.NET 效率高，但它可能更容易使用。Dapper 是 EF Core 的替代 ORM。它更高效，因为它通过扩展低级的 ADO.NET `IDbConnection` 接口，提供了非常基本的功能，而没有试图成为所有人的所有东西。
 
@@ -824,35 +1278,97 @@ Dapper 向实现 `IDbConnection`（如 `SqlConnection`）的任何类添加了�
 
 1.  在 `Northwind.Console.SqlClient` 项目中，添加对 `Dapper` 的包引用，如下面的标记所示：
 
-    [PRE37]
+    ```cs
+    <ItemGroup>
+      <PackageReference Include="Microsoft.Data.SqlClient" Version="5.1.2" />
+     **<PackageReference Include=****"Dapper"** **Version=****"2.1.21"** **/>**
+    </ItemGroup> 
+    ```
 
-    在撰写本文时，Dapper 的最新版本是 2.1.21，发布于 2023 年 11 月 11 日。您可以通过以下链接检查自那时以来是否已更新：[https://www.nuget.org/packages/Dapper](https://www.nuget.org/packages/Dapper)。
+    在撰写本文时，Dapper 的最新版本是 2.1.21，发布于 2023 年 11 月 11 日。您可以通过以下链接检查自那时以来是否已更新：[`www.nuget.org/packages/Dapper`](https://www.nuget.org/packages/Dapper)。
 
 1.  构建项目以还原包。
 
 1.  添加一个名为 `Supplier.cs` 的新类文件，并修改其内容以定义一个类来表示 `Suppliers` 表中每一行的四个列，如下面的代码所示：
 
-    [PRE38]
+    ```cs
+    namespace Northwind.Models;
+    public class Supplier
+    {
+      public int SupplierId { get; set; }
+      public string? CompanyName { get; set; }
+      public string? City { get; set; }
+      public string? Country { get; set; }
+    } 
+    ```
 
 1.  在 `Program.cs` 的底部添加语句以检索 `Germany` 中的 `Supplier` 实体，枚举输出每个产品的基本信息，然后将集合序列化为 JSON 输出到控制台，如下面的代码所示：
 
-    [PRE39]
+    ```cs
+    WriteLineInColor("Using Dapper", ConsoleColor.DarkGreen);
+    connection.ResetStatistics(); // So we can compare using Dapper.
+    IEnumerable<Supplier> suppliers = connection.Query<Supplier>(
+      sql: "SELECT * FROM Suppliers WHERE Country=@Country",
+      param: new { Country = "Germany" });
+    foreach (Supplier s in suppliers)
+    {
+      WriteLine("{0}: {1}, {2}, {3}",
+        s.SupplierId, s.CompanyName, s.City, s.Country);
+    }
+    WriteLineInColor(JsonSerializer.Serialize(suppliers),
+      ConsoleColor.Green);
+    OutputStatistics(connection); 
+    ```
 
 1.  运行控制台应用程序，在我们在其中使用 Dapper 的部分，注意使用了相同的连接，因此在 Dapper 查询执行时触发了其事件，然后是来自供应商列表的枚举集合输出，以及随后生成的 JSON，如下面的输出所示：
 
-    [PRE40]
+    ```cs
+    Using Dapper
+    11: Heli Süßwaren GmbH & Co. KG, Berlin, Germany
+    12: Plutzer Lebensmittelgroßmärkte AG, Frankfurt, Germany
+    13: Nord-Ost-Fisch Handelsgesellschaft mbH, Cuxhaven, Germany
+    [{"SupplierId":11,  "CompanyName":"Heli S\u00FC\u00DFwaren GmbH \u0026 Co. KG",
+      "City":"Berlin","Country":"Germany"},
+     {"SupplierId":12,
+      "CompanyName":"Plutzer Lebensmittelgro\u00DFm\u00E4rkte AG",
+      "City":"Frankfurt","Country":"Germany"},
+     {"SupplierId":13,
+      "CompanyName":"Nord-Ost-Fisch Handelsgesellschaft mbH",
+      "City":"Cuxhaven","Country":"Germany"}]
+    BytesReceived: 1,430
+    BytesSent: 240
+    SelectRows: 3
+    ExecutionTime: 5 
+    ```
 
 1.  在 `Program.cs` 的底部添加语句以运行 `GetExpensiveProducts` 存储过程，传递一个 `price` 参数值为 `100`，枚举输出每个产品的基本信息，然后将集合序列化为 JSON 输出到控制台，如下面的代码所示：
 
-    [PRE41]
+    ```cs
+    IEnumerable<Product> productsFromDapper = 
+      connection.Query<Product>(sql: "GetExpensiveProducts",
+      param: new { price = 100M, count = 0 }, 
+      commandType: CommandType.StoredProcedure);
+    foreach (Product p in productsFromDapper)
+    {
+      WriteLine("{0}: {1}, {2}",
+        p.ProductId, p.ProductName, p.UnitPrice);
+    }
+    WriteLineInColor(JsonSerializer.Serialize(productsFromDapper),
+      ConsoleColor.Green); 
+    ```
 
 **警告！** 使用 Dapper 时，你必须传递一个包含所有参数的 `param` 对象，即使它们仅用作输出参数。例如，我们必须定义 `count`，否则将抛出异常。你还必须记住显式设置命令类型为存储过程！
 
 运行控制台应用程序，在我们在其中使用 Dapper 运行存储过程以获取价格超过 100 的产品的部分，注意使用了相同的连接，因此在 Dapper 查询执行时触发了其事件，然后是来自产品列表的枚举集合输出，以及随后生成的 JSON，如下面的输出所示：
 
-[PRE42]
+```cs
+Info: Getting expensive products: 100.00.
+29: Thüringer Rostbratwurst, 123.7900
+38: Côte de Blaye, 263.5000
+[{"ProductId":29,"ProductName":"Th\u00FCringer Rostbratwurst","UnitPrice":123.7900},{"ProductId":38,"ProductName":"C\u00F4te de Blaye","UnitPrice":263.5000}] 
+```
 
-**更多信息**：你可以在以下链接中了解更多关于 Dapper 的信息：[https://github.com/DapperLib/Dapper/blob/main/Readme.md](https://github.com/DapperLib/Dapper/blob/main/Readme.md)。
+**更多信息**：你可以在以下链接中了解更多关于 Dapper 的信息：[`github.com/DapperLib/Dapper/blob/main/Readme.md`](https://github.com/DapperLib/Dapper/blob/main/Readme.md)。
 
 # 清理数据资源
 
@@ -898,17 +1414,17 @@ Northwind 数据库被本书的大部分章节使用，所以如果你计划在�
 
 使用以下页面上的链接了解本章涵盖主题的更多详细信息：
 
-[https://github.com/markjprice/apps-services-net8/blob/main/docs/book-links.md#chapter-2---managing-relational-data-using-sql-server](https://github.com/markjprice/apps-services-net8/blob/main/docs/book-links.md#chapter-2---managing-relational-data-using-sql-server)
+[`github.com/markjprice/apps-services-net8/blob/main/docs/book-links.md#chapter-2---managing-relational-data-using-sql-server`](https://github.com/markjprice/apps-services-net8/blob/main/docs/book-links.md#chapter-2---managing-relational-data-using-sql-server)
 
 ## 练习 2.3 – 存储秘密的替代方案
 
 像密码和其他在数据库连接字符串中使用的值，或用于访问服务的密钥等秘密，通常存储在环境变量中。这些值的其他存储位置包括应用程序秘密。您可以在以下链接中了解更多关于它们的信息：*在 ASP.NET Core 中开发中安全存储应用程序秘密*：
 
-[https://learn.microsoft.com/en-us/aspnet/core/security/app-secrets](https://learn.microsoft.com/en-us/aspnet/core/security/app-secrets)
+[`learn.microsoft.com/en-us/aspnet/core/security/app-secrets`](https://learn.microsoft.com/en-us/aspnet/core/security/app-secrets)
 
 关于处理连接字符串的相关指导，您可以阅读以下链接：
 
-[https://learn.microsoft.com/en-us/ef/core/miscellaneous/connection-strings](https://learn.microsoft.com/en-us/ef/core/miscellaneous/connection-strings)
+[`learn.microsoft.com/en-us/ef/core/miscellaneous/connection-strings`](https://learn.microsoft.com/en-us/ef/core/miscellaneous/connection-strings)
 
 # 摘要
 

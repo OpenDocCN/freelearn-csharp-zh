@@ -1,6 +1,6 @@
 # 关于依赖注入的反模式和误解
 
-模式向我们展示了实现依赖注入的正确方式。在上一章中，我们深入了解到了DI生态系统中每个模式的使用、它们的优点、缺点，以及何时选择哪一个。如果正确遵循这些模式，我们就能实现一个松耦合的架构，这将更容易进行单元测试。
+模式向我们展示了实现依赖注入的正确方式。在上一章中，我们深入了解到了 DI 生态系统中每个模式的使用、它们的优点、缺点，以及何时选择哪一个。如果正确遵循这些模式，我们就能实现一个松耦合的架构，这将更容易进行单元测试。
 
 然而，在应用这些模式时，我们通常忽视了一些原则，这可能导致我们未来遇到问题。这可能是由于对模式行为的无知，或者简单地由于懒惰。
 
@@ -12,9 +12,9 @@
 
 本章我们将涵盖以下主题：
 
-+   当DI成为反模式时
++   当 DI 成为反模式时
 
-+   DI反模式
++   DI 反模式
 
 +   在项目中识别反模式
 
@@ -24,7 +24,7 @@
 
 # 何时依赖注入成为反模式？
 
-我们将探索在具有DI的项目中开发者遵循的反模式。然而，你有没有想过DI本身成为反模式的场景！是的，有时它可以成为反模式。以下列出了这些情况：
+我们将探索在具有 DI 的项目中开发者遵循的反模式。然而，你有没有想过 DI 本身成为反模式的场景！是的，有时它可以成为反模式。以下列出了这些情况：
 
 假设我们有一个控制器依赖于`Service`进行某些数据库操作。例如，`UsersController`需要一个`IUsersService`类型的依赖项来进行`User`表相关的操作。我们为依赖项配置了`UsersService`，并且它已经注册到容器中。现在，请稍微帮助自己，并问以下问题。
 
@@ -32,15 +32,26 @@
 
 *你一启动应用程序就需要依赖项吗？*依赖注入建议我们在一个称为组合根（Composition Root）的地方注册所有内容。然而，想象一下一个名为`CompanyService`的`Service`，它的实例只有在我想将`User`添加到公司时才需要。例如，看看以下代码：
 
-[PRE0]
+```cs
+    public IActionResult AddUser(UserModel userModel)
+    {
+      var user = _usersService.CreateUser(userModel);
+      if (userModel.AddUserToCompany)
+      {
+        var companyService = new CompanyService();
+        companyService.AssignUserToCompany(user);
+      }
+      return View();
+    }
+```
 
 通常，我们公司有管理员负责管理用户记录。想象一下这样的场景，管理员登录后想要将一些用户分配给特定的公司。在这种情况下，有一个从名为`AddUserToCompany`的模型中来的`boolean`值。如果它是`true`，我们需要将用户分配给公司。这意味着懒加载实例化，看起来相当不错。
 
-因此，在这里，它的意思是快速获取`CompanyService`实例并与之工作。然而，如果你选择了DI，那么`CompanyService`实例将保留在容器中（因为你将其注册在组合根中），直到你实际上在代码中使用它，这通常不会发生。有时，如果登录的用户是普通用户而不是管理员，这种情况根本不会发生。
+因此，在这里，它的意思是快速获取`CompanyService`实例并与之工作。然而，如果你选择了 DI，那么`CompanyService`实例将保留在容器中（因为你将其注册在组合根中），直到你实际上在代码中使用它，这通常不会发生。有时，如果登录的用户是普通用户而不是管理员，这种情况根本不会发生。
 
-这只是一个简单的例子。你可以想象一个复杂的应用程序，这些类型的场景可能会在DI中产生不良影响。有时，懒加载比在容器中占用不必要的内存空间更好。
+这只是一个简单的例子。你可以想象一个复杂的应用程序，这些类型的场景可能会在 DI 中产生不良影响。有时，懒加载比在容器中占用不必要的内存空间更好。
 
-如果DI被不必要地选择或使用不当，它本身就会导致反模式。如果你永远不会为一种实现注入不同的依赖项，那么就没有必要使用DI。现在让我们探索在使用项目中的DI时可能会遇到的反模式。
+如果 DI 被不必要地选择或使用不当，它本身就会导致反模式。如果你永远不会为一种实现注入不同的依赖项，那么就没有必要使用 DI。现在让我们探索在使用项目中的 DI 时可能会遇到的反模式。
 
 # 反模式
 
@@ -64,13 +75,23 @@
 
 ![](img/bb44cae7-c5fc-46ae-9bed-747d3b101475.png)
 
-当我们说它试图自己管理依赖项时，我们指的是什么？记住在[第6章](72113d11-0af8-431f-91d0-ced4cb35af21.xhtml)，*对象生命周期*中，如果一个类想要管理一个依赖项，这意味着它想要实例化它，然后管理其生命周期，以及杀死或处理它。
+当我们说它试图自己管理依赖项时，我们指的是什么？记住在第六章，*对象生命周期*中，如果一个类想要管理一个依赖项，这意味着它想要实例化它，然后管理其生命周期，以及杀死或处理它。
 
 实例化，是的，这是通过我们熟知的关键字`new`完成的。类使用`new`关键字在内部实例化每个依赖项，然后与对象一起工作，并通过`析构函数`或`终结器`来处理它们。因此，一旦这样做，它就创建了一个紧密耦合的系统。此外，它还使得单元测试变得困难。
 
 该类要么自己创建对象，要么代表其他类执行此操作。让我们通过一个例子来理解这个场景：
 
-[PRE1]
+```cs
+    public class EmployeeService
+    {
+      private readonly EmployeeRepository repository;
+      public EmployeeService()
+      {
+         string connectionString = "Read String from config";
+         this.repository = new SqlEmployeeRepository(connectionString);
+      }
+    }
+```
 
 立即发挥作用的第一件事是`new SqlEmplyeeRepository()`。现在，这个服务与`SqlEmployeeRepository`紧密耦合。假设你想使用另一个仓库类来替代它，那么我们必须更改服务代码并重新编译。没有这样的插件点来说明“我提供给你这个仓库，请使用它”。
 
@@ -88,11 +109,26 @@
 
 创建`EmployeeRepositoryFactory`是拥有一个`Create()`方法的另一个借口（以及一种懒惰的方法），这个方法将通过`new`关键字创建一个`SqlEmployeeRepository`实例：
 
-[PRE2]
+```cs
+    public class EmployeeRepositoryFactory
+    {
+      public EmployeeRepository Create()
+      {
+        string connectionString = "Read String from config";
+        return new SqlEmployeeRepository(connectionString);
+      }
+    }
+```
 
 我们从`EmployeeService`中移除了这个块，但添加了另一个与之前非常相似的新类。然后我们可以这样使用工厂：
 
-[PRE3]
+```cs
+    public EmployeeService()
+    {
+      var employeeRepofactory = new EmployeeRepositoryFactory();
+      this.repository = employeeRepofactory.Create();
+    }
+```
 
 在`EmployeeService`构造函数中，我们使用`new`关键字获取工厂实例，然后调用`Create()`方法来获取`SqlEmployeeRepository`实例，并将其分配给`repository`变量。
 
@@ -104,17 +140,37 @@
 
 派生工厂负责创建和管理所需的仓库，而不是最初设计的工厂。考虑以下代码片段：
 
-[PRE4]
+```cs
+    public abstract class EmployeeRepositoryFactory
+    {
+        public abstract EmployeeRepository Create();
+    }
+```
 
 这意味着我们试图隐藏将要服务的仓库是哪一个。我们试图通过隐藏实际提供的类型来实现松耦合。
 
 为了分配`repository`变量，我们必须继承这个类并创建一个子类，返回`SqlEmployeeRepository`：
 
-[PRE5]
+```cs
+    public class SqlEmployeeService : EmployeeRepositoryFactory
+    {
+      public override EmployeeRepository Create()
+      {
+        string connectionString = "Read String from config";
+        return new SqlEmployeeRepository(connectionString);
+      }
+    }
+```
 
 基本上，我们将`repository`的实例化与主服务解耦了。同样的问题再次出现。我们是否实现了什么有用的东西？我不这么认为。这是因为这种新的架构再次以在`EmployeeService`（使用`new`关键字）内部的一个实例化为代价：
 
-[PRE6]
+```cs
+    public EmployeeService()
+    {
+      var sqlEmployeeService = new SqlEmployeeService();
+      this.repository = sqlEmployeeService.Create();
+    }
+```
 
 虽然你能够通过将其抽象化来隐藏`SqlEmplyeeRepository`从工厂中，但你没有改变在`EmployeeService`构造函数内部处理事情的方式。你现在正在实例化`SqlEmployeeService`。
 
@@ -122,15 +178,43 @@
 
 下一个方法是通过引入`static`模式来避免工厂实例化。考虑以下代码片段：
 
-[PRE7]
+```cs
+    public static class EmployeeRepositoryFactory
+    {
+      public static EmployeeRepository Create()
+      {
+        string connectionstring = "read string from config";
+        return new SqlEmployeeRepository(connectionstring);
+      }
+    }
+```
 
 这将阻止我们创建一个对象并直接使用它。让我们看看如何：
 
-[PRE8]
+```cs
+    public EmployeeService()
+   {
+      repository = EmployeeRepositoryFactory.Create(); 
+   }
+```
 
 哈雷！我们终于移除了`new`关键字。好吧，看起来我们完成了。哦，等等！我们仍然在`Create()`方法中使用`new`创建了`SqlEmployeeRepository`实例。但是，有一个简单的解决方案可以从`config`或类似的地方读取这种类型的存储库：
 
-[PRE9]
+```cs
+    public static EmployeeRepository Create()
+    {
+      var repository = "read from config";
+      switch (repository)
+      {
+        case "sql":
+            return EmployeeRepositoryFactory.CreateSql();
+        case "azure":
+            return EmployeeRepositoryFactory.CreateAzure();
+        default:
+            throw new InvalidOperationException("Invalid operation");
+      }
+    }
+```
 
 初看似乎很有希望，但实际上并非如此。所有类都变得紧密耦合。这如下面的图中所示：
 
@@ -144,39 +228,92 @@
 
 我们已经在上一章中探讨了模式。对于控制狂问题，构造函数注入是最合适的。考虑以下代码片段：
 
-[PRE10]
+```cs
+    public class EmployeeService
+    {
+      private readonly IEmployeeRepository repository;
+      public EmployeeService(IEmployeeRepository repository)
+      {
+        this.repository = repository ?? throw new
+          ArgumentNullException("repository");
+      }
+    }
+```
 
 这样，你抽象出了具体的存储库，并且通过构造函数插入了依赖。通过引入一个工厂类，可以进一步进行重构，该工厂类将负责生成存储库。
 
-现在可以使用DI容器注册工厂接口或存储库接口，并按需解析，以便依赖项对服务可用。
+现在可以使用 DI 容器注册工厂接口或存储库接口，并按需解析，以便依赖项对服务可用。
 
-控制狂是最常见的一种反模式，在项目中实现。当开发者在他们的项目中考虑使用DI时，他们有时会发现这很困难，并且他们被控制对象创建而不是其他组件为他们做这件事所吸引。如果他们只是忽略成为控制狂，并跟随DI流程，结果将会很棒。
+控制狂是最常见的一种反模式，在项目中实现。当开发者在他们的项目中考虑使用 DI 时，他们有时会发现这很困难，并且他们被控制对象创建而不是其他组件为他们做这件事所吸引。如果他们只是忽略成为控制狂，并跟随 DI 流程，结果将会很棒。
 
-下一个反模式是“混蛋注入”。然而，在进入那个之前，我们需要了解一种名为“穷人DI”的手动依赖管理方法**Poor Man's DI**。
+下一个反模式是“混蛋注入”。然而，在进入那个之前，我们需要了解一种名为“穷人 DI”的手动依赖管理方法**Poor Man's DI**。
 
-# 穷人DI
+# 穷人 DI
 
-穷人DI；这个名字听起来非常有趣，不是吗！当你自己尝试在普通场合（否则可以称为组合根）处理依赖项的注册，而不是使用库（特别是DI容器）时，这种技术可以定义为穷人DI。
+穷人 DI；这个名字听起来非常有趣，不是吗！当你自己尝试在普通场合（否则可以称为组合根）处理依赖项的注册，而不是使用库（特别是 DI 容器）时，这种技术可以定义为穷人 DI。
 
 # 方法
 
 让我们通过一个快速的代码示例来看看如何实现。假设`EmployeeService`依赖于`EmployeeRepository`类型的依赖项，我们可以直接将其提供到构造函数中，如下所示：
 
-[PRE11]
+```cs
+    static void Main(string[] args)
+    {
+      EmployeeService empService = new 
+         EmployeeService(new EmployeeRepository());
+      Console.ReadKey();
+    }
+```
 
 考虑这个控制台应用程序示例，其中 `EmployeeService` 在 `Main` 方法中实例化。它看起来简单而美观。但如果依赖项嵌套较深，则效果并不理想。
 
 如果 `EmployeeRepository` 再次需要其他依赖项，然后又是另一个，依此类推，你可能会做到以下这样：
 
-[PRE12]
+```cs
+    EmployeeService empService = new 
+      EmployeeService(new EmployeeRepository(new
+      Cass1(new Class2(new Class3()))));
+```
 
 现在代码变得复杂且难以维护。然后你可能想要通过为每个类引入默认构造函数来在一定程度上简化这个结构。所以，以下是你为 `Service` 和 `Repository` 要做的事情：
 
-[PRE13]
+```cs
+    public class EmployeeService : IEmployeeService
+    {
+      private readonly IEmployeeRepository repository;
+ // Default Constructor calls the parameterized one
+      public EmployeeService() : this(new EmployeeRepository()) 
+ {
+ }
+      public EmployeeService(IEmployeeRepository employeeRepository)
+      {
+         repository = employeeRepository;
+      }
+    }
+    public class EmployeeRepository : IEmployeeRepository
+    {
+      private readonly ISomeClass class1;
+ // Default constructor calls the parameterised one.
+      public EmployeeRepository() : this(new Class1())
+ {
+ }
+      public EmployeeRepository(ISomeClass someClass)
+      {
+        class1 = someClass;
+      }
+    }
+```
 
 你可以对所有嵌套的类做同样的事情。我们为所有类添加了默认构造函数；这些构造函数内部调用参数化构造函数，并带有默认依赖项实例。这肯定会减少代码。请看以下简化后的代码：
 
-[PRE14]
+```cs
+    static void Main(string[] args)
+    {
+      EmployeeService empService = new 
+        EmployeeService(); // No Dependency passed here.
+      Console.ReadKey();
+    }
+```
 
 现在不需要将这些构造函数传递任何依赖项。此外，如果你传递了期望类型的任何依赖项，它也会正常工作，因为还存在参数化构造函数。这意味着我们得到了一个非常灵活的类结构，并且我们也减少了实例化。
 
@@ -210,7 +347,7 @@
 
 +   你可以按自己的意愿管理依赖项的生命周期。实例可以表现为`Singleton`、`Transient`或`Scoped`，具体取决于你的配置。
 
-建议使用DI容器来注册和解析依赖项，而不是在组合根中手动管理它们。因此，默认构造函数方法被称为恶劣注入。在下一节中，我们将对此进行更多探讨。
+建议使用 DI 容器来注册和解析依赖项，而不是在组合根中手动管理它们。因此，默认构造函数方法被称为恶劣注入。在下一节中，我们将对此进行更多探讨。
 
 # 恶劣注入
 
@@ -224,7 +361,33 @@
 
 为了简单起见，让我们考虑同一个例子：`EmployeeService`，它需要一个仓库来工作：
 
-[PRE15]
+```cs
+    public class EmployeeService
+    {
+      private readonly IEmployeeRepository repository;
+      // Default Constructor.
+      public EmployeeService()
+      {
+         repository = CreateDefaultRepository();
+      }
+
+      // Constructor Injection can happen here.
+      public EmployeeService(IEmployeeRepository repository)
+      {
+        if (repository == null)
+        {
+          throw new ArgumentNullException("repository");
+        }
+        this.repository = repository;
+      }
+      // Method creating a default repository.
+      private static EmployeeRepository CreateDefaultRepository()
+      {
+        string connectionString = "Read String from config";
+        return new SqlEmployeeRepository(connectionString);
+      }
+    }
+```
 
 存在一个默认构造函数，它通过创建一个`SqlEmployeeRepository`的实例来确保仓库的可用性。显然，默认仓库是从另一个组件中引用的，因为服务和仓库通常不会位于同一个组件中。这就是为什么默认构造函数可以被标记为**外部默认**。
 
@@ -232,13 +395,13 @@
 
 # 解决方案
 
-恶劣注入之所以不好，仅仅是因为这个外部默认。此外，它可能依赖于我们甚至不需要在类中的某些东西。从前面的例子中可以看出，如果我们使用DI容器，它将自动将解析的依赖项连接到其他参数化构造函数。然而，如果我们有这种类型的默认构造函数，那么DI容器在选择目标时可能会感到困惑。只有一个构造函数用于注入确保与容器的顺畅操作。
+恶劣注入之所以不好，仅仅是因为这个外部默认。此外，它可能依赖于我们甚至不需要在类中的某些东西。从前面的例子中可以看出，如果我们使用 DI 容器，它将自动将解析的依赖项连接到其他参数化构造函数。然而，如果我们有这种类型的默认构造函数，那么 DI 容器在选择目标时可能会感到困惑。只有一个构造函数用于注入确保与容器的顺畅操作。
 
-当你遇到默认构造函数与外部默认产生耦合时，你可以考虑消除它，因为当你决定应用构造函数注入时。有一个构造函数用于DI就足够了，因为确保外部默认在服务请求时始终就绪是DI容器的责任。
+当你遇到默认构造函数与外部默认产生耦合时，你可以考虑消除它，因为当你决定应用构造函数注入时。有一个构造函数用于 DI 就足够了，因为确保外部默认在服务请求时始终就绪是 DI 容器的责任。
 
 当你重构代码并移除默认构造函数时，编译器可能会报错。在这种情况下，你需要将实例化代码移动到组合根。如果所引用的依赖项是*局部默认值*（它位于同一程序集内），那么我们仍然需要移除该构造函数，因为构造函数歧义会导致*自动装配*复杂性的增加。
 
-如果你还记得，我们已经在[第8章](795befd2-857f-40d2-ba05-cb2921168bcc.xhtml)中讨论了局部默认值，*模式 - 依赖注入*。处理局部默认值的最简单方法就是引入*属性注入*。默认构造函数可以被转换为一个可写属性。
+如果你还记得，我们已经在第八章中讨论了局部默认值，*模式 - 依赖注入*。处理局部默认值的最简单方法就是引入*属性注入*。默认构造函数可以被转换为一个可写属性。
 
 # 约束构造
 
@@ -256,7 +419,16 @@
 
 现在你已经从`config`中获取了存储库类型名称，你必须使用该名称创建一个`System.Type`实例：
 
-[PRE16]
+```cs
+    var employeeRepositoryTypeName = "Read from config"; 
+      //SqlEmployeeRepository
+    var connectionString = "Read from config";
+
+    var employeeRepositoryType = Type.GetType(employeeRepositoryTypeName,
+         true);
+    var employeeRepository = Activator.CreateInstance(employeeRepositoryType,
+       connectionString);
+```
 
 `Activator.CreateInstance`用于调用给定类型的构造函数。此方法中的第二个参数传递给第一个参数中提供的类型的构造函数。
 
@@ -278,7 +450,7 @@
 
 在这种情况下，在类之间共享单个依赖项变得困难。将创建多个相同依赖项的实例，这是不必要的。这将消耗内存和资源。
 
-在设计时应该仔细选择特定依赖项的单个实例。如果没有妥善处理，可能会对在不同线程中运行的应用程序产生不利影响。如果您还记得，我们已经在 [第 6 章](72113d11-0af8-431f-91d0-ced4cb35af21.xhtml) 中讨论了 Singleton Lifetime，*对象生命周期*，我们讨论了该模式的优点和用法。
+在设计时应该仔细选择特定依赖项的单个实例。如果没有妥善处理，可能会对在不同线程中运行的应用程序产生不利影响。如果您还记得，我们已经在 第六章 中讨论了 Singleton Lifetime，*对象生命周期*，我们讨论了该模式的优点和用法。
 
 可以将某人视为一个工厂，这是我们接下来将要探讨的。
 
@@ -294,7 +466,14 @@ DI 容器在组合根处提供帮助，以克服这些困难并一次性解决�
 
 我们将设计一个名为 `EmployeeServiceFactory` 的工厂，该工厂实现 `IEmployeeServiceFactory` 并使用特定的存储库。这个工厂将负责创建服务。`Service` 可能看起来像以下这样：
 
-[PRE17]
+```cs
+    public class EmployeeService : IEmployeeService
+    {
+      public EmployeeService(IEmployeeRepository repository)
+      {
+      }
+    }
+```
 
 `EmployeeServiceFactory` 包含一个 `CreateService()` 方法来创建它所负责的服务（在本例中为 `EmployeeService`）。
 
@@ -302,7 +481,11 @@ DI 容器在组合根处提供帮助，以克服这些困难并一次性解决�
 
 你可以在`.config`文件中存储工厂的合格类型名称。然后可以使用`Activator.CreateInstance`来创建`IEmployeeServiceFactory`实现（你将在配置中定义）的实例，因为它有一个默认构造函数：
 
-[PRE18]
+```cs
+    var employeeFactoryTypeName = "Read from config";
+    var employeeFactoryType = Type.GetType(employeeFactoryTypeName, true);
+    var employeeFactory = Activator.CreateInstance(employeeFactoryType);
+```
 
 现在有了`employeeFactory`，你可以调用`CreateService()`，这将通过相关的存储库`EmployeeRepository`返回`EmployeeService`实例。
 
@@ -328,7 +511,7 @@ DI 容器在组合根处提供帮助，以克服这些困难并一次性解决�
 
 +   服务定位器的配置可以通过代码或读取相关的配置设置来管理
 
-依赖注入容器看起来像*服务定位器*。在DI上下文中，定位器或容器的主要职责是在其他操作开始之前解决依赖图。理想情况下，解决图应该只在组合根处发生，以实现正确的实现。问题开始于你直接在应用程序中使用定位器或容器请求依赖项或服务，而不是将它们注入到消费者中。在这种情况下，定位器将被标记为反模式。
+依赖注入容器看起来像*服务定位器*。在 DI 上下文中，定位器或容器的主要职责是在其他操作开始之前解决依赖图。理想情况下，解决图应该只在组合根处发生，以实现正确的实现。问题开始于你直接在应用程序中使用定位器或容器请求依赖项或服务，而不是将它们注入到消费者中。在这种情况下，定位器将被标记为反模式。
 
 定位器过程可以定义为如下：
 
@@ -342,11 +525,39 @@ DI 容器在组合根处提供帮助，以克服这些困难并一次性解决�
 
 一个简单的服务定位器可能类似于以下类：
 
-[PRE19]
+```cs
+    public static class ServiceLocator
+    {
+      static Dictionary<Type, object> servicesDictionary = 
+        new Dictionary<Type, object>();
+      public static void Register<T>(T service)
+      {
+         servicesDictionary[typeof(T)] = service;
+      }
+       public static T GetService<T>()
+       {
+         T instance = default(T);
+         if (servicesDictionary.ContainsKey(typeof(T)) == true)
+         {
+            instance = (T)servicesDictionary[typeof(T)];
+         }
+         return instance;
+       }
+    }
+```
 
 `Register`方法将服务存储在字典中，`GetService`方法返回。我们可以使用定位器来获取特定类型的实例：
 
-[PRE20]
+```cs
+    public class EmployeeService : IEmployeeService
+    {
+      private readonly IEmployeeRepository repository;
+      public EmployeeService()
+      {
+        this.repository = ServiceLocator.GetService<IEmployeeRepository>();
+      }
+     } 
+```
 
 如果你已经使用`Register`方法预先注册了服务，那么你可以从字典中获取它。
 
@@ -372,21 +583,23 @@ DI 容器在组合根处提供帮助，以克服这些困难并一次性解决�
 
 ![](img/a995e4f8-b337-47e6-9b84-2d9a7e91033c.png)
 
-`EmployeeService`现在依赖于`EmployeeRepository`和`ServiceLocator`。理想情况下，它应该只依赖于存储库来遵循DI原则。
+`EmployeeService`现在依赖于`EmployeeRepository`和`ServiceLocator`。理想情况下，它应该只依赖于存储库来遵循 DI 原则。
 
 由于这两个依赖项都存在，如果有人想要重用`EmployeeService`，那么他们必须引用这两个依赖项。如果`ServiceLocator`位于不同的程序集，那么还需要程序集引用，这会导致一个非常低效的设计。如果你说我这是一个紧密耦合的架构，你一定会同意我的观点。
 
-此外，服务的消费者在实例化服务时无法识别依赖关系。这是因为定位器在构造函数或方法内部使用，而不是像DI策略那样公开：
+此外，服务的消费者在实例化服务时无法识别依赖关系。这是因为定位器在构造函数或方法内部使用，而不是像 DI 策略那样公开：
 
-[PRE21]
+```cs
+    var empService = new EmployeeService();
+```
 
 现在你可能会争辩，开发者为什么要试图了解内部的内容，因为依赖关系是在默认构造函数内部处理的吗？但是如果你忘记将依赖关系注册到定位器中会发生什么？不要说你不会忘记。很可能发生这种情况，因为在你实例化类的时候，依赖关系的存在并不能通过构造函数来明确。因此，如果类没有告诉你它依赖于什么，你在寻找和注册它时就不会那么小心，这可能会导致意外的异常。
 
 我知道你现在在想什么；显然，服务是一种控制狂，不是吗？它正在使用定位器来控制依赖项。
 
-需求类（needy class）指的是依赖于他人的类。它不再遵循DI，因为依赖项不是注入的；而是从定位器的`static`字典中获取的。
+需求类（needy class）指的是依赖于他人的类。它不再遵循 DI，因为依赖项不是注入的；而是从定位器的`static`字典中获取的。
 
-另一个问题是在开发者想要向已经采用定位器模式的类添加更多依赖项时可以清楚地识别出来。您要么遵循相同的原理引入更多依赖项，要么移除服务定位器模式并实现DI。在这两种情况下，编译错误是肯定的。
+另一个问题是在开发者想要向已经采用定位器模式的类添加更多依赖项时可以清楚地识别出来。您要么遵循相同的原理引入更多依赖项，要么移除服务定位器模式并实现 DI。在这两种情况下，编译错误是肯定的。
 
 由于所有上述原因，服务定位器被认为是一种反模式。让我们谈谈解决这种反模式的稳健解决方案。
 
@@ -396,7 +609,7 @@ DI 容器在组合根处提供帮助，以克服这些困难并一次性解决�
 
 # 重构步骤
 
-在大多数情况下，定位器（Locator）在代码库的各个地方被用来获取依赖项的实例。按照以下步骤重构它以实现DI：
+在大多数情况下，定位器（Locator）在代码库的各个地方被用来获取依赖项的实例。按照以下步骤重构它以实现 DI：
 
 1.  识别代码库中所有的定位器（Locator）调用。
 
@@ -414,19 +627,28 @@ DI 容器在组合根处提供帮助，以克服这些困难并一次性解决�
 
 经过所有这些步骤后，使用构造函数注入模式（Constructor Injection Pattern）的相同`EmployeeService`可以被设计出来，如下所示：
 
-[PRE22]
+```cs
+    public class EmployeeService : IEmployeeService
+    {
+      private readonly IEmployeeRepository repository;
+      public EmployeeService(IEmployeeRepository repository)
+      {
+        this.repository = repository;
+      }
+    }
+```
 
 现在服务要求其消费者提供一个`IEmployeeRepository`实现的依赖项，之前并没有发生这种情况。
 
 # 摘要
 
-最后一章介绍了实现依赖注入（DI）的方法。当我们没有正确实现模式时，我们的应用程序设计就会变得糟糕。我们了解到了在实现DI过程中经常犯的错误。
+最后一章介绍了实现依赖注入（DI）的方法。当我们没有正确实现模式时，我们的应用程序设计就会变得糟糕。我们了解到了在实现 DI 过程中经常犯的错误。
 
-在继续讨论DI反模式之前，我们讨论了为什么以及何时我们可以将DI本身视为反模式！
+在继续讨论 DI 反模式之前，我们讨论了为什么以及何时我们可以将 DI 本身视为反模式！
 
 然后我们继续前进，讨论了所有由对依赖注入（Dependency Injection）的误解引起的常见反模式。我们探讨了控制狂（Control Freak）、糟糕的注入（Bastard Injection）、约束构造（Constrained Construction）和（最重要的）服务定位器（Service Locator）。
 
-控制狂（Control Freak）是最容易发现的。每当您看到任何类使用`new`关键字来实例化其依赖项时，这意味着它试图在没有外部模块控制的情况下管理它们。这是不好的，在DI生态系统中应该避免这样做。
+控制狂（Control Freak）是最容易发现的。每当您看到任何类使用`new`关键字来实例化其依赖项时，这意味着它试图在没有外部模块控制的情况下管理它们。这是不好的，在 DI 生态系统中应该避免这样做。
 
 这是其中最危险的一个，我们在重构时应该首先解决。其他模式比这个危害小，因为它对松耦合有直接影响。组合根（Composition Root）应该是实例化应用程序所需的一切的地方，然后通过注入，所有可能的依赖项都将可用。
 

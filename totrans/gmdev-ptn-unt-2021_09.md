@@ -18,11 +18,11 @@
 
 # 技术要求
 
-下一章是实践性的，因此你需要对Unity和C#有基本的了解。
+下一章是实践性的，因此你需要对 Unity 和 C#有基本的了解。
 
-本章的代码文件可以在GitHub上找到：[https://github.com/PacktPublishing/Game-Development-Patterns-with-Unity-2021-Second-Edition/tree/main/Assets/Chapters/Chapter07](https://github.com/PacktPublishing/Game-Development-Patterns-with-Unity-2021-Second-Edition/tree/main/Assets/Chapters/Chapter07)。
+本章的代码文件可以在 GitHub 上找到：[`github.com/PacktPublishing/Game-Development-Patterns-with-Unity-2021-Second-Edition/tree/main/Assets/Chapters/Chapter07`](https://github.com/PacktPublishing/Game-Development-Patterns-with-Unity-2021-Second-Edition/tree/main/Assets/Chapters/Chapter07)。
 
-查看以下视频以查看代码的实际运行效果：[https://bit.ly/3wAWYpb](https://bit.ly/3wAWYpb)[.](https://bit.ly/3wAWYpb)
+查看以下视频以查看代码的实际运行效果：[`bit.ly/3wAWYpb`](https://bit.ly/3wAWYpb)[.](https://bit.ly/3wAWYpb)
 
 # 理解命令模式
 
@@ -30,13 +30,49 @@
 
 以下非常简化的伪代码总结了我们的想法：
 
-[PRE0]
+```cs
+using UnityEngine;
+using System.Collections;
+
+public class InputHandler : MonoBehaviour
+{
+    void Update()
+    {
+        if (Input.GetKeyDown("space"))
+        {
+            CharacterController.Jump();
+        }
+    }
+}
+```
 
 如我们所见，这种方法可以完成任务，但如果我们要在以后的时间记录、撤销或回放玩家的输入，可能会变得复杂。然而，命令模式允许我们将调用操作的对象与知道如何执行它的对象解耦。换句话说，我们的`InputHandler`不需要知道当玩家按下空格键时需要采取什么具体动作。它只需要确保执行正确的*命令*，并让命令模式机制在幕后施展其魔法。
 
 以下伪代码显示了当我们使用命令模式时，我们实现`InputHandler`的方式的差异：
 
-[PRE1]
+```cs
+using UnityEngine;
+using System.Collections;
+
+public class InputHandler : MonoBehaviour
+{
+    [SerializedField]
+    private Controller _characterController;
+
+    private Command _spaceButton;
+
+    void Start()
+    {
+        _spaceButton = new JumpCommand();
+    }
+
+    void Update()
+    {
+        if (Input.GetKeyDown("space"))
+            _spaceButton.Execute(_characterController);
+    }
+}
+```
 
 如我们所见，当玩家按下空格键时，我们并不是直接调用 `CharacterController`。我们实际上是将执行跳跃动作所需的所有信息封装到一个对象中，我们可以将其放入队列并在稍后重新调用。
 
@@ -94,7 +130,7 @@
 
 +   **确定性**：我们游戏中的所有内容都是确定性的，这意味着我们没有具有随机行为的实体，这使得我们的重放系统更容易实现，因为我们不必担心记录场景中移动的实体（如敌机）的位置或状态。我们知道它们在重放序列中将以相同的方式移动和表现。
 
-+   **物理**：我们尽量减少使用Unity引擎的物理特性，因为我们的实体运动不由任何物理属性或交互决定。因此，我们不必担心物体碰撞时出现意外行为。
++   **物理**：我们尽量减少使用 Unity 引擎的物理特性，因为我们的实体运动不由任何物理属性或交互决定。因此，我们不必担心物体碰撞时出现意外行为。
 
 +   **数字**：我们所有的输入都是数字的，所以我们不会费心去捕捉或处理来自摇杆或触发按钮的细粒度模拟输入数据。
 
@@ -106,7 +142,7 @@
 
 ![图片](img/3a1df14e-86fb-485c-b8de-c79880fb233f.png)
 
-图7.2 – 重放系统的示意图
+图 7.2 – 重放系统的示意图
 
 如图中所示，`InputRecorder` 记录并序列化输入，以便 `ReplaySystem` 可以稍后回放它们。在回放序列中，`ReplaySystem` 的行为类似于机器人，因为它控制自行车并通过回放玩家的输入来自动操纵它。这是一种简单的自动化形式，给人一种我们在观看回放视频的错觉。
 
@@ -124,21 +160,80 @@
 
 1.  首先，我们正在实现一个名为 `Command` 的基抽象类，它有一个名为 `Execute()` 的单一方法：
 
-[PRE2]
+```cs
+public abstract class Command
+{
+    public abstract void Execute();
+}
+```
 
 1.  现在我们将编写三个具体的命令类，它们将派生自 `Command` 基类，然后我们将实现 `Execute()` 方法。每个类封装了一个要执行的操作。
 
 第一个操作是在 `BikeController` 上打开涡轮增压：
 
-[PRE3]
+```cs
+namespace Chapter.Command
+{
+    public class ToggleTurbo : Command
+    {
+        private BikeController _controller;
+
+        public ToggleTurbo(BikeController controller)
+        {
+            _controller = controller;
+        }
+
+        public override void Execute()
+        {
+            _controller.ToggleTurbo();
+        }
+    }
+}
+```
 
 1.  以下两个命令是 `TurnLeft` 和 `TurnRight` 命令。每个命令代表不同的动作，并映射到特定的输入键，正如我们将在实现 `InputHandler` 时看到的那样：
 
-[PRE4]
+```cs
+namespace Chapter.Command
+{
+    public class TurnLeft : Command
+    {
+        private BikeController _controller;
+
+        public TurnLeft(BikeController controller)
+        {
+            _controller = controller;
+        }
+
+        public override void Execute()
+        {
+            _controller.Turn(BikeController.Direction.Left);
+        }
+    }
+}
+```
 
 1.  以下命令表示右转动作，正如其名称所暗示的，这将自行车转向右边：
 
-[PRE5]
+```cs
+namespace Chapter.Command
+{
+    public class TurnRight : Command
+    {
+        private BikeController _controller;
+
+        public TurnRight(BikeController controller)
+        {
+            _controller = controller;
+        }
+
+        public override void Execute()
+        {
+            _controller.Turn(BikeController.Direction.Right);
+        }
+    }
+}
+```
 
 现在我们已经将每个命令封装到单独的类中，是时候编写使我们的回放系统工作的关键成分了——`Invoker`。
 
@@ -146,19 +241,93 @@
 
 1.  因为这个类非常长，我们将分两部分来审查。以下是一部分：
 
-[PRE6]
+```cs
+using UnityEngine;
+using System.Linq;
+using System.Collections.Generic;
+
+namespace Chapter.Command
+{
+    class Invoker : MonoBehaviour
+    {
+        private bool _isRecording;
+        private bool _isReplaying;
+        private float _replayTime;
+        private float _recordingTime;
+        private SortedList<float, Command> _recordedCommands = 
+            new SortedList<float, Command>();
+
+        public void ExecuteCommand(Command command)
+        {
+            command.Execute();
+
+            if (_isRecording) 
+                _recordedCommands.Add(_recordingTime, command);
+
+            Debug.Log("Recorded Time: " + _recordingTime);
+            Debug.Log("Recorded Command: " + command);
+        }
+
+        public void Record()
+        {
+            _recordingTime = 0.0f;
+            _isRecording = true;
+        }
+```
 
 在 `Invoker` 类的这一部分，每次 `Invoker` 执行一个新的命令时，我们都会将其添加到 `_recordedCommands` 排序列表中。然而，我们只在开始录制时这样做，因为我们希望在特定的时刻记录玩家输入，例如在比赛开始时。
 
 1.  对于 `Invoker` 类的下一部分，我们将实现回放行为：
 
-[PRE7]
+```cs
+        public void Replay()
+        {
+            _replayTime = 0.0f;
+            _isReplaying = true;
+
+            if (_recordedCommands.Count <= 0)
+                Debug.LogError("No commands to replay!");
+
+            _recordedCommands.Reverse();
+        }
+
+        void FixedUpdate()
+        {
+            if (_isRecording) 
+                _recordingTime += Time.fixedDeltaTime;
+
+            if (_isReplaying)
+            {
+                _replayTime += Time.deltaTime;
+
+                if (_recordedCommands.Any()) 
+                {
+                    if (Mathf.Approximately(
+                        _replayTime, _recordedCommands.Keys[0])) {
+
+                        Debug.Log("Replay Time: " + _replayTime);
+                        Debug.Log("Replay Command: " + 
+                                  _recordedCommands.Values[0]);
+
+                        _recordedCommands.Values[0].Execute();
+                        _recordedCommands.RemoveAt(0);
+                    }
+                }
+                else
+                {
+                    _isReplaying = false;
+                }
+            }
+        }
+    }
+}
+```
 
 如您可能已经注意到的，我们正在使用`FixedUpdate()`来记录和回放命令。这可能会显得有些奇怪，因为我们通常使用`Update()`来监听玩家输入。然而，`FixedUpdate()`具有在固定时间步长中运行的优点，这对于时间依赖但帧率无关的任务非常有帮助。
 
-因此，我们知道默认的引擎时间步长是0.02秒，并且我们的时间戳将以类似的增量增加，因为我们使用`Time.fixedDeltaTime`来记录执行命令的时间。
+因此，我们知道默认的引擎时间步长是 0.02 秒，并且我们的时间戳将以类似的增量增加，因为我们使用`Time.fixedDeltaTime`来记录执行命令的时间。
 
-然而，这也意味着我们在记录阶段会失去精度，因为我们的时间戳受限于Unity的时间步长设置。在这个例子中，这种精度损失是可以容忍的。然而，如果游戏玩法和回放序列之间存在重大不一致，这可能会成为一个问题。
+然而，这也意味着我们在记录阶段会失去精度，因为我们的时间戳受限于 Unity 的时间步长设置。在这个例子中，这种精度损失是可以容忍的。然而，如果游戏玩法和回放序列之间存在重大不一致，这可能会成为一个问题。
 
 在这种情况下，我们可能需要考虑一个包括`Update()`、`Time.deltaTime`以及允许我们设置比较记录和回放时间精度程度的值的解决方案。然而，这超出了本章的范围。
 
@@ -170,7 +339,44 @@
 
 1.  我们将要实现的第一类是`InputHandler`。其主要职责是监听玩家的输入并调用适当的命令。然而，由于其长度，我们将分两部分来审查它：
 
-[PRE8]
+```cs
+using UnityEngine;
+
+namespace Chapter.Command
+{
+    public class InputHandler : MonoBehaviour
+    {
+        private Invoker _invoker;
+        private bool _isReplaying;
+        private bool _isRecording;
+        private BikeController _bikeController;
+        private Command _buttonA, _buttonD, _buttonW;
+
+        void Start()
+        {
+            _invoker = gameObject.AddComponent<Invoker>();
+            _bikeController = FindObjectOfType<BikeController>();
+
+            _buttonA = new TurnLeft(_bikeController);
+            _buttonD = new TurnRight(_bikeController);
+            _buttonW = new ToggleTurbo(_bikeController);
+        }
+
+        void Update()
+        {
+            if (!_isReplaying && _isRecording)
+            {
+                if (Input.GetKeyUp(KeyCode.A)) 
+                    _invoker.ExecuteCommand(_buttonA);
+
+                if (Input.GetKeyUp(KeyCode.D)) 
+                    _invoker.ExecuteCommand(_buttonD);
+
+                if (Input.GetKeyUp(KeyCode.W)) 
+                    _invoker.ExecuteCommand(_buttonW);
+            }
+        }
+```
 
 在这个类的这个部分，我们初始化我们的命令并将它们映射到特定的输入。请注意，我们在命令的构造函数中传递了一个`BikeController`的实例。`InputHandler`只知道`BikeController`的存在，但不需要了解其功能。根据所需操作，调用自行车控制器的适当公共方法是个别命令类的责任。在`Update()`循环中，我们监听特定的按键输入，并调用`Invoker`执行与特定输入关联的命令。
 
@@ -178,11 +384,76 @@
 
 1.  对于 `InputHandler` 类的最后一部分，我们添加了一些 GUI 调试按钮，这将帮助我们测试回放系统。此段代码仅用于调试和测试目的：
 
-[PRE9]
+```cs
+        void OnGUI()
+        {
+            if (GUILayout.Button("Start Recording"))
+            {
+                _bikeController.ResetPosition();
+                _isReplaying = false;
+                _isRecording = true;
+                _invoker.Record();
+            }
+
+            if (GUILayout.Button("Stop Recording"))
+            {
+                _bikeController.ResetPosition();
+                _isRecording = false;
+            }
+
+            if (!_isRecording)
+            {
+                if (GUILayout.Button("Start Replay"))
+                {
+                    _bikeController.ResetPosition();
+                    _isRecording = false;
+                    _isReplaying = true;
+                    _invoker.Replay();
+                }
+            }
+        }
+    }
+}
+```
 
 1.  对于我们的最终类，我们将实现 `BikeController` 类的骨架版本以供测试。在命令模式的上下文中，它充当接收者：
 
-[PRE10]
+```cs
+using UnityEngine;
+
+public class BikeController : MonoBehaviour
+{
+    public enum Direction
+    {
+        Left = -1,
+        Right = 1
+    }
+
+    private bool _isTurboOn;
+    private float _distance = 1.0f;
+
+    public void ToggleTurbo()
+    {
+        _isTurboOn = !_isTurboOn;
+        Debug.Log("Turbo Active: " + _isTurboOn.ToString());
+    }
+
+    public void Turn(Direction direction)
+    {
+        if (direction == Direction.Left) 
+            transform.Translate(Vector3.left * _distance);
+
+        if (direction == Direction.Right)
+            transform.Translate(Vector3.right * _distance);
+    }
+
+    public void ResetPosition()
+    {
+        transform.position = new Vector3(0.0f, 0.0f, 0.0f);
+    }
+}
+
+```
 
 类的总体目的和结构是显而易见的。`ToggleTurbo()` 和 `Turn()` 是被命令类调用的公共方法。然而，`ResetPosition()` 仅用于调试和测试目的，可以忽略。
 
@@ -220,8 +491,8 @@
 
 # 摘要
 
-在本章中，我们通过使用命令模式实现了一个简单但功能性的回放系统。我们编写本章的目标不是展示如何构建一个健壮的回放系统，而是展示如何使用命令模式在Unity中创建可能对游戏项目有用的东西。
+在本章中，我们通过使用命令模式实现了一个简单但功能性的回放系统。我们编写本章的目标不是展示如何构建一个健壮的回放系统，而是展示如何使用命令模式在 Unity 中创建可能对游戏项目有用的东西。
 
-我希望你会研究实现命令模式的替代方法，这些方法可能比本书中展示的更好，因为，就像编程中的大多数事情一样，没有一种唯一的方法来做事情。然而，至少这一章提供了使用Unity中的命令模式的第一种方法。
+我希望你会研究实现命令模式的替代方法，这些方法可能比本书中展示的更好，因为，就像编程中的大多数事情一样，没有一种唯一的方法来做事情。然而，至少这一章提供了使用 Unity 中的命令模式的第一种方法。
 
 在本书的下一部分，我们将开始使用对象池来优化我们的代码。一款优秀的赛车游戏的一个重要方面是保持一致的性能和帧率。每一刻都必须运行顺畅，否则可能会让我们的游戏感觉缓慢和笨拙。

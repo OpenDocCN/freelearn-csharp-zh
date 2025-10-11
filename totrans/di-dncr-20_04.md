@@ -1,34 +1,34 @@
-# ASP.NET Core中的依赖注入。
+# ASP.NET Core 中的依赖注入。
 
-在[第3章](087ee78f-87f2-49ef-bfca-ae04dfa47880.xhtml)“介绍.NET Core 2.0中的依赖注入”，我们专注于.NET Core，分析了该平台在依赖注入方面的可能性以及实现它的不同方式。在本章中，我们将继续分析DI，但这次将专注于ASP.NET Core的实现以及当时为程序员提供的配置网站和其他相关功能的可能性，这些功能贯穿了整个生命周期。
+在第三章“介绍.NET Core 2.0 中的依赖注入”，我们专注于.NET Core，分析了该平台在依赖注入方面的可能性以及实现它的不同方式。在本章中，我们将继续分析 DI，但这次将专注于 ASP.NET Core 的实现以及当时为程序员提供的配置网站和其他相关功能的可能性，这些功能贯穿了整个生命周期。
 
-理念是从命令行工具（CLI）开始，看看如何修改控制台应用程序并将其转换为Web应用程序，这样你可以更好地理解中间件的概念以及它在ASP.NET Core中的使用方式。
+理念是从命令行工具（CLI）开始，看看如何修改控制台应用程序并将其转换为 Web 应用程序，这样你可以更好地理解中间件的概念以及它在 ASP.NET Core 中的使用方式。
 
-有了这些，我们将准备好分析Visual Studio 2017为ASP.NET Core应用程序提供的默认模板以及与DI相关的特定功能。
+有了这些，我们将准备好分析 Visual Studio 2017 为 ASP.NET Core 应用程序提供的默认模板以及与 DI 相关的特定功能。
 
 最后，我们将看看如何调整我们自己的服务以及如何通过依赖注入在注册选项、控制器和视图中使用它们。
 
 总的来说，在本章中，我们将涵盖以下主题：
 
-+   使用命令行工具构建ASP.NET Core应用程序。
++   使用命令行工具构建 ASP.NET Core 应用程序。
 
-+   ASP.NET Core的中间件架构。
++   ASP.NET Core 的中间件架构。
 
-+   分析Visual Studio提供的默认模板。
++   分析 Visual Studio 提供的默认模板。
 
-+   ASP.NET应用程序中DI的特性。定制服务。
++   ASP.NET 应用程序中 DI 的特性。定制服务。
 
-注意官方文档网站使用与Visual Studio 2017提供的模板相同的代码。你可以在[https://docs.microsoft.com/en-us/aspnet/core/tutorials/first-mvc-app/start-mvc](https://docs.microsoft.com/en-us/aspnet/core/tutorials/first-mvc-app/start-mvc)找到它。
+注意官方文档网站使用与 Visual Studio 2017 提供的模板相同的代码。你可以在[`docs.microsoft.com/en-us/aspnet/core/tutorials/first-mvc-app/start-mvc`](https://docs.microsoft.com/en-us/aspnet/core/tutorials/first-mvc-app/start-mvc)找到它。
 
-# 从命令行工具使用ASP.NET Core。
+# 从命令行工具使用 ASP.NET Core。
 
-一旦我们在我们的机器上安装了.NET Core并（如果需要）更新到2.0版本，我们就可以从头开始使用命令行工具启动一个非常简单但具有说明性的网站，并看看我们如何通过几个步骤将这个最小的.NET Core控制台应用程序转换为ASP.NET Core应用程序。
+一旦我们在我们的机器上安装了.NET Core 并（如果需要）更新到 2.0 版本，我们就可以从头开始使用命令行工具启动一个非常简单但具有说明性的网站，并看看我们如何通过几个步骤将这个最小的.NET Core 控制台应用程序转换为 ASP.NET Core 应用程序。
 
-这个过程将帮助你理解ASP.NET Core带来的架构上的深刻变化，以及我们看到的某些SOLID原则是如何以各种方式应用于实现这一目标的。
+这个过程将帮助你理解 ASP.NET Core 带来的架构上的深刻变化，以及我们看到的某些 SOLID 原则是如何以各种方式应用于实现这一目标的。
 
-因此，第一步应该是检查我们安装的.NET Core版本，我们可以在命令行窗口中这样做（记住Visual Studio 2017在Windows菜单中安装了几个指向这些窗口的链接，并且开发者命令提示符已经定义了环境变量以适应程序员的 主要需求）。
+因此，第一步应该是检查我们安装的.NET Core 版本，我们可以在命令行窗口中这样做（记住 Visual Studio 2017 在 Windows 菜单中安装了几个指向这些窗口的链接，并且开发者命令提示符已经定义了环境变量以适应程序员的 主要需求）。
 
-如果你还没有安装.NET Core命令行工具，请记住你可以在命令行/其他部分中的网站[https://www.microsoft.com/net/download/core](https://www.microsoft.com/net/download/core)进行单独安装，这允许你下载所有当前支持版本的安装程序。运行安装程序时，它应该看起来如下：
+如果你还没有安装.NET Core 命令行工具，请记住你可以在命令行/其他部分中的网站[`www.microsoft.com/net/download/core`](https://www.microsoft.com/net/download/core)进行单独安装，这允许你下载所有当前支持版本的安装程序。运行安装程序时，它应该看起来如下：
 
 ![](img/b275b9f4-c822-417a-b523-a698ca3f9a57.png)
 
@@ -66,7 +66,15 @@
 
 我们的 `program.cs` 文件的内容如预期（与典型的控制台应用程序在经典 .NET Framework 中没有变化）：
 
-[PRE0]
+```cs
+    class Program 
+   { 
+      static void Main(string[] args) 
+      { 
+         Console.WriteLine("Hello World!"); 
+      } 
+   }  
+```
 
 但是，我们仍然需要下载依赖项，这是一个使用 `dotnet restore` 命令在所有其他选项之前执行的任务。发出该命令后，你会看到它下载所有必需的包，并且会出现一个新的 `obj` 目录。
 
@@ -74,7 +82,7 @@
 
 # 转换到 ASP .NET Core
 
-现在，要将我们的应用程序更改为ASP.NET Core应用程序，首先要做的事情是安装名为 `Microsoft.AspNetCore` 的包。我们可以通过发出 `dotnet add package Microsoft.AspNetCore` 命令来完成此操作。
+现在，要将我们的应用程序更改为 ASP.NET Core 应用程序，首先要做的事情是安装名为 `Microsoft.AspNetCore` 的包。我们可以通过发出 `dotnet add package Microsoft.AspNetCore` 命令来完成此操作。
 
 当我们这样做时，命令行工具将下载适当的包并相应地修改我们的 `.csproj` 文件，因此它也被包含在我们的解决方案中（在发出命令后查看 `csproj` 的新版本）：
 
@@ -86,37 +94,80 @@
 
 在那个文件中，我们将引用创建网站所需的三个额外命名空间（尽管是一个基本的网站）：
 
-+   `Microsoft.AspNetCore.Builder`：使用我们定义的 `config` 参数实际构建Web服务器
++   `Microsoft.AspNetCore.Builder`：使用我们定义的 `config` 参数实际构建 Web 服务器
 
-+   `Microsoft.AspNetCore.Hosting`：用于持有Web应用程序
++   `Microsoft.AspNetCore.Hosting`：用于持有 Web 应用程序
 
-+   `Microsoft.AspNetCore.Http`：用于所有HTTP相关活动
++   `Microsoft.AspNetCore.Http`：用于所有 HTTP 相关活动
 
 有这些引用后，我们需要添加一个名为 `Configure` 的方法（这是通过约定），我们将指示服务器启动时需要执行的最小操作。
 
 在这里，我们将开始看到依赖注入（DI）的实际应用，因为这个非常基本的方法的形状如下：
 
-[PRE1]
+```cs
+    using Microsoft.AspNetCore.Builder; 
+    using Microsoft.AspNetCore.Hosting; 
+    using Microsoft.AspNetCore.Http; 
+
+    namespace WebApplication1 
+    { 
+      public class Startup 
+      { 
+        public void Configure(IApplicationBuilder app, 
+            IHostingEnvironment env) 
+        { 
+          if (env.IsDevelopment()) 
+          { 
+            app.UseDeveloperExceptionPage(); 
+          } 
+          app.Run(async (context) => 
+          { 
+            await context.Response.WriteAsync("This is a first
+                  web app..."); 
+          }); 
+        } 
+      } 
+    } 
+```
 
 但是，在我们开始解释该文件的内部细节之前，让我们确保它能够正确编译，并且将我们的应用程序重定向到新的网站。
 
-因此，我们将发出另一个 `dotnet restore` 命令，以便所有新的引用都正确定位，下一步将是修改我们的主入口点，创建一个新的使用刚刚创建的 `Startup` 类的Web宿主。
+因此，我们将发出另一个 `dotnet restore` 命令，以便所有新的引用都正确定位，下一步将是修改我们的主入口点，创建一个新的使用刚刚创建的 `Startup` 类的 Web 宿主。
 
 为了这个目的，新的 `Main()` 入口点将使用对 `Microsoft.AspNetCore.Hosting` 命名空间的引用，并定义以下内容：
 
-[PRE2]
+```cs
+    using Microsoft.AspNetCore; 
+    using Microsoft.AspNetCore.Hosting; 
 
-最后，我们可以重复执行 `dotnet run` 命令，我们将看到两个不同的输出。在一侧的CLI环境中，我们将生成一个Web宿主并运行它（默认情况下，使用端口号 `5000`），在控制台输出中指示：
+    namespace WebApplication1 
+    { 
+      public class Program 
+      { 
+        public static void Main(string[] args) 
+        { 
+            BuildWebHost(args).Run(); 
+        } 
+
+        public static IWebHost BuildWebHost(string[] args) => 
+            WebHost.CreateDefaultBuilder(args) 
+                .UseStartup<Startup>() 
+                .Build(); 
+      } 
+    } 
+```
+
+最后，我们可以重复执行 `dotnet run` 命令，我们将看到两个不同的输出。在一侧的 CLI 环境中，我们将生成一个 Web 宿主并运行它（默认情况下，使用端口号 `5000`），在控制台输出中指示：
 
 ![图片](img/af29f757-4ed4-4201-85d3-1a87a2859dea.png)
 
-该宿主将持续运行并监听该端口，直到我们使用 *Ctrl* + *C* 停止它。现在，我们可以打开浏览器并输入URL以查看以下页面：
+该宿主将持续运行并监听该端口，直到我们使用 *Ctrl* + *C* 停止它。现在，我们可以打开浏览器并输入 URL 以查看以下页面：
 
 ![图片](img/e08ab7b6-8bbb-41a9-b255-a85a7d515ce5.png)
 
-当然，那个页面不包含任何HTML，只有我们命令服务器在接收到该端口的请求时发送给用户的文本。如果你想检查这一点，请查看源代码。
+当然，那个页面不包含任何 HTML，只有我们命令服务器在接收到该端口的请求时发送给用户的文本。如果你想检查这一点，请查看源代码。
 
-但是，在我们继续解释前面的代码之前，理解中间件的概念非常重要，它从ASP.NET Core一开始就存在。
+但是，在我们继续解释前面的代码之前，理解中间件的概念非常重要，它从 ASP.NET Core 一开始就存在。
 
 # 中间件
 
@@ -160,7 +211,7 @@
 
 ![](img/c606338c-ce7b-447d-8d4c-ad99ecd6ffad.png)
 
-（图片来源：[http://developer.telerik.com/featured/understanding-asp-net-core-initialization/](http://developer.telerik.com/featured/understanding-asp-net-core-initialization/))
+（图片来源：[`developer.telerik.com/featured/understanding-asp-net-core-initialization/`](http://developer.telerik.com/featured/understanding-asp-net-core-initialization/))
 
 在进一步进行演示之前，让我们更详细地解释之前的代码。
 
@@ -196,125 +247,179 @@
 
 此外，`Map*`方法族允许分支管道，执行返回该点的调用并相应地扩展功能。
 
-# 新的ASP.NET服务器
+# 新的 ASP.NET 服务器
 
-让我们快速回顾一下在为ASP.NET Core编程时使用的服务器的一些重要方面，因为这是与这个新平台相关的主要变化之一。
+让我们快速回顾一下在为 ASP.NET Core 编程时使用的服务器的一些重要方面，因为这是与这个新平台相关的主要变化之一。
 
-首先，一个ASP.NET Core应用程序运行一个进程内的HTTP服务器实现。该实现正在监听HTTP请求，并将这些请求发送到名为`HttpContext`的对象中，该对象包含一组组合到其中的功能。
+首先，一个 ASP.NET Core 应用程序运行一个进程内的 HTTP 服务器实现。该实现正在监听 HTTP 请求，并将这些请求发送到名为`HttpContext`的对象中，该对象包含一组组合到其中的功能。
 
-这个版本的ASP.NET提供了两种不同的服务器实现：`Kestrel`和`WebListener`。正如官方文档提醒我们的：
+这个版本的 ASP.NET 提供了两种不同的服务器实现：`Kestrel`和`WebListener`。正如官方文档提醒我们的：
 
 # Kestrel
 
-`Kestrel`是一个基于`libuv`的跨平台HTTP服务器，`libuv`是一个跨平台的异步I/O库：
+`Kestrel`是一个基于`libuv`的跨平台 HTTP 服务器，`libuv`是一个跨平台的异步 I/O 库：
 
-`libuv`被定义为一种多平台支持库，专注于异步I/O。它最初是为Node.js开发的，但也被Luvit、Julia、pyuv和其他使用。
+`libuv`被定义为一种多平台支持库，专注于异步 I/O。它最初是为 Node.js 开发的，但也被 Luvit、Julia、pyuv 和其他使用。
 
-Kestrel是包含在ASP.NET项目模板中的默认Web服务器。优点是，如果您的应用程序仅从内部网络接受请求，则可以单独使用它。
+Kestrel 是包含在 ASP.NET 项目模板中的默认 Web 服务器。优点是，如果您的应用程序仅从内部网络接受请求，则可以单独使用它。
 
-这是Kestrel默认场景的工作方案：
+这是 Kestrel 默认场景的工作方案：
 
 ![](img/eda9b927-3790-45fd-b410-dad0faef0c7a.png)
 
-（图片来源：[https://docs.microsoft.com/en-us/aspnet/core/fundamentals/servers/](https://docs.microsoft.com/en-us/aspnet/core/fundamentals/servers/))
+（图片来源：[`docs.microsoft.com/en-us/aspnet/core/fundamentals/servers/`](https://docs.microsoft.com/en-us/aspnet/core/fundamentals/servers/))
 
-然而，如果您将应用程序暴露给互联网，将存在一些Kestrel未准备好应对的安全问题（它相对较新，并且还没有整个所需的安全资源集）。对于这些情况，建议的配置是使用反向代理服务器，例如IIS、Apache或Nginx，以提供功能。
+然而，如果您将应用程序暴露给互联网，将存在一些 Kestrel 未准备好应对的安全问题（它相对较新，并且还没有整个所需的安全资源集）。对于这些情况，建议的配置是使用反向代理服务器，例如 IIS、Apache 或 Nginx，以提供功能。
 
-注意，正如文档所述，反向代理服务器*从互联网接收HTTP请求，并在进行一些初步处理后将其转发到Kestrel*（请参阅以下截图）：
+注意，正如文档所述，反向代理服务器*从互联网接收 HTTP 请求，并在进行一些初步处理后将其转发到 Kestrel*（请参阅以下截图）：
 
 ![图片](img/bcbed41a-719b-4b2f-a69e-ef755a25a391.png)
 
-（图片来源：[https://docs.microsoft.com/en-us/aspnet/core/fundamentals/servers/](https://docs.microsoft.com/en-us/aspnet/core/fundamentals/servers/))
+（图片来源：[`docs.microsoft.com/en-us/aspnet/core/fundamentals/servers/`](https://docs.microsoft.com/en-us/aspnet/core/fundamentals/servers/))
 
-另一个重要的一点是，没有Kestrel或自定义服务器实现，您不能使用任何那些反向代理服务器。这是因为ASP.NET Core被设计为在其自己的进程中运行，以便它可以在各个平台上保持一致的行为。
+另一个重要的一点是，没有 Kestrel 或自定义服务器实现，您不能使用任何那些反向代理服务器。这是因为 ASP.NET Core 被设计为在其自己的进程中运行，以便它可以在各个平台上保持一致的行为。
 
-我们可能面临的问题是我们可能遇到的是IIS、Nginx和Apache规定了它们自己的启动过程和环境。结果是，为了直接使用它们，应该适应每个的要求。
+我们可能面临的问题是我们可能遇到的是 IIS、Nginx 和 Apache 规定了它们自己的启动过程和环境。结果是，为了直接使用它们，应该适应每个的要求。
 
-这样，Kestrel赋予了ASP.NET Core以任何所需形式编码`Program`和`Startup`类的功能，以满足用户的需求，同时避免对具体、特定服务器的另一个依赖。这也是中间件在这个环境中如此重要的原因之一。
+这样，Kestrel 赋予了 ASP.NET Core 以任何所需形式编码`Program`和`Startup`类的功能，以满足用户的需求，同时避免对具体、特定服务器的另一个依赖。这也是中间件在这个环境中如此重要的原因之一。
 
 # WebListener
 
-`WebListener`是一个基于`Http.Sys`内核驱动器的Windows专用HTTP服务器。它作为那些场景的替代方案，在这些场景中，将我们的应用程序暴露给互联网是强制性的，但我们不希望使用IIS，如果出于某种原因不能这样做的话。
+`WebListener`是一个基于`Http.Sys`内核驱动器的 Windows 专用 HTTP 服务器。它作为那些场景的替代方案，在这些场景中，将我们的应用程序暴露给互联网是强制性的，但我们不希望使用 IIS，如果出于某种原因不能这样做的话。
 
-以下架构表示WebListener在类似之前Kestrel所展示的场景中的角色：
+以下架构表示 WebListener 在类似之前 Kestrel 所展示的场景中的角色：
 
 ![图片](img/c4bb5714-625b-4f2c-ad9f-25e870db28dd.png)
 
-（图片来源：[https://docs.microsoft.com/en-us/aspnet/core/fundamentals/servers/](https://docs.microsoft.com/en-us/aspnet/core/fundamentals/servers/))
+（图片来源：[`docs.microsoft.com/en-us/aspnet/core/fundamentals/servers/`](https://docs.microsoft.com/en-us/aspnet/core/fundamentals/servers/))
 
-同样，如果您在内部网络中工作需要Kestrel不支持的一些功能，您可以使用WebListener进行相当类似的配置：
+同样，如果您在内部网络中工作需要 Kestrel 不支持的一些功能，您可以使用 WebListener 进行相当类似的配置：
 
 ![图片](img/7796eaba-9226-486a-822e-513f4c0a8157.png)
 
-（图片来源：[https://docs.microsoft.com/en-us/aspnet/core/fundamentals/servers/](https://docs.microsoft.com/en-us/aspnet/core/fundamentals/servers/))
+（图片来源：[`docs.microsoft.com/en-us/aspnet/core/fundamentals/servers/`](https://docs.microsoft.com/en-us/aspnet/core/fundamentals/servers/))
 
-最后，请记住，对于内部网络场景，Kestrel是推荐的，因为它提供了改进的性能。无论如何，如果您想了解更多关于WebListener提供的功能，官方文档可在[https://docs.microsoft.com/en-us/aspnet/core/fundamentals/servers/weblistener](https://docs.microsoft.com/en-us/aspnet/core/fundamentals/servers/weblistener)找到。
+最后，请记住，对于内部网络场景，Kestrel 是推荐的，因为它提供了改进的性能。无论如何，如果您想了解更多关于 WebListener 提供的功能，官方文档可在[`docs.microsoft.com/en-us/aspnet/core/fundamentals/servers/weblistener`](https://docs.microsoft.com/en-us/aspnet/core/fundamentals/servers/weblistener)找到。
 
 # 架构中的依赖倒置 - OWIN
 
-还有可能创建自己的服务器实现，以与ASP.NET Core一起工作。**.NET开放Web接口**（**OWIN**）是平台支持的第三种可能的实现。
+还有可能创建自己的服务器实现，以与 ASP.NET Core 一起工作。**.NET 开放 Web 接口**（**OWIN**）是平台支持的第三种可能的实现。
 
-在某些方面，OWIN的实现也与依赖倒置原则相关。其主要目标是使Web应用程序与Web服务器解耦。
+在某些方面，OWIN 的实现也与依赖倒置原则相关。其主要目标是使 Web 应用程序与 Web 服务器解耦。
 
 为了这个目的，它定义了创建中间件的标准方式，这些中间件可以在管道中使用，以配置和调整您的服务器。
 
 # 分析默认模板
 
-现在是时候打开Visual Studio 2017（或安装了ASP.NET Core的2015版本）并查看它，并解释默认模板是如何工作的。
+现在是时候打开 Visual Studio 2017（或安装了 ASP.NET Core 的 2015 版本）并查看它，并解释默认模板是如何工作的。
 
-记住，ASP.NET Core也可以使用经典的.NET Framework执行，因此，当你创建一个新的Web项目时，你最初会被要求在三个主要选项之间进行选择：经典ASP.NET、带有.NET Core的ASP.NET Core和带有经典.NET Framework的ASP.NET Core：
+记住，ASP.NET Core 也可以使用经典的.NET Framework 执行，因此，当你创建一个新的 Web 项目时，你最初会被要求在三个主要选项之间进行选择：经典 ASP.NET、带有.NET Core 的 ASP.NET Core 和带有经典.NET Framework 的 ASP.NET Core：
 
 ![图片](img/d5a62e2e-b436-405f-b72b-1ded0e64ec91.png)
 
-一旦选择，你将看到一个额外的选择窗口：空、Web API、Web应用程序、Web应用程序（模型-视图-控制器），以及为第三方库添加到2.0版本的一些新选项，包括Angular、React.js和React.js与Redux。
+一旦选择，你将看到一个额外的选择窗口：空、Web API、Web 应用程序、Web 应用程序（模型-视图-控制器），以及为第三方库添加到 2.0 版本的一些新选项，包括 Angular、React.js 和 React.js 与 Redux。
 
-在第一种情况下，我们现在使用的是创建一个具有最小配置的应用程序，以便能够使用Kestrel创建和运行一个Web服务器，并在浏览器中显示一些文本。它很简单，但允许我们更详细地了解它是如何完成的，并做出一些更改。
+在第一种情况下，我们现在使用的是创建一个具有最小配置的应用程序，以便能够使用 Kestrel 创建和运行一个 Web 服务器，并在浏览器中显示一些文本。它很简单，但允许我们更详细地了解它是如何完成的，并做出一些更改。
 
-其他三个（Web API、Web应用程序和Web App MVC）与经典ASP.NET中的对应项相似，不同之处在于它们使用新的架构和配置文件。这样，我们将能够更好地欣赏从旧架构迁移到新架构所需的迁移过程。
+其他三个（Web API、Web 应用程序和 Web App MVC）与经典 ASP.NET 中的对应项相似，不同之处在于它们使用新的架构和配置文件。这样，我们将能够更好地欣赏从旧架构迁移到新架构所需的迁移过程。
 
 你应该看到以下对话框：
 
 ![图片](img/ed226be6-21c8-4aae-b66f-e4f0e56055a2.png)
 
-注意，你也可以像以前版本一样更改身份验证，并且有一个复选框允许启用Docker支持。
+注意，你也可以像以前版本一样更改身份验证，并且有一个复选框允许启用 Docker 支持。
 
 结果项目比我们之前做的基本演示要复杂一些，尽管基本组件是相同的。然而，在配置方面有一些显著的变化。
 
 # 配置文件
 
-一旦编译了应用程序并激活了解决方案资源管理器中的“查看所有文件”选项，你将注意到一些额外的配置文件，它们负责一些任务，例如在默认URL上启动浏览器。这些选项定义在`Properties`目录中可用的`launchSettings.json`文件内。
+一旦编译了应用程序并激活了解决方案资源管理器中的“查看所有文件”选项，你将注意到一些额外的配置文件，它们负责一些任务，例如在默认 URL 上启动浏览器。这些选项定义在`Properties`目录中可用的`launchSettings.json`文件内。
 
 看一看也是相当说明性的：
 
-[PRE3]
+```cs
+    { 
+      "iisSettings": { 
+        "windowsAuthentication": false, 
+        "anonymousAuthentication": true, 
+        "iisExpress": { 
+          "applicationUrl": "http://localhost:57539/", 
+          "sslPort": 0 
+        } 
+      }, 
+      "profiles": { 
+        "IIS Express": { 
+          "commandName": "IISExpress", 
+          "launchBrowser": true, 
+          "environmentVariables": { 
+            "ASPNETCORE_ENVIRONMENT": "Development" 
+          } 
+        }, 
+        "ASPNETCoreDemo1": { 
+          "commandName": "Project", 
+          "launchBrowser": true, 
+          "environmentVariables": { 
+           "ASPNETCORE_ENVIRONMENT": "Development" 
+          }, 
+          "applicationUrl": "http://localhost:57540" 
+        } 
+      } 
+```
 
-如你所见，这里应用了三个主要的配置区域：`iisSettings`，用于指示IIS行为，包括要使用的URL，一个只包含一个`IISExpress`配置文件的`profiles`部分，表示应该启动一个浏览器，以及关于开发模式的提示，以及一个名为应用程序本身（`ASPNETCoreDemo1`）的最终配置，包含类似的信息。
+如你所见，这里应用了三个主要的配置区域：`iisSettings`，用于指示 IIS 行为，包括要使用的 URL，一个只包含一个`IISExpress`配置文件的`profiles`部分，表示应该启动一个浏览器，以及关于开发模式的提示，以及一个名为应用程序本身（`ASPNETCoreDemo1`）的最终配置，包含类似的信息。
 
 当然，如果你深入到`\bin`或`\obj`目录，你会看到更多，例如带有额外信息的`ASPNETCoreDemo1.runtimeconfig.json`。最后，如果你检查`.csproj`文件，你也会看到一些添加项：
 
-记住，在解决方案资源管理器的项目上下文菜单选项中，你现在有一个选项可以直接在Visual Studio 2017中打开它。
+记住，在解决方案资源管理器的项目上下文菜单选项中，你现在有一个选项可以直接在 Visual Studio 2017 中打开它。
 
-[PRE4]
+```cs
+     <Project Sdk="Microsoft.NET.Sdk.Web"> 
+     <PropertyGroup> 
+      <TargetFramework>netcoreapp1.1</TargetFramework> 
+     </PropertyGroup> 
 
-没有太多变化，但现在它表明了使用`wwwroot`文件夹，并添加了`ApplicationInsights`调用。显然，没有文件类型指示，因为默认情况下，编译的组件是一个DLL。
+     <ItemGroup> 
+      <Folder Include="wwwroot\" /> 
+    </ItemGroup> 
+    <ItemGroup> 
+      <PackageReference Include= "Microsoft.ApplicationInsights.AspNetCore" 
+           Version="2.0.0" /> 
+      <PackageReference Include="Microsoft.AspNetCore" Version="1.1.1" /> 
+    </ItemGroup> 
+    </Project> 
+```
+
+没有太多变化，但现在它表明了使用`wwwroot`文件夹，并添加了`ApplicationInsights`调用。显然，没有文件类型指示，因为默认情况下，编译的组件是一个 DLL。
 
 # 入口点
 
 让我们从`program.cs`开始。它的`main()`方法类似，但它包含新的中间件：
 
-[PRE5]
+```cs
+    public static void Main(string[] args)
+    {
+      var host = new WebHostBuilder()
+      .UseKestrel()
+      .UseContentRoot(Directory.GetCurrentDirectory())
+      .UseIISIntegration()
+      .UseStartup<Startup>()
+      .UseApplicationInsights()
+      .Build();
+      host.Run();
+    }
+```
 
 三大主要区别是：`UseContentRoot()`、`UseIISIntegration()`和`UseApplicationInsights()`。
 
 `UseContentRoot(Directory.GetCurrentDirectory())`表示，当用户请求物理资源时，将搜索该目录。默认情况下，它将指向`wwwroot`目录。
 
-`UseIISIntegration()`用于指示将使用IIS作为反向代理（如我们之前提到的），而`UseApplicationInsights()`则有助于监控和审计您的应用程序。
+`UseIISIntegration()`用于指示将使用 IIS 作为反向代理（如我们之前提到的），而`UseApplicationInsights()`则有助于监控和审计您的应用程序。
 
-正如官方文档所述（[https://github.com/Microsoft/ApplicationInsights-aspnetcore/wiki/Getting-Started-with-Application-Insights-for-ASP.NET-Core](https://github.com/Microsoft/ApplicationInsights-aspnetcore/wiki/Getting-Started-with-Application-Insights-for-ASP.NET-Core)），它允许我们使用Visual Studio Application Insights监控您的实时ASP.NET Core应用程序。Application Insights是一个可扩展的分析平台，它监控您的实时Web应用程序的性能和用法。通过您从应用程序在野外的性能和有效性获得的反馈，您可以在每个开发生命周期中做出明智的设计方向选择。
+正如官方文档所述（[`github.com/Microsoft/ApplicationInsights-aspnetcore/wiki/Getting-Started-with-Application-Insights-for-ASP.NET-Core`](https://github.com/Microsoft/ApplicationInsights-aspnetcore/wiki/Getting-Started-with-Application-Insights-for-ASP.NET-Core)），它允许我们使用 Visual Studio Application Insights 监控您的实时 ASP.NET Core 应用程序。Application Insights 是一个可扩展的分析平台，它监控您的实时 Web 应用程序的性能和用法。通过您从应用程序在野外的性能和有效性获得的反馈，您可以在每个开发生命周期中做出明智的设计方向选择。
 
-因此，我们有一个通过新的中间件加强的入口点，因此我们可以从开始使用DI。让我们看看`Startup`类（配置）中它做了什么。
+因此，我们有一个通过新的中间件加强的入口点，因此我们可以从开始使用 DI。让我们看看`Startup`类（配置）中它做了什么。
 
-# 默认的Startup类
+# 默认的 Startup 类
 
 首先要注意的是`ConfigureServices`的存在（即使它是空的）。如图所示，它允许向我们的管道添加不同的服务，并将它们存储在`services`集合中。这将是我们注册我们自己的服务的地方。
 
@@ -324,11 +429,29 @@ Kestrel是包含在ASP.NET项目模板中的默认Web服务器。优点是，如
 
 关于`Configure()`方法，这次它通过依赖注入（当然，当然是通过依赖注入），接收了三个类型的实例：`IApplicationBuilder`、`IHostingEnvironment`和`ILoggerFactory`，如下代码所示：
 
-[PRE6]
+```cs
+    // This method gets called by the runtime. Use this method to //
+    // configure the HTTP request pipeline. 
+    public void Configure(IApplicationBuilder app, 
+       IHostingEnvironment env, ILoggerFactory loggerFactory) 
+    { 
+      loggerFactory.AddConsole(); 
+
+      if (env.IsDevelopment()) 
+      { 
+        app.UseDeveloperExceptionPage(); 
+      } 
+
+      app.Run(async (context) => 
+      { 
+        await context.Response.WriteAsync("Hello World!"); 
+      }); 
+    } 
+```
 
 第一个在应用程序结束时使用，用于启动应用程序，这次使用`async/await`结构来保证正式的异步调用，返回一个字符串。
 
-`ILoggerFactory` 的使用方式与我们在第 3 章，“.NET Core 2.0 中的依赖注入介绍”中所做的方式相似，用于配置将输出到控制台的消息。
+`ILoggerFactory` 的使用方式与我们在第三章，“.NET Core 2.0 中的依赖注入介绍”中所做的方式相似，用于配置将输出到控制台的消息。
 
 最后，`IHostingEnvironment` 变量用于检查应用程序是否处于开发模式，如果是这样，则配置一个开发者异常页面，我们可以在其他地方定义它。
 
@@ -344,7 +467,17 @@ ASP.NET Core 区分了四种可能的开发模式：`development`、`production`
 
 因此，如果我们将之前的 `development` 值更改为一个自定义值，例如 `PACKT`，我们可以在浏览器中用以下方式修改退出：
 
-[PRE7]
+```cs
+    app.Run(async (context) => 
+    { 
+       if (env.IsEnvironment("Packt")) 
+       { 
+        await context.Response.WriteAsync("We're in PACKT 
+             development mode!"); 
+       } 
+       else await context.Response.WriteAsync("Hello World!"); 
+    }); 
+```
 
 在这种情况下，输出将不同，因此我们可以自由配置任何内容，并将其与其他值混合，以获得完全定制、模式依赖的体验：
 
@@ -358,7 +491,7 @@ ASP.NET Core 区分了四种可能的开发模式：`development`、`production`
 
 以这种方式，容器管理一个对象的生命周期，避免了硬编码对象构造的需要。
 
-除了其他内置实现之外，请记住 ASP.NET Core 提供了一个简单的依赖注入容器（我们在第 3 章，“.Net Core 2.0 中的依赖注入介绍”中已经测试过），它由 `IServiceProvider` 接口表示。
+除了其他内置实现之外，请记住 ASP.NET Core 提供了一个简单的依赖注入容器（我们在第三章，“.Net Core 2.0 中的依赖注入介绍”中已经测试过），它由 `IServiceProvider` 接口表示。
 
 正如我们所提到的，在这个平台上使用该接口配置服务的位置是 `ConfigureServices` 方法，我们将在下一节中分析它。
 
@@ -415,13 +548,64 @@ Web 应用程序模板在展示服务和依赖注入的角色方面更为明显�
 
 最有趣的部分在 `Startup` 类本身：
 
-[PRE8]
+```cs
+    public class Startup 
+    { 
+      public Startup(IHostingEnvironment env) 
+      { 
+        var builder = new ConfigurationBuilder() 
+            .SetBasePath(env.ContentRootPath) 
+            .AddJsonFile("appsettings.json", optional: false,  
+                         reloadOnChange: true) 
+          .AddJsonFile($"appsettings.{env.EnvironmentName}.json",  
+                         optional: true) 
+            .AddEnvironmentVariables(); 
+        Configuration = builder.Build(); 
+      }   
+
+      public IConfigurationRoot Configuration { get; } 
+
+      // This method gets called by the runtime. Use this method to  
+      // add services to the container. 
+      public void ConfigureServices(IServiceCollection services) 
+      { 
+        // Add framework services. 
+        services.AddMvc(); 
+      } 
+```
 
 到目前为止，默认模板只初始化 MVC 引擎，将其视为一个额外的服务，对用户来说完全是可选的。
 
 接下来，我们将看到如何使用此方法注册和配置其他内置或自定义服务：
 
-[PRE9]
+```cs
+    // This method gets called by the runtime. Use this method to  
+    // configure  the HTTP request pipeline. 
+    public void Configure(IApplicationBuilder app,  
+        IHostingEnvironment env, ILoggerFactory loggerFactory) 
+    { 
+        loggerFactory.AddConsole(Configuration.GetSection("Logging")); 
+        loggerFactory.AddDebug(); 
+
+        if (env.IsDevelopment()) 
+        { 
+            app.UseDeveloperExceptionPage(); 
+            app.UseBrowserLink(); 
+        } 
+        else 
+        { 
+            app.UseExceptionHandler("/Home/Error"); 
+        } 
+
+        app.UseStaticFiles(); 
+
+        app.UseMvc(routes => 
+        { 
+            routes.MapRoute( name: "default", 
+                template:{controller=Home}/{action=Index}/{id?}"); 
+        }); 
+     } 
+```
 
 首先，我们现在有一个构造函数和一个只读私有属性（`Configuration`），其类型为 `IConfigurationRoot`。嗯，在构造函数末尾调用的 `builder.Build()` 方法就是这种类型，并提供了一种方便的方式来包含和访问从多个 `.json` 文件中加载的所有配置信息。
 
@@ -455,7 +639,7 @@ Web 应用程序模板在展示服务和依赖注入的角色方面更为明显�
 
 # 在 ASP.NET MVC 视图中使用依赖注入
 
-史蒂夫·史密斯提出一个演示（[http://ardalis.com/how-to-list-all-services-available-to-an-asp-net-core-app](http://ardalis.com/how-to-list-all-services-available-to-an-asp-net-core-app)），它可以阐明在特定时刻可用的服务总数。
+史蒂夫·史密斯提出一个演示（[`ardalis.com/how-to-list-all-services-available-to-an-asp-net-core-app`](http://ardalis.com/how-to-list-all-services-available-to-an-asp-net-core-app)），它可以阐明在特定时刻可用的服务总数。
 
 这给了我一个关于如何使用 MVC 获取所有可用服务的列表的另一个演示的想法，即在视图中包含 `Microsoft.Extensions.DependencyInjection` 命名空间。让我们从我们刚刚分析的默认模板开始，并进行适当的修改。
 
@@ -471,19 +655,41 @@ Web 应用程序模板在展示服务和依赖注入的角色方面更为明显�
 
 让我们回顾一下`Startup`，并进行一些更改（不多）。实际上，只需要以下这些：
 
-[PRE10]
+```cs
+    public static IServiceCollection _services { get; private set; } 
+    public void ConfigureServices(IServiceCollection services) 
+    { 
+      // Add framework services. 
+      services.AddMvc(); 
+      _services = services; 
+   } 
+```
 
 我们创建一个公共静态变量`_services`来保存所有服务，一旦配置完成，就将`services`变量分配给它，其唯一目的是从控制器中访问其内容。
 
 现在，回到`HomeController`，我们可以添加一个新的控制器，代码如下：
 
-[PRE11]
+```cs
+    public IActionResult ServicesAvailable() 
+    { 
+      ViewData["Services"] = Startup._services; 
+      return View(); 
+    } 
+```
 
 通过这几行代码，我们的服务现在在控制器中可用，并且我们可以以非常简单的方式将它们传递给视图（注意这里没有数据模型，因为它只是一个简单的数据集合，而`ViewData`对象正好可以满足这个目的）。
 
 最后一步将是添加`ServicesAvailable`视图。代码如下（我将从头部的解释开始）：
 
-[PRE12]
+```cs
+    @using Microsoft.Extensions.DependencyInjection; 
+    @{ 
+      ViewData["Title"] = "Services Available"; 
+      var _services = @ViewData["Services"]; 
+    } 
+    <h2>@ViewData["Title"]</h2> 
+    <h1>All Services</h1> 
+```
 
 首先，回想一下，当我们在一个视图中引用一个命名空间时，`using`语句不应属于一个代码块。相反，它将是一个以`@`符号为首的独立句子（我们需要`DependencyInjection`命名空间，以便将传递到`ViewData`对象中的信息转换为真正的`IServiceCollection`对象）。
 
@@ -491,7 +697,27 @@ Web 应用程序模板在展示服务和依赖注入的角色方面更为明显�
 
 最后，我们将使用表格来展示`IServiceCollection`中的三个服务（在视图中称为`_services`）所保存的一些信息。注意，这里也使用了`as`运算符进行类型转换，以获取真正的`IServiceCollection`对象：
 
-[PRE13]
+```cs
+    <table class="table table-bordered"> 
+    <thead> 
+        <tr> 
+            <th>Type</th> 
+            <th>Lifetime</th> 
+            <th>Instance</th> 
+        </tr> 
+    </thead> 
+    <tbody> 
+     @foreach (var svc in _services as IServiceCollection) 
+     { 
+       <tr> 
+       <td>@svc.ServiceType.Name</td>           
+        <td>@svc.Lifetime</td>            
+        <td>@svc.ImplementationType?.Name</td> 
+        </tr> 
+     } 
+    </tbody> 
+    </table> 
+```
 
 就这样！现在我们可以启动应用程序并选择新的菜单元素*服务列表*。一个新视图将显示出来，其中包含一个相当长的服务列表，同时展示了我们如何在视图中使用`DependencyInjection`命名空间（或任何其他命名空间）（请参见以下截图）：
 
@@ -499,7 +725,7 @@ Web 应用程序模板在展示服务和依赖注入的角色方面更为明显�
 
 # 垃圾回收和自定义服务
 
-与垃圾回收行为相关，ASP.NET MVC自动化了一些操作，并将其他操作留给用户的判断。
+与垃圾回收行为相关，ASP.NET MVC 自动化了一些操作，并将其他操作留给用户的判断。
 
 主要规则如下：如果您在过程中注册了一个服务并调用了其构造函数，那么您有义务销毁该对象；否则，如果容器负责创建对象，它将调用实现的对象上的`Dispose()`。
 
@@ -509,7 +735,18 @@ Web 应用程序模板在展示服务和依赖注入的角色方面更为明显�
 
 行为将根据每个服务的实例化而有所不同（我已经在每个情况下进行了注释，所以你会看到差异）：
 
-[PRE14]
+```cs
+    publicvoidConfigureServices(IServiceCollectionservices)
+ {     // Add framework services
+     services.AddMvc();
+     // container will create the instance(s) of these types
+     // and will dispose themservices
+     AddScoped<Service1>();
+     // Here, the container did not create instance (we do it)
+     // so it will NOT dispose itservices
+     AddSingleton(newService2());
+ }
+```
 
 总的来说，这是一种管理服务垃圾回收相当方便的方法。
 
@@ -527,29 +764,59 @@ Web 应用程序模板在展示服务和依赖注入的角色方面更为明显�
 
 下一步将是通过`ConfigureServices`在`Startup`类中注册这些类，正如我们之前所看到的（我使用两种不同的语法只是为了展示）：
 
-[PRE15]
+```cs
+    publicvoidConfigureServices(IServiceCollectionservices)
+ {    // Add framework services.
+    services.AddMvc();
+    // container will create the instance(s) of these types
+    // and will dispose them
+    services.AddScoped<ProgrammerSentenceSvc>();
+    // Here, the container did not create instance (we do it)
+    // so it will NOT dispose it
+    services.AddSingleton(newEngineerSentenceSvc());
+ }
+```
 
 这就是我们需要的，以便在任何一个控制器中都有我们的服务可用。所以，让我们回顾一下我们的`HomeController`，并添加以下操作方法（记住，我们必须通过`using ASPNETCoreDisposeDemo.Services;`来引用我们的服务命名空间）：
 
-[PRE16]
+```cs
+    publicIActionResultSentences(ProgrammerSentenceSvcsvc,
+        EngineerSentenceSvcsvc2
+     {
+      Randomrnd = newRandom();ViewData["ProgSentence"] = 
+          svc.programmersSentences[rnd.Next(1,5)];
+      ViewData["EngSentence"] = svc2.engineersSentences[rnd.Next(1,5)];
+      returnView();
+     }
+```
 
 就这样！以这种方式注册的任何服务都通过依赖注入自动在控制器中可用，只需将其作为相应操作方法的参数引用即可。
 
 最后一步是创建名为`Sentences`的视图来恢复信息并向用户展示：
 
-[PRE17]
+```cs
+    @{ViewData["Title"] = "Random sentences about programmers
+       and engineers";
+    }
+     <h1>@ViewData["Title"].</h1>
+     < hr />
+     < h1 > Programmer's Sentence </ h1 >
+     <h2>@ViewData["ProgSentence"]</h2>
+     < h1 > Engineers' Sentence </ h1 >
+     <h2>@ViewData["EngSentence"]</h2>
+```
 
 如果我们添加（就像之前一样），在默认菜单旁边添加一个指向此操作方法名称的新链接，我们将看到以下输出：
 
 ![](img/995a1979-bb06-4548-8fc9-ea56097b31b8.png)
 
-如您所见，输出是预期的，并且与MVC模型相比，应用程序的一般架构与之前的版本相当相似。
+如您所见，输出是预期的，并且与 MVC 模型相比，应用程序的一般架构与之前的版本相当相似。
 
 # 服务和数据管理
 
-尽管数据管理不是本书的目标，但我想要提到，当在ASP.NET Core MVC应用程序中访问数据时，所提出的架构相对类似。
+尽管数据管理不是本书的目标，但我想要提到，当在 ASP.NET Core MVC 应用程序中访问数据时，所提出的架构相对类似。
 
-要测试这个功能并突出与依赖注入直接相关的那部分，请遵循初始说明在 [https://docs.microsoft.com/en-us/ef/core/get-started/aspnetcore/existing-db](https://docs.microsoft.com/en-us/ef/core/get-started/aspnetcore/existing-db)。这将创建一个使用 SQLLocalDb 的非常简单的数据库，名为 `Blogging`。它创建了一个 `Blogs` 表，并添加了三个记录，以便有一些数据可以操作。你还可以找到它提出的完整示例的链接，使用多种方法：数据库优先、新建数据库等。
+要测试这个功能并突出与依赖注入直接相关的那部分，请遵循初始说明在 [`docs.microsoft.com/en-us/ef/core/get-started/aspnetcore/existing-db`](https://docs.microsoft.com/en-us/ef/core/get-started/aspnetcore/existing-db)。这将创建一个使用 SQLLocalDb 的非常简单的数据库，名为 `Blogging`。它创建了一个 `Blogs` 表，并添加了三个记录，以便有一些数据可以操作。你还可以找到它提出的完整示例的链接，使用多种方法：数据库优先、新建数据库等。
 
 我想在这里指出的是那些暗示在该解决方案中使用 DI 的代码片段。
 
@@ -579,46 +846,95 @@ Web 应用程序模板在展示服务和依赖注入的角色方面更为明显�
 
 为了完整性，我将解释一个简单的示例，说明如何在 Razor 视图中使用 DI。这是一个相当有趣的功能，它可以用来访问数据、服务相关的信息，甚至你自己的 Razor 辅助工具。
 
-想法是创建另一个视图，使其能够访问与之前的`Services`视图相同的数据，但这次不涉及业务逻辑中的控制器。除此之外，我将创建一个Razor辅助器，以展示我们如何通过`@inject`指令完成这两项任务。
+想法是创建另一个视图，使其能够访问与之前的`Services`视图相同的数据，但这次不涉及业务逻辑中的控制器。除此之外，我将创建一个 Razor 辅助器，以展示我们如何通过`@inject`指令完成这两项任务。
 
 首先，在新的文件夹（`Helpers`）中，让我们创建一个简单的辅助器，提供某种信息（例如当前系统的时间）：
 
-[PRE18]
+```cs
+    namespaceASPNETCoreDisposeDemo.Helpers{
+      publicclassDateTimeHelpers
+      {
+        publicDateTimeHelpers()
+        {
+          LocalTime = DateTime.Now.TimeOfDay.ToString();
+        }
+          publicstringLocalTime { get; privateset; }
+      }
+    }
+```
 
 在这个新服务到位后，我们需要像对`Sentences*`服务那样注册它。`ConfigureServices`方法的新版本将如下所示：
 
-[PRE19]
+```cs
+    publicvoidConfigureServices(IServiceCollectionservices)
+    {
+      // Add framework services.
+      services.AddMvc();
+      // container will create the instance(s) of these types
+      // and will dispose them
+      services.AddScoped<ProgrammerSentenceSvc>();
+      // Here, the container did not create instance (we do it)
+      // so it will NOT dispose it
+      services.AddSingleton(newEngineerSentenceSvc());
+      services.AddTransient<DateTimeHelpers>();
+    }
+```
 
 在业务逻辑方面，我们需要的就这些，因为我们可以使用现有的服务，只是以不同的方式。所以，我将创建另一个名为`ServicesDI`的动作方法作为`HomeController`的一部分，并尝试复制之前的功能。
 
-我们还可以使用`[Route("key")]`属性将URL查询重定向到这个动作方法。实际上，这比其他方法还要简单：
+我们还可以使用`[Route("key")]`属性将 URL 查询重定向到这个动作方法。实际上，这比其他方法还要简单：
 
-[PRE20]
+```cs
+    [Route("SentencesDI")]publicIActionResultSentencesDI()
+    {
+       returnView();
+    }
+```
 
 其余的编程逻辑将推迟到视图本身。因此，`SentencesDI`视图将需要引用与它将要使用的服务相关的命名空间，并声明任何所需的服务：
 
-[PRE21]
+```cs
+    @usingASPNETCoreDisposeDemo.Helpers
+    @usingASPNETCoreDisposeDemo.Services
+    @inject DateTimeHelpersTimeHelpers
+    @inject ProgrammerSentenceSvcPSentences
+    @inject EngineerSentenceSvcESentences
+    @{
+      Randomrnd = newRandom();
+       ViewData["Title"] = "Random sentences obtained via
+            Dependency Injection";
+     }
+     <h1>@ViewData["Title"]</h1>
+     <h3>Local Time: @TimeHelpers.LocalTime</h3>
+     < hr />
+     < h2 > Programmer's Sentences (DI) </ h2 >
+     <h3>@PSentences.programmersSentences[rnd.Next(1,5)]</h3>
+     < h2 > Engineers' Sentences (DI) </ h2 >
+     <h3>@ESentences.engineersSentences[rnd.Next(1,5)]</h3>
+```
 
-正如你所见，其余的代码相当直观。一旦服务注册并建立引用，我们可以使用`@inject`指令来指导DI容器关于我们的视图将要需要的资源。语法如下：
+正如你所见，其余的代码相当直观。一旦服务注册并建立引用，我们可以使用`@inject`指令来指导 DI 容器关于我们的视图将要需要的资源。语法如下：
 
-[PRE22]
+```cs
+    @inject [Type] [Name/Alias]  
+```
 
-这样，任何与注入到视图中的服务相关的功能都可以访问服务内部的数据，而无需在控制器中处理它。你可能会说这某种程度上打破了MVC基础的架构，但在某些情况下，如果某些数据仅与特定视图相关，将其从控制器中分离出来可能是有趣的。
+这样，任何与注入到视图中的服务相关的功能都可以访问服务内部的数据，而无需在控制器中处理它。你可能会说这某种程度上打破了 MVC 基础的架构，但在某些情况下，如果某些数据仅与特定视图相关，将其从控制器中分离出来可能是有趣的。
 
 并且，你肯定会发现更多有用的可能性。顺便说一句，你可以在浏览器中输入`localhost:[port]/ServicesDI`来获取相应的输出：
 
 ![图片](img/f711fe22-b931-4bf8-a799-3ee618634c7c.png)
 
-简而言之，这是与依赖注入相关的另一个功能，这次是在Razor视图中使用，我们可以在ASP.NET Core平台上使用它。
+简而言之，这是与依赖注入相关的另一个功能，这次是在 Razor 视图中使用，我们可以在 ASP.NET Core 平台上使用它。
 
 # 摘要
 
-在本章中，我们专注于ASP.NET Core和依赖注入，分析了整个架构和配置过程是基于ASP.NET Core内部DI容器的。
+在本章中，我们专注于 ASP.NET Core 和依赖注入，分析了整个架构和配置过程是基于 ASP.NET Core 内部 DI 容器的。
 
-我们还看到了如何从简单的控制台应用程序迁移到ASP.NET Core应用程序，以及如何调整开发和生产环境中不同的服务器。
+我们还看到了如何从简单的控制台应用程序迁移到 ASP.NET Core 应用程序，以及如何调整开发和生产环境中不同的服务器。
 
-然后，我们分析了Visual Studio 2017为ASP.NET Core应用程序提供的主要模板，并回顾了它们如何使用DI来配置和管理所需的信息和功能。
+然后，我们分析了 Visual Studio 2017 为 ASP.NET Core 应用程序提供的主要模板，并回顾了它们如何使用 DI 来配置和管理所需的信息和功能。
 
-最后，我们看到了如何使用我们自己的自定义服务，并通过DI将它们集成到ASP.NET Core中，无论是在控制器中还是在Razor视图中。
+最后，我们看到了如何使用我们自己的自定义服务，并通过 DI 将它们集成到 ASP.NET Core 中，无论是在控制器中还是在 Razor 视图中。
 
-在[第5章](c2b6c427-7a04-43d9-93bf-076daeb0f024.xhtml)，*对象组合*，我们将分析对象组合及其在DI环境中的应用。
+在第五章，*对象组合*，我们将分析对象组合及其在 DI 环境中的应用。

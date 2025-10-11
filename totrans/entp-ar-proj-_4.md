@@ -1,18 +1,18 @@
-# 使用WebAR和增强类！进行AR培训
+# 使用 WebAR 和增强类！进行 AR 培训
 
-在本章中，我们将探讨两种适用于Android设备的工具，这些工具可以应用于培训领域。第一个工具将基于WebAR，具体来说，是Google Web组件`<model-viewer>`，它将允许我们通过网页使用ARCore在真实环境中可视化3D模型。我们将能够在网页上从一系列模型中选择一个，将其放置在现实世界中，并对其进行操作（移动、旋转和缩放）。
+在本章中，我们将探讨两种适用于 Android 设备的工具，这些工具可以应用于培训领域。第一个工具将基于 WebAR，具体来说，是 Google Web 组件`<model-viewer>`，它将允许我们通过网页使用 ARCore 在真实环境中可视化 3D 模型。我们将能够在网页上从一系列模型中选择一个，将其放置在现实世界中，并对其进行操作（移动、旋转和缩放）。
 
-第二个工具将是增强类！，这是一个以教育为导向的创建工具，它将允许我们创建AR培训项目，在图像或真实生活中的图片上展示不同的元素（图像、音频文件、视频和3D模型等），为我们的项目添加交互性，并在用户之间交换它们。
+第二个工具将是增强类！，这是一个以教育为导向的创建工具，它将允许我们创建 AR 培训项目，在图像或真实生活中的图片上展示不同的元素（图像、音频文件、视频和 3D 模型等），为我们的项目添加交互性，并在用户之间交换它们。
 
-本章的主要目标是介绍两种AR工具，其应用场景与本书其他章节略有不同。本章的主要思想是让你发现与我们已覆盖或将要覆盖的其他SDK不同的AR形式，以及它们在如此跨领域的培训领域中的价值。到本章结束时，你将能够通过Web使用ARCore创建自己的AR查看器，但你也将发现使用增强类！工具丰富AR应用程序用户体验的交互性可能性。
+本章的主要目标是介绍两种 AR 工具，其应用场景与本书其他章节略有不同。本章的主要思想是让你发现与我们已覆盖或将要覆盖的其他 SDK 不同的 AR 形式，以及它们在如此跨领域的培训领域中的价值。到本章结束时，你将能够通过 Web 使用 ARCore 创建自己的 AR 查看器，但你也将发现使用增强类！工具丰富 AR 应用程序用户体验的交互性可能性。
 
-在撰写本书时，这两个工具都在持续开发和改进中，不断添加新的功能和集成。目前，它们仅适用于Android设备，但预计它们很快也将支持iOS。
+在撰写本书时，这两个工具都在持续开发和改进中，不断添加新的功能和集成。目前，它们仅适用于 Android 设备，但预计它们很快也将支持 iOS。
 
 在本章中，我们将涵盖以下主题：
 
-+   使用AR进行培训
++   使用 AR 进行培训
 
-+   探索使用Google组件`<model-viewer>`的WebAR
++   探索使用 Google 组件`<model-viewer>`的 WebAR
 
 +   探索增强类！
 
@@ -22,71 +22,71 @@
 
 对于`<model-viewer>`项目，你需要以下内容：
 
-+   支持ARCore的Android设备（请参阅以下列表：[https://developers.google.com/ar/discover/supported-devices](https://developers.google.com/ar/discover/supported-devices)）。该项目已在Pocophone F1上进行了测试。
++   支持 ARCore 的 Android 设备（请参阅以下列表：[`developers.google.com/ar/discover/supported-devices`](https://developers.google.com/ar/discover/supported-devices)）。该项目已在 Pocophone F1 上进行了测试。
 
 对于增强类！项目，你需要以下内容：
 
-+   安装有Android 5.0或更高版本的Android设备
++   安装有 Android 5.0 或更高版本的 Android 设备
 
-本章的资源和相关代码文件可以在这里找到：[https://github.com/PacktPublishing/Enterprise-Augmented-Reality-Projects/tree/master/Chapter04](https://github.com/PacktPublishing/Enterprise-Augmented-Reality-Projects/tree/master/Chapter04)。
+本章的资源和相关代码文件可以在这里找到：[`github.com/PacktPublishing/Enterprise-Augmented-Reality-Projects/tree/master/Chapter04`](https://github.com/PacktPublishing/Enterprise-Augmented-Reality-Projects/tree/master/Chapter04)。
 
-# 使用AR进行培训
+# 使用 AR 进行培训
 
-增强现实在教育领域已经存在了20多年，尤其是在大学范围内，尽管其增长速度比在更商业化的领域如市场营销或旅游要慢得多，也较少受到关注。
+增强现实在教育领域已经存在了 20 多年，尤其是在大学范围内，尽管其增长速度比在更商业化的领域如市场营销或旅游要慢得多，也较少受到关注。
 
-随着支持硬件（如手机、平板电脑和数字白板）的演变，AR已经成为教育和培训中的一个宝贵资产。它允许学生通过图像或直接在房间内以三维形式可视化概念，以便他们能够更快、更动态地获取信息（只需用摄像头指向而不是在书本或互联网上搜索信息），或者创建更深入的个人项目（使一幅画栩栩如生，在手工项目上添加说明或额外信息，创建动画演示等）。
+随着支持硬件（如手机、平板电脑和数字白板）的演变，AR 已经成为教育和培训中的一个宝贵资产。它允许学生通过图像或直接在房间内以三维形式可视化概念，以便他们能够更快、更动态地获取信息（只需用摄像头指向而不是在书本或互联网上搜索信息），或者创建更深入的个人项目（使一幅画栩栩如生，在手工项目上添加说明或额外信息，创建动画演示等）。
 
-一个重要的考虑因素是，在教育/培训中，AR技术适用于所有年龄段和学科：一个孩子可以在课堂上用它来学习形状和颜色，而一家公司可以用它来培训员工关于其职业风险预防计划——这完全取决于工具和AR内容的目标。
+一个重要的考虑因素是，在教育/培训中，AR 技术适用于所有年龄段和学科：一个孩子可以在课堂上用它来学习形状和颜色，而一家公司可以用它来培训员工关于其职业风险预防计划——这完全取决于工具和 AR 内容的目标。
 
-在本章中，我们将学习如何使用两种不同且易于使用的工具，这些工具将帮助我们快速创建两个不同的教育项目。为此，我们将使用以下3D模型：
+在本章中，我们将学习如何使用两种不同且易于使用的工具，这些工具将帮助我们快速创建两个不同的教育项目。为此，我们将使用以下 3D 模型：
 
-+   [https://sketchfab.com/3d-models/gearbox-planetary-2bee7992d266456aaef1f1394b0ebb98](https://sketchfab.com/3d-models/gearbox-planetary-2bee7992d266456aaef1f1394b0ebb98)
++   [`sketchfab.com/3d-models/gearbox-planetary-2bee7992d266456aaef1f1394b0ebb98`](https://sketchfab.com/3d-models/gearbox-planetary-2bee7992d266456aaef1f1394b0ebb98)
 
-+   [https://sketchfab.com/3d-models/warm-gearbox-e7fedd86a90b4c46a53fe88882e66aa3](https://sketchfab.com/3d-models/warm-gearbox-e7fedd86a90b4c46a53fe88882e66aa3)
++   [`sketchfab.com/3d-models/warm-gearbox-e7fedd86a90b4c46a53fe88882e66aa3`](https://sketchfab.com/3d-models/warm-gearbox-e7fedd86a90b4c46a53fe88882e66aa3)
 
-+   [https://sketchfab.com/3d-models/gearbox-conical-60f023924ee0456daa758eb590b6064b](https://sketchfab.com/3d-models/gearbox-conical-60f023924ee0456daa758eb590b6064b)
++   [`sketchfab.com/3d-models/gearbox-conical-60f023924ee0456daa758eb590b6064b`](https://sketchfab.com/3d-models/gearbox-conical-60f023924ee0456daa758eb590b6064b)
 
-让我们从学习Google Web Component `<model-viewer>`是什么以及它是如何工作的开始，来了解WebAR。
+让我们从学习 Google Web Component `<model-viewer>`是什么以及它是如何工作的开始，来了解 WebAR。
 
-# 使用Google Web Component `<model-viewer>` 探索WebAR
+# 使用 Google Web Component `<model-viewer>` 探索 WebAR
 
-在智能手机进入市场之前，增强现实（AR）技术仅在计算机上开发。后来，出现了网络应用程序，最初是用Flash编写的，然后是HTML5，但始终需要计算机的摄像头。自从ARCore（谷歌）和ARKit（苹果）工具包出现以来，AR技术也通过网络进入了智能手机。
+在智能手机进入市场之前，增强现实（AR）技术仅在计算机上开发。后来，出现了网络应用程序，最初是用 Flash 编写的，然后是 HTML5，但始终需要计算机的摄像头。自从 ARCore（谷歌）和 ARKit（苹果）工具包出现以来，AR 技术也通过网络进入了智能手机。
 
-WebXR设备API是当前正在努力提供从网络访问VR和AR的规范之一，包括使用设备的传感器或**头戴式显示器**（**HMDs**）。这个标准规范是由**万维网联盟**（**W3C**）编写的，目前正处于开发中。在撰写本文时，AR在WebXR规范中的集成仍然不稳定，因此没有在本章中介绍。预计在接下来的几个月里，这一功能将得到进一步开发。有关标准和其进展的更多信息，您可以查看他们的网站（[https://www.w3.org/TR/webxr](https://www.w3.org/TR/webxr)）和GitHub（[https://github.com/immersive-web/webxr/](https://github.com/immersive-web/webxr/)）。
+WebXR 设备 API 是当前正在努力提供从网络访问 VR 和 AR 的规范之一，包括使用设备的传感器或**头戴式显示器**（**HMDs**）。这个标准规范是由**万维网联盟**（**W3C**）编写的，目前正处于开发中。在撰写本文时，AR 在 WebXR 规范中的集成仍然不稳定，因此没有在本章中介绍。预计在接下来的几个月里，这一功能将得到进一步开发。有关标准和其进展的更多信息，您可以查看他们的网站（[`www.w3.org/TR/webxr`](https://www.w3.org/TR/webxr)）和 GitHub（[`github.com/immersive-web/webxr/`](https://github.com/immersive-web/webxr/)）。
 
-在本节中，为了开发WebAR应用程序，我们将使用Google的`<model-viewer>`网络组件，它允许我们轻松地将3D模型嵌入到网页中，并使用智能手机或平板电脑在AR中可视化它们。
+在本节中，为了开发 WebAR 应用程序，我们将使用 Google 的`<model-viewer>`网络组件，它允许我们轻松地将 3D 模型嵌入到网页中，并使用智能手机或平板电脑在 AR 中可视化它们。
 
-Web组件是一个基于现有网络标准的自定义HTML元素，它可以在现代浏览器中工作。
+Web 组件是一个基于现有网络标准的自定义 HTML 元素，它可以在现代浏览器中工作。
 
-Google的`<model-viewer>`组件首次于2019年2月推出，允许用户在网页中显示3D模型。2019年5月，他们宣布通过`ar`属性实现AR兼容性。它基于ARCore功能场景查看器，目前仅适用于支持此技术的Android设备。我们将看到它的使用非常简单，并且可以在任何浏览器上工作。在[第3章](2d2b4e6f-1ee8-46ab-9041-24e36d57f949.xhtml)，“使用ARCore的AR制造”，我们学习了如何实现一个完整的AR移动项目。在这种情况下，我们只需使用提到的`<model-viewer>`组件来使用其网络功能。我们将看到我们可以使用哪种类型的模型，如何创建一个包含组件的网页，以及如何实际上添加组件并在移动设备上使其工作。
+Google 的`<model-viewer>`组件首次于 2019 年 2 月推出，允许用户在网页中显示 3D 模型。2019 年 5 月，他们宣布通过`ar`属性实现 AR 兼容性。它基于 ARCore 功能场景查看器，目前仅适用于支持此技术的 Android 设备。我们将看到它的使用非常简单，并且可以在任何浏览器上工作。在第三章，“使用 ARCore 的 AR 制造”，我们学习了如何实现一个完整的 AR 移动项目。在这种情况下，我们只需使用提到的`<model-viewer>`组件来使用其网络功能。我们将看到我们可以使用哪种类型的模型，如何创建一个包含组件的网页，以及如何实际上添加组件并在移动设备上使其工作。
 
-现在我们已经了解了我们将要使用的工具，在下一节中，我们将介绍此组件接受的3D模型（截至编写时）。
+现在我们已经了解了我们将要使用的工具，在下一节中，我们将介绍此组件接受的 3D 模型（截至编写时）。
 
-# 与3D模型一起工作
+# 与 3D 模型一起工作
 
-由于我们在浏览器中显示模型，支持的格式是**GL传输格式**（**glTF**）2.0/glb，这是一种旨在最小化大小和运行时处理的格式，使其成为网络传输的最佳选择。如今，许多3D设计程序，如Blender、3ds Max和Maya，以及一些3D模型平台，如Sketchfab，都提供了导出此格式的工具。
+由于我们在浏览器中显示模型，支持的格式是**GL 传输格式**（**glTF**）2.0/glb，这是一种旨在最小化大小和运行时处理的格式，使其成为网络传输的最佳选择。如今，许多 3D 设计程序，如 Blender、3ds Max 和 Maya，以及一些 3D 模型平台，如 Sketchfab，都提供了导出此格式的工具。
 
-你可以在[https://www.khronos.org/gltf/](https://www.khronos.org/gltf/)和[https://github.com/KhronosGroup/glTF/blob/master/README.md](https://github.com/KhronosGroup/glTF/blob/master/README.md)上找到有关glTF功能及其可能性的更多信息。
+你可以在[`www.khronos.org/gltf/`](https://www.khronos.org/gltf/)和[`github.com/KhronosGroup/glTF/blob/master/README.md`](https://github.com/KhronosGroup/glTF/blob/master/README.md)上找到有关 glTF 功能及其可能性的更多信息。
 
-3D模型的纹理可以是`.jpg`或`.png`格式，该工具支持动画，并且由于模型将通过网络浏览器显示，它们不应太重，以保持AR体验流畅。
+3D 模型的纹理可以是`.jpg`或`.png`格式，该工具支持动画，并且由于模型将通过网络浏览器显示，它们不应太重，以保持 AR 体验流畅。
 
-更多关于这些要求的信息可以在[https://developers.google.com/ar/develop/java/scene-viewer](https://developers.google.com/ar/develop/java/scene-viewer)找到。
+更多关于这些要求的信息可以在[`developers.google.com/ar/develop/java/scene-viewer`](https://developers.google.com/ar/develop/java/scene-viewer)找到。
 
-对于这个项目，我们将使用三个静态模型，分别是`gearbox_conical.glb`、`gearbox_planetary.glb`和`gearbox_worm.glb`。这些模型提供了良好的细节，以实现更真实的AR体验，我们将在下一节中使用增强类来使用它们！
+对于这个项目，我们将使用三个静态模型，分别是`gearbox_conical.glb`、`gearbox_planetary.glb`和`gearbox_worm.glb`。这些模型提供了良好的细节，以实现更真实的 AR 体验，我们将在下一节中使用增强类来使用它们！
 
 现在我们已经了解了`<model-viewer>`组件的基本工作原理，让我们开始创建一个网页。
 
 # 创建简单的网页
 
-我们将要做的第一件事是创建一个网页，其中将显示3D模型，并准备好在AR中启动。为此，我们也将使用Glitch，这是一个在线工具，将帮助我们创建此项目。
+我们将要做的第一件事是创建一个网页，其中将显示 3D 模型，并准备好在 AR 中启动。为此，我们也将使用 Glitch，这是一个在线工具，将帮助我们创建此项目。
 
-首先，我们将学习如何在编写样式表和HTML页面之前如何准备Glitch项目。
+首先，我们将学习如何在编写样式表和 HTML 页面之前如何准备 Glitch 项目。
 
-# 使用Glitch进行编码
+# 使用 Glitch 进行编码
 
-Glitch是一个用于创建具有强大协作组件的Web应用的简单工具。它允许我们混搭现有应用或从GitHub或GitLab等服务克隆项目。在我们的情况下，因为我们只想创建一个简单的演示网页，我们将使用Glitch来存储HTML页面和3D模型。要创建一个新的Glitch项目，请按照以下步骤操作：
+Glitch 是一个用于创建具有强大协作组件的 Web 应用的简单工具。它允许我们混搭现有应用或从 GitHub 或 GitLab 等服务克隆项目。在我们的情况下，因为我们只想创建一个简单的演示网页，我们将使用 Glitch 来存储 HTML 页面和 3D 模型。要创建一个新的 Glitch 项目，请按照以下步骤操作：
 
-1.  首先，前往[https://glitch.com](https://glitch.com/)并点击登录按钮。它将自动创建一个账户。
+1.  首先，前往[`glitch.com`](https://glitch.com/)并点击登录按钮。它将自动创建一个账户。
 
 1.  在页面右上角，点击新建项目以开始新项目。然后，点击第一个选项，`hello-webpage`：
 
@@ -98,11 +98,11 @@ Glitch是一个用于创建具有强大协作组件的Web应用的简单工具�
 
 ![](img/10a2eb29-89f2-48a8-906f-f6a9bf69cca0.png)
 
-Gitch板
+Gitch 板
 
-查看README文件，因为它解释了页面的主要功能。
+查看 README 文件，因为它解释了页面的主要功能。
 
-1.  下一步将是更改Glitch为我们提供的项目名称。点击页面左上角的名称并提供名称和描述：
+1.  下一步将是更改 Glitch 为我们提供的项目名称。点击页面左上角的名称并提供名称和描述：
 
 ![](img/e1bf670f-d670-4e47-a468-d0e9e939414b.png)
 
@@ -138,71 +138,145 @@ Gitch板
 
 链接到资产和删除按钮
 
-Glitch保存我们按下的每个键，因此我们不需要手动保存代码。
+Glitch 保存我们按下的每个键，因此我们不需要手动保存代码。
 
-在准备好基本元素后，让我们编写网页代码，从样式表开始，然后是HTML页面。
+在准备好基本元素后，让我们编写网页代码，从样式表开始，然后是 HTML 页面。
 
 # 编写样式表
 
-在样式表中，我们将决定我们网页的外观。由于我们的主要目标是展示AR，所以我们现在会保持简单。Glitch的`style.css`文件中已经有一些代码。让我们修改这个文件并适应我们的需求。按照以下步骤进行操作：
+在样式表中，我们将决定我们网页的外观。由于我们的主要目标是展示 AR，所以我们现在会保持简单。Glitch 的`style.css`文件中已经有一些代码。让我们修改这个文件并适应我们的需求。按照以下步骤进行操作：
 
 1.  我们将保持`body`括号不变：
 
-[PRE0]
+```cs
+body {
+  font-family: "Benton Sans", "Helvetica Neue", helvetica, arial, sans-serif;
+  margin: 2em;
+}
+```
 
 在这里，我们指定了网页将使用的字体和`body`元素的边距。
 
 1.  接下来，我们将修改`h1`标题元素：
 
-[PRE1]
+```cs
+h1 {
+ text-align: center;
+ color: #000000;
+ font-style: bold;
+}
+```
 
 现在，标题将居中、黑色和粗体。
 
 1.  让我们添加一些类元素：
 
-[PRE2]
+```cs
+.box{
+  max-width: 600px;
+  margin: 4em auto;
+  border-radius: 8px;
+  box-shadow: 3px 3px 10px rgba(0, 0, 0, 0.7);
+  text-align: center;
+  overflow: hidden;
+}
+```
 
-这个类将封装在网页上显示的3D模型（不在AR中）。它们将出现在一个盒子里，带有圆角边框和柔和的阴影。我们将添加的文本将居中在盒子内，并且`overflow: hidden`参数将防止内容从盒子溢出。
+这个类将封装在网页上显示的 3D 模型（不在 AR 中）。它们将出现在一个盒子里，带有圆角边框和柔和的阴影。我们将添加的文本将居中在盒子内，并且`overflow: hidden`参数将防止内容从盒子溢出。
 
-1.  现在，我们将为模型的CC BY信息添加另一个类，这对于这些类型的模型是必需的：
+1.  现在，我们将为模型的 CC BY 信息添加另一个类，这对于这些类型的模型是必需的：
 
-[PRE3]
+```cs
+.cc{
+  display: flex;
+  justify-content: flex-start;
+  margin: 0.5em;
+  font-style: italic;
+}
+```
 
 在这里，我们将内容定位在左侧，并使用斜体文本。
 
 1.  我们还将更改`cc`类图像的外观：
 
-[PRE4]
+```cs
+.cc img{
+ height: 1em;
+ opacity: 0.6;
+}
+```
 
 这两条线将选择这个类中图像的`height`并使它们略微透明。
 
 1.  最后，我们将修改`<model-viewer>`组件的样式：
 
-[PRE5]
+```cs
+model-viewer {
+  width: 100%;
+  height: 580px;
+}
+```
 
 通过这种方式，我们将使模型查看器占据容器盒子的`width`并设置其`height`。
 
 现在样式表已经准备好了，我们可以创建我们的页面。
 
-# 编码index.html页面
+# 编码 index.html 页面
 
-现在，打开`index.html`文件，在文档的开头将网页标题从`Hello!`改为`AR Training Web App`。你可以保留`<head>` `<head>`标签之间的其余代码不变。现在，删除`<body>` `<body>`标签之间的所有内容（如果你愿意，可以保留带有Glitch按钮的最后两行）。
+现在，打开`index.html`文件，在文档的开头将网页标题从`Hello!`改为`AR Training Web App`。你可以保留`<head>` `<head>`标签之间的其余代码不变。现在，删除`<body>` `<body>`标签之间的所有内容（如果你愿意，可以保留带有 Glitch 按钮的最后两行）。
 
 现在，让我们在`<body>`标签内添加标题和三个模型盒子：
 
 1.  在`<h1>`标签之间添加标题，使其使用我们的`.css`文件中的样式：
 
-[PRE6]
+```cs
+<h1>Select a gearbox to display in AR</h1>
+```
 
-1.  现在，在标题之后，添加第一个带有顶部标题和底部CC BY信息的盒子：
+1.  现在，在标题之后，添加第一个带有顶部标题和底部 CC BY 信息的盒子：
 
-[PRE7]
+```cs
+<div class="box">
+   <h2>Planetary Gearbox</h2>
+   <div class="cc"> 
+     <a href="https://creativecommons.org/licenses/by/2.0/" target="_blank">
+         <img src="img/cc.svg">
+         <img src="img/by.svg">
+     </a> 
+     &nbsp;&nbsp; 
+     <a href="https://sketchfab.com/3d-models/gearbox-planetary-2bee7992d266456aaef1f1394b0ebb98" target="_blank">T-FLEX CAD ST (Free)</a>
+   </div>
+</div>
+```
 
-主要组件是`box`类。在里面，我们有`<h2>`格式的标题和带有指向许可证的`cc`类，以及两个来自`creativecommons`的图像来标识CC BY许可证类型，还有指向模型来源的Sketchfab页面的作者链接。
+主要组件是`box`类。在里面，我们有`<h2>`格式的标题和带有指向许可证的`cc`类，以及两个来自`creativecommons`的图像来标识 CC BY 许可证类型，还有指向模型来源的 Sketchfab 页面的作者链接。
 
 1.  对其他两个模型也做同样的处理：
 
-[PRE8]
+```cs
+<div class="box"> 
+      <h2>Worm Gearbox</h2>
+      <div class="cc"> 
+        <a href="https://creativecommons.org/licenses/by/2.0/" target="_blank">
+          <img src="img/cc.svg">
+          <img src="img/by.svg">
+        </a> 
+        &nbsp; &nbsp;
+        <a href="https://sketchfab.com/3d-models/warm-gearbox-e7fedd86a90b4c46a53fe88882e66aa3" target="_blank">T-FLEX CAD ST (Free)</a>
+      </div>
+    </div>
+    <div class="box"> 
+      <h2>Conical Gearbox</h2>
+      <div class="cc"> 
+        <a href="https://creativecommons.org/licenses/by/2.0/" target="_blank">
+          <img src="img/cc.svg">
+          <img src="img/by.svg">
+        </a> 
+        &nbsp; &nbsp;
+        <a href="https://sketchfab.com/3d-models/gearbox-conical-60f023924ee0456daa758eb590b6064b" target="_blank">T-FLEX CAD ST (Free)</a>
+      </div>
+</div>
+```
 
 目前，你的项目应该看起来像这样：
 
@@ -210,7 +284,7 @@ Glitch保存我们按下的每个键，因此我们不需要手动保存代码�
 
 带有三个盒子的网页
 
-现在，我们必须包含`<model-viewer>`组件的3D模型。
+现在，我们必须包含`<model-viewer>`组件的 3D 模型。
 
 # 将<model-viewer>组件添加到我们的页面
 
@@ -218,7 +292,10 @@ Glitch保存我们按下的每个键，因此我们不需要手动保存代码�
 
 1.  首先，我们不得不在`<body>`元素末尾添加以下两行：
 
-[PRE9]
+```cs
+<script type="module" src="img/model-viewer.js"></script>
+<script nomodule src="img/model-viewer-legacy.js"></script>
+```
 
 通过这些行，我们将模块添加到我们的页面，并使其在新旧浏览器中工作。
 
@@ -226,7 +303,9 @@ Glitch保存我们按下的每个键，因此我们不需要手动保存代码�
 
 1.  然后，我们可以在 `box` 类内部调用它，在 `h2` 标题之后和 `cc` 类之前，引用模型的 URL（在 `src` 属性中放入您自己的模型 URL）：
 
-[PRE10]
+```cs
+<model-viewer src="img/6f8eb042-0e74-4182-9d39-4f877746edb1%2Fgerabox_planetary.glb?v=1566506940560" alt="Planetary Gearbox" background-color="#42697b" auto-rotate camera-controls ar></model-viewer> 
+```
 
 以下截图显示了代码界面：
 
@@ -246,7 +325,14 @@ Glitch保存我们按下的每个键，因此我们不需要手动保存代码�
 
 1.  对其他两个模型做同样的操作：
 
-[PRE11]
+```cs
+...
+<model-viewer src="img/6f8eb042-0e74-4182-9d39-4f877746edb1%2Fgearbox_worm.glb?v=1566506941410" alt="Worm Gearbox" background-color="#42697b" auto-rotate camera-controls ar></model-viewer>
+
+...
+
+<model-viewer src="img/6f8eb042-0e74-4182-9d39-4f877746edb1%2Fgearbox_conical.glb?v=1566506963689" alt="Conical Gearbox" background-color="#42697b" auto-rotate camera-controls ar></model-viewer>
+```
 
 1.  这样，您应该会看到网页上加载并旋转的三个模型：
 
@@ -290,21 +376,21 @@ Google Play 商店中的 AR Google Play 服务
 
 1.  现在，您可以调整模型的大小和位置，从不同的角度查看它，并在其中移动。
 
-重要！3D模型必须通过HTTPS连接访问。否则，当点击右下角的小方块时，模型中的“在您的空间中查看”按钮将不会出现。如果您在未来应用程序中使用自己的服务器而不是Glitch，请记住这一点。
+重要！3D 模型必须通过 HTTPS 连接访问。否则，当点击右下角的小方块时，模型中的“在您的空间中查看”按钮将不会出现。如果您在未来应用程序中使用自己的服务器而不是 Glitch，请记住这一点。
 
-就这样。现在，您知道了如何使用Web组件`<model-viewer>`和ARCore在AR中显示模型。
+就这样。现在，您知道了如何使用 Web 组件`<model-viewer>`和 ARCore 在 AR 中显示模型。
 
-如我们之前提到的，组件相当新，并且一直在不断变化。要查看最新功能和接受属性，您可以查看[https://googlewebcomponents.github.io/model-viewer/](https://googlewebcomponents.github.io/model-viewer/)和[https://github.com/GoogleWebComponents/model-viewer](https://github.com/GoogleWebComponents/model-viewer)。
+如我们之前提到的，组件相当新，并且一直在不断变化。要查看最新功能和接受属性，您可以查看[`googlewebcomponents.github.io/model-viewer/`](https://googlewebcomponents.github.io/model-viewer/)和[`github.com/GoogleWebComponents/model-viewer`](https://github.com/GoogleWebComponents/model-viewer)。
 
-在下一节中，我们将使用相同的3D模型创建另一个培训项目，但使用Augmented Class!工具。我们将使用图像标记并向我们的最终项目添加交互。
+在下一节中，我们将使用相同的 3D 模型创建另一个培训项目，但使用 Augmented Class!工具。我们将使用图像标记并向我们的最终项目添加交互。
 
-# 探索Augmented Class!
+# 探索 Augmented Class!
 
-Augmented Class!是一个由一群开发者和教师/教授的动机产生的教育内容创作工具，它提供了一个完整的解决方案，允许教育社区的全体成员（教师、学生和家长）无需技术知识，无需这些工具通常的约束（如内容有限和功能有限），创建和共享交互式AR项目。
+Augmented Class!是一个由一群开发者和教师/教授的动机产生的教育内容创作工具，它提供了一个完整的解决方案，允许教育社区的全体成员（教师、学生和家长）无需技术知识，无需这些工具通常的约束（如内容有限和功能有限），创建和共享交互式 AR 项目。
 
-目前，在3.0.30版本中，它可以在Google Play Store中免费获取，并且为PC提供私人测试版。该应用程序使用图像标记，在其他工具中称为目标。这意味着它会在真实图像上显示虚拟内容，例如图片、书封面等，而不是像ARCore那样在平坦表面上显示。Augmented Class!允许广泛的内容（图像、音频文件、视频、3D模型和文本），我们还可以添加交互（触摸屏幕、与相机和标记之间的距离互动，以及两个标记之间的距离互动），并在用户之间共享我们的项目。在这个版本中它是免费的，预计他们将在接下来的几个月内推出更多免费和专业的功能。更多信息，请访问[www.augmentedclass.com](http://www.augmentedclass.com)。
+目前，在 3.0.30 版本中，它可以在 Google Play Store 中免费获取，并且为 PC 提供私人测试版。该应用程序使用图像标记，在其他工具中称为目标。这意味着它会在真实图像上显示虚拟内容，例如图片、书封面等，而不是像 ARCore 那样在平坦表面上显示。Augmented Class!允许广泛的内容（图像、音频文件、视频、3D 模型和文本），我们还可以添加交互（触摸屏幕、与相机和标记之间的距离互动，以及两个标记之间的距离互动），并在用户之间共享我们的项目。在这个版本中它是免费的，预计他们将在接下来的几个月内推出更多免费和专业的功能。更多信息，请访问[www.augmentedclass.com](http://www.augmentedclass.com)。
 
-在这一章中，我们将使用Android应用程序创建一个简单的项目来显示变速箱的3D模型。然后，我们将添加用户交互以显示更多信息。最后，我们将创建另一个标记并在它们之间创建交互。为此，我们将在移动设备上准备我们的材料（图像和3D模型），创建一个简单的项目，向其中添加一些用户交互，并创建两个不同标记之间的交互。
+在这一章中，我们将使用 Android 应用程序创建一个简单的项目来显示变速箱的 3D 模型。然后，我们将添加用户交互以显示更多信息。最后，我们将创建另一个标记并在它们之间创建交互。为此，我们将在移动设备上准备我们的材料（图像和 3D 模型），创建一个简单的项目，向其中添加一些用户交互，并创建两个不同标记之间的交互。
 
 要做到这一点，我们需要为我们的移动设备准备所有材料。
 
@@ -312,7 +398,7 @@ Augmented Class!是一个由一群开发者和教师/教授的动机产生的教
 
 在开始项目之前，我们必须在我们的移动设备上准备材料，以便我们可以快速访问它：
 
-1.  我们首先需要做的是在他们网页上注册（[http://creativitic.es/augmentedclass/beta/](http://creativitic.es/augmentedclass/beta/））并下载Android应用（[https://play.google.com/store/apps/details?id=com.AugmentedClass.AClass&hl=es_419](https://play.google.com/store/apps/details?id=com.AugmentedClass.AClass&hl=es_419)）。该应用允许我们进行演示访问，而无需登录，但对于项目来说，它比注册访问有更多的限制。
+1.  我们首先需要做的是在他们网页上注册（[`creativitic.es/augmentedclass/beta/`](http://creativitic.es/augmentedclass/beta/））并下载 Android 应用（[https://play.google.com/store/apps/details?id=com.AugmentedClass.AClass&hl=es_419](https://play.google.com/store/apps/details?id=com.AugmentedClass.AClass&hl=es_419)）。该应用允许我们进行演示访问，而无需登录，但对于项目来说，它比注册访问有更多的限制。
 
 1.  现在，在您的手机或平板电脑上，在`root`文件夹中创建一个名为`AClass`的文件夹，并将模型文件`gearbox_worm.glb`以及标记`gearbox_worm.jpg`和`component_desc.jpg`复制到其中。创建文件夹不是必需的，但它会使使用和搜索应用中的内容更容易。
 
@@ -320,7 +406,7 @@ Augmented Class!是一个由一群开发者和教师/教授的动机产生的教
 
 # 创建一个简单项目
 
-我们将首先创建一个简单项目，看看如何使用基于图像的标记在培训项目中使用AR。让我们开始吧：
+我们将首先创建一个简单项目，看看如何使用基于图像的标记在培训项目中使用 AR。让我们开始吧：
 
 1.  打开应用，授予所需的权限，并在登录页面输入您之前提供的电子邮件地址收到的用户名和密码：
 
@@ -348,11 +434,11 @@ Augmented Class! 应用登录窗口
 
 1.  在这里，我们可以选择我们的标记类型。它们如下所示：
 
-+   简单标记：在所选图像上显示AR内容
++   简单标记：在所选图像上显示 AR 内容
 
-+   摄像头交互：当摄像头远离标记时显示一些AR内容，当摄像头靠近标记时显示另一种不同的AR内容
++   摄像头交互：当摄像头远离标记时显示一些 AR 内容，当摄像头靠近标记时显示另一种不同的 AR 内容
 
-+   标记交互：当标记分离时在每个标记上显示AR内容，当它们靠近时在每个标记上显示其他内容
++   标记交互：当标记分离时在每个标记上显示 AR 内容，当它们靠近时在每个标记上显示其他内容
 
 选择 简单标记：
 
@@ -366,7 +452,7 @@ Augmented Class! 应用登录窗口
 
 将“加载标记”方形从左侧滚动视图拖动到中间
 
-1.  现在，我们可以将我们的3D模型添加到标记中。点击左侧的3D按钮，并将“加载模型”拖到屏幕中间的标记上：
+1.  现在，我们可以将我们的 3D 模型添加到标记中。点击左侧的 3D 按钮，并将“加载模型”拖到屏幕中间的标记上：
 
 ![](img/1e4a0391-4d4c-407d-a352-1cdfbf498fd5.png)
 
@@ -376,13 +462,13 @@ Augmented Class! 应用登录窗口
 
 ![](img/0d54980c-0ddd-4ee2-8c3e-2f2d90360542.png)
 
-选择我们的3D模型
+选择我们的 3D 模型
 
 1.  等待模型加载完毕。你会看到模型默认被选中，并且顶部栏上显示着新的按钮。选择手形图标来操纵模型。使用移动/旋转/缩放按钮，操纵齿轮箱，直到它看起来如下：
 
 ![](img/4ebf9ad2-f477-4853-8e24-8d1a6354bf98.png)
 
-3D模型旋转并缩小
+3D 模型旋转并缩小
 
 多手势选项允许你用更少的按钮来操纵模型。
 
@@ -398,19 +484,19 @@ Augmented Class! 应用登录窗口
 
 带有我们项目的查看者窗口
 
-1.  由于我们只有一个项目并且它已经被选中，请按眼睛图标来加载AR。然后，用摄像头指向标记，以在图像上看到3D模型出现。移动和旋转图像，靠近或远离它，从所有角度查看模型：
+1.  由于我们只有一个项目并且它已经被选中，请按眼睛图标来加载 AR。然后，用摄像头指向标记，以在图像上看到 3D 模型出现。移动和旋转图像，靠近或远离它，从所有角度查看模型：
 
 ![](img/d6004136-857a-4321-a99b-86620169f8ec.png)
 
 齿轮箱出现在图像标记上
 
-发明者和查看者窗口都有一个打印按钮，这样你就可以在没有它们的情况下打印带有标记的PDF。
+发明者和查看者窗口都有一个打印按钮，这样你就可以在没有它们的情况下打印带有标记的 PDF。
 
 就这样。我们已经准备好了基本项目。现在，让我们给它添加一些交互功能。
 
 # 添加用户交互
 
-让我们通过让用户触摸屏幕来添加一些交互性，这样他们就可以在悬停在标记上时查看更多的AR信息。按照以下步骤操作：
+让我们通过让用户触摸屏幕来添加一些交互性，这样他们就可以在悬停在标记上时查看更多的 AR 信息。按照以下步骤操作：
 
 1.  返回到发明者窗口并选择我们的项目。按铅笔图标来编辑它：
 
@@ -430,7 +516,7 @@ Augmented Class! 应用登录窗口
 
 将文本元素拖到标记上
 
-1.  输入文本`Worm gear`，并使用操作按钮将其移动到金色齿轮（蜗轮齿轮）旁边我们的3D模型：
+1.  输入文本`Worm gear`，并使用操作按钮将其移动到金色齿轮（蜗轮齿轮）旁边我们的 3D 模型：
 
 ![](img/b299f30d-71bf-4347-bc6c-0d8554655d96.png)
 
@@ -450,7 +536,7 @@ Augmented Class! 应用登录窗口
 
 你可以通过按它们或在层次结构面板中按它们的名称来选择场景中的不同元素。
 
-1.  保存场景并返回到观众窗口以启动AR。现在，当模型出现在图像上时，按它。文本将出现：
+1.  保存场景并返回到观众窗口以启动 AR。现在，当模型出现在图像上时，按它。文本将出现：
 
 ![图片](img/c29c7a7f-811d-4a37-ab7f-17a9f875386b.png)
 
@@ -462,9 +548,9 @@ Augmented Class! 应用登录窗口
 
 现在，我们将创建一个标记交互。我们将有两个标记：模型，如前几节所述，以及一些简单的文本，“组件描述”。
 
-在本例中，我们将保持简单，当我们用相机聚焦于模型的标记时，它将显示3D模型。然而，当我们把两个标记放在一起时，描述文本将出现。
+在本例中，我们将保持简单，当我们用相机聚焦于模型的标记时，它将显示 3D 模型。然而，当我们把两个标记放在一起时，描述文本将出现。
 
-因为我们将重用我们的3D模型的标记，我们将创建另一个项目。在一个项目中，单个标记不能重复，因为观众不知道它应该在标记上显示哪个内容。因此，我们将启动一个新的项目并创建必要的交互。让我们开始吧：
+因为我们将重用我们的 3D 模型的标记，我们将创建另一个项目。在一个项目中，单个标记不能重复，因为观众不知道它应该在标记上显示哪个内容。因此，我们将启动一个新的项目并创建必要的交互。让我们开始吧：
 
 1.  在项目窗口中创建一个新的项目，在黑板窗口中将其命名为`交互式变速箱`。对于此项目，选择两个标记交互：
 
@@ -478,7 +564,7 @@ Augmented Class! 应用登录窗口
 
 ![图片](img/dc8bfb59-d2ca-4c74-9c55-2e1ac8ea2aff.png)
 
-将之前上传的gearbox_womr1图像拖动到第一个标记上
+将之前上传的 gearbox_womr1 图像拖动到第一个标记上
 
 1.  现在，将加载标记方框拖动到第二个标记上以加载`component_desc.png`图片：
 
@@ -486,7 +572,7 @@ Augmented Class! 应用登录窗口
 
 拖动负载标记方框从移动设备加载图像
 
-1.  按下3D按钮，并将`gearbox_worm`模型从滚动视图的末端拖动并放到第一个标记上。这将是我们标记分离时的内容：
+1.  按下 3D 按钮，并将`gearbox_worm`模型从滚动视图的末端拖动并放到第一个标记上。这将是我们标记分离时的内容：
 
 ![图片](img/6b8ca40b-b02d-4adf-b21c-268ad0a4bacf.png)
 
@@ -498,7 +584,7 @@ Augmented Class! 应用登录窗口
 
 场景变为“一起”模式
 
-1.  重复*步骤4*，将模型放置在第一个标记上方。
+1.  重复*步骤 4*，将模型放置在第一个标记上方。
 
 1.  选择文本按钮，并将其中一个字体拖放到第一个标记的两个单独实例中，以创建两组不同的文本。选择并放置如下：
 
@@ -512,19 +598,19 @@ Augmented Class! 应用登录窗口
 
 改变相机视图后的相同场景
 
-1.  就这样。现在，按保存按钮并返回到查看器窗口以启动AR。在网格中选择当前项目并按眼睛图标：
+1.  就这样。现在，按保存按钮并返回到查看器窗口以启动 AR。在网格中选择当前项目并按眼睛图标：
 
 ![图片](img/ac94cf3d-d136-4732-b4f2-d967c0076b09.png)
 
-选择在AR中显示的当前项目
+选择在 AR 中显示的当前项目
 
-1.  现在，你会看到，当它们分离时，变速箱显示3D模型：
+1.  现在，你会看到，当它们分离时，变速箱显示 3D 模型：
 
 ![图片](img/d34a2090-b541-41e6-833c-55f5a8f4421d.png)
 
 当标记分离时，只显示模型
 
-1.  现在，当它们放在一起时，我们展示了之前添加的3D模型和文本：
+1.  现在，当它们放在一起时，我们展示了之前添加的 3D 模型和文本：
 
 ![图片](img/65df9321-4f28-48a6-831a-76ecfafb8c56.png)
 
@@ -580,14 +666,14 @@ Augmented Class! 应用登录窗口
 
 # 接下来是什么？
 
-到目前为止，你已经学会了如何创建一个简单的标记和两个标记交互，并为触摸屏添加了交互功能。为此，我们使用了3D模型和一些文本，但你也可以尝试用视频文件或音频解释来丰富当前的项目。
+到目前为止，你已经学会了如何创建一个简单的标记和两个标记交互，并为触摸屏添加了交互功能。为此，我们使用了 3D 模型和一些文本，但你也可以尝试用视频文件或音频解释来丰富当前的项目。
 
 另一方面，增强类！提供了更多选项，包括与摄像头的交互（当摄像头远离标记时内容改变，当摄像头靠近标记时内容改变），延迟显示内容（元素在一段时间后出现，它们可以再次消失或不消失），以及内容编辑（视频和音频循环，文本颜色和样式等）。一旦你尝试了所有这些选项并且熟悉了它们，就可以设计并创建一个使用所有可能交互的完全交互式项目。
 
 # 摘要
 
-在本章中，你学习了两种不同的训练项目工具。第一个是基于ARCore的Web功能，它允许我们无需编写太多代码，就可以将AR可视化添加到任何在网页上显示的3D模型。第二个工具增强类！使我们能够轻松创建可以服务于不同目的的交互式教育项目，例如学习某个作品的基础知识，培训维护工程师等。
+在本章中，你学习了两种不同的训练项目工具。第一个是基于 ARCore 的 Web 功能，它允许我们无需编写太多代码，就可以将 AR 可视化添加到任何在网页上显示的 3D 模型。第二个工具增强类！使我们能够轻松创建可以服务于不同目的的交互式教育项目，例如学习某个作品的基础知识，培训维护工程师等。
 
-现在，你对AR的通用性有了更好的理解，它可以在移动设备和Web应用程序上使用，以及交互如何帮助创建更深入和更有价值的体验。凭借你在本章中获得的技术，你可以尝试将你的项目迁移到其他领域和需求，以及进一步探索这两个工具，以便你可以改进当前的项目。
+现在，你对 AR 的通用性有了更好的理解，它可以在移动设备和 Web 应用程序上使用，以及交互如何帮助创建更深入和更有价值的体验。凭借你在本章中获得的技术，你可以尝试将你的项目迁移到其他领域和需求，以及进一步探索这两个工具，以便你可以改进当前的项目。
 
-在下一章中，我们将开始使用Unity 3D环境和一些可以集成到其中的其他AR工具。在这里，你将学习如何使用EasyAR工具的图像识别过程来创建一个AR目录。
+在下一章中，我们将开始使用 Unity 3D 环境和一些可以集成到其中的其他 AR 工具。在这里，你将学习如何使用 EasyAR 工具的图像识别过程来创建一个 AR 目录。

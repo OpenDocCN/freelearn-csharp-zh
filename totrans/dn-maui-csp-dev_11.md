@@ -2,11 +2,11 @@
 
 # 探索高级主题
 
-现在，你拥有了中级.NET MAUI程序员的技能和知识。你看到了如何布局控件以及管理和操作这些控件。然后你学习了MVVM设计模式。这些都是基础。
+现在，你拥有了中级.NET MAUI 程序员的技能和知识。你看到了如何布局控件以及管理和操作这些控件。然后你学习了 MVVM 设计模式。这些都是基础。
 
-之后，你进阶到了Shell导航，使用SQLite进行数据持久化，以及编写单元测试的至关重要的技能。
+之后，你进阶到了 Shell 导航，使用 SQLite 进行数据持久化，以及编写单元测试的至关重要的技能。
 
-这最后一章将带你超越这个水平，进入专家.NET MAUI知识的领域。在本章中，我们将涵盖以下主题：
+这最后一章将带你超越这个水平，进入专家.NET MAUI 知识的领域。在本章中，我们将涵盖以下主题：
 
 +   在运行时选择数据模板
 
@@ -20,29 +20,123 @@
 
 # 技术要求
 
-本章的源代码可以在[https://github.com/PacktPublishing/.NET-MAUI-for-C-Sharp-Developers/tree/AdvancedTopics](https://github.com/PacktPublishing/.NET-MAUI-for-C-Sharp-Developers/tree/AdvancedTopics)找到。如果你希望跟随，请确保使用上一章的代码。
+本章的源代码可以在[`github.com/PacktPublishing/.NET-MAUI-for-C-Sharp-Developers/tree/AdvancedTopics`](https://github.com/PacktPublishing/.NET-MAUI-for-C-Sharp-Developers/tree/AdvancedTopics)找到。如果你希望跟随，请确保使用上一章的代码。
 
 # 在运行时选择数据模板
 
-你在[*第5章*](B19723_05.xhtml#_idTextAnchor092)中看到了数据模板在集合视图中使用的情况。现在让我们重新审视那段代码，并在此基础上进行扩展，以便我们能够在运行时根据对象本身的数据修改每个对象的显示。
+你在*第五章*中看到了数据模板在集合视图中使用的情况。现在让我们重新审视那段代码，并在此基础上进行扩展，以便我们能够在运行时根据对象本身的数据修改每个对象的显示。
 
-回顾一下，我们是从`PreferenceService`开始的，我们模拟了获取`Preference`对象列表的过程。现在，我们只需稍作工作就可以从API中获取它。修改`IPreferenceService`以移除`GetPreferencesMock`。
+回顾一下，我们是从`PreferenceService`开始的，我们模拟了获取`Preference`对象列表的过程。现在，我们只需稍作工作就可以从 API 中获取它。修改`IPreferenceService`以移除`GetPreferencesMock`。
 
 接下来，我们需要对`PreferenceService`进行重大重构以与客户端交互。删除你有的内容，并使用以下内容：
 
-[PRE0]
+```cs
+using ForgetMeNot.ApiClient;
+using ForgetMeNotDemo.Model;
+namespace ForgetMeNotDemo.Services;
+public class PreferenceService : IPreferenceService
+{
+  readonly Client apiClient;
+  public PreferenceService(Client apiClient)
+  {
+    this.apiClient = apiClient;
+  }
+  public async Task<List<Preference>> GetPreferences()
+  {
+    try
+    {
+      var response = await apiClient.GetProfile();
+      return response?.Preferences.Select(p => new
+         Preference
+      {
+        PreferencePrompt = p.PreferencePrompt,
+        PreferenceValue = p.PreferenceValue
+      }).ToList();
+    }
+    catch (Exception e)
+    {
+      await Application.Current.MainPage.DisplayAlert
+        ("Preferences error",
+        "We were unable to get your preferences", "Ok");
+      Console.WriteLine(e);
+    }
+    return null;
+  }
+}
+```
 
-这里没有什么新的内容；它与我们在[*第10章*](B19723_10.xhtml#_idTextAnchor187)中获取*Buddies*时看到的内容直接平行。现在我们有一个`Preference`对象的集合，我们可以像在[*第5章*](B19723_05.xhtml#_idTextAnchor092)中那样（如前一章中在`PreferencesPage`中所示）在`CollectionView`中显示它们：
+这里没有什么新的内容；它与我们在*第十章*中获取*Buddies*时看到的内容直接平行。现在我们有一个`Preference`对象的集合，我们可以像在*第五章*中那样（如前一章中在`PreferencesPage`中所示）在`CollectionView`中显示它们：
 
-[PRE1]
+```cs
+<CollectionView
+    ItemsSource="{Binding PreferenceList}"
+    Margin="20,20,10,10"
+    SelectionMode="None">
+    <CollectionView.ItemTemplate>
+        <DataTemplate>
+            <Grid ColumnDefinitions="*,2*">
+                <Entry
+                    FontSize="10"
+                    Grid.Column="0"
+                    HorizontalOptions="Start"
+                    HorizontalTextAlignment="Start"
+                    Text="{Binding PreferencePrompt,
+                        Mode=TwoWay}"
+                    TextColor="{OnPlatform Black,
+                                           iOS=White}" />
+                <Entry
+                    FontSize="10"
+                    Grid.Column="1"
+                    HeightRequest="32"
+                    HorizontalOptions="Start"
+                    HorizontalTextAlignment="Start"
+                    Text="{Binding PreferenceValue,
+                      Mode=TwoWay}"
+                    TextColor="{OnPlatform Black,
+                                           iOS=White}"
+                    WidthRequest="350" />
+            </Grid>
+        </DataTemplate>
+    </CollectionView.ItemTemplate>
+</CollectionView>
+```
 
 注意到`CollectionView`的`ItemTemplate`是在`CollectionView`本身的声明中声明的，但这并不是声明`ItemTemplate`的唯一方式。让我们看看另一种方法。
 
-## 将ItemTemplates声明为资源
+## 将 ItemTemplates 声明为资源
 
 你可以将`ItemTemplate`从`CollectionView`的定义中移除，并将其移动到`ResourceDictionary`中：
 
-[PRE2]
+```cs
+    <ContentPage.Resources>  [1]
+        <ResourceDictionary>
+            <DataTemplate x:Key="PreferenceTemplate"> [2]
+                <Grid ColumnDefinitions="*,2*"> [3]
+                    <Entry
+                        FontSize="10"
+                        Grid.Column="0"
+                        HorizontalOptions="Start"
+                        HorizontalTextAlignment="Start"
+                        Text="{Binding PreferencePrompt,
+                          Mode=TwoWay}"
+                        TextColor="{OnPlatform Black,
+                                iOS=White}" />
+                    <Entry
+                        FontSize="10"
+                        Grid.Column="1"
+                        HeightRequest="32"
+                        HorizontalOptions="Start"
+                        HorizontalTextAlignment="Start"
+                        Text="{Binding PreferenceValue,
+                           Mode=TwoWay}"
+                        TextColor="{OnPlatform Black,
+                                         iOS=White}"
+                        WidthRequest="350" />
+                </Grid>
+            </DataTemplate>
+        </ResourceDictionary>
+    </ContentPage.Resources>
+```
 
 让我们看看我们在这里做了什么：
 
@@ -54,7 +148,14 @@
 
 `CollectionView`现在要简单得多——它只是声明其`ItemTemplate`属性为我们创建的`StaticResource`：
 
-[PRE3]
+```cs
+<CollectionView
+    ItemsSource="{Binding PreferenceList}"
+    ItemTemplate="{StaticResource PreferenceTemplate}"
+    Margin="20,20,10,10"
+    SelectionMode="None">
+</CollectionView>
+```
 
 这很有价值，但除了它开辟了新的可能性之外，几乎没有什么令人兴奋的。
 
@@ -68,7 +169,62 @@
 
 我们知道当我们获取首选项时，一些会有值，一些则没有。假设我们想告诉用户输入一个值，当值为空时将提示变成红色。我们可以创建两个 DataTemplates：
 
-[PRE4]
+```cs
+    <ContentPage.Resources>
+        <ResourceDictionary>
+            <DataTemplate x:Key="PreferenceTemplate">  [1]
+                <Grid ColumnDefinitions="*,2*">
+                    <Entry
+                        FontSize="10"
+                        Grid.Column="0"
+                        HorizontalOptions="Start"
+                        HorizontalTextAlignment="Start"
+                        Text="{Binding PreferencePrompt,
+                           Mode=TwoWay}"
+                        TextColor="{OnPlatform Black,  [2]
+                                       iOS=White}" />
+                    <Entry
+                        FontSize="10"
+                        Grid.Column="1"
+                        HeightRequest="32"
+                        HorizontalOptions="Start"
+                        HorizontalTextAlignment="Start"
+                        Text="{Binding PreferenceValue,
+                           Mode=TwoWay}"
+                        TextColor="{OnPlatform Black,
+                                               iOS=White}"
+                        WidthRequest="350" />
+                </Grid>
+            </DataTemplate>
+            <DataTemplate x:Key=
+              "PreferenceTemplateEmpty">
+              [3]
+                <Grid ColumnDefinitions="*,2*">
+                    <Entry
+                        FontSize="10"
+                        Grid.Column="0"
+                        HorizontalOptions="Start"
+                        HorizontalTextAlignment="Start"
+                        Text="{Binding PreferencePrompt,
+                          Mode=TwoWay}"
+                        TextColor="{OnPlatform Red,
+                                   iOS=Yellow}" />    [4]
+                    <Entry
+                        FontSize="10"
+                        Grid.Column="1"
+                        HeightRequest="32"
+                        HorizontalOptions="Start"
+                        HorizontalTextAlignment="Start"
+                        Text="{Binding PreferenceValue,
+                            Mode=TwoWay}"
+                        TextColor="{OnPlatform Black,
+                                               iOS=White}"
+                        WidthRequest="350" />
+                </Grid>
+            </DataTemplate>
+         </ResourceDictionary>
+    </ContentPage.Resources>
+```
 
 让我们看看这个：
 
@@ -86,7 +242,25 @@
 
 你必须做的第一件事是创建一个包含显示哪个模板逻辑的类。我将其命名为 `PreferenceDataTemplateSelector`。由于我只打算有一个，所以我将其放在 `Services` 文件夹中：
 
-[PRE5]
+```cs
+using ForgetMeNotDemo.Model;
+namespace ForgetMeNotDemo.Services;
+public class PreferenceDataTemplateSelector :
+  DataTemplateSelector  [1]
+{
+  public DataTemplate PreferenceTemplate { get; set; }
+    [2]
+  public DataTemplate PreferenceTemplateEmpty { get; set; }
+  protected override DataTemplate OnSelectTemplate(object
+    item,  [3] BindableObject container)
+  {
+    if (((Preference)item)?.PreferenceValue == null)
+      return PreferenceTemplateEmpty;
+    return ((Preference) item).PreferenceValue.Length > 0 ?
+      PreferenceTemplate : PreferenceTemplateEmpty;    [4]
+  }
+}
+```
 
 你必须做以下事情：
 
@@ -104,7 +278,14 @@
 
 返回到 `PreferencesPage.xaml`。在页面声明中添加 `Xmlns:services="clr-namespace:ForgetMeNotDemo.Services"`。然后，在 `ResourceDictionary` 中添加以下内容：
 
-[PRE6]
+```cs
+<services:PreferenceDataTemplateSelector
+                PreferenceTemplate="{StaticResource
+                    PreferenceTemplate}"
+                PreferenceTemplateEmpty="{StaticResource
+                    PreferenceTemplateEmpty}"
+                x:Key="PreferenceDataTemplateSelector" />
+```
 
 这为我们刚刚创建的类中的名称提供了链接。我们现在有了逻辑，但如何将其连接到 `CollectionView` 呢？
 
@@ -112,13 +293,18 @@
 
 将所有这些连接到 `CollectionView` 只需设置一个 `ItemTemplate`：
 
-[PRE7]
+```cs
+<CollectionView
+    ItemTemplate="{StaticResource PreferenceDataTemplate
+       Selector}"
+    ItemsSource="{Binding PreferenceList}"
+    Margin="20,20,10,10"
+    SelectionMode="None" />
+```
 
 所有这些都汇集在一起。`CollectionView` 在资源中查找 `PreferenceDataTemplateSelector`，它与我们所创建的包含显示哪个 `DataTemplate` 逻辑的类相关联。结果如 *图 11**.1* 所示：
 
-![图 11.1 – 数据模板选择
-
-](img/Figure_11.1_B19723.jpg)
+![图 11.1 – 数据模板选择](img/Figure_11.1_B19723.jpg)
 
 图 11.1 – 数据模板选择
 
@@ -132,13 +318,13 @@ VisualElement
 
 `VisualElement` 是所有控件（和页面）的基类。
 
-根据其状态在`VisualElement`上设置视觉属性的`VisualStates`对象，并根据在XAML中设置的属性显示`VisualElement`。
+根据其状态在`VisualElement`上设置视觉属性的`VisualStates`对象，并根据在 XAML 中设置的属性显示`VisualElement`。
 
 这迫使人们提出问题：什么是视觉状态？
 
 ## 定义通用视觉状态
 
-.NET MAUI为控件定义了一套通用视觉状态：
+.NET MAUI 为控件定义了一套通用视觉状态：
 
 +   `正常`
 
@@ -148,23 +334,54 @@ VisualElement
 
 +   `已选择`
 
-+   `鼠标悬停`（适用于Windows和macOS）
++   `鼠标悬停`（适用于 Windows 和 macOS）
 
-.NET MAUI还允许你定义自己的视觉状态，尽管这不太常见。
+.NET MAUI 还允许你定义自己的视觉状态，尽管这不太常见。
 
 你使用这些视觉状态来设置`VisualElement`上的属性。例如，你可能根据按钮的`VisualState`来改变按钮的外观。一个例子将使这一点更加清晰。
 
 ## 按钮视觉状态示例
 
-当你第一次访问**登录**页面时，你会看到**提交**按钮是禁用的。我们希望它显示为灰色。一旦你填写了**您的电子邮件**和**密码**字段，按钮应该变为浅绿色。如果你将光标移至按钮，它应该通过变为全绿色来表示它具有焦点。你可以通过创建视觉状态来声明性地完成所有这些，如图*图11.2*所示。2*：
+当你第一次访问**登录**页面时，你会看到**提交**按钮是禁用的。我们希望它显示为灰色。一旦你填写了**您的电子邮件**和**密码**字段，按钮应该变为浅绿色。如果你将光标移至按钮，它应该通过变为全绿色来表示它具有焦点。你可以通过创建视觉状态来声明性地完成所有这些，如图*图 11.2*所示。2*：
 
 ![](img/1.jpg)
 
-图11.2 – 按钮的视觉状态
+图 11.2 – 按钮的视觉状态
 
-你可以为单个按钮设置视觉状态，或者，正如我们将在这里做的那样，你可以将视觉状态的XAML放入样式并应用于所有按钮。以下是按钮的完整`Style`：
+你可以为单个按钮设置视觉状态，或者，正如我们将在这里做的那样，你可以将视觉状态的 XAML 放入样式并应用于所有按钮。以下是按钮的完整`Style`：
 
-[PRE8]
+```cs
+<Style x:Key="LoginButton" TargetType="Button"> [1]
+    <Setter Property="Margin" Value="0,20,0,0" />
+    <Setter Property="TextColor" Value="Black" />
+    <Setter Property="WidthRequest" Value="125" />
+    <Setter Property="VisualStateManager
+      .VisualStateGroups"> [2]
+        <VisualStateGroupList>
+            <VisualStateGroup x:Name="CommonStates"> [3]
+                <VisualState x:Name="Normal"> [4]
+                    <VisualState.Setters> [5]
+                        <Setter Property="BackgroundColor"
+                           Value="LightGreen" /> [6]
+                    </VisualState.Setters>
+                </VisualState>
+                <VisualState x:Name="Focused">
+                    <VisualState.Setters>
+                        <Setter Property="BackgroundColor"
+                           Value="Green" />
+                    </VisualState.Setters>
+                </VisualState>
+                <VisualState x:Name="Disabled">
+                    <VisualState.Setters>
+                        <Setter Property="BackgroundColor"
+                          Value="Gray" />
+                    </VisualState.Setters>
+                </VisualState>
+            </VisualStateGroup>
+        </VisualStateGroupList>
+    </Setter>
+</Style>
+```
 
 在这里，我们有以下内容：
 
@@ -180,11 +397,11 @@ VisualElement
 
 +   `[6]`：我们的第一个（在这种情况下，唯一的）`Setter`设置了`BackgroundColor`属性
 
-然后我们继续为所有其他状态设置`Setter`。注意，我们没有为`PointerOver`设置`Setter`，这意味着在Windows和macOS上，如果你将鼠标悬停在按钮上，将不会有任何变化。
+然后我们继续为所有其他状态设置`Setter`。注意，我们没有为`PointerOver`设置`Setter`，这意味着在 Windows 和 macOS 上，如果你将鼠标悬停在按钮上，将不会有任何变化。
 
-.NET MAUI为控件定义了专门的视觉状态。例如，`Button`添加了*按下*状态，而`CheckBox`添加了*已选中*状态，`CollectionViews`添加了*已选择*。
+.NET MAUI 为控件定义了专门的视觉状态。例如，`Button`添加了*按下*状态，而`CheckBox`添加了*已选中*状态，`CollectionViews`添加了*已选择*。
 
-.NET MAUI社区工具包为管理你的应用的外观和行为提供了进一步的帮助，它包含大量行为。
+.NET MAUI 社区工具包为管理你的应用的外观和行为提供了进一步的帮助，它包含大量行为。
 
 # 利用社区工具包行为
 
@@ -192,7 +409,7 @@ VisualElement
 
 社区工具包是开源的
 
-社区工具包不是.NET MAUI的官方部分，它由（惊喜！）社区提供的代码组成——也就是说，独立于微软的开发者。尽管如此，微软的文档包括并越来越多地整合了社区工具包。
+社区工具包不是.NET MAUI 的官方部分，它由（惊喜！）社区提供的代码组成——也就是说，独立于微软的开发者。尽管如此，微软的文档包括并越来越多地整合了社区工具包。
 
 `CommunityToolkit`提供了一套处理许多其他常见编程需求的行为。其中许多行为帮助验证输入。例如，`CommunityToolkit`包括以下内容：
 
@@ -204,15 +421,33 @@ VisualElement
 
 +   文本验证
 
-+   URI验证
++   URI 验证
 
 你将行为附加到控件上。例如，让我们为**登录**页面添加一条规则，说明用户名必须是一个有效的电子邮件地址。首先，在头文件中添加所需的命名空间：
 
-[PRE9]
+```cs
+Xmlns:behaviors=http://schemas.microsoft.com/dotnet/2022/maui/toolkit
+```
 
-你就可以使用Community Toolkit行为来测试有效的电子邮件：
+你就可以使用 Community Toolkit 行为来测试有效的电子邮件：
 
-[PRE10]
+```cs
+<Entry
+    Grid.Column="1"
+    Grid.ColumnSpan="2"
+    Grid.Row="0"
+    Placeholder="Please enter your email address"
+    Text="{Binding LoginName}"
+    WidthRequest="150">
+    <Entry.Behaviors>   [1]
+        <behaviors:EmailValidationBehavior  [2]
+            InvalidStyle="{StaticResource InvalidUserName}"
+              [3]
+            ValidStyle="{StaticResource ValidUserName}" [4]
+            Flags="ValidateOnValueChanged" /> [5]
+    </Entry.Behaviors>
+</Entry>
+```
 
 执行以下操作：
 
@@ -226,17 +461,29 @@ VisualElement
 
 `[5]`: 添加验证行为。它们有标志来指示何时进行验证（在这种情况下，当值改变时），如下面的图所示：
 
-![Figure 11.3 – 验证标志
+![Figure 11.3 – 验证标志](img/Figure_11.3_B19723.jpg)
 
-](img/Figure_11.3_B19723.jpg)
-
-图11.3 – 验证标志
+图 11.3 – 验证标志
 
 还有其他几种非验证行为。这些包括帮助动画视图、进度条动画、帮助自定义设备状态栏颜色和样式的行为，以及当用户停止输入时触发动作的行为。
 
 最后一个在允许用户搜索大量数据时非常有用。与其让搜索在用户输入时增量，或者强迫用户点击**搜索**按钮，不如让搜索在用户停止输入指定时间后开始：
 
-[PRE11]
+```cs
+Place the following code at the top of PreferencesPage.xaml
+<Entry Placeholder="Search" x:Name="SearchEntry">
+    <Entry.Behaviors>
+        <behaviors:UserStoppedTypingBehavior
+            Command="{Binding PreferencesSearchCommand}"
+              [1]
+            CommandParameter="{Binding Source={x:Reference
+               SearchEntry}, Path=Text}"    [2]
+            MinimumLengthThreshold="4"  [3]
+            ShouldDismissKeyboardAutomatically="True" [4]
+            StoppedTypingTimeThreshold="500" /> [5]
+    </Entry.Behaviors>
+</Entry>
+```
 
 让我们看看这段代码做了什么：
 
@@ -250,23 +497,39 @@ VisualElement
 
 +   `[5]`: 等待这么长时间（半秒）以表示用户已经停止输入。
 
-当你将此添加到你的XAML中，并且用户在输入框中输入`Shoe`时，命令被触发，并传递参数。*图11**.4*显示了参数被传递到`PreferencesPageViewModel`中的命令处理器：
+当你将此添加到你的 XAML 中，并且用户在输入框中输入`Shoe`时，命令被触发，并传递参数。*图 11**.4*显示了参数被传递到`PreferencesPageViewModel`中的命令处理器：
 
-![Figure 11.4 – 传递搜索字符串
+![Figure 11.4 – 传递搜索字符串](img/Figure_11.4_B19723.jpg)
 
-](img/Figure_11.4_B19723.jpg)
+图 11.4 – 传递搜索字符串
 
-图11.4 – 传递搜索字符串
-
-行为是一种声明系统在XAML中应该如何表现的方式。另一种将响应动作移动到XAML触发器中的强大机制。
+行为是一种声明系统在 XAML 中应该如何表现的方式。另一种将响应动作移动到 XAML 触发器中的强大机制。
 
 # 使用触发器采取行动
 
-*触发器*允许你根据数据变化在XAML中声明控件的外观。你还可以使用*状态触发器*来改变控件的*视觉状态*，如前面所示。
+*触发器*允许你根据数据变化在 XAML 中声明控件的外观。你还可以使用*状态触发器*来改变控件的*视觉状态*，如前面所示。
 
 例如，我们可能想强制执行`DataTrigger`：
 
-[PRE12]
+```cs
+<Button
+    Command="{Binding DoCreateAccountCommand}"
+    Grid.Column="1"
+    Grid.Row="2"
+    Style="{StaticResource LoginButton}"
+    Text="Create Account">
+    <Button.Triggers>  [1]
+        <DataTrigger
+            Binding="{Binding Source={x:Reference
+               passwordEntry}, Path=Text.Length}"
+            TargetType="Button"
+            Value="0"> [2]
+            <Setter Property="IsEnabled" Value="False" />
+              [3]
+        </DataTrigger>
+    </Button.Triggers>
+</Button>
+```
 
 让我们看看这段代码做了什么：
 
@@ -286,17 +549,17 @@ VisualElement
 
 `public string password =` `string.Empty;`
 
-此触发器的结果在 *图11.5* 和 *图11.6* 中显示。
+此触发器的结果在 *图 11.5* 和 *图 11.6* 中显示。
 
-![图片2](img/2.jpg)
+![图片 2](img/2.jpg)
 
-图11.5 – 当密码字段为空时的触发器
+图 11.5 – 当密码字段为空时的触发器
 
-在 *图11.5* 中，**密码** 字段为空，而在 *图11.6* 中，已经输入了字符到 **密码** 字段：
+在 *图 11.5* 中，**密码** 字段为空，而在 *图 11.6* 中，已经输入了字符到 **密码** 字段：
 
-![图片3](img/3.jpg)
+![图片 3](img/3.jpg)
 
-图11.6 – 当密码字段不为空时的触发器
+图 11.6 – 当密码字段不为空时的触发器
 
 为了好玩，将 `Property` 从 `IsEnabled` 更改为 `IsVisible`。现在，当你进入页面时，按钮不会出现，但当你将字符输入到 **密码** 字段时，它会出现。
 
@@ -318,7 +581,7 @@ VisualElement
 
 这是我多年来一直有的一个应用想法，你可以自由地编写（如果你愿意，还可以出售）。我将无限制地给你：
 
-创建一个看起来很棒的应用程序，收集你在网上书店（使用它们的公共API）上评分为五星的所有书籍。然后，收集那些也给出了大量书籍五星评价的人。排除任何给那些书籍评分为少于五星的人。现在，找到那些似乎与你意见一致的人，并找出他们评分为五星而你尚未阅读的任何书籍。这些是你想阅读的书籍。
+创建一个看起来很棒的应用程序，收集你在网上书店（使用它们的公共 API）上评分为五星的所有书籍。然后，收集那些也给出了大量书籍五星评价的人。排除任何给那些书籍评分为少于五星的人。现在，找到那些似乎与你意见一致的人，并找出他们评分为五星而你尚未阅读的任何书籍。这些是你想阅读的书籍。
 
 享受这个项目！我希望你喜欢这本书。
 
@@ -346,7 +609,7 @@ VisualElement
 
 本节包含所有章节的问题答案。
 
-# 第 1 章，组装你的工具和创建你的第一个应用程序
+# 第一章，组装你的工具和创建你的第一个应用程序
 
 1.  你可以通过选择 **创建一个新项目** 从启动对话框创建一个新的项目。如果你是通过点击 **文件** | **新项目** 直接进入 Visual Studio 的，也可以这样做。
 
@@ -358,7 +621,7 @@ VisualElement
 
 1.  `MauiProgram.cs`。
 
-# 第 3 章，XAML 和 Fluent C#
+# 第三章，XAML 和 Fluent C#
 
 1.  XAML 是一种基于 XML 的标记语言。
 
@@ -372,7 +635,7 @@ VisualElement
 
 1.  事件处理程序位于代码隐藏中。
 
-# 第 4 章，MVVM 和控件
+# 第四章，MVVM 和控件
 
 1.  MVVM 有两个主要优点。首先，如果你的逻辑在代码隐藏文件中，那么几乎不可能对 .NET MAUI 应用程序进行单元测试 – 将逻辑放在 `ViewModel` 中是至关重要的，正如我们将在即将到来的单元测试章节中看到的。其次，MVVM 很好地将 UI 与你的逻辑解耦，允许你更改一个而不破坏另一个。
 
@@ -384,7 +647,7 @@ VisualElement
 
 1.  `SnackBar` 是一个高度可配置的 `Toast` – 一个从页面底部弹出的弹出窗口，然后可以通过计时器耗尽或用户点击它来消失。
 
-# 第 5 章，高级控件
+# 第五章，高级控件
 
 1.  `ActivityIndicator` 显示有 *某事* 正在进行，而 `ProgressBar` 告诉用户任务完成的百分比。
 
@@ -396,11 +659,11 @@ VisualElement
 
 1.  重构样式的 一种方法 是创建一个基本样式，然后使用`BasedOn`创建派生类型，根据需要添加或覆盖属性。
 
-# 第6章，布局
+# 第六章，布局
 
-1.  星号，`auto`和dpi中的值
+1.  星号，`auto`和 dpi 中的值
 
-1.  将100 dpi分配给最后一列，这是第二列所需的大小，然后将第一列和第三列按比例2:1进行划分
+1.  将 100 dpi 分配给最后一列，这是第二列所需的大小，然后将第一列和第三列按比例 2:1 进行划分
 
 1.  行和列偏移量由枚举常量定义
 
@@ -408,7 +671,7 @@ VisualElement
 
 1.  `BindableLayout`不允许你进行选择
 
-# 第7章，理解导航
+# 第七章，理解导航
 
 1.  `AppShell.xaml`
 
@@ -418,9 +681,9 @@ VisualElement
 
 1.  `Shell.Current.GoToAsync`
 
-1.  URL语法或使用字典
+1.  URL 语法或使用字典
 
-# 第8章，存储和检索数据
+# 第八章，存储和检索数据
 
 1.  `Preferences`（不要与`UserPreferences`混淆）。
 
@@ -430,34 +693,34 @@ VisualElement
 
 1.  `SQLiteAsyncConnection`
 
-# 第9章，单元测试
+# 第九章，单元测试
 
 1.  单元测试对于确保代码质量至关重要，并允许你添加和更改代码，同时有信心知道，如果你破坏了某些东西，你将立即发现。
 
-1.  .NET MAUI应用程序中的大部分可测试代码将在ViewModel中，或者可能是服务中。
+1.  .NET MAUI 应用程序中的大部分可测试代码将在 ViewModel 中，或者可能是服务中。
 
 1.  当你需要一个较慢的服务来测试你的代码中的方法时，一个模拟可以代替该服务并立即给出响应。
 
 1.  为了向你的测试提供一个模拟，你必须能够将其注入代码中，以替代运行时对象。
 
-# 第10章，消费REST服务
+# 第十章，消费 REST 服务
 
-1.  一个DTO负责持有将发送到API或从API发送的数据。
+1.  一个 DTO 负责持有将发送到 API 或从 API 发送的数据。
 
-1.  数据库现在在云中，并通过API进行管理。作为客户端，我们不知道，也不需要知道正在使用哪种数据库。
+1.  数据库现在在云中，并通过 API 进行管理。作为客户端，我们不知道，也不需要知道正在使用哪种数据库。
 
-1.  它封装了所有的API调用，以便客户端可以像与一个**普通的CLR对象**（**POCO**）交互一样与API交互。
+1.  它封装了所有的 API 调用，以便客户端可以像与一个**普通的 CLR 对象**（**POCO**）交互一样与 API 交互。
 
-1.  账户创建通过API在云中完成。
+1.  账户创建通过 API 在云中完成。
 
-1.  认证通过API在云中完成。
+1.  认证通过 API 在云中完成。
 
-# 第11章，探索高级主题
+# 第十一章，探索高级主题
 
 1.  根据控件的状态（例如，是否有焦点）修改控件的外观。
 
-1.  在XAML中，添加一个`DataTemplateSelector`来指示潜在的模板，然后添加一个继承自`DataTemplateSelector`的类，重写`OnSelectTemplate`并返回要显示的`DataTemplate`。
+1.  在 XAML 中，添加一个`DataTemplateSelector`来指示潜在的模板，然后添加一个继承自`DataTemplateSelector`的类，重写`OnSelectTemplate`并返回要显示的`DataTemplate`。
 
 1.  我们已经看到了`EventToCommand`行为，它允许你向只有事件的控件添加命令，让你可以在`ViewModel`中处理事件/命令。
 
-1.  你添加带有属性的setter来改变值，并将其设置为指定的值。
+1.  你添加带有属性的 setter 来改变值，并将其设置为指定的值。

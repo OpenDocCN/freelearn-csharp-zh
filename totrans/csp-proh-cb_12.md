@@ -1,4 +1,4 @@
-# 第12章。在Visual Studio中编写安全代码和调试
+# 第十二章。在 Visual Studio 中编写安全代码和调试
 
 在本章中，我们将探讨一些作为开发者提高调试代码效率的示例。我们还将探讨如何编写安全代码。编写安全代码可能是一个挑战，但考虑以下情况：如果你的代码安全部分涉及确保密码被安全存储，为什么要在项目之间反复编写相同的代码？编写一次代码，并在你创建的每个新项目中实施它。我们将探讨的概念如下：
 
@@ -8,7 +8,7 @@
 
 +   保护 `App.config`/`web.config` 中的敏感部分
 
-+   防止SQL注入攻击
++   防止 SQL 注入攻击
 
 +   使用 **诊断工具** 和 **历史调试**
 
@@ -24,7 +24,7 @@
 
 这种场景是许多开发者面临的现实。你可能认为这种场景根本不可能存在，或者也许你正在阅读这篇文章，并认为这个场景与你公司当前的工作流程相符。无论情况如何，这是软件开发中今天正在发生的事情。
 
-那么开发者如何应对项目自杀？（我之所以这样称呼这些项目，是因为以这种方式处理的项目很少能成功。）首先，创建可重用代码。想想那些你经常重复执行到足以编写可重用DLL的过程。你知道你可以创建Visual Studio模板吗？如果你有一个你经常使用的标准项目结构，从它创建一个模板，并在每个新项目中重用它，从而加快交付速度并减少错误。
+那么开发者如何应对项目自杀？（我之所以这样称呼这些项目，是因为以这种方式处理的项目很少能成功。）首先，创建可重用代码。想想那些你经常重复执行到足以编写可重用 DLL 的过程。你知道你可以创建 Visual Studio 模板吗？如果你有一个你经常使用的标准项目结构，从它创建一个模板，并在每个新项目中重用它，从而加快交付速度并减少错误。
 
 对于项目模板的一些考虑包括数据库层、安全层、常见验证代码（这个数据表是否包含任何数据）、常见扩展方法等。
 
@@ -56,15 +56,41 @@
 
 1.  以下类被添加到你的 `Chapter12` 库项目中：
 
-    [PRE0]
+    ```cs
+    namespace Chapter12
+    {
+        public class Recipes
+        {
+
+        }
+    }
+    ```
 
 1.  将以下 `using` 语句添加到你的类中：
 
-    [PRE1]
+    ```cs
+    using System.Security.Cryptography;
+    ```
 
 1.  接下来，你需要向类中添加两个属性。这些属性将存储盐和散列。通常你会在数据库中将这些值与用户名一起写入，但为了本食谱的目的，我们将简单地将其添加到静态属性中。还要添加两个名为 `RegisterUser()` 和 `ValidateLogin()` 的方法。这两个方法都接受 `username` 和 `password` 变量作为参数：
 
-    [PRE2]
+    ```cs
+    public static class Recipes
+    {
+        public static string saltValue { get; set; }
+        public static string hashValue { get; set; }
+
+        public static void RegisterUser(string password, string username)
+        {
+
+        }
+
+        public static void ValidateLogin(string password, string username)
+        {                  
+
+        }
+    }
+    ```
 
 1.  从 `RegisterUser()` 方法开始，这里我们做了很多事情。以下是方法中的步骤列表：
 
@@ -84,7 +110,28 @@
 
         这是在你的应用程序中处理用户密码的一种非常安全的方式：
 
-        [PRE3]
+        ```cs
+        public static void RegisterUser(string password, string username)
+        {
+            // Create a truly random salt using RNGCryptoServiceProvider.
+            RNGCryptoServiceProvider csprng = new RNGCryptoServiceProvider();
+            byte[] salt = new byte[32];
+            csprng.GetBytes(salt);
+
+            // Get the salt value
+            saltValue = Convert.ToBase64String(salt);
+            // Salt the password
+            byte[] saltedPassword = Encoding.UTF8.GetBytes(saltValue + password);
+
+            // Hash the salted password using SHA256
+            SHA256Managed hashstring = new SHA256Managed();
+            byte[] hash = hashstring.ComputeHash(saltedPassword);
+
+            // Save both the salt and the hash in the user's database record.
+            saltValue = Convert.ToBase64String(salt);
+            hashValue = Convert.ToBase64String(hash);            
+        }
+        ```
 
 1.  我们需要创建的下一个方法是`ValidateLogin()`方法。在这里，我们首先验证用户名。如果用户输入的用户名不正确，不要告诉他们。这将警告试图破坏系统的人他们有错误的用户名，并且一旦他们收到错误密码的通知，他们就会知道用户名是正确的。这个方法中的步骤如下：
 
@@ -98,23 +145,62 @@
 
         注意，我们从未从数据库中解密密码。如果你有解密用户密码并匹配输入密码的代码，你需要重新考虑并重写你的密码逻辑。系统永远不应该能够解密用户密码。
 
-        [PRE4]
+        ```cs
+        public static void ValidateLogin(string password, string username)
+        {            
+            // Read the user's salt value from the database
+            string saltValueFromDB = saltValue;
+
+            // Read the user's hash value from the database
+            string hashValueFromDB = hashValue;
+
+            byte[] saltedPassword = Encoding.UTF8.GetBytes(saltValueFromDB + password);
+
+            // Hash the salted password using SHA256
+            SHA256Managed hashstring = new SHA256Managed();
+            byte[] hash = hashstring.ComputeHash(saltedPassword);
+
+            string hashToCompare = Convert.ToBase64String(hash);
+
+            if (hashValueFromDB.Equals(hashToCompare))
+                Console.WriteLine("User Validated.");            
+            else
+                Console.WriteLine("Login credentials incorrect. User not validated.");            
+        }
+        ```
 
 1.  为了测试代码，在你的`CodeSamples`项目中添加对`Chapter12`类的引用：![如何操作…](img/B05391_12_05.jpg)
 
 1.  因为我们已经创建了一个静态类，你可以在你的`Program.cs`文件中添加新的`using static`：
 
-    [PRE5]
+    ```cs
+    using static Chapter12.Recipes;
+    ```
 
 1.  通过调用`RegisterUser()`方法并传入`username`和`password`变量来测试代码。之后，调用`ValidateLogin()`方法，看看密码是否与哈希值匹配。这显然不会在实际的生产系统中同时发生：
 
-    [PRE6]
+    ```cs
+    string username = "dirk.strauss";
+    string password = "^tj_Y4$g1!8LkD";
+    RegisterUser(password, username);
+
+    ValidateLogin(password, username);
+    Console.ReadLine();
+    ```
 
 1.  当你调试代码时，你会看到用户已被验证：![如何操作…](img/B05391_12_06.jpg)
 
 1.  最后，稍微修改一下代码，将`password`变量设置为其他值。这将模拟用户输入错误密码的情况：
 
-    [PRE7]
+    ```cs
+    string username = "dirk.strauss";
+    string password = "^tj_Y4$g1!8LkD";
+    RegisterUser(password, username);
+
+    password = "WrongPassword";
+    ValidateLogin(password, username);
+    Console.ReadLine();
+    ```
 
 1.  当你调试应用程序时，你会看到用户没有被验证：![如何操作…](img/B05391_12_07.jpg)
 
@@ -122,7 +208,7 @@
 
 在代码的任何地方，我们都没有解密密码。事实上，密码从未在任何地方存储过。我们总是与密码的哈希值一起工作。以下是这个菜谱中需要记住的重要点：
 
-+   永远不要在C#中使用`Random`类来生成你的盐。始终使用`RNGCryptoServiceProvider`类。
++   永远不要在 C#中使用`Random`类来生成你的盐。始终使用`RNGCryptoServiceProvider`类。
 
 +   在你的代码中永远不要重复使用相同的盐。所以不要创建一个包含你的盐的常量，并使用它来对系统中所有的密码进行盐化。
 
@@ -130,7 +216,7 @@
 
 +   您无法从数据库中存储的哈希值或盐值中获取密码。因此，如果数据库被破坏，其中存储的密码数据就不会处于风险之中。用户密码的加密是一个单向操作，这意味着它永远不能被解密。同样重要的是要注意，即使源代码被恶意意图的人窃取，您也无法使用该代码来解密数据库中的加密数据。
 
-+   将之前的方法与强大的密码策略相结合（因为即使在2016年，仍然有用户认为使用`'l3tm31n'`作为密码就足够好了），您就拥有了一个非常好的密码加密流程。
++   将之前的方法与强大的密码策略相结合（因为即使在 2016 年，仍然有用户认为使用`'l3tm31n'`作为密码就足够好了），您就拥有了一个非常好的密码加密流程。
 
 当我们查看用户访问表时，存储用户凭据的正确方式看起来可能像这样：
 
@@ -142,15 +228,15 @@
 
 如果您在互联网上注册一项服务，并且他们通过电子邮件或短信向您发送确认，并在该消息中以纯文本形式显示您的密码，那么您应该认真考虑关闭您的账户。如果一个系统可以读取您的密码并以纯文本形式将其发送给您，那么任何人都可以这样做。永远不要为所有登录使用相同的密码。
 
-# 在代码中使用SecureString
+# 在代码中使用 SecureString
 
-保护应用程序免受恶意攻击不是一项容易的任务。这是在编写安全代码的同时最小化错误（黑客通常利用这些错误）和黑帽编写越来越复杂的手段来破坏系统和网络之间的持续斗争。我个人认为，高等教育机构需要教给IT学生两件事：
+保护应用程序免受恶意攻击不是一项容易的任务。这是在编写安全代码的同时最小化错误（黑客通常利用这些错误）和黑帽编写越来越复杂的手段来破坏系统和网络之间的持续斗争。我个人认为，高等教育机构需要教给 IT 学生两件事：
 
-+   如何使用和集成流行的ERP系统
++   如何使用和集成流行的 ERP 系统
 
 +   正确的软件安全原则
 
-事实上，我认为安全编程101不应该只是某个IT课程中的一个模块或主题，而应该是一个独立的课程。它需要得到应有的严肃和尊重，并且最好由能够实际入侵系统或网络的人来教授。
+事实上，我认为安全编程 101 不应该只是某个 IT 课程中的一个模块或主题，而应该是一个独立的课程。它需要得到应有的严肃和尊重，并且最好由能够实际入侵系统或网络的人来教授。
 
 白帽教学生如何妥协系统、利用脆弱的代码和渗透网络，这将大大改变未来软件开发者对待编程的方式。这归结为开发者在进行防御性编程时知道不要做什么。完全有可能，其中一些学生可能会成为黑帽，但这与他们是否参加了关于安全编程黑客的课程无关。
 
@@ -174,25 +260,61 @@
 
     为您创建的代码是文本框控制的 **KeyPress** 事件处理程序。这将在用户按下键盘上的任何键时触发：
 
-    [PRE8]
+    ```cs
+    private void textBox1_KeyPress(object sender, KeyPressEventArgs e)
+    {
+
+    }
+    ```
 
 1.  在 **属性** 面板中，展开 **行为** 组并将 **UseSystemPasswordChar** 的值更改为 `true`：![如何操作…](img/B05391_12_13.jpg)
 
 1.  在代码后，添加以下 `using` 语句：
 
-    [PRE9]
+    ```cs
+    using System.Runtime.InteropServices;
+    ```
 
 1.  将 `SecureString` 变量作为全局变量添加到您的 Windows Forms 中：
 
-    [PRE10]
+    ```cs
+    SecureString secure = new SecureString();
+    ```
 
 1.  然后在 `KeyPress` 事件中，每次用户按下键时，将 `KeyChar` 值追加到 `SecureString` 变量中。您可能想要添加代码来忽略某些按键，但这超出了本食谱的范围：
 
-    [PRE11]
+    ```cs
+    private void textBox1_KeyPress(object sender, KeyPressEventArgs e)
+    {
+        secure.AppendChar(e.KeyChar);
+    }
+    ```
 
 1.  然后在 **登录** 按钮的事件处理程序中，添加以下代码以从 `SecureString` 对象中读取值。我们正在处理非托管内存和非托管代码：
 
-    [PRE12]
+    ```cs
+    private void btnLogin_Click(object sender, EventArgs e)
+    {
+        IntPtr unmanagedPtr = IntPtr.Zero;
+
+        try
+        {
+            if (secure == null)
+                throw new ArgumentNullException("Password not defined");
+            unmanagedPtr = Marshal.SecureStringToGlobalAllocUnicode(secure);
+            MessageBox.Show($"SecureString password to validate is {Marshal.PtrToStringUni(unmanagedPtr)}");
+        }
+        catch(Exception ex)
+        {
+            MessageBox.Show(ex.Message);
+        }
+        finally
+        {
+            Marshal.ZeroFreeGlobalAllocUnicode(unmanagedPtr);
+            secure.Dispose();
+        }
+    }
+    ```
 
 1.  运行您的 Windows Forms 应用程序并输入一个密码：![如何操作…](img/B05391_12_31.jpg)
 
@@ -222,11 +344,25 @@
 
 1.  如果你打开 `App.config` 文件，你会看到在 `appSettings` 标签内添加了一个名为 `Secret` 的键。这些信息可能一开始就不应该放在 `App.config` 文件中。这里的问题可能是它可能会被提交到你的源代码控制中。想象一下在 GitHub 上会怎样？
 
-    [PRE13]
+    ```cs
+    <?xml version="1.0" encoding="utf-8"?>
+    <configuration>
+        <startup> 
+            <supportedRuntime version="v4.0" sku=".NETFramework,Version=v4.6.1"/>
+        </startup>
+        <appSettings>
+          <add key="name" value="Dirk"/>
+          <add key="lastname" value="Strauss"/> 
+          <add key="Secret" value="letMeIn"/>
+        </appSettings>
+    </configuration>
+    ```
 
 1.  为了克服这种漏洞，我们需要将敏感数据从 `App.config` 文件移到另一个文件中。为此，我们指定一个包含我们想要从 `App.config` 文件中移除的敏感数据的文件路径：
 
-    [PRE14]
+    ```cs
+    <appSettings file="C:\temp\secret\secret.config">
+    ```
 
     ### 注意
 
@@ -246,11 +382,17 @@
 
 1.  在你的 `Program.cs` 文件顶部添加以下 `using` 语句：
 
-    [PRE15]
+    ```cs
+    using System.Configuration;
+    ```
 
 1.  将以下代码添加到读取 `Secret` 密钥设置的 `App.config` 文件中。这次，它将读取合并的文件，该文件由你的 `App.config` 和 `secret.config` 文件组成：
 
-    [PRE16]
+    ```cs
+    string sSecret = ConfigurationManager.AppSettings["Secret"];
+    Console.WriteLine(sSecret);
+    Console.ReadLine();
+    ```
 
 1.  运行你的控制台应用程序，你会看到敏感数据已经从 `secret.config` 文件中读取，该文件在运行时与 `App.config` 文件合并：![如何操作…](img/B05391_12_21.jpg)
 
@@ -280,11 +422,37 @@ SQL 注入攻击是一个非常现实的问题。有太多应用程序仍然容�
 
 1.  SQL Server 将为你创建以下存储过程模板。这个模板包括一个可以注释特定存储过程的区域，以及一个可以添加你可能需要的参数的区域，以及显然你需要添加实际 SQL 语句的区域：
 
-    [PRE17]
+    ```cs
+    SET ANSI_NULLS ON
+    GO
+    SET QUOTED_IDENTIFIER ON
+    GO
+    -- =============================================
+    -- Author:          <Author,,Name>
+    -- Create date:      <Create Date,,>
+    -- Description:      <Description,,>
+    -- =============================================
+    CREATE PROCEDURE <Procedure_Name, sysname, ProcedureName> 
+        -- Add the parameters for the stored procedure here
+        <@Param1, sysname, @p1> <Datatype_For_Param1, , int> = <Default_Value_For_Param1, , 0>, 
+        <@Param2, sysname, @p2> <Datatype_For_Param2, , int> = <Default_Value_For_Param2, , 0>
+    AS
+    BEGIN
+        -- SET NOCOUNT ON added to prevent extra result sets from
+        -- interfering with SELECT statements.
+        SET NOCOUNT ON;
+
+        -- Insert statements for procedure here
+        SELECT <@Param1, sysname, @p1>, <@Param2, sysname, @p2>
+    END
+    GO
+    ```
 
 1.  给存储过程一个合适的名称，以描述存储过程的行为或意图：
 
-    [PRE18]
+    ```cs
+    CREATE PROCEDURE cb_ReadCurrentUserDisplayData
+    ```
 
     ### 注意
 
@@ -294,11 +462,20 @@ SQL 注入攻击是一个非常现实的问题。有太多应用程序仍然容�
 
 1.  为此存储过程定义一个参数。通过这样做，你是在告诉数据库，当调用此存储过程时，它将通过一个存储在参数调用 `@userID` 中的整数值传递：
 
-    [PRE19]
+    ```cs
+    @userID INT
+    ```
 
 1.  你现在定义此存储过程要使用的 SQL 语句。我们只是做一个简单的 `SELECT` 语句：
 
-    [PRE20]
+    ```cs
+    SELECT
+       Firstname, Lastname, Displayname
+    FROM
+       dbo.UserDisplayData
+    WHERE
+       ID = @userID
+    ```
 
     ### 注意
 
@@ -318,15 +495,34 @@ SQL 注入攻击是一个非常现实的问题。有太多应用程序仍然容�
 
 1.  首先，将以下 `using` 语句添加到控制台应用程序的顶部：
 
-    [PRE21]
+    ```cs
+    using System.Data.SqlClient;
+    ```
 
 1.  然后，我们添加变量来包含我们需要登录服务器的凭据：
 
-    [PRE22]
+    ```cs
+    int intUserID = 1;
+    int cmdTimeout = 15;
+    string server = "DIRK";
+    string db = "CookbookDB";
+    string uid = "dirk";
+    string password = "uR^GP2ABG19@!R";
+    ```
 
 1.  我们现在使用 `SecureString` 来存储密码并将其添加到 `SqlCredential` 对象中：
 
-    [PRE23]
+    ```cs
+    SecureString secpw = new SecureString();
+    if (password.Length > 0)
+    {
+        foreach (var c in password.ToCharArray()) secpw.AppendChar(c);
+    }
+    secpw.MakeReadOnly();
+
+    string dbConn = $"Data Source={server};Initial Catalog={db};";
+    6SqlCredential cred = new SqlCredential(uid, secpw);
+    ```
 
     ### 注意
 
@@ -334,11 +530,26 @@ SQL 注入攻击是一个非常现实的问题。有太多应用程序仍然容�
 
 1.  现在，我们在 `using` 语句内部创建一个 `SqlConnection` 对象。这确保了当 `using` 语句超出作用域时，SQL 连接将被关闭：
 
-    [PRE24]
+    ```cs
+    using (SqlConnection conn = new SqlConnection(dbConn, cred))
+    {                
+        try
+        {
 
-1.  在`try`块中，添加以下代码以打开连接字符串并创建一个`SqlCommand`对象，该对象接受打开的连接和存储过程的名称作为参数。你可以使用创建实际SQL参数的快捷方法将其传递给存储过程：
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+        }
+    }
+    Console.ReadLine();
+    ```
 
-    [PRE25]
+1.  在`try`块中，添加以下代码以打开连接字符串并创建一个`SqlCommand`对象，该对象接受打开的连接和存储过程的名称作为参数。你可以使用创建实际 SQL 参数的快捷方法将其传递给存储过程：
+
+    ```cs
+    cmd.Parameters.Add("userID", SqlDbType.Int).Value = intUserID;
+    ```
 
     因为我只是向存储过程传递一个整型参数，所以我没有为这个参数定义长度：
 
@@ -346,89 +557,205 @@ SQL 注入攻击是一个非常现实的问题。有太多应用程序仍然容�
 
     然而，如果你需要定义一个类型为`VarChar(MAX)`的参数，你需要通过添加`-1`来定义参数类型的大小。例如，如果你需要将学生的论文存储到数据库中，那么对于`VarChar(MAX)`的代码将如下所示：
 
-    [PRE26]
+    ```cs
+    cmd.Parameters.Add("essay", SqlDbType.VarChar, -1).Value = essayValue;
+    ```
 
 1.  在我们将参数及其值添加到`SqlCommand`对象之后，我们指定一个超时值，执行`SqlDataReader`，并将其加载到`DataTable`中。然后，该值被输出到控制台应用程序：
 
-    [PRE27]
+    ```cs
+    conn.Open();
+    SqlCommand cmd = new SqlCommand("cb_ReadCurrentUserDisplayData", conn);
+    cmd.CommandType = CommandType.StoredProcedure;
+    cmd.Parameters.Add("userID", SqlDbType.Int).Value = intUserID;
+    cmd.CommandTimeout = cmdTimeout;
+    var returnData = cmd.ExecuteReader();
+    var dtData = new DataTable();
+    dtData.Load(returnData);
+
+    if (dtData.Rows.Count != 0)
+         Console.WriteLine(dtData.Rows[0]["Displayname"]);
+    ```
 
 1.  在你将所有代码添加到控制台应用程序之后，正确的完整代码将如下所示：
 
-    [PRE28]
+    ```cs
+    int intUserID = 1;
+    int cmdTimeout = 15;
+    string server = "DIRK";
+    string db = "CookbookDB";
+    string uid = "dirk";
+    string password = "uR^GP2ABG19@!R";
+    SecureString secpw = new SecureString();
+    if (password.Length > 0)
+    {
+        foreach (var c in password.ToCharArray()) secpw.AppendChar(c);
+    }
+    secpw.MakeReadOnly();
+
+    string dbConn = $"Data Source={server};Initial Catalog={db};";
+
+    SqlCredential cred = new SqlCredential(uid, secpw);
+    using (SqlConnection conn = new SqlConnection(dbConn, cred))
+    {                
+        try
+        {
+            conn.Open();
+            SqlCommand cmd = new SqlCommand("cb_ReadCurrentUserDisplayData", conn);
+            cmd.CommandType = CommandType.StoredProcedure;
+            cmd.Parameters.Add("userID", SqlDbType.Int).Value = intUserID;
+            cmd.CommandTimeout = cmdTimeout;
+            var returnData = cmd.ExecuteReader();
+            var dtData = new DataTable();
+            dtData.Load(returnData);
+            if (dtData.Rows.Count != 0)
+            Console.WriteLine(dtData.Rows[0]["Displayname"]);
+
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+        }
+    }
+    Console.ReadLine();
+    ```
 
 1.  运行你的控制台应用程序，你将看到显示名称输出到屏幕上：![如何操作…](img/B05391_12_28.jpg)
 
 ## 它是如何工作的…
 
-通过创建参数化SQL查询，编译器在运行SQL语句之前正确地替换了参数。它将防止恶意数据更改你的SQL语句以实现恶意结果。这是因为`SqlCommand`对象不会直接将参数值插入到语句中。
+通过创建参数化 SQL 查询，编译器在运行 SQL 语句之前正确地替换了参数。它将防止恶意数据更改你的 SQL 语句以实现恶意结果。这是因为`SqlCommand`对象不会直接将参数值插入到语句中。
 
 总结一下，使用参数化存储过程意味着不再有“小鲍比·表格”的问题。
 
 # 使用诊断工具和历史调试
 
-这个可靠的旧虫子已经成为了软件开发者和工程师们超过140年的噩梦。是的，你没有看错。实际上，是托马斯·爱迪生在19世纪70年代末提出了“bug”这个术语。这个词出现在他许多笔记本条目中，例如，他描述了白炽灯泡仍然有许多“bug”未解决。
+这个可靠的旧虫子已经成为了软件开发者和工程师们超过 140 年的噩梦。是的，你没有看错。实际上，是托马斯·爱迪生在 19 世纪 70 年代末提出了“bug”这个术语。这个词出现在他许多笔记本条目中，例如，他描述了白炽灯泡仍然有许多“bug”未解决。
 
-他调试发明的努力是非常传奇的。考虑一下，一个已经六十多岁的男人需要工作112小时的工作周，这需要多大的真金不怕火炼和决心。他和他的七人团队（有一个常见的误解，认为只有六个人，因为第七个人没有出现在团队照片中）在5周的艰苦工作中几乎没睡过觉，因此被称为“失眠小队”。
+他调试发明的努力是非常传奇的。考虑一下，一个已经六十多岁的男人需要工作 112 小时的工作周，这需要多大的真金不怕火炼和决心。他和他的七人团队（有一个常见的误解，认为只有六个人，因为第七个人没有出现在团队照片中）在 5 周的艰苦工作中几乎没睡过觉，因此被称为“失眠小队”。
 
-现在，由于技术的进步，软件开发者可以拥有大量的调试工具（在Visual Studio内部和外部）可供使用。那么调试真的重要吗？当然很重要。它是我们作为软件开发者所做的一部分。如果我们不调试，那么这里有一些例子：
+现在，由于技术的进步，软件开发者可以拥有大量的调试工具（在 Visual Studio 内部和外部）可供使用。那么调试真的重要吗？当然很重要。它是我们作为软件开发者所做的一部分。如果我们不调试，那么这里有一些例子：
 
-+   在2004年，英国**电子数据系统公司**（**EDS**）的儿童抚养金系统向近200万人多付了抚养金，向近100万人少付了抚养金，导致数十亿美元的抚养金未能收回。EDS与它依赖的另一个系统之间的不兼容性导致纳税人损失了钱财，并负面影响了许多单身父母的生活。
++   在 2004 年，英国**电子数据系统公司**（**EDS**）的儿童抚养金系统向近 200 万人多付了抚养金，向近 100 万人少付了抚养金，导致数十亿美元的抚养金未能收回。EDS 与它依赖的另一个系统之间的不兼容性导致纳税人损失了钱财，并负面影响了许多单身父母的生活。
 
-+   2012年苹果地图的首次发布。无需多言。尽管对许多人来说令人困惑，但我仍然在陌生的城市或地区使用谷歌地图进行路线导航。
++   2012 年苹果地图的首次发布。无需多言。尽管对许多人来说令人困惑，但我仍然在陌生的城市或地区使用谷歌地图进行路线导航。
 
-+   Therac-25放射治疗机使用电子束靶向患者的肿瘤。不幸的是，软件中的竞争条件导致机器向几位患者提供了致命的过量辐射。
++   Therac-25 放射治疗机使用电子束靶向患者的肿瘤。不幸的是，软件中的竞争条件导致机器向几位患者提供了致命的过量辐射。
 
 在互联网上可以找到许多影响数百万人的软件缺陷的例子。我们不仅仅是在谈论普通的缺陷。有时我们面临的是看似无法克服的问题。知道如何使用一些可用工具的安慰，是稳定应用程序和完全无法使用应用程序之间的区别。
 
 ## 准备中
 
-到我写这篇文章的时候，IntelliTrace仅在Visual Studio 2015 Enterprise中可用。然而，IntelliTrace并不是Visual Studio的新特性。自Visual Studio 2010以来，它已经随着时间的推移发展成我们今天所拥有的功能。
+到我写这篇文章的时候，IntelliTrace 仅在 Visual Studio 2015 Enterprise 中可用。然而，IntelliTrace 并不是 Visual Studio 的新特性。自 Visual Studio 2010 以来，它已经随着时间的推移发展成我们今天所拥有的功能。
 
 ## 如何操作…
 
 1.  首先，转到**工具** | **选项**：![如何操作…](img/B05391_12_34.jpg)
 
-1.  展开IntelliTrace节点并点击**常规**。确保**启用IntelliTrace**被勾选。同时，确保**IntelliTrace事件和调用信息**选项被选中。点击**确定**：![如何操作…](img/B05391_12_35.jpg)
+1.  展开 IntelliTrace 节点并点击**常规**。确保**启用 IntelliTrace**被勾选。同时，确保**IntelliTrace 事件和调用信息**选项被选中。点击**确定**：![如何操作…](img/B05391_12_35.jpg)
 
 1.  在`Recipes.cs`文件中，你可能需要添加以下`using`语句：
 
-    [PRE29]
+    ```cs
+    using System.Diagnostics;
+    using System.Reflection;
+    using System.IO;
+    ```
 
 1.  向`Recipes`类添加一个名为`ErrorInception()`的方法。同时，添加读取基本路径的代码，并假设存在一个名为`log`的文件夹。不要在你的硬盘上创建此文件夹。我们希望抛出一个异常。最后，添加另一个名为`LogException()`的方法，它不做任何事情：
 
-    [PRE30]
+    ```cs
+    public static void ErrorInception()
+    {
+        string basepath = Path.GetDirectoryName (Assembly.GetEntryAssembly().Location);
+        var full = Path.Combine(basepath, "log");
+    }
+
+    private static void LogException(string message)
+    {
+
+    }
+    ```
 
 1.  在确定完整路径后，将以下代码添加到`ErrorInception()`方法中。这里我们正在尝试打开日志文件。这就是异常将发生的地方：
 
-    [PRE31]
+    ```cs
+    try
+    {
+        for (int i = 0; i <= 3; i++)
+        {
+            // do work
+            File.Open($"{full}\\log.txt", FileMode.Append);
+        }
+    }
+    catch (Exception ex)
+    {
+        StackTrace st = new StackTrace();
+        StackFrame sf = st.GetFrame(0);
+        MethodBase currentMethodName = sf.GetMethod();
+        ex.Data.Add("Date", DateTime.Now);
+        LogException(ex.Message);
+    }
+    ```
 
 1.  当你添加了所有代码后，你的代码应该看起来像这样：
 
-    [PRE32]
+    ```cs
+    public static void ErrorInception()
+    {
+        string basepath = Path.GetDirectoryName(Assembly.GetEntryAssembly().Location);
+        var full = Path.Combine(basepath, "log");
+
+        try
+        {
+            for (int i = 0; i <= 3; i++)
+            {
+                // do work
+                File.Open($"{full}\\log.txt", FileMode.Append);
+            }
+        }
+        catch (Exception ex)
+        {
+            StackTrace st = new StackTrace();
+            StackFrame sf = st.GetFrame(0);
+            MethodBase currentMethodName = sf.GetMethod();
+            ex.Data.Add("Date", DateTime.Now);
+            LogException(ex.Message);
+        }
+    }
+
+    private static void LogException(string message)
+    {
+
+    }
+    ```
 
 1.  在`Program.cs`文件中，调用`ErrorInception()`方法。紧接着，执行`Console.ReadLine()`，以便我们的控制台应用程序在此处暂停。不要在你的代码中添加任何断点：
 
-    [PRE33]
+    ```cs
+    ErrorInception();
+    Console.ReadLine();
+    ```
 
 1.  开始调试你的应用程序。异常被抛出，应用程序继续运行，这是在更复杂的应用程序中经常遇到的情况。在这个时候，你可能会期望日志文件附加了应用程序的虚构数据，但什么也没有发生。正是在这个时候，你停止应用程序，并在你的代码中到处添加断点，进行一种试错练习。我说试错，因为你可能不知道错误的确切位置。如果你的代码文件包含几千行代码，这种情况尤其如此。
 
-    好吧，现在，有了IntelliTrace和历史调试，你只需要点击**Break All**按钮：
+    好吧，现在，有了 IntelliTrace 和历史调试，你只需要点击**Break All**按钮：
 
     ![如何操作…](img/B05391_12_41.jpg)
 
 1.  你的应用程序现在基本上是暂停的。如果你看不到**诊断工具**窗口，请转到**调试**并点击**显示诊断工具**（或*Ctrl* + *Alt* + *F2*）：![如何操作…](img/B05391_12_40.jpg)
 
-1.  Visual Studio现在显示**诊断工具**窗口。立即你可以看到在**事件**部分由红色菱形图标指示的问题。在底部的**事件**选项卡中，你可以点击异常：![如何操作…](img/B05391_12_42.jpg)
+1.  Visual Studio 现在显示**诊断工具**窗口。立即你可以看到在**事件**部分由红色菱形图标指示的问题。在底部的**事件**选项卡中，你可以点击异常：![如何操作…](img/B05391_12_42.jpg)
 
-1.  做这件事可以扩展异常详细信息，你可以看到日志文件未找到。然而，Visual Studio在历史调试方面更进一步：![如何操作…](img/B05391_12_43.jpg)
+1.  做这件事可以扩展异常详细信息，你可以看到日志文件未找到。然而，Visual Studio 在历史调试方面更进一步：![如何操作…](img/B05391_12_43.jpg)
 
 1.  你会在异常详细信息底部看到一个链接，上面写着**激活历史调试**。点击此链接。这允许你在代码编辑器中看到导致此异常的实际代码行。它还允许你在**局部变量**窗口、调用堆栈和其他窗口中查看应用程序的状态历史。现在你可以在代码编辑器中看到导致异常的具体代码行。在**局部变量**窗口中，你还可以看到应用程序用来查找日志文件的路径。这种调试体验非常强大，允许开发者直接找到错误的源头。这导致生产力的提高和更好的代码：![如何操作…](img/B05391_12_44.jpg)
 
 ## 它是如何工作的…
 
-那么，这里的关键点是什么？如果你只能记住一件事，那就记住这一点。一旦你的系统用户因为bug而失去对该系统能力和潜力的信心，这种信心几乎无法恢复。即使你从bug和其他问题中恢复你的系统，重新启动它，并生产出一个无瑕疵的产品，用户也不会轻易被说服。这是因为在他们心中，系统是有bug的。
+那么，这里的关键点是什么？如果你只能记住一件事，那就记住这一点。一旦你的系统用户因为 bug 而失去对该系统能力和潜力的信心，这种信心几乎无法恢复。即使你从 bug 和其他问题中恢复你的系统，重新启动它，并生产出一个无瑕疵的产品，用户也不会轻易被说服。这是因为在他们心中，系统是有 bug 的。
 
-我曾经接管了一个由即将离职的高级开发者部分开发完成的系统。她有一个优秀的规范和一个展示给客户的良好展示的原型。唯一的问题是她在系统第一阶段实施后不久就离开了公司。当bug开始出现时，客户自然要求她提供帮助。
+我曾经接管了一个由即将离职的高级开发者部分开发完成的系统。她有一个优秀的规范和一个展示给客户的良好展示的原型。唯一的问题是她在系统第一阶段实施后不久就离开了公司。当 bug 开始出现时，客户自然要求她提供帮助。
 
 告诉客户，负责与客户建立关系的开发者（一直负责构建这种关系）已经离开公司，这对建立信心并没有好处。在这个特定项目中，只有一个开发者参与本身就是第一个错误。
 
@@ -452,7 +779,14 @@ Visual Studio 为开发者提供了一套非常强大且功能丰富的调试工
 
 1.  将以下代码添加到你的 `Program.cs` 文件中。我们只是创建了一个整数列表并遍历该列表：
 
-    [PRE34]
+    ```cs
+    List<int> myList = new List<int>() { 1, 4, 6, 9, 11 };
+    foreach(int num in myList)
+    {
+        Console.WriteLine(num);
+    }
+    Console.ReadLine();
+    ```
 
 1.  接下来，在循环内的 `Console.WriteLine(num)` 代码行上放置一个断点：![如何做…](img/B05391_12_45.jpg)
 
@@ -464,9 +798,9 @@ Visual Studio 为开发者提供了一套非常强大且功能丰富的调试工
 
 ## 它是如何工作的…
 
-条件在每次循环时都会被评估。当条件为真时，断点将被触发。在本食谱中展示的示例中，条件断点的真正好处有些被忽略了，因为它是一个非常小的列表。但考虑一下。您正在绑定一个数据网格。网格中的项目根据项目状态被赋予特定的图标。由于这是一个分层网格，您的网格包含数百个项目。您识别出绑定到网格的项目的主ID。然后，将此主ID传递给其他代码逻辑以确定状态，该状态决定了显示的图标。
+条件在每次循环时都会被评估。当条件为真时，断点将被触发。在本食谱中展示的示例中，条件断点的真正好处有些被忽略了，因为它是一个非常小的列表。但考虑一下。您正在绑定一个数据网格。网格中的项目根据项目状态被赋予特定的图标。由于这是一个分层网格，您的网格包含数百个项目。您识别出绑定到网格的项目的主 ID。然后，将此主 ID 传递给其他代码逻辑以确定状态，该状态决定了显示的图标。
 
-通过数百次循环来调试并按下 *F10* 键在任何情况下都是没有效率的。使用条件断点，您可以为主ID指定一个值，并且只有当循环达到该值时才会中断。然后您可以直接跳转到显示不正确的项目。
+通过数百次循环来调试并按下 *F10* 键在任何情况下都是没有效率的。使用条件断点，您可以为主 ID 指定一个值，并且只有当循环达到该值时才会中断。然后您可以直接跳转到显示不正确的项目。
 
 # 使用 PerfTips 识别代码中的瓶颈
 
@@ -482,15 +816,34 @@ PerfTips 一定是 Visual Studio 2015 中我最喜欢的功能之一。解释它
 
 1.  我们将创建一些简单的模拟长时间运行任务的方法。为此，我们只需让线程休眠几秒钟。在 `Recipes.cs` 文件中，添加以下代码：
 
-    [PRE35]
+    ```cs
+    public static void RunFastTask()
+    {
+        RunLongerTask();
+    }
+
+    private static void RunLongerTask()
+    {
+        Thread.Sleep(3000);
+        BottleNeck();
+    }
+
+    private static void BottleNeck()
+    {
+        Thread.Sleep(8000);
+    }
+    ```
 
 1.  在您的控制台应用程序中，调用静态方法 `RunFastTask()` 并在此行代码上放置断点：
 
-    [PRE36]
+    ```cs
+    RunFastTask();
+    Thread.Sleep(1000);
+    ```
 
 1.  开始调试您的控制台应用程序。您的断点将停在 `RunFastTask()` 方法上。按 *F10* 跳过此方法：![如何操作…](img/B05391_12_37.jpg)
 
-1.  您会注意到11秒后，下一行将被突出显示，并显示 PerfTip。PerfTip 显示了上一行代码执行所需的时间。因此，现在位于 `Thread.Sleep` 上的调试器显示 `RunFastTask()` 方法花费了11秒来完成。显然，这个任务并不快：![如何操作…](img/B05391_12_38.jpg)
+1.  您会注意到 11 秒后，下一行将被突出显示，并显示 PerfTip。PerfTip 显示了上一行代码执行所需的时间。因此，现在位于 `Thread.Sleep` 上的调试器显示 `RunFastTask()` 方法花费了 11 秒来完成。显然，这个任务并不快：![如何操作…](img/B05391_12_38.jpg)
 
 1.  步入 `RunFastTask()` 方法，您可以放置更多的断点并逐个跳过它们以找到导致最长延迟的方法。正如您所看到的，PerfTips 允许开发者快速轻松地识别代码中的瓶颈：![如何操作…](img/B05391_12_39.jpg)
 

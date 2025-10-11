@@ -1,8 +1,8 @@
 # *第一章*：文本、流程、选择和编织
 
-本章通过考察分支叙事以及ink如何支持创建它们，介绍了非线性叙事的核心概念。在这些概念的基础上，本章还回顾了使用线条、它们内部的文本，以及如何将它们结合起来的方法。
+本章通过考察分支叙事以及 ink 如何支持创建它们，介绍了非线性叙事的核心概念。在这些概念的基础上，本章还回顾了使用线条、它们内部的文本，以及如何将它们结合起来的方法。
 
-在ink中创建非线性、交互式叙事的核心元素中，选择被解释，以及如何最佳地使用它们。在需要大型分支结构的情况下，以及如何使用聚集点将这些编织简化为更简单的部分，讨论了选择的编织和集合。
+在 ink 中创建非线性、交互式叙事的核心元素中，选择被解释，以及如何最佳地使用它们。在需要大型分支结构的情况下，以及如何使用聚集点将这些编织简化为更简单的部分，讨论了选择的编织和集合。
 
 本章将涵盖以下主要内容：
 
@@ -14,7 +14,7 @@
 
 # 技术要求
 
-本章中使用的示例，在`*.ink`文件中，可以在GitHub上找到：[https://github.com/PacktPublishing/Dynamic-Story-Scripting-with-the-ink-Scripting-Language/tree/main/Chapter1](https://github.com/PacktPublishing/Dynamic-Story-Scripting-with-the-ink-Scripting-Language/tree/main/Chapter1)。
+本章中使用的示例，在`*.ink`文件中，可以在 GitHub 上找到：[`github.com/PacktPublishing/Dynamic-Story-Scripting-with-the-ink-Scripting-Language/tree/main/Chapter1`](https://github.com/PacktPublishing/Dynamic-Story-Scripting-with-the-ink-Scripting-Language/tree/main/Chapter1)。
 
 # 将分支叙事视为流程
 
@@ -24,13 +24,21 @@
 
 考虑以下示例，其中每个句子都是故事的一部分：
 
-[PRE0]
+```cs
+The sun was shining in a clear blue sky.
+Clouds rolled in and it began to rain.
+The clouds cleared away and the sun emerged.
+```
 
 如果从第一句到最后一句话按顺序阅读，有一个故事，其中主要部分是太阳照耀、云朵到来，但随后云朵离开，太阳再次照耀。然而，如果重新排列这些部分会发生什么呢？
 
 示例 1：
 
-[PRE1]
+```cs
+The clouds cleared away and the sun emerged.
+The sun was shining in a clear blue sky.
+Clouds rolled in and it began to rain.
+```
 
 通过不同的顺序，为读者创造一个新的叙事。在这个版本中，故事的发展从太阳升起和照耀开始。接下来，云朵移动进来，开始下雨。在任何情况下，只使用了三个事件，但它们的顺序影响了读者的叙事体验。
 
@@ -42,7 +50,7 @@
 
 ![Figure 1.1 – Mapping nonlinear storytelling](img/Figure_1.1_B17597.jpg)
 
-图1.1 – 非线性叙事映射
+图 1.1 – 非线性叙事映射
 
 通过导航非线性故事创建的结构通常被比作*树*。它们从树干开始，然后，随着遇到不同的部分，就会形成一个*分支模式*，每个**分支**代表从故事的一端到另一端的部分移动。非线性故事的叙事遍历创建了一个*分支叙事*，其中不同的部分被或未被遇到。体验到的叙事地图代表了故事整体树及其部分的特定分支。
 
@@ -58,89 +66,126 @@
 
 流的概念也扩展到在墨水中如何理解代码。在墨水中，跨越故事的任何移动都是从代码的顶部*向下*到底部，除非告诉它导航到故事中的不同部分。
 
-本章前面分享的示例故事也是代码示例。ink旨在创建分支叙事，并提供了编写代码来创建这些结构的能力。这意味着在ink中，故事中不包含任何其他特殊字符或语法的文本或单词都是有效的。
+本章前面分享的示例故事也是代码示例。ink 旨在创建分支叙事，并提供了编写代码来创建这些结构的能力。这意味着在 ink 中，故事中不包含任何其他特殊字符或语法的文本或单词都是有效的。
 
-ink中行内的间距很重要。因为文本被视为一种代码形式，ink假设任何使用间距都是作者有意为之的选择。例如，在单词之间添加额外的空格不会被其输出移除：
+ink 中行内的间距很重要。因为文本被视为一种代码形式，ink 假设任何使用间距都是作者有意为之的选择。例如，在单词之间添加额外的空格不会被其输出移除：
 
-[PRE2]
+```cs
+The sun was        shining in a clear blue sky.
+```
 
 输出：
 
-[PRE3]
+```cs
+The sun was        shining in a clear blue sky.
+```
 
-ink会忽略任何空行。它假设文本的每一行都是重要的，并且它们之间的任何间距都应该被视为对故事本身不重要的事物而被忽略。
+ink 会忽略任何空行。它假设文本的每一行都是重要的，并且它们之间的任何间距都应该被视为对故事本身不重要的事物而被忽略。
 
 示例 2：
 
-[PRE4]
+```cs
+The sun was shining in a clear blue sky.
+Clouds rolled in and it began to rain.
+The clouds cleared away and the sun emerged.
+```
 
 输出：
 
-[PRE5]
+```cs
+The sun was shining in a clear blue sky.
+Clouds rolled in and it began to rain.
+The clouds cleared away and the sun emerged.
+```
 
 ## 最小的单位是行
 
-在引入非线性叙事时，将三行作为故事的一部分并不是一个错误。ink故事中最小的单位是一行：
+在引入非线性叙事时，将三行作为故事的一部分并不是一个错误。ink 故事中最小的单位是一行：
 
-[PRE6]
+```cs
+This is a story.
+```
 
-因为ink认为文本是代码的一部分，所以只有四个单词的单行是完全有效的故事。添加更多行也会扩展将展示给读者的内容，但单行本身也可以是一个故事：
+因为 ink 认为文本是代码的一部分，所以只有四个单词的单行是完全有效的故事。添加更多行也会扩展将展示给读者的内容，但单行本身也可以是一个故事：
 
-[PRE7]
+```cs
+This is a story in ink.
+It has two lines.
+```
 
-在ink中，术语*行*的使用很重要。在阅读物理书籍时，故事中最小的单位通常是句子。这通常是更大作品中最小的完整思想。在数字环境中，特别是在ink中，行是最小的单位。当ink加载故事时，它逐行通过故事。它将每一行视为与最后一行同等重要。
+在 ink 中，术语*行*的使用很重要。在阅读物理书籍时，故事中最小的单位通常是句子。这通常是更大作品中最小的完整思想。在数字环境中，特别是在 ink 中，行是最小的单位。当 ink 加载故事时，它逐行通过故事。它将每一行视为与最后一行同等重要。
 
-随着更复杂代码的引入，行的概念也会变得更加重要。然而，就像单行示例一样，一个故事不需要复杂才能变得重要。对ink来说，一个故事由行组成。这可以是一行，也可能是多行。
+随着更复杂代码的引入，行的概念也会变得更加重要。然而，就像单行示例一样，一个故事不需要复杂才能变得重要。对 ink 来说，一个故事由行组成。这可以是一行，也可能是多行。
 
 ## 粘合行
 
-作者可能需要使用多行文本作为一行“代码”。在这些情况下，ink提供了一个名为`<>`的概念，当它们一起使用时，它们会将一行内容粘接到下一行，创建一个长行：
+作者可能需要使用多行文本作为一行“代码”。在这些情况下，ink 提供了一个名为`<>`的概念，当它们一起使用时，它们会将一行内容粘接到下一行，创建一个长行：
 
 示例 3：
 
-[PRE8]
+```cs
+This <>
+is <>
+considered <>
+one <>
+line of text.
+```
 
 输出：
 
-[PRE9]
+```cs
+This is considered one line of text.
+```
 
-使用粘合剂时的间距很重要。就像单行内的间距一样，ink尊重作者在单行中呈现文本时的选择。当使用粘合剂时，这些间距也被尊重。
+使用粘合剂时的间距很重要。就像单行内的间距一样，ink 尊重作者在单行中呈现文本时的选择。当使用粘合剂时，这些间距也被尊重。
 
 如果每个单词后面没有空格，那么在前面示例中使用的粘合剂会将所有单词粘合在一起：
 
-[PRE10]
+```cs
+This<>
+is<>
+considered<>
+one<>
+line of text.
+```
 
 输出：
 
-[PRE11]
+```cs
+Thisisconsideredoneline of text.
+```
 
 ## 使用注释作为对作者的笔记
 
-作为一种脚本语言，ink还提供了在故事代码中包含注释的能力。借鉴更通用的编程术语，ink将这些注释称为**注释**。它们以两个斜杠开始，然后包含注释的内容。行中的任何部分也被视为注释的一部分：
+作为一种脚本语言，ink 还提供了在故事代码中包含注释的能力。借鉴更通用的编程术语，ink 将这些注释称为**注释**。它们以两个斜杠开始，然后包含注释的内容。行中的任何部分也被视为注释的一部分：
 
 示例 4：
 
-[PRE12]
+```cs
+The sun was shining in a clear blue sky.
+// Change this next line in the future.
+Clouds rolled in and it began to rain.
+// Maybe update this story in a future version?
+The clouds cleared away and the sun emerged.
+```
 
 当运行时，故事的文本会被视为其代码。然而，任何注释的使用都不会出现在故事的输出中。注释仅设计给人类观众，允许作者向其他观众解释代码，或者更普遍地，作为作者或其团队其他成员关于如何工作的笔记。
 
-### 使用Inky
+### 使用 Inky
 
 为了帮助作者更快地在墨水中开发故事，**Inkle Studios**创建了一个名为**Inky**的程序。这个编辑工具允许作者编写代码，并预览其输出：
 
-![图1.2 – Inky编辑器的截图
+![图 1.2 – Inky 编辑器的截图](img/Figure_1.2_B17597.jpg)
 
-](img/Figure_1.2_B17597.jpg)
+图 1.2 – Inky 编辑器的截图
 
-图1.2 – Inky编辑器的截图
+虽然最初由 Inkle Studios 开发，但 Inky 现在是一个开源项目，社区经常会有数十个提交来修复小问题或添加新功能。通常每年会推出一个新的小版本。
 
-虽然最初由Inkle Studios开发，但Inky现在是一个开源项目，社区经常会有数十个提交来修复小问题或添加新功能。通常每年会推出一个新的小版本。
+在撰写本文时，Inky 没有 Windows 安装程序，但为 macOS X 和 Linux 系统提供构建。在 Windows 或 Linux 上运行时，需要将 ZIP 文件解压缩到现有文件夹中，并运行`Inky.exe`（Windows）或`Inky`（Linux）文件以打开编辑器。
 
-在撰写本文时，Inky没有Windows安装程序，但为macOS X和Linux系统提供构建。在Windows或Linux上运行时，需要将ZIP文件解压缩到现有文件夹中，并运行`Inky.exe`（Windows）或`Inky`（Linux）文件以打开编辑器。
+### 使用 Inky
 
-### 使用Inky
-
-Inky提供了一个具有两个窗格的界面：
+Inky 提供了一个具有两个窗格的界面：
 
 +   左边是编写墨水代码的地方。
 
@@ -148,17 +193,15 @@ Inky提供了一个具有两个窗格的界面：
 
 这使用户能够快速看到他们的代码将如何根据所使用的代码产生不同的输出。
 
-Inky最有用的功能是能够“回退”故事到一个较早的点并尝试不同的叙事分支。这允许作者更快地测试故事的不同分支，而不需要每次都重新启动故事。
+Inky 最有用的功能是能够“回退”故事到一个较早的点并尝试不同的叙事分支。这允许作者更快地测试故事的不同分支，而不需要每次都重新启动故事。
 
-![图1.3 – “回退单个选择”和“重新启动故事”按钮
+![图 1.3 – “回退单个选择”和“重新启动故事”按钮](img/Figure_1.3_B17597.jpg)
 
-](img/Figure_1.3_B17597.jpg)
-
-图1.3 – “回退单个选择”和“重新启动故事”按钮
+图 1.3 – “回退单个选择”和“重新启动故事”按钮
 
 重要提示
 
-本书将使用Inky的截图来展示不同代码产生的结果输出。
+本书将使用 Inky 的截图来展示不同代码产生的结果输出。
 
 # 创建选择和编织
 
@@ -170,11 +213,23 @@ Inky最有用的功能是能够“回退”故事到一个较早的点并尝试�
 
 选择在墨水中使用星号`*`来编写。在墨水中，可能看起来像事物列表的东西，实际上是一个单一的编织中的不同选择：
 
-[PRE13]
+```cs
+What did I want to eat?
+* Apples
+* Oranges
+* Pears
+```
 
 在之前的代码中，以星号开头的每一行都是一个选择。它从星号开始，延伸到行的末尾。行中的所有内容都成为选择的一部分。每一行的新星号在编织中创建一个新的选择：
 
-[PRE14]
+```cs
+We smiled again at each other across the coffee shop. I had seen her coming in at this same time for over a week now. We had spoken a couple of times, but I could not bring myself to talk to her more.
+As I looked back down at my coffee, I needed to decide.
+* I decided to go talk to her.
+"Uh. Hi!" I said, maybe a little too loud as I approached her.
+* I gave up for now. Maybe tomorrow.
+I shook my head to myself and looked away from her and out the window. Today was not the day.
+```
 
 在编织中的每个选择都有分支叙事的潜力。在之前的代码中，有两个选择。然而，在每个选择之后还有另一行代码。当运行时，ink 会理解每个选择之后的每一行代码都是读者选择的结果。为了更好地视觉区分选择的结果，选择之后的行通常在开头缩进。
 
@@ -182,7 +237,14 @@ Inky最有用的功能是能够“回退”故事到一个较早的点并尝试�
 
 示例 6：
 
-[PRE15]
+```cs
+We smiled at each other again across the coffee shop. I had seen her coming in at this same time for over a week now. We had spoken a couple of times, but I could not bring myself to talk to her more.
+As I looked back down at my coffee, I needed to decide.
+* I decided to go talk to her.
+    "Uh. Hi!" I said, maybe a little too loud, as I approached       her.
+* I gave up for now. Maybe tomorrow.
+    I shook my head to myself and looked away from her and out       the window. Today was not the day.
+```
 
 ## 选择中的选择
 
@@ -190,7 +252,19 @@ Inky最有用的功能是能够“回退”故事到一个较早的点并尝试�
 
 示例 7：
 
-[PRE16]
+```cs
+Should I really forgive her again? I thought about the options in front of me as I considered what she told me.
+* I forgive her.
+    ** She does the same behavior again.
+        I just end up hurt again.
+    ** She really does change.
+        She does not have another affair and maybe we can save           our relationship.
+* I do not forgive her.
+    ** I would have to move out.
+        I would need to find another apartment.
+    ** I stay with her and try to live again without being in a          relationship.
+        I could try going back to being friends like we were           before our relationship.
+```
 
 在之前的代码中，有两个选择，每个选择都引出自己的选择，从中心集合分支出来。这是一个**复杂编织**的例子。编织的第一层是初始的两个选择。然后，每个选择的后果是另一个编织，最后以文本结束。根据用户的流程，他们可能在移动到这些部分时只看到整体故事的一部分。
 
@@ -198,21 +272,40 @@ Inky最有用的功能是能够“回退”故事到一个较早的点并尝试�
 
 输出
 
-[PRE17]
+```cs
+Should I really forgive her again? I thought about the options in front of me as I considered what she told me.
+I forgive her.
+She does the same behavior again.
+I just end up hurt again.
+```
 
 故事中的不同分支序列也可能产生以下输出：
 
-[PRE18]
+```cs
+Should I really forgive her again? I thought about the options in front of me as I considered what she told me.
+I do not forgive her.
+I would have to move out.
+I would need to find another apartment.
+```
 
 ## 选择性选择输出
 
 使用选择时，选择的文本本身会出现在其输出中。这可以通过使用与选择相关的特殊概念**选择性输出**来改变。通过在选择的行中的任何文本周围使用开闭方括号，它将不会作为选择的结果出现在输出中：
 
-[PRE19]
+```cs
+What did I want to eat?
+* [Apples]
+* [Oranges]
+* [Pears]
+I got some food.
+```
 
 在之前的代码中，无论读者做出何种选择，输出结果都会相同：
 
-[PRE20]
+```cs
+What did I want to eat?
+I got some food.
+```
 
 当选择的内容与展示给读者的内容不同时，使用**选项**这个词。选择是通过代码在 ink 中创建的。最终展示给读者的内容是一个*选项*。
 
@@ -222,11 +315,19 @@ Inky最有用的功能是能够“回退”故事到一个较早的点并尝试�
 
 示例 8：
 
-[PRE21]
+```cs
+I looked at the timer again and then at the wires in front of me. I had five seconds to stop this bomb from exploding.
+* [I cut the wire.] It was the green one.
+* [I cut the wire.] It was the red one.
+* [I cut the wire.] It was the blue one.
+```
 
 可能的输出：
 
-[PRE22]
+```cs
+I looked at the timer again and then at the wires in front me. I had five seconds to stop this bomb from exploding.
+It was the green one.
+```
 
 从读者的角度来看，之前的代码会显示三个选项。每个选项都会读作`我剪断了电线`。然而，选择性输出的使用是告诉墨迹忽略每个颜色的附加文本。在做出选择后，用户会看到选择的结果作为新的一行，使用方括号排除任何包含的内容。
 
@@ -236,7 +337,18 @@ Inky最有用的功能是能够“回退”故事到一个较早的点并尝试�
 
 编织中的每个选择都可能分支一个叙事。然而，有时需要将一个或多个分支汇集回它们开始的地方。而不是走向新的方向，可以使用汇集点将更复杂的编织折叠成一个*中心点*。在墨迹中，*汇集点*是通过在行上使用单个减号(`-`)来创建的：
 
-[PRE23]
+```cs
+You peer down at the desk with two drawers.
+* Try to open the top drawer.
+    It does not open.
+    ** Try again more forcefully.
+    ** Give up for now
+* Try to open the side drawer.
+    It does not open.
+    ** Try again more forcefully.
+    ** Give up for now
+- All the drawers seem locked tight.
+```
 
 在之前的代码中，有两个选择，每个选择下又有两个子选择。然而，在编织的底部有一个*汇集点*。无论选择哪个分支跨过第一个编织层然后进入下一层，流动总是会汇集在最后一行。这就是汇集点的力量：它们允许一个具有多层复杂编织的结构折叠成一个单一点。
 
@@ -246,23 +358,39 @@ Inky最有用的功能是能够“回退”故事到一个较早的点并尝试�
 
 示例 9：
 
-[PRE24]
+```cs
+You peer down at the desk with two drawers to open.
+* [Try the top drawer.]
+* [Try the side drawer.]
+- All the drawers seem locked tight.
+You give up on the drawers and look at the top of the desk.
+* [Look at the papers on top of the desk.]
+* [Pick up the papers and look through them.]
+- You find nothing of interest.
+```
 
 在之前的代码中，既使用了选择性输出也使用了汇集点来创造两个编织，每个编织有两个选择的错觉。由于它们使用了汇集点，每个结果的输出都是各自的最后一行。选项呈现给读者，但代码本身会折叠每个编织的任何可能的分支，并将故事从第一个编织流向第二层。
 
 # 消失和粘性选择
 
-编织的默认行为是沿着其选择提供的其中一个分支引导故事的流动。当读者做出选择时，其他选项*消失*，所选择的分支成为故事的当前流动。即使在用Inky测试故事时回放，似乎在任何时候编织只有一个有效的分支。
+编织的默认行为是沿着其选择提供的其中一个分支引导故事的流动。当读者做出选择时，其他选项*消失*，所选择的分支成为故事的当前流动。即使在用 Inky 测试故事时回放，似乎在任何时候编织只有一个有效的分支。
 
 预测读者可能会重新访问故事的一部分，并且可能会看到之前没有见过的选择的情况，墨水使用粘性选择的概念来再次向读者展示相同的选择。使用粘性选择，每次重访时每个选项都保持 *开放*，并且可以在将来再次使用：
 
-[PRE25]
+```cs
+You look at the boulder in front of you.
++ Push the boulder.
+```
 
 粘性选择使用加号 (`+`) 创建。它们可以被视为聚集点的对立面。而不是折叠编织，粘性选择 *保持开放* 编织中使用不同分支的选项。任何作为编织一部分创建的粘性选择总是 *粘性的*，即使它是编织中唯一的：
 
 示例 10：
 
-[PRE26]
+```cs
+You look at the boulder in front of you.
++ Push the boulder.
+* Ignore it for now.
+```
 
 在之前的代码中，有两种选择：
 
@@ -274,7 +402,13 @@ Inky最有用的功能是能够“回退”故事到一个较早的点并尝试�
 
 在故事只从上到下流动的示例中，粘性选择似乎用处不大。做出任何选择后，故事都会沿着分支流向故事的下一个较低部分，而不管选择类型如何：
 
-[PRE27]
+```cs
+The blank page stared back at me, taunting me. I glanced again at the clock and then back at the page. I needed to write something.
++ I tried again to write something.
+    I wrote a few words and paused.
++ I checked my email again.
+    No new messages.
+```
 
 在前面的示例中，有一个包含两个粘性选择的单一编织。在从上到下移动故事时，编织会被访问一次，然后任一选择会分支出去，并在最后再次汇合。
 
@@ -282,17 +416,23 @@ Inky最有用的功能是能够“回退”故事到一个较早的点并尝试�
 
 示例 11：
 
-[PRE28]
+```cs
+The blank page stared back at me, taunting me. I glanced again at the clock and then back at the page. I needed to write something.
+* I tried again to write something.
+    I wrote a few words and paused.
+* I checked my email again.
+    No new messages.
+```
 
 两个代码示例的不同之处在于它们的意图。在第一个示例中，读者可能可以重新访问故事的同一部分并再次看到选择。在第二个示例中，选择是单向的。通过在编织中做出选择，它们不能在故事中重新访问。一旦做出选择，基本选择就是永久的。唯一改变这种意图的方法是使用粘性选择，当使用时它们会 *添加* 自己回到编织中。
 
-在下一章，[*第二章*](B17597_02_Final_PG_ePub.xhtml#_idTextAnchor031)，*结、转向和循环模式*，我们将开始检查循环并控制故事在更复杂结构中的流动。循环将允许我们多次回到故事中的同一部分。在这些情况下，粘性选择将成为为玩家创建选项的默认用法。因为粘性选择保持开放，它们允许作者创建一个编织，玩家可以在其中多次选择相同的选项。
+在下一章，*第二章*，*结、转向和循环模式*，我们将开始检查循环并控制故事在更复杂结构中的流动。循环将允许我们多次回到故事中的同一部分。在这些情况下，粘性选择将成为为玩家创建选项的默认用法。因为粘性选择保持开放，它们允许作者创建一个编织，玩家可以在其中多次选择相同的选项。
 
 # 摘要
 
 本章为您提供了对术语故事、内容和叙述的解释，以及读者可能从其内容中体验到的内容。我们探讨了非线性叙述，即故事的部分可以以不同于它们被书写或最初创作的顺序体验。接下来，我们学习了分支叙述，这是一种描述体验非线性故事的方式，其中不同的序列、分支被探索而不是其他。通过使用代码（脚本），我们看到了通过控制读者体验故事内容的时间来创建不同叙述的方法。
 
-ink是一种叙述脚本语言。我们将通过故事中的移动理解为一个称为流的概念。我们发现，通过使用不同类型的选项创建的每个交叉点都被称为编织物。通过使用选项，我们看到了编织的不同层次和更多分支是可能的。对于编织物变得过于复杂的情况，我们可以使用聚集点。这会将编织物折叠成单个点或线。
+ink 是一种叙述脚本语言。我们将通过故事中的移动理解为一个称为流的概念。我们发现，通过使用不同类型的选项创建的每个交叉点都被称为编织物。通过使用选项，我们看到了编织的不同层次和更多分支是可能的。对于编织物变得过于复杂的情况，我们可以使用聚集点。这会将编织物折叠成单个点或线。
 
 在下一章中，我们将开始使用结，故事的部分标记区域，以及偏离，在这些部分之间移动，来构建非线性叙述和分支叙述的概念。我们将开始使用选项将读者移动到特定的结或重复相同的编织物。
 

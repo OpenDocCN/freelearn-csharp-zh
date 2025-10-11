@@ -12,13 +12,13 @@
 
 # 技术要求
 
-以下章节是实践性的，因此你需要对Unity和C#有一个基本的了解。
+以下章节是实践性的，因此你需要对 Unity 和 C#有一个基本的了解。
 
-本章的代码文件可以在GitHub上找到：[https://github.com/PacktPublishing/Game-Development-Patterns-with-Unity-2021-Second-Edition/tree/main/Assets/Chapters/Chapter14](https://github.com/PacktPublishing/Game-Development-Patterns-with-Unity-2021-Second-Edition/tree/main/Assets/Chapters/Chapter14) [](https://github.com/PacktPublishing/Game-Development-Patterns-with-Unity-2021-Second-Edition/tree/main/Assets/Chapters/Chapter14)
+本章的代码文件可以在 GitHub 上找到：[`github.com/PacktPublishing/Game-Development-Patterns-with-Unity-2021-Second-Edition/tree/main/Assets/Chapters/Chapter14`](https://github.com/PacktPublishing/Game-Development-Patterns-with-Unity-2021-Second-Edition/tree/main/Assets/Chapters/Chapter14) [](https://github.com/PacktPublishing/Game-Development-Patterns-with-Unity-2021-Second-Edition/tree/main/Assets/Chapters/Chapter14)
 
 查看以下视频，看看代码是如何在行动中应用的：
 
-[https://bit.ly/3wBHqkX](https://bit.ly/3wBHqkX)
+[`bit.ly/3wBHqkX`](https://bit.ly/3wBHqkX)
 
 # 理解适配器模式
 
@@ -36,7 +36,7 @@
 
 ![图片](img/82dbcfc8-0321-4c29-90ec-32dbf28f35e9.png)
 
-图14.1 – 重放系统图
+图 14.1 – 重放系统图
 
 正如你所见，在两种情况下，**适配器**类都位于**客户端**和适配实体（**适配者**）之间。但是，类适配器通过继承与适配者建立关系。相比之下，对象适配器使用组合来包装适配者的一个实例以进行适配。
 
@@ -60,7 +60,7 @@
 
 以下是一些适配器模式的潜在缺点：
 
-+   **持久遗产**：使用旧代码与新系统兼容的能力是成本效益的，但从长远来看，可能会成为一个问题，因为随着旧代码变得过时且与Unity或第三方库的新版本不兼容，它可能会限制你的升级选项。
++   **持久遗产**：使用旧代码与新系统兼容的能力是成本效益的，但从长远来看，可能会成为一个问题，因为随着旧代码变得过时且与 Unity 或第三方库的新版本不兼容，它可能会限制你的升级选项。
 
 +   **轻微开销**：因为，在某些情况下，你需要在对象之间重定向调用，这可能会带来轻微的性能损失，通常太小，不会成为问题。
 
@@ -68,11 +68,11 @@
 
 ## 何时使用适配器模式
 
-在Unity中，适配器的一个潜在用例是当你有一个从Unity Asset Store下载的第三方库，你需要修改其一些核心类和接口以添加新特性。但是，每次从库所有者那里拉取更新时，更改第三方代码都会带来合并问题。
+在 Unity 中，适配器的一个潜在用例是当你有一个从 Unity Asset Store 下载的第三方库，你需要修改其一些核心类和接口以添加新特性。但是，每次从库所有者那里拉取更新时，更改第三方代码都会带来合并问题。
 
 因此，你发现自己处于一个选择等待第三方库所有者集成所需更改或修改他们的代码并添加缺失特性的情况。这两种选择都有其风险与回报。但适配器模式通过允许我们在现有类之间放置适配器，从而提供了一个解决这个困境的方法，这样它们就可以在不直接修改它们的情况下一起工作。
 
-让我们想象我们正在为一个项目编写代码库，该项目使用的是从Unity Asset Store下载的库存系统包。该系统非常出色；它将玩家的购买或赠送的库存项目保存到安全的云后端服务。但有一个问题，它不支持本地磁盘保存。这种限制已经成为我们项目中的一个问题，因为我们需要本地和云保存以实现冗余。
+让我们想象我们正在为一个项目编写代码库，该项目使用的是从 Unity Asset Store 下载的库存系统包。该系统非常出色；它将玩家的购买或赠送的库存项目保存到安全的云后端服务。但有一个问题，它不支持本地磁盘保存。这种限制已经成为我们项目中的一个问题，因为我们需要本地和云保存以实现冗余。
 
 在这种情况下，我们可以轻松地修改供应商的代码并添加我们需要的特性。但是，当它们发布下一个更新时，我们必须将我们的代码与他们的代码合并。这种方法可能是一个容易出错的流程。相反，我们将使用适配器模式并实现一个包装器，它将保持对库存系统的统一接口，同时添加本地保存支持。在这个过程中，我们不需要修改任何现有的类。因此，我们将能够避免更改供应商的代码，同时仍然让您的本地保存系统处理库存项目的保存。
 
@@ -88,33 +88,180 @@
 
 1.  我们虚构的提供者提供的`InventorySystem`类有三个方法，`AddItem()`、`RemoveItem()`和`GetInventory()`。所有这些方法都是硬编码为使用云存储，我们无法修改它们：
 
-[PRE0]
+```cs
+using UnityEngine;
+using System.Collections.Generic;
+
+namespace Chapter.Adapter
+{
+    public class InventorySystem
+    {
+        public void AddItem(InventoryItem item)
+        {
+            Debug.Log(
+                "Adding item to the cloud");
+        }
+
+        public void RemoveItem(InventoryItem item)
+        {
+            Debug.Log(
+                "Removing item from the cloud");
+        }
+
+        public List<InventoryItem> GetInventory()
+        {
+            Debug.Log(
+                "Returning an inventory list stored in the cloud");
+
+            return new List<InventoryItem>();
+        }
+    }
+}
+```
 
 1.  接下来是将在这种情况下充当适配器的类。它增加了将库存项目保存到本地磁盘的能力。但它还暴露了新的功能，允许合并和同步玩家的本地和云库存：
 
-[PRE1]
+```cs
+using UnityEngine;
+using System.Collections.Generic;
+
+namespace Chapter.Adapter {
+    public class InventorySystemAdapter:
+        InventorySystem, IInventorySystem {
+
+        private List<InventoryItem> _cloudInventory;
+
+        public void SyncInventories() {
+            var _cloudInventory = GetInventory();
+
+            Debug.Log(
+                "Synchronizing local drive and cloud inventories");
+        }
+
+        public void AddItem(
+            InventoryItem item, SaveLocation location) {
+
+            if (location == SaveLocation.Cloud)
+                AddItem(item);
+
+            if (location == SaveLocation.Local)
+                Debug.Log("Adding item to local drive");
+
+            if (location == SaveLocation.Both)
+                Debug.Log(
+                    "Adding item to local drive and on the cloud");
+        }
+
+        public void RemoveItem(
+            InventoryItem item, SaveLocation location) {
+
+            Debug.Log(
+                "Remove item from local/cloud/both");
+        }
+
+        public List<InventoryItem> 
+            GetInventory(SaveLocation location) {
+
+            Debug.Log(
+                "Get inventory from local/cloud/both");
+
+            return new List<InventoryItem>();
+        }
+    }
+}
+```
 
 注意，通过继承第三方的`InventorySystem`类，我们可以访问其所有属性和方法。因此，我们可以在添加自己的同时继续使用其核心功能。我们在过程中没有修改任何东西，只是在适配它。
 
 1.  我们将向我们的新库存系统提供一个接口：
 
-[PRE2]
+```cs
+using System.Collections.Generic;
+
+namespace Chapter.Adapter
+{
+    public interface IInventorySystem
+    {
+        void SyncInventories();
+
+        void AddItem(
+            InventoryItem item, SaveLocation location);
+
+        void RemoveItem(
+            InventoryItem item, SaveLocation location);
+
+        List<InventoryItem> GetInventory(SaveLocation location);
+    }
+}
+```
 
 使用此接口的客户不会意识到它正在与另一个系统进行通信。适配者（Adaptee）也不知道我们在适配它。就像充电适配器一样，手机和电缆不知道它们连接的是哪个插头，只知道电流正在通过系统并为电池充电。
 
 1.  为了完成我们的实现，我们需要添加一个`enum`来暴露保存位置：
 
-[PRE3]
+```cs
+namespace Chapter.Adapter
+{
+    public enum SaveLocation
+    {
+        Disk,
+        Cloud,
+        Both
+    }
+}
+```
 
 1.  对于我们的最后一步，我们将实现一个占位符`InventoryItem`类：
 
-[PRE4]
+```cs
+using UnityEngine;
+
+namespace Chapter.Adapter
+{
+    [CreateAssetMenu(
+        fileName = "New Item", menuName = "Inventory")]
+    public class InventoryItem : ScriptableObject
+    {
+        // Placeholder class
+    }
+}
+```
 
 ## 测试适配器模式实现
 
-要测试你在Unity实例中的实现，将我们刚刚审查的所有类复制到你的项目中，并将以下客户端类附加到一个新Unity场景中的空GameObject上：
+要测试你在 Unity 实例中的实现，将我们刚刚审查的所有类复制到你的项目中，并将以下客户端类附加到一个新 Unity 场景中的空 GameObject 上：
 
-[PRE5]
+```cs
+using UnityEngine;
+
+namespace Chapter.Adapter
+{
+    public class ClientAdapter : MonoBehaviour
+    {
+        public InventoryItem item;
+
+        private InventorySystem _inventorySystem;
+        private IInventorySystem _inventorySystemAdapter;
+
+        void Start()
+        {
+            _inventorySystem = new InventorySystem();
+            _inventorySystemAdapter = new InventorySystemAdapter();
+        }
+
+        void OnGUI()
+        {
+            if (GUILayout.Button("Add item (no adapter)"))
+                _inventorySystem.AddItem(item);
+
+            if (GUILayout.Button("Add item (with adapter)"))
+                _inventorySystemAdapter.
+                    AddItem(item, SaveLocation.Both);
+
+        }
+    }
+}
+```
 
 我们现在可以构建一个新的库存系统，该系统使用由第三方提供的旧功能。我们可以继续从第三方网站自信地拉取库更新，而无需担心合并问题。我们的系统可以在我们继续适配他们的同时增加功能，如果有一天我们想从我们的代码库中移除他们的系统并只使用我们自己的，我们可以通过更新`adapter`类开始弃用过程。
 

@@ -1,10 +1,10 @@
-# *第4章*：线程和异步操作
+# *第四章*：线程和异步操作
 
-到目前为止，我们已经探讨了各种设计原则、模式、.NET 6的新特性以及我们将在这本书中使用的架构指南。在本章中，我们将看到如何在构建企业应用时利用异步编程。
+到目前为止，我们已经探讨了各种设计原则、模式、.NET 6 的新特性以及我们将在这本书中使用的架构指南。在本章中，我们将看到如何在构建企业应用时利用异步编程。
 
-对于任何Web应用来说，关键指标之一是 *可伸缩性* —— 即通过扩展来减少处理请求所需的时间，增加服务器可以处理的请求数量，以及在不增加加载时间的情况下，应用程序可以同时服务的用户数量。对于移动/桌面应用，扩展可以提高应用的响应速度，使用户能够在不冻结屏幕的情况下执行各种操作。
+对于任何 Web 应用来说，关键指标之一是 *可伸缩性* —— 即通过扩展来减少处理请求所需的时间，增加服务器可以处理的请求数量，以及在不增加加载时间的情况下，应用程序可以同时服务的用户数量。对于移动/桌面应用，扩展可以提高应用的响应速度，使用户能够在不冻结屏幕的情况下执行各种操作。
 
-正确使用异步编程技术和并行结构可以在提高这些指标方面产生奇迹，而在C#中，最好的方法是**任务并行库**（**TPL**）、async-await的简化语法，通过它可以编写干净的异步代码。
+正确使用异步编程技术和并行结构可以在提高这些指标方面产生奇迹，而在 C#中，最好的方法是**任务并行库**（**TPL**）、async-await 的简化语法，通过它可以编写干净的异步代码。
 
 在本章中，我们将涵盖以下主题：
 
@@ -22,9 +22,9 @@
 
 # 技术要求
 
-您需要了解.NET Core、C#和LINQ的基础知识。本章的代码示例可以在此处找到：[https://github.com/PacktPublishing/Enterprise-Application-Development-with-C-10-and-.NET-6-Second-Edition/tree/main/Chapter04](https://github.com/PacktPublishing/Enterprise-Application-Development-with-C-10-and-.NET-6-Second-Edition/tree/main/Chapter04)。
+您需要了解.NET Core、C#和 LINQ 的基础知识。本章的代码示例可以在此处找到：[`github.com/PacktPublishing/Enterprise-Application-Development-with-C-10-and-.NET-6-Second-Edition/tree/main/Chapter04`](https://github.com/PacktPublishing/Enterprise-Application-Development-with-C-10-and-.NET-6-Second-Edition/tree/main/Chapter04)。
 
-有关代码的几个说明可以在此处找到：[https://github.com/PacktPublishing/Enterprise-Application-Development-with-C-10-and-.NET-6-Second-Edition/tree/main/Enterprise%20Application](https://github.com/PacktPublishing/Enterprise-Application-Development-with-C-10-and-.NET-6-Second-Edition/tree/main/Enterprise%20Application)。
+有关代码的几个说明可以在此处找到：[`github.com/PacktPublishing/Enterprise-Application-Development-with-C-10-and-.NET-6-Second-Edition/tree/main/Enterprise%20Application`](https://github.com/PacktPublishing/Enterprise-Application-Development-with-C-10-and-.NET-6-Second-Edition/tree/main/Enterprise%20Application)。
 
 # 理解术语
 
@@ -34,9 +34,7 @@
 
 当谈到并行编程时，一些关键术语会多次出现。这些术语在以下图中表示：
 
-![Figure 4.1 – 并发与并行与异步
-
-![Figure 4.1_B18507.jpg](img/Figure_4.1_B18507.jpg)
+![Figure 4.1 – 并发与并行与异步![Figure 4.1_B18507.jpg](img/Figure_4.1_B18507.jpg)
 
 Figure 4.1 – 并发与并行与异步
 
@@ -52,63 +50,91 @@ Figure 4.1 – 并发与并行与异步
 
 现在我们已经了解了并行编程中的关键术语，让我们继续探讨如何在 .NET Core 中创建线程以及 `ThreadPool` 的作用。
 
-# 消除线程、懒加载初始化和ThreadPool的神秘感
+# 消除线程、懒加载初始化和 ThreadPool 的神秘感
 
 线程是操作系统中最小的单位，它在处理器中执行指令。进程是一个更大的执行容器，进程内的线程是使用处理器时间和执行指令的最小单位。要记住的关键点是，每当你的代码需要在进程中执行时，它应该被分配到一个线程上。每个处理器一次只能执行一条指令；这就是为什么在单核系统中，在任何时刻，只有一个线程正在执行。有一些调度算法用于将处理器时间分配给线程。线程通常有一个堆栈（用于跟踪执行历史），一些寄存器用于存储各种变量，以及计数器用于保存需要执行的指令。
 
-快速查看**任务管理器**将提供有关物理和逻辑核心数量的详细信息，导航到**资源监视器**将告诉我们每个核心的CPU使用情况。以下图显示了启用超线程的四核CPU的详细信息，该CPU在任何时刻可以并行执行八个线程：
+快速查看**任务管理器**将提供有关物理和逻辑核心数量的详细信息，导航到**资源监视器**将告诉我们每个核心的 CPU 使用情况。以下图显示了启用超线程的四核 CPU 的详细信息，该 CPU 在任何时刻可以并行执行八个线程：
+
+![Figure 4.2 – 任务管理器和资源监视器![Figure_4.2_B18507.jpg](img/Figure_4.2_B18507.jpg)
 
 ![Figure 4.2 – 任务管理器和资源监视器
 
-![Figure_4.2_B18507.jpg](img/Figure_4.2_B18507.jpg)
+.NET Core 的典型应用程序在启动时只有一个线程，可以通过手动创建来添加更多线程。以下几节将简要介绍如何进行此操作。
 
-![Figure 4.2 – 任务管理器和资源监视器
+## 使用 System.Threading.Thread
 
-.NET Core的典型应用程序在启动时只有一个线程，可以通过手动创建来添加更多线程。以下几节将简要介绍如何进行此操作。
+我们可以通过创建`System.Threading.Thread`的实例并传递一个方法委托来创建新的线程。以下是一个简单的示例，模拟从 API 检索数据并从磁盘加载文件：
 
-## 使用System.Threading.Thread
+```cs
+Thread loadFileFromDisk = new Thread(LoadFileFromDisk);
+```
 
-我们可以通过创建`System.Threading.Thread`的实例并传递一个方法委托来创建新的线程。以下是一个简单的示例，模拟从API检索数据并从磁盘加载文件：
+```cs
+void LoadFileFromDisk(object? obj)
+```
 
-[PRE0]
+```cs
+{
+```
 
-[PRE1]
+```cs
+    Thread.Sleep(2000);
+```
 
-[PRE2]
+```cs
+    Console.WriteLine("data returned from API");
+```
 
-[PRE3]
+```cs
+}
+```
 
-[PRE4]
+```cs
+loadFileFromDisk.Start();
+```
 
-[PRE5]
+```cs
+Thread fetchDataFromAPI = new Thread(FetchDataFromAPI);
+```
 
-[PRE6]
+```cs
+void FetchDataFromAPI(object? obj)
+```
 
-[PRE7]
+```cs
+{
+```
 
-[PRE8]
+```cs
+    Thread.Sleep(2000);
+```
 
-[PRE9]
+```cs
+    Console.WriteLine("File loaded from disk");
+```
 
-[PRE10]
+```cs
+}
+```
 
-[PRE11]
+```cs
+fetchDataFromAPI.Start("https://dummy/v1/api"); //Parameterized method
+```
 
-[PRE12]
-
-[PRE13]
-
-[PRE14]
+```cs
+Console.ReadLine();
+```
 
 在前面的代码中，`FetchDataFromAPI`和`LoadFileFromDisk`是将在新线程上运行的方法。
 
 提示
 
-在任何时刻，每个核心上只会有一个线程在执行——也就是说，只有一个线程被分配了CPU时间。因此，为了实现并发，当被分配CPU时间的线程空闲或队列中出现高优先级线程时（也可能有其他原因，例如线程正在等待同步对象或达到分配的CPU时间），操作系统会进行上下文切换。
+在任何时刻，每个核心上只会有一个线程在执行——也就是说，只有一个线程被分配了 CPU 时间。因此，为了实现并发，当被分配 CPU 时间的线程空闲或队列中出现高优先级线程时（也可能有其他原因，例如线程正在等待同步对象或达到分配的 CPU 时间），操作系统会进行上下文切换。
 
-由于被切换出的线程尚未完成其工作，在某个时刻，它将再次被分配CPU时间。因此，操作系统需要保存线程的状态（其堆栈、寄存器等），并在线程被分配CPU时间时再次检索它。上下文切换通常非常昂贵，是性能改进的关键领域之一。
+由于被切换出的线程尚未完成其工作，在某个时刻，它将再次被分配 CPU 时间。因此，操作系统需要保存线程的状态（其堆栈、寄存器等），并在线程被分配 CPU 时间时再次检索它。上下文切换通常非常昂贵，是性能改进的关键领域之一。
 
-可以在[https://docs.microsoft.com/en-us/dotnet/api/system.threading.thread?view=net-6.0](https://docs.microsoft.com/en-us/dotnet/api/system.threading.thread?view=net-6.0)进一步查看`Thread`类的所有属性和方法。
+可以在[`docs.microsoft.com/en-us/dotnet/api/system.threading.thread?view=net-6.0`](https://docs.microsoft.com/en-us/dotnet/api/system.threading.thread?view=net-6.0)进一步查看`Thread`类的所有属性和方法。
 
 尽管管理线程带来了对执行方式的更多控制优势，但也伴随着以下开销：
 
@@ -124,9 +150,11 @@ Figure 4.1 – 并发与并行与异步
 
 ## ThreadPool
 
-可以通过使用由.NET Core管理的线程池来创建线程，这更广为人知的是CLR `ThreadPool`。CLR `ThreadPool`是一组工作线程，它们与CLR一起加载到您的应用程序中，并负责线程生命周期，包括回收线程、创建线程和支持更好的上下文切换。`System.Threading.ThreadPool`类中的各种API可以消费CLR `ThreadPool`。具体来说，对于在某个线程上调度操作，有`QueueUserWorkItem`方法，它接受需要调度的方法的委托。在之前的代码中，让我们将创建新线程的代码替换为以下代码，这意味着应用程序将使用`ThreadPool`：
+可以通过使用由.NET Core 管理的线程池来创建线程，这更广为人知的是 CLR `ThreadPool`。CLR `ThreadPool`是一组工作线程，它们与 CLR 一起加载到您的应用程序中，并负责线程生命周期，包括回收线程、创建线程和支持更好的上下文切换。`System.Threading.ThreadPool`类中的各种 API 可以消费 CLR `ThreadPool`。具体来说，对于在某个线程上调度操作，有`QueueUserWorkItem`方法，它接受需要调度的方法的委托。在之前的代码中，让我们将创建新线程的代码替换为以下代码，这意味着应用程序将使用`ThreadPool`：
 
-[PRE15]
+```cs
+ThreadPool.QueueUserWorkItem(FetchDataFromAPI);
+```
 
 如其名所示，`ThreadPool`类的`QueueUserWorkItem`确实使用了队列，任何应该在`ThreadPool`线程上执行的计算代码都会被排队，然后出队——即以**先进先出**（**FIFO**）的方式分配给工作线程。
 
@@ -134,9 +162,9 @@ Figure 4.1 – 并发与并行与异步
 
 +   使用不属于`ThreadPool`线程的线程调用`QueueUserWorkItem`或`ThreadPool`类的类似方法
 
-+   通过TPL进行调用
++   通过 TPL 进行调用
 
-当在`ThreadPool`中创建新线程时，它维护自己的本地队列，该队列检查全局队列并以FIFO（先进先出）的方式出队工作项；然而，如果在此线程上执行的代码创建了另一个线程，例如子线程，那么它将被排队到本地队列而不是全局队列。
+当在`ThreadPool`中创建新线程时，它维护自己的本地队列，该队列检查全局队列并以 FIFO（先进先出）的方式出队工作项；然而，如果在此线程上执行的代码创建了另一个线程，例如子线程，那么它将被排队到本地队列而不是全局队列。
 
 工作线程本地队列中操作的执行顺序始终是`ThreadPool`，其中*n*是`ThreadPool`中的线程数——即*n*个本地队列——而*1*指的是全局队列。
 
@@ -146,19 +174,19 @@ Figure 4.1 – 并发与并行与异步
 
 ![img/Figure_4.3_B18507.jpg]
 
-图4.3 – `ThreadPool`的高级表示
+图 4.3 – `ThreadPool`的高级表示
 
 除了`QueueUserWorkItem`之外，`ThreadPool`类还有许多其他属性/方法可用，例如这些：
 
-+   `SetMinThreads`: 用于设置程序启动时`ThreadPool`将拥有的最小工作线程和异步I/O线程数
++   `SetMinThreads`: 用于设置程序启动时`ThreadPool`将拥有的最小工作线程和异步 I/O 线程数
 
-+   `SetMaxThreads`: 用于设置`ThreadPool`将拥有的最大工作线程和异步I/O线程数，之后，新的请求将被排队
++   `SetMaxThreads`: 用于设置`ThreadPool`将拥有的最大工作线程和异步 I/O 线程数，之后，新的请求将被排队
 
-可以进一步查看`ThreadPool`类的所有属性和方法，请参阅[https://docs.microsoft.com/en-us/dotnet/api/system.threading.threadpool?view=net-6.0](https://docs.microsoft.com/en-us/dotnet/api/system.threading.threadpool?view=net-6.0)。
+可以进一步查看`ThreadPool`类的所有属性和方法，请参阅[`docs.microsoft.com/en-us/dotnet/api/system.threading.threadpool?view=net-6.0`](https://docs.microsoft.com/en-us/dotnet/api/system.threading.threadpool?view=net-6.0)。
 
 虽然通过`ThreadPool`线程的`QueueUserWorkItem`编写多线程代码简化了线程的生命周期管理，但它也有自己的局限性：
 
-+   我们无法从在`ThreadPool`线程上安排的工作中获得响应，因此代理的返回类型是void。
++   我们无法从在`ThreadPool`线程上安排的工作中获得响应，因此代理的返回类型是 void。
 
 +   跟踪在`ThreadPool`线程上安排的工作的进度并不容易，因此像进度报告这样的功能并不容易实现。
 
@@ -166,7 +194,7 @@ Figure 4.1 – 并发与并行与异步
 
 +   `ThreadPool`线程始终是后台线程；因此，与前台线程不同，如果进程关闭，它不会等待`ThreadPool`线程完成其工作。
 
-由于`QueueUserWorkItem`存在局限性，`ThreadPool`线程也可以通过TPL（我们将用于我们的企业应用程序，并在本章后面介绍）来消耗。在.NET Core中，TPL是实现并发/并行化的首选方法，因为它克服了我们迄今为止看到的所有局限性，并最终有助于实现允许您的应用程序扩展和响应的目标。
+由于`QueueUserWorkItem`存在局限性，`ThreadPool`线程也可以通过 TPL（我们将用于我们的企业应用程序，并在本章后面介绍）来消耗。在.NET Core 中，TPL 是实现并发/并行化的首选方法，因为它克服了我们迄今为止看到的所有局限性，并最终有助于实现允许您的应用程序扩展和响应的目标。
 
 ## 懒加载
 
@@ -174,93 +202,190 @@ Figure 4.1 – 并发与并行与异步
 
 如下所示，此类的一个典型实现限制了在构造函数中初始化属性，并且有一个或多个填充类属性的方法：
 
-[PRE16]
+```cs
+        public class ImageFile
+```
 
-[PRE17]
+```cs
+        {
+```
 
-[PRE18]
+```cs
+            string fileName;
+```
 
-[PRE19]
+```cs
+            object loadImage;
+```
 
-[PRE20]
+```cs
+            public ImageFile(string fileName)
+```
 
-[PRE21]
+```cs
+            {
+```
 
-[PRE22]
+```cs
+                this.fileName = fileName;
+```
 
-[PRE23]
+```cs
+            }
+```
 
-[PRE24]
+```cs
+            public object GetImage()
+```
 
-[PRE25]
+```cs
+            {
+```
 
-[PRE26]
+```cs
+                if (loadImage == null)
+```
 
-[PRE27]
+```cs
+                {
+```
 
-[PRE28]
+```cs
+                    loadImage = File.ReadAllText(fileName);
+```
 
-[PRE29]
+```cs
+                }
+```
 
-[PRE30]
+```cs
+                return loadImage;
+```
 
-[PRE31]
+```cs
+            }
+```
 
-[PRE32]
+```cs
+        }
+```
 
 假设这是一个用于从磁盘加载图像的类，在构造函数中加载图像是没有用的，因为只有在调用`GetImage`方法之前无法使用它。因此，懒初始化模式建议，而不是在构造函数中初始化`loadImage`对象，它应该在`GetImage`中初始化，这意味着图像只有在需要时才被加载到内存中。这也可以通过属性来实现，如下所示：
 
-[PRE33]
+```cs
+        object loadImage;
+```
 
-[PRE34]
+```cs
+        public object LoadImage
+```
 
-[PRE35]
+```cs
+        {
+```
 
-[PRE36]
+```cs
+            get
+```
 
-[PRE37]
+```cs
+            {
+```
 
-[PRE38]
+```cs
+                if (loadImage == null)
+```
 
-[PRE39]
+```cs
+                {
+```
 
-[PRE40]
+```cs
+                    loadImage = File.ReadAllText(fileName);
+```
 
-[PRE41]
+```cs
+                }
+```
 
-[PRE42]
+```cs
+                return loadImage;
+```
 
-[PRE43]
+```cs
+            }
+```
 
-[PRE44]
+```cs
+        }
+```
 
 正如你所见，这通常是通过缓存对象来完成的，也被称为`LoadImage`方法或属性，它会导致多次调用磁盘。因此，这里需要通过锁或其他机制进行同步，这显然会增加维护开销，并且类的实现可能会变得更加复杂。
 
-因此，尽管我们可以实现自己的懒加载模式，但在C#中，我们有`System.Lazy`类来处理这种实现。使用`System.Lazy`类的一个关键优点是它是线程安全的。
+因此，尽管我们可以实现自己的懒加载模式，但在 C#中，我们有`System.Lazy`类来处理这种实现。使用`System.Lazy`类的一个关键优点是它是线程安全的。
 
 `System.Lazy`类提供了多个构造函数来实现懒初始化。以下是我们可以使用的两种最常见方式：
 
 +   将类围绕`Lazy`包装，并使用该对象的`Value`方法来检索数据。这通常用于在构造函数中有初始化逻辑的类。以下是一些示例代码：
 
-    [PRE45]
+    ```cs
+            public class ImageFile
+            {
+                string fileName;
+                public object LoadImage { get; set; }
+                public ImageFile(string fileName)
+                {
+                    this.fileName = fileName;
+                    this.LoadImage = $"File {fileName}
+                     loaded from disk";
+                }
+            }
+    ```
 
 在初始化这个类时，我们将使用`System.Lazy`类的泛型类型，并将`ImageFile`类作为其类型，以及`ImageFile`对象作为委托：
 
-[PRE46]
+```cs
+        Lazy<ImageFile> imageFile = new
+         Lazy<ImageFile>(() => new ImageFile("test"));
+        var image = imageFile.Value.LoadImage;
+```
 
 在这里，如果你在`ImageFile`类的构造函数中设置断点，它只有在调用`System.Lazy`类的`Value`方法时才会被触发。
 
 +   对于具有加载各种参数的方法的类，我们可以将方法传递给`Lazy`类作为委托。以下是将之前示例代码中的文件检索逻辑移动到单独方法的示例：
 
-    [PRE47]
+    ```cs
+            public class ImageFile
+            {
+                string fileName;
+                public object LoadImage { get; set; }
+                public ImageFile(string fileName)
+                {
+                    this.fileName = fileName;
+                }
+                public object LoadImageFromDisk()
+                {
+                    this.LoadImage = $"File
+                     {this.fileName} loaded from disk";
+                    return LoadImage;
+                }
+            }
+    ```
 
-在初始化这个类时，我们将一个Lambda传递给泛型委托，然后将该泛型委托传递给初始化`System.Lazy`类的对象，如下面的代码所示：
+在初始化这个类时，我们将一个 Lambda 传递给泛型委托，然后将该泛型委托传递给初始化`System.Lazy`类的对象，如下面的代码所示：
 
-[PRE48]
+```cs
+        Func<object> imageFile = new Func<object>(()
+         => { var obj = new ImageFile("test");
+        return obj.LoadImageFromDisk(); });
+        Lazy<object> lazyImage = new
+         Lazy<object>(imageFile);
+        var image = lazyImage.Value;
+```
 
 注意
 
-C#中的func是一种委托类型，它接受零个或多个参数并返回一个值。更多详细信息可以在这里找到：[https://docs.microsoft.com/en-us/dotnet/api/system.func-1?view=net-6.0](https://docs.microsoft.com/en-us/dotnet/api/system.func-1?view=net-6.0)。
+C#中的 func 是一种委托类型，它接受零个或多个参数并返回一个值。更多详细信息可以在这里找到：[`docs.microsoft.com/en-us/dotnet/api/system.func-1?view=net-6.0`](https://docs.microsoft.com/en-us/dotnet/api/system.func-1?view=net-6.0)。
 
 这两种方式都会延迟对象的初始化，直到调用`Value`方法时。
 
@@ -270,33 +395,45 @@ C#中的func是一种委托类型，它接受零个或多个参数并返回一�
 
 通常，懒初始化非常适合缓存类和单例类，并且可以进一步扩展用于初始化成本高昂的对象。
 
-可以在[https://docs.microsoft.com/en-us/dotnet/api/system.lazy-1?view=net-6.0](https://docs.microsoft.com/en-us/dotnet/api/system.lazy-1?view=net-6.0)进一步查看`Lazy`类的所有属性。
+可以在[`docs.microsoft.com/en-us/dotnet/api/system.lazy-1?view=net-6.0`](https://docs.microsoft.com/en-us/dotnet/api/system.lazy-1?view=net-6.0)进一步查看`Lazy`类的所有属性。
 
-虽然可以通过将底层对象包装在`System.Lazy`类中来实现懒加载，但在.NET中也有`LazyInitializer`静态类可用，可以通过其`EnsureInitialized`方法进行懒加载。
+虽然可以通过将底层对象包装在`System.Lazy`类中来实现懒加载，但在.NET 中也有`LazyInitializer`静态类可用，可以通过其`EnsureInitialized`方法进行懒加载。
 
-如MSDN文档中提到的，它有几个构造函数[https://docs.microsoft.com/en-us/dotnet/api/system.threading.lazyinitializer.ensureinitialized?view=net-6.0](https://docs.microsoft.com/en-us/dotnet/api/system.threading.lazyinitializer.ensureinitialized?view=net-6.0)。
+如 MSDN 文档中提到的，它有几个构造函数[`docs.microsoft.com/en-us/dotnet/api/system.threading.lazyinitializer.ensureinitialized?view=net-6.0`](https://docs.microsoft.com/en-us/dotnet/api/system.threading.lazyinitializer.ensureinitialized?view=net-6.0)。
 
-然而，其理念是相同的，即它期望一个对象和一个函数来填充该对象。以之前的例子来说，如果我们必须使用`LazyInitializer.EnsureInitialized`进行懒加载，我们需要将对象的实例和创建实际对象的Lambda表达式传递给`LazyInitializer.EnsureInitialized`，如下面的代码所示：
+然而，其理念是相同的，即它期望一个对象和一个函数来填充该对象。以之前的例子来说，如果我们必须使用`LazyInitializer.EnsureInitialized`进行懒加载，我们需要将对象的实例和创建实际对象的 Lambda 表达式传递给`LazyInitializer.EnsureInitialized`，如下面的代码所示：
 
-[PRE49]
+```cs
+        object image = null;
+```
 
-[PRE50]
+```cs
+        LazyInitializer.EnsureInitialized(ref image, () =>
+```
 
-[PRE51]
+```cs
+            {
+```
 
-[PRE52]
+```cs
+                var obj = new ImageFile("test");
+```
 
-[PRE53]
+```cs
+                return obj.LoadImageFromDisk();
+```
 
-[PRE54]
+```cs
+            });
+```
 
 在这里，我们传递了两个参数——一个是持有`image`类属性值的对象，另一个是创建`image`类对象并返回图像的函数。因此，这就像调用`System.Lazy`属性的`Value`属性一样简单，而不需要初始化对象的额外开销。
 
 显然，使用`LazyInitializer`进行懒加载的一个小优势是，没有创建额外的对象，这意味着更小的内存占用。另一方面，`System.Lazy`提供了更易读的代码。因此，如果有明确的*空间优化*，请选择`LazyInitializer`；否则，为了获得更干净、更易读的代码，请使用`System.Lazy`。
 
-# 理解锁、信号量和SemaphoreSlim
+# 理解锁、信号量和 SemaphoreSlim
 
-在前面的章节中，我们看到了如何使用.NET中的各种API来实现并行性。然而，当我们这样做时，我们需要对共享变量进行额外的注意。让我们考虑本书中构建的企业电子商务应用程序。想想购买商品的流程。比如说有两个用户计划购买一个产品，但只有一个商品可用。假设两个用户都将商品添加到购物车，第一个用户下订单，而订单正在通过支付网关处理时，第二个用户也尝试下订单。
+在前面的章节中，我们看到了如何使用.NET 中的各种 API 来实现并行性。然而，当我们这样做时，我们需要对共享变量进行额外的注意。让我们考虑本书中构建的企业电子商务应用程序。想想购买商品的流程。比如说有两个用户计划购买一个产品，但只有一个商品可用。假设两个用户都将商品添加到购物车，第一个用户下订单，而订单正在通过支付网关处理时，第二个用户也尝试下订单。
 
 在这种情况下，第二级应该失败（假设第一级成功），因为书的数量现在是零；这只会发生在对线程间的数量应用了适当的同步时。此外，如果第一级在支付网关失败或第一个用户取消他们的交易，第二级应该通过。所以，我们在这里说的是，数量应该在处理第一级时锁定，并且只有在订单完成后（成功或失败）才释放。在我们深入了解处理机制之前，让我们快速回顾一下什么是临界区。
 
@@ -316,15 +453,25 @@ C#中的func是一种委托类型，它接受零个或多个参数并返回一�
 
 **锁**是一个基本类，它允许你在多线程代码中实现同步，其中锁块内的任何变量只能由一个线程访问。在锁中，获取锁的线程需要释放锁，直到那时，任何其他尝试进入锁的线程都将进入等待状态。一个简单的锁可以像以下代码所示那样创建：
 
-[PRE55]
+```cs
+            object locker = new object();
+```
 
-[PRE56]
+```cs
+            lock (locker)
+```
 
-[PRE57]
+```cs
+            {
+```
 
-[PRE58]
+```cs
+                quantity--;
+```
 
-[PRE59]
+```cs
+            }
+```
 
 首先执行此代码的线程将获取锁，并在代码块完成后释放它。锁也可以使用`Monitor.Enter`和`Monitor.Exit`来获取，实际上，使用锁的编译器内部将线程转换为`Monitor.Enter`和`Monitor.Exit`。以下是一些关于锁的重要点：
 
@@ -360,7 +507,7 @@ C#中的func是一种委托类型，它接受零个或多个参数并返回一�
 
 **信号量**是一种非独占锁，它通过允许多个线程进入临界区来支持同步。然而，与独占锁不同，信号量用于需要限制对资源池访问的场景——例如，允许应用程序和数据库之间固定数量连接的数据库连接池。
 
-回到我们在电子商务应用程序中购买产品的例子，如果产品的可用数量是10，这意味着10个人可以将此商品添加到他们的购物车并下订单。如果有11个并发订单，应该允许10个用户下订单，而第11个用户应该被挂起，直到前10个订单完成。
+回到我们在电子商务应用程序中购买产品的例子，如果产品的可用数量是 10，这意味着 10 个人可以将此商品添加到他们的购物车并下订单。如果有 11 个并发订单，应该允许 10 个用户下订单，而第 11 个用户应该被挂起，直到前 10 个订单完成。
 
 在 .NET 中，可以通过创建 `System.Threading.Semaphore` 类的实例并传递两个参数来创建信号量：
 
@@ -370,7 +517,9 @@ C#中的func是一种委托类型，它接受零个或多个参数并返回一�
 
 这是一个简单的代码片段，用于创建信号量：
 
-[PRE60]
+```cs
+Semaphore quantity = new Semaphore(0, 10);
+```
 
 在这种情况下，`0` 表示没有请求获取共享资源，并且允许最多 10 个并发请求。要获取共享资源，我们需要调用 `WaitOne()`，要释放资源，我们需要调用 `Release()` 方法。
 
@@ -422,7 +571,7 @@ C#中的func是一种委托类型，它接受零个或多个参数并返回一�
 
 异步编程背后的思想是，没有任何线程应该等待一个操作——也就是说，框架应该具有将操作包装到某种抽象中的能力，然后在操作完成后恢复，而不阻塞任何线程。这种抽象就是 `Task` 类，它通过 `System.Threading.Tasks` 暴露出来，并有助于在 .NET 中编写异步代码。
 
-`Task` 类简化了任何等待操作的包装，无论是从数据库检索的数据、从磁盘加载到内存中的文件，还是任何高度CPU密集型操作，并且如果需要，它简化了在单独的线程上运行的操作。它具有以下重要特性：
+`Task` 类简化了任何等待操作的包装，无论是从数据库检索的数据、从磁盘加载到内存中的文件，还是任何高度 CPU 密集型操作，并且如果需要，它简化了在单独的线程上运行的操作。它具有以下重要特性：
 
 +   `Task` 通过其泛型类型 `Task<T>` 支持在操作完成后从操作中返回值。
 
@@ -440,51 +589,87 @@ TPL 是由 .NET 在 `System.Threading.Tasks` 和 `System.Threading` 中提供的
 
 +   您可以创建 `Task` 类的实例并传递一个 Lambda 表达式。在此方法中，它需要显式启动，如下面的代码所示：
 
-    [PRE61]
+    ```cs
+                Task dataTask = new Task(() =>
+                 FetchDataFromAPI("https://foo.com/api"));
+                dataTask.Start();
+    ```
 
 +   任务也可以使用`Task.Run`创建，如下面的代码所示，它支持创建和启动任务而不需要显式调用`Start()`：
 
-    [PRE62]
+    ```cs
+    Task dataTask = Task.Run(() => FetchDataFromAPI ("https://foo.com/api"));
+    ```
 
 +   创建任务的另一种方式是使用`Task.Factory.StartNew`：
 
-    [PRE63]
+    ```cs
+    Task dataTask = Task.Factory.StartNew(() => FetchDataFromAPI("https://foo.com/api"));
+    ```
 
 在所有这些方法中，都使用`ThreadPool`线程来运行`FetchDataFromAPI`方法，并通过返回给调用者的`dataTask`对象进行引用，以跟踪操作的完成或异常。
 
-由于这个任务将在`ThreadPool`线程上异步执行，并且所有`ThreadPool`线程都是后台线程，应用程序不会等待`FetchDataFromAPI`方法完成。TPL提供了一个`Wait`方法来等待任务的完成，例如`dataTask.Wait()`。以下是一个使用任务的简单控制台应用程序的代码片段：
+由于这个任务将在`ThreadPool`线程上异步执行，并且所有`ThreadPool`线程都是后台线程，应用程序不会等待`FetchDataFromAPI`方法完成。TPL 提供了一个`Wait`方法来等待任务的完成，例如`dataTask.Wait()`。以下是一个使用任务的简单控制台应用程序的代码片段：
 
-[PRE64]
+```cs
+Task t = Task.Factory.StartNew(() =>
+```
 
-[PRE65]
+```cs
+             FetchDataFromAPI("https://foo.com"));
+```
 
-[PRE66]
+```cs
+t.Wait();
+```
 
-[PRE67]
+```cs
+void FetchDataFromAPI(string apiURL)
+```
 
-[PRE68]
+```cs
+{
+```
 
-[PRE69]
+```cs
+     Thread.Sleep(2000);
+```
 
-[PRE70]
+```cs
+     Console.WriteLine("data returned from API");
+```
 
-[PRE71]
+```cs
+}
+```
 
-在这个代码片段中，我们使用了Lambda表达式。然而，它也可以是一个委托或无参数方法的动作委托，因此以下内容也可以用来创建任务：
+在这个代码片段中，我们使用了 Lambda 表达式。然而，它也可以是一个委托或无参数方法的动作委托，因此以下内容也可以用来创建任务：
 
-[PRE72]
+```cs
+Task t = Task.Factory.StartNew(delegate { FetchDataFromAPI("https://foo.com");});
+```
 
 无论哪种方式，你都会收到`Task`对象的引用并相应地处理它。如果一个方法返回一个值，那么我们可以使用`Task`类的泛型版本，并使用`Result`方法从`Task`中检索数据。例如，如果`FetchDataFromAPI`返回一个字符串，我们可以使用`Task<String>`，如下面的代码片段所示：
 
-[PRE73]
+```cs
+            Task<string> t =
+```
 
-[PRE74]
+```cs
+             Task.Factory.StartNew<string>(()
+```
 
-[PRE75]
+```cs
+             => FetchDataFromAPI(""));
+```
 
-[PRE76]
+```cs
+            t.Wait();
+```
 
-[PRE77]
+```cs
+            Console.WriteLine(t.Result);
+```
 
 这些方法中的每一个都接受各种附加参数，以下是一些重要的参数：
 
@@ -494,11 +679,13 @@ TPL 是由 .NET 在 `System.Threading.Tasks` 和 `System.Threading` 中提供的
 
 +   自定义实现`TaskScheduler`以控制任务的排队方式。
 
-`TaskCreationOptions`是TPL中的一个枚举，它告诉`TaskScheduler`我们正在创建什么类型的任务。例如，我们可以创建一个长时间运行的任务，如下所示：
+`TaskCreationOptions`是 TPL 中的一个枚举，它告诉`TaskScheduler`我们正在创建什么类型的任务。例如，我们可以创建一个长时间运行的任务，如下所示：
 
-[PRE78]
+```cs
+Task<string> t = Task.Factory.StartNew<string>(() => FetchDataFromAPI(""), TaskCreationOptions.LongRunning);
+```
 
-尽管这并不能保证输出更快，但它更像是对调度器的一种提示，使其进行自我优化。例如，如果调度器看到有长时间运行的任务正在被调度，它可以启动更多的线程。这个枚举的所有选项都可以在[https://docs.microsoft.com/en-us/dotnet/api/system.threading.tasks.taskcreationoptions?view=net-6.0](https://docs.microsoft.com/en-us/dotnet/api/system.threading.tasks.taskcreationoptions?view=net-6.0)找到。
+尽管这并不能保证输出更快，但它更像是对调度器的一种提示，使其进行自我优化。例如，如果调度器看到有长时间运行的任务正在被调度，它可以启动更多的线程。这个枚举的所有选项都可以在[`docs.microsoft.com/en-us/dotnet/api/system.threading.tasks.taskcreationoptions?view=net-6.0`](https://docs.microsoft.com/en-us/dotnet/api/system.threading.tasks.taskcreationoptions?view=net-6.0)找到。
 
 `Task`还支持通过创建和传递所有任务作为参数到以下方法的同时等待多个任务：
 
@@ -516,31 +703,57 @@ TPL 是由 .NET 在 `System.Threading.Tasks` 和 `System.Threading` 中提供的
 
 在任务中的异常处理就像在任务周围写一个 `try` 块，然后捕获异常，这些异常通常被封装在 `AggregateException` 中，如下面的代码片段所示：
 
-[PRE79]
+```cs
+            try
+```
 
-[PRE80]
+```cs
+            {
+```
 
-[PRE81]
+```cs
+                Task<string> t =
+```
 
-[PRE82]
+```cs
+                 Task.Factory.StartNew<string>(()
+```
 
-[PRE83]
+```cs
+                 => FetchDataFromAPI(""));
+```
 
-[PRE84]
+```cs
+                t.Wait();
+```
 
-[PRE85]
+```cs
+            }
+```
 
-[PRE86]
+```cs
+            catch (AggregateException agex)
+```
 
-[PRE87]
+```cs
+            {
+```
 
-[PRE88]
+```cs
+                //Handle exception
+```
 
-[PRE89]
+```cs
+                Console.WriteLine(
+```
 
-[PRE90]
+```cs
+                  agex.InnerException.Message);
+```
 
-[PRE91]
+```cs
+            }
+```
 
 在前面的代码中，`agex.InnerException` 将给出实际的异常，因为我们正在等待单个任务。然而，如果我们正在等待多个任务，那么将是 `InnerExceptions` 集合，我们可以遍历它。此外，它还包含一个 `Handle` 回调方法，可以在 `catch` 块中订阅，一旦触发，回调将包含有关异常的信息。
 
@@ -548,7 +761,7 @@ TPL 是由 .NET 在 `System.Threading.Tasks` 和 `System.Threading` 中提供的
 
 此外，如果一个任务是附加子任务或嵌套任务的父任务，或者如果你正在等待多个任务，可能会抛出多个异常。为了将所有异常传播回调用线程，`Task` 基础设施将它们封装在 `AggregateException` 实例中。
 
-更多关于异常处理的详细信息可以在 [https://docs.microsoft.com/en-us/dotnet/standard/parallel-programming/exception-handling-task-parallel-library](https://docs.microsoft.com/en-us/dotnet/standard/parallel-programming/exception-handling-task-parallel-library) 找到。
+更多关于异常处理的详细信息可以在 [`docs.microsoft.com/en-us/dotnet/standard/parallel-programming/exception-handling-task-parallel-library`](https://docs.microsoft.com/en-us/dotnet/standard/parallel-programming/exception-handling-task-parallel-library) 找到。
 
 ## 实现任务取消
 
@@ -566,115 +779,219 @@ TPL 是由 .NET 在 `System.Threading.Tasks` 和 `System.Threading` 中提供的
 
 对于前者，我们可以创建一个支持取消的任务。我们使用 TPL API 并将取消令牌传递给构造函数，如果任务需要取消，就调用 `CancellationTokenSource` 类的 `Cancel` 方法，如下面的代码片段所示：
 
-[PRE92]
+```cs
+            cts = new CancellationTokenSource();
+```
 
-[PRE93]
+```cs
+            CancellationToken token = cts.Token;
+```
 
-[PRE94]
+```cs
+            Task dataFromAPI = Task.Factory.StartNew(()
+```
 
-[PRE95]
+```cs
+             => FetchDataFromAPI(new List<string> {
+```
 
-[PRE96]
+```cs
+                "https://foo.com",
+```
 
-[PRE97]
+```cs
+                "https://foo1.com",}), token);
+```
 
-[PRE98]
+```cs
+            cts.Cancel();
+```
 
 所有支持异步调用的 .NET Core API，如 `HttpClient` 类的 `GetAsync` 和 `PostAsync`，都有接受取消令牌的重载。对于后一种情况（中止任务），决策基于将要运行的操作是否支持取消。假设它支持取消，我们可以将取消令牌传递给方法，并在方法调用内部检查取消令牌的 `IsCancellationRequested` 属性，并相应地处理它。
 
 让我们创建一个简单的控制台应用程序，创建一个支持取消的任务。在这里，我们创建了一个 `FetchDataFromAPI` 方法，该方法接受一个 URL 列表并从这些 URL 获取数据。此方法还支持使用 `CancellationToken` 进行取消。在实现中，我们遍历 URL 列表，直到请求取消或循环完成所有迭代：
 
-[PRE99]
+```cs
+        static string FetchDataFromAPI(List<string>
+```
 
-[PRE100]
+```cs
+         apiURL, CancellationToken token)
+```
 
-[PRE101]
+```cs
+        {
+```
 
-[PRE102]
+```cs
+            Console.WriteLine("Task started");
+```
 
-[PRE103]
+```cs
+            int counter = 0;
+```
 
-[PRE104]
+```cs
+            foreach (string url in apiURL)
+```
 
-[PRE105]
+```cs
+            {
+```
 
-[PRE106]
+```cs
+                if (token.IsCancellationRequested)
+```
 
-[PRE107]
+```cs
+                {
+```
 
-[PRE108]
+```cs
+                    throw new TaskCanceledException($"data
+```
 
-[PRE109]
+```cs
+                     from API returned up to iteration
+```
 
-[PRE110]
+```cs
+                       {counter}");
+```
 
-[PRE111]
+```cs
+                    //throw new 
+```
 
-[PRE112]
+```cs
+                    //OperationCanceledException($"data 
+```
 
-[PRE113]
+```cs
+                    //from API returned up to iteration 
+```
 
-[PRE114]
+```cs
+                    //{counter}"); 
+```
 
-[PRE115]
+```cs
+                    // Alternate exception with same result
+```
 
-[PRE116]
+```cs
+                    //break; // To handle manually
+```
 
-[PRE117]
+```cs
+                }
+```
 
-[PRE118]
+```cs
+                Thread.Sleep(1000);
+```
 
-[PRE119]
+```cs
+                Console.WriteLine($"data retrieved from
+```
 
-[PRE120]
+```cs
+                 {url} for iteration {counter}");
+```
 
-[PRE121]
+```cs
+                counter++;
+```
 
-[PRE122]
+```cs
+            }
+```
 
-[PRE123]
+```cs
+            return $"data from API returned up to iteration
+```
 
-[PRE124]
+```cs
+             {counter}";
+```
 
-[PRE125]
+```cs
+        }
+```
 
 现在，从主方法中调用 `FetchDataFromAPI`，使用四个 URL 的列表，如下所示。在这里，我们使用 `CancellationTokenSource` 类的 `Token` 属性创建 `CancellationToken`，并将其传递给 `FetchDataFromAPI` 方法。我们模拟了 3 秒后的取消，以便在获取第四个 URL 之前取消 `FetchDataFromAPI`：
 
-[PRE126]
+```cs
+CancellationTokenSource cts = new CancellationTokenSource();
+```
 
-[PRE127]
+```cs
+CancellationToken token = cts.Token;
+```
 
-[PRE128]
+```cs
+Task<string> dataFromAPI;
+```
 
-[PRE129]
+```cs
+try
+```
 
-[PRE130]
+```cs
+{
+```
 
-[PRE131]
+```cs
+    dataFromAPI = Task.Factory.StartNew<string>(() =>
+```
 
-[PRE132]
+```cs
+     FetchDataFromAPI(new List<string> {
+```
 
-[PRE133]
+```cs
+    "https://foo.com","https://foo1.com","https://foo2.com"
+```
 
-[PRE134]
+```cs
+      ,"https://foo3.com", "https://foo4.com", }, token));
+```
 
-[PRE135]
+```cs
+    Thread.Sleep(3000);
+```
 
-[PRE136]
+```cs
+    cts.Cancel(); //Trigger cancel notification to 
+```
 
-[PRE137]
+```cs
+                  //cancellation token
+```
 
-[PRE138]
+```cs
+    dataFromAPI.Wait(); // Wait for task completion
+```
 
-[PRE139]
+```cs
+    Console.WriteLine(dataFromAPI.Result); // If task is 
+```
 
-[PRE140]
+```cs
+      //completed display message accordingly
+```
 
-[PRE141]
+```cs
+}
+```
 
-[PRE142]
+```cs
+catch (AggregateException agex)
+```
 
-[PRE143]
+```cs
+{// Handle exception}
+```
 
 一旦运行此代码，我们可以看到三个 URL 的输出，然后是一个异常/中断（基于 `FetchDataFromAPI` 方法中注释掉的哪一行）。
 
@@ -682,85 +999,151 @@ TPL 是由 .NET 在 `System.Threading.Tasks` 和 `System.Threading` 中提供的
 
 在那些情况下，我们必须编写一个接受取消令牌的包装方法，并在包装器内部调用长时间运行的操作；然后在主方法中，我们调用包装器代码。以下代码片段显示了一个使用 `TaskCompletionSource` 的包装方法，这是 TPL 中的另一个类。它用于通过类中可用的 `Task` 属性将非任务异步方法（包括基于异步方法的那些）转换为任务。在这种情况下，我们将取消令牌传递给 `TaskCompletionSource`，以便其 `Task` 得到相应的更新：
 
-[PRE144]
+```cs
+        static Task<string>
+```
 
-[PRE145]
+```cs
+         FetchDataFromAPIWithCancellation(List<string>
+```
 
-[PRE146]
+```cs
+         apiURL, CancellationToken cancellationToken)
+```
 
-[PRE147]
+```cs
+        {
+```
 
-[PRE148]
+```cs
+            var tcs = new TaskCompletionSource<string>();
+```
 
-[PRE149]
+```cs
+            tcs.TrySetCanceled(cancellationToken);
+```
 
-[PRE150]
+```cs
+            // calling overload of long running operation 
+```
 
-[PRE151]
+```cs
+            // that doesn't support cancellation token
+```
 
-[PRE152]
+```cs
+            var dataFromAPI = Task.Factory.StartNew(() =>
+```
 
-[PRE153]
+```cs
+             FetchDataFromAPI(apiURL));
+```
 
-[PRE154]
+```cs
+            // Wait for the first task to complete
+```
 
-[PRE155]
+```cs
+            var outputTask = Task.WhenAny(dataFromAPI,
+```
 
-[PRE156]
+```cs
+             tcs.Task);
+```
 
-[PRE157]
+```cs
+            return outputTask.Result;
+```
 
-[PRE158]
+```cs
+        }
+```
 
 在这种情况下，`CancellationToken` 通过 `TaskCompletionSource` 的 `Task` 属性进行跟踪，我们创建了另一个任务来调用我们的长时间运行的操作（不支持取消令牌支持的操作），并且哪个任务先完成，我们就返回哪个任务。
 
 当然，`Main` 方法需要更新为调用包装器，如下所示（其余代码保持不变）：
 
-[PRE159]
+```cs
+            dataFromAPI = Task.Factory.StartNew(() =>
+```
 
-[PRE160]
+```cs
+             FetchDataFromAPIWithCancellation(new
+```
 
-[PRE161]
+```cs
+             List<string>
+```
 
-[PRE162]
+```cs
+                {
+```
 
-[PRE163]
+```cs
+                        "https://foo.com",
+```
 
-[PRE164]
+```cs
+                        "https://foo1.com",
+```
 
-[PRE165]
+```cs
+                        "https://foo2.com",
+```
 
-[PRE166]
+```cs
+                        "https://foo3.com",
+```
 
-[PRE167]
+```cs
+                        "https://foo4.com",
+```
 
-[PRE168]
+```cs
+                    }, token)).Result;
+```
 
 这不会取消底层方法，但仍然允许应用程序在底层操作完成之前退出。
 
-任务取消是一种非常有用的机制，有助于减少不必要的处理，无论是尚未开始的任务还是已经开始但需要停止/中止的任务。因此，.NET中的所有异步API都支持取消。
+任务取消是一种非常有用的机制，有助于减少不必要的处理，无论是尚未开始的任务还是已经开始但需要停止/中止的任务。因此，.NET 中的所有异步 API 都支持取消。
 
 ## 实现延续
 
-在企业应用程序中，大多数情况下，需要创建多个任务，构建任务层次结构，创建依赖任务，或创建任务之间的子/父关系。任务延续可以用来定义这样的子任务/子任务。它就像JavaScript的承诺一样工作，并支持将任务链式连接到多个级别。就像承诺一样，层次结构中的后续任务在第一个任务之后执行，并且这可以进一步链式连接到多个级别。
+在企业应用程序中，大多数情况下，需要创建多个任务，构建任务层次结构，创建依赖任务，或创建任务之间的子/父关系。任务延续可以用来定义这样的子任务/子任务。它就像 JavaScript 的承诺一样工作，并支持将任务链式连接到多个级别。就像承诺一样，层次结构中的后续任务在第一个任务之后执行，并且这可以进一步链式连接到多个级别。
 
 实现任务延续有多种方法，但最常见的方法是使用`Task`类的`ContinueWith`方法，如下面的示例所示：
 
-[PRE169]
+```cs
+Task.Factory.StartNew(() => Task1(1)) // 1+2 = 3
+```
 
-[PRE170]
+```cs
+                .ContinueWith(a => Task2(a.Result)) // 3*2 = 6
+```
 
-[PRE171]
+```cs
+                    .ContinueWith(b => Task3(b.Result))// 6-2=4
+```
 
-[PRE172]
+```cs
+                        .ContinueWith(c => Console.WriteLine(c.Result));
+```
 
-[PRE173]
+```cs
+Console.ReadLine();
+```
 
-[PRE174]
+```cs
+static int Task1(int a) => a + 2;
+```
 
-[PRE175]
+```cs
+static int Task2(int a) => a * 2;
+```
 
-[PRE176]
+```cs
+static int Task3(int a) => a - 2;
+```
 
 如您所猜测的，这里的输出将是`4`，并且每个任务都在前一个任务的执行完成后执行。
 
@@ -772,19 +1155,19 @@ TPL 是由 .NET 在 `System.Threading.Tasks` 和 `System.Threading` 中提供的
 
 +   `Task.Factory.ContinueWhenAny`：这个方法接受多个任务引用作为参数，并在其中一个引用的任务完成时创建一个延续。
 
-理解任务延续对于理解async-await的底层工作原理至关重要，我们将在本章后面讨论这一点。
+理解任务延续对于理解 async-await 的底层工作原理至关重要，我们将在本章后面讨论这一点。
 
 ## 同步上下文
 
-`SynchronizationContext`是`System.Threading`中可用的一个抽象类，它有助于线程之间的通信。例如，从并行任务更新UI元素需要线程重新加入UI线程并继续执行。`SynchronizationContext`主要通过这个类的`Post`方法提供这种抽象，该方法接受一个在稍后阶段执行的委托。因此，在前面的示例中，如果需要更新UI元素，就需要获取UI线程的`SynchronizationContext`，调用其`Post`方法，并传递必要的更新UI元素的数据。
+`SynchronizationContext`是`System.Threading`中可用的一个抽象类，它有助于线程之间的通信。例如，从并行任务更新 UI 元素需要线程重新加入 UI 线程并继续执行。`SynchronizationContext`主要通过这个类的`Post`方法提供这种抽象，该方法接受一个在稍后阶段执行的委托。因此，在前面的示例中，如果需要更新 UI 元素，就需要获取 UI 线程的`SynchronizationContext`，调用其`Post`方法，并传递必要的更新 UI 元素的数据。
 
-由于`SynchronizationContext`是一个抽象类，因此有各种派生类型——例如，Windows Forms有`WindowsFormsSynchronizationContext`，而WPF有`DispatcherSynchronizationContext`。
+由于`SynchronizationContext`是一个抽象类，因此有各种派生类型——例如，Windows Forms 有`WindowsFormsSynchronizationContext`，而 WPF 有`DispatcherSynchronizationContext`。
 
 `SynchronizationContext`的主要优势在于它是一个抽象，这有助于无论`Post`方法的重写实现如何，都可以排队一个委托。
 
 ## TaskScheduler
 
-当我们使用前面描述的各种方法创建任务时，我们看到了任务会在`ThreadPool`线程上被*调度*，但问题是谁或什么负责调度。`System.Threading.Tasks.TaskScheduler`是TPL中可用的类，负责在`ThreadPool`线程上排队和执行任务委托。
+当我们使用前面描述的各种方法创建任务时，我们看到了任务会在`ThreadPool`线程上被*调度*，但问题是谁或什么负责调度。`System.Threading.Tasks.TaskScheduler`是 TPL 中可用的类，负责在`ThreadPool`线程上排队和执行任务委托。
 
 当然，这是一个抽象类，框架提供了两个派生类：
 
@@ -792,31 +1175,41 @@ TPL 是由 .NET 在 `System.Threading.Tasks` 和 `System.Threading` 中提供的
 
 +   `SynchronizationContextScheduler`
 
-`TaskScheduler`公开了一个`Default`属性，默认设置为`ThreadPoolTaskScheduler`。因此，默认情况下，所有任务都安排到`ThreadPool`线程上；然而，GUI应用程序通常使用`SynchronizationContextScheduler`，以便任务可以成功返回并更新UI元素。
+`TaskScheduler`公开了一个`Default`属性，默认设置为`ThreadPoolTaskScheduler`。因此，默认情况下，所有任务都安排到`ThreadPool`线程上；然而，GUI 应用程序通常使用`SynchronizationContextScheduler`，以便任务可以成功返回并更新 UI 元素。
 
-.NET Core提供了`TaskScheduler`和`SynchronizationContext`类的复杂派生类型。然而，它们在async-await中扮演着重要角色，并有助于快速调试任何与死锁相关的问题。
+.NET Core 提供了`TaskScheduler`和`SynchronizationContext`类的复杂派生类型。然而，它们在 async-await 中扮演着重要角色，并有助于快速调试任何与死锁相关的问题。
 
 注意，查看`TaskScheduler`和`SynchronizationContext`的内部工作原理超出了本书的范围，留作练习探索。
 
 ## 实现数据并行化
 
-数据并行化主要涉及将源集合分割成多个并行可执行的任务，这些任务并行执行相同的操作。使用TPL（Task Parallel Library），这可以通过`Parallel`静态类来实现，该类公开了`For`和`ForEach`等方法，并具有多个重载以处理此类执行。
+数据并行化主要涉及将源集合分割成多个并行可执行的任务，这些任务并行执行相同的操作。使用 TPL（Task Parallel Library），这可以通过`Parallel`静态类来实现，该类公开了`For`和`ForEach`等方法，并具有多个重载以处理此类执行。
 
 假设你有一个包含一百万个数字的集合，你需要找出其中的素数。数据并行化在这里可以派上用场，因为集合可以被分割成范围，并评估其中的素数。通常的并行`for`循环可以写成如下片段：
 
-[PRE177]
+```cs
+            List<int> numbers = Enumerable.Range(1,
+```
 
-[PRE178]
+```cs
+             100000).ToList();
+```
 
-[PRE179]
+```cs
+            Parallel.For(numbers.First(), numbers.Last(), x
+```
 
-[PRE180]
+```cs
+             => CalculatePrime(x));
+```
 
 然而，一个更现实的例子可能是一个图像处理应用程序，它需要处理图像中的每个像素，并将每个像素的亮度降低五点。此类操作可以从数据并行化中受益匪浅，因为每个像素与其他像素独立，因此可以并行处理。
 
 类似地，`Parallel`静态类中有一个`ForEach`方法，可以如下使用：
 
-[PRE181]
+```cs
+Parallel.ForEach(numbers, x => CalculatePrime(x));
+```
 
 使用`Parallel.For`和`Parallel.ForEach`实现数据并行化的关键优势如下列出：
 
@@ -838,113 +1231,189 @@ TPL 是由 .NET 在 `System.Threading.Tasks` 和 `System.Threading` 中提供的
 
     小贴士
 
-    数据并行性应谨慎使用，因为有时会被误用。这就像把40个任务分给4个人。如果组织这项工作（分割和合并）给4个人做比完成40个任务的整体工作还要多，那么数据并行性不是正确的选择。有关进一步阅读，请参阅[https://docs.microsoft.com/en-us/dotnet/standard/parallel-programming/data-parallelism-task-parallel-library](https://docs.microsoft.com/en-us/dotnet/standard/parallel-programming/data-parallelism-task-parallel-library)。
+    数据并行性应谨慎使用，因为有时会被误用。这就像把 40 个任务分给 4 个人。如果组织这项工作（分割和合并）给 4 个人做比完成 40 个任务的整体工作还要多，那么数据并行性不是正确的选择。有关进一步阅读，请参阅[`docs.microsoft.com/en-us/dotnet/standard/parallel-programming/data-parallelism-task-parallel-library`](https://docs.microsoft.com/en-us/dotnet/standard/parallel-programming/data-parallelism-task-parallel-library)。
 
-## 使用Parallel LINQ (PLINQ)
+## 使用 Parallel LINQ (PLINQ)
 
-PLINQ是LINQ的并行实现；这是一组在`ParallelEnumerable`类中可用的API，它使LINQ查询的并行执行成为可能。使LINQ查询并行运行的最简单方法是在LINQ查询中嵌入`AsParallel`方法。请参见以下代码片段，它调用一个计算1到1,000之间素数的方法：
+PLINQ 是 LINQ 的并行实现；这是一组在`ParallelEnumerable`类中可用的 API，它使 LINQ 查询的并行执行成为可能。使 LINQ 查询并行运行的最简单方法是在 LINQ 查询中嵌入`AsParallel`方法。请参见以下代码片段，它调用一个计算 1 到 1,000 之间素数的方法：
 
-[PRE182]
+```cs
+List<int> numbers = Enumerable.Range(1, 1000).ToList();
+```
 
-[PRE183]
+```cs
+var resultList = numbers.AsParallel().Where(I => CalculatePrime
+```
 
-[PRE184]
+```cs
+(i)).ToList();
+```
 
-使用LINQ查询语法，这将是如下所示：
+使用 LINQ 查询语法，这将是如下所示：
 
-[PRE185]
+```cs
+var primeNumbers = (from i in numbers.AsParallel()where CalculatePrime(i) select i).ToList();
+```
 
 内部，此查询被分割成多个更小的查询，这些查询在每个处理器上并行执行，从而加快了查询速度。分区源需要合并回主线程，以便结果（输出集合）可以遍历以进行进一步的处理/显示。
 
 让我们创建一个控制台应用程序，使用 PLINQ 和 `Parallel.For` 打印给定范围内的所有素数。添加以下方法，该方法接受一个数字，如果它是素数则返回 `true`，否则返回 `false`：
 
-[PRE186]
+```cs
+bool CalculatePrime(int num)
+```
 
-[PRE187]
+```cs
+{
+```
 
-[PRE188]
+```cs
+    bool isDivisible = false;
+```
 
-[PRE189]
+```cs
+    for (int i = 2; i <= num / 2; i++)
+```
 
-[PRE190]
+```cs
+    {
+```
 
-[PRE191]
+```cs
+        if (num % i == 0)
+```
 
-[PRE192]
+```cs
+        {
+```
 
-[PRE193]
+```cs
+            isDivisible = true;
+```
 
-[PRE194]
+```cs
+            break;
+```
 
-[PRE195]
+```cs
+        }
+```
 
-[PRE196]
+```cs
+    }
+```
 
-[PRE197]
+```cs
+    if (!isDivisible && num != 1)
+```
 
-[PRE198]
+```cs
+        return true;
+```
 
-[PRE199]
+```cs
+    else
+```
 
-[PRE200]
+```cs
+        return false;
+```
 
-[PRE201]
+```cs
+}
+```
 
 现在，在主方法中，添加以下代码，它创建了一个列表，包含我们将使用 PLINQ 遍历的前 100 个数字，然后将其传递给 `CalculatePrime` 方法；然后，我们将最终使用 `Parallel.ForEach` 显示素数列表：
 
-[PRE202]
+```cs
+List<int> numbers = Enumerable.Range(1, 100).ToList();
+```
 
-[PRE203]
+```cs
+try
+```
 
-[PRE204]
+```cs
+{
+```
 
-[PRE205]
+```cs
+       var primeNumbers = (from number in 
+```
 
-[PRE206]
+```cs
+       numbers.AsParallel() where CalculatePrime(number) == 
+```
 
-[PRE207]
+```cs
+       true select number).ToList();
+```
 
-[PRE208]
+```cs
+  Parallel.ForEach(primeNumbers, (primeNumber) =>
+```
 
-[PRE209]
+```cs
+  {
+```
 
-[PRE210]
+```cs
+    Console.WriteLine(primeNumber);
+```
 
-[PRE211]
+```cs
+  });
+```
 
-[PRE212]
+```cs
+}
+```
 
-[PRE213]
+```cs
+catch (AggregateException ex)
+```
 
-[PRE214]
+```cs
+{
+```
 
-[PRE215]
+```cs
+  Console.WriteLine(ex.InnerException.Message);
+```
 
-[PRE216]
+```cs
+}
+```
 
 此示例的输出将是一个素数列表；然而，你可以看到输出将不会是按升序排列的素数，而是随机顺序，因为 `CalculatePrime` 方法是并行调用多个数字的。
 
 下面的代码内部工作原理图如下：
 
-![图 4.4 – PLINQ 和 Parallel.ForEach
-
-](img/Figure_4.4_B18507.jpg)
+![图 4.4 – PLINQ 和 Parallel.ForEach](img/Figure_4.4_B18507.jpg)
 
 图 4.4 – PLINQ 和 Parallel.ForEach
 
 PLINQ 还提供了一个方法，用于处理每个分区/线程的结果，而无需使用 `ForAll` 将结果合并到调用线程中，前面的代码可以进一步优化如下：
 
-[PRE217]
+```cs
+            (from i in numbers.AsParallel()
+```
 
-[PRE218]
+```cs
+             where CalculatePrime(i) == true
+```
 
-[PRE219]
+```cs
+             select i).ForAll((primeNumber) =>
+```
 
-[PRE220]
+```cs
+               Console.WriteLine(primeNumber));
+```
 
 提示
 
-在 LINQ/PLINQ 中进行实验的最佳工具之一是 LINQPad；我建议您从 [https://www.linqpad.net/Download.aspx](https://www.linqpad.net/Download.aspx) 下载它。
+在 LINQ/PLINQ 中进行实验的最佳工具之一是 LINQPad；我建议您从 [`www.linqpad.net/Download.aspx`](https://www.linqpad.net/Download.aspx) 下载它。
 
 对于 PLINQ，以下是一些重要事项需要记住：
 
@@ -982,9 +1451,7 @@ PLINQ 和 TPL 一起构成了并行扩展。
 
 使用 `async` 修饰符，然后在任务（或任何公开 `GetAwaiter()` 的自定义可等待类型）包装的异步操作上使用 `await`。简单来说，这种模式涉及使用单个具有 `async` 修饰符并返回任务的方法来表示异步操作；任何异步操作都进一步使用 `await` 进行等待。以下是一个示例代码片段，它异步地下载文件，这是使用 TAP 实现的：
 
-![图 4.5 – 使用 async-await 的异步方法示例
-
-](img/Figure_4.5_B18507.jpg)
+![图 4.5 – 使用 async-await 的异步方法示例](img/Figure_4.5_B18507.jpg)
 
 图 4.5 – 使用 async-await 的异步方法示例
 
@@ -1002,9 +1469,7 @@ PLINQ 和 TPL 一起构成了并行扩展。
 
 在一个大致的高级层面上，代码将转换为如下所示：
 
-![图 4.6 – 转换后的示例异步方法
-
-![图 4.6_B18507.jpg](img/Figure_4.6_B18507.jpg)
+![图 4.6 – 转换后的示例异步方法![图 4.6_B18507.jpg](img/Figure_4.6_B18507.jpg)
 
 图 4.6 – 转换后的示例异步方法
 
@@ -1026,69 +1491,133 @@ PLINQ 和 TPL 一起构成了并行扩展。
 
 让我们看看以下来自 WPF 应用程序的代码片段，该应用程序在按钮点击时从网络上下载文件。然而，我们不是等待异步方法的调用，而是使用`Task`的`Result`方法：
 
-[PRE221]
+```cs
+        private void Button_Click(object sender,
+```
 
-[PRE222]
+```cs
+         RoutedEventArgs e)
+```
 
-[PRE223]
+```cs
+        {
+```
 
-[PRE224]
+```cs
+            var task = 
+```
 
-[PRE225]
+```cs
+            DownloadFileAsync("https://github.com/Ravindra-
+```
 
-[PRE226]
+```cs
+            a/largefile/blob/master/README.md", @$"{System.IO.Directory.GetCurrentDirectory()}\download.txt");
+```
 
-[PRE227]
+```cs
+            bool fileDownload = task.Result; // Or 
+```
 
-[PRE228]
+```cs
+                            //task.GetAwaiter().GetResult()
+```
 
-[PRE229]
+```cs
+            if (fileDownload)
+```
 
-[PRE230]
+```cs
+            {
+```
 
-[PRE231]
+```cs
+                MessageBox.Show("file downloaded");
+```
 
-[PRE232]
+```cs
+            }
+```
 
-[PRE233]
+```cs
+        }
+```
 
-[PRE234]
+```cs
+        private async Task<bool> DownloadFileAsync(string
+```
 
-[PRE235]
+```cs
+         url, string path)
+```
 
-[PRE236]
+```cs
+        {
+```
 
-[PRE237]
+```cs
+            // Create a new web client object
+```
 
-[PRE238]
+```cs
+            using WebClient webClient = new WebClient();
+```
 
-[PRE239]
+```cs
+            // Add user-agent header to avoid forbidden 
+```
 
-[PRE240]
+```cs
+            // errors.
+```
 
-[PRE241]
+```cs
+            webClient.Headers.Add("user-agent",
+```
 
-[PRE242]
+```cs
+              "Mozilla/5.0 (Windows NT 10.0; WOW64)");
+```
 
-[PRE243]
+```cs
+            byte[] data = await
+```
 
-[PRE244]
+```cs
+              webClient.DownloadDataTaskAsync(url);
+```
 
-[PRE245]
+```cs
+            // Write data in file.
+```
 
-[PRE246]
+```cs
+            Using var fileStream = File.OpenWrite(path);
+```
 
-[PRE247]
+```cs
+            {
+```
 
-[PRE248]
+```cs
+                await fileStream.WriteAsync(data, 0,
+```
 
-[PRE249]
+```cs
+                 data.Length);
+```
 
-[PRE250]
+```cs
+            }
+```
 
-[PRE251]
+```cs
+            return true;
+```
 
-[PRE252]
+```cs
+        }
+```
 
 在此方法中，`await` `webClient.DownloadDataTaskAsync(url);` 之后的代码永远不会执行，原因如下：
 
@@ -1112,31 +1641,57 @@ PLINQ 和 TPL 一起构成了并行扩展。
 
 使用 `ConfigureAwait(false)`，特别是如果你正在实现库方法，因为它将避免在原始上下文中运行后续操作。对于库方法，必须使用 `ConfigureAwait(false)`，因为它们不应该依赖于调用者/原始上下文来执行后续操作。例如，以下代码不会导致死锁：
 
-[PRE253]
+```cs
+        private void Button_Click(object sender, RoutedEventArgs e)
+```
 
-[PRE254]
+```cs
+        {
+```
 
-[PRE255]
+```cs
+            string output = GetAsync().Result; //Blocking 
+```
 
-[PRE256]
+```cs
+              //code, ideally should cause deadlock.
+```
 
-[PRE257]
+```cs
+            MessageBox.Show(output);
+```
 
-[PRE258]
+```cs
+        }
+```
 
-[PRE259]
+```cs
+        //  Library code        
+```
 
-[PRE260]
+```cs
+        public async Task<string> GetAsync()
+```
 
-[PRE261]
+```cs
+        {
+```
 
-[PRE262]
+```cs
+            var uri = new Uri("http://www.google.com");
+```
 
-[PRE263]
+```cs
+            return await new HttpClient().
+```
 
-[PRE264]
+```cs
+             GetStringAsync(uri).ConfigureAwait(false);
+```
 
-[PRE265]
+```cs
+        }
+```
 
 默认情况下，每个 `await` 表达式都有 `ConfigureAwait(true)`，因此建议尽可能显式地调用 `ConfigureAwait(false)`。除了避免死锁之外，`ConfigureAwait(false)` 还可以提高性能，因为没有对原始上下文的序列化。
 
@@ -1154,39 +1709,73 @@ PLINQ 和 TPL 一起构成了并行扩展。
 
 这里是一个使用 async-await 来管理 CPU 密集型工作的简单代码片段：
 
-[PRE266]
+```cs
+        private async Task CPUIOResult()
+```
 
-[PRE267]
+```cs
+        {
+```
 
-[PRE268]
+```cs
+            var doExpensiveCalculationTask = Task.Run(() => 
+```
 
-[PRE269]
+```cs
+              DoExpensiveCalculation()); //Call a method 
+```
 
-[PRE270]
+```cs
+              //that does CPU intense operation        
+```
 
-[PRE271]
+```cs
+           var downloadFileAsyncTask = DownloadFileAsync();
+```
 
-[PRE272]
+```cs
+            await Task.WhenAll(doExpensiveCalculationTask,
+```
 
-[PRE273]
+```cs
+             downloadFileAsyncTask);
+```
 
-[PRE274]
+```cs
+        }
+```
 
-[PRE275]
+```cs
+private async Task DownloadFileAsync(string url, string path)
+```
 
-[PRE276]
+```cs
+        {
+```
 
-[PRE277]
+```cs
+            // Implementation
+```
 
-[PRE278]
+```cs
+        }
+```
 
-[PRE279]
+```cs
+        private float DoExpensiveCalculation()
+```
 
-[PRE280]
+```cs
+        {
+```
 
-[PRE281]
+```cs
+            //Implementation
+```
 
-[PRE282]
+```cs
+        }
+```
 
 如前述代码所示，仍然可以使用 async-await 和 TPL 的组合来管理 CPU 密集型工作；这取决于开发者评估所有可能的选项并相应地编写代码。
 
@@ -1200,59 +1789,111 @@ PLINQ 和 TPL 一起构成了并行扩展。
 
 在 `async` Lambda 的情况下，也需要考虑相同的因素，我们需要避免将它们作为参数传递给接受 `Action` 类型的参数的方法。以下是一个示例：
 
-[PRE283]
+```cs
+long elapsedTime = AsyncLambda(async() =>
+```
 
-[PRE284]
+```cs
+{
+```
 
-[PRE285]
+```cs
+    await Task.Delay(1000);
+```
 
-[PRE286]
+```cs
+});
+```
 
-[PRE287]
+```cs
+Console.WriteLine(elapsedTime);
+```
 
-[PRE288]
+```cs
+Console.ReadLine();
+```
 
-[PRE289]
+```cs
+static long AsyncLambda(Action a)
+```
 
-[PRE290]
+```cs
+{
+```
 
-[PRE291]
+```cs
+    Stopwatch sw = new Stopwatch();
+```
 
-[PRE292]
+```cs
+    sw.Start();
+```
 
-[PRE293]
+```cs
+    for (int i = 0; i < 10; i++)
+```
 
-[PRE294]
+```cs
+    {
+```
 
-[PRE295]
+```cs
+        a();
+```
 
-[PRE296]
+```cs
+    }
+```
 
-[PRE297]
+```cs
+    return sw.ElapsedMilliseconds;
+```
 
-[PRE298]
+```cs
+}
+```
 
 在这里，预期 `elapsedTime` 的值将在 10,000 左右。然而，它接近 100 的原因相同——那就是，由于 `Action` 是 `void` 返回类型的委托，对 `AsyncLambda` 的调用会立即返回到 `Main` 方法（就像任何 `async` `void` 方法一样）。这可以通过如下修改 `AsyncLambda` 来修复（或者只需将参数更改为 `Func<Task>` 并相应地处理 `a()` 的等待），然后强制调用者一路使用 `async`：
 
-[PRE299]
+```cs
+        async static Task<long> AsyncLambda(Func<Task> a)
+```
 
-[PRE300]
+```cs
+        {
+```
 
-[PRE301]
+```cs
+            Stopwatch sw = new Stopwatch();
+```
 
-[PRE302]
+```cs
+            sw.Start();
+```
 
-[PRE303]
+```cs
+            for (int i = 0; i < 10; i++)
+```
 
-[PRE304]
+```cs
+            {
+```
 
-[PRE305]
+```cs
+                await a();
+```
 
-[PRE306]
+```cs
+            }
+```
 
-[PRE307]
+```cs
+            return sw.ElapsedMilliseconds;
+```
 
-[PRE308]
+```cs
+        }
+```
 
 注意——如果你的应用程序中有接受 `Action` 类型参数的方法，建议你有一个接受 `Func<Task>` 或 `Func<Task<T>>` 的重载。幸运的是，C# 编译器自动处理这一点，并且始终调用带有 `Func<Task>` 参数的重载。
 
@@ -1264,117 +1905,199 @@ PLINQ 和 TPL 一起构成了并行扩展。
 
 我们都知道 `foreach` 用于遍历 `IEnumerable<T>` 或 `IEnumerator<T>`。让我们看看以下代码，其中我们从数据库中检索所有员工 ID 并遍历每个员工以打印他们的 ID：
 
-[PRE309]
+```cs
+        static async Task Main(string[] args)
+```
 
-[PRE310]
+```cs
+        {
+```
 
-[PRE311]
+```cs
+            var employeeTotal = await
+```
 
-[PRE312]
+```cs
+             GetEmployeeIDAsync(5);
+```
 
-[PRE313]
+```cs
+            foreach (int i in employeeTotal)
+```
 
-[PRE314]
+```cs
+            {
+```
 
-[PRE315]
+```cs
+                Console.WriteLine(i);
+```
 
-[PRE316]
+```cs
+            }
+```
 
-[PRE317]
+```cs
+        }
+```
 
 `GetEmployeeIDAsync` 的实现如下：
 
-[PRE318]
+```cs
+        static async Task<IEnumerable<int>>
+```
 
-[PRE319]
+```cs
+         GetEmployeeIDAsync(int input)
+```
 
-[PRE320]
+```cs
+        {
+```
 
-[PRE321]
+```cs
+            int id = 0;
+```
 
-[PRE322]
+```cs
+            List<int> tempID = new List<int>();
+```
 
-[PRE323]
+```cs
+            for (int i = 0; i < input; i++) //Some async DB 
+```
 
-[PRE324]
+```cs
+              //iterator method like ReadNextAsync
+```
 
-[PRE325]
+```cs
+            {
+```
 
-[PRE326]
+```cs
+                await Task.Delay(1000); // simulate async
+```
 
-[PRE327]
+```cs
+                id += i; // Hypothetically calculation
+```
 
-[PRE328]
+```cs
+                tempID.Add(id);
+```
 
-[PRE329]
+```cs
+            }
+```
 
-[PRE330]
+```cs
+            return tempID;
+```
 
-[PRE331]
+```cs
+        }
+```
 
 在这里，你可以看到我们必须使用一个临时列表，直到我们从数据库中接收到所有记录，然后最终返回这个列表。然而，如果我们的方法中有一个迭代器，C# 中的 `yield` 就是一个明显的选择，因为它有助于立即返回结果并避免使用临时变量。现在，假设你使用了 `yield`，如下面的代码所示：
 
-[PRE332]
+```cs
+yield return id;
+```
 
 编译时你会收到以下错误：
 
-[PRE333]
+```cs
+The body of 'Program.GetEmployeeIDAsync(int)' cannot be an iterator block because 'Task<IEnumerable<int>>' is not an iterator interface type
+```
 
 因此，需要能够使用 `yield` 与 `async` 方法一起，并且循环遍历集合以异步调用应用程序。这就是 C# 8.0 通过 `IAsyncEnumerable` 提出异步流的原因，它主要允许你立即返回数据并异步消费集合。因此，前面的代码可以修改如下：
 
-[PRE334]
+```cs
+await foreach (int i in GetEmployeeIDAsync(5))
+```
 
-[PRE335]
+```cs
+    {
+```
 
-[PRE336]
+```cs
+        Console.WriteLine(i);
+```
 
-[PRE337]
+```cs
+    }       
+```
 
-[PRE338]
+```cs
+static async IAsyncEnumerable<int>
+```
 
-[PRE339]
+```cs
+ GetEmployeeIDAsync(int input)
+```
 
-[PRE340]
+```cs
+{
+```
 
-[PRE341]
+```cs
+    int id = 0;
+```
 
-[PRE342]
+```cs
+    List<int> tempID = new List<int>();
+```
 
-[PRE343]
+```cs
+    for (int i = 0; i < input; i++)
+```
 
-[PRE344]
+```cs
+    {
+```
 
-[PRE345]
+```cs
+        await Task.Delay(1000);
+```
 
-[PRE346]
+```cs
+        id += i; // Hypothetically calculation
+```
 
-[PRE347]
+```cs
+        yield return id;
+```
 
-[PRE348]
+```cs
+    }
+```
 
-[PRE349]
+```cs
+}
+```
 
 因此，在这里你可以看到一旦一个方法开始返回，`IAsyncEnumerable` 循环可以异步迭代，这在许多情况下有助于编写更干净的代码。
 
 ## 线程池饥饿
 
-假设你有一个包含异步代码的应用程序。然而，你注意到在高负载期间，请求的响应时间会急剧增加。你进一步研究这个问题，但你的服务器的CPU并没有完全利用，你的进程的内存也没有很高，而且这也不是数据库成为瓶颈的情况。在这种情况下，你的应用程序可能正在导致所谓的`ThreadPool`饥饿。
+假设你有一个包含异步代码的应用程序。然而，你注意到在高负载期间，请求的响应时间会急剧增加。你进一步研究这个问题，但你的服务器的 CPU 并没有完全利用，你的进程的内存也没有很高，而且这也不是数据库成为瓶颈的情况。在这种情况下，你的应用程序可能正在导致所谓的`ThreadPool`饥饿。
 
 `ThreadPool`饥饿是一种状态，其中新线程不断被添加以服务并发请求，最终达到一个点，`ThreadPool`无法添加更多线程，请求开始看到延迟的响应时间，在最坏的情况下甚至开始失败。即使`ThreadPool`可以以每秒一两个线程的速度添加线程，新的请求也可能以更高的速率到来（例如，在假日季节网络应用程序的突发负载期间）。因此，响应时间显著增加。这种情况发生的原因有很多，这里列出了一些：
 
-+   消耗更多线程以加快长时间运行的CPU密集型工作
++   消耗更多线程以加快长时间运行的 CPU 密集型工作
 
 +   在`sync`方法中使用`GetAwaiter().GetResult()`调用`async`方法
 
 +   错误使用同步原语，例如一个线程长时间持有锁，而其他线程等待获取它
 
-在所有前面的点中，共同点是阻塞代码；因此，即使是短暂的阻塞代码，如`Thread.Sleep`，或者像`GetAwaiter().GetResult()`这样的操作，或者尝试为CPU密集型项分配更多线程，都会增加`ThreadPool`中的线程数量，并最终导致饥饿。
+在所有前面的点中，共同点是阻塞代码；因此，即使是短暂的阻塞代码，如`Thread.Sleep`，或者像`GetAwaiter().GetResult()`这样的操作，或者尝试为 CPU 密集型项分配更多线程，都会增加`ThreadPool`中的线程数量，并最终导致饥饿。
 
-可以使用**PerfView**等工具进一步诊断`ThreadPool`饥饿，例如捕获200秒的跟踪，并验证你进程中线程的增长情况。如果在高峰负载期间看到你的线程以快速的速度增长，那么可能存在饥饿的情况。
+可以使用**PerfView**等工具进一步诊断`ThreadPool`饥饿，例如捕获 200 秒的跟踪，并验证你进程中线程的增长情况。如果在高峰负载期间看到你的线程以快速的速度增长，那么可能存在饥饿的情况。
 
 防止`ThreadPool`饥饿的最佳方法是在整个应用程序中使用`async-await`，并且永远不要阻塞任何`async`调用。此外，限制新创建的操作的节流也可以帮助，因为它限制了一次可以排队多少项。
 
-在本节中，我们讨论了两个重要的结构，`async-await`和TPL，当它们结合使用时，可以简化异步代码的编写。在下一节中，我们将学习.NET 6中可用的各种数据结构，这些数据结构可以支持同步/线程安全，而无需编写任何额外的代码。
+在本节中，我们讨论了两个重要的结构，`async-await`和 TPL，当它们结合使用时，可以简化异步代码的编写。在下一节中，我们将学习.NET 6 中可用的各种数据结构，这些数据结构可以支持同步/线程安全，而无需编写任何额外的代码。
 
 # 使用并发集合实现并行化
 
@@ -1388,77 +2111,137 @@ PLINQ 和 TPL 一起构成了并行扩展。
 
 我们在每个任务中添加 `Thread.Sleep` 来模拟现实场景，确保在这个例子中一个任务不会在另一个任务完成之前完成。让我们考虑一个具有以下代码片段的示例控制台应用程序：
 
-[PRE350]
+```cs
+// Task t1 as one operation from a client who is adding to the dictionary.
+```
 
-[PRE351]
+```cs
+Dictionary<int, string> employeeDictionary = new Dictionary<int, string>();            
+```
 
-[PRE352]
+```cs
+            Task t1 = Task.Factory.StartNew(() =>
+```
 
-[PRE353]
+```cs
+            {
+```
 
-[PRE354]
+```cs
+                for (int i = 0; i < 100; ++i)
+```
 
-[PRE355]
+```cs
+                {
+```
 
-[PRE356]
+```cs
+                    employeeDictionary.TryAdd(i, "Employee"
+```
 
-[PRE357]
+```cs
+                     + i.ToString());
+```
 
-[PRE358]
+```cs
+                    Thread.Sleep(100);
+```
 
-[PRE359]
+```cs
+                }
+```
 
-[PRE360]
+```cs
+            });
+```
 
 这是从另一个客户端读取字典的第二个操作 `Task t2`：
 
-[PRE361]
+```cs
+            Task t2 = Task.Factory.StartNew(() =>
+```
 
-[PRE362]
+```cs
+            {
+```
 
-[PRE363]
+```cs
+                Thread.Sleep(500);
+```
 
-[PRE364]
+```cs
+                foreach (var item in employeeDictionary)
+```
 
-[PRE365]
+```cs
+                {
+```
 
-[PRE366]
+```cs
+                    Console.WriteLine(item.Key + "-" +
+```
 
-[PRE367]
+```cs
+                      item.Value);
+```
 
-[PRE368]
+```cs
+                    Thread.Sleep(100);
+```
 
-[PRE369]
+```cs
+                }
+```
 
-[PRE370]
+```cs
+            });
+```
 
 现在，两个任务同时执行，如下所示：
 
-[PRE371]
+```cs
+try
+```
 
-[PRE372]
+```cs
+            {
+```
 
-[PRE373]
+```cs
+                Task.WaitAll(t1, t2); // Not recommended to 
+```
 
-[PRE374]
+```cs
+                  //use in production application.
+```
 
-[PRE375]
+```cs
+            }
+```
 
-[PRE376]
+```cs
+            catch (AggregateException ex)
+```
 
-[PRE377]
+```cs
+            {
+```
 
-[PRE378]
+```cs
+                Console.WriteLine(ex.Flatten().Message);
+```
 
-[PRE379]
+```cs
+            }
+```
 
-[PRE380]
+```cs
+            Console.ReadLine();
+```
 
 当你运行这个程序时，你会得到以下异常，指出你不能同时修改和枚举集合：
 
-![表 4.2 – ConcurrentDictionary 示例输出
-
-](img/Table_4.2.jpg)
+![表 4.2 – ConcurrentDictionary 示例输出](img/Table_4.2.jpg)
 
 表 4.2 – ConcurrentDictionary 示例输出
 
@@ -1466,15 +2249,60 @@ PLINQ 和 TPL 一起构成了并行扩展。
 
 1.  首先，我们有 `Task` `t1` 作为向字典添加操作的客户端的一个操作：
 
-    [PRE381]
+    ```cs
+    Dictionary<int, string> employeeDictionary = new Dictionary<int, string>();            
+                Task t1 = Task.Factory.StartNew(() =>
+                {
+                    for (int i = 0; i < 100; ++i)
+                    {
+                        //Lock the shared data
+                        lock (syncObject)
+                        {
+                            employeeDictionary.TryAdd(i,
+                              "Employee" + i.ToString());
+                        }
+                        Thread.Sleep(100);
+
+                    }
+                });
+    ```
 
 1.  然后，我们有 `Task` `t2` 作为另一个客户端从字典读取的第二个操作：
 
-    [PRE382]
+    ```cs
+                Task t2 = Task.Factory.StartNew(() =>
+                {
+                    Thread.Sleep(500);
+                    //Lock the shared data
+                    lock (syncObject)
+                    {
+                        foreach (var item in
+                         employeeDictionary)
+                        {
+                            Console.WriteLine(item.Key + 
+                              "-" + item.Value);
+                            Thread.Sleep(100);
+                        }
+                    }
+                });
+    ```
 
 1.  现在，我们同时执行了两个任务：
 
-    [PRE383]
+    ```cs
+    try
+                {
+                    Task.WaitAll(t1, t2); // Not 
+                      //recommended to use in production 
+                      //application.
+                }
+                catch (AggregateException ex)
+                {
+                    Console.WriteLine(ex.Flatten()
+                      .Message);
+                }
+                Console.ReadLine();
+    ```
 
 当你运行这段代码时，你不会看到任何异常。然而，正如之前提到的，锁有一些问题，因此这段代码可以使用并发集合重写。它们内部使用多线程同步技术，有助于扩展，防止数据损坏，并避免所有与锁相关的问题。
 
@@ -1482,15 +2310,52 @@ PLINQ 和 TPL 一起构成了并行扩展。
 
 我们有 `Task t1` 作为向字典添加操作的客户端的一个操作，并且与并发集合一起不需要显式的锁：
 
-[PRE384]
+```cs
+ConcurrentDictionary<int, string> employeeDictionary = new ConcurrentDictionary<int, string>();
+            Task t1 = Task.Factory.StartNew(() =>
+            {
+                for (int i = 0; i < 100; ++i)
+                {
+                    employeeDictionary.TryAdd(i, 
+                      "Employee"
+                      + i.ToString());
+                    Thread.Sleep(100);
+
+                }
+            });
+```
 
 1.  然后，我们还有`Task t2`作为来自另一个客户端的第二个操作，该客户端正在从字典中读取，并且在使用并发集合时不需要显式锁：
 
-    [PRE385]
+    ```cs
+                Task t2 = Task.Factory.StartNew(() =>
+                {
+                    Thread.Sleep(500);
+                    foreach (var item in 
+                      employeeDictionary)
+                    {
+                        Console.WriteLine(item.Key + "-" +
+                           item.Value);
+                        Thread.Sleep(100);
+                    }
+                });
+    ```
 
 1.  现在，这两个任务同时执行：
 
-    [PRE386]
+    ```cs
+    try
+                {
+                    Task.WaitAll(t1, t2);
+                }
+                catch (AggregateException ex) // You will 
+                  //not get Exception
+                {
+                    Console.WriteLine(ex.Flatten()
+                      .Message);
+                }
+                Console.ReadLine();
+    ```
 
 当你现在运行程序时，你将不会遇到任何异常，因为所有操作在`ConcurrentDictionary`中都是线程安全且原子的。随着项目的扩大，开发者无需为实现锁和维持锁而承担任何开销。以下是一些关于如`ConcurrentDictionary`之类的并发集合的注意事项，你需要牢记：
 
@@ -1508,29 +2373,35 @@ PLINQ 和 TPL 一起构成了并行扩展。
 
 我们在上一个章节中看到的`ConcurrentDictionary`是一个通用集合类，你可以添加你想要的项并指定你想要读取的项。其他并发集合是为特定问题设计的：
 
-+   `ConcurrentQueue`适用于需要FIFO（先进先出）的场景。
++   `ConcurrentQueue`适用于需要 FIFO（先进先出）的场景。
 
-+   `ConcurrentStack`适用于需要LIFO（后进先出）的场景。
++   `ConcurrentStack`适用于需要 LIFO（后进先出）的场景。
 
 +   `ConcurrentBag`适用于需要同一线程生产并消费存储在包中的数据，且顺序不重要的场景。
 
 这三个集合也被称为**生产者-消费者集合**，其中一个或多个线程可以生产任务并从同一个集合中消费任务，如下面的图所示：
 
-![图4.7 – 生产者-消费者并发集合
+![图 4.7 – 生产者-消费者并发集合](img/Figure_4.7_B18507.jpg)
 
-](img/Figure_4.7_B18507.jpg)
-
-图4.7 – 生产者-消费者并发集合
+图 4.7 – 生产者-消费者并发集合
 
 所有这三个集合都实现了`IProducerConsumerCollection<T>`接口，最重要的方法是`TryAdd`和`TryTake`，如下所示：
 
-[PRE387]
+```cs
+// Returns: true if the object was added successfully; otherwise, false.        
+```
 
-[PRE388]
+```cs
+bool TryAdd(T item);
+```
 
-[PRE389]
+```cs
+// Returns true if an object was removed and returned successfully; otherwise, false.
+```
 
-[PRE390]
+```cs
+bool TryTake([MaybeNullWhen(false)] out T item);
+```
 
 让我们以一个生产者-消费者为例，并使用`ConcurrentQueue`来模拟它：
 
@@ -1540,83 +2411,157 @@ PLINQ 和 TPL 一起构成了并行扩展。
 
 实现如下所示：
 
-[PRE391]
+```cs
+//Producer: Client sending request to web service and server storing the request in queue.
+```
 
-[PRE392]
+```cs
+ConcurrentQueue<string> concurrentQueue = new ConcurrentQueue<string>();            
+```
 
-[PRE393]
+```cs
+            Task t1 = Task.Factory.StartNew(() =>
+```
 
-[PRE394]
+```cs
+            {
+```
 
-[PRE395]
+```cs
+                for (int i = 0; i < 10; ++i)
+```
 
-[PRE396]
+```cs
+                {
+```
 
-[PRE397]
+```cs
+                    concurrentQueue.Enqueue("Web request " 
+```
 
-[PRE398]
+```cs
+                      + i);
+```
 
-[PRE399]
+```cs
+                    Console.WriteLine("Sending "+ "Web 
+```
 
-[PRE400]
+```cs
+                      request " + i);
+```
 
-[PRE401]
+```cs
+                    Thread.Sleep(100);
+```
 
-[PRE402]
+```cs
+                }
+```
 
-[PRE403]
+```cs
+            });
+```
 
 现在，我们有`Consumer`，其中`Worker`线程从队列中拉取请求并处理它：
 
-[PRE404]
+```cs
+            Task t2 = Task.Factory.StartNew(() =>
+```
 
-[PRE405]
+```cs
+            {
+```
 
-[PRE406]
+```cs
+                while (true)
+```
 
-[PRE407]
+```cs
+                {
+```
 
-[PRE408]
+```cs
+                    if (concurrentQueue.TryDequeue(out
+```
 
-[PRE409]
+```cs
+                     string request))
+```
 
-[PRE410]
+```cs
+                    {
+```
 
-[PRE411]
+```cs
+                        Console.WriteLine("Processing "+
+```
 
-[PRE412]
+```cs
+                         request);
+```
 
-[PRE413]
+```cs
+                    }
+```
 
-[PRE414]
+```cs
+                    else
+```
 
-[PRE415]
+```cs
+                    {
+```
 
-[PRE416]
+```cs
+                        Console.WriteLine("No request");
+```
 
-[PRE417]
+```cs
+                    }
+```
 
-[PRE418]
+```cs
+                }
+```
 
-[PRE419]
+```cs
+            });
+```
 
 生产者和消费者任务同时成功执行。等待所有提供的任务在指定的毫秒数内完成执行。请参考以下代码片段：
 
-[PRE420]
+```cs
+try
+```
 
-[PRE421]
+```cs
+            {                
+```
 
-[PRE422]
+```cs
+                Task.WaitAll(new Task[] { t1, t2 }, 1000);
+```
 
-[PRE423]
+```cs
+            }
+```
 
-[PRE424]
+```cs
+            catch (AggregateException ex) // No exception
+```
 
-[PRE425]
+```cs
+            {
+```
 
-[PRE426]
+```cs
+                Console.WriteLine(ex.Flatten().Message);
+```
 
-[PRE427]
+```cs
+            }
+```
 
 这是根据微软的方法定义：
 
@@ -1634,43 +2579,75 @@ PLINQ 和 TPL 一起构成了并行扩展。
 
 这就是代码现在的样子：
 
-[PRE428]
+```cs
+IProducerConsumerCollection<string> concurrentQueue = new ConcurrentQueue<string>();
+```
 
-[PRE429]
+```cs
+//Removed code for brevity.
+```
 
-[PRE430]
+```cs
+Task t1 = Task.Factory.StartNew(() =>
+```
 
-[PRE431]
+```cs
+            {
+```
 
-[PRE432]
+```cs
+                for (int i = 0; i < 10; ++i)
+```
 
-[PRE433]
+```cs
+                {
+```
 
-[PRE434]
+```cs
+                    concurrentQueue.TryAdd("Web request " + 
+```
 
-[PRE435]
+```cs
+                      i);
+```
 
-[PRE436]
+```cs
+//Removed code for brevity.
+```
 
-[PRE437]
+```cs
+Task t2 = Task.Factory.StartNew(() =>
+```
 
-[PRE438]
+```cs
+            {
+```
 
-[PRE439]
+```cs
+                while (true)
+```
 
-[PRE440]
+```cs
+                {
+```
 
-[PRE441]
+```cs
+                    if (concurrentQueue.TryTake(out string
+```
 
-[PRE442]
+```cs
+                     request))
+```
 
-[PRE443]
+```cs
+//Removed code for brevity.
+```
 
 现在，继续运行程序。你可以看到 `task` `t1` 正在生成请求，而 `task` `t2` 正在轮询然后消费请求。你可以看到 `task` `t1` 生成的所有 10 个请求都被 `task` `t2` 消费。但是有两个问题：
 
 +   生产者以自己的速率生产，消费者以自己的速率消费，并且没有同步。
 
-+   在 `task` `t2` 中，消费者进行了连续的不定轮询，这对性能和CPU使用率不利，正如我们通过 `concurrentqueue.TryTake` 看到的。
++   在 `task` `t2` 中，消费者进行了连续的不定轮询，这对性能和 CPU 使用率不利，正如我们通过 `concurrentqueue.TryTake` 看到的。
 
 这就是 `BlockingCollection<T>` 发挥作用的地方。
 
@@ -1684,65 +2661,123 @@ PLINQ 和 TPL 一起构成了并行扩展。
 
 这里是一个示例代码片段：
 
-[PRE444]
+```cs
+BlockingCollection<string> blockingCollection = new BlockingCollection<string>(new ConcurrentQueue<string>(),5);    
+```
 
-[PRE445]
+```cs
+            Task t1 = Task.Factory.StartNew(() =>
+```
 
-[PRE446]
+```cs
+            {
+```
 
-[PRE447]
+```cs
+                for (int i = 0; i < 10; ++i)
+```
 
-[PRE448]
+```cs
+                {
+```
 
-[PRE449]
+```cs
+                    blockingCollection.TryAdd("Web request
+```
 
-[PRE450]
+```cs
+                     " + i);
+```
 
-[PRE451]
+```cs
+                    Console.WriteLine("Sending " + "Web
+```
 
-[PRE452]
+```cs
+                      request " + i);
+```
 
-[PRE453]
+```cs
+                    Thread.Sleep(100);
+```
 
-[PRE454]
+```cs
+                }
+```
 
-[PRE455]
+```cs
+                blockingCollection.CompleteAdding();
+```
 
-[PRE456]
+```cs
+            });
+```
 
 然后，具有 `Worker` 线程的消费线程从队列中拉取项目并处理它：
 
-[PRE457]
+```cs
+            Task t2 = Task.Factory.StartNew(() =>
+```
 
-[PRE458]
+```cs
+            {
+```
 
-[PRE459]
+```cs
+                while (!blockingCollection.IsCompleted)
+```
 
-[PRE460]
+```cs
+                {
+```
 
-[PRE461]
+```cs
+                    if (blockingCollection.TryTake(out
+```
 
-[PRE462]
+```cs
+                     string request,100))
+```
 
-[PRE463]
+```cs
+                    {
+```
 
-[PRE464]
+```cs
+                        Console.WriteLine("Processing " +
+```
 
-[PRE465]
+```cs
+                         request);
+```
 
-[PRE466]
+```cs
+                    }
+```
 
-[PRE467]
+```cs
+                    else
+```
 
-[PRE468]
+```cs
+                    {
+```
 
-[PRE469]
+```cs
+                        Console.WriteLine("No request");
+```
 
-[PRE470]
+```cs
+                    }
+```
 
-[PRE471]
+```cs
+                }
+```
 
-[PRE472]
+```cs
+            });
+```
 
 现在，生产者和消费者线程可以并发访问。
 
@@ -1762,13 +2797,13 @@ PLINQ 和 TPL 一起构成了并行扩展。
 
 除了我们看到的 `TryTake` 方法之外，你还可以使用 `foreach` 循环从阻塞集合中移除项目。你可以在这里了解相关信息：
 
-[https://docs.microsoft.com/en-us/dotnet/standard/collections/thread-safe/how-to-use-foreach-to-remove](https://docs.microsoft.com/en-us/dotnet/standard/collections/thread-safe/how-to-use-foreach-to-remove)
+[`docs.microsoft.com/en-us/dotnet/standard/collections/thread-safe/how-to-use-foreach-to-remove`](https://docs.microsoft.com/en-us/dotnet/standard/collections/thread-safe/how-to-use-foreach-to-remove)
 
 在阻塞集合中，可能会出现消费者需要与多个集合一起工作并取或添加项目的情况。`TakeFromAny` 和 `AddToAny` 方法将帮助你在这种情况下。你可以在这里进一步了解这两个方法：
 
-[https://docs.microsoft.com/en-us/dotnet/api/system.collections.concurrent.blockingcollection-1.takefromany?view=net-6.0](https://docs.microsoft.com/en-us/dotnet/api/system.collections.concurrent.blockingcollection-1.takefromany?view=net-6.0)
+[`docs.microsoft.com/en-us/dotnet/api/system.collections.concurrent.blockingcollection-1.takefromany?view=net-6.0`](https://docs.microsoft.com/en-us/dotnet/api/system.collections.concurrent.blockingcollection-1.takefromany?view=net-6.0)
 
-[https://docs.microsoft.com/en-us/dotnet/api/system.collections.concurrent.blockingcollection-1.addtoany?view=net-6.0](https://docs.microsoft.com/en-us/dotnet/api/system.collections.concurrent.blockingcollection-1.addtoany?view=net-6.0)
+[`docs.microsoft.com/en-us/dotnet/api/system.collections.concurrent.blockingcollection-1.addtoany?view=net-6.0`](https://docs.microsoft.com/en-us/dotnet/api/system.collections.concurrent.blockingcollection-1.addtoany?view=net-6.0)
 
 # 摘要
 
@@ -1826,10 +2861,10 @@ d. `async Task<bool>`
 
 # 进一步阅读
 
-+   [https://www.packtpub.com/product/hands-on-parallel-programming-with-c-8-and-net-core-3/9781789132410](https://www.packtpub.com/product/hands-on-parallel-programming-with-c-8-and-net-core-3/9781789132410)
++   [`www.packtpub.com/product/hands-on-parallel-programming-with-c-8-and-net-core-3/9781789132410`](https://www.packtpub.com/product/hands-on-parallel-programming-with-c-8-and-net-core-3/9781789132410)
 
-+   [https://devblogs.microsoft.com/dotnet/configureawait-faq/](https://devblogs.microsoft.com/dotnet/configureawait-faq/)
++   [`devblogs.microsoft.com/dotnet/configureawait-faq/`](https://devblogs.microsoft.com/dotnet/configureawait-faq/)
 
-+   [http://www.albahari.com/threading/](http://www.albahari.com/threading/)
++   [`www.albahari.com/threading/`](http://www.albahari.com/threading/)
 
-+   *数据流（任务并行库）| Microsoft Docs*：[https://docs.microsoft.com/en-us/dotnet/standard/parallel-programming/dataflow-task-parallel-library](https://docs.microsoft.com/en-us/dotnet/standard/parallel-programming/dataflow-task-parallel-library)
++   *数据流（任务并行库）| Microsoft Docs*：[`docs.microsoft.com/en-us/dotnet/standard/parallel-programming/dataflow-task-parallel-library`](https://docs.microsoft.com/en-us/dotnet/standard/parallel-programming/dataflow-task-parallel-library)

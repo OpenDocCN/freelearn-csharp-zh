@@ -12,17 +12,17 @@
 
 +   使用外观模式的基本车辆引擎实现
 
-由于简单和简洁的原因，本节包括了一个引擎实现的简化版本。此代码示例的完整实现可以在GitHub项目的`/FPP`文件夹中找到——链接可在*技术要求*部分找到。
+由于简单和简洁的原因，本节包括了一个引擎实现的简化版本。此代码示例的完整实现可以在 GitHub 项目的`/FPP`文件夹中找到——链接可在*技术要求*部分找到。
 
 # 技术要求
 
-这是一个实践性章节，因此你需要对Unity和C#有基本的了解。
+这是一个实践性章节，因此你需要对 Unity 和 C#有基本的了解。
 
-本章的代码文件可以在GitHub上找到，链接为[https://github.com/PacktPublishing/Game-Development-Patterns-with-Unity-2021-Second-Edition/tree/main/Assets/Chapters/Chapter15](https://github.com/PacktPublishing/Game-Development-Patterns-with-Unity-2021-Second-Edition/tree/main/Assets/Chapters/Chapter15)。
+本章的代码文件可以在 GitHub 上找到，链接为[`github.com/PacktPublishing/Game-Development-Patterns-with-Unity-2021-Second-Edition/tree/main/Assets/Chapters/Chapter15`](https://github.com/PacktPublishing/Game-Development-Patterns-with-Unity-2021-Second-Edition/tree/main/Assets/Chapters/Chapter15)。
 
 观看以下视频，查看代码的实际效果：
 
-[https://bit.ly/36wJdxe](https://bit.ly/36wJdxe)
+[`bit.ly/36wJdxe`](https://bit.ly/36wJdxe)
 
 # 理解外观模式
 
@@ -30,7 +30,7 @@
 
 ![图片](img/7948ddd6-8d2d-4779-a345-a4a5cccf0d76.png)
 
-图15.1 – 外观模式的统一建模语言（UML）图
+图 15.1 – 外观模式的统一建模语言（UML）图
 
 如前图所示，`EngineFacade`充当引擎各个组件的接口，因此当在`EngineFacade`上调用`StartEngine()`时，客户端对幕后发生的事情一无所知。它不知道构成引擎的组件以及如何访问它们；它只知道它需要知道的内容。这类似于当你转动汽车点火钥匙时发生的情况——你看不到引擎盖下发生了什么，你也不需要知道；你唯一关心的是引擎是否启动。因此，外观模式在代码中也提供了这种相同级别的抽象，保持系统引擎盖下的细节。
 
@@ -48,7 +48,7 @@
 
 +   **使其更容易隐藏混乱**：使用外观模式在干净的面向用户界面后面隐藏混乱的代码，从长远来看可能会损害模式的核心优势，但这个模式确实提供了一种方法来掩盖一些代码问题，直到你有时间重构它们。然而，期望以后有足够的时间来修复问题是自身的一个陷阱，因为我们很少有时间正确地重构事物。
 
-+   **过多的外观**：在Unity开发者中，全局可访问的管理器类作为核心系统的外观很受欢迎；他们通常通过结合单例和外观模式来实现它们。不幸的是，滥用这种组合很容易，最终导致代码库中包含过多的管理器类，每个类都依赖于其他类才能正常工作。因此，调试、重构和单元测试组件变得非常困难。
++   **过多的外观**：在 Unity 开发者中，全局可访问的管理器类作为核心系统的外观很受欢迎；他们通常通过结合单例和外观模式来实现它们。不幸的是，滥用这种组合很容易，最终导致代码库中包含过多的管理器类，每个类都依赖于其他类才能正常工作。因此，调试、重构和单元测试组件变得非常困难。
 
 外观模式建立了一个新的接口，而适配器模式则适配一个旧接口。因此，在实现看似和听起来相似的模式时，牢记它们在目的上不一定相同是至关重要的。
 
@@ -68,41 +68,265 @@
 
 # 实现自行车发动机
 
-正如我们将看到的，Facade模式很简单，所以我们将保持以下代码示例简单直接。首先，我们将为组成自行车发动机的核心组件编写类，如下所示：
+正如我们将看到的，Facade 模式很简单，所以我们将保持以下代码示例简单直接。首先，我们将为组成自行车发动机的核心组件编写类，如下所示：
 
 1.  我们将从燃油泵开始；这个组件的目的是模拟燃油消耗，以便它知道剩余的燃油量，并在燃油耗尽时关闭发动机。以下是所需的代码：
 
-[PRE0]
+```cs
+using UnityEngine;
+using System.Collections;
 
-[PRE1]
+namespace Chapter.Facade
+{
+    public class FuelPump : MonoBehaviour
+    {
+        public BikeEngine engine;
+        public IEnumerator burnFuel;
+
+        void Start()
+        {
+            burnFuel = BurnFuel();
+        }
+
+        IEnumerator BurnFuel()
+        {
+            while (true)
+            {
+                yield return new WaitForSeconds(1);
+                engine.fuelAmount -= engine.burnRate;
+
+                if (engine.fuelAmount <= 0.0f) {
+                    engine.TurnOff();
+                    yield return 0;
+                }
+            }
+        }
+
+        void OnGUI()
+        {
+            GUI.color = Color.green;
+            GUI.Label(
+                new Rect(100, 40, 500, 20), 
+                "Fuel: " +  engine.fuelAmount);
+        }
+
+```
+
+```cs
+    } 
+}
+```
 
 1.  接下来是冷却系统，它负责防止发动机过热，但如果涡轮增压器被激活，则会关闭。代码如下所示：
 
-[PRE2]
+```cs
+using UnityEngine;
+using System.Collections;
+
+namespace Chapter.Facade {
+    public class CoolingSystem : MonoBehaviour {
+
+        public BikeEngine engine;
+        public IEnumerator coolEngine;
+        private bool _isPaused;
+
+        void Start() {
+            coolEngine = CoolEngine();
+        }
+
+        public void PauseCooling() {
+            _isPaused = !_isPaused;
+        }
+
+        public void ResetTemperature() {
+            engine.currentTemp = 0.0f;
+        }
+
+        IEnumerator CoolEngine() {
+            while (true) {
+                yield return new WaitForSeconds(1);
+
+                if (!_isPaused) {
+                    if (engine.currentTemp > engine.minTemp)
+                        engine.currentTemp -= engine.tempRate;
+                    if (engine.currentTemp < engine.minTemp)
+                        engine.currentTemp += engine.tempRate;
+                } else {
+                    engine.currentTemp += engine.tempRate;
+                }
+
+                if (engine.currentTemp > engine.maxTemp)
+                    engine.TurnOff();
+            }
+        }
+
+        void OnGUI() {
+            GUI.color = Color.green;
+            GUI.Label(
+                new Rect(100, 20, 500, 20), 
+                "Temp: " +  engine.currentTemp);
+        }
+    }
+}
+```
 
 1.  最后，当涡轮增压器被激活时，它会增加自行车的极速，但为了使其工作，它需要暂时关闭冷却系统。以下是实现这一功能的代码：
 
-[PRE3]
+```cs
+using UnityEngine;
+using System.Collections;
 
-[PRE4]
+namespace Chapter.Facade
+{
+    public class TurboCharger : MonoBehaviour
+    {
+        public BikeEngine engine;
 
-1.  现在我们已经准备好了发动机的核心组件，我们需要实现一个类，允许客户端无缝地与之交互。因此，我们将实现一个名为`BikeEngine`的Facade类，它将为客户端提供一个接口来启动和停止发动机以及切换涡轮增压。
+        private bool _isTurboOn;
+        private CoolingSystem _coolingSystem;
 
-[PRE5]
+        public void ToggleTurbo(CoolingSystem coolingSystem)
+        {
+            _coolingSystem = coolingSystem;
+
+            if (!_isTurboOn)
+                StartCoroutine(TurboCharge());
+        }
+
+        IEnumerator TurboCharge()
+        {
+            _isTurboOn = true;
+            _coolingSystem.PauseCooling();
+
+            yield return new WaitForSeconds(engine.turboDuration);
+
+            _isTurboOn = false;
+            _coolingSystem.PauseCooling();
+        }
+
+        void OnGUI()
+        {
+            GUI.color = Color.green;
+            GUI.Label(
+                new Rect(100, 60, 500, 20), 
+                "Turbo Activated: " +  _isTurboOn);
+        }
+
+```
+
+```cs
+    }
+}
+```
+
+1.  现在我们已经准备好了发动机的核心组件，我们需要实现一个类，允许客户端无缝地与之交互。因此，我们将实现一个名为`BikeEngine`的 Facade 类，它将为客户端提供一个接口来启动和停止发动机以及切换涡轮增压。
+
+```cs
+using UnityEngine;
+
+namespace Chapter.Facade
+{
+    public class BikeEngine : MonoBehaviour
+    {
+        public float burnRate = 1.0f;
+        public float fuelAmount = 100.0f;
+        public float tempRate = 5.0f;
+        public float minTemp = 50.0f;
+        public float maxTemp = 65.0f;
+        public float currentTemp;
+        public float turboDuration = 2.0f;
+
+        private bool _isEngineOn;
+        private FuelPump _fuelPump;
+        private TurboCharger _turboCharger;
+        private CoolingSystem _coolingSystem;
+
+        void Awake() {
+            _fuelPump = 
+                gameObject.AddComponent<FuelPump>();
+
+            _turboCharger = 
+                gameObject.AddComponent<TurboCharger>();
+
+            _coolingSystem = 
+                gameObject.AddComponent<CoolingSystem>();
+        }
+
+        void Start() {
+            _fuelPump.engine = this;
+            _turboCharger.engine = this;
+            _coolingSystem.engine = this;
+        }
+```
 
 这个类的第一部分是初始化代码，这部分是自解释的，但以下部分是重要的：
 
-[PRE6]
+```cs
+        public void TurnOn() {
+            _isEngineOn = true;
+            StartCoroutine(_fuelPump.burnFuel);
+            StartCoroutine(_coolingSystem.coolEngine);
+        }
 
-如我们所见，`EngineFacade`类公开了自行车发动机提供的可用功能，同时，它也隐藏了其组件之间的交互。如果我们想启动发动机，我们只需要调用`StartEngine()`方法。如果我们没有像我们刚刚实现的那样有一个Facade模式，我们就必须单独初始化每个发动机组件，并知道每个组件的设置参数和要调用的方法。Facade模式允许我们将所有复杂性隐藏在干净的接口后面。
+        public void TurnOff() {
+            _isEngineOn = false;
+            _coolingSystem.ResetTemperature();
+            StopCoroutine(_fuelPump.burnFuel);
+            StopCoroutine(_coolingSystem.coolEngine);
+        }
+
+        public void ToggleTurbo() {
+            if (_isEngineOn) 
+                _turboCharger.ToggleTurbo(_coolingSystem);
+        }
+
+        void OnGUI() {
+            GUI.color = Color.green;
+            GUI.Label(
+                new Rect(100, 0, 500, 20), 
+                "Engine Running: " +  _isEngineOn);
+        }
+    }
+}
+```
+
+如我们所见，`EngineFacade`类公开了自行车发动机提供的可用功能，同时，它也隐藏了其组件之间的交互。如果我们想启动发动机，我们只需要调用`StartEngine()`方法。如果我们没有像我们刚刚实现的那样有一个 Facade 模式，我们就必须单独初始化每个发动机组件，并知道每个组件的设置参数和要调用的方法。Facade 模式允许我们将所有复杂性隐藏在干净的接口后面。
 
 但假设我们希望添加另一个发动机组件，例如一个硝基喷射器；在这种情况下，我们只需要修改`BikeFacade`类，并公开一个新的公共方法，以便我们可以触发喷射器。
 
-## 测试发动机Facade
+## 测试发动机 Facade
 
-我们可以通过向一个空的Unity场景中的GameObject添加以下客户端脚本来快速测试我们刚刚实现的代码：
+我们可以通过向一个空的 Unity 场景中的 GameObject 添加以下客户端脚本来快速测试我们刚刚实现的代码：
 
-[PRE7]
+```cs
+using UnityEngine;
+
+namespace Chapter.Facade
+{
+    public class ClientFacade : MonoBehaviour
+    {
+        private BikeEngine _bikeEngine;
+
+        void Start()
+        {
+            _bikeEngine = 
+                gameObject.AddComponent<BikeEngine>();
+        }
+
+        void OnGUI()
+        {
+            if (GUILayout.Button("Turn On"))
+                _bikeEngine.TurnOn();
+
+            if (GUILayout.Button("Turn Off"))
+                _bikeEngine.TurnOff();
+
+            if (GUILayout.Button("Toggle Turbo"))
+                _bikeEngine.ToggleTurbo();
+        }
+    }
+}
+```
 
 在客户端类中，我们看到它并不了解引擎的内部工作原理，这就是我们使用外观模式时想要达到的效果。客户端类唯一知道的是，它可以调用由`BikeEngine`类提供的公共方法来启动和停止引擎，以及切换涡轮增压功能。换句话说，就像现实生活中一样，我们不需要打开引擎盖来启动引擎；我们转动点火钥匙，组件就会开始协同工作，而我们不需要知道它们是如何相互作用的。
 

@@ -1,16 +1,16 @@
-# 第3章。控制器
+# 第三章。控制器
 
-如第一章所述，所有Web应用程序都从服务器接收请求并生成响应，该响应被发送回最终用户。在ASP.NET MVC中，控制器负责接收请求并根据输入数据生成输出。
+如第一章所述，所有 Web 应用程序都从服务器接收请求并生成响应，该响应被发送回最终用户。在 ASP.NET MVC 中，控制器负责接收请求并根据输入数据生成输出。
 
 在本章中，您将学习以下主题：
 
-+   控制器在ASP.NET MVC应用程序中的作用
++   控制器在 ASP.NET MVC 应用程序中的作用
 
 +   路由简介和概念
 
-+   创建您的第一个ASP.NET 5应用程序
++   创建您的第一个 ASP.NET 5 应用程序
 
-+   在您的应用程序中安装ASP.NET Core `NuGet`包
++   在您的应用程序中安装 ASP.NET Core `NuGet`包
 
 +   创建您的第一个控制器和`action`方法，该方法返回一个简单的*Hello World*
 
@@ -18,21 +18,21 @@
 
 +   添加模型并将模型数据传递给视图
 
-# 控制器在ASP.NET MVC应用程序中的作用
+# 控制器在 ASP.NET MVC 应用程序中的作用
 
-在高层次上，控制器在模型和视图之间进行协调，并将输出发送回用户。这也是通常通过操作过滤器进行身份验证的地方。操作过滤器将在本章的*过滤器*部分详细讨论。以下图显示了ASP.Net MVC中请求（包括步骤）的高级流程，并展示了控制器如何融入整个画面：
+在高层次上，控制器在模型和视图之间进行协调，并将输出发送回用户。这也是通常通过操作过滤器进行身份验证的地方。操作过滤器将在本章的*过滤器*部分详细讨论。以下图显示了 ASP.Net MVC 中请求（包括步骤）的高级流程，并展示了控制器如何融入整个画面：
 
-![控制器在ASP.NET MVC应用程序中的作用](img/Image00021.jpg)
+![控制器在 ASP.NET MVC 应用程序中的作用](img/Image00021.jpg)
 
-当用户访问ASP.NET Core应用程序时，以下是在高层次上发生的事件序列：
+当用户访问 ASP.NET Core 应用程序时，以下是在高层次上发生的事件序列：
 
-1.  用户在浏览器中输入URL。
+1.  用户在浏览器中输入 URL。
 
-1.  根据URL模式，路由引擎选择适当的控制器。
+1.  根据 URL 模式，路由引擎选择适当的控制器。
 
 1.  控制器通过其操作方法与模型通信，以获取任何相关数据。操作方法是在`controller`类中的方法。
 
-1.  控制器随后将数据传递给视图，以便以可查看的格式呈现，通常为HTML元素。
+1.  控制器随后将数据传递给视图，以便以可查看的格式呈现，通常为 HTML 元素。
 
 1.  视图最终交付给用户，用户将在其浏览器中查看。
 
@@ -40,51 +40,105 @@
 
 # 路由简介
 
-路由引擎负责获取传入的请求，并根据URL模式将其路由到适当的控制器。我们可以配置路由引擎，使其能够根据相关信息选择适当的控制器。
+路由引擎负责获取传入的请求，并根据 URL 模式将其路由到适当的控制器。我们可以配置路由引擎，使其能够根据相关信息选择适当的控制器。
 
-按照惯例，ASP.NET MVC遵循以下模式：**控制器/操作/标识符**。
+按照惯例，ASP.NET MVC 遵循以下模式：**控制器/操作/标识符**。
 
-如果用户输入URL `http://yourwebsite.com/Hello/Greeting/1`，路由引擎将选择`Hello控制器`类中的`Greeting操作`方法，并将`Id`值作为`1`传递。您可以给一些参数设置默认值，并使一些参数为可选。
+如果用户输入 URL `http://yourwebsite.com/Hello/Greeting/1`，路由引擎将选择`Hello 控制器`类中的`Greeting 操作`方法，并将`Id`值作为`1`传递。您可以给一些参数设置默认值，并使一些参数为可选。
 
 以下是一个示例配置：
 
-[PRE0]
+```cs
+The template: "{controller=Hello}/{action=Greeting}/{id?}");
+```
 
 在前面的配置中，我们向路由引擎提供了三条指令：
 
 +   使用路由模式`controller/action/id`。
 
-+   如果在URL中没有提供`controller`或`action`的值，则分别使用默认值`Hello`和`Greeting`。
++   如果在 URL 中没有提供`controller`或`action`的值，则分别使用默认值`Hello`和`Greeting`。
 
-+   将`Id`参数设置为可选，这样URL就不需要包含此信息。如果URL包含此`Id`信息，则将使用它。否则，`Id`信息将不会传递给`action`方法。
++   将`Id`参数设置为可选，这样 URL 就不需要包含此信息。如果 URL 包含此`Id`信息，则将使用它。否则，`Id`信息将不会传递给`action`方法。
 
-让我们讨论路由引擎如何为不同的URL选择`controller`类、`action`方法和`Id`值：
+让我们讨论路由引擎如何为不同的 URL 选择`controller`类、`action`方法和`Id`值：
 
-[PRE1]
+```cs
+URL1:http://localhost/ 
+Controller: Hello 
+Action method: Greeting 
+Id: no value is passed for the id parameter 
 
-理由：根据路由配置，将`Hello`控制器作为默认值传递，因为在URL中没有传递`Controller`的值。
+```
 
-当传递前面的URL时，以下`action`方法将被路由处理程序选中：
+理由：根据路由配置，将`Hello`控制器作为默认值传递，因为在 URL 中没有传递`Controller`的值。
 
-[PRE2]
+当传递前面的 URL 时，以下`action`方法将被路由处理程序选中：
 
-理由：由于URL中第一个参数包含`Hello`，因此将选择`Hello`控制器。并且由于URL中第二个参数包含`Greeting2`，因此将选择`Greeting2`操作方法。请注意，只有在URL中没有值的情况下，才会选择配置中提到的默认值。由于`id`参数是可选的，并且URL中没有提供`id`的值，因此不会将任何值传递给`id`参数。
+```cs
+public class HelloController : Controller { 
+  public ActionResult Greeting(int id) { 
+    return View(); 
+  } 
+}
 
-当传递前面的URL时，以下操作方法`Greeting2`将被路由处理程序选中：
+URL2: http://localhost/Hello/Greeting2 
+Controller: Hello 
+Action method: Greeting2 
+Id: no value is passed for the id parameter 
 
-[PRE3]
+```
+
+理由：由于 URL 中第一个参数包含`Hello`，因此将选择`Hello`控制器。并且由于 URL 中第二个参数包含`Greeting2`，因此将选择`Greeting2`操作方法。请注意，只有在 URL 中没有值的情况下，才会选择配置中提到的默认值。由于`id`参数是可选的，并且 URL 中没有提供`id`的值，因此不会将任何值传递给`id`参数。
+
+当传递前面的 URL 时，以下操作方法`Greeting2`将被路由处理程序选中：
+
+```cs
+public class HelloController : Controller { 
+  public ActionResult Greeting(int id) { 
+    return View(); 
+  } 
+
+  public ActionResult Greeting2(int id) { 
+    return View(); 
+  } 
+} 
+
+URL3: http://localhost/Hello2/Greeting2 
+Controller: Hello2 
+Action method: Greeting2 
+Id: no value is passed for the id parameter 
+
+```
 
 理由：由于第一个参数传递了`Hello2`，因此将选择`Hello2`控制器，并且由于第二个参数传递了`Greeting2`，因此选择了`Greeting2`作为操作方法。由于`id`参数是可选的，并且没有为`id`参数传递值，因此不会为`id`传递任何值。
 
-当传递前面的URL时，以下`action`方法将被路由处理程序选中：
+当传递前面的 URL 时，以下`action`方法将被路由处理程序选中：
 
-[PRE4]
+```cs
+public class Hello2Controller : Controller { 
+  public ActionResult Greeting2(int id) { 
+    return View(); 
+  } 
+} 
+URL4: http://localhost/Hello3/Greeting2/1 
+Controller: Hello3 
+Action method: Greeting2 
+Id: 1 
+
+```
 
 理由：`Hello3`是作为第一个参数提到的控制器，`Greeting4`是操作方法，而`1`是作为`id`传递的值。
 
-当传递前面的URL时，以下`action`方法将被路由处理程序选中：
+当传递前面的 URL 时，以下`action`方法将被路由处理程序选中：
 
-[PRE5]
+```cs
+public class Hello3Controller : Controller { 
+  public ActionResult Greeting2(int id) { 
+    return View(); 
+  } 
+} 
+
+```
 
 我们将在后续章节中详细讨论路由。
 
@@ -92,27 +146,41 @@
 
 # 创建 ASP.NET 5 应用程序
 
-是时候动手实践了。让我们创建一个简单的ASP.NET 5应用程序。启动Visual Studio并按照以下步骤操作：
+是时候动手实践了。让我们创建一个简单的 ASP.NET 5 应用程序。启动 Visual Studio 并按照以下步骤操作：
 
-1.  通过在Visual Studio中选择**文件** | **新建项目**来创建一个项目。第一个选项是创建ASP.NET Web应用程序的早期版本。第二个选项是使用.NET Core框架创建ASP.NET Core应用程序。第三个选项是使用.NET框架创建ASP.NET Core应用程序。第二个和第三个选项之间的区别在于，.NET框架支持所有现有.NET框架的功能，而.NET Core只支持核心功能。使用.NET Core库的优势在于它可以在任何平台上部署。![创建ASP.NET 5应用程序](img/Image00022.jpg)
+1.  通过在 Visual Studio 中选择**文件** | **新建项目**来创建一个项目。第一个选项是创建 ASP.NET Web 应用程序的早期版本。第二个选项是使用.NET Core 框架创建 ASP.NET Core 应用程序。第三个选项是使用.NET 框架创建 ASP.NET Core 应用程序。第二个和第三个选项之间的区别在于，.NET 框架支持所有现有.NET 框架的功能，而.NET Core 只支持核心功能。使用.NET Core 库的优势在于它可以在任何平台上部署。![创建 ASP.NET 5 应用程序](img/Image00022.jpg)
 
-1.  从ASP.NET 5模板列表中选择**Empty**模板。第二个选项是用于创建Web API应用程序（用于构建基于HTTP的服务），第三个选项是用于创建包含一些基本功能的Web应用程序，你可以直接运行它，无需编写任何代码。![创建ASP.NET 5应用程序](img/Image00023.jpg)
+1.  从 ASP.NET 5 模板列表中选择**Empty**模板。第二个选项是用于创建 Web API 应用程序（用于构建基于 HTTP 的服务），第三个选项是用于创建包含一些基本功能的 Web 应用程序，你可以直接运行它，无需编写任何代码。![创建 ASP.NET 5 应用程序](img/Image00023.jpg)
 
-1.  一旦你在如图所示的窗口中点击**OK**（在选择了Empty模板选项之后），就会创建一个解决方案，如图所示：![创建ASP.NET 5应用程序](img/Image00024.jpg)
+1.  一旦你在如图所示的窗口中点击**OK**（在选择了 Empty 模板选项之后），就会创建一个解决方案，如图所示：![创建 ASP.NET 5 应用程序](img/Image00024.jpg)
 
-1.  当你运行应用程序（通过按**F5**键）而不做任何更改时，你的屏幕上会显示简单的**Hello World!**文本，如图所示：![创建ASP.NET 5应用程序](img/Image00025.jpg)
+1.  当你运行应用程序（通过按**F5**键）而不做任何更改时，你的屏幕上会显示简单的**Hello World!**文本，如图所示：![创建 ASP.NET 5 应用程序](img/Image00025.jpg)
 
 在这个新创建的应用程序中，我们还没有编写任何代码。那么，你有没有想过它是如何显示文本**Hello World!**的？
 
-答案在于`Startup.cs`文件，该文件包含一个名为`Startup`的类。这个类包含`Main`方法，它是Web应用程序的入口点。如果你使用过任何之前的ASP.NET MVC版本，或者甚至ASP.NET Web Forms，情况就不会是这样了。
+答案在于`Startup.cs`文件，该文件包含一个名为`Startup`的类。这个类包含`Main`方法，它是 Web 应用程序的入口点。如果你使用过任何之前的 ASP.NET MVC 版本，或者甚至 ASP.NET Web Forms，情况就不会是这样了。
 
-ASP.NET 5运行时调用`ConfigureServices`和`Configure`方法。例如，如果你想配置任何服务，你可以在这里添加。任何针对应用程序的定制配置都可以添加到这个`Configure`方法中：
+ASP.NET 5 运行时调用`ConfigureServices`和`Configure`方法。例如，如果你想配置任何服务，你可以在这里添加。任何针对应用程序的定制配置都可以添加到这个`Configure`方法中：
 
-[PRE6]
+```cs
+public void ConfigureServices(IServiceCollection services) { 
 
-`Configure`方法中只有几条语句。第一条语句告诉运行时使用`IISPlatformHandler`来处理所有传入的HTTP请求。现在我们先暂时放下`async`、`await`和`context`，这些我们稍后再讨论。本质上，第二条语句告诉运行时对于所有传入的请求，无论传入的URL是什么，都返回`Hello World!`。
+} 
 
-当你在浏览器中输入URL `http://localhost:50140/Hello` 时，它仍然会返回相同的**Hello World!**。
+// This method gets called by the runtime. Use this method to  configure the HTTP request pipeline. 
+public void Configure(IApplicationBuilder app) { 
+  app.UseIISPlatformHandler(); 
+  app.Run(async (context) => { 
+    await context.Response.WriteAsync("Hello World!"); 
+  }); 
+
+} 
+
+```
+
+`Configure`方法中只有几条语句。第一条语句告诉运行时使用`IISPlatformHandler`来处理所有传入的 HTTP 请求。现在我们先暂时放下`async`、`await`和`context`，这些我们稍后再讨论。本质上，第二条语句告诉运行时对于所有传入的请求，无论传入的 URL 是什么，都返回`Hello World!`。
+
+当你在浏览器中输入 URL `http://localhost:50140/Hello` 时，它仍然会返回相同的**Hello World!**。
 
 这就是为什么当我们运行应用程序时，我们得到了**Hello World!**。
 
@@ -120,7 +188,13 @@ ASP.NET 5运行时调用`ConfigureServices`和`Configure`方法。例如，如�
 
 您可以通过打开 `project.json` 文件来确认，您可以在依赖项列表中看到没有提到 ASP.NET MVC：
 
-[PRE7]
+```cs
+"dependencies": { 
+  "Microsoft.AspNet.IISPlatformHandler": "1.0.0-rc1-final", 
+  "Microsoft.AspNet.Server.Kestrel": "1.0.0-rc1-final" 
+}, 
+
+```
 
 首先，让我们为我们的应用程序安装 ASP.Net Core 包。
 
@@ -140,7 +214,14 @@ ASP.NET 5运行时调用`ConfigureServices`和`Configure`方法。例如，如�
 
 现在，您的 `project.json` 文件将更新依赖项。第二行 `Microsoft.AspNet.Mvc` 已添加：
 
-[PRE8]
+```cs
+"dependencies": { 
+  "Microsoft.AspNet.IISPlatformHandler": "1.0.0-rc1-final", 
+  "Microsoft.AspNet.Mvc": "6.0.0-rc1-final", 
+  "Microsoft.AspNet.Server.Kestrel": "1.0.0-rc1-final" 
+}, 
+
+```
 
 或者，您也可以通过更新 `project.json` 文件来添加 `NuGet` 包及其版本信息。**NuGet 包管理器**将自动下载并安装它们。
 
@@ -150,11 +231,21 @@ ASP.NET Core 已安装在我们的应用程序中。现在，我们需要告诉�
 
 1.  配置应用程序以添加 MVC 服务。这可以通过向 `Startup` 类的 `ConfigureServices` 方法中添加以下行来完成：
 
-    [PRE9]
+    ```cs
+          services.AddMvc(); 
+
+    ```
 
 1.  配置路由，以便根据输入的 URL 选取正确的控制器来处理传入的请求。以下代码片段需要更新在 `Startup.cs` 文件的 `Configure` 方法中：app.UseMvc(routes => {
 
-    [PRE10]
+    ```cs
+    app.UseMvc(routes => { 
+      routes.MapRoute( 
+        name: "default", 
+        template: "{controller=Home}/{action=Index}/{id?}"); 
+    }); 
+
+    ```
 
 在前面的语句中，我们正在配置我们应用程序的路由。
 
@@ -164,7 +255,12 @@ ASP.NET Core 已安装在我们的应用程序中。现在，我们需要告诉�
 
 在创建控制器之前，我们需要删除以下 `app.Run` 语句，因为这将为所有传入的请求返回 `Hello World!`。由于我们希望传入的请求由控制器处理，我们需要从 `Startup` 类的 `Configure` 方法中删除以下代码：
 
-[PRE11]
+```cs
+app.Run(async (context) => { 
+  await context.Response.WriteAsync("Hello World!"); 
+}); 
+
+```
 
 我们已经在我们的应用程序中安装了 ASP.NET Core。因此，我们准备创建我们的第一个 ASP.NET Core 控制器。创建一个名为 `Controllers` 的文件夹，并从上下文菜单中选择添加一个新的控制器，如下面的截图所示：
 
@@ -176,7 +272,15 @@ ASP.NET Core 已安装在我们的应用程序中。现在，我们需要告诉�
 
 将创建一个包含以下内容的类：
 
-[PRE12]
+```cs
+public class HomeController : Controller { 
+  // GET: /<controller>/ 
+  public IActionResult Index() { 
+    return View(); 
+  } 
+} 
+
+```
 
 所有控制器，无论是 MVC 还是 Web API 控制器，都继承自 `Controller` 基类。在 ASP.NET MVC 的早期版本中，MVC 控制器会继承自 `Controller` 类，而 Web API 控制器会继承自 `APIController` 类。
 
@@ -184,7 +288,12 @@ ASP.NET Core 已安装在我们的应用程序中。现在，我们需要告诉�
 
 我们不创建并返回该视图，而是对这个操作方法进行简单的修改。让我们返回一个字符串，`Hello World! 我正在学习 MVC 6!`，并更改 `IActionResult` 的返回类型：
 
-[PRE13]
+```cs
+public string Index() { 
+  return "Hello World! I am learning MVC 6!"; 
+} 
+
+```
 
 运行应用程序。你将在浏览器中看到 **Hello World! 我正在学习 MVC 6!**，如下面的截图所示。请确保你已按照前面提到的在 `Configure` 方法中删除了 `app.Run` 语句：
 
@@ -212,7 +321,13 @@ ASP.NET Core 已安装在我们的应用程序中。现在，我们需要告诉�
 
 在前面的示例中，我将 `return` 类型更改为字符串以使事情简单。现在，让我们通过保持 `return` 类型（`IActionResult`）不变来返回字符串：
 
-[PRE14]
+```cs
+// GET: /<controller>/ 
+public IActionResult Index() { 
+  return Content("Hello World! I am learning MVC 6!"); 
+} 
+
+```
 
 在返回字符串时，我们使用 `virtual` 方法，即 `Controller` 类（`HomeController` 继承自的基控制器）中先前的 `action` 方法中的 `Content` 方法。`Content()` 方法的目的是将字符串转换为 `IActionResult` 类型。
 
@@ -242,15 +357,20 @@ ASP.NET Core 已安装在我们的应用程序中。现在，我们需要告诉�
 
 让我们创建一个新的名为`Index2`的`action`方法：
 
-[PRE15]
+```cs
+public IActionResult Index2() { 
+  return View(); // View for this 'Index2' action method 
+} 
 
-现在，我们已经创建了返回视图的`action`方法。但我们对相同的视图还没有添加。按照惯例，ASP.NET MVC会尝试在`Views\{ControllerName}\{ActionMethod.cshtml}`文件夹中搜索我们的视图。根据前面的示例，它将尝试搜索`Views\Home\Index2.cshtml`。请注意，`controller`文件夹的名称是`Home`，而不是`HomeController`。按照惯例，只需要前缀。由于这个文件夹结构和文件不存在，当你尝试通过URL `http://localhost:50140/Home/Index2` 访问这个`action`方法时，你会得到一个**500内部服务器错误**。
+```
+
+现在，我们已经创建了返回视图的`action`方法。但我们对相同的视图还没有添加。按照惯例，ASP.NET MVC 会尝试在`Views\{ControllerName}\{ActionMethod.cshtml}`文件夹中搜索我们的视图。根据前面的示例，它将尝试搜索`Views\Home\Index2.cshtml`。请注意，`controller`文件夹的名称是`Home`，而不是`HomeController`。按照惯例，只需要前缀。由于这个文件夹结构和文件不存在，当你尝试通过 URL `http://localhost:50140/Home/Index2` 访问这个`action`方法时，你会得到一个**500 内部服务器错误**。
 
 因此，让我们创建一个文件夹结构。右键单击解决方案，从上下文菜单中选择**添加** | **新建文件夹**，创建一个名为`Views`的文件夹，然后在`Views`文件夹内创建一个名为`Home`的子文件夹：
 
 ![添加视图](img/Image00034.jpg)
 
-右键单击`Home`文件夹，从上下文菜单中选择**添加** | **新建项**。会出现一个对话框，如下面的截图所示。将文件名命名为`Index2.cshtml`，因为我们的`action`方法名为`Index2`。`cshtml`是当你使用C#时使用的razor视图引擎的扩展名（这将在*视图*章节的*视图引擎*部分详细讨论）。
+右键单击`Home`文件夹，从上下文菜单中选择**添加** | **新建项**。会出现一个对话框，如下面的截图所示。将文件名命名为`Index2.cshtml`，因为我们的`action`方法名为`Index2`。`cshtml`是当你使用 C#时使用的 razor 视图引擎的扩展名（这将在*视图*章节的*视图引擎*部分详细讨论）。
 
 ![添加视图](img/Image00035.jpg)
 
@@ -258,11 +378,18 @@ ASP.NET Core 已安装在我们的应用程序中。现在，我们需要告诉�
 
 ![添加视图](img/Image00036.jpg)
 
-`@*`是razor视图引擎中的注释语法。你可以在`@{}`块内编写任何C#代码。
+`@*`是 razor 视图引擎中的注释语法。你可以在`@{}`块内编写任何 C#代码。
 
-让我们在生成的代码后添加一个简单的HTML块：
+让我们在生成的代码后添加一个简单的 HTML 块：
 
-[PRE16]
+```cs
+<html> 
+  <body> 
+    Hello! This is <b>my first View</b>  
+  </body> 
+</html> 
+
+```
 
 现在，当你运行应用程序时，你会得到以下输出：
 
@@ -292,19 +419,46 @@ ASP.NET Core 已安装在我们的应用程序中。现在，我们需要告诉�
 
 # 添加模型
 
-模型代表你的业务域类。现在，我们将学习如何在控制器中使用模型。创建一个`Models`文件夹，并添加一个简单的`Employee`类。这是一个普通的C#类：
+模型代表你的业务域类。现在，我们将学习如何在控制器中使用模型。创建一个`Models`文件夹，并添加一个简单的`Employee`类。这是一个普通的 C#类：
 
-[PRE17]
+```cs
+public class Employee { 
+  public int EmployeeId { get; set; } 
+  public string Name { get; set; } 
+  public string Designation { get; set; } 
+} 
+
+```
 
 在我们的`HomeController`中创建一个新的`action`方法`Employee`，创建一个带有一些值的`Employee`模型对象，并将模型传递给视图。我们的想法是在视图中使用模型员工值来向用户展示：
 
-[PRE18]
+```cs
+using Chapter3.Models; 
+public IActionResult Employee() { 
+  //Sample Model - Usually this comes from database 
+ Employee emp1 = new Employee { 
+    EmployeeId = 1, 
+    Name = "Jon Skeet", 
+    Designation = " Software Architect" 
+  }; 
+  return View(emp1); 
+} 
+
+```
 
 现在，我们需要为这个 `action` 方法添加相应的视图。在 `View\Home` 文件夹中添加一个新的 Razor 视图文件。
 
 添加以下代码片段。在 `@` 符号之后的所有内容都被认为是 Razor 代码。在以下代码中，我们正在尝试访问传递给我们的视图的 `Model` 对象的属性。在我们的例子中，`Model` 代表我们在 `action` 方法中构建的 `employee` 对象。您可以使用 Model 关键字从视图中访问该对象：
 
-[PRE19]
+```cs
+<html> 
+  <body> 
+ Employee Name : @Model.Name <br/> 
+    Employee Designation: @Model.Designation <br/> 
+  </body> 
+</html> 
+
+```
 
 当你运行应用程序并输入 URL `http://localhost:50140/Home/Employee` 时，你会看到以下输出：
 
@@ -318,11 +472,36 @@ ASP.NET Core 已安装在我们的应用程序中。现在，我们需要告诉�
 
 让我们使用以下代码片段添加公司名称和公司位置属性，使用 `ViewBag` 和 `ViewData` 如下所示：
 
-[PRE20]
+```cs
+public IActionResult Employee() { 
+  //Sample Model - Usually this comes from database 
+  Employee emp1 = new Employee { 
+    EmployeeId = 1, 
+    Name = "Jon Skeet", 
+    Designation = " Software Architect" 
+  }; 
+
+  ViewBag.Company = "Google Inc"; 
+  ViewData["CompanyLocation"] = "United States"; 
+
+  return View(emp1); 
+} 
+
+```
 
 也要在视图文件中进行相应的更改，以便我们可以显示 `Company` 名称和 `Company location` 值：
 
-[PRE21]
+```cs
+<html> 
+  <body> 
+    Employee Name : @Model.Name <br/> 
+    Employee Designation: @Model.Designation <br/> 
+    Company : @ViewBag.Company <br/> 
+    Company Location: @ViewData["CompanyLocation"] <br /> 
+  </body> 
+</html> 
+
+```
 
 在进行前面的更改后运行应用程序：
 
@@ -332,7 +511,13 @@ ASP.NET Core 已安装在我们的应用程序中。现在，我们需要告诉�
 
 为了测试这个，让我们对我们的 `view` 文件进行简单的更改：
 
-[PRE22]
+```cs
+Employee Name : @Model.Name <br/> 
+Employee Designation: @Model.Designation <br/> 
+Company : @ViewData["Company"] <br /> 
+Company Location : @ViewBag.CompanyLocation <br /> 
+
+```
 
 尽管我在 `Controller` 中使用 `ViewBag` 存储了 `Company` 值，但我仍然使用 `ViewData` 访问相同的值。对于 `Company Location` 值也是如此，我们在 `Controller` 中使用 `ViewData` 存储了值，但我们使用 `ViewBag` 访问该值。
 
@@ -348,7 +533,15 @@ ASP.NET MVC 中的过滤器允许你在执行管道的特定阶段之前或之�
 
 我创建了一个简单的控制器，名为 `DateController`，其中我只是显示时间。在这个 `action` 方法中，我使用了一个名为 `ResponseCache` 的预定义动作过滤器，该过滤器将响应缓存为指定的秒数。在下面的代码片段中，我们提到了持续时间是 600 秒。因此，响应将被缓存 10 分钟。
 
-[PRE23]
+```cs
+public class DateController : Controller { 
+  [ResponseCache(Duration = 600)] 
+  public IActionResult Index() { 
+    return Content(DateTime.Now.ToShortTimeString()); 
+  } 
+} 
+
+```
 
 当我第一次运行它时，它显示的时间与预期相符。但是当你刷新浏览器（这间接地再次触发了请求），时间没有更新，因为响应已经被应用程序缓存。在下面的屏幕截图中，尽管时间是 7:43，但应用程序仍然显示为 7:40：
 

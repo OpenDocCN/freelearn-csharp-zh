@@ -1,6 +1,6 @@
-# *第8章*：故事API – 访问墨水变量和函数
+# *第八章*：故事 API – 访问墨水变量和函数
 
-在本章中，我们将讨论如何使用ink Unity API来处理变量和函数。ink中定义的任何变量或函数都可以从其代码的任何位置访问。ink-Unity集成插件提供的API通过其`variablesState`属性提供了一个接口，用于访问任何定义的变量。这也适用于由`EvaluateFunction()` API提供的方法，它可以访问ink代码中定义的任何函数。理解这一功能是使用ink-Unity集成插件作为ink故事和Unity代码之间桥梁来创建更复杂项目的关键。
+在本章中，我们将讨论如何使用 ink Unity API 来处理变量和函数。ink 中定义的任何变量或函数都可以从其代码的任何位置访问。ink-Unity 集成插件提供的 API 通过其`variablesState`属性提供了一个接口，用于访问任何定义的变量。这也适用于由`EvaluateFunction()` API 提供的方法，它可以访问 ink 代码中定义的任何函数。理解这一功能是使用 ink-Unity 集成插件作为 ink 故事和 Unity 代码之间桥梁来创建更复杂项目的关键。
 
 在本章中，我们将涵盖以下主要主题：
 
@@ -12,39 +12,37 @@
 
 # 技术要求
 
-本章中使用的示例，在`*.cs`和`*.ink`文件中，可以在GitHub上找到：[https://github.com/PacktPublishing/Dynamic-Story-Scripting-with-the-ink-Scripting-Language/tree/main/Chapter8](https://github.com/PacktPublishing/Dynamic-Story-Scripting-with-the-ink-Scripting-Language/tree/main/Chapter8)。
+本章中使用的示例，在`*.cs`和`*.ink`文件中，可以在 GitHub 上找到：[`github.com/PacktPublishing/Dynamic-Story-Scripting-with-the-ink-Scripting-Language/tree/main/Chapter8`](https://github.com/PacktPublishing/Dynamic-Story-Scripting-with-the-ink-Scripting-Language/tree/main/Chapter8)。
 
 # 在故事之外更改墨水变量
 
 `VAR`关键字和初始值。在整个故事中，变量的值可以被更改。通过比较它们的值，变量也可以影响故事的流程。
 
-在ink中，变量是*全局的*。一旦创建，它们可以被同一故事内的代码的任何其他部分访问。此功能也通过ink-Unity集成插件的一部分名为`variablesState`的命名属性传递，该插件称为`variablesState`。Ink故事中定义的每个变量都可以通过其名称访问。
+在 ink 中，变量是*全局的*。一旦创建，它们可以被同一故事内的代码的任何其他部分访问。此功能也通过 ink-Unity 集成插件的一部分名为`variablesState`的命名属性传递，该插件称为`variablesState`。Ink 故事中定义的每个变量都可以通过其名称访问。
 
-在这个主题中，我们将探讨如何使用这个属性来访问和更改运行中的ink故事的值。我们将首先查看如何使用`variablesState`属性，并在ink中比较值以控制其故事外的流程。
+在这个主题中，我们将探讨如何使用这个属性来访问和更改运行中的 ink 故事的值。我们将首先查看如何使用`variablesState`属性，并在 ink 中比较值以控制其故事外的流程。
 
 ## 访问墨水变量
 
-Unity中的故事API提供了对ink变量的访问。在本节中，我们将探讨`variablesState`属性以及如何通过名称访问ink变量。执行以下步骤：
+Unity 中的故事 API 提供了对 ink 变量的访问。在本节中，我们将探讨`variablesState`属性以及如何通过名称访问 ink 变量。执行以下步骤：
 
-1.  首先在Unity中基于2D内置模板创建一个新项目。
+1.  首先在 Unity 中基于 2D 内置模板创建一个新项目。
 
-1.  导入ink-Unity集成插件。
+1.  导入 ink-Unity 集成插件。
 
-1.  添加一个新的ink文件，并将其重命名为`InkVariables.ink`。
+1.  添加一个新的 ink 文件，并将其重命名为`InkVariables.ink`。
 
-    创建的文件将包含ink源代码。因为ink-Unity集成插件运行编译后的ink故事，所以必须在API可以使用之前存在故事的源代码：
+    创建的文件将包含 ink 源代码。因为 ink-Unity 集成插件运行编译后的 ink 故事，所以必须在 API 可以使用之前存在故事的源代码：
 
-    ![图8.1 – 显示InkVariables.ink文件的工程窗口
+    ![图 8.1 – 显示 InkVariables.ink 文件的工程窗口    ](img/Figure_8.1_B17597.jpg)
 
-    ](img/Figure_8.1_B17597.jpg)
+    图 8.1 – 显示 InkVariables.ink 文件的工程窗口
 
-    图8.1 – 显示InkVariables.ink文件的工程窗口
-
-1.  在Inky中打开`InkVariables.ink`文件进行编辑。
+1.  在 Inky 中打开`InkVariables.ink`文件进行编辑。
 
 1.  将内容更改为`Example 1 (InkVariables.ink)`文件。
 
-1.  保存文件并返回Unity。
+1.  保存文件并返回 Unity。
 
     提醒
 
@@ -66,9 +64,7 @@ Unity中的故事API提供了对ink变量的访问。在本节中，我们将探
 
     一旦项目开始运行，打开 **控制台** 窗口。将添加一条新消息：
 
-    ![图 8.2 – 显示 ink 变量值的控制台窗口
-
-    ](img/Figure_8.2_B17597.jpg)
+    ![图 8.2 – 显示 ink 变量值的控制台窗口    ](img/Figure_8.2_B17597.jpg)
 
     图 8.2 – 显示 ink 变量值的控制台窗口
 
@@ -132,55 +128,55 @@ Unity中的故事API提供了对ink变量的访问。在本节中，我们将探
 
 1.  运行项目。
 
-    由于调用了两个方法`HasFunction()`和`EvaluateFunction()`，`relationship` ink变量已被更改。`Story`类的`HasFunction()`方法返回一个布尔值。它还保证了在使用之前函数存在。
+    由于调用了两个方法`HasFunction()`和`EvaluateFunction()`，`relationship` ink 变量已被更改。`Story`类的`HasFunction()`方法返回一个布尔值。它还保证了在使用之前函数存在。
 
 1.  停止项目。
 
-在验证函数存在后，可以对其进行评估。`InkStoryFunctions.cs`文件中的代码使用两个方法：`HasFunction()`和`EvaluateFunction()`。在ink API中，术语`EvaluateFunction()`方法。
+在验证函数存在后，可以对其进行评估。`InkStoryFunctions.cs`文件中的代码使用两个方法：`HasFunction()`和`EvaluateFunction()`。在 ink API 中，术语`EvaluateFunction()`方法。
 
-在使用`EvaluateFunction()`方法时，第一个参数是ink中函数的名称。任何其他参数都直接传递给ink函数。在作为`InkStoryFunctions.cs`文件一部分使用的代码中，`EvaluateFunction()`方法的用法包括两个参数：`increase()` ink函数的名称以及ink中要增加的值量。
+在使用`EvaluateFunction()`方法时，第一个参数是 ink 中函数的名称。任何其他参数都直接传递给 ink 函数。在作为`InkStoryFunctions.cs`文件一部分使用的代码中，`EvaluateFunction()`方法的用法包括两个参数：`increase()` ink 函数的名称以及 ink 中要增加的值量。
 
-当使用ink-Unity集成插件时，从Unity调用墨水功能来更改值是一种非常常见的模式。在这种情况下，ink中的`increase()`函数更新ink内部的`relationship`值。这允许ink值通过ink函数进行调整。在Unity中工作时，可以根据为这些任务定义的ink函数，将值传递给ink以执行多个任务，而无需在Unity侧添加额外代码。
+当使用 ink-Unity 集成插件时，从 Unity 调用墨水功能来更改值是一种非常常见的模式。在这种情况下，ink 中的`increase()`函数更新 ink 内部的`relationship`值。这允许 ink 值通过 ink 函数进行调整。在 Unity 中工作时，可以根据为这些任务定义的 ink 函数，将值传递给 ink 以执行多个任务，而无需在 Unity 侧添加额外代码。
 
-ink函数是故事的特殊部分。这意味着它们还可以与其他与代码相关的操作一起产生文本输出。但是，要使用`EvaluateFunction()`方法获取ink函数的文本输出，需要在C#中使用一个特殊的关键字：`out`。我们将在下一节中了解更多关于这个关键字的信息。
+ink 函数是故事的特殊部分。这意味着它们还可以与其他与代码相关的操作一起产生文本输出。但是，要使用`EvaluateFunction()`方法获取 ink 函数的文本输出，需要在 C#中使用一个特殊的关键字：`out`。我们将在下一节中了解更多关于这个关键字的信息。
 
-## 获取ink函数文本输出
+## 获取 ink 函数文本输出
 
 C#编程语言允许您定义一个变量，然后将其传递给一个方法。在方法内部，预期变量的值将发生变化。请注意，这不会是传递给方法的值的变化，而是变量本身包含的值的变化。更普遍地说，在编程中，这被称为通过引用传递。不是将一些数据传递给方法，而是传递一个引用（即找到变量以存储值的位置）。
 
-在C#中，可以使用`out`关键字与方法的参数一起使用，以指定变量（而不是其值）应该通过引用传递。这意味着当方法完成其操作后，传递给方法的变量中的值将发生变化。在C#中，使用`out`关键字允许开发人员指定他们想要从方法中获取值并将其放入特定变量中。
+在 C#中，可以使用`out`关键字与方法的参数一起使用，以指定变量（而不是其值）应该通过引用传递。这意味着当方法完成其操作后，传递给方法的变量中的值将发生变化。在 C#中，使用`out`关键字允许开发人员指定他们想要从方法中获取值并将其放入特定变量中。
 
-当使用ink-Unity集成插件提供的`EvaluateFunction()`方法时，如果第二个参数使用`out`关键字，该方法知道在评估过程中产生的任何文本都应该传递*出*方法并返回到变量。执行以下步骤：
+当使用 ink-Unity 集成插件提供的`EvaluateFunction()`方法时，如果第二个参数使用`out`关键字，该方法知道在评估过程中产生的任何文本都应该传递*出*方法并返回到变量。执行以下步骤：
 
-1.  返回到*验证和评估ink函数*部分中使用的代码。
+1.  返回到*验证和评估 ink 函数*部分中使用的代码。
 
 1.  将`InkStoryFunctions.cs`文件中的代码更新为`示例 5 (InkStoryFunctions.cs)`。
 
 1.  保存更改后的`InkStoryFunctions.cs`文件。
 
-1.  返回Unity。
+1.  返回 Unity。
 
 1.  播放项目。
 
 1.  停止项目。
 
-使用`out`关键字将`functionOut`变量作为`EvaluateFunction()`方法的参数，让C#知道将任何文本*输出*到方法之外。因为`relationship`值是通过从Unity调用ink中的`increase()`函数内部更新的，所以它的值在C#中的`functionOut`变量中显示为`51`。这允许它然后将值传递给`Debug.Log()`方法，并最终在**控制台**窗口中显示更新后的值。
+使用`out`关键字将`functionOut`变量作为`EvaluateFunction()`方法的参数，让 C#知道将任何文本*输出*到方法之外。因为`relationship`值是通过从 Unity 调用 ink 中的`increase()`函数内部更新的，所以它的值在 C#中的`functionOut`变量中显示为`51`。这允许它然后将值传递给`Debug.Log()`方法，并最终在**控制台**窗口中显示更新后的值。
 
-当以这种方式使用`out`关键字与`EvaluateFunction()`方法时，任何从函数输出的文本都可以被捕获并从ink传递回Unity。结合创建ink函数来更新ink值，这种对*验证和评估ink函数*部分中显示模式的额外更改允许你调用ink函数来执行ink相关任务。这允许ink关注点与Unity中的关注点分离。
+当以这种方式使用`out`关键字与`EvaluateFunction()`方法时，任何从函数输出的文本都可以被捕获并从 ink 传递回 Unity。结合创建 ink 函数来更新 ink 值，这种对*验证和评估 ink 函数*部分中显示模式的额外更改允许你调用 ink 函数来执行 ink 相关任务。这允许 ink 关注点与 Unity 中的关注点分离。
 
-在ink中，故事可以通过不同的值来控制。使用条件选项和选择性输出，可以选择显示选择文本或跟随分支。因为可以通过`variablesState`属性和`EvaluateFunction()`方法调用的函数直接访问变量值，这意味着ink故事可以从Unity中控制。在下一节中，我们将学习如何将Unity中的用户界面元素与ink变量和函数连接起来。
+在 ink 中，故事可以通过不同的值来控制。使用条件选项和选择性输出，可以选择显示选择文本或跟随分支。因为可以通过`variablesState`属性和`EvaluateFunction()`方法调用的函数直接访问变量值，这意味着 ink 故事可以从 Unity 中控制。在下一节中，我们将学习如何将 Unity 中的用户界面元素与 ink 变量和函数连接起来。
 
 # 通过变量和函数控制故事
 
-`variablesState`属性和`EvaluateFunction()`方法为开发者提供了两种访问ink故事中值的方式。通过使用这两种方法，故事可以通过向玩家展示的选项之外的更多方式来控制。Unity中的用户界面元素可以附加到可以更改ink值的方法。
+`variablesState`属性和`EvaluateFunction()`方法为开发者提供了两种访问 ink 故事中值的方式。通过使用这两种方法，故事可以通过向玩家展示的选项之外的更多方式来控制。Unity 中的用户界面元素可以附加到可以更改 ink 值的方法。
 
-在本节中，我们将连接ink到Unity。通过使用`variablesState`属性和`EvaluateFunction()`方法，我们将回顾一个代码模式，其中Unity提供用户界面并与ink函数通信，以在运行时调整和响应值。
+在本节中，我们将连接 ink 到 Unity。通过使用`variablesState`属性和`EvaluateFunction()`方法，我们将回顾一个代码模式，其中 Unity 提供用户界面并与 ink 函数通信，以在运行时调整和响应值。
 
-在本主题的三个部分中，首先，我们将通过创建必要的游戏对象来准备一个Unity项目。接下来，我们将添加代码来控制用户界面。最后，我们将调整用户界面的展示并运行项目。
+在本主题的三个部分中，首先，我们将通过创建必要的游戏对象来准备一个 Unity 项目。接下来，我们将添加代码来控制用户界面。最后，我们将调整用户界面的展示并运行项目。
 
 ## 准备用户界面
 
-要开始使用Unity按钮，需要一个新项目。为了简单起见，建议使用2D项目。这将允许你轻松地与界面一起工作，而无需担心透视。执行以下步骤：
+要开始使用 Unity 按钮，需要一个新项目。为了简单起见，建议使用 2D 项目。这将允许你轻松地与界面一起工作，而无需担心透视。执行以下步骤：
 
 1.  使用内置的 2D 模板在 Unity 中创建一个新项目，并将此项目命名为`购物之旅`。
 
@@ -234,9 +230,7 @@ C#编程语言允许您定义一个变量，然后将其传递给一个方法。
 
     因为`按钮`是一个`GameObject`，它只能与其他游戏对象通信。这是 Unity 理解游戏对象和它们组件之间差异的重要方面。一个`GameObject`是其他组件的*容器*，包括任何`脚本`组件。这意味着要将`按钮`游戏对象的`OnClick`用户事件连接到某个`脚本`组件中找到的代码，必须使用与该`脚本`组件关联的`GameObject`。对我们来说，这意味着`InkStory`游戏对象。
 
-1.  将`InkStory`游戏对象与第一个`按钮`游戏对象的`On Click ()`组件关联起来。这可以通过将`InkStory`游戏对象拖放到属性上完成：![图 8.8 – 关联 InkStory GameObject 与 On Click () 组件
-
-    ![图片](img/Figure_8.8_B17597.jpg)
+1.  将`InkStory`游戏对象与第一个`按钮`游戏对象的`On Click ()`组件关联起来。这可以通过将`InkStory`游戏对象拖放到属性上完成：![图 8.8 – 关联 InkStory GameObject 与 On Click () 组件    ![图片](img/Figure_8.8_B17597.jpg)
 
     图 8.8 – 关联 InkStory GameObject 与 On Click () 组件
 
@@ -248,9 +242,7 @@ C#编程语言允许您定义一个变量，然后将其传递给一个方法。
 
 1.  按照*步骤 7*和*步骤 8*将`InkStory`游戏对象与`On Click``()`组件关联起来。对于*步骤 8*，而不是使用`Buy``()`方法，选择`Sell``()`方法：
 
-![图 8.9 – 关联 InkStoryShopping.Sell() 方法
-
-![图片](img/Figure_8.9_B17597.jpg)
+![图 8.9 – 关联 InkStoryShopping.Sell() 方法![图片](img/Figure_8.9_B17597.jpg)
 
 图 8.9 – 关联 InkStoryShopping.Sell() 方法
 
@@ -262,11 +254,9 @@ C#编程语言允许您定义一个变量，然后将其传递给一个方法。
 
 1.  选择`Text`游戏对象中的第一个`Button`游戏对象。
 
-1.  将`Text`属性值从默认设置`Button`更改为`Buy`：![图8.10 – 更改Text属性
+1.  将`Text`属性值从默认设置`Button`更改为`Buy`：![图 8.10 – 更改 Text 属性    ![图片](img/Figure_8.10_B17597.jpg)
 
-    ![图片](img/Figure_8.10_B17597.jpg)
-
-    图8.10 – 更改Text属性
+    图 8.10 – 更改 Text 属性
 
 1.  选择展示的`Text`游戏对象中的第二个`Button`游戏对象。
 
@@ -274,48 +264,44 @@ C#编程语言允许您定义一个变量，然后将其传递给一个方法。
 
 1.  选择`Canvas`游戏对象的第三个子游戏对象，即`Text`游戏对象。确保不要选择之前步骤中更新的前两个`Text`游戏对象。
 
-1.  将`Text`游戏对象的宽度和高度更改为`400`和`250`：![图8.11 – 调整Text游戏对象的宽度和高度
+1.  将`Text`游戏对象的宽度和高度更改为`400`和`250`：![图 8.11 – 调整 Text 游戏对象的宽度和高度    ![图片](img/Figure_8.11_B17597.jpg)
 
-    ![图片](img/Figure_8.11_B17597.jpg)
-
-    图8.11 – 调整Text游戏对象的宽度和高度
+    图 8.11 – 调整 Text 游戏对象的宽度和高度
 
 1.  将`Text`游戏对象的字体大小从默认值更改为`32`。
 
-1.  将`Text`游戏对象的颜色从默认设置更改为白色或接近白色的颜色：![图8.12 – 更新Text游戏对象的颜色
+1.  将`Text`游戏对象的颜色从默认设置更改为白色或接近白色的颜色：![图 8.12 – 更新 Text 游戏对象的颜色    ![图片](img/Figure_8.12_B17597.jpg)
 
-    ![图片](img/Figure_8.12_B17597.jpg)
-
-    图8.12 – 更新Text游戏对象的颜色
+    图 8.12 – 更新 Text 游戏对象的颜色
 
 1.  播放项目。
 
-    播放时，最左侧将显示墨迹中`money`和`inventory`变量的更新状态。点击按钮将调用Unity方法，这些方法反过来将评估墨迹函数并更改运行中的墨迹故事中的值。这是一个如何通过变量和函数*控制*墨迹故事的完整示例。
+    播放时，最左侧将显示墨迹中`money`和`inventory`变量的更新状态。点击按钮将调用 Unity 方法，这些方法反过来将评估墨迹函数并更改运行中的墨迹故事中的值。这是一个如何通过变量和函数*控制*墨迹故事的完整示例。
 
 1.  停止项目。
 
-虽然创建用户界面元素和更改其属性值涉及多个步骤，但代码相对简单。在墨迹中创建了函数来调整墨迹值。在Unity中，创建了与墨迹函数名称匹配的方法。
+虽然创建用户界面元素和更改其属性值涉及多个步骤，但代码相对简单。在墨迹中创建了函数来调整墨迹值。在 Unity 中，创建了与墨迹函数名称匹配的方法。
 
-本节演示了如何在墨迹中创建一个简单的购物场景，并从Unity中进行操作。通过了解墨迹函数的名称，Unity中的C#方法可以评估它们以调整值，或者在`status()`墨迹函数的情况下，检索文本输出。这还演示了如何将用户界面编程与与故事相关的代码分离。它们相互通信，但它们是在不同的上下文中编写的。
+本节演示了如何在墨迹中创建一个简单的购物场景，并从 Unity 中进行操作。通过了解墨迹函数的名称，Unity 中的 C#方法可以评估它们以调整值，或者在`status()`墨迹函数的情况下，检索文本输出。这还演示了如何将用户界面编程与与故事相关的代码分离。它们相互通信，但它们是在不同的上下文中编写的。
 
-在下一章中，我们将探讨在故事中处理变量和函数的不同方法，同时继续我们分离叙事和游戏代码的趋势。然而，我们不会在Unity中点击按钮来触发ink中的函数，而是探索相反的方法。事件将在ink中发生并触发Unity中的变化。本章重点介绍了如何从Unity控制ink。下一章将演示如何从运行中的ink故事中的事件控制Unity的某些部分。
+在下一章中，我们将探讨在故事中处理变量和函数的不同方法，同时继续我们分离叙事和游戏代码的趋势。然而，我们不会在 Unity 中点击按钮来触发 ink 中的函数，而是探索相反的方法。事件将在 ink 中发生并触发 Unity 中的变化。本章重点介绍了如何从 Unity 控制 ink。下一章将演示如何从运行中的 ink 故事中的事件控制 Unity 的某些部分。
 
 # 摘要
 
-在本章中，我们首先演示了如何通过`GetVariableWithName()`方法使用名称访问变量以及使用方括号提供的简写语法。为了完整性，解释了`variablesState`属性。然而，在大多数情况下，ink函数应该改变ink的值。这有助于保持任何与这些值一起工作的代码存在于ink故事中，并且随着时间的推移更容易维护，我们以这个主题结束了本章。此外，我们还探讨了Unity中的按钮如何调用它们的方法，然后调用ink函数。通过使用`EvaluateFunction()`方法，我们可以访问Unity中的ink函数，要么将数据传递到项目中，要么使用C#中的`out`关键字检索可能的文本输出。
+在本章中，我们首先演示了如何通过`GetVariableWithName()`方法使用名称访问变量以及使用方括号提供的简写语法。为了完整性，解释了`variablesState`属性。然而，在大多数情况下，ink 函数应该改变 ink 的值。这有助于保持任何与这些值一起工作的代码存在于 ink 故事中，并且随着时间的推移更容易维护，我们以这个主题结束了本章。此外，我们还探讨了 Unity 中的按钮如何调用它们的方法，然后调用 ink 函数。通过使用`EvaluateFunction()`方法，我们可以访问 Unity 中的 ink 函数，要么将数据传递到项目中，要么使用 C#中的`out`关键字检索可能的文本输出。
 
-在[*第9章*](B17597_09_Final_PG_ePub.xhtml#_idTextAnchor137)“Story API – 观察和响应故事事件”中，我们将通过检查Unity和ink之间关系的一种不同方法来强调ink-Unity集成插件及其API。我们不会使用Unity方法来调用ink函数，而是检查一些从ink控制Unity部分的模式。我们不需要在Unity中点击按钮来更改值，ink将导致变化，然后将在Unity中注册。对于需要从ink获得更多实时反馈的项目，这些模式将是本章中所示使用`variablesState`属性和`EvaluateFunction()`方法所示方法的优选方法。
+在*第九章*“Story API – 观察和响应故事事件”中，我们将通过检查 Unity 和 ink 之间关系的一种不同方法来强调 ink-Unity 集成插件及其 API。我们不会使用 Unity 方法来调用 ink 函数，而是检查一些从 ink 控制 Unity 部分的模式。我们不需要在 Unity 中点击按钮来更改值，ink 将导致变化，然后将在 Unity 中注册。对于需要从 ink 获得更多实时反馈的项目，这些模式将是本章中所示使用`variablesState`属性和`EvaluateFunction()`方法所示方法的优选方法。
 
 # 问题
 
-1.  ink中的变量是否是全局的？
+1.  ink 中的变量是否是全局的？
 
-1.  函数全局化对它们在ink中如何访问有什么影响？
+1.  函数全局化对它们在 ink 中如何访问有什么影响？
 
-1.  `Continue()`和`ContinueMaximally()`方法是否会影响ink中变量的值？
+1.  `Continue()`和`ContinueMaximally()`方法是否会影响 ink 中变量的值？
 
 1.  `VariablesState`类提供了什么简写语法来根据名称访问变量？
 
-1.  在尝试访问之前，是否应该使用ink函数的名称来测试它是否存在？
+1.  在尝试访问之前，是否应该使用 ink 函数的名称来测试它是否存在？
 
-1.  在使用ink-Unity集成插件时，`out` C#关键字是如何与`EvaluateFunction()`方法一起作为Story API的一部分使用的？
+1.  在使用 ink-Unity 集成插件时，`out` C#关键字是如何与`EvaluateFunction()`方法一起作为 Story API 的一部分使用的？

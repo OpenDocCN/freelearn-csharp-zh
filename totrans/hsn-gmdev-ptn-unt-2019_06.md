@@ -10,9 +10,9 @@
 
 # 技术要求
 
-本章是一个实践章节；你需要对Unity和C#有一个基本的了解。
+本章是一个实践章节；你需要对 Unity 和 C#有一个基本的了解。
 
-我们将使用以下特定的Unity引擎和C#语言概念：
+我们将使用以下特定的 Unity 引擎和 C#语言概念：
 
 +   接口
 
@@ -20,21 +20,21 @@
 
 如果你对这些概念不熟悉，请在开始本章之前复习它们。
 
-本章的代码文件可以在GitHub上找到：
+本章的代码文件可以在 GitHub 上找到：
 
-[https://github.com/PacktPublishing/Hands-On-Game-Development-Patterns-with-Unity-2018](https://github.com/PacktPublishing/Hands-On-Game-Development-Patterns-with-Unity-2018)
+[`github.com/PacktPublishing/Hands-On-Game-Development-Patterns-with-Unity-2018`](https://github.com/PacktPublishing/Hands-On-Game-Development-Patterns-with-Unity-2018)
 
 观看以下视频，以查看代码的实际效果：
 
-[http://bit.ly/2WviTwe](http://bit.ly/2WviTwe)
+[`bit.ly/2WviTwe`](http://bit.ly/2WviTwe)
 
 # 原型模式概述
 
-原型模式被归类为**创建型模式**，这意味着它的主要职责是优化初始化对象的过程。在Unity脚本API中，我们通常不使用构造函数；相反，我们将我们的类转换为组件并将它们附加到GameObject上。采用这种方法，引擎管理我们的对象初始化序列到内存中。
+原型模式被归类为**创建型模式**，这意味着它的主要职责是优化初始化对象的过程。在 Unity 脚本 API 中，我们通常不使用构造函数；相反，我们将我们的类转换为组件并将它们附加到 GameObject 上。采用这种方法，引擎管理我们的对象初始化序列到内存中。
 
 从理论上讲，对象的初始化开销超出了我们的控制，因为引擎为我们管理这一点。这个说法在某种程度上是正确的，但它没有考虑到场景生命周期中发生的事情。如果我们需要在场景的特定时刻动态加载预制体，引擎将无法防止在将整个实体加载到内存中时帧率突然下降。
 
-**预制体**是一个由组装好的GameObject和组件组成的预制容器。例如，你可以为游戏中每种类型的角色创建一个预制体。预制体易于加载和复制到内存中。它们通常被称为游戏的构建块。
+**预制体**是一个由组装好的 GameObject 和组件组成的预制容器。例如，你可以为游戏中每种类型的角色创建一个预制体。预制体易于加载和复制到内存中。它们通常被称为游戏的构建块。
 
 原型模式为这个技术难题提供了一个简单的解决方案；我们不是加载一个新的预制件，而是复制一个已经存在于内存中的。类似于复印机，我们可以从一个单一引用中制作出我们需要的任意数量的副本。这种方法适用于生成预制件和单个组件。
 
@@ -84,51 +84,132 @@
 
 1.  作为第一步，让我们实现一个名为 `ICopyable` 的接口。我们将公开一个名为 `Copy()` 的函数：
 
-[PRE0]
+```cs
+public interface iCopyable
+{
+    iCopyable Copy();
+}
+```
 
 注意，我们的接口名为 `ICopyable`；这是为了避免与 C# 的原生接口 `ICloneable` 混淆，后者用于声明一个类为 **可克隆**。在我们的示例中，我们不会使用这个 C# 接口。
 
 1.  现在我们有了我们的接口，让我们在名为 `Enemy` 的具体类中实现它：
 
-[PRE1]
+```cs
+using UnityEngine;
+
+public class Enemy : MonoBehaviour, iCopyable
+{
+    public iCopyable Copy()
+    {
+        return Instantiate(this);
+    }
+}
+```
 
 我们的 `Enemy` 父类现在能够通过 `Copy()` 函数返回其自身的克隆实例。正如我们之前提到的，我们没有使用 C# 的原生 `ICloneable` 接口，因为我们正在通过使用 Unity 的 `Instantiate()` 函数利用 Unity 的 API。这个 API 函数更适合我们的上下文，因为它可以在克隆过程中持续原生 Unity GameObject 或组件的层次关系。换句话说，当使用 `Instantiate()` 克隆 GameObject 时，您也在复制（克隆）其子对象。这种方法在 Unity 中至关重要，因为 GameObjects 通常由多个对象和组件组成，以父子结构排列。
 
 1.  下一步涉及实现我们的两个主要敌人；让我们从 `Drone` 开始：
 
-[PRE2]
+```cs
+public class Drone: Enemy
+{
+    public void Fly()
+    {
+        // Implement flying functionality.
+    }
+
+    public void Fire()
+    {
+        // Implement laser fire functionality.
+    }
+}
+```
 
 如您所见，我们的 `Drone` 类现在是 `Enemy` 类的一个子类，并且因为在面向对象的环境中子对象继承其父对象的属性，`Drone` 类获得了访问 `Copy()` 函数的权限。这种安排意味着客户端可以通过调用 `Copy()` 来请求 `Drone` 的副本。
 
 1.  现在，让我们为我们的 `Sniper` 做同样的事情：
 
-[PRE3]
+```cs
+public class Sniper : Enemy
+{
+    public void Shoot()
+    {
+        // Implement shooting functionality.
+    }
+}
+```
 
 1.  现在我们已经将所有具体的 `Enemy` 类型类写下来，让我们实现我们的 `EnemySpawner`：
 
-[PRE4]
+```cs
+using UnityEngine;
+
+public class EnemySpawner : MonoBehaviour
+{
+    public iCopyable m_Copy;
+
+    public Enemy SpawnEnemy(Enemy prototype)
+    {
+        m_Copy = prototype.Copy();
+        return (Enemy)m_Copy;
+    }
+}
+```
 
 我们的生成系统相当简单；它通过复制接收到的任何对应于`Enemy`类型的对象来生成敌人。就像一台复印机；给它正确的文档，它就会复制它。然而，有一个核心区别；我们的`EnemySpawner`不执行复制。它只是要求它接收到的对象复制自己，然后将复制品返回给客户端。
 
 1.  为了测试我们的敌人生成系统实现，让我们编写一个`Client`类：
 
-[PRE5]
+```cs
+using UnityEngine;
+
+public class Client : MonoBehaviour
+{
+    public Drone m_Drone;
+    public Sniper m_Sniper;
+    public EnemySpawner m_Spawner;
+
+    private Enemy m_Spawn;
+    private int m_IncrementorDrone = 0;
+    private int m_IncrementorSniper = 0;
+
+    public void Update()
+    {
+        if (Input.GetKeyDown(KeyCode.D))
+        {
+            m_Spawn = m_Spawner.SpawnEnemy(m_Drone);
+
+            m_Spawn.name = "Drone_Clone_" + ++m_IncrementorDrone;
+            m_Spawn.transform.Translate(Vector3.forward * m_IncrementorDrone * 1.5f);
+        }
+
+        if (Input.GetKeyDown(KeyCode.S))
+        {
+            m_Spawn = m_Spawner.SpawnEnemy(m_Sniper);
+
+            m_Spawn.name = "Sniper_Clone_" + ++m_IncrementorSniper;
+            m_Spawn.transform.Translate(Vector3.forward * m_IncrementorSniper * 1.5f);
+        }
+    }
+}
+```
 
 我们的`Client`类相当简单；根据玩家是否在键盘上按下*S*或*D*，它将请求`EnemySpawner`返回一个`Drone`或`Sniper`实例，然后它将把它放在之前生成的实体旁边。
 
-在本书中，我们假设读者具备基本的Unity技能，并且已经知道如何设置GameObject以及将组件附加到它们上。作为一个快速提醒，为了使此代码示例在Unity场景中编译并工作，你需要执行以下操作：
+在本书中，我们假设读者具备基本的 Unity 技能，并且已经知道如何设置 GameObject 以及将组件附加到它们上。作为一个快速提醒，为了使此代码示例在 Unity 场景中编译并工作，你需要执行以下操作：
 
-1.  创建两个GameObject，并将Drone或Sniper脚本附加到它们作为组件。
+1.  创建两个 GameObject，并将 Drone 或 Sniper 脚本附加到它们作为组件。
 
-1.  创建一个带有客户端（脚本）的GameObject。
+1.  创建一个带有客户端（脚本）的 GameObject。
 
-1.  在客户端（脚本）组件的检查器中，将Drone和Sniper GameObject设置为相应字段中的引用。
+1.  在客户端（脚本）组件的检查器中，将 Drone 和 Sniper GameObject 设置为相应字段中的引用。
 
-以下截图显示了测试我们的代码示例的典型Unity场景设置：
+以下截图显示了测试我们的代码示例的典型 Unity 场景设置：
 
 ![图片](img/c3306d86-bf00-403c-9460-40dfd82887a9.png)
 
-本书的相关源代码和Unity项目可在GitHub仓库[https://github.com/PacktPublishing/Hands-On-Game-Development-Patterns-with-Unity-2018](https://github.com/PacktPublishing/Hands-On-Game-Development-Patterns-with-Unity-2018)中找到。
+本书的相关源代码和 Unity 项目可在 GitHub 仓库[`github.com/PacktPublishing/Hands-On-Game-Development-Patterns-with-Unity-2018`](https://github.com/PacktPublishing/Hands-On-Game-Development-Patterns-with-Unity-2018)中找到。
 
 我们在构建简单的生成系统时成功实现了原型模式。这段代码是开发更高级生成系统的坚实基础。需要记住的最重要的一课是始终考虑在创建对象之前复制它。这种方法是一种直接的优化策略。
 
@@ -140,16 +221,16 @@
 
 # 练习
 
-每次你学习一个新的模式并将其适应到Unity中时，你应该验证它是否在使你的代码看起来结构化之外还有益处。与其他领域不同，游戏程序员不仅被他们的编写整洁代码的能力所评判，还在于代码的运行速度。你会发现很多设计模式为了结构的一致性而牺牲了性能。
+每次你学习一个新的模式并将其适应到 Unity 中时，你应该验证它是否在使你的代码看起来结构化之外还有益处。与其他领域不同，游戏程序员不仅被他们的编写整洁代码的能力所评判，还在于代码的运行速度。你会发现很多设计模式为了结构的一致性而牺牲了性能。
 
 作为一项练习，我建议你比较使用`Instantiate()`通过复制内存中现有对象和使用`Resource.Load()`加载相同对象的现有预制件来使用`Instantiate()`的性能。
 
-为了完成这个任务，你可以尝试使用Unity的本地分析工具。
+为了完成这个任务，你可以尝试使用 Unity 的本地分析工具。
 
-我建议阅读Unity的分析器文档；你可以在本章的“进一步阅读”部分查看链接。经常分析你的代码是一个好习惯，尤其是在尝试任何优化之前。这种方法将帮助你避免花费数小时优化那些甚至不经常执行的代码。
+我建议阅读 Unity 的分析器文档；你可以在本章的“进一步阅读”部分查看链接。经常分析你的代码是一个好习惯，尤其是在尝试任何优化之前。这种方法将帮助你避免花费数小时优化那些甚至不经常执行的代码。
 
 # 进一步阅读
 
-+   《游戏编程模式》由Robert Nystrom著：[http://gameprogrammingpatterns.com](http://gameprogrammingpatterns.com/)
++   《游戏编程模式》由 Robert Nystrom 著：[`gameprogrammingpatterns.com`](http://gameprogrammingpatterns.com/)
 
-+   《Unity手册 – 分析器概述：》[https://docs.unity3d.com/Manual/Profiler.html](https://docs.unity3d.com/Manual/Profiler.html)
++   《Unity 手册 – 分析器概述：》[`docs.unity3d.com/Manual/Profiler.html`](https://docs.unity3d.com/Manual/Profiler.html)

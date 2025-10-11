@@ -8,43 +8,43 @@
 
 # 本书涵盖内容
 
-[第一章](61135ab9-f2f1-44a9-9016-75f70508b6bd.xhtml)，*入门*，将涵盖规划阶段，解释如何根据我们的需求或问题陈述确定完美的技术堆栈，以及 RESTful 和 RESTless 服务的根本方面。
+第一章，*入门*，将涵盖规划阶段，解释如何根据我们的需求或问题陈述确定完美的技术堆栈，以及 RESTful 和 RESTless 服务的根本方面。
 
-[第二章](c5995463-034e-4746-8255-e0bdfa248c4a.xhtml)，*构建初始框架 – 应用程序布局基础*，将使你熟悉各种方法的概念，例如 GET、POST、PUT、DELETE 等。
+第二章，*构建初始框架 – 应用程序布局基础*，将使你熟悉各种方法的概念，例如 GET、POST、PUT、DELETE 等。
 
-[第三章](09fe6ad3-7061-4ae2-a2cb-c454ba802985.xhtml)，*用户注册和管理*，将使你熟悉使用 ASP.NET Core 2.0、Entity Framework Core、基本身份验证和 OAuth 2.0 进行身份验证。
+第三章，*用户注册和管理*，将使你熟悉使用 ASP.NET Core 2.0、Entity Framework Core、基本身份验证和 OAuth 2.0 进行身份验证。
 
-[第四章](920b925a-af77-4f0d-8055-6313669af320.xhtml)，*商品目录、购物车和结账*，将帮助你理解在构建电子商务应用程序的不同部分时 ASP.NET Core 的复杂组件，包括 .NET Standard 2.0。
+第四章，*商品目录、购物车和结账*，将帮助你理解在构建电子商务应用程序的不同部分时 ASP.NET Core 的复杂组件，包括 .NET Standard 2.0。
 
-[第五章](f3ee816a-8343-4a03-9e1d-1682e4cab467.xhtml)，*集成外部组件和处理*，将帮助你了解中间件、使用中间件实现日志记录、身份验证和资源限制。
+第五章，*集成外部组件和处理*，将帮助你了解中间件、使用中间件实现日志记录、身份验证和资源限制。
 
-[第六章](17c8ef83-d95b-41af-9b61-54f69981bc3a.xhtml)，*测试 RESTful 网络服务*，将使你熟悉测试范式、测试概念、存根和模拟、安全测试和集成测试。
+第六章，*测试 RESTful 网络服务*，将使你熟悉测试范式、测试概念、存根和模拟、安全测试和集成测试。
 
-[第七章](f766a64a-f90e-487a-8ba3-30e49a2415f3.xhtml)，*持续集成和持续部署*，将使你熟悉使用 VSTS 和 Azure 的 CI 和 CD 概念。
+第七章，*持续集成和持续部署*，将使你熟悉使用 VSTS 和 Azure 的 CI 和 CD 概念。
 
-[第八章](18479f1e-2030-404b-b016-1764984f46ed.xhtml)，*保护 RESTful 网络服务*，将帮助你了解各种安全技术，包括基本身份验证、XSS 攻击和数据加密。
+第八章，*保护 RESTful 网络服务*，将帮助你了解各种安全技术，包括基本身份验证、XSS 攻击和数据加密。
 
-[第9章](dfa68fd5-a510-4446-be5c-fe23d0ca08cd.xhtml)，*扩展RESTful服务（Web服务的性能）*，将解释扩展内、扩展外以及各种扩展模式。
+第九章，*扩展 RESTful 服务（Web 服务的性能）*，将解释扩展内、扩展外以及各种扩展模式。
 
-[第10章](9fcac4d2-710a-48a2-98be-ed0034525cee.xhtml)，*构建Web客户端（消费Web服务）*，将教授读者使用ASP.NET Core和Rest Client with RestSharp。
+第十章，*构建 Web 客户端（消费 Web 服务）*，将教授读者使用 ASP.NET Core 和 Rest Client with RestSharp。
 
-[第11章](f0f2e5ae-96d9-49b7-bdd9-ce2ea9c75dea.xhtml)，*微服务简介*，通过涵盖ASP.NET Core中的微服务生态系统来概述微服务。
+第十一章，*微服务简介*，通过涵盖 ASP.NET Core 中的微服务生态系统来概述微服务。
 
 # 为了充分利用本书
 
-读者应具备先前的.NET Core和.NET Standard知识，以及C#、RESTful服务、Visual Studio 2017（作为IDE）、Postman、高级Rest客户端和Swagger的基本知识。
+读者应具备先前的.NET Core 和.NET Standard 知识，以及 C#、RESTful 服务、Visual Studio 2017（作为 IDE）、Postman、高级 Rest 客户端和 Swagger 的基本知识。
 
 为了设置系统，读者应在他们的机器上具备以下内容：
 
-+   Visual Studio 2017更新3或更高版本（有关下载和安装说明，请参阅[https://docs.microsoft.com/en-us/visualstudio/install/install-visual-studio](https://docs.microsoft.com/en-us/visualstudio/install/install-visual-studio)）
++   Visual Studio 2017 更新 3 或更高版本（有关下载和安装说明，请参阅[`docs.microsoft.com/en-us/visualstudio/install/install-visual-studio`](https://docs.microsoft.com/en-us/visualstudio/install/install-visual-studio)）
 
-+   SQL Server 2008 R2或更高版本（有关下载和安装说明，请参阅[https://blogs.msdn.microsoft.com/bethmassi/2011/02/18/step-by-step-installing-sql-server-management-studio-2008-express-after-visual-studio-2010/](https://blogs.msdn.microsoft.com/bethmassi/2011/02/18/step-by-step-installing-sql-server-management-studio-2008-express-after-visual-studio-2010/)))
++   SQL Server 2008 R2 或更高版本（有关下载和安装说明，请参阅[`blogs.msdn.microsoft.com/bethmassi/2011/02/18/step-by-step-installing-sql-server-management-studio-2008-express-after-visual-studio-2010/`](https://blogs.msdn.microsoft.com/bethmassi/2011/02/18/step-by-step-installing-sql-server-management-studio-2008-express-after-visual-studio-2010/)))
 
 +   .NET Core 2.0
 
-    +   下载：[https://www.microsoft.com/net/download/windows](https://www.microsoft.com/net/download/windows)
+    +   下载：[`www.microsoft.com/net/download/windows`](https://www.microsoft.com/net/download/windows)
 
-    +   安装说明：[https://blogs.msdn.microsoft.com/benjaminperkins/2017/09/20/how-to-install-net-core-2-0/](https://blogs.msdn.microsoft.com/benjaminperkins/2017/09/20/how-to-install-net-core-2-0/)
+    +   安装说明：[`blogs.msdn.microsoft.com/benjaminperkins/2017/09/20/how-to-install-net-core-2-0/`](https://blogs.msdn.microsoft.com/benjaminperkins/2017/09/20/how-to-install-net-core-2-0/)
 
 # 下载示例代码文件
 
@@ -54,7 +54,7 @@
 
 1.  在[www.packtpub.com](http://www.packtpub.com/support)上登录或注册。
 
-1.  选择SUPPORT选项卡。
+1.  选择 SUPPORT 选项卡。
 
 1.  点击代码下载与勘误表。
 
@@ -62,35 +62,58 @@
 
 文件下载后，请确保您使用最新版本的以下软件解压缩或提取文件夹：
 
-+   Windows上的WinRAR/7-Zip
++   Windows 上的 WinRAR/7-Zip
 
-+   Mac上的Zipeg/iZip/UnRarX
++   Mac 上的 Zipeg/iZip/UnRarX
 
-+   Linux上的7-Zip/PeaZip
++   Linux 上的 7-Zip/PeaZip
 
-本书代码包也托管在GitHub上，地址为[https://github.com/PacktPublishing/Building-RESTful-Web-services-with-DOTNET-Core](https://github.com/PacktPublishing/Building-RESTful-Web-services-with-DOTNET-Core)。如果代码有更新，它将在现有的GitHub仓库中更新。
+本书代码包也托管在 GitHub 上，地址为[`github.com/PacktPublishing/Building-RESTful-Web-services-with-DOTNET-Core`](https://github.com/PacktPublishing/Building-RESTful-Web-services-with-DOTNET-Core)。如果代码有更新，它将在现有的 GitHub 仓库中更新。
 
-我们还有其他来自我们丰富的书籍和视频目录的代码包可供选择，请访问[https://github.com/PacktPublishing/](https://github.com/PacktPublishing/)。查看它们！
+我们还有其他来自我们丰富的书籍和视频目录的代码包可供选择，请访问[`github.com/PacktPublishing/`](https://github.com/PacktPublishing/)。查看它们！
 
 # 下载彩色图像
 
-我们还提供了一份包含本书中使用的截图/图表的彩色图像的PDF文件。您可以从[https://www.packtpub.com/sites/default/files/downloads/BuildingRESTfulWebServiceswithDOTNETCore_ColorImages.pdf](https://www.packtpub.com/sites/default/files/downloads/BuildingRESTfulWebServiceswithDOTNETCore_ColorImages.pdf)下载它。
+我们还提供了一份包含本书中使用的截图/图表的彩色图像的 PDF 文件。您可以从[`www.packtpub.com/sites/default/files/downloads/BuildingRESTfulWebServiceswithDOTNETCore_ColorImages.pdf`](https://www.packtpub.com/sites/default/files/downloads/BuildingRESTfulWebServiceswithDOTNETCore_ColorImages.pdf)下载它。
 
 # 使用的约定
 
 本书使用了多种文本约定。
 
-`CodeInText`：表示文本中的代码单词、数据库表名、文件夹名、文件名、文件扩展名、路径名、虚拟URL、用户输入和Twitter昵称。以下是一个示例：“`Header`必须作为信封的第一个子元素出现，在`body`元素之前。”
+`CodeInText`：表示文本中的代码单词、数据库表名、文件夹名、文件名、文件扩展名、路径名、虚拟 URL、用户输入和 Twitter 昵称。以下是一个示例：“`Header`必须作为信封的第一个子元素出现，在`body`元素之前。”
 
 代码块设置如下：
 
-[PRE0]
+```cs
+<?xml version = "1.0"?>
+<SOAP-ENV:Envelope 
+ xmlns:SOAP-ENV = "http://www.w3.org/2001/12/soap-envelope" 
+ SOAP-ENV:encodingStyle = "http://www.w3.org/2001/12/soap-encoding">
+ ...
+ SOAP Message information goes here
+ ...
+</SOAP-ENV:Envelope>
+```
 
 当我们希望您注意代码块中的特定部分时，相关的行或项目将以粗体显示：
 
-[PRE1]
+```cs
+{
+  // GET: api/Products
+  [HttpGet]
+  public IEnumerable<Product> Get()
+  {
+    return new Product[]
+    {
+      new Product(1, "Oats", new decimal(3.07)),
+      new Product(2, "Toothpaste", new decimal(10.89)),
+      new Product(3, "Television", new decimal(500.90))
+    };
+  }
+}
+```
 
-**粗体**：表示新术语、重要单词或您在屏幕上看到的单词。例如，菜单或对话框中的单词在文本中显示如下。以下是一个示例：“**简单对象访问协议**（**SOAP**）是一种基于XML的消息协议，用于计算机之间交换信息。”
+**粗体**：表示新术语、重要单词或您在屏幕上看到的单词。例如，菜单或对话框中的单词在文本中显示如下。以下是一个示例：“**简单对象访问协议**（**SOAP**）是一种基于 XML 的消息协议，用于计算机之间交换信息。”
 
 警告或重要注意事项看起来像这样。
 
@@ -110,6 +133,6 @@
 
 # 评论
 
-请留下评论。一旦您阅读并使用了这本书，为什么不在您购买它的网站上留下评论呢？潜在读者可以查看并使用您的客观意见来做出购买决定，Packt公司可以了解您对我们产品的看法，我们的作者也可以看到他们对书籍的反馈。谢谢！
+请留下评论。一旦您阅读并使用了这本书，为什么不在您购买它的网站上留下评论呢？潜在读者可以查看并使用您的客观意见来做出购买决定，Packt 公司可以了解您对我们产品的看法，我们的作者也可以看到他们对书籍的反馈。谢谢！
 
-如需了解Packt的更多信息，请访问 [packtpub.com](https://www.packtpub.com/).
+如需了解 Packt 的更多信息，请访问 [packtpub.com](https://www.packtpub.com/).

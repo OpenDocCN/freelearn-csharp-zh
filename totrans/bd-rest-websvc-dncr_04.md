@@ -1,6 +1,6 @@
 # 项目目录、购物车和结账
 
-本章将探讨编码电子商务应用程序的主要部分及其相关的API端点。
+本章将探讨编码电子商务应用程序的主要部分及其相关的 API 端点。
 
 我们已经在上一章讨论了用户注册和身份验证，我们将继续使用这些知识来帮助我们在本章构建的不同控制器中实现安全性。
 
@@ -24,51 +24,94 @@
 
 # 实现控制器
 
-由于我们将学习我们应用程序的核心功能，我们需要设计其控制器，以便我们有REST端点来执行来自客户端的任务。例如，*产品列表*、*产品搜索*、*添加到购物车*、*下订单*和*处理发货*可以通过为每个功能分配一个专门的控制器来完成。这些控制器将负责对数据库执行操作，因此我们需要为相关表建模类。让我们开始工作！
+由于我们将学习我们应用程序的核心功能，我们需要设计其控制器，以便我们有 REST 端点来执行来自客户端的任务。例如，*产品列表*、*产品搜索*、*添加到购物车*、*下订单*和*处理发货*可以通过为每个功能分配一个专门的控制器来完成。这些控制器将负责对数据库执行操作，因此我们需要为相关表建模类。让我们开始工作！
 
 # 生成模型
 
 以下行可以在包管理控制台中执行以生成数据库中所有表的模型类：
 
-[PRE0]
+```cs
+Scaffold-DbContext "Server=.;Database=FlixOneStore;Trusted_Connection=True;" Microsoft.EntityFrameworkCore.SqlServer -OutputDir Models -Force
+```
 
 上述命令将为`Models`文件夹中的每个表生成类文件，如下面的截图所示：
 
 ![图片](img/281b8757-ef5d-40b2-b86c-3702e6fdbabc.png)
 
-如果您还没有这样做，请参考[https://github.com/PacktPublishing/Building-RESTful-Web-services-with-DOTNET-Core](https://github.com/PacktPublishing/Building-RESTful-Web-services-with-DOTNET-Core)中的数据库脚本以生成您应用程序的数据库表。
+如果您还没有这样做，请参考[`github.com/PacktPublishing/Building-RESTful-Web-services-with-DOTNET-Core`](https://github.com/PacktPublishing/Building-RESTful-Web-services-with-DOTNET-Core)中的数据库脚本以生成您应用程序的数据库表。
 
 # 生成控制器
 
-要为模型生成控制器，右键单击`Controllers`文件夹 | 添加 | 控制器 | 使用Entity Framework的API控制器（带操作）。
+要为模型生成控制器，右键单击`Controllers`文件夹 | 添加 | 控制器 | 使用 Entity Framework 的 API 控制器（带操作）。
 
 首先，让我们从`ProductsdetailsController`开始，因为我们最初想要向客户展示产品列表。
 
 通过生成器生成的`Productsdetail.cs`模型类应该看起来像以下片段：
 
-[PRE1]
+```cs
+public partial class Productsdetail
+{
+  public Guid Id { get; set; }
+  public Guid? Productid { get; set; }
+  public string Name { get; set; }
+  public string Description { get; set; }
+  public string Url { get; set; }
+  public int Views { get; set; }
+  public Products Product { get; set; }
+} 
+```
 
 上述代码也可以用来生成带有`GET`、`POST`、`PUT`和`DELETE`操作方法的控制器：（我们现在专注于`GetProductsdetail`方法。）
 
-[PRE2]
+```cs
+// GET: api/Productsdetails
+[HttpGet]
+public IEnumerable<Productsdetail> GetProductsdetail()
+{
+  return _context.Productsdetail;
+}
+```
 
-您可以使用Postman快速测试您的控制器是否正常工作，如下面的截图所示：
+您可以使用 Postman 快速测试您的控制器是否正常工作，如下面的截图所示：
 
 ![图片](img/d6c1645c-c091-4b39-9e5e-8da4ea9e01ee.png)
 
-在这里，URL是`http://localhost:57571/api/Productsdetails`，类型是`GET`。我们可以在结果框中看到结果，它以JSON格式显示产品详情数组。请注意，我们通过在请求的“头部”选项卡中设置`contentType`头部为`application/json`来发送此请求。
+在这里，URL 是`http://localhost:57571/api/Productsdetails`，类型是`GET`。我们可以在结果框中看到结果，它以 JSON 格式显示产品详情数组。请注意，我们通过在请求的“头部”选项卡中设置`contentType`头部为`application/json`来发送此请求。
 
 # 产品列表
 
-现在，让我们设计所需的jQuery代码来消费此端点，以便我们可以在网页上显示这些记录并列出可供购买的产品。它应该看起来如下：
+现在，让我们设计所需的 jQuery 代码来消费此端点，以便我们可以在网页上显示这些记录并列出可供购买的产品。它应该看起来如下：
 
-[PRE3]
+```cs
+function LoadProducts() 
+{
+  // Load products' details.
+  $.ajax({
+    url: 'http://localhost:57571/api/Productsdetails',
+    type: "GET",
+    contentType: "application/json",
+    dataType: "json",
+    success: function (result) {
+      $.each(result, function (index, value) {
+        $('#tblProducts')
+        .append('<tr><td>' +
+        '<h3>' + value.name + '</h3>' +
+        '<p>' + value.description + '</p>' +
+        '<a target="_blank" href=' + value.url + '>Amazon Link</a>' +
+        '<input type="button" style="float:right;" 
+        class="btn btn-success" value="Add To Cart" />' +
+        '</td></tr>');
+      });
+    }
+  });
+}
+```
 
-要获取不同语言的调用API的代码，您可以在Postman中点击*代码*链接，然后选择所需的语言。我们已经在之前的章节中讨论过这一点。
+要获取不同语言的调用 API 的代码，您可以在 Postman 中点击*代码*链接，然后选择所需的语言。我们已经在之前的章节中讨论过这一点。
 
-前面的方法调用端点`http://localhost:57571/api/Productsdetails`，并在收到响应后通过`success`方法遍历记录。在遍历过程中，它构建一个HTML表格行，并将其追加到页面上的现有表格中。
+前面的方法调用端点`http://localhost:57571/api/Productsdetails`，并在收到响应后通过`success`方法遍历记录。在遍历过程中，它构建一个 HTML 表格行，并将其追加到页面上的现有表格中。
 
-以下截图是显示所有产品详细信息的jQuery代码的反映：
+以下截图是显示所有产品详细信息的 jQuery 代码的反映：
 
 ![](img/c88b2b8d-1a9f-4846-bfd2-367b627532fe.png)
 
@@ -76,17 +119,55 @@
 
 您注意到产品的关键参数，即价格，没有显示吗？这是因为价格不在`Productdetail`表中。所以，现在让我们看看`Product.cs`模型类，如下所示：
 
-[PRE4]
+```cs
+public partial class Products
+{
+  public Products()
+  {
+    Cart = new HashSet<Cart>();
+    CartAttributes = new HashSet<CartAttributes>();
+    OrdersProducts = new HashSet<OrdersProducts>();
+    ProductsAttributes = new HashSet<ProductsAttributes>();
+    Productsdetail = new HashSet<Productsdetail>();
+    Reviews = new HashSet<Reviews>();
+  }
+  public Guid Id { get; set; }
+  public int Qty { get; set; }
+  public string Model { get; set; }
+  public string Image { get; set; }
+  public decimal Price { get; set; }
+  public DateTime Addedon { get; set; }
+  public DateTime Modifiedon { get; set; }
+  public decimal Weight { get; set; }
+  public byte Status { get; set; }
+  public Guid? ManufactureId { get; set; }
+  public Guid? Taxclassid { get; set; }
+  public ICollection<Cart> Cart { get; set; }
+  public ICollection<CartAttributes> CartAttributes { get; set; }
+  public ICollection<OrdersProducts> OrdersProducts { get; set; }
+  public ICollection<ProductsAttributes> ProductsAttributes 
+  { get; set; }
+  public ICollection<Productsdetail> Productsdetail { get; set; }
+  public ICollection<Reviews> Reviews { get; set; }
+}
+```
 
 显然，`Product`类包含我们需要的所有内容，包括`Name`、`Description`、`Url`、`Views`等，以`Productdetail`作为参考点。我们已经消费了`ProductdetailsController`的`GET`操作来显示我们的产品，所以现在是时候使用`ProductsController`读取所有我们的产品了。
 
 `ProductsController`的`GET`操作会返回所有`Productdetail`中的产品记录，如下所示：
 
-[PRE5]
+```cs
+// GET: api/Products
+[HttpGet]
+public IEnumerable<Products> GetProducts()
+{
+  return _context.Products.Include(x => x.Productsdetail).ToList();
+}
+```
 
 上述代码中加粗的部分是`Include`子句，它用于包含来自`Productdetail`的结果。现在，我们不再调用`/api/Productsdetails`，而是调用`/api/Products`。
 
-调用此端点实际上不会工作，这是因为存在循环引用。如果您仔细观察`Products`和`Productdetail`模型，您应该会看到它们都相互包含引用。这在解析到JSON时会产生问题。为了避免这种情况，我们需要在`Startup`中编写以下代码：
+调用此端点实际上不会工作，这是因为存在循环引用。如果您仔细观察`Products`和`Productdetail`模型，您应该会看到它们都相互包含引用。这在解析到 JSON 时会产生问题。为了避免这种情况，我们需要在`Startup`中编写以下代码：
 
 `services.AddMvc()`
 
@@ -102,13 +183,72 @@
 
 现在，让我们看看调用此端点时我们收到的单个产品的响应，如下面的片段所示。请注意，实际上你会得到一个数组，但我们为了简洁只展示一条记录：
 
-[PRE6]
+```cs
+{
+  "id": "98a95bb6-c573-450d-a470-0a637e126dd7",
+  "qty": 30,
+  "model": "A",
+  "image": "NA",
+  "price": 49.99,
+  "addedon": "2018-05-13T12:09:39.873",
+  "modifiedon": "2018-05-13T12:09:39.873",
+  "weight": 0.9,
+  "status": 1,
+  "manufactureId": null,
+  "taxclassid": null,
+  "cart": [],
+  "cartAttributes": [],
+  "ordersProducts": [],
+  "productsAttributes": [],
+  "productsdetail": [
+  {
+    "id": "c96ac991-6581-4675-b00c-439df3961f03",
+    "productid": "98a95bb6-c573-450d-a470-0a637e126dd7",
+    "name": "Dependency Injection in .NET Core 2.0",
+    "description": "Make use of constructors, parameters, 
+    setters, and interface injection to write reusable and 
+    loosely-coupled code",
+    "url": "https://www.amazon.com/Dependency-Injection-NET-Core-
+    loosely-coupled/dp/1787121305/ref=tmm_pap_swatch_0? 
+    _encoding=UTF8&qid=1510939068&sr=8-3",
+    "views": 5000
+  }],
+  "reviews": []
+}
+```
 
 现在，我们需要修改我们的客户端代码，以反映`Productdetail`现在位于`Product`对象中的事实，如下所示：
 
-[PRE7]
+```cs
+function LoadProducts() 
+{
+  // Load products' details.
+  $.ajax({
+    url: 'http://localhost:57571/api/Products',
+    type: "GET",
+    contentType: "application/json",
+    dataType: "json",
+    success: function (result) {
+      console.log(result);
+      $.each(result, function (index, value) {
+        $('#tblProducts')
+        .append('<tr><td>' +
+        '<h3>' + value.productsdetail[0].name + '</h3>' +
+        '<span class="spanPrice">Price: $' + value.price + 
+        '</span>' +
+        '<p>' + value.productsdetail[0].description + '</p>' +
+        '<a target="_blank" href=' + value.productsdetail[0].url +
+        '>Amazon Link</a>' +
+        '<input type="button" style="float:right;" class="btn btn-
+        success" value="Add To Cart" />' +
+        '</td></tr>');
+      });
+    }
+  });
+}
+```
 
-这很容易理解，不是吗？在这里，你应该注意我们做出的URL更改以及我们如何读取产品详情。`Productsdetail`位于`Product`对象内部作为一个数组，因此它被写成`value.productsdetail[0]`，其中`value`是产品对象。我们还引入了`value.price`。
+这很容易理解，不是吗？在这里，你应该注意我们做出的 URL 更改以及我们如何读取产品详情。`Productsdetail`位于`Product`对象内部作为一个数组，因此它被写成`value.productsdetail[0]`，其中`value`是产品对象。我们还引入了`value.price`。
 
 你现在应该看到以下更新后的截图：
 
@@ -116,25 +256,59 @@
 
 # 产品搜索
 
-现在是时候实现搜索功能，允许客户在搜索框中输入任何字符串来查找产品。我们需要在UI中添加一个搜索按钮，当点击时，将接收输入的字符串并相应地获取记录。
+现在是时候实现搜索功能，允许客户在搜索框中输入任何字符串来查找产品。我们需要在 UI 中添加一个搜索按钮，当点击时，将接收输入的字符串并相应地获取记录。
 
 首先，`action`方法需要接受客户输入的搜索文本作为参数；目前`GetProducts()`不接受任何参数。
 
 更新的`GetProducts()`应该看起来像以下代码片段：
 
-[PRE8]
+```cs
+// GET: api/Products
+[HttpGet]
+public IEnumerable<Products> GetProducts(string searchText)
+{
+  var products = _context.Products.Include(x => 
+  x.Productsdetail).ToList();
+  if (!string.IsNullOrEmpty(searchText))
+  products = products.Where(p => p.Productsdetail
+ .Any(pd => pd.Name.ToLower().Contains(searchText.ToLower())))
+  .ToList();
+  return products;
+}
+```
 
 考虑到`searchText`参数，结果会根据书籍的标题进行过滤，该标题位于`Product`对象内部的`Productsdetail`集合的`Name`字段中。因此，使用`Any`来检查`searchText`是否存在于`Productsdetail`对象中。
 
-现在API已经准备好进行搜索，让我们更新客户端代码，如下发送参数：
+现在 API 已经准备好进行搜索，让我们更新客户端代码，如下发送参数：
 
-[PRE9]
+```cs
+function LoadProducts(searchText) 
+{
+  if (!searchText)
+  searchText = "";
+  // Load products' details.
+  $.ajax({
+    url: 'http://localhost:57571/api/Products?searchText=' + 
+    searchText,
+    type: "GET",
+    // Other codes removed for brevity.
+```
 
-如前所述的代码片段中所示，`LoadProducts`现在接受一个`searchText`参数，该参数作为URL参数传递给API。现在，只需在调用此方法时发送参数值即可。
+如前所述的代码片段中所示，`LoadProducts`现在接受一个`searchText`参数，该参数作为 URL 参数传递给 API。现在，只需在调用此方法时发送参数值即可。
 
 以下代码展示了搜索功能，它获取文本并使用输入的值执行`LoadProducts`：
 
-[PRE10]
+```cs
+$('#btnSearch').click(function () 
+{
+  var searchText = $('#txtSearch').val().trim();
+  if (searchText) 
+  {
+    $('#tblProducts').empty();
+    LoadProducts(searchText);
+  }
+});
+```
 
 以下截图显示了此功能在实际操作中的样子：
 
@@ -146,13 +320,18 @@
 
 # 实施安全措施
 
-这就是安全措施介入的地方，即身份验证。如[第3章](09fe6ad3-7061-4ae2-a2cb-c454ba802985.xhtml)中讨论的*用户注册和管理*，可以使用处理程序应用基本身份验证，或者可以使用令牌应用携带者身份验证。
+这就是安全措施介入的地方，即身份验证。如第三章中讨论的*用户注册和管理*，可以使用处理程序应用基本身份验证，或者可以使用令牌应用携带者身份验证。
 
 首先，让我们使用与之前相同的步骤生成`CartsController`。现在我们需要直接应用`[Authorize]`属性到控制器上，这样购物车中的所有操作都可以进行身份验证。我们的应用程序已经设置好以处理携带者身份验证。
 
 下面的代码片段是`CartsController`的代码快照：
 
-[PRE11]
+```cs
+[Produces("application/json")]
+[Route("api/Carts")]
+[Authorize]
+public class CartsController : Controller
+```
 
 由于`[Authorize]`属性，如果你不提供访问令牌，这个控制器将不允许你访问`GET`、`POST`、`PUT`和`DELETE`操作方法。
 
@@ -162,15 +341,38 @@
 
 # 客户端添加到购物车函数
 
-当客户点击“添加到购物车”时，信息将被添加到另一个名为“我的购物车”的HTML表中。如果您为同一产品连续两次点击“添加到购物车”，其数量将更新为2，价格也将相应计算。每次点击假定是特定产品的一个单位。
+当客户点击“添加到购物车”时，信息将被添加到另一个名为“我的购物车”的 HTML 表中。如果您为同一产品连续两次点击“添加到购物车”，其数量将更新为 2，价格也将相应计算。每次点击假定是特定产品的一个单位。
 
-让我们现在深入代码。以下代码片段显示了JavaScript的`AddToCart`函数：
+让我们现在深入代码。以下代码片段显示了 JavaScript 的`AddToCart`函数：
 
-[PRE12]
+```cs
+function AddToCart(productId, productName, qty, price) 
+{
+  $('#tblCart tbody')
+  .append($('<tr>')
+    .attr('data-product-id', productId)
+    .append($('<td>').html(productName))
+    .append($('<td class="qty">').html(qty))
+    .append($('<td class="price">').html('$' + qty * price))
+    .append($('<td>')
+      .append($('<a>')
+        .attr('href', '#')
+        .append($('<span>').addClass('glyphicon glyphicon-trash')) 
+ // For Delete Icon.
+        .click(function () 
+        {
+          // Delete Cart from Database.
+        })
+      )
+    )
+  );
+  // Add one Cart record in Database.
+}
+```
 
-此函数接受`productId`、`productName`、`qty`和`price`作为参数，因为这些信息在购物车HTML表中显示。
+此函数接受`productId`、`productName`、`qty`和`price`作为参数，因为这些信息在购物车 HTML 表中显示。
 
-注意，在前面的图像中，每一行都有一个删除图标。这是通过在锚点内添加`glyphicon`并在其周围包裹一个span来实现的，该锚点的`click`事件也已定义。我们将在本章稍后讨论删除功能。
+注意，在前面的图像中，每一行都有一个删除图标。这是通过在锚点内添加`glyphicon`并在其周围包裹一个 span 来实现的，该锚点的`click`事件也已定义。我们将在本章稍后讨论删除功能。
 
 此外，请注意已添加到行的`data-product-id`属性。这有助于我们唯一地识别购物车行，您将在稍后看到它是如何帮助的。
 
@@ -178,33 +380,124 @@
 
 在这里，我们需要更新购物车的机会，而不仅仅是向其中添加产品，如下面的代码片段所示：
 
-[PRE13]
+```cs
+function AddToCart(productId, productName, qty, price) 
+{
+  // Check if item already present. If yes, increase the qty 
+  and calculate price.
+  var cartItem = $('#tblCart').find('tr[data-product-id=' + 
+  productId + ']');
+  if (cartItem.length > 0) 
+  {
+    var qtyTd = cartItem.find('td.qty');
+    var newQty = parseInt(qtyTd.html()) + qty;
+    qtyTd.html(newQty);
+    cartItem.find('td.price').html('$' + (newQty * price).toFixed(2));
+ // Update Cart in Database: PUT /api/Carts/{id}
+return;
+  }
+  $('#tblCart tbody')
+  .append($('<tr>')
+    .attr('data-product-id', productId)
+    .append($('<td>').html(productName))
+    .append($('<td class="qty">').html(qty))
+    .append($('<td class="price">').html('$' + qty * price))
+    .append($('<td>')
+      .append($('<a>')
+        .attr('href', '#')
+        .append($('<span>').addClass('glyphicon glyphicon-trash'))
+        .click(function () {
+          // Delete Cart from Database: DELETE /api/Carts/{id}
+        })
+      )
+    )
+  );
+  // Add one Cart record in Database: POST /api/Carts
+}
+```
 
-简单，不是吗？首先，使用产品ID从购物车表中检索记录，然后相应地更新其数量和价格。从这个块中，一个`return`语句确保记录不再添加到表中。
+简单，不是吗？首先，使用产品 ID 从购物车表中检索记录，然后相应地更新其数量和价格。从这个块中，一个`return`语句确保记录不再添加到表中。
 
-现在客户端应该一切正常工作。我们现在只需要调用我们的API来涉及数据库操作，以便任何已插入、更新和删除的行也在服务器端更新。
+现在客户端应该一切正常工作。我们现在只需要调用我们的 API 来涉及数据库操作，以便任何已插入、更新和删除的行也在服务器端更新。
 
-# 添加到购物车的API调用
+# 添加到购物车的 API 调用
 
-在本节中，我们将查看客户端实际执行的API调用。
+在本节中，我们将查看客户端实际执行的 API 调用。
 
 # POST – api/Carts
 
 通过调用`POST`操作将数据插入购物车表，如下所示在`CartsController`中的代码块：
 
-[PRE14]
+```cs
+// POST: api/Carts
+[HttpPost]
+public async Task<IActionResult> PostCart([FromBody] Cart cart)
+{
+  if (!ModelState.IsValid)
+  {
+    return BadRequest(ModelState);
+  }
+  _context.Cart.Add(cart);
+  try
+  {
+    await _context.SaveChangesAsync();
+  }
+  catch (DbUpdateException)
+  {
+    if (CartExists(cart.Id))
+    {
+      return new StatusCodeResult(StatusCodes.Status409Conflict);
+    }
+    else
+    {
+      throw;
+    }
+  }
+  return CreatedAtAction("GetCart", new { id = cart.Id }, cart);
+}
+```
 
 调用此操作的客户端函数可以设计如下：
 
-[PRE15]
+```cs
+function PostCart(customerId, productId, qty, finalPrice) 
+{
+  var cart = 
+  {
+    Customerid: customerId,
+    Productid: productId,
+    Qty: qty,
+    Finalprice: finalPrice
+  };
+  $.ajax({
+    url: 'http://localhost:57571/api/Carts',
+    type: "POST",
+    contentType: "application/json",
+    dataType: "json",
+    data: JSON.stringify(cart),
+    success: function (result) {
+      console.log(result);
+    },
+    error: function (message) {
+      console.log(message.statusText);
+    }
+  });
+}
+```
 
 直接了当，不是吗？现在我们可以构建一个购物车对象并发送一个`POST`操作。您可以通过在我们的`AddToCart()`函数中调用以下方法来尝试此操作：
 
-[PRE16]
+```cs
+// Add one Cart record in Database: POST /api/Carts
+PostCart('910D4C2F-B394-4578-8D9C-7CA3FD3266E2',
+  productId,
+  cartItem.find('td.qty').html(),
+  cartItem.find('td.price').html().replace('$', ''))
+```
 
 在这里，第一个参数是`Customerid`，我们已将其硬编码。`Customerid`可以存储在任何请求的会话存储中——尽管这被认为是一种风险行为。
 
-您可以发送电子邮件ID到POST操作，而不是发送`Customerid`。然后使用电子邮件ID，您可以获取`Customerid`，这可以用来插入购物车记录。
+您可以发送电子邮件 ID 到 POST 操作，而不是发送`Customerid`。然后使用电子邮件 ID，您可以获取`Customerid`，这可以用来插入购物车记录。
 
 让我们现在运行我们的应用程序并点击特定产品的“添加到购物车”。哎呀！开发工具中出现了以下错误：
 
@@ -220,7 +513,23 @@
 
 为了节省时间和空间，我们将直接使用 Postman 生成一个令牌，使用 `taditdash@gmail.com` 作为我们的电子邮件 ID，并使用 `12345` 作为我们的密码*.* 使用令牌的后续 Ajax 调用应如下所示：
 
-[PRE17]
+```cs
+$.ajax({
+  url: 'http://localhost:57571/api/Carts',
+  type: "POST",
+  contentType: "application/json",
+  dataType: "json",
+  data: JSON.stringify(cart),
+  headers: { "Authorization": "Bearer eyJhbGciOiJSUzI1NiIs...
+  [Long String Removed]" },
+  success: function (result) 
+  {
+    var cartItem = $('#tblCart').find('tr[data-product-id=' + 
+    productId + ']');
+    cartItem.attr('data-cart-id', result.id);
+  },
+});
+```
 
 注意，为了简洁起见，我们在前面的片段中删除了令牌字符串。使用前面的代码，将创建一个购物车记录，并从 API 返回的所有数据都将提供有关该记录的所有详细信息。您可以在 HTML 行中存储购物车的 `Id`（如前述代码块中所示），以便在更新或删除购物车记录时进行进一步处理。
 
@@ -232,17 +541,71 @@
 
 现在我们已经添加了一个购物车记录，让我们转到更新记录，每当客户反复点击“添加到购物车”按钮时。我们已经有更新客户端表格中数量和价格的代码，所以我们只需要编写调用 `PUT` 端点的代码来更新记录，如下所示：
 
-[PRE18]
+```cs
+function PutCart(cartItem) 
+{
+  var cart = 
+  {
+    Id: cartItem.attr('data-cart-id'),
+    Customerid: '910D4C2F-B394-4578-8D9C-7CA3FD3266E2',
+    Productid: cartItem.attr('data-product-id'),
+    Qty: cartItem.find('td.qty').html(),
+    Finalprice: cartItem.find('td.price').html().replace('$', '')
+  };
+  $.ajax({
+    url: 'http://localhost:57571/api/Carts/' + cart.Id,
+    type: "PUT",
+    contentType: "application/json",
+    dataType: "json",
+    data: JSON.stringify(cart),
+    headers: { "Authorization": "Bearer eyJhbGciOiJSUzI1NiIs..." }
+  });
+}
+```
 
 前面代码的重要部分是 URL，它还包含购物车 `Id`，因为路由实际上是 `api/Carts/{id}`。数据放在体中。
 
 参数 `cartItem` 是可以从 `AddToCart` 函数传递的行，如下所示：
 
-[PRE19]
+```cs
+// Update Cart in Database: PUT /api/Carts/{id}
+PutCart($('#tblCart').find('tr[data-product-id=' + productId + ']'));
+```
 
 API 操作应如下所示：
 
-[PRE20]
+```cs
+// PUT: api/Carts/5
+[HttpPut("{id}")]
+public async Task<IActionResult> PutCart([FromRoute] Guid id, [FromBody] Cart cart)
+{
+  if (!ModelState.IsValid)
+  {
+    return BadRequest(ModelState);
+  }
+  if (id != cart.Id)
+  {
+    return BadRequest();
+  }
+  _context.Entry(cart).State = EntityState.Modified;
+  try
+  {
+    await _context.SaveChangesAsync();
+  }
+  catch (DbUpdateConcurrencyException)
+  {
+    if (!CartExists(id))
+    {
+      return NotFound();
+    }
+    else
+    {
+      throw;
+    }
+  }
+  return NoContent();
+}
+```
 
 注意，`id` 从带有 `[FromRoute]` 属性的路由中读取，而购物车对象则从请求体中读取，因为它带有 `[FromBody]` 标记。如果没有与路由一起发送 ID，客户端将收到 400 BadRequest 错误。
 
@@ -258,19 +621,73 @@ API 操作现在已更新了带有必要详细信息的记录，如下面的截�
 
 删除记录的操作方法如下：
 
-[PRE21]
+```cs
+// DELETE: api/Carts/5
+[HttpDelete("{id}")]
+public async Task<IActionResult> DeleteCart([FromRoute] Guid id)
+{
+  if (!ModelState.IsValid)
+  {
+    return BadRequest(ModelState);
+  }
+  var cart = await _context.Cart.SingleOrDefaultAsync(m => m.Id == id);
+  if (cart == null)
+  {
+    return NotFound();
+  }
+  _context.Cart.Remove(cart);
+  await _context.SaveChangesAsync();
+  return Ok(cart);
+}
+```
 
-客户端应用程序需要更新以允许此功能。由于删除图标已经在HTML表格的每一行中显示，我们只需在用户点击时将购物车ID发送到API。
+客户端应用程序需要更新以允许此功能。由于删除图标已经在 HTML 表格的每一行中显示，我们只需在用户点击时将购物车 ID 发送到 API。
 
-以下JavaScript函数可以用来删除购物车记录：
+以下 JavaScript 函数可以用来删除购物车记录：
 
-[PRE22]
+```cs
+function DeleteCart(cartId) 
+{
+  $.ajax({
+    url: 'http://localhost:57571/api/Carts/' + cartId,
+    type: "DELETE",
+    contentType: "application/json",
+    headers: { "Authorization": "Bearer " + accessToken },
+    success: function (result) {
+      if (result.id) {
+ // Deleting the row from the html table.
+        var cartItem = $('#tblCart').find('tr[data-cart-id=' + 
+        cartId + ']');
+        cartItem.remove();
+      }
+    }
+  });
+}
+```
 
-如您所见，`DeleteCart`函数期望一个参数，`cartId`，它将在点击删除图标时提供。此函数使用类型`DELETE`以及`Id`和URL调用API。在成功删除后，购物车行将从HTML表格中移除。
+如您所见，`DeleteCart`函数期望一个参数，`cartId`，它将在点击删除图标时提供。此函数使用类型`DELETE`以及`Id`和 URL 调用 API。在成功删除后，购物车行将从 HTML 表格中移除。
 
 调用`DeleteCart`的代码块位于`AddToCart`内部，如下面的代码片段所示：
 
-[PRE23]
+```cs
+cartItem = $('#tblCart tbody')
+.append($('<tr>')
+  .attr('data-product-id', productId)
+  .append($('<td>').html(productName))
+  .append($('<td class="qty">').html(qty))
+  .append($('<td class="price">').html('$' + qty * price))
+  .append($('<td>')
+    .append($('<a>')
+      .attr('href', '#')
+      .append($('<span>').addClass('glyphicon glyphicon-trash'))
+      .click(function () {
+        // Delete Cart from Database: DELETE /api/Carts/{id}
+        DeleteCart($(this).parents('tr').attr('data-cart-id'));
+      })
+    )
+  )
+);
+```
 
 `DeleteCart`在显示删除图标的锚点的点击事件中被调用。在事件内部，我们通过提取`data-cart-id`属性的值从行本身获取购物车`Id`。
 
@@ -286,15 +703,22 @@ API 操作现在已更新了带有必要详细信息的记录，如下面的截�
 
 `Orders`类是我们最初生成的脚手架，其中包含所有必要的信息。让我们使用这个类生成控制器。按照我们为`ProductsController`、`ProductsdetailsController`和`CartsController`生成控制器的方式，遵循相同的流程生成控制器。
 
-模型和控制类可以在GitHub仓库中找到。
+模型和控制类可以在 GitHub 仓库中找到。
 
 现在是时候调用`OrdersController`的`POST`操作来在客户端保存订单了。以下代码是执行此操作的函数的骨架：
 
-[PRE24]
+```cs
+function PostOrders()
+{
+  // 1\. Build order object to match the model class Orders.cs.
+  // 2\. Push cart items into order object as an array.
+  // 3\. Call POST /api/Orders.
+}
+```
 
 让我们一步步解释这个过程。
 
-# 下订单的UI设计
+# 下订单的 UI 设计
 
 在我们继续之前，我们需要向用户显示一个模态框，让他们可以输入他们的送货地址。一旦点击“下订单”按钮，模态框就会打开，如下面的截图所示。
 
@@ -302,35 +726,87 @@ API 操作现在已更新了带有必要详细信息的记录，如下面的截�
 
 以下代码片段展示了“下订单”的点击事件（如果购物车中有项目，则会打开模态框）：
 
-[PRE25]
+```cs
+$('#btnPlaceOrder').click(function () 
+{
+  var cartItems = $('#tblCart tbody tr');
+  // If Cart items present, then show modal to enter Shipping Address.
+  if (cartItems.length > 0) {
+    $('#Order').modal('show');
+    return;
+  }
+  alert("Please add items into the cart.");
+});
+```
 
-通过点击“提交”使用`POST`进行Ajax调用，将订单记录插入数据库。以下代码片段是“提交”的点击事件：
+通过点击“提交”使用`POST`进行 Ajax 调用，将订单记录插入数据库。以下代码片段是“提交”的点击事件：
 
-[PRE26]
+```cs
+$('#btnConfirmOrder').click(function () {
+  PostOrders();
+});
+```
 
-# 客户端PostOrder函数
+# 客户端 PostOrder 函数
 
 让我们继续到`PostOrders`所需的步骤。
 
-# 构建与模型类Orders.cs匹配的订单对象
+# 构建与模型类 Orders.cs 匹配的订单对象
 
 在这里，我们必须从与送货信息相关的文本框中读取值，并将它们与`Orders.cs`的字段匹配，以构建一个对象。`OrdersProducts`是一个表示模型类`OrdersProducts.cs`的数组。每个订单可以与多个产品相关联。
 
 以下代码实现了订单对象：
 
-[PRE27]
+```cs
+// 1\. Build order object to match the model class Orders.cs.
+var order = {
+  Customerid: customerId,
+  CustomerStreetaddress: $('#txtStreetAdd').val(),
+  Customercity: $('#txtCity').val(),
+  Customerstate: $('#txtState').val(),
+  Customerpostalcode: $('#txtPostalCode').val(),
+  Customercountry: $('#txtCountry').val(),
+  OrdersProducts: new Array()
+};
+```
 
 # 将购物车项目作为数组推入订单对象
 
 填充`OrdersProducts`数组是下一步，这可以通过遍历购物车表的行并将每个购物车行的详情推送到数组中来实现。在循环内部，从行中读取所有必要的值，无论是从其属性还是`td`中。请记住，形成一个对象并将值分配给与模型类匹配的字段名，如下所示：
 
-[PRE28]
+```cs
+// 2\. Push cart items into order object as an array.
+$('#tblCart tbody tr').each(function () 
+{
+  order.OrdersProducts.push(
+  {
+    Productid: $(this).attr('data-product-id'),
+    Productname: $(this).find('td.name').html(),
+    Productprice: $(this).attr('data-price'),
+    Finalprice: $(this).find('td.price').html().replace('$', ''),
+    Productqty: $(this).find('td.qty').html()
+  });
+});
+```
 
 # 调用 POST /api/Orders
 
-太好了，现在我们有了我们的对象！现在是时候使用`POST`请求调用API `/api/Orders`，以便我们的订单进入数据库，如下所示：
+太好了，现在我们有了我们的对象！现在是时候使用`POST`请求调用 API `/api/Orders`，以便我们的订单进入数据库，如下所示：
 
-[PRE29]
+```cs
+// 3\. Call POST /api/Orders.
+$.ajax({
+  url: 'http://localhost:57571/api/Orders',
+  type: "POST",
+  contentType: "application/json",
+  dataType: "json",
+  data: JSON.stringify(order),
+  headers: { "Authorization": "Bearer " + accessToken },
+  success: function (result) {
+    alert("Order Placed Successfully.")
+  }
+});
+```
 
 如果一切正常，你应该会看到以下截图中的内容：
 
@@ -338,11 +814,20 @@ API 操作现在已更新了带有必要详细信息的记录，如下面的截�
 
 但我们在这里忘记了一些事情；尽管我们的订单已经成功提交，但我们还需要清空购物车。这可以通过在`PostOrders`的`success`函数中调用`DELETE /api/Carts`为每个购物车项来实现，如下所示：
 
-[PRE30]
+```cs
+success: function (result) 
+{
+  // Empty Cart.
+ $('#tblCart tbody tr').each(function () {
+ DeleteCart($(this).attr('data-cart-id'));
+ });
+  alert("Order Placed Successfully.");
+},
+```
 
-我们已经从客户端方面探索了一切，现在是时候检查API了。
+我们已经从客户端方面探索了一切，现在是时候检查 API 了。
 
-# PostOrders API POST方法
+# PostOrders API POST 方法
 
 订单表看起来与我们发送给客户端的略有不同。在以下截图中，请注意标记在框中的字段。这些是我们没有发送而是在动作方法内部操作的字段：
 
@@ -350,46 +835,108 @@ API 操作现在已更新了带有必要详细信息的记录，如下面的截�
 
 像姓名、电子邮件和电话号码这样的字段可以从客户表中获取。`Customerid`由客户端发送，我们将使用它来获取这些详细信息，如下所示：
 
-[PRE31]
+```cs
+// POST: api/Orders
+[HttpPost]
+public async Task<IActionResult> PostOrders([FromBody] Orders orders)
+{
+  if (!ModelState.IsValid)
+  {
+    return BadRequest(ModelState);
+  }
+  // Retrieve customer details and add to order.
+  if (orders.Customerid != null)
+  {
+    var customer = _context.Customers.SingleOrDefault
+    (x => x.Id == orders.Customerid);
+    if (customer != null)
+    {
+      orders.Deliveryname = orders.Customername = customer.Firstname;
+ orders.Customeremail = customer.Email;
+ orders.Customertelephone = customer.Telephone;
+    }
+  }
+  ...
+```
 
 以下代码片段说明了用户如何复制他们的账单地址，使其也成为他们的送货地址：
 
-[PRE32]
+```cs
+// Copy customer address to delivery address.
+orders.Deliverycity = orders.Customercity;
+orders.Deliverycountry = orders.Customercountry;
+orders.Deliverystreetaddress = orders.CustomerStreetaddress;
+orders.Deliverypostalcode = orders.Customerpostalcode;
+orders.Deliverystate = orders.Customerstate;
+```
 
 包括`datapurchased`、`lastmodified`和`orderdatefinished`在内的附加字段将被设置为`DateTime.Now`。像`currency`和`currency_value`这样的详细信息将被设置为美元($)和零(0)。我们还将`Guid.NewGuid`设置为`shipingmethodid`和`paymentmethodid`。
 
 这些可以在订单构造函数内部完成，如下所示：
 
-[PRE33]
+```cs
+public Orders()
+{
+  Id = Guid.NewGuid();
+  OrderProductAttributes = new HashSet<OrderProductAttributes>();
+  OrdersProducts = new HashSet<OrdersProducts>();
+  Datepurchased = DateTime.Now;
+  Lastmodified = DateTime.Now;
+  Shipingmethodid = Guid.NewGuid();
+  Paymentmethodid = Guid.NewGuid();
+  Shippingcost = 0;
+  Orderdatefinished = DateTime.Now;
+  Currency = "$";
+  CurrencyValue = 0;
+  Orderstatus = "Placed";
+}
+```
 
 注意到`Orderstatus`是已放置。这是当订单准备好发货时网站可以更新的内容。后续状态可能包括批准、准备、已发货、已送达等。如果你设计管理界面，请确保你处理这个字段的更新，包括`latsmodified`和`orderdatefinished`。
 
-本书演示的应用程序尚未准备好投入生产。通常，应该有一个与*OAuth2.0认证*一起工作的登录页面。在API端以及客户端进行基本验证也是必要的。在这本书中，我们的应用程序是为了展示我们正在探索的概念而构建的，但你绝对可以优化我们的示例，甚至在此基础上构建。
+本书演示的应用程序尚未准备好投入生产。通常，应该有一个与*OAuth2.0 认证*一起工作的登录页面。在 API 端以及客户端进行基本验证也是必要的。在这本书中，我们的应用程序是为了展示我们正在探索的概念而构建的，但你绝对可以优化我们的示例，甚至在此基础上构建。
 
 # 暴露运输详情
 
-使用`GET`请求可以在`OrdersController`中通过订单ID来获取订单详情，以便第三方网站可以显示这些信息。例如，许多快递公司公开了它们的API，其他网站可以使用这些API来显示订单、运输和跟踪信息。
+使用`GET`请求可以在`OrdersController`中通过订单 ID 来获取订单详情，以便第三方网站可以显示这些信息。例如，许多快递公司公开了它们的 API，其他网站可以使用这些 API 来显示订单、运输和跟踪信息。
 
-例如，让我们检查我们的`GET`方法`OrdersController`，它接受ID作为参数：
+例如，让我们检查我们的`GET`方法`OrdersController`，它接受 ID 作为参数：
 
-[PRE34]
+```cs
+// GET: api/Orders/5
+[HttpGet("{id}")]
+public async Task<IActionResult> GetOrders([FromRoute] Guid id)
+{
+  if (!ModelState.IsValid)
+  {
+    return BadRequest(ModelState);
+  }
+  var orders = await _context.Orders.Include
+  (o => o.OrdersProducts).SingleOrDefaultAsync(m => m.Id == id);
+  if (orders == null)
+  {
+    return NotFound();
+  }
+  return Ok(orders);
+}
+```
 
-注意到使用了`Include`子句来包含来自`OrdersProducts`表的结果。现在让我们快速使用Postman调用此端点，查看我们之前订单的结果，如下面的截图所示：
+注意到使用了`Include`子句来包含来自`OrdersProducts`表的结果。现在让我们快速使用 Postman 调用此端点，查看我们之前订单的结果，如下面的截图所示：
 
 ![图片](img/538eb690-57ed-4097-9e78-4856fce019ef.png)
 
-在这里，你可以看到与订单相关的每一个细节，包括其产品，都是通过API返回的。
+在这里，你可以看到与订单相关的每一个细节，包括其产品，都是通过 API 返回的。
 
 # 摘要
 
-如果你已经读到这本书的这一部分，你将使用API设计了一些酷炫的东西。做得好！
+如果你已经读到这本书的这一部分，你将使用 API 设计了一些酷炫的东西。做得好！
 
-在本章中，我们转向了消费`ProductsController`以在我们的客户端应用程序上显示产品列表。使用Bootstrap、jQuery和HTML设计的简单UI展示了产品属性及其定价详情。
+在本章中，我们转向了消费`ProductsController`以在我们的客户端应用程序上显示产品列表。使用 Bootstrap、jQuery 和 HTML 设计的简单 UI 展示了产品属性及其定价详情。
 
-在`ProductsController`内部稍微修改了带有`searchString`参数的`GET`请求，这帮助我们从API中检索搜索结果。客户端可以通过消费带有文本的端点轻松实现搜索功能。
+在`ProductsController`内部稍微修改了带有`searchString`参数的`GET`请求，这帮助我们从 API 中检索搜索结果。客户端可以通过消费带有文本的端点轻松实现搜索功能。
 
-然后，我们查看我们的购物车。我们探讨了如何消费`CartsController`操作来添加、更新和删除购物车项目，同时更新UI。在这个过程中，我们使用身份验证实现了控制器的安全性。
+然后，我们查看我们的购物车。我们探讨了如何消费`CartsController`操作来添加、更新和删除购物车项目，同时更新 UI。在这个过程中，我们使用身份验证实现了控制器的安全性。
 
 最后，我们将购物车中的项目转换成了可视化的订单。这是通过使用`OrdersController`完成的，该控制器还可以用于向客户提供运输和跟踪信息。
 
-在下一章中，我们将探讨测试.NET Core中设计的RESTful Web API的不同技术。
+在下一章中，我们将探讨测试.NET Core 中设计的 RESTful Web API 的不同技术。

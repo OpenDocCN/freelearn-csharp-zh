@@ -1,4 +1,4 @@
-# 第 3 章。C# 中的面向对象编程
+# 第三章。C# 中的面向对象编程
 
 本章将向你介绍 C# 和 **面向对象编程** （**OOP**）的基础。在本章中，你将涵盖以下食谱：
 
@@ -54,17 +54,51 @@
 
 1.  现在，让我们创建一个名为 `SpaceShip` 的新类：
 
-    [PRE0]
+    ```cs
+    public class SpaceShip
+    {
+
+    }
+    ```
 
 1.  我们的`SpaceShip`类将包含一些描述飞船基本功能的方法。将这些方法添加到你的`SpaceShip`类中：
 
-    [PRE1]
+    ```cs
+    public class SpaceShip
+    {
+        public void ControlBridge()
+        {
+
+        }
+        public void MedicalBay(int patientCapacity)
+        {
+
+        }
+        public void EngineRoom(int warpDrives)
+        {
+
+        }
+        public void CrewQuarters(int crewCapacity)
+        {
+
+        }
+        public void TeleportationRoom()
+        {
+
+        }
+    }
+    ```
 
     因为`SpaceShip`类是所有其他星际飞船的一部分，它成为了其他所有飞船的蓝图。
 
 1.  接下来，我们想要创建一个`Destroyer`类。为了实现这一点，我们将创建一个`Destroyer`类，并在类名后使用冒号来表示我们想要从另一个类（`SpaceShip`类）继承。因此，在创建`Destroyer`类时需要添加以下内容：
 
-    [PRE2]
+    ```cs
+    public class Destroyer : SpaceShip
+    {
+
+    }
+    ```
 
     ### 注意
 
@@ -72,15 +106,50 @@
 
 1.  接下来，向`Destroyer`类添加一些仅属于驱逐舰的独特方法。这些方法仅属于`Destroyer`类，而不属于`SpaceShip`类：
 
-    [PRE3]
+    ```cs
+    public class Destroyer : SpaceShip
+    {
+        public void WarRoom()
+        {
+
+        }
+        public void Armory(int payloadCapacity)
+        {
+
+        }
+
+        public void WarSpecialists(int activeBattalions)
+        {
+
+        }
+    }
+    ```
 
 1.  最后，创建一个名为`Annihilator`的第三个类。这是最强大的星际飞船，用于在行星上发动战争。通过创建类并将它标记为从`Destroyer`类派生出来，让`Annihilator`类继承自`Destroyer`类，如下所示`Annihilator : Destroyer`：
 
-    [PRE4]
+    ```cs
+    public class Annihilator : Destroyer
+    {
+
+    }
+    ```
 
 1.  最后，向`Annihilator`类添加一些仅属于此类飞船的方法：
 
-    [PRE5]
+    ```cs
+    public class Annihilator : Destroyer
+    {
+        public void TractorBeam()
+        {
+
+        }
+
+        public void PlanetDestructionCapability()
+        {
+
+        }
+    }
+    ```
 
 1.  在控制台应用程序中，通过在**CodeSamples**项目下的**References**上右键单击并从上下文菜单中选择**Add Reference**来添加对`Chapter3`类库的引用：![如何操作…](img/B05391_03_05.jpg)
 
@@ -90,7 +159,14 @@
 
 1.  在控制台应用程序中创建包含其方法的`SpaceShip`类：
 
-    [PRE6]
+    ```cs
+    SpaceShip transporter = new SpaceShip();
+    transporter.ControlBridge();
+    transporter.CrewQuarters(1500);
+    transporter.EngineRoom(2);
+    transporter.MedicalBay(350);
+    transporter.TeleportationRoom();
+    ```
 
     你会看到，这些是我们实例化这个类的新实例时唯一可用的方法。
 
@@ -98,13 +174,35 @@
 
 1.  在控制台应用程序中创建包含所有方法的`Destroyer`类：
 
-    [PRE7]
+    ```cs
+    Destroyer warShip = new Destroyer();
+    warShip.Armory(6);
+    warShip.ControlBridge();
+    warShip.CrewQuarters(2200);
+    warShip.EngineRoom(4);
+    warShip.MedicalBay(800);
+    warShip.TeleportationRoom();
+    warShip.WarRoom();
+    warShip.WarSpecialists(1);
+    ```
 
 1.  最后，创建`Annihilator`类的新实例。这个类包含了`Destroyer`类的所有方法以及`SpaceShip`类的方法。这是因为`Annihilator`类从`Destroyer`类继承，而`Destroyer`类又从`SpaceShip`类继承：![如何操作…](img/B05391_03_09.jpg)
 
 1.  在控制台应用程序中创建 `Annihilator` 类及其所有方法：
 
-    [PRE8]
+    ```cs
+    Annihilator planetClassDestroyer = new Annihilator();
+    planetClassDestroyer.Armory(12);
+    planetClassDestroyer.ControlBridge();
+    planetClassDestroyer.CrewQuarters(4500);
+    planetClassDestroyer.EngineRoom(7);
+    planetClassDestroyer.MedicalBay(3500);
+    planetClassDestroyer.PlanetDestructionCapability();
+    planetClassDestroyer.TeleportationRoom();
+    planetClassDestroyer.TractorBeam();
+    planetClassDestroyer.WarRoom();
+    planetClassDestroyer.WarSpecialists(3);
+    ```
 
 ## 它是如何工作的…
 
@@ -124,15 +222,35 @@
 
 1.  创建一个名为 `SpaceCadet` 的抽象类。这是你开始训练时可以成为的第一种宇航员类型。抽象类及其成员使用 `abstract` 关键字定义。需要注意的是，抽象类不能被实例化。成员代表 `SpaceCadet` 将拥有的技能，例如谈判和基本武器训练：
 
-    [PRE9]
+    ```cs
+    public abstract class SpaceCadet
+    {
+        public abstract void ChartingStarMaps();
+        public abstract void BasicCommunicationSkill();
+        public abstract void BasicWeaponsTraining();
+        public abstract void Negotiation();
+    }
+    ```
 
 1.  接下来，创建另一个名为 `SpacePrivate` 的抽象类，这个抽象类从 `SpaceCadet` 抽象类继承。我们基本上是在说，当一名太空新兵被训练成太空列兵时，他们仍然会保留作为太空新兵时学到的所有技能：
 
-    [PRE10]
+    ```cs
+    public abstract class SpacePrivate : SpaceCadet
+    {
+        public abstract void AdvancedCommunicationSkill();
+        public abstract void AdvancedWeaponsTraining();
+        public abstract void Persuader();
+    }
+    ```
 
 1.  为了演示这一点，创建一个名为 `LabResearcher` 的类，并从 `SpaceCadet` 抽象类继承。从抽象类继承是通过在新建的类名后定义一个冒号和抽象类名称来完成的。这告诉编译器 `LabResearcher` 类是从 `SpaceCadet` 类继承的：
 
-    [PRE11]
+    ```cs
+    public class LabResearcher : SpaceCadet
+    {
+
+    }
+    ```
 
     由于我们正在继承一个抽象类，编译器会在 `LabResearcher` 类名下划线以警告我们，派生类没有实现 `SpaceCadet` 抽象类中的任何方法。
 
@@ -142,11 +260,39 @@
 
 1.  在 Visual Studio 添加了所需的方法后，你会看到这些方法与 `SpaceCadet` 抽象类中定义的方法相同。因此，抽象类要求从抽象类继承的类实现抽象类中定义的方法。你还会注意到添加到 `LabResearcher` 类中的方法没有任何实现，如果直接使用将会抛出异常：
 
-    [PRE12]
+    ```cs
+    public class LabResearcher : SpaceCadet
+    {
+        public override void BasicCommunicationSkill()
+        {
+            throw new NotImplementedException();
+        }
+
+        public override void BasicWeaponsTraining()
+        {
+            throw new NotImplementedException();
+        }
+
+        public override void ChartingStarMaps()
+        {
+            throw new NotImplementedException();
+        }
+
+        public override void Negotiation()
+        {
+            throw new NotImplementedException();
+        }
+    }
+    ```
 
 1.  接下来，创建一个名为 `PlanetExplorer` 的类，并使这个类继承自 `SpacePrivate` 抽象类。你会记得 `SpacePrivate` 抽象类是从 `SpaceCadet` 抽象类继承而来的：
 
-    [PRE13]
+    ```cs
+    public class PlanetExplorer : SpacePrivate
+    {
+
+    }
+    ```
 
 1.  Visual Studio 将再次警告你，你的新类没有实现你继承的抽象类中的方法。然而，在这里，你会注意到灯泡提示告诉你，你没有在 `SpacePrivate` 和 `SpaceCadet` 抽象类中实现任何方法。这是因为 `SpacePrivate` 抽象类是从 `SpaceCadet` 抽象类继承而来的：![如何操作……](img/B05391_03_12.jpg)
 
@@ -154,7 +300,45 @@
 
 1.  在将修复方案添加到你的代码后，你会看到 `PlanetExplorer` 类包含了 `SpacePrivate` 和 `SpaceCadet` 抽象类中的所有方法：
 
-    [PRE14]
+    ```cs
+    public class PlanetExplorer : SpacePrivate
+    {
+        public override void AdvancedCommunicationSkill()
+        {
+            throw new NotImplementedException();
+        }
+
+        public override void AdvancedWeaponsTraining()
+        {
+            throw new NotImplementedException();
+        }
+
+        public override void BasicCommunicationSkill()
+        {
+            throw new NotImplementedException();
+        }
+
+        public override void BasicWeaponsTraining()
+        {
+            throw new NotImplementedException();
+        }
+
+        public override void ChartingStarMaps()
+        {
+            throw new NotImplementedException();
+        }
+
+        public override void Negotiation()
+        {
+            throw new NotImplementedException();
+        }
+
+        public override void Persuader()
+        {
+            throw new NotImplementedException();
+        }
+    }
+    ```
 
 ## 它是如何工作的……
 
@@ -172,49 +356,147 @@
 
 ## 准备工作
 
-为了说明封装的概念，我们将创建一个在内部工作原理上相对复杂的类。我们需要计算航天飞机的**推重比**（**TWR**），以确定它是否能够垂直起飞。它需要施加比其重量更大的推力来对抗重力并进入稳定的轨道。这也取决于航天飞机起飞的行星，因为不同的行星对其表面的物体施加不同的重力。简单来说，TWR必须大于一。
+为了说明封装的概念，我们将创建一个在内部工作原理上相对复杂的类。我们需要计算航天飞机的**推重比**（**TWR**），以确定它是否能够垂直起飞。它需要施加比其重量更大的推力来对抗重力并进入稳定的轨道。这也取决于航天飞机起飞的行星，因为不同的行星对其表面的物体施加不同的重力。简单来说，TWR 必须大于一。
 
 ## 如何做到这一点…
 
 1.  创建一个名为`LaunchSuttle`的新类。然后，向该类添加以下私有变量，用于发动机推力；航天飞机的质量；局部重力加速度；地球、月球和火星的重力常量值（这些是常量，因为它们永远不会改变）；万有引力常数；以及我们正在处理的行星枚举器：
 
-    [PRE15]
+    ```cs
+    public class LaunchShuttle
+    {
+        private double _EngineThrust;
+        private double _TotalShuttleMass;
+        private double _LocalGravitationalAcceleration;
 
-1.  为了我们的类，我们将添加三个重载构造函数，这些构造函数对于根据实例化时的已知事实计算TWR是必不可少的（我们假设我们总是会知道发动机推力能力和航天飞机的质量）。我们将为第一个构造函数传递重力加速度。如果我们事先知道这个值，这很有用。例如，地球的重力加速度是9.81 m/s²。
+        private const double EarthGravity = 9.81;
+        private const double MoonGravity = 1.63;
+        private const double MarsGravity = 3.75;
+        private double UniversalGravitationalConstant;
 
-    第二个构造函数将使用`Planet`枚举来计算使用常量变量值的TWR。
+        public enum Planet { Earth, Moon, Mars }
+    }
+    ```
 
-    第三个构造函数将使用行星的半径和质量来计算当这些值已知时返回TWR的重力加速度：
+1.  为了我们的类，我们将添加三个重载构造函数，这些构造函数对于根据实例化时的已知事实计算 TWR 是必不可少的（我们假设我们总是会知道发动机推力能力和航天飞机的质量）。我们将为第一个构造函数传递重力加速度。如果我们事先知道这个值，这很有用。例如，地球的重力加速度是 9.81 m/s²。
 
-    [PRE16]
+    第二个构造函数将使用`Planet`枚举来计算使用常量变量值的 TWR。
+
+    第三个构造函数将使用行星的半径和质量来计算当这些值已知时返回 TWR 的重力加速度：
+
+    ```cs
+    public LaunchShuttle(double engineThrust, double totalShuttleMass, double gravitationalAcceleration)
+    {
+        _EngineThrust = engineThrust;
+        _TotalShuttleMass = totalShuttleMass;
+        _LocalGravitationalAcceleration = gravitationalAcceleration;
+
+    }
+
+    public LaunchShuttle(double engineThrust, double totalShuttleMass, Planet planet)
+    {
+        _EngineThrust = engineThrust;
+        _TotalShuttleMass = totalShuttleMass;
+        SetGraviationalAcceleration(planet);
+
+    }
+
+    public LaunchShuttle(double engineThrust, double totalShuttleMass, double planetMass, double planetRadius)
+    {
+        _EngineThrust = engineThrust;
+        _TotalShuttleMass = totalShuttleMass;
+        SetUniversalGravitationalConstant();
+        _LocalGravitationalAcceleration = Math.Round(CalculateGravitationalAcceleration (planetRadius, planetMass), 2);
+    }
+    ```
 
 1.  为了使用传递`Planet`枚举作为参数给类的第二个重载构造函数，我们需要创建另一个被范围限定为`private`的方法来计算重力加速度。我们还需要将`_LocalGravitationalAcceleration`变量设置为与枚举值匹配的特定常量。这个方法是对类用户来说不需要看到就能使用类的方法。因此，它被范围限定为`private`，以便从用户那里隐藏该功能：
 
-    [PRE17]
+    ```cs
+    private void SetGraviationalAcceleration(Planet planet)
+    {
+        switch (planet)
+        {
+             case Planet.Earth:
+                _LocalGravitationalAcceleration = EarthGravity;
+                break;
+             case Planet.Moon:
+                _LocalGravitationalAcceleration = MoonGravity;
+                break;
+             case Planet.Mars:
+                _LocalGravitationalAcceleration = MarsGravity;
+                break;
+            default:
+                break;
+        }
+    }
+    ```
 
-1.  在以下方法中，只有一个被定义为公共的，因此对类的用户是可见的。创建私有方法来设置万有引力常数、计算TWR和计算重力加速度。这些方法都被设置为私有作用域，因为开发者不需要知道这些方法做什么，以便使用该类：
+1.  在以下方法中，只有一个被定义为公共的，因此对类的用户是可见的。创建私有方法来设置万有引力常数、计算 TWR 和计算重力加速度。这些方法都被设置为私有作用域，因为开发者不需要知道这些方法做什么，以便使用该类：
 
-    [PRE18]
+    ```cs
+    private void SetUniversalGravitationalConstant()
+    {
+        UniversalGravitationalConstant = 6.6726 * Math.Pow(10, -11);
+    }
+
+    private double CalculateThrustToWeightRatio()
+    {
+        // TWR = Ft/m.g > 1
+        return _EngineThrust / (_TotalShuttleMass * _LocalGravitationalAcceleration);
+    }
+
+    private double CalculateGravitationalAcceleration(double radius, double mass)
+    {
+        return (UniversalGravitationalConstant * mass) / Math.Pow(radius, 2);
+    }
+
+    public double TWR()
+    {
+        return Math.Round(CalculateThrustToWeightRatio(), 2);
+    }
+    ```
 
 1.  最后，在你的控制台应用程序中，创建以下具有已知值的变量：
 
-    [PRE19]
+    ```cs
+    double thrust = 220; // kN
+    double shuttleMass = 16.12; // t
+    double graviatatonalAccelerationEarth = 9.81;
+    double earthMass = 5.9742 * Math.Pow(10, 24);
+    double earthRadius = 6378100;
+    double thrustToWeightRatio = 0;
+    ```
 
-1.  创建`LaunchShuttle`类的新实例，并传递计算TWR所需的价值：
+1.  创建`LaunchShuttle`类的新实例，并传递计算 TWR 所需的价值：
 
-    [PRE20]
+    ```cs
+    LaunchShuttle NasaShuttle1 = new LaunchShuttle(thrust, shuttleMass, graviatatonalAccelerationEarth);
+    thrustToWeightRatio = NasaShuttle1.TWR();
+    Console.WriteLine(thrustToWeightRatio);
+    ```
 
-1.  当你在`NasaShuttle1`变量上使用点操作符时，你会注意到IntelliSense只显示`TWR`方法。这个类没有暴露任何关于它是如何得到计算出的TWR值的内部工作原理。开发者唯一知道的是，给定相同的输入参数，`LaunchShuttle`类将始终返回正确的TWR值：![如何做…](img/B05391_03_14.jpg)
+1.  当你在`NasaShuttle1`变量上使用点操作符时，你会注意到 IntelliSense 只显示`TWR`方法。这个类没有暴露任何关于它是如何得到计算出的 TWR 值的内部工作原理。开发者唯一知道的是，给定相同的输入参数，`LaunchShuttle`类将始终返回正确的 TWR 值：![如何做…](img/B05391_03_14.jpg)
 
 1.  为了测试这一点，创建`LaunchShuttle`类的两个更多实例，并且每次调用不同的构造函数：
 
-    [PRE21]
+    ```cs
+    LaunchShuttle NasaShuttle2 = new LaunchShuttle(thrust, shuttleMass, LaunchShuttle.Planet.Earth);
+    thrustToWeightRatio = NasaShuttle2.TWR();
+    Console.WriteLine(thrustToWeightRatio);
 
-1.  如果你运行你的控制台应用程序，你会看到TWR的值是相同的。这个值表明，一个重16.12吨的航天飞机，如果火箭产生220千牛顿的推力，将能够从地球表面起飞（即使只是勉强）：![如何做…](img/B05391_03_15.jpg)
+    LaunchShuttle NasaShuttle3 = new LaunchShuttle(thrust, shuttleMass, earthMass, earthRadius);
+    thrustToWeightRatio = NasaShuttle3.TWR();
+    Console.WriteLine(thrustToWeightRatio);
+
+    Console.Read();
+    ```
+
+1.  如果你运行你的控制台应用程序，你会看到 TWR 的值是相同的。这个值表明，一个重 16.12 吨的航天飞机，如果火箭产生 220 千牛顿的推力，将能够从地球表面起飞（即使只是勉强）：![如何做…](img/B05391_03_15.jpg)
 
 ## 它是如何工作的…
 
-该类使用作用域规则来隐藏类内部的一些功能，以防止类使用者访问。如前所述，开发者不需要知道如何进行计算，以便返回TWR的值。所有这些都帮助使类更有用且易于实现。以下是C#中可用的各种作用域及其用途列表：
+该类使用作用域规则来隐藏类内部的一些功能，以防止类使用者访问。如前所述，开发者不需要知道如何进行计算，以便返回 TWR 的值。所有这些都帮助使类更有用且易于实现。以下是 C#中可用的各种作用域及其用途列表：
 
 +   `Public`：这个关键字用于变量、属性、类型和方法，并且在任何地方都是可见的。
 
@@ -228,7 +510,7 @@
 
 # 实现多态性
 
-一旦你研究了并理解了OOP的其他支柱，多态性这个概念就很容易掌握了。多态性字面上意味着某物可以有多种形式。这意味着从一个单一接口，你可以创建多个实现。
+一旦你研究了并理解了 OOP 的其他支柱，多态性这个概念就很容易掌握了。多态性字面上意味着某物可以有多种形式。这意味着从一个单一接口，你可以创建多个实现。
 
 这有两个子部分，即静态多态和动态多态。在静态多态中，您正在处理方法和函数的重载。您可以使用相同的方法，但执行许多不同的任务。
 
@@ -242,11 +524,21 @@
 
 1.  创建一个名为 `Shuttle` 的抽象类，并给它一个名为 `TWR` 的成员，这是计算航天飞机的 TWR：
 
-    [PRE22]
+    ```cs
+    public abstract class Shuttle
+    {
+        public abstract double TWR();
+    }
+    ```
 
 1.  接下来，创建一个名为 `NasaShuttle` 的类，并使其继承自抽象类 `Shuttle`，通过在 `NasaShuttle` 类声明末尾冒号后放置抽象类名称来实现：
 
-    [PRE23]
+    ```cs
+    public class NasaShuttle : Shuttle
+    {
+
+    }
+    ```
 
 1.  Visual Studio 将下划线显示 `NasaShuttle` 类，因为您已告诉编译器该类继承自一个抽象类，但您尚未实现该抽象类的成员：![如何实现它…](img/B05391_03_16.jpg)
 
@@ -254,11 +546,24 @@
 
 1.  Visual Studio 然后将缺失的实现添加到您的 `NasaShuttle` 类中。默认情况下，它将添加为未实现，因为您需要为在抽象类中重写的抽象成员提供实现：
 
-    [PRE24]
+    ```cs
+    public class NasaShuttle : Shuttle
+    {
+        public override double TWR()
+        {
+            throw new NotImplementedException();
+        }
+    }
+    ```
 
 1.  创建另一个名为 `RoscosmosShuttle` 的类，并使其继承自相同的 `Shuttle` 抽象类：
 
-    [PRE25]
+    ```cs
+    public class RoscosmosShuttle : Shuttle
+    {
+
+    }
+    ```
 
 1.  Visual Studio 将下划线显示 `RoscosmosShuttle` 类，因为您已告诉编译器该类继承自一个抽象类，但您尚未实现该抽象类的成员：![如何实现它…](img/B05391_03_18.jpg)
 
@@ -266,11 +571,29 @@
 
 1.  被重写的方法随后被添加到 `RoscosmosShuttle` 类中，标记为未实现。您刚刚看到了动态多态的一个实际例子：
 
-    [PRE26]
+    ```cs
+    public class RoscosmosShuttle : Shuttle
+    {
+        public override double TWR()
+        {
+            throw new NotImplementedException();
+        }
+    }
+    ```
 
 1.  要查看静态多态的示例，为 `NasaShuttle` 创建以下重载构造函数。构造函数名称保持不变，但构造函数的签名发生变化，这使得它成为重载：
 
-    [PRE27]
+    ```cs
+    public NasaShuttle(double engineThrust, double totalShuttleMass, double gravitationalAcceleration)
+    {
+
+    }
+
+    public NasaShuttle(double engineThrust, double totalShuttleMass, double planetMass, double planetRadius)
+    {
+
+    }
+    ```
 
 ## 它是如何工作的…
 
@@ -280,7 +603,7 @@
 
 # 单一职责原则
 
-当谈论SOLID原则时，我们将从SRP（单一职责原则）开始。在这里，我们实际上是在说一个类有一个特定的任务需要完成，它不应该做其他任何事情。
+当谈论 SOLID 原则时，我们将从 SRP（单一职责原则）开始。在这里，我们实际上是在说一个类有一个特定的任务需要完成，它不应该做其他任何事情。
 
 ## 准备工作
 
@@ -290,19 +613,48 @@
 
 1.  创建一个名为`StarShip`的新类：
 
-    [PRE28]
+    ```cs
+    public class Starship
+    {
+
+    }
+    ```
 
 1.  向你的类中添加一个新方法，用于设置`StarShip`类的最大部队容量：
 
-    [PRE29]
+    ```cs
+    public void SetMaximumTroopCapacity(int capacity)
+    {            
+
+    }
+    ```
 
 1.  在这个方法中，添加一个`trycatch`子句，尝试设置最大部队容量，但出于某种原因，它将失败。失败后，它将错误写入数据库中的日志表：
 
-    [PRE30]
+    ```cs
+    try
+    {
+        // Read current capacity and try to add more
+    }
+    catch (Exception ex)
+    {
+        string connectionString = "connection string goes here";
+        string sql = $"INSERT INTO tblLog (error, date) VALUES ({ex.Message}, GetDate())";
+        using (SqlConnection con = new SqlConnection(connectionString))
+        {
+            SqlCommand cmd = new SqlCommand(sql);
+            cmd.CommandType = CommandType.Text;
+            cmd.Connection = con;
+            con.Open();
+            cmd.ExecuteNonQuery();
+        }
+        throw ex;
+    }
+    ```
 
 ## 它是如何工作的…
 
-如果你有的代码看起来像前面的代码，你违反了SRP（单一职责原则）。`StarShip`类不再只负责自身以及与星际飞船相关的事物。现在它还必须承担将错误记录到数据库的角色。你在这里看到的问题是，数据库记录代码不属于`SetMaximumTroopCapacity`方法的`catch`子句。更好的方法是将创建一个单独的`DatabaseLogging`类，其中包含创建连接和将异常写入适当日志表的方法。你还会发现你将不得不在多个地方（每个`catch`子句）编写那些记录代码。如果你发现自己正在重复代码（通过从其他区域复制粘贴），你可能需要将那些代码放入一个公共类中，你很可能已经违反了SRP规则。
+如果你有的代码看起来像前面的代码，你违反了 SRP（单一职责原则）。`StarShip`类不再只负责自身以及与星际飞船相关的事物。现在它还必须承担将错误记录到数据库的角色。你在这里看到的问题是，数据库记录代码不属于`SetMaximumTroopCapacity`方法的`catch`子句。更好的方法是将创建一个单独的`DatabaseLogging`类，其中包含创建连接和将异常写入适当日志表的方法。你还会发现你将不得不在多个地方（每个`catch`子句）编写那些记录代码。如果你发现自己正在重复代码（通过从其他区域复制粘贴），你可能需要将那些代码放入一个公共类中，你很可能已经违反了 SRP 规则。
 
 # 开放/封闭原则
 
@@ -316,7 +668,12 @@
 
 1.  创建一个名为`StarTrooper`的类：
 
-    [PRE31]
+    ```cs
+    public class StarTrooper
+    {
+
+    }
+    ```
 
 1.  向这个类添加一个枚举器`TrooperClass`，以标识我们想要返回技能的士兵类型。此外，创建一个`List<string>`变量来包含特定士兵类的技能。最后，创建一个名为`GetSkills`的方法，该方法返回给定士兵类的特定技能集。
 
@@ -324,19 +681,80 @@
 
     这种代码的更改可能会导致您在之前运行良好的代码中引入错误。我们现在看到`StarTrooper`类不是封闭的，并且不能轻松扩展以适应额外的`TrooperClass`对象：
 
-    [PRE32]
+    ```cs
+    public enum TrooperClass { Soldier, Medic, Scientist }
+    List<string> TroopSkill;
+
+    public List<string> GetSkills(TrooperClass troopClass)
+    {
+        switch (troopClass)
+        {
+            case TrooperClass.Soldier:
+            return TroopSkill = new List<string>(new string[] { "Weaponry", "TacticalCombat", "HandToHandCombat" });
+
+            case TrooperClass.Medic:
+            return TroopSkill = new List<string>(new string[] { "CPR", "AdvancedLifeSupport" });
+
+            case TrooperClass.Scientist:
+            return TroopSkill = new List<string>(new string[] { "Chemistry", "MollecularDeconstruction", "QuarkTheory" });
+
+            default:
+                return TroopSkill = new List<string>(new string[] { "none" });
+        }
+    }
+    ```
 
 1.  这个问题的解决方案是继承。我们不需要更改代码，而是扩展它。首先，重写上面的`StarTrooper`类并创建一个`Trooper`类。`GetSkills`方法被声明为`virtual`：
 
-    [PRE33]
+    ```cs
+    public class Trooper
+    {
+        public virtual List<string> GetSkills()
+        {
+            return new List<string>(new string[] { "none" });
+        }
+    }
+    ```
 
 1.  现在，我们可以轻松地为可用的`Soldier`、`Medic`和`Scientist`士兵类创建派生类。创建以下从`Trooper`类继承的派生类。您可以看到，在创建`GetSkills`方法时使用了`override`关键字：
 
-    [PRE34]
+    ```cs
+    public class Soldier : Trooper
+    {
+        public override List<string> GetSkills()
+        {
+             return new List<string>(new string[] { "Weaponry", "TacticalCombat", "HandToHandCombat" });
+        }
+    }
+
+    public class Medic : Trooper
+    {
+        public override List<string> GetSkills()
+        {
+            return new List<string>(new string[] { "CPR", "AdvancedLifeSupport" });
+        }
+    }
+
+    public class Scientist : Trooper
+    {
+        public override List<string> GetSkills()
+        {
+            return new List<string>(new string[] { "Chemistry", "MollecularDeconstruction", "QuarkTheory" });
+        }
+    }
+    ```
 
 1.  当扩展类以添加额外的`Trooper`类时，代码变得极其容易实现。如果我们现在想添加`Engineer`类，我们只需在从之前创建的`Trooper`类继承后简单地重写`GetSkills`方法：
 
-    [PRE35]
+    ```cs
+    public class Engineer : Trooper
+    {
+    public override List<string> GetSkills()
+        {
+            return new List<string>(new string[] { "Construction", "Demolition" });
+        }
+    }
+    ```
 
 ## 它是如何工作的...
 

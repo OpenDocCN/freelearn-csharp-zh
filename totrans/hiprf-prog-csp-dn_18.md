@@ -1,4 +1,4 @@
-# *第 15 章*：并行编程
+# *第十五章*：并行编程
 
 在本章中，你将学习如何利用现代计算机中可用的多个 CPU 核心来提高性能。你将学习如何通过在进程之间并发分配工作来处理代码，以及如何使用 **任务并行库**（**TPL**）和 **并行 LINQ**（**PLINQ**）来并行运行代码。在本书中，你将学习如何使用并行数据结构，并使用 Visual Studio 调试器来诊断任务和并行堆栈。你还将了解并发可视化器。
 
@@ -30,19 +30,19 @@
 
 +   Visual Studio 2022
 
-+   本书源代码：[https://github.com/PacktPublishing/High-Performance-Programming-in-CSharp-and-.NET/tree/master/CH15](https://github.com/PacktPublishing/High-Performance-Programming-in-CSharp-and-.NET/tree/master/CH15)
++   本书源代码：[`github.com/PacktPublishing/High-Performance-Programming-in-CSharp-and-.NET/tree/master/CH15`](https://github.com/PacktPublishing/High-Performance-Programming-in-CSharp-and-.NET/tree/master/CH15)
 
-+   Visual Studio 2022 的并发可视化器：[https://marketplace.visualstudio.com/items?itemName=Diagnostics.DiagnosticsConcurrencyVisualizer2022#overview](https://marketplace.visualstudio.com/items?itemName=Diagnostics.DiagnosticsConcurrencyVisualizer2022#overview)
++   Visual Studio 2022 的并发可视化器：[`marketplace.visualstudio.com/items?itemName=Diagnostics.DiagnosticsConcurrencyVisualizer2022#overview`](https://marketplace.visualstudio.com/items?itemName=Diagnostics.DiagnosticsConcurrencyVisualizer2022#overview)
 
 # 使用任务并行库（TPL）
 
 在本章中，我们将使用 TPL 通过利用机器上可用的处理器能力来提高我们程序的性能。
 
-我们在[*第 14 章*](B16617_14_Final_SB_Epub.xhtml#_idTextAnchor254)“多线程编程”中学习了如何编写线程并执行它们。当多个线程在单个处理器上运行时，它们提供了并行运行的错觉，但实际上它们是并发运行的。
+我们在*第十四章*“多线程编程”中学习了如何编写线程并执行它们。当多个线程在单个处理器上运行时，它们提供了并行运行的错觉，但实际上它们是并发运行的。
 
 当线程并发运行时，处理器使用调度算法和/或中断来确定线程之间的切换和优先级。然而，并行编程在不同的处理器上运行不同的线程，这样线程可以相互并行执行，减少了切换和线程中断的需求。
 
-如其名称所示，TPL用于并行运行任务。任务通过在计算机处理器的每个单独的核心上运行每个任务来并行运行。例如，如果你的计算机有四个核心，你有四个任务。每个任务将在单独的核心上运行，并且每个任务将与另外三个任务并行运行。这有助于提高代码的整体性能，因为你可以有与处理器核心一样多的任务并行执行。
+如其名称所示，TPL 用于并行运行任务。任务通过在计算机处理器的每个单独的核心上运行每个任务来并行运行。例如，如果你的计算机有四个核心，你有四个任务。每个任务将在单独的核心上运行，并且每个任务将与另外三个任务并行运行。这有助于提高代码的整体性能，因为你可以有与处理器核心一样多的任务并行执行。
 
 此外，如果你有一个需要处理大量记录并存储在变量中的大数据集，你可以将任务分割成不同的线程，这些线程在不同的处理器上运行。然后，这些线程同步合并并存储在变量中。
 
@@ -56,25 +56,48 @@
 
 1.  添加以下`using`语句：
 
-    [PRE0]
+    ```cs
+    using System.Threading.Tasks;
+    ```
 
-此`using`语句为我们提供了对TPL的访问。
+此`using`语句为我们提供了对 TPL 的访问。
 
 1.  更新`Program`类中的`Main`方法，如下所示：
 
-    [PRE1]
+    ```cs
+    static void Main(string[] _)
+    {
+      RunSingleProcessorExample();
+    }
+    ```
 
 此方法调用`RunSingleProcessorExample`方法。
 
 1.  添加`RunSingleProcessorExample`方法：
 
-    [PRE2]
+    ```cs
+    static void RunSingleProcessorExample()
+    {
+      Thread thread = new(SingleProcessorExample);
+      thread.Start();
+    }
+    ```
 
 此方法创建一个新的线程，并给它分配`SingleProcessorExample`方法，它将调用该方法。然后使用`Start`方法调用该方法。
 
 1.  现在，添加`SingleProcessorMethod`：
 
-    [PRE3]
+    ```cs
+    static void SingleProcessorExample()
+    {
+    string output = “Index: “;
+        for (int index = 0; index < 1000000; index++)
+    {
+          Console.WriteLine($”{output}{index}”);
+    }
+        Console.ReadKey();
+    }
+    ```
 
 此方法将`for`循环索引的值写入控制台窗口一百万次，然后暂停，直到接收到用户按键。
 
@@ -82,25 +105,9 @@
 
 1.  清除**性能监控器**屏幕，然后运行控制台应用程序。你应该看到以下类似的内容：
 
-![图15.1 – 运行中的控制台应用程序的性能监控器
+![图 15.1 – 运行中的控制台应用程序的性能监控器![图片](img/B16617_Figure_15.1.jpg)
 
-![图片](img/B16617_Figure_15.1.jpg)
-
-![图15.1 – 运行中的控制台应用程序的性能监控器
-
-如你所见，处理器实例1是最被充分利用的处理器。我们需要做的是修改程序以利用所有可用的处理器。
-
-1.  在 `Main` 方法中注释掉方法调用，并在注释掉的方法之后添加以下代码：
-
-    [PRE4]
-
-此代码使用并行 `for` 循环处理 `MultipleProcessorExample` 方法一百万次。
-
-1.  再次运行代码。你应该在性能监视器中看到以下内容：
-
-![图 15.2 – 性能监视器显示我们的修改后的程序正在使用所有处理器
-
-](img/B16617_Figure_15.2.jpg)
+![图 15.1 – 运行中的控制台应用程序的性能监控器如你所见，处理器实例 1 是最被充分利用的处理器。我们需要做的是修改程序以利用所有可用的处理器。1.  在 `Main` 方法中注释掉方法调用，并在注释掉的方法之后添加以下代码：    ```cs    Parallel.For(        0, 1000000, x => MultipleProcessorExample(x)    );    ```此代码使用并行 `for` 循环处理 `MultipleProcessorExample` 方法一百万次。1.  再次运行代码。你应该在性能监视器中看到以下内容：![图 15.2 – 性能监视器显示我们的修改后的程序正在使用所有处理器](img/B16617_Figure_15.2.jpg)
 
 图 15.2 – 性能监视器显示我们的修改后的程序正在使用所有处理器
 
@@ -112,55 +119,93 @@
 
 在本节中，你将学习如何使用 PLINQ 将你的顺序 LINQ 查询转换为并行 LINQ。看看以下代码：
 
-[PRE5]
+```cs
+var productNames = GetProductNames();
+```
 
-[PRE6]
+```cs
+var names = from name in productNames
+```
 
-[PRE7]
+```cs
+           where name.Length > 8
+```
 
-[PRE8]
+```cs
+           select name;
+```
 
 上述代码调用了 `GetProductNames` 方法，并将结果存储在 `productNames` 变量中。然后对 `productNames` 列表执行 LINQ 语句，以提取所有长度大于八个字符的产品名称列表。此 LINQ 语句的结果随后存储在 `names` 变量中。
 
 以下代码与前面的代码相同，但我们已对其进行修改，使其在多个处理器上并行运行：
 
-[PRE9]
+```cs
+var productNames = GetProductNames();
+```
 
-[PRE10]
+```cs
+var names = from name in productNames.AsParallel()
+```
 
-[PRE11]
+```cs
+           where name.Length > 8
+```
 
-[PRE12]
+```cs
+           select name;
+```
 
 在这里，我们可以看到，要使 LINQ 语句执行为并行 LINQ，唯一的更改是添加 `AsParallel()` 方法调用。其余代码保持不变。
 
 如果你希望从 PLINQ 语句中返回数据，那么在 `AsParallel()` 调用后加上 `AsOrdered()` 调用：
 
-[PRE13]
+```cs
+var productNames = GetProductNames();
+```
 
-[PRE14]
+```cs
+var names = from name in productNames
+```
 
-[PRE15]
+```cs
+             .AsParallel().AsOrdered()
+```
 
-[PRE16]
+```cs
+           where name.Length > 8
+```
 
-[PRE17]
+```cs
+           select name;
+```
 
 上述代码将返回一个按字母顺序排列的产品名称列表，其长度大于 `8`。
 
 PLINQ 利用执行计算机上的所有处理器。然而，你可以使用 `WithDegreeOfParallelism` 调用来限制 PLINQ 使用的处理器数量，传递你想要限制 PLINQ 执行的处理器数量：
 
-[PRE18]
+```cs
+var productNames = GetProductNames();
+```
 
-[PRE19]
+```cs
+var names = from name in productNames
+```
 
-[PRE20]
+```cs
+             .AsParallel()
+```
 
-[PRE21]
+```cs
+             .WithDegreeOfParallelism(2)
+```
 
-[PRE22]
+```cs
+           where name.Length > 8
+```
 
-[PRE23]
+```cs
+           select name;
+```
 
 上述代码仅限于在两个处理器上运行。
 
@@ -182,7 +227,7 @@ PLINQ 利用执行计算机上的所有处理器。然而，你可以使用 `Wit
 
 对于实现 `IProducerConsumerCollection<T>` 接口的数据类型，你应该使用通用的 `BlockingCollection<T>` 类，它提供了边界和阻塞功能。使用 `ConcurrentDictionary<TKey, TValue>` 类来创建线程安全的字典。对于线程安全的 FIFO 队列，使用 `ConcurrentQueue<T>` 类。使用 `ConcurrentStack<T>` 类来创建 LIFO 栈。对于线程安全的元素集合实现，使用 `ConcurrentBag<T>` 类。最后，对于要在 `BlockingCollection` 中使用的类型，实现 `IProducerConsumerCollection<T>` 类。
 
-你可以在 Microsoft Docs 网站上了解更多有关线程安全集合的信息：[https://docs.microsoft.com/en-us/dotnet/standard/collections/thread-safe/](https://docs.microsoft.com/en-us/dotnet/standard/collections/thread-safe/)。
+你可以在 Microsoft Docs 网站上了解更多有关线程安全集合的信息：[`docs.microsoft.com/en-us/dotnet/standard/collections/thread-safe/`](https://docs.microsoft.com/en-us/dotnet/standard/collections/thread-safe/)。
 
 接下来，我们将查看基准测试循环、LINQ 和 PLINQ。
 
@@ -192,7 +237,9 @@ PLINQ 利用执行计算机上的所有处理器。然而，你可以使用 `Wit
 
 1.  在 `Main` 方法中注释掉代码并添加以下行：
 
-    [PRE24]
+    ```cs
+    BenchmarkRunner.Run<Benchmarks>();
+    ```
 
 1.  添加一个名为 `Benchmarks` 的类。
 
@@ -206,249 +253,489 @@ PLINQ 利用执行计算机上的所有处理器。然而，你可以使用 `Wit
 
 1.  添加以下代码来设置我们的基准测试：
 
-    [PRE25]
+    ```cs
+    private short[] data;
+    [GlobalSetup]
+    public void GlobalSetup()
+    {
+         integers = new Int16[Int16.MaxValue];
+         for (short x = 1; x <= integers.Length - 1; x++)
+         { 
+         integers[x] = x; 
+         }
+    }
+    ```
 
 这里，我们声明了一个短数据类型的数组。然后初始化并填充该数组。这个数组将被以下六个方法中的两个使用。
 
 1.  添加 `StandardForLoopExample` 方法：
 
-    [PRE26]
+    ```cs
+    [Benchmark]
+    public void StandardForEachLoopExample()
+    {
+         foreach (int x in integers)
+                 Console.WriteLine($”Item {x}: {x}”);
+    }
+    ```
 
 上一段代码使用标准的 `foreach` 循环遍历数据数组中的值，然后将数组在给定索引处的值写入控制台窗口。
 
 1.  添加 `ParallelForLoopExample` 方法：
 
-    [PRE27]
+    ```cs
+    [Benchmark]
+    public void ParallelForEachLoopExample()
+    {
+         Parallel.ForEach(integers, x => {
+             Console.WriteLine($”Item {x}: {x}”);
+         });
+    }
+    ```
 
 上一段代码与上一段代码执行相同，但使用 PLINQ 执行代码。
 
 1.  添加 `UrlDownloader1` 方法：
 
-    [PRE28]
+    ```cs
+     public List<string> DownloadWebsites1()
+            {
+                List<string> websitesContent = new();
+                HttpClient httpClient = new();
+
+                string[]? websites = new[]
+                {
+                “https://docs.microsoft.com”,      
+                 “https://ownCloud.com”,       
+                 “https://www.oanda.com/uk-en/”,     
+                 “https://azure.microsoft.com/en-gb/”  
+                };
+
+                foreach (string? website in websites)
+                {
+                    Console.WriteLine($”Downloading of 
+                        {website} content has started.”);
+                    string websiteContent = 
+                    httpClient.GetStringAsync(website)
+                    .GetAwaiter().GetResult();
+                    websitesContent.Add(websiteContent);
+                    Console.WriteLine($”Downloading of 
+                        {website} content has finished.”);
+                }
+
+                httpClient.Dispose();
+
+                return websitesContent;
+            }
+    ```
 
 上一段代码创建了一个 URL 数组，并使用 `foreach` 循环下载它们的内容。
 
 1.  添加 `UrlDownloader2` 方法：
 
-[PRE29]
+```cs
+ [Benchmark]
+```
 
-[PRE30]
+```cs
+        public List<string> DownloadWebsites2()
+```
 
-[PRE31]
+```cs
+        {
+```
 
-[PRE32]
+```cs
+            List<string> websitesContent = new();
+```
 
-[PRE33]
+```cs
+            string[]? websites = new[]
+```
 
-[PRE34]
+```cs
+                {
+```
 
-[PRE35]
+```cs
+            "https://docs.microsoft.com",              
+```
 
-[PRE36]
+```cs
+            "https://ownCloud.com",
+```
 
-[PRE37]
+```cs
+            "https://www.oanda.com/uk-en/",        
+```
 
-[PRE38]
+```cs
+            "https://azure.microsoft.com/en-gb/"
+```
 
-[PRE39]
+```cs
+                };
+```
 
-[PRE40]
+```cs
+            Task[]? downloadJobs = websites
+```
 
-[PRE41]
+```cs
+                .Select(jobs => Task.Factory.StartNew(
+```
 
-[PRE42]
+```cs
+                    state =>
+```
 
-[PRE43]
+```cs
+                    {
+```
 
-[PRE44]
+```cs
+                        using HttpClient? httpClient = new 
+```
 
-[PRE45]
+```cs
+                            HttpClient();
+```
 
-[PRE46]
+```cs
+                        string? website = state == null ? 
+```
 
-[PRE47]
+```cs
+                            String.Empty : (string)state;
+```
 
-[PRE48]
+```cs
+                        Console.WriteLine($"Downloading of 
+```
 
-[PRE49]
+```cs
+                          {website} content has started.");
+```
 
-[PRE50]
+```cs
+                        string result = 
+```
 
-[PRE51]
+```cs
+                        httpClient.GetStringAsync(website)
+```
 
-[PRE52]
+```cs
+                        .GetAwaiter().GetResult();
+```
 
-[PRE53]
+```cs
+                        websitesContent.Add(result);
+```
 
-[PRE54]
+```cs
+                        Console.WriteLine($"Downloading of 
+```
 
-[PRE55]
+```cs
+                        {website} content has finished.");
+```
 
-[PRE56]
+```cs
+                    }, jobs)
+```
 
-[PRE57]
+```cs
+                )
+```
 
-[PRE58]
+```cs
+                .ToArray();
+```
 
-[PRE59]
+```cs
+            Task.WaitAll(downloadJobs);
+```
 
-[PRE60]
+```cs
+            return websitesContent;
+```
 
-[PRE61]
+```cs
+        }
+```
 
 上一段代码创建了一个 URL 数组，并将它们作为一系列任务下载。代码会在返回内容之前等待所有任务完成。
 
 1.  添加 `Urldownloader3` 方法：
 
-[PRE62]
+```cs
+ [Benchmark]
+```
 
-[PRE63]
+```cs
+        public List<string> DownloadWebsites3()
+```
 
-[PRE64]
+```cs
+        {
+```
 
-[PRE65]
+```cs
+            List<string> websitesContent = new();
+```
 
-[PRE66]
+```cs
+            HttpClient httpClient = new();
+```
 
-[PRE67]
+```cs
+            List<string> websites = new()
+```
 
-[PRE68]
+```cs
+            {
+```
 
-[PRE69]
+```cs
+            "https://docs.microsoft.com",           
+```
 
-[PRE70]
+```cs
+            "https://ownCloud.com",
+```
 
-[PRE71]
+```cs
+             "https://www.oanda.com/uk-en/",               
+```
 
-[PRE72]
+```cs
+             "https://azure.microsoft.com/en-gb/"
+```
 
-[PRE73]
+```cs
+            };
+```
 
-[PRE74]
+```cs
+            websites.ForEach(website =>
+```
 
-[PRE75]
+```cs
+            {
+```
 
-[PRE76]
+```cs
+                Console.WriteLine($"Downloading of 
+```
 
-[PRE77]
+```cs
+                    {website} content has started.");
+```
 
-[PRE78]
+```cs
+                string result = 
+```
 
-[PRE79]
+```cs
+                  httpClient.GetStringAsync(website)
+```
 
-[PRE80]
+```cs
+                    .GetAwaiter().GetResult();
+```
 
-[PRE81]
+```cs
+                websitesContent.Add(result);
+```
 
-[PRE82]
+```cs
+                Console.WriteLine($"Downloading of 
+```
 
-[PRE83]
+```cs
+                    {website} content has finished.");
+```
 
-[PRE84]
+```cs
+            });
+```
 
-[PRE85]
+```cs
+            httpClient.Dispose();
+```
 
-[PRE86]
+```cs
+            return websitesContent;
+```
 
-[PRE87]
+```cs
+        }
+```
 
 上一段代码使用 `Parallel.ForeEach` 循环下载存储在数组中的 URL 的内容。
 
 1.  确保你的项目设置为发布模式，然后运行你的程序。程序将需要一些时间来执行。然而，一旦执行完成，你应该看到以下类似的内容：
 
-![图15.3 – BenchmarkDotNet结果
+![图 15.3 – BenchmarkDotNet 结果![图 15.3 – BenchmarkDotNet 结果](img/B16617_Figure_15.3.jpg)
 
-![图15.3 – BenchmarkDotNet结果](img/B16617_Figure_15.3.jpg)
-
-图15.3 – BenchmarkDotNet结果
+图 15.3 – BenchmarkDotNet 结果
 
 观察到`ForEachLoop`示例，我们可以看到标准的`foreach`循环比我们的`Parallel.ForEach`循环执行得更快。因此，在这个例子中，使用并行代码比使用非并行代码稍微慢一些。但如果数据集很大且数据类型更复杂，那么结果可能会显示并行代码执行得更快。
 
-当查看我们的`UrlDownloader`方法时，`UrlDownloader4`使用`Parallel.ForEach`循环，这比使用`foreach`循环和带有lambda方法的`foreach`循环的方法要快得多。然而，创建任务数组并等待它们全部完成的方法比`Parallel.ForEach`循环稍微快一些。
+当查看我们的`UrlDownloader`方法时，`UrlDownloader4`使用`Parallel.ForEach`循环，这比使用`foreach`循环和带有 lambda 方法的`foreach`循环的方法要快得多。然而，创建任务数组并等待它们全部完成的方法比`Parallel.ForEach`循环稍微快一些。
 
 从这些测试结果中，我们可以看到我们有不同的方式执行相同的行为，每种方法的处理速度都不同。在某些情况下，我们看到了并行代码比非并行代码慢，而在其他情况下，我们看到了并行代码比非并行代码快。
 
-当性能成为问题时，你可以使用BenchmarkDotNet来测试对同一任务的多种不同方法的效率。然后，你可以为你要解决的问题选择最有效的选项。
+当性能成为问题时，你可以使用 BenchmarkDotNet 来测试对同一任务的多种不同方法的效率。然后，你可以为你要解决的问题选择最有效的选项。
 
-在下一节中，我们将学习如何使用TPL和LINQ的lambda表达式。
+在下一节中，我们将学习如何使用 TPL 和 LINQ 的 lambda 表达式。
 
-# 使用TPL和LINQ的lambda表达式
+# 使用 TPL 和 LINQ 的 lambda 表达式
 
-TPL中有几个方法接受`System.Func<TResult>`或`System.Action`委托作为输入参数。这些可以用来将自定义逻辑传递到任务、查询或并行循环中。在创建委托时可以使用内联块。
+TPL 中有几个方法接受`System.Func<TResult>`或`System.Action`委托作为输入参数。这些可以用来将自定义逻辑传递到任务、查询或并行循环中。在创建委托时可以使用内联块。
 
 使用`Func`委托封装返回值的函数，使用`Action`委托封装不返回值的函数。让我们回顾以下示例：
 
-[PRE88]
+```cs
+        static void FuncAction()
+```
 
-[PRE89]
+```cs
+        {
+```
 
-[PRE90]
+```cs
+            int[] numbers = { 15, 10, 12, 17, 11, 13, 16, 
+```
 
-[PRE91]
+```cs
+                14, 18 };
+```
 
-[PRE92]
+```cs
+            int additionResult = 0;
+```
 
-[PRE93]
+```cs
+            try
+```
 
-[PRE94]
+```cs
+            {
+```
 
-[PRE95]
+```cs
+                Parallel.ForEach(
+```
 
-[PRE96]
+```cs
+                    numbers,
+```
 
-[PRE97]
+```cs
+                    () => 0,
+```
 
-[PRE98]
+```cs
+                    (number, currentState, addition) =>
+```
 
-[PRE99]
+```cs
+                    {
+```
 
-[PRE100]
+```cs
+                        addition += number;
+```
 
-[PRE101]
+```cs
+                        Console.WriteLine($"Thread: 
+```
 
-[PRE102]
+```cs
+                       {Thread.CurrentThread.
+```
 
-[PRE103]
+```cs
+                        ManagedThreadId}, Number: 
+```
 
-[PRE104]
+```cs
+                        {number}, Addition: {addition}");
+```
 
-[PRE105]
+```cs
+                        return addition;
+```
 
-[PRE106]
+```cs
+                    },
+```
 
-[PRE107]
+```cs
+                    (addition) => Interlocked.Add(ref 
+```
 
-[PRE108]
+```cs
+                         additionResult, addition)
+```
 
-[PRE109]
+```cs
+                );
+```
 
-[PRE110]
+```cs
+                Console.WriteLine($"Addition Result: 
+```
 
-[PRE111]
+```cs
+                    {additionResult}");
+```
 
-[PRE112]
+```cs
+            }
+```
 
-[PRE113]
+```cs
+            catch (AggregateException e)
+```
 
-[PRE114]
+```cs
+            {
+```
 
-[PRE115]
+```cs
+                Console.WriteLine($"Aggregate Exception: 
+```
 
-[PRE116]
+```cs
+                    FuncAction.\n{e.Message}");
+```
 
-[PRE117]
+```cs
+            }
+```
 
-[PRE118]
+```cs
+        }
+```
 
 上述代码展示了如何使用`Parallel.ForEach`方法和线程局部状态。我们期望代码以并行方式执行并计算存储在`int`数组中的所有值。`Parallel.For`循环的每个线程维护一个局部累加变量。当每个线程初始化时，该累加变量被设置为`0`。随着每次迭代的进行，累加变量会加上数值。一旦线程完成其任务，该线程的局部总和会安全地添加到全局总和。循环完成后，全局总和将被打印出来。
 
-上述代码还展示了如何使用lambda表达式来表示`Func`和`Action`委托：
+上述代码还展示了如何使用 lambda 表达式来表示`Func`和`Action`委托：
 
-[PRE119]
+```cs
+]Parallel.ForEach<TSource,TLocal>(IEnumerable<TSource>, 
+```
 
-[PRE120]
+```cs
+    Func<TLocal>, Func<TSource,ParallelLoopState,Tlocal
+```
 
-[PRE121]
+```cs
+        ,TLocal>, Action<TLocal>).
+```
 
 在下一节中，我们将探讨一些并行调试工具。
 
@@ -460,27 +747,21 @@ TPL中有几个方法接受`System.Func<TResult>`或`System.Action`委托作为�
 
 运行程序，直到调试器将其暂停。然后，从**Visual Studio**菜单中选择**调试** | **窗口** | **并行任务**。这将显示**并行任务**窗口。你应该会看到以下内容：
 
-![图 15.4 – 并行堆栈线程视图
-
-![图片](img/B16617_Figure_15.4.jpg)
+![图 15.4 – 并行堆栈线程视图![图片](img/B16617_Figure_15.4.jpg)
 
 图 15.4 – 并行堆栈线程视图
 
-如你所见，我们的主线程是通过我们的`Program.Main`方法启动的。我们可以看到调试器暂停在`Program.MethodC`。有四个线程 – 分别对应方法A、B和C，以及外部代码中的一个。还有五个线程正在运行 – 这些是外部代码线程。
+如你所见，我们的主线程是通过我们的`Program.Main`方法启动的。我们可以看到调试器暂停在`Program.MethodC`。有四个线程 – 分别对应方法 A、B 和 C，以及外部代码中的一个。还有五个线程正在运行 – 这些是外部代码线程。
 
 当你悬停在方法上时，你会看到以下弹出窗口：
 
-![图 15.5 – 显示线程和堆栈帧视图的并行堆栈线程视图
-
-![图片](img/B16617_Figure_15.5.jpg)
+![图 15.5 – 显示线程和堆栈帧视图的并行堆栈线程视图![图片](img/B16617_Figure_15.5.jpg)
 
 图 15.5 – 显示线程和堆栈帧视图的并行堆栈线程视图
 
 通过悬停在每个方法组上，你可以看到一个线程和它们的堆栈帧的表格。这些堆栈帧提供了方法名称和行号。当前线程的活动堆栈帧由黄色箭头标识。如果你在悬停在堆栈帧上时右键单击，你可以选择显示哪些详细信息，包括参数值，如下所示：
 
-![图 15.6 – 线程和堆栈帧视图
-
-![图片](img/B16617_Figure_15.6.jpg)
+![图 15.6 – 线程和堆栈帧视图![图片](img/B16617_Figure_15.6.jpg)
 
 图 15.6 – 线程和堆栈帧视图
 
@@ -490,25 +771,15 @@ TPL中有几个方法接受`System.Func<TResult>`或`System.Action`委托作为�
 
 要查看**任务**窗口，从**并行任务**选项卡中选择下拉菜单中的**任务**。你应该会看到以下内容：
 
-![图 15.7 – 任务视图
-
-![图片](img/B16617_Figure_15.7.jpg)
+![图 15.7 – 任务视图![图片](img/B16617_Figure_15.7.jpg)
 
 图 15.7 – 任务视图
 
 前面的截图显示了异步逻辑堆栈。如果你悬停在方法上，你会看到一个弹出窗口，就像你在线程视图中做的那样：
 
-![图 15.8 – 线程和堆栈帧视图
+![图 15.8 – 线程和堆栈帧视图![图片](img/B16617_Figure_15.6.jpg)
 
-![图片](img/B16617_Figure_15.6.jpg)
-
-![图 15.8 – 线程和堆栈帧视图
-
-从**Visual Studio**菜单中选择**调试** | **窗口** | **任务**。你应该会看到以下窗格：
-
-![图 15.9 – 任务窗格
-
-![图片](img/B16617_Figure_15.9.jpg)
+![图 15.8 – 线程和堆栈帧视图从**Visual Studio**菜单中选择**调试** | **窗口** | **任务**。你应该会看到以下窗格：![图 15.9 – 任务窗格![图片](img/B16617_Figure_15.9.jpg)
 
 图 15.9 – 任务窗格
 
@@ -518,69 +789,77 @@ TPL中有几个方法接受`System.Func<TResult>`或`System.Action`委托作为�
 
 ## 并发可视化器
 
-并发可视化器是一个命令行实用工具，允许您从命令行收集跟踪数据。这些数据可以在Visual Studio 2022的并发可视化器中查看，该可视化器可用于未安装Visual Studio的计算机。并发可视化器不支持Web项目；它依赖于Windows事件跟踪。
+并发可视化器是一个命令行实用工具，允许您从命令行收集跟踪数据。这些数据可以在 Visual Studio 2022 的并发可视化器中查看，该可视化器可用于未安装 Visual Studio 的计算机。并发可视化器不支持 Web 项目；它依赖于 Windows 事件跟踪。
 
 默认情况下，`CVCollectionCmd.exe`安装在`C:\Program Files\Microsoft Visual Studio\2022\Preview\Common7\IDE\Extensions\rf2nfg00.o0t`和/或`C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\Extensions\rf2nfg00.o0t`。
 
 要开始收集跟踪，您可以使用以下命令：
 
-[PRE122]
+```cs
+C:\Program Files\Microsoft Visual 
+```
 
-[PRE123]
+```cs
+Studio\2022\Preview\Common7\IDE\Extensions\rf2nfg00.o0t\CVC
+```
 
-[PRE124]
+```cs
+ollectionCmd.exe" /launch D:\dev\CH15_ParallelProgrammingDe
+```
 
-[PRE125]
+```cs
+buggingAndProfilingSample\CH15_ParallelProgrammingDebugging
+```
 
-[PRE126]
+```cs
+AndProfilingSample\bin\Debug\net6.0\CH15_ParallelProgrammin
+```
 
-[PRE127]
+```cs
+gDebuggingAndProfilingSample.exe /outdir D:\Debugging
+```
 
-[PRE128]
+```cs
+    \TraceData
+```
 
 这将启动我们的应用程序并将跟踪数据记录到由`/outdir`命令行参数指定的位置。工具将生成几个文件，它们将具有`.etl`和`.cvtrace`文件扩展名。
 
 从**Visual Studio**菜单中选择**分析** | **并发可视化器** | **打开跟踪**以查看生成的跟踪文件。您应该看到以下类似的内容：
 
-![图15.10 – 上下文可视化器利用率选项卡
+![图 15.10 – 上下文可视化器利用率选项卡![img/B16617_Figure_15.10.jpg](img/B16617_Figure_15.10.jpg)
 
-![img/B16617_Figure_15.10.jpg](img/B16617_Figure_15.10.jpg)
+图 15.10 – 上下文可视化器利用率选项卡
 
-图15.10 – 上下文可视化器利用率选项卡
+此屏幕显示了您所追踪的程序正在使用的逻辑核心数量。正如您所看到的，我的计算机有 16 个逻辑核心。在这 16 个核心中，只有 12 个正在被使用。点击**线程**选项卡将显示以下视图：
 
-此屏幕显示了您所追踪的程序正在使用的逻辑核心数量。正如您所看到的，我的计算机有16个逻辑核心。在这16个核心中，只有12个正在被使用。点击**线程**选项卡将显示以下视图：
+![图 15.11 – 上下文可视化器线程选项卡![img/B16617_Figure_15.11.jpg](img/B16617_Figure_15.11.jpg)
 
-![图15.11 – 上下文可视化器线程选项卡
-
-![img/B16617_Figure_15.11.jpg](img/B16617_Figure_15.11.jpg)
-
-图15.11 – 上下文可视化器线程选项卡
+图 15.11 – 上下文可视化器线程选项卡
 
 此屏幕为我们提供了关于所使用的线程、其功能和执行时间的良好、详细的分解。点击**核心**选项卡将显示以下视图：
 
-![图15.12 – 上下文可视化器核心选项卡
+![图 15.12 – 上下文可视化器核心选项卡![img/B16617_Figure_15.12.jpg](img/B16617_Figure_15.12.jpg)
 
-![img/B16617_Figure_15.12.jpg](img/B16617_Figure_15.12.jpg)
+图 15.12 – 上下文可视化器核心选项卡
 
-图15.12 – 上下文可视化器核心选项卡
-
-此视图显示了逻辑核心及其由主线程和工作线程的使用情况。您将看到线程ID、其名称、跨核心上下文切换次数、总上下文切换次数以及上下文切换的百分比。
+此视图显示了逻辑核心及其由主线程和工作线程的使用情况。您将看到线程 ID、其名称、跨核心上下文切换次数、总上下文切换次数以及上下文切换的百分比。
 
 注意
 
-微软提供了对并发可视化器的更详细说明。我刚刚为您提供了该工具的简要概述及其使用方法。如果您想了解更多关于如何使用此工具的信息，可以查看微软的文档，链接为[https://docs.microsoft.com/en-us/visualstudio/profiling/concurrency-visualizer?view=vs-2022](https://docs.microsoft.com/en-us/visualstudio/profiling/concurrency-visualizer?view=vs-2022)。
+微软提供了对并发可视化器的更详细说明。我刚刚为您提供了该工具的简要概述及其使用方法。如果您想了解更多关于如何使用此工具的信息，可以查看微软的文档，链接为[`docs.microsoft.com/en-us/visualstudio/profiling/concurrency-visualizer?view=vs-2022`](https://docs.microsoft.com/en-us/visualstudio/profiling/concurrency-visualizer?view=vs-2022)。
 
 到此，我们已经到达了本章的结尾。现在，让我们总结一下我们所学到的内容。
 
 # 摘要
 
-在本章中，我们探讨了如何使用TPL和PLINQ来并行执行代码。到目前为止，我们了解到TPL和PLINQ之间的主要区别在于TPL不能有效地利用计算机上的所有核心，而PLINQ可以。
+在本章中，我们探讨了如何使用 TPL 和 PLINQ 来并行执行代码。到目前为止，我们了解到 TPL 和 PLINQ 之间的主要区别在于 TPL 不能有效地利用计算机上的所有核心，而 PLINQ 可以。
 
-我们还看到了如何查看计算机的CPU利用率。使用PLINQ使我们能够有效地利用CPU的所有核心来提高代码性能。然而，在基准测试并行代码时，我们发现它有时比非并行代码更快，而有时则更快。因此，对你的代码进行基准测试以查看哪种方法最适合你是有益的。
+我们还看到了如何查看计算机的 CPU 利用率。使用 PLINQ 使我们能够有效地利用 CPU 的所有核心来提高代码性能。然而，在基准测试并行代码时，我们发现它有时比非并行代码更快，而有时则更快。因此，对你的代码进行基准测试以查看哪种方法最适合你是有益的。
 
-我们还回顾了一段代码，展示了如何使用lambda表达式来表示`Func`和`Action`委托。
+我们还回顾了一段代码，展示了如何使用 lambda 表达式来表示`Func`和`Action`委托。
 
-最后，我们通过一个使用Parallel Tasks窗口、任务面板和并发可视化器的代码示例来查看并行应用程序的调试。
+最后，我们通过一个使用 Parallel Tasks 窗口、任务面板和并发可视化器的代码示例来查看并行应用程序的调试。
 
 在下一章中，我们将探讨异步编程。但在我们这样做之前，试着回答这些问题，看看你记住了多少。然后，查看*进一步阅读*部分以增强你的知识。
 
@@ -588,11 +867,11 @@ TPL中有几个方法接受`System.Func<TResult>`或`System.Action`委托作为�
 
 回答以下问题以测试你对本章知识的掌握：
 
-1.  TPL代表什么？
+1.  TPL 代表什么？
 
-1.  PLINQ代表什么？
+1.  PLINQ 代表什么？
 
-1.  你可以使用什么Windows程序来查看CPU核心使用情况？
+1.  你可以使用什么 Windows 程序来查看 CPU 核心使用情况？
 
 1.  并行代码是否总是比非并行代码更快？
 
@@ -602,14 +881,14 @@ TPL中有几个方法接受`System.Func<TResult>`或`System.Action`委托作为�
 
 要了解更多关于本章所涵盖的主题，请查看以下资源：
 
-+   *PLINQ和TPL中的Lambda表达式*: [https://docs.microsoft.com/en-us/dotnet/standard/parallel-programming/lambda-expressions-in-plinq-and-tpl](https://docs.microsoft.com/en-us/dotnet/standard/parallel-programming/lambda-expressions-in-plinq-and-tpl)
++   *PLINQ 和 TPL 中的 Lambda 表达式*: [`docs.microsoft.com/en-us/dotnet/standard/parallel-programming/lambda-expressions-in-plinq-and-tpl`](https://docs.microsoft.com/en-us/dotnet/standard/parallel-programming/lambda-expressions-in-plinq-and-tpl)
 
-+   *任务并行库 (TPL)*: [https://docs.microsoft.com/en-us/dotnet/standard/parallel-programming/task-parallel-library-tpl](https://docs.microsoft.com/en-us/dotnet/standard/parallel-programming/task-parallel-library-tpl)
++   *任务并行库 (TPL)*: [`docs.microsoft.com/en-us/dotnet/standard/parallel-programming/task-parallel-library-tpl`](https://docs.microsoft.com/en-us/dotnet/standard/parallel-programming/task-parallel-library-tpl)
 
-+   *PLINQ简介*: [https://docs.microsoft.com/en-us/dotnet/standard/parallel-programming/introduction-to-plinq](https://docs.microsoft.com/en-us/dotnet/standard/parallel-programming/introduction-to-plinq)
++   *PLINQ 简介*: [`docs.microsoft.com/en-us/dotnet/standard/parallel-programming/introduction-to-plinq`](https://docs.microsoft.com/en-us/dotnet/standard/parallel-programming/introduction-to-plinq)
 
-+   *并行诊断工具*: [https://docs.microsoft.com/en-us/dotnet/standard/parallel-programming/parallel-diagnostic-tools](https://docs.microsoft.com/en-us/dotnet/standard/parallel-programming/parallel-diagnostic-tools)
++   *并行诊断工具*: [`docs.microsoft.com/en-us/dotnet/standard/parallel-programming/parallel-diagnostic-tools`](https://docs.microsoft.com/en-us/dotnet/standard/parallel-programming/parallel-diagnostic-tools)
 
-+   *调试异步代码：任务的并行堆栈*: [https://devblogs.microsoft.com/visualstudio/debugging-async-code-parallel-stacks-for-tasks/](https://devblogs.microsoft.com/visualstudio/debugging-async-code-parallel-stacks-for-tasks/)
++   *调试异步代码：任务的并行堆栈*: [`devblogs.microsoft.com/visualstudio/debugging-async-code-parallel-stacks-for-tasks/`](https://devblogs.microsoft.com/visualstudio/debugging-async-code-parallel-stacks-for-tasks/)
 
-+   *在Visual Studio中调试并行应用程序（C#、Visual Basic、C++）的教程*: [https://docs.microsoft.com/en-us/visualstudio/debugger/walkthrough-debugging-a-parallel-application?view=vs-2022&tabs=csharp#main](https://docs.microsoft.com/en-us/visualstudio/debugger/walkthrough-debugging-a-parallel-application?view=vs-2022&tabs=csharp#main)
++   *在 Visual Studio 中调试并行应用程序（C#、Visual Basic、C++）的教程*: [`docs.microsoft.com/en-us/visualstudio/debugger/walkthrough-debugging-a-parallel-application?view=vs-2022&tabs=csharp#main`](https://docs.microsoft.com/en-us/visualstudio/debugger/walkthrough-debugging-a-parallel-application?view=vs-2022&tabs=csharp#main)

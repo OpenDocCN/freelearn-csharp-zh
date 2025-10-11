@@ -1,72 +1,72 @@
-# *第9章*：故事API – 观察和响应故事事件
+# *第九章*：故事 API – 观察和响应故事事件
 
-在本章中，我们将探索运行中的ink故事中的变化如何触发Unity中的事件。我们将学习ink-Unity集成插件提供的Story API中的`ObserveVariable()`和`ObserveVariables()`方法如何允许您准备函数以响应Unity中的未来事件。我们将从观察单个变量开始，然后继续学习如何观察多个值。
+在本章中，我们将探索运行中的 ink 故事中的变化如何触发 Unity 中的事件。我们将学习 ink-Unity 集成插件提供的 Story API 中的`ObserveVariable()`和`ObserveVariables()`方法如何允许您准备函数以响应 Unity 中的未来事件。我们将从观察单个变量开始，然后继续学习如何观察多个值。
 
-在[*第8章*](B17597_08_Final_PG_ePub.xhtml#_idTextAnchor123)，*故事API – 访问ink变量和函数*中，重点是通过对ink故事调用其函数和从Unity更改其值来控制ink故事。本章将这两个系统之间的重点进行了反转。在本章中，我们将探索如何使用叙事事件，例如由于玩家的选择而更改的变量，来控制Unity中呈现的信息。
+在*第八章*，*故事 API – 访问 ink 变量和函数*中，重点是通过对 ink 故事调用其函数和从 Unity 更改其值来控制 ink 故事。本章将这两个系统之间的重点进行了反转。在本章中，我们将探索如何使用叙事事件，例如由于玩家的选择而更改的变量，来控制 Unity 中呈现的信息。
 
 在本章中，我们将涵盖以下主题：
 
 +   监听变量变化
 
-+   动态响应ink故事
++   动态响应 ink 故事
 
-+   观察多个ink值
++   观察多个 ink 值
 
 # 技术要求
 
-本章中使用的示例，在`*.ink`文件中，可以在GitHub上找到：[https://github.com/PacktPublishing/Dynamic-Story-Scripting-with-the-ink-Scripting-Language/tree/main/Chapter9](https://github.com/PacktPublishing/Dynamic-Story-Scripting-with-the-ink-Scripting-Language/tree/main/Chapter9)。
+本章中使用的示例，在`*.ink`文件中，可以在 GitHub 上找到：[`github.com/PacktPublishing/Dynamic-Story-Scripting-with-the-ink-Scripting-Language/tree/main/Chapter9`](https://github.com/PacktPublishing/Dynamic-Story-Scripting-with-the-ink-Scripting-Language/tree/main/Chapter9)。
 
 # 监听变量变化
 
-ink中的变量是全局的。一旦创建，它们可以在故事的任何位置访问。在第[*第8章*](B17597_08_Final_PG_ePub.xhtml#_idTextAnchor123)，*故事API – 访问ink变量和函数*中，我们学习了如何使用`variablesState`属性来访问或更改它们的值。然而，我们不仅可以直接在Unity中干预正在运行的ink，我们还可以等待ink中发生某些事情，然后在Unity中做出反应。这种类型的方法所使用的动词，作为故事API的一部分，被称为*观察*。
+ink 中的变量是全局的。一旦创建，它们可以在故事的任何位置访问。在第*第八章*，*故事 API – 访问 ink 变量和函数*中，我们学习了如何使用`variablesState`属性来访问或更改它们的值。然而，我们不仅可以直接在 Unity 中干预正在运行的 ink，我们还可以等待 ink 中发生某些事情，然后在 Unity 中做出反应。这种类型的方法所使用的动词，作为故事 API 的一部分，被称为*观察*。
 
-当我们观察ink变量时，我们可以编写自己的规则，关于当其值发生变化或达到某个阈值时应该发生什么。我们只是在*观察*其值。由于这种观察，我们做什么取决于开发者。
+当我们观察 ink 变量时，我们可以编写自己的规则，关于当其值发生变化或达到某个阈值时应该发生什么。我们只是在*观察*其值。由于这种观察，我们做什么取决于开发者。
 
 在这个主题中，我们将探索`ObserveVariable()`方法。
 
 推荐
 
-建议您为此主题创建一个新的Unity 2D项目。有关如何创建新的Unity项目以及导入ink-Unity集成插件的说明，请参阅[*第6章*](B17597_06_Final_PG_ePub.xhtml#_idTextAnchor092)，*添加和使用ink Unity插件*。
+建议您为此主题创建一个新的 Unity 2D 项目。有关如何创建新的 Unity 项目以及导入 ink-Unity 集成插件的说明，请参阅*第六章*，*添加和使用 ink Unity 插件*。
 
 我们将执行以下步骤：
 
-1.  在一个新的Unity项目中，使用带有ink-Unity集成插件的2D模板，创建一个新的空游戏对象，并将其命名为`InkStory`。此游戏对象将包含`script`组件，并响应Ink代码中的变化。
+1.  在一个新的 Unity 项目中，使用带有 ink-Unity 集成插件的 2D 模板，创建一个新的空游戏对象，并将其命名为`InkStory`。此游戏对象将包含`script`组件，并响应 Ink 代码中的变化。
 
-1.  创建一个新的Ink文件，并将其命名为`InkStoryStepCounter.ink`。
+1.  创建一个新的 Ink 文件，并将其命名为`InkStoryStepCounter.ink`。
 
-1.  在Inky中打开`InkStoryStepCounter.ink`进行编辑，并更新其内容为`示例1 (InkStoryStepCounter.ink)`。
+1.  在 Inky 中打开`InkStoryStepCounter.ink`进行编辑，并更新其内容为`示例 1 (InkStoryStepCounter.ink)`。
 
 1.  在`InkStory`游戏对象内部创建一个新的`script`组件。创建的文件命名为`InkStoryScript.cs`。
 
-1.  在Visual Studio中打开`InkStoryScript.cs`进行编辑。
+1.  在 Visual Studio 中打开`InkStoryScript.cs`进行编辑。
 
-    将`InkStoryScript.cs`更新为`示例1 (InkStoryScript.cs)`。
+    将`InkStoryScript.cs`更新为`示例 1 (InkStoryScript.cs)`。
 
     `ObserveVariable()`方法是在本章中引入的新方法，接受两个参数。第一个参数是要观察的变量的名称，第二个是要调用的函数或方法。
 
-    本例中使用的代码还结合了一个名为`ObserveVariable()`的C#概念，该方法在ink中观察一个变量。如果其值在任何时候发生变化，lambda表达式将运行。这发生在正常流程之外。
+    本例中使用的代码还结合了一个名为`ObserveVariable()`的 C#概念，该方法在 ink 中观察一个变量。如果其值在任何时候发生变化，lambda 表达式将运行。这发生在正常流程之外。
 
-1.  关联编译后的Ink JSON文件。
+1.  关联编译后的 Ink JSON 文件。
 
 1.  运行项目。
 
 当项目运行时，`ObserveVariable()`方法和第三个将是作为第一个选项产生的文本：
 
-![图9.1 – 在Unity中按执行顺序显示文本输出](img/Figure_9.1_B17597.jpg)
+![图 9.1 – 在 Unity 中按执行顺序显示文本输出](img/Figure_9.1_B17597.jpg)
 
-图9.1 – 在Unity中按执行顺序显示文本输出
+图 9.1 – 在 Unity 中按执行顺序显示文本输出
 
-第二条消息在选项的第三个文本之前显示值的原因是因为执行顺序。在运行中的ink故事中，`ObserveVariable()`方法发生在文本输出为选项生成并返回Unity之前。这种方式下，委托的lambda表达式出现在正常执行流程之外。每当观察变量的值发生变化时，函数会立即被调用，无论此时周围是否有其他代码正在执行。
+第二条消息在选项的第三个文本之前显示值的原因是因为执行顺序。在运行中的 ink 故事中，`ObserveVariable()`方法发生在文本输出为选项生成并返回 Unity 之前。这种方式下，委托的 lambda 表达式出现在正常执行流程之外。每当观察变量的值发生变化时，函数会立即被调用，无论此时周围是否有其他代码正在执行。
 
-在下一节中，我们将在此基础上进行构建。通常，在Unity中，只有在变量发生变化时才应该通知Unity，这样可以释放执行时间，让Unity执行其他任务，并允许开发者编写更响应式的代码，只有在需要时才运行。
+在下一节中，我们将在此基础上进行构建。通常，在 Unity 中，只有在变量发生变化时才应该通知 Unity，这样可以释放执行时间，让 Unity 执行其他任务，并允许开发者编写更响应式的代码，只有在需要时才运行。
 
-# 动态响应ink故事
+# 动态响应 ink 故事
 
-在Unity中，当项目运行时，作为正常执行周期的一部分，会调用多个方法。通常，如`Update()`这样的方法，是Unity中行为脚本的一个常见部分，包含许多行代码。甚至像`FixedUpdate()`这样的方法，在每个运行项目中的物理计算周期结束时被调用，也可能包含多个部分。任何依赖于其他系统（如与ink通信的系统）的代码也可以在每个周期中增加额外的时间。
+在 Unity 中，当项目运行时，作为正常执行周期的一部分，会调用多个方法。通常，如`Update()`这样的方法，是 Unity 中行为脚本的一个常见部分，包含许多行代码。甚至像`FixedUpdate()`这样的方法，在每个运行项目中的物理计算周期结束时被调用，也可能包含多个部分。任何依赖于其他系统（如与 ink 通信的系统）的代码也可以在每个周期中增加额外的时间。
 
-使用`ObserveVariable()`方法允许ink的数据只在需要时更新Unity。因为Story API只有在必要时才会调用委托函数，所以Unity也只有在需要知道变化时才会获取数据。这也会发生在Unity中`Update()`方法或`FixedUpdate()`方法之外的使用。
+使用`ObserveVariable()`方法允许 ink 的数据只在需要时更新 Unity。因为 Story API 只有在必要时才会调用委托函数，所以 Unity 也只有在需要知道变化时才会获取数据。这也会发生在 Unity 中`Update()`方法或`FixedUpdate()`方法之外的使用。
 
-在本节中，我们将检查`ObserveVariable()`方法如何在Unity外部作为其他方法的一部分运行。它只会在值发生变化时调用委托函数，从而允许Unity中动态响应。
+在本节中，我们将检查`ObserveVariable()`方法如何在 Unity 外部作为其他方法的一部分运行。它只会在值发生变化时调用委托函数，从而允许 Unity 中动态响应。
 
 返回上一节创建的项目，并执行以下步骤：
 
@@ -76,33 +76,31 @@ ink中的变量是全局的。一旦创建，它们可以在故事的任何位�
 
     **第一**个是变量时间的增加，使用最新的`Time.deltaTime`，这是在十进制（float）数字中测量的循环之间的毫秒数。**第二**个是将其浮点值转换为整数。这个操作移除了数字的小数部分。**第三**个动作是一个称为`%`的数学运算，可以用来找到除法的余数。这个操作称为**模运算**。然而，许多编程语言也使用术语**余数运算符**。当这个操作执行时，它将确定一个数字可以被另一个数字除多少次。在这种情况下，使用`60`的余数，`seconds`变量将始终等于自项目开始以来经过的秒数，除以`time`变量。
 
-    在`Update()`方法中的**第四**个动作是将`seconds`变量赋值为秒数，这是由之前解释的动作定义的。在Unity的每个循环中，这个数字都会更新，`seconds`变量将始终保持最新。
+    在`Update()`方法中的**第四**个动作是将`seconds`变量赋值为秒数，这是由之前解释的动作定义的。在 Unity 的每个循环中，这个数字都会更新，`seconds`变量将始终保持最新。
 
-    在委托函数中发生最后一个动作，即使用`Destroy()`方法。在代码中，一旦`steps`ink变量的值等于由Unity确定的`3`，它将从一个场景中移除一个按钮。这有助于保持按钮与Unity外部更改的值之间的连接。一旦ink变量更改并被报告给Unity，按钮就会被移除。
+    在委托函数中发生最后一个动作，即使用`Destroy()`方法。在代码中，一旦`steps`ink 变量的值等于由 Unity 确定的`3`，它将从一个场景中移除一个按钮。这有助于保持按钮与 Unity 外部更改的值之间的连接。一旦 ink 变量更改并被报告给 Unity，按钮就会被移除。
 
-    在`Start()`方法的最后一行，为按钮的`onClick`事件提供了一个监听函数。当按钮被点击时，与监听器关联的任何函数都将被调用。在这个例子中，点击按钮将调用新的`TakeStep()`方法。这将加载下一个文本内容，直到遇到ink代码中的下一个编织点，然后选择编织中的第一个（`0`）选项。这将导致ink代码内部循环。
+    在`Start()`方法的最后一行，为按钮的`onClick`事件提供了一个监听函数。当按钮被点击时，与监听器关联的任何函数都将被调用。在这个例子中，点击按钮将调用新的`TakeStep()`方法。这将加载下一个文本内容，直到遇到 ink 代码中的下一个编织点，然后选择编织中的第一个（`0`）选项。这将导致 ink 代码内部循环。
 
     在创建代码后，还需要两个步骤才能播放项目。首先，需要向项目中添加一个新的`Button`游戏对象。然后，一旦`Button`游戏对象存在，它必须与新代码中的`InkStory`属性相关联。
 
-1.  在Unity中创建一个新的`Button`游戏对象。
+1.  在 Unity 中创建一个新的`Button`游戏对象。
 
 1.  将`Button`游戏对象与`Button Step`属性关联。
 
 1.  播放项目。
 
-1.  创建的`Button`游戏对象出现在场景底部。点击`Button`游戏对象四次将导致其消失，并在**控制台**窗口中显示一条消息：![图9.2 – 由委托函数生成的控制台窗口中的消息
+1.  创建的`Button`游戏对象出现在场景底部。点击`Button`游戏对象四次将导致其消失，并在**控制台**窗口中显示一条消息：![图 9.2 – 由委托函数生成的控制台窗口中的消息    ](img/Figure_9.2_B17597.jpg)
 
-    ](img/Figure_9.2_B17597.jpg)
-
-    图9.2 – 由委托函数生成的控制台窗口中的消息
+    图 9.2 – 由委托函数生成的控制台窗口中的消息
 
 1.  停止项目。
 
-当项目首次启动时，代码的`Update()`方法在每个周期中都会被调用。在内部，它更新Unity代码中的`time`和`seconds`变量。每当点击`Button`游戏对象时，它就会推进墨迹代码，该代码会内部循环。由于使用了`ObserveVariable()`方法，每当墨迹变量步骤更新时，它都会调用委托函数并测试传递给它的新值。一旦达到`3`（基于总共四次点击将其从`0`移动到`3`），委托函数就在`Button`游戏对象中创建了一条消息。
+当项目首次启动时，代码的`Update()`方法在每个周期中都会被调用。在内部，它更新 Unity 代码中的`time`和`seconds`变量。每当点击`Button`游戏对象时，它就会推进墨迹代码，该代码会内部循环。由于使用了`ObserveVariable()`方法，每当墨迹变量步骤更新时，它都会调用委托函数并测试传递给它的新值。一旦达到`3`（基于总共四次点击将其从`0`移动到`3`），委托函数就在`Button`游戏对象中创建了一条消息。
 
-本节中使用的示例遵循一个常见的模式，其中Unity在方法（如`Update()`）中执行自己的计算，并动态响应墨迹故事的变化。而不是在每个周期中检查`steps`墨迹变量是否作为`variablesState`属性的一部分发生变化，如果值没有变化，则会浪费时间，委托函数允许Unity仅在需要时采取行动。对于更复杂的项目，这是首选的方法，并且通常会产生更快的项目。
+本节中使用的示例遵循一个常见的模式，其中 Unity 在方法（如`Update()`）中执行自己的计算，并动态响应墨迹故事的变化。而不是在每个周期中检查`steps`墨迹变量是否作为`variablesState`属性的一部分发生变化，如果值没有变化，则会浪费时间，委托函数允许 Unity 仅在需要时采取行动。对于更复杂的项目，这是首选的方法，并且通常会产生更快的项目。
 
-在墨迹中可以观察到多个变量。根据设计的复杂性，Unity项目可能对观察多个墨迹值并更新屏幕区域以显示故事进展或玩家当前统计数据感兴趣。在这些情况下，需要不同的方法：`ObserveVariables()`。在下一节中，我们将演示如何使用此方法。
+在墨迹中可以观察到多个变量。根据设计的复杂性，Unity 项目可能对观察多个墨迹值并更新屏幕区域以显示故事进展或玩家当前统计数据感兴趣。在这些情况下，需要不同的方法：`ObserveVariables()`。在下一节中，我们将演示如何使用此方法。
 
 # 观察多个墨迹值
 
@@ -110,7 +108,7 @@ ink中的变量是全局的。一旦创建，它们可以在故事的任何位�
 
 建议
 
-建议您为这一节创建一个新的Unity 2D项目。有关如何创建新的Unity项目以及导入ink-Unity集成插件的说明，请参阅[*第6章*](B17597_06_Final_PG_ePub.xhtml#_idTextAnchor092)，*添加并使用ink-Unity集成插件*。
+建议您为这一节创建一个新的 Unity 2D 项目。有关如何创建新的 Unity 项目以及导入 ink-Unity 集成插件的说明，请参阅*第六章*，*添加并使用 ink-Unity 集成插件*。
 
 执行以下步骤：
 
@@ -138,13 +136,13 @@ ink中的变量是全局的。一旦创建，它们可以在故事的任何位�
 
 1.  停止项目。
 
-本章本节重点介绍了`ObserveVariables()`方法的使用，与上一节中我们使用的`ObserveVariable()`姐妹方法模式相呼应。一般来说，两种方法都提供了一种控制Unity如何响应ink的方式，在两个系统之间转换信息控制。与`variablesState`属性一起，本章中涵盖的不同方法，如在第[*第8章*](B17597_08_Final_PG_ePub.xhtml#_idTextAnchor123)“Story API – Accessing ink Variables and Functions”中所述，提供了对ink中变量的访问。根据开发者的需求，它们可以在项目中使用，要么更多地从ink端驱动Unity项目，要么根据需要直接从Unity代码在ink端更改值。
+本章本节重点介绍了`ObserveVariables()`方法的使用，与上一节中我们使用的`ObserveVariable()`姐妹方法模式相呼应。一般来说，两种方法都提供了一种控制 Unity 如何响应 ink 的方式，在两个系统之间转换信息控制。与`variablesState`属性一起，本章中涵盖的不同方法，如在第*第八章*“Story API – Accessing ink Variables and Functions”中所述，提供了对 ink 中变量的访问。根据开发者的需求，它们可以在项目中使用，要么更多地从 ink 端驱动 Unity 项目，要么根据需要直接从 Unity 代码在 ink 端更改值。
 
 # 摘要
 
-在本章中，我们探讨了多个示例。首先，我们从`ObserveVariable()`方法开始，只观察一个变量。在第二部分，我们动态地响应Unity中的ink故事。使用委托函数，我们学习了当ink变量发生变化时，代码的一部分才会被调用。在第三部分，我们探讨了使用`ObserveVariables()`方法来观察按名称指定的多个变量。
+在本章中，我们探讨了多个示例。首先，我们从`ObserveVariable()`方法开始，只观察一个变量。在第二部分，我们动态地响应 Unity 中的 ink 故事。使用委托函数，我们学习了当 ink 变量发生变化时，代码的一部分才会被调用。在第三部分，我们探讨了使用`ObserveVariables()`方法来观察按名称指定的多个变量。
 
-在[*第10章*](B17597_10_Final_PG_ePub.xhtml#_idTextAnchor145)，“使用墨迹的对话系统”中，我们将从Story API的个体属性和方法转向开始，将功能组合成更复杂的用例。结合在第[*第7章*](B17597_07_Final_PG_ePub.xhtml#_idTextAnchor106)“Unity API – Making Choices and Story Progression”中引入的Unity API的部分，以及本章中涵盖的`ObserveVariable()`方法，我们将探讨如何创建不同的对话系统。
+在*第十章*，“使用墨迹的对话系统”中，我们将从 Story API 的个体属性和方法转向开始，将功能组合成更复杂的用例。结合在第*第七章*“Unity API – Making Choices and Story Progression”中引入的 Unity API 的部分，以及本章中涵盖的`ObserveVariable()`方法，我们将探讨如何创建不同的对话系统。
 
 # 问题
 
@@ -154,4 +152,4 @@ ink中的变量是全局的。一旦创建，它们可以在故事的任何位�
 
 1.  `ObserveVariable()`方法和`ObserveVariables()`方法之间有什么区别？
 
-1.  使用`variablesState`属性访问ink变量和使用`ObserveVariable()`方法或`ObserveVariables()`方法之间有什么区别？
+1.  使用`variablesState`属性访问 ink 变量和使用`ObserveVariable()`方法或`ObserveVariables()`方法之间有什么区别？

@@ -14,13 +14,13 @@
 
 # 技术要求
 
-本章将包含示例代码，以演示我们讨论的每种缓存策略。要使用该代码，您需要您信任的 IDE（Visual Studio）或代码编辑器（Visual Studio Code）。您可以从本书的 GitHub 仓库直接下载示例代码：[https://github.com/PacktPublishing/Hands-On-Network-Programming-with-C-and-.NET-Core/tree/master/Chapter%2015](https://github.com/PacktPublishing/Hands-On-Network-Programming-with-C-and-.NET-Core/tree/master/Chapter%2015)。
+本章将包含示例代码，以演示我们讨论的每种缓存策略。要使用该代码，您需要您信任的 IDE（Visual Studio）或代码编辑器（Visual Studio Code）。您可以从本书的 GitHub 仓库直接下载示例代码：[`github.com/PacktPublishing/Hands-On-Network-Programming-with-C-and-.NET-Core/tree/master/Chapter%2015`](https://github.com/PacktPublishing/Hands-On-Network-Programming-with-C-and-.NET-Core/tree/master/Chapter%2015)。
 
-查看以下视频以查看代码的实际运行情况：[http://bit.ly/2HY67CM](http://bit.ly/2HY67CM)
+查看以下视频以查看代码的实际运行情况：[`bit.ly/2HY67CM`](http://bit.ly/2HY67CM)
 
-我们还将使用 Windows Subsystem for Linux 在本地机器上托管基于 Linux 的 Redis 缓存服务器。当然，如果您已经在运行类似 OS X 或 Linux 发行版的 *nix 系统上运行，您不必担心这一点。或者，当您在本地运行应用程序时，如果您没有管理员权限或对学习 Redis 缓存服务器不感兴趣，您可以稍微修改示例代码以使用不同的缓存提供者，您将在本章的学习过程中了解到。然而，我建议您熟悉 Redis 缓存，因为它被广泛使用，并且是大多数情况下的优秀选择。如果您选择这样做，您可以在以下链接中找到安装 Linux 子系统的说明：[https://docs.microsoft.com/en-us/windows/wsl/install-win10](https://docs.microsoft.com/en-us/windows/wsl/install-win10)
+我们还将使用 Windows Subsystem for Linux 在本地机器上托管基于 Linux 的 Redis 缓存服务器。当然，如果您已经在运行类似 OS X 或 Linux 发行版的 *nix 系统上运行，您不必担心这一点。或者，当您在本地运行应用程序时，如果您没有管理员权限或对学习 Redis 缓存服务器不感兴趣，您可以稍微修改示例代码以使用不同的缓存提供者，您将在本章的学习过程中了解到。然而，我建议您熟悉 Redis 缓存，因为它被广泛使用，并且是大多数情况下的优秀选择。如果您选择这样做，您可以在以下链接中找到安装 Linux 子系统的说明：[`docs.microsoft.com/en-us/windows/wsl/install-win10`](https://docs.microsoft.com/en-us/windows/wsl/install-win10)
 
-一旦完成，您可以在以下链接中找到安装和运行 Redis 的说明：[https://redislabs.com/blog/redis-on-windows-10/](https://redislabs.com/blog/redis-on-windows-10/)
+一旦完成，您可以在以下链接中找到安装和运行 Redis 的说明：[`redislabs.com/blog/redis-on-windows-10/`](https://redislabs.com/blog/redis-on-windows-10/)
 
 # 为什么需要缓存呢？
 
@@ -94,7 +94,7 @@
 
 或者，你可以尝试使用最少使用替换策略。这将丢弃系统上所有记录中缓存命中次数最少的记录，无论这些命中发生的时间有多近。当然，这种方法的缺点是，没有考虑到最近的使用情况，你忽略了最近使用过的记录可能因为用户打算使用它进行一系列后续操作而变得相关的可能性。由于它的命中率低而被删除，并且忽略了命中的最近性，这增加了未来缓存未命中的可能性。
 
-每种缓存替换策略都有其自身的缺点，应该在应用程序的上下文中考虑。然而，有一个关键指标可以帮助你确定替换策略的相对成功程度。一旦你的初始启发式方法设计并部署，你可以跟踪你的缓存命中率。一个缓存的命中率非常简单，就是缓存命中次数除以缓存未命中次数。这个数字越接近1.0，你的缓存替换策略就越好。
+每种缓存替换策略都有其自身的缺点，应该在应用程序的上下文中考虑。然而，有一个关键指标可以帮助你确定替换策略的相对成功程度。一旦你的初始启发式方法设计并部署，你可以跟踪你的缓存命中率。一个缓存的命中率非常简单，就是缓存命中次数除以缓存未命中次数。这个数字越接近 1.0，你的缓存替换策略就越好。
 
 # 缓存失效
 
@@ -114,7 +114,7 @@
 
 缓存在历史上一直被用来通过减少延迟或操作时间来提高性能。然而，对于分布式架构中的会话缓存，缓存本身并不旨在对特定操作提供任何特定的性能改进。相反，它旨在促进多个应用程序实例之间必要的交互。其设计是为了促进状态管理，否则将涉及多个主机复杂的编排。为了理解这是如何实现的，让我们考虑一个例子。
 
-假设你有一个托管在云上的API，该API负责验证用户的身份和年龄。为了做到这一点，它请求各种信息，这些信息加在一起可以用来验证用户。为了设计尽可能不干扰用户体验，你首先只问一些关于他们的出生日期和当前地址的问题，这些问题最有可能成功地验证他们的年龄和身份。一旦他们提交了答案，你的应用程序将尝试验证他们。如果成功，用户可以继续，但如果最初的问题集不成功，你的应用程序将跟进更多的问题，这些问题与第一组答案结合在一起，高度可能验证用户的身份。用户提交了答案，你再次尝试失败，最终提出一个要求用户提供社会保险号码最后四位数字的问题。提交后，用户要么成功验证，要么永久无法访问你的系统。
+假设你有一个托管在云上的 API，该 API 负责验证用户的身份和年龄。为了做到这一点，它请求各种信息，这些信息加在一起可以用来验证用户。为了设计尽可能不干扰用户体验，你首先只问一些关于他们的出生日期和当前地址的问题，这些问题最有可能成功地验证他们的年龄和身份。一旦他们提交了答案，你的应用程序将尝试验证他们。如果成功，用户可以继续，但如果最初的问题集不成功，你的应用程序将跟进更多的问题，这些问题与第一组答案结合在一起，高度可能验证用户的身份。用户提交了答案，你再次尝试失败，最终提出一个要求用户提供社会保险号码最后四位数字的问题。提交后，用户要么成功验证，要么永久无法访问你的系统。
 
 从业务逻辑的角度来看，这个过程相对简单，但你如何在保持网络请求之间完全无状态的网络上实现它？作为一个云托管的应用程序，你如何维护用户在流程中的当前位置，这跨越了处理给定请求的多个可能的应用服务器实例？
 
@@ -122,7 +122,7 @@
 
 在这个特定情况下，有一些技术可用，每种技术都有其自身的优点和缺点。您可以使用粘性会话来强制后续请求来自特定主机在给定会话中由处理初始请求的同一应用服务器提供服务。这将在会话期间允许进行一些轻微的本地状态管理。这种方法的缺点是，它消除了云托管系统中水平扩展的性能优势。如果用户在整个会话过程中始终被迫与单个服务器交互，无论该服务器的流量如何或其他服务器的可用性如何，他们实际上就是在与单体应用架构的单实例交互。此外，您将不再坚持“无状态”服务的架构理想，因为您将实现某种机制来在您的活动服务交互过程中保留用户在工作流程中的位置。
 
-或者，您可以使用我们在第14章“网络上的身份验证和授权”中看到的相同原则，即*自编码令牌*部分。在这种情况下，您将在服务器的响应中自行编码用户的当前状态，而您的用户将负责在后续请求中将该自编码状态返回到服务器。这允许每个请求体充当一条通往客户端首次交互的面包屑路径，服务器可以根据之前的交互重建在后续交互中创建的状态。
+或者，您可以使用我们在第十四章“网络上的身份验证和授权”中看到的相同原则，即*自编码令牌*部分。在这种情况下，您将在服务器的响应中自行编码用户的当前状态，而您的用户将负责在后续请求中将该自编码状态返回到服务器。这允许每个请求体充当一条通往客户端首次交互的面包屑路径，服务器可以根据之前的交互重建在后续交互中创建的状态。
 
 这种方法会增加您请求/响应模型的复杂性。它还会引入无法强制执行的验证尝试限制的风险。假设出于安全考虑，您的业务规则规定用户只能尝试每轮问题一次。如果您在请求/响应模型中自行编码用户会话的状态，您就依赖于您的用户在每次请求中返回每个先前尝试的准确表示。一个有意的恶意行为者可以通过简单地从后续请求中清除工作流程状态来随意进行尽可能多的尝试。
 
@@ -136,83 +136,202 @@
 
 # 分布式缓存的好处
 
-我所描述的系统具有确保用户状态在其与所有部署的应用程序实例交互过程中一致性的好处，只需对缓存进行少量读取和写入操作即可实现。这种数据一致性，即使在您的分布式缓存不用于状态管理时也是关键的。它可以防止多个应用程序实例尝试对同一份数据进行两个不兼容的修改，或者在将事务提交到底层数据库之前，允许跨多个应用服务器同步事务。最重要的是，从开发者的角度来看，它可以消除由服务之间的竞争条件引起的难以重现和难以追踪的bug。
+我所描述的系统具有确保用户状态在其与所有部署的应用程序实例交互过程中一致性的好处，只需对缓存进行少量读取和写入操作即可实现。这种数据一致性，即使在您的分布式缓存不用于状态管理时也是关键的。它可以防止多个应用程序实例尝试对同一份数据进行两个不兼容的修改，或者在将事务提交到底层数据库之前，允许跨多个应用服务器同步事务。最重要的是，从开发者的角度来看，它可以消除由服务之间的竞争条件引起的难以重现和难以追踪的 bug。
 
-独立于所有其他应用程序托管缓存服务器也为其提供了一定程度的对应用程序重启或崩溃的弹性。通过隔离您的数据存储，您可以隔离与您的云提供商提供的更高可用性和弹性保证相关的成本。这还可以帮助最小化您在应用程序服务器上运行的容器内存占用。如果您按RAM使用付费，这可以在缓存扩展时为您节省数千美元。那么，我们如何在代码中具体获得这些好处呢？
+独立于所有其他应用程序托管缓存服务器也为其提供了一定程度的对应用程序重启或崩溃的弹性。通过隔离您的数据存储，您可以隔离与您的云提供商提供的更高可用性和弹性保证相关的成本。这还可以帮助最小化您在应用程序服务器上运行的容器内存占用。如果您按 RAM 使用付费，这可以在缓存扩展时为您节省数千美元。那么，我们如何在代码中具体获得这些好处呢？
 
 # 在代码中处理缓存
 
-为了了解我们如何从.NET Core支持的多种缓存机制中受益，我们将设置一个相对复杂的演示应用程序结构。我们首先要做的事情是创建一个远程数据存储，它具有长时间运行的操作以返回查询结果。一旦完成，我们将设置一个依赖于该数据的应用程序，并为其提供一个缓存策略，以减轻我们人为减缓的远程数据存储的影响。
+为了了解我们如何从.NET Core 支持的多种缓存机制中受益，我们将设置一个相对复杂的演示应用程序结构。我们首先要做的事情是创建一个远程数据存储，它具有长时间运行的操作以返回查询结果。一旦完成，我们将设置一个依赖于该数据的应用程序，并为其提供一个缓存策略，以减轻我们人为减缓的远程数据存储的影响。
 
 # 编写我们的后端数据系统
 
-我们将创建我们的后端数据系统作为一个简单的Web API项目。目标是创建一个控制器，在该控制器上暴露几个端点，以展示如何将值写入我们的缓存，而不管记录之间的类型差异。首先，让我们使用.NET Core CLI创建我们的项目。让我们看看以下命令：
+我们将创建我们的后端数据系统作为一个简单的 Web API 项目。目标是创建一个控制器，在该控制器上暴露几个端点，以展示如何将值写入我们的缓存，而不管记录之间的类型差异。首先，让我们使用.NET Core CLI 创建我们的项目。让我们看看以下命令：
 
-[PRE0]
+```cs
+dotnet new webapi -n DataSimulation
+```
 
-接下来，由于我们将在缓存准备好的应用程序的同时托管此项目，我们希望配置它使用自己的端口，而不是默认设置。在你的`Program.cs`文件中，修改你的`CreateWebHostBuilder(string[] args)`方法以使用你希望此应用程序监听的任何自定义URL：
+接下来，由于我们将在缓存准备好的应用程序的同时托管此项目，我们希望配置它使用自己的端口，而不是默认设置。在你的`Program.cs`文件中，修改你的`CreateWebHostBuilder(string[] args)`方法以使用你希望此应用程序监听的任何自定义 URL：
 
-[PRE1]
+```cs
+public static IWebHostBuilder CreateWebHostBuilder(string[] args) =>
+  WebHost.CreateDefaultBuilder(args)
+    .UseUrls("https://[::]:33333")
+    .UseStartup<Startup>();
+```
 
-然后，我们将修改`ValuesController.cs`类以提供我们的数据。首先，我们将类的名称更改为`DataController`，以便我们的路由更加直观。我们将移除所有预配置的端点，并用三个新的端点替换它们，每个端点返回唯一的数据类型。首先，让我们为我们返回的数据创建一个新的数据类型。它将是一个简单的模型，具有ID和两个任意属性；一个将是`string`类型，另一个将是`List<string>`：
+然后，我们将修改`ValuesController.cs`类以提供我们的数据。首先，我们将类的名称更改为`DataController`，以便我们的路由更加直观。我们将移除所有预配置的端点，并用三个新的端点替换它们，每个端点返回唯一的数据类型。首先，让我们为我们返回的数据创建一个新的数据类型。它将是一个简单的模型，具有 ID 和两个任意属性；一个将是`string`类型，另一个将是`List<string>`：
 
-[PRE2]
+```cs
+public class OutputRecord {
+  public int Id { get; set; }
+  public string SimpleString { get; set; }
+  public List<string> StringList { get; set; } = new List<string>();
+}
+```
 
 在这个模型设置好之后，我们可以定义我们将要公开的端点。在这个演示中，我们将返回一个简单的`List<string>`字符串，一个单独的`OutputRecord`实例，以及一个`List<OutputRecord>`方法。因此，当我们为每种数据类型定义了查找端点之后，我们将有返回简单字符串、字符串列表、复杂记录和复杂记录列表的方法。让我们看看以下代码：
 
-[PRE3]
+```cs
+public class DataController : ControllerBase {
+
+  [HttpGet("value/{id}")]
+  public ActionResult<string> GetString(int id) {
+    return $"{id}: some data";
+  }
+
+  [HttpGet("values/{id}")]
+  public ActionResult<IEnumerable<string>> GetStrings(int id) {
+    return new string[] { $"{id}: value1", $"{id + 1}: value2" };
+  }
+```
 
 这些定义了我们的简单字符串响应，并且用我们的缓存进行测试将会相对简单。然而，对于我们的`OutputRecord`端点，我们希望为每个属性应用独特的数据，以便我们可以确认整个对象被正确缓存。因此，返回单个`OutputRecord`实例的端点将看起来像这样：
 
-[PRE4]
+```cs
+[HttpGet("record/{id}")]
+public ActionResult<OutputRecord> GetRecord(int id) {
+  return new OutputRecord() {
+    Id = id,
+    SimpleString = $"{id}: value 1",
+    StringList = new List<string> {
+      $"{id}:value 2",
+      $"{id}:value 3"
+    }
+  };
+}
+```
 
-这给我们一个具有不同属性值的对象，它们通过相同的ID连接在一起，这将使我们能够轻松验证缓存的行为。最后，我们将定义一个端点来返回`OutputRecord`实例的列表：
+这给我们一个具有不同属性值的对象，它们通过相同的 ID 连接在一起，这将使我们能够轻松验证缓存的行为。最后，我们将定义一个端点来返回`OutputRecord`实例的列表：
 
-[PRE5]
+```cs
+[HttpGet("records/{id}")]
+public ActionResult<IEnumerable<OutputRecord>> GetRecords(int id) {
+  return new List<OutputRecord>(){
+    new OutputRecord() {
+      Id = id,
+      SimpleString = $"{id}: value 1",
+      StringList = new List<string> {
+        $"{id}:value 2",
+        $"{id}:value 3"
+      }
+    }, new OutputRecord() {
+      Id = id + 1,
+      SimpleString = $"{id + 1}: value 4",
+      StringList = new List<string> {
+        $"{id + 1}:value 5",
+        $"{id + 1}:value 6"
+      }
+    }
+  };
+}
+```
 
-这些端点中的每一个都返回一些带有提供ID的简单对象或字符串，这些对象用于响应对象中，但这只是区分一个响应与下一个响应的一种方式。我们响应的重要方面将是我们将应用的感知延迟。为此，我们将在返回结果之前为每个方法添加五秒钟的延迟。这将给我们一个明显的方式来识别当后端数据存储被击中时与当我们的用户界面应用程序成功缓存击中时的情况。
+这些端点中的每一个都返回一些带有提供 ID 的简单对象或字符串，这些对象用于响应对象中，但这只是区分一个响应与下一个响应的一种方式。我们响应的重要方面将是我们将应用的感知延迟。为此，我们将在返回结果之前为每个方法添加五秒钟的延迟。这将给我们一个明显的方式来识别当后端数据存储被击中时与当我们的用户界面应用程序成功缓存击中时的情况。
 
-为了模拟这种延迟，我们将使当前线程休眠五秒钟，然后返回一个包含给定ID的任意字符串：
+为了模拟这种延迟，我们将使当前线程休眠五秒钟，然后返回一个包含给定 ID 的任意字符串：
 
-[PRE6]
+```cs
+[HttpGet("value/{id}")]
+public ActionResult<string> GetString(int id) {
+    Thread.Sleep(5000);
+    return $"{id}: some data";
+}
+```
 
-每个额外的方法都将做同样的事情，应用延迟然后使用任意值初始化其预期的返回类型。现在，如果你运行应用程序并ping你的`/data/value/1234`端点，你应该会在五秒后看到结果返回：
+每个额外的方法都将做同样的事情，应用延迟然后使用任意值初始化其预期的返回类型。现在，如果你运行应用程序并 ping 你的`/data/value/1234`端点，你应该会在五秒后看到结果返回：
 
 ![图片](img/e26b5043-1f91-4888-a09d-441220d4f5ab.png)
 
-注意响应时间为5269ms。这个延迟将是我们未来缓存未命中的指示。并且有了我们的数据存储就绪，我们可以构建我们的应用程序并定义其缓存策略。
+注意响应时间为 5269ms。这个延迟将是我们未来缓存未命中的指示。并且有了我们的数据存储就绪，我们可以构建我们的应用程序并定义其缓存策略。
 
 # 利用缓存
 
-要开始使用我们的缓存，我们首先需要安装并运行一个Redis服务器的本地实例。Redis是一个开源的内存数据存储。它通常在企业部署中用作简单的键值数据存储或缓存。它还由Azure云托管环境直接支持，这使得它对于基于.NET的微服务和基于云的应用程序非常受欢迎。
+要开始使用我们的缓存，我们首先需要安装并运行一个 Redis 服务器的本地实例。Redis 是一个开源的内存数据存储。它通常在企业部署中用作简单的键值数据存储或缓存。它还由 Azure 云托管环境直接支持，这使得它对于基于.NET 的微服务和基于云的应用程序非常受欢迎。
 
-要安装它，请遵循本章*技术要求*部分中的说明。一旦完成，你将有一个本地实例正在运行。如果你已经安装了服务器，请确保它已启动并运行，通过打开你的Windows子系统Linux界面，并输入以下命令以验证其监听端口：
+要安装它，请遵循本章*技术要求*部分中的说明。一旦完成，你将有一个本地实例正在运行。如果你已经安装了服务器，请确保它已启动并运行，通过打开你的 Windows 子系统 Linux 界面，并输入以下命令以验证其监听端口：
 
 ![图片](img/f5d37ee1-04b1-41e7-b710-bcf809ee71b5.png)
 
-一旦你的Redis实例运行起来，你就可以实现你的示例微服务了。由于我们将从我们的后端API加载缓存未命中，我们希望在`Startup.cs`文件中为该特定应用程序配置`HttpClient`。为此，我创建了一个静态的`Constants`类，以避免在我的代码中使用魔法字符串，并在`ConfigureServices(IServiceCollection services)`方法中使用`DATA_CLIENT`属性注册一个命名的`HttpClient`实例：
+一旦你的 Redis 实例运行起来，你就可以实现你的示例微服务了。由于我们将从我们的后端 API 加载缓存未命中，我们希望在`Startup.cs`文件中为该特定应用程序配置`HttpClient`。为此，我创建了一个静态的`Constants`类，以避免在我的代码中使用魔法字符串，并在`ConfigureServices(IServiceCollection services)`方法中使用`DATA_CLIENT`属性注册一个命名的`HttpClient`实例：
 
-[PRE7]
+```cs
+services.AddHttpClient(Constants.DATA_CLIENT, options => {
+  options.BaseAddress = new Uri("https://localhost:33333");
+  options.DefaultRequestHeaders.Add("Accept", "application/json");
+});
+```
 
-接下来，我们将创建一个服务客户端来抽象我们将要进行的HTTP请求的细节，使用我们在第9章中建立的相同模式，即*.NET中的HTTP*。我们的接口定义将提供以下简单的方法：
+接下来，我们将创建一个服务客户端来抽象我们将要进行的 HTTP 请求的细节，使用我们在第九章中建立的相同模式，即*.NET 中的 HTTP*。我们的接口定义将提供以下简单的方法：
 
-[PRE8]
+```cs
+public interface IDataService{
+  Task<string> GetStringValueById(string id);
+  Task<IEnumerable<string>> GetStringListById(string id);
+  Task<DataRecord> GetRecordById(string id);
+  Task<IEnumerable<DataRecord>> GetRecordListById(string id);
+}
+```
 
-在实现此接口的类中，我们将有一个`IHttpClientFactory`的私有实例，我们将使用我们的命名`HttpClient`实例来访问我们的后端数据存储。这个常见任务被隔离到一个私有方法中，用于实际的HTTP交互：
+在实现此接口的类中，我们将有一个`IHttpClientFactory`的私有实例，我们将使用我们的命名`HttpClient`实例来访问我们的后端数据存储。这个常见任务被隔离到一个私有方法中，用于实际的 HTTP 交互：
 
-[PRE9]
+```cs
+private async Task<string> GetResponseString(string path) {
+    var client = _httpFactory.CreateClient(Constants.DATA_CLIENT);
+    var request = new HttpRequestMessage(HttpMethod.Get, path);
+    var response = await client.SendAsync(request);
+    return await response.Content.ReadAsStringAsync();
+}
+```
 
 然后，每个公共接口方法都实现了这里建立的一般模式的端点特定变体：
 
-[PRE10]
+```cs
+public async Task<DataRecord> GetRecordById(string id) {
+    var respStr = await GetResponseString($"api/data/record/{id}");
+    return JsonConvert.DeserializeObject<DataRecord>(respStr);
+}
+```
 
-将此逻辑扩展到我们所有四种访问方法，我们将完成我们的后端数据客户端。在这个时候，我们应该修改我们的控制器以公开每个后端API端点，并使用它们来测试我们的数据访问服务。我们将公开与我们的后端API相同的同一服务合约，为每种可能查找的记录类型提供四个端点。我们不会重命名我们的文件，而是重新定义我们控制器的路由，并定义一个公共构造函数以允许依赖注入框架提供我们的`DataService`实例（只是别忘了在`Startup.cs`中注册具体的实现）。让我们看看以下代码：
+将此逻辑扩展到我们所有四种访问方法，我们将完成我们的后端数据客户端。在这个时候，我们应该修改我们的控制器以公开每个后端 API 端点，并使用它们来测试我们的数据访问服务。我们将公开与我们的后端 API 相同的同一服务合约，为每种可能查找的记录类型提供四个端点。我们不会重命名我们的文件，而是重新定义我们控制器的路由，并定义一个公共构造函数以允许依赖注入框架提供我们的`DataService`实例（只是别忘了在`Startup.cs`中注册具体的实现）。让我们看看以下代码：
 
-[PRE11]
+```cs
+[Route("api/cache-client")]
+[ApiController]
+public class ValuesController : ControllerBase {
 
-一旦我们有了我们的数据服务，我们就可以使用我们的API端点从我们的后端系统调用每个请求的对象：
+    private IDataService _dataService;
 
-[PRE12]
+    public ValuesController(IDataService data) {
+        _dataService = data;
+    }
+    ...
+```
+
+一旦我们有了我们的数据服务，我们就可以使用我们的 API 端点从我们的后端系统调用每个请求的对象：
+
+```cs
+[HttpGet("value/{id}")]
+public async Task<ActionResult<string>> GetValue(string id) {
+    return await _dataService.GetStringValueById(id);
+}
+
+[HttpGet("values/{id}")]
+public async Task<IEnumerable<string>> GetValues(string id) {
+    return await _dataService.GetStringListById(id);
+}
+
+[HttpGet("record/{id}")]
+public async Task<ActionResult<DataRecord>> GetRecord(string id) {
+    return await _dataService.GetRecordById(id);
+}
+
+[HttpGet("records/{id}")]
+public async Task<IEnumerable<DataRecord>> Get(string id) {
+    return await _dataService.GetRecordListById(id);
+}
+```
 
 到目前为止，通过运行你的后端 API 和缓存服务 API，你应该能够从你的缓存服务请求相同的值，并且有相同的五秒延迟。所以，现在我们的应用程序已经完全连接到请求后端服务的数据，让我们通过缓存来提高其性能。
 
@@ -220,13 +339,26 @@
 
 使用 Redis 作为我们的分布式缓存解决方案的主要好处之一是它由 .NET Core 默认支持。甚至还有一个针对 `IServicesCollection` 类的扩展方法，专门用于在应用程序中使用 Redis 缓存进行注册。只需为你的当前项目安装 `Microsoft.Extensions.Caching.Redis` NuGet 包，然后添加以下代码：
 
-[PRE13]
+```cs
+services.AddDistributedRedisCache(options => {
+    options.Configuration = "localhost";
+    options.InstanceName = "local";
+});
+```
 
 这将自动将 `RedisCache` 类的实例注册为任何注入到你的服务中的 `IDistributedCache` 实例的具体实现。本地主机配置设置将使用 Redis 客户端本地部署的默认配置，因此除非你明确更改本地部署，否则不需要指定 IP 地址和端口。同时，`InstanceName` 字段将为由该应用程序设置的缓存条目提供应用程序特定的前缀。所以，在这个例子中，如果我用本地设置设置了一个 `1234` 键的记录，那么这个键将存储在缓存中为 `local1234`。通过 `AddDistributedRedisCache()` 方法注册的 `RedisCache` 实例将自动查找我们选项中指定的 `InstanceName` 前缀的键。我们将在稍后检查我们的缓存实例时看到这一点。
 
 在我们的 Redis 缓存运行，并且我们的 `IDistributedCache` 实例配置并注册到我们的依赖注入容器后，我们可以编写一个 `CacheService` 类。这个类将遵循与我们的 `DataService` 类相似的模板，其中只公开少量逻辑操作作为公共方法，隐藏缓存交互的细节。我们为这个 `CacheService` 类的接口如下：
 
-[PRE14]
+```cs
+public interface ICacheService {
+    Task<bool> HasCacheRecord(string id);
+    Task<string> FetchString(string id);
+    Task<T> FetchRecord<T>(string id);
+    Task WriteString(string id, string value);
+    Task WriteRecord<T>(string id, T record);
+}
+```
 
 在这里，我们区分了写入单个字符串和写入更复杂的记录，以区分在每个方法实现中序列化和反序列化我们条目的需求。
 
@@ -234,7 +366,7 @@
 
 `IDistributedCache` 类提供了一个简单的机制来与我们的缓存数据交互。它基于简单的 get/set 模式运行，尝试获取记录将根据给定的 ID 返回缓存的字节数组或字符串，如果不存在记录则返回 null。没有错误处理或状态检查。缓存的速度取决于这种简单的交互机制和失败状态。
 
-同样，设置记录同样简单。只需定义记录的ID，然后提供记录的序列化表示形式以供存储。这种序列化格式可以是使用`SetString(string id, string value)`方法的字符串，或者使用`Set(string id, byte[] value)`方法的字节数组。
+同样，设置记录同样简单。只需定义记录的 ID，然后提供记录的序列化表示形式以供存储。这种序列化格式可以是使用`SetString(string id, string value)`方法的字符串，或者使用`Set(string id, byte[] value)`方法的字节数组。
 
 此外，当你向缓存写入值时，你可以为你的缓存记录设置额外的选项来指定过期时间范围。你可以应用的过期设置类型如下：
 
@@ -242,47 +374,96 @@
 
 +   **绝对过期相对于现在**：这将在记录被设置在缓存中的那一刻起，设置一个固定的时间点，无论它最近是否被使用，记录都将被失效。与绝对过期不同的是，过期时间是以记录设置在缓存中的那一刻起的一段时间长度来表示的。
 
-+   **滑动过期**：这将在记录最后访问的时间点设置一个过期时间。因此，如果滑动过期设置为60分钟，并且记录在62分钟后没有被再次访问，它将过期。然而，如果记录在58分钟后再次被访问，过期时间将从第二次访问的那一秒重置为60分钟。
++   **滑动过期**：这将在记录最后访问的时间点设置一个过期时间。因此，如果滑动过期设置为 60 分钟，并且记录在 62 分钟后没有被再次访问，它将过期。然而，如果记录在 58 分钟后再次被访问，过期时间将从第二次访问的那一秒重置为 60 分钟。
 
 因此，让我们看看我们将如何实现这个缓存。首先，我们必须注入在`Startup.cs`类中注册的`IDistributedCache`实例：
 
-[PRE15]
+```cs
+public class CacheService : ICacheService {
+    IDistributedCache _cache;
+
+    public CacheService(IDistributedCache cache) {
+        _cache = cache;
+    }
+```
 
 然后，我们将实现我们的接口方法。第一个方法相当直接，仅在我们缓存命中时通知我们的消费者：
 
-[PRE16]
+```cs
+public async Task<bool> HasCacheRecord(string id) {
+    var record = await _cache.GetStringAsync(id);
+    return record != null;
+}
+```
 
 接下来，我们将实现我们的记录检索方法。这些方法之间的唯一区别是，检索复杂的数据类型（记录和字符串列表）将需要额外的反序列化步骤。除此之外，我们的`Fetch...()`方法应该看起来相当直接：
 
-[PRE17]
+```cs
+public async Task<string> FetchString(string id) {
+    return await _cache.GetStringAsync(id);
+}
 
-最后，我们需要实现写入方法。为了演示，我们将使用`DistributedCacheEntryOptions`类将所有记录的滑动过期时间设置为60分钟。之后，我们可以简单地传递我们的键和序列化值（我们将使用JSON，以利用`Newtonsoft.Json`库）以及过期选项到缓存中：
+public async Task<T> FetchRecord<T>(string id) {
+    var record = await _cache.GetStringAsync(id);
+    T result = JsonConvert.DeserializeObject<T>(record);
+    return result;
+}
+```
 
-[PRE18]
+最后，我们需要实现写入方法。为了演示，我们将使用`DistributedCacheEntryOptions`类将所有记录的滑动过期时间设置为 60 分钟。之后，我们可以简单地传递我们的键和序列化值（我们将使用 JSON，以利用`Newtonsoft.Json`库）以及过期选项到缓存中：
+
+```cs
+public async Task WriteString(string id, string value) {
+    DistributedCacheEntryOptions opts = new DistributedCacheEntryOptions() {
+        SlidingExpiration = TimeSpan.FromMinutes(60)
+    };
+    await _cache.SetStringAsync(id, value, opts);
+}
+
+public async Task WriteRecord<T>(string id, T record) {
+    var value = JsonConvert.SerializeObject(record);
+    DistributedCacheEntryOptions opts = new DistributedCacheEntryOptions() {
+        SlidingExpiration = TimeSpan.FromMinutes(60)
+    };
+
+    await _cache.SetStringAsync(id, value, opts);
+}
+```
 
 有了这些，我们的缓存应该已经准备好使用了。现在，是时候在我们的控制器端点中整合所有内容了。为此，每个方法的交互模式都将相同，唯一的区别是我们对缓存执行的读写操作类型。所以，让我们看看我们将如何实现我们的缓存策略：
 
-[PRE19]
+```cs
+[HttpGet("record/{id}")]
+public async Task<ActionResult<DataRecord>> GetRecord(string id) {
+    var key = $"{id}record";
+    if (await _cache.HasCacheRecord(key)) {
+        return await _cache.FetchRecord<DataRecord>(key);
+    }
+    var value = await _dataService.GetRecordById(id);
+    await _cache.WriteRecord(key, value);
+    return value;
+}
+```
 
-你首先会注意到，我为给定的ID添加了一个后缀，这与我的路由匹配。这是为了允许我的缓存中每个不同数据类型的重复ID。接下来，我们检查我们的`HasCacheRecord`（键）方法，以确定我们是否有一个缓存命中。如果有，我们只需获取缓存记录并返回结果。然而，当我们没有命中时，我们必须从我们的底层数据存储中获取数据。一旦我们有了它，我们就将其写入我们的缓存，以便在后续请求中更快地检索，然后返回该值。
+你首先会注意到，我为给定的 ID 添加了一个后缀，这与我的路由匹配。这是为了允许我的缓存中每个不同数据类型的重复 ID。接下来，我们检查我们的`HasCacheRecord`（键）方法，以确定我们是否有一个缓存命中。如果有，我们只需获取缓存记录并返回结果。然而，当我们没有命中时，我们必须从我们的底层数据存储中获取数据。一旦我们有了它，我们就将其写入我们的缓存，以便在后续请求中更快地检索，然后返回该值。
 
-在对每个端点进行适当的修改后应用此模式，我们就准备好进行测试了。为了确认缓存的运行行为，首先对具有新ID的任何端点运行相同的查询，连续两次。如果一切正常，你的第一次请求应该有5秒的延迟，而后续请求的延迟几乎为零。
+在对每个端点进行适当的修改后应用此模式，我们就准备好进行测试了。为了确认缓存的运行行为，首先对具有新 ID 的任何端点运行相同的查询，连续两次。如果一切正常，你的第一次请求应该有 5 秒的延迟，而后续请求的延迟几乎为零。
 
-一旦你在缓存中存储了至少一条或两条记录，你就可以在Windows Subsystem for Linux控制台中使用redis-cli观察这些值。`RedisCache`类将条目作为哈希类型存储在底层缓存中，因此你需要使用这些命令来查找键值。我在测试应用程序时查找记录的操作如下：
+一旦你在缓存中存储了至少一条或两条记录，你就可以在 Windows Subsystem for Linux 控制台中使用 redis-cli 观察这些值。`RedisCache`类将条目作为哈希类型存储在底层缓存中，因此你需要使用这些命令来查找键值。我在测试应用程序时查找记录的操作如下：
 
 ![](img/9584f3f5-0bfa-480a-b9dd-01b711217714.png)
 
-第一个命令`keys *`简单地搜索所有匹配给定模式（*是通配符，所以`keys *`匹配所有键）的活跃键。然后，我使用了`hgetall [key]`命令来获取我条目哈希中的每个属性。在这个输出中，你可以清楚地看到从我应用程序写入缓存中的JSON，这证明了我的应用程序和缓存之间成功且预期的交互。
+第一个命令`keys *`简单地搜索所有匹配给定模式（*是通配符，所以`keys *`匹配所有键）的活跃键。然后，我使用了`hgetall [key]`命令来获取我条目哈希中的每个属性。在这个输出中，你可以清楚地看到从我应用程序写入缓存中的 JSON，这证明了我的应用程序和缓存之间成功且预期的交互。
 
-我还想指出键的结构。正如我之前提到的，我设置的键（在这种情况下，2345条记录）以`RedisCacheOptions`的`InstanceName`为前缀，我在`Startup.cs`文件中配置了`RedisCache`。通过这个输出，你已经看到了微软为与Redis缓存实例交互而建立的完整交互模式。
+我还想指出键的结构。正如我之前提到的，我设置的键（在这种情况下，2345 条记录）以`RedisCacheOptions`的`InstanceName`为前缀，我在`Startup.cs`文件中配置了`RedisCache`。通过这个输出，你已经看到了微软为与 Redis 缓存实例交互而建立的完整交互模式。
 
 # 缓存提供者
 
-尽管我们在示例代码中演示了使用`IDistributedCache`类实例的数据缓存，但这并不是.NET Core中我们所能访问的唯一缓存提供者。在我们结束缓存主题之前，我想简要讨论框架中另外两个最常见的提供者。
+尽管我们在示例代码中演示了使用`IDistributedCache`类实例的数据缓存，但这并不是.NET Core 中我们所能访问的唯一缓存提供者。在我们结束缓存主题之前，我想简要讨论框架中另外两个最常见的提供者。
 
-# SqlServerCache提供者
+# SqlServerCache 提供者
 
-Redis无疑是工程师们中流行的高性能缓存实现。然而，它并不是唯一的分布式提供者。实际上，当需要时，微软自己的SQL Server也可以作为缓存使用，并且他们为`IDistributedCache`类定义了一个类似的实现来公开它。
+Redis 无疑是工程师们中流行的高性能缓存实现。然而，它并不是唯一的分布式提供者。实际上，当需要时，微软自己的 SQL Server 也可以作为缓存使用，并且他们为`IDistributedCache`类定义了一个类似的实现来公开它。
 
 与 `SqlServerCache` 提供程序和 `RedisCache` 实例最大的不同之处在于它们所需的配置。由于 Redis 是一个简单的键值存储，`SqlServer` 仍然是一个功能齐全的关系型数据库。因此，为了提供高性能缓存所需的轻量级交互，您必须在将其设置为 `IDistributedCache` 提供程序时指定您打算利用的确切模式、表和数据库连接。并且由于 SQL Server 不支持 Redis 所支持的哈希表，您的应用程序连接用于缓存的表应实现 `IDistributedCache` 记录的预期结构。幸运的是，.NET Core CLI 提供了一个用于建立此类表的实用命令：`sql-cache create` 命令。值得注意的是，由于您的应用程序应该始终只与注入的 `IDistributedCache` 实例交互，您甚至可能不会注意到差异，除非是在性能方面。然而，出于性能的考虑，我建议尽可能使用 Redis。它正迅速成为行业标准，其速度确实无法与 SQL Server 相匹敌。
 
@@ -322,6 +503,6 @@ Redis无疑是工程师们中流行的高性能缓存实现。然而，它并不
 
 # 进一步阅读
 
-对于在现代 .NET 环境中构建缓存的更多实践指导，我推荐由 *Rod Stephens* 编著的书籍 *The Modern C# Challenge*。它深入探讨了与本章中讨论的相同类型的模式和惯例，并以极其易于理解的方式呈现。您可以通过 Packt 出版公司找到它，网址为：[https://www.packtpub.com/application-development/modern-c-challenge-0.](https://www.packtpub.com/application-development/modern-c-challenge-0)
+对于在现代 .NET 环境中构建缓存的更多实践指导，我推荐由 *Rod Stephens* 编著的书籍 *The Modern C# Challenge*。它深入探讨了与本章中讨论的相同类型的模式和惯例，并以极其易于理解的方式呈现。您可以通过 Packt 出版公司找到它，网址为：[`www.packtpub.com/application-development/modern-c-challenge-0.`](https://www.packtpub.com/application-development/modern-c-challenge-0)
 
-或者，如果你想考虑分布式、水平扩展的应用架构固有的其他挑战，你应该查看*Vinicius Feitosa Pacheco*的*《微服务模式和最佳实践》*。它也由Packt出版，你可以在这里获取： [https://www.packtpub.com/application-development/microservice-patterns-and-best-practices.](https://www.packtpub.com/application-development/microservice-patterns-and-best-practices)
+或者，如果你想考虑分布式、水平扩展的应用架构固有的其他挑战，你应该查看*Vinicius Feitosa Pacheco*的*《微服务模式和最佳实践》*。它也由 Packt 出版，你可以在这里获取： [`www.packtpub.com/application-development/microservice-patterns-and-best-practices.`](https://www.packtpub.com/application-development/microservice-patterns-and-best-practices)

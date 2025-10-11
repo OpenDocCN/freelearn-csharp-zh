@@ -2,7 +2,7 @@
 
 # 存储和检索数据
 
-您现在拥有了创建和导航页面、布局以及用于填充页面的控件的所有基础知识。恭喜！您现在是一名.NET MAUI程序员。
+您现在拥有了创建和导航页面、布局以及用于填充页面的控件的所有基础知识。恭喜！您现在是一名.NET MAUI 程序员。
 
 本章开始介绍本书的中间部分，其中您将了解如何存储和检索数据，然后创建单元测试——这两个都是编写现实世界应用，尤其是企业应用的关键方面。
 
@@ -16,15 +16,15 @@
 
 # 技术要求
 
-要跟随本章内容，您需要Visual Studio。您还将安装另一个`NuGet`包，如本章后面所示。
+要跟随本章内容，您需要 Visual Studio。您还将安装另一个`NuGet`包，如本章后面所示。
 
-本章完成代码的源代码可以在以下位置找到：[https://github.com/PacktPublishing/.NET-MAUI-for-C-Sharp-Developers/tree/persistence](https://github.com/PacktPublishing/.NET-MAUI-for-C-Sharp-Developers/tree/persistence)。要跟随本章内容，您需要使用上一章的代码。
+本章完成代码的源代码可以在以下位置找到：[`github.com/PacktPublishing/.NET-MAUI-for-C-Sharp-Developers/tree/persistence`](https://github.com/PacktPublishing/.NET-MAUI-for-C-Sharp-Developers/tree/persistence)。要跟随本章内容，您需要使用上一章的代码。
 
 # 存储用户偏好
 
-大多数应用允许用户设置可以存储在手机上并在应用启动时检索的偏好设置。.NET MAUI提供了这项服务，可以轻松存储*键/值对*，例如主题偏好、最后使用日期、登录名等。
+大多数应用允许用户设置可以存储在手机上并在应用启动时检索的偏好设置。.NET MAUI 提供了这项服务，可以轻松存储*键/值对*，例如主题偏好、最后使用日期、登录名等。
 
-.NET MAUI提供了`IPreferences`接口来帮助存储这些偏好。使用它以及相关的`Preferences`类（都在`Microsoft.Maui.Storage`命名空间中），您可以存储以下类型的字符串键和值：
+.NET MAUI 提供了`IPreferences`接口来帮助存储这些偏好。使用它以及相关的`Preferences`类（都在`Microsoft.Maui.Storage`命名空间中），您可以存储以下类型的字符串键和值：
 
 +   `布尔`
 
@@ -38,13 +38,13 @@
 
 持久化日期时间
 
-`DateTime`值存储为64位整数，并使用`ToBinary`和`FromBinary`方法进行编码和解码。
+`DateTime`值存储为 64 位整数，并使用`ToBinary`和`FromBinary`方法进行编码和解码。
 
 让我们创建一个`UserPreferences`页面，包含一个简短表单来收集用户的偏好。我们还将添加`Button`，用于显示所有已保存的偏好，并允许用户删除一个或全部。
 
 名称冲突
 
-我们有一个偏好设置页面，这可能会引起问题，因为我们想使用内置的`Preferences`对象。为了解决这个问题，请转到`PreferencesViewModel`并将`List<Preference>`重命名为`preferenceList`。不应该有其他冲突。最安全的重命名方法是使用Visual Studio的重命名功能，您可以通过将光标放在名称上并输入`Control-R R`来访问它。重命名后，您可能需要根据Visual Studio的最新更新手动重命名`ObservableProperties`。
+我们有一个偏好设置页面，这可能会引起问题，因为我们想使用内置的`Preferences`对象。为了解决这个问题，请转到`PreferencesViewModel`并将`List<Preference>`重命名为`preferenceList`。不应该有其他冲突。最安全的重命名方法是使用 Visual Studio 的重命名功能，您可以通过将光标放在名称上并输入`Control-R R`来访问它。重命名后，您可能需要根据 Visual Studio 的最新更新手动重命名`ObservableProperties`。
 
 新的`UserPreferences`页面将从用户那里收集三个偏好，具体如下：
 
@@ -52,7 +52,7 @@
 
 +   偏好的主题
 
-+   应用是否可以在蜂窝或Wi-Fi上使用
++   应用是否可以在蜂窝或 Wi-Fi 上使用
 
 浅色和深色主题
 
@@ -62,15 +62,75 @@
 
 这里是 `UserPreferences` 页面：
 
-[PRE0]
+```cs
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    Title="User Preferences"
+    x:Class="ForgetMeNotDemo.View.UserPreferencesPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml">
+    <VerticalStackLayout>
+        <Grid
+            ColumnDefinitions="*,*"
+            RowDefinitions="*,*,*,*">
+            <Label
+                Grid.Column="0"
+                Grid.Row="0"
+                Text="Display Name" />
+            <Entry
+                Grid.Column="1"
+                Grid.Row="0"
+                Placeholder="Your name as you want it
+                   displayed"
+                Text="{Binding DisplayName}" />
+```
 
 收集了用户的显示名称后，我们可以继续询问他们希望选择哪两个互斥主题之一。为此，我们将使用 `RadioButtonGroup` 和两个 `RadioButtons`，初始化 `Light` 为选中状态：
 
-[PRE1]
+```cs
+            <Label
+                Grid.Column="0"
+                Grid.Row="1"
+                Text="Theme" />
+            <HorizontalStackLayout
+                Grid.Column="1"
+                Grid.Row="1"
+                RadioButtonGroup.GroupName="{Binding
+                    ThemeGroupName}" [1]
+                RadioButtonGroup.SelectedValue="{Binding
+                    ThemeSelection}"> [2]
+                <RadioButton Content="Dark" />
+                <RadioButton
+                    Content="Light"
+                    IsChecked="True" /> [3]
+            </HorizontalStackLayout>
+```
 
 我们现在想询问用户是否应该在连接到 Wi-Fi 时才使用应用程序。我们可以使用一个开关控件来实现，其中 `on` 表示 `WiFi only` 是 `true`：
 
-[PRE2]
+```cs
+            <Label
+                Grid.Column="0"
+                Grid.Row="2"
+                Text="Wifi Only?" />
+            <Switch                  [4]
+                Grid.Column="1"
+                Grid.Row="2"
+                HorizontalOptions="Start"
+                IsToggled="{Binding WifiOnly}"
+                OnColor="Green"
+                ThumbColor="Blue" />
+            <Button
+                Command="{Binding SavePreferencesCommand}"
+                Grid.Column="0"
+           Grid.ColumnSpan="2"
+                Grid.Row="3"
+                HorizontalOptions="Center"
+                Text="Save" />
+        </Grid>
+    </VerticalStackLayout>
+</ContentPage>
+```
 
 `[1]` 在这里，我们引入了一个新的控件，`RadioButton`。单选按钮可以是隐式或显式的组。隐式组是通过将所有 `RadioButtons` 放入同一个容器中（例如，`VerticalStackLayout`）来创建的。显式组被赋予 `GroupName`，正如我们所看到的。
 
@@ -86,11 +146,28 @@
 
 如您所预期，我们首先会为绑定的控件创建属性：
 
-[PRE3]
+```cs
+[ObservableObject]
+public partial class UserPreferencesViewModel
+{
+  [ObservableProperty] private string displayName;
+  [ObservableProperty] private string themeSelection;
+  [ObservableProperty] private bool wifiOnly;
+  public string ThemeGroupName => "Theme";
+```
 
 接下来，我们需要处理 `SavePreferences` 命令。我们通过使用 .NET MAUI 的 `Preferences` 对象，调用静态的 `Set` 方法来完成：
 
-[PRE4]
+```cs
+[RelayCommand]
+public async Task SavePreferences()
+{
+  Preferences.Default.Set("DisplayName", displayName);
+  Preferences.Default.Set("ThemeSelection",
+    themeSelection);
+  Preferences.Default.Set("WifiOnly", wifiOnly);
+}
+```
 
 .NET MAUI 将为我们处理持久性。
 
@@ -100,19 +177,29 @@
 
 我们需要一种方法来访问我们新的页面。一个典型的放置位置是将 `Button` 作为 `VerticalStackLayout` 的最后一个项目：
 
-[PRE5]
+```cs
+<Button
+    Command="{Binding OpenPreferencesCommand}"
+    Text="Preferences"
+    WidthRequest="150"
+    Margin="10,50,10,0"/>
+```
 
 `OnPreferences` 命令简单地导航到我们的新页面：
 
-[PRE6]
+```cs
+[RelayCommand]
+public async Task OpenPreferences()
+{
+  await Shell.Current.GoToAsync("userpreferences");
+}
+```
 
 确保在调用此方法之前在 `AppShell` 中注册 `userpreferences` 页面。
 
 页面可能看起来并不美观，但它已经准备好收集用户的偏好，如下所示：
 
-![图 8.1 – 偏好页面
-
-](img/Figure_8.1_B19723.jpg)
+![图 8.1 – 偏好页面](img/Figure_8.1_B19723.jpg)
 
 图 8.1 – 偏好页面
 
@@ -124,7 +211,16 @@
 
 `Get` 方法接受两个参数，*键*和*默认值*。我们将将其放在 `ViewModel` 构造函数中，以便在显示时填充偏好页面：
 
-[PRE7]
+```cs
+public UserPreferencesViewModel()
+{
+  displayName = Preferences.Default.Get("DisplayName",
+    "Unknown");
+  themeSelection = Preferences.Default.Get
+    ("ThemeSelection", "Light");
+  wifiOnly = Preferences.Default.Get("WifiOnly", false);
+}
+```
 
 注意，`Get` 方法的第一个参数是键，正如在 `SavePreferences` 方法中 `Set` 方法定义的那样。第二个参数是如果键不存在时将提供的默认值。
 
@@ -194,7 +290,21 @@
 
 要创建你的数据库，你需要存储数据库文件名及其路径以及其他常量值。为此，右键单击你的项目并创建一个 `Constants.cs` 文件。为了方便，我将创建一个 `Database` 文件夹并将其放置在那里：
 
-[PRE8]
+```cs
+namespace ForgetMeNotDemo.Database;
+public static class Constants
+{
+  public const string DatabaseFilename =
+    "ForgetMeNotDemo.db3"; [1]
+  public const SQLite.SQLiteOpenFlags Flags = [2]
+    SQLite.SQLiteOpenFlags.ReadWrite |
+    SQLite.SQLiteOpenFlags.Create |
+    SQLite.SQLiteOpenFlags.SharedCache;
+  public static string DatabasePath =>
+    Path.Combine(FileSystem.AppDataDirectory,
+      DatabaseFilename); [3]
+}
+```
 
 `[1]` 为你的数据库设置名称。你可以使用显示的名称，也可以将其重命名为你喜欢的任何名称。
 
@@ -210,7 +320,25 @@
 
 该类需要一个 `Init()` 方法来创建数据库和我们的第一个表。为了让我们开始，让我们创建一个表来存储所有我们的首选项：
 
-[PRE9]
+```cs
+using ForgetMeNotDemo.Database;
+using ForgetMeNotDemo.Model;
+using SQLite;
+namespace ForetMeNotDemoDatabase;
+public class ForgetMeNotDemoDatabase
+{
+    private SQLiteAsyncConnection Database;  [1]
+    private async Task Init()
+    {
+        if (Database is not null)  [2]
+            return;
+        Database = new SQLiteAsyncConnection(  [3]
+              Constants.DatabasePath,
+              Constants.Flags);
+        await Database.CreateTableAsync<Preference>(); [4]
+    }
+}
+```
 
 `[1]` 声明一个类型为 `SQLiteAsyncConnection` 的对象，并将其命名为 `Database`。
 
@@ -232,11 +360,33 @@
 
 首先在 `Model` 文件夹中打开 `Preference.cs` 并添加一个 `id` 属性：
 
-[PRE10]
+```cs
+[ObservableObject]
+public partial class Preference
+{
+    [ObservableProperty] private int id;
+    [ObservableProperty] private string preferencePrompt;
+    [ObservableProperty] private string preferenceValue;
+}
+```
 
 接下来，返回到 `ForgetMeNotDemoDatabase.cs` 并添加 `SavePreference` 方法：
 
-[PRE11]
+```cs
+public async Task<int> SavePreference(Preference
+    preference) [1]
+{
+    await Init();  [2]
+    if (preference.Id != 0) [3]
+    {
+        return await Database.UpdateAsync(preference);
+    }
+    else
+    {
+        return await Database.InsertAsync(preference);
+    }
+}
+```
 
 `[1]` 我们的 `SavePreference` 方法接受一个类型（`Preference`）作为参数，并返回更新的行数（在这种情况下，零或一）。
 
@@ -250,13 +400,19 @@
 
 我们将希望能够从数据库中获取所有我们的首选项。为此，我们将创建一个 `GetPreferences` 方法，它返回一个 `Preference` 对象的列表：
 
-[PRE12]
+```cs
+public async Task<List<Preference>> GetPreferences()
+{
+    await Init();
+    return await Database.Table<Preference>();
+}
+```
 
 软删除
 
 当我们编写`Delete`方法时，我们可能想要进行一次*软删除*——也就是说，将其标记为已删除而不是实际删除。为了实现这一点，你需要在`Preference`中添加另一个属性`Deleted`，以及`int`类型。然后，我们的读取语句将包含一个`where`子句，检查`Deleted`属性是否等于零。
 
-一旦你有了数据库设计，你需要决定你是打算在设备上本地保留数据库，还是在云端通过你的API访问。
+一旦你有了数据库设计，你需要决定你是打算在设备上本地保留数据库，还是在云端通过你的 API 访问。
 
 # 本地还是远程？
 
@@ -266,9 +422,9 @@
 
 # 摘要
 
-在本章中，我们回顾了两种存储数据的方式。最简单且最轻量级的是使用.NET MAUI的偏好设置功能。如果你只需要存储原始数据和针对持久化程序用户偏好的短字符串，这非常合适。
+在本章中，我们回顾了两种存储数据的方式。最简单且最轻量级的是使用.NET MAUI 的偏好设置功能。如果你只需要存储原始数据和针对持久化程序用户偏好的短字符串，这非常合适。
 
-如果你需要持久化更大量的数据，你需要一个数据库，而对于设备上的存储来说，最流行的类型无疑是SQLite。我们检查了SQLite的CRUD功能，然后指出了一种替代方案，即不是在设备上存储所有内容，而是在云中存储并通过程序的API访问。
+如果你需要持久化更大量的数据，你需要一个数据库，而对于设备上的存储来说，最流行的类型无疑是 SQLite。我们检查了 SQLite 的 CRUD 功能，然后指出了一种替代方案，即不是在设备上存储所有内容，而是在云中存储并通过程序的 API 访问。
 
 # 习题
 
@@ -276,10 +432,10 @@
 
 1.  我们向`Get`方法传递哪两个值来检索存储的值？
 
-1.  我们需要哪些`NuGet`包来在.NET MAUI中与SQLite一起工作？
+1.  我们需要哪些`NuGet`包来在.NET MAUI 中与 SQLite 一起工作？
 
 1.  我们使用什么类型的对象来创建表？
 
 # 你来试试
 
-将剩余的CRUD操作添加到`Preference`表（例如，删除和按ID获取）。
+将剩余的 CRUD 操作添加到`Preference`表（例如，删除和按 ID 获取）。

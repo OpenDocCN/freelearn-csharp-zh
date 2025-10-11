@@ -1,6 +1,6 @@
 # 空间划分
 
-在本章中，我们将回顾空间划分模式；空间划分的概念在计算机图形学中很普遍，用于以最佳方式组织虚拟空间中的对象。这种方法也适用于管理Unity场景中放置的GameObject。通过实现空间划分模式的核心原则，我们可以将充满二维或三维对象的大型环境划分为两部分，同时仍然能够保持一定程度的性能一致性。正如您在本章中将会看到的，这种模式是使大型AAA开放世界游戏制作成为可能的核心成分之一。
+在本章中，我们将回顾空间划分模式；空间划分的概念在计算机图形学中很普遍，用于以最佳方式组织虚拟空间中的对象。这种方法也适用于管理 Unity 场景中放置的 GameObject。通过实现空间划分模式的核心原则，我们可以将充满二维或三维对象的大型环境划分为两部分，同时仍然能够保持一定程度的性能一致性。正如您在本章中将会看到的，这种模式是使大型 AAA 开放世界游戏制作成为可能的核心成分之一。
 
 本章将涵盖以下主题：
 
@@ -10,31 +10,31 @@
 
 # 技术要求
 
-本章是实践性的，您需要对Unity和C#有基本的了解。
+本章是实践性的，您需要对 Unity 和 C#有基本的了解。
 
-我们将使用以下特定的Unity引擎和C#语言概念：
+我们将使用以下特定的 Unity 引擎和 C#语言概念：
 
 +   LINQ
 
 如果您不熟悉这个概念，请在继续之前进行复习。
 
-LINQ是一种非常强大的查询语言，与SQL有些相似；当您想简单地遍历数据结构时，它可以节省时间。
+LINQ 是一种非常强大的查询语言，与 SQL 有些相似；当您想简单地遍历数据结构时，它可以节省时间。
 
-本章的代码文件可以在GitHub上找到：
+本章的代码文件可以在 GitHub 上找到：
 
-[https://github.com/PacktPublishing/Hands-On-Game-Development-Patterns-with-Unity-2018](https://github.com/PacktPublishing/Hands-On-Game-Development-Patterns-with-Unity-2018)
+[`github.com/PacktPublishing/Hands-On-Game-Development-Patterns-with-Unity-2018`](https://github.com/PacktPublishing/Hands-On-Game-Development-Patterns-with-Unity-2018)
 
 查看以下视频，以查看代码的实际运行情况：
 
-[http://bit.ly/2FAyWCf](http://bit.ly/2FAyWCf)
+[`bit.ly/2FAyWCf`](http://bit.ly/2FAyWCf)
 
 # 空间划分模式的概述
 
-游戏程序员经常面临的问题是如何快速定位场景中与参考点最近的特定实体，例如玩家角色。在Unity中，有许多解决这个问题的方法，如下所示：
+游戏程序员经常面临的问题是如何快速定位场景中与参考点最近的特定实体，例如玩家角色。在 Unity 中，有许多解决这个问题的方法，如下所示：
 
 +   实现一个射线投射系统，该系统将扫描玩家角色周围的区域，并报告特定实体的位置。
 
-+   使用Unity的API功能，例如`GameObject.Find()`函数，在场景中定位特定实体，然后比较它们的坐标与玩家角色的坐标。
++   使用 Unity 的 API 功能，例如`GameObject.Find()`函数，在场景中定位特定实体，然后比较它们的坐标与玩家角色的坐标。
 
 第一个选项是有效的，但如果我们的三维环境复杂，可能很难定位我们正在寻找的所有实体，因为它们可能被其他对象遮挡，无法被射线相交。第二个选项在性能方面可能不是最佳选择，因为我们可能需要遍历包含场景中每个实体的列表，直到找到特定类型的每个实例。
 
@@ -46,9 +46,9 @@ LINQ是一种非常强大的查询语言，与SQL有些相似；当您想简单�
 
 ![图片](img/159db14d-2aec-488b-8a74-63cad602f3eb.png)
 
-现在，让我们想象这个网格叠加在一个大型开放世界地图的RPG视频游戏上。每个单元格（正方形）代表一个虚拟的2x2平方公里区域。我们知道我们的玩家角色在地图上的一个特定单元格（正方形）中出生，但我们想给他提供快速前往一个充满他可以战斗的2级怪物的区域的选择。通过使用空间分区，我们可以轻松地计算内存中特定类型的最近实体，而无需扫描整个三维环境。
+现在，让我们想象这个网格叠加在一个大型开放世界地图的 RPG 视频游戏上。每个单元格（正方形）代表一个虚拟的 2x2 平方公里区域。我们知道我们的玩家角色在地图上的一个特定单元格（正方形）中出生，但我们想给他提供快速前往一个充满他可以战斗的 2 级怪物的区域的选择。通过使用空间分区，我们可以轻松地计算内存中特定类型的最近实体，而无需扫描整个三维环境。
 
-计算结果可以向我们建议一个包含2级敌人最大群体的附近单元格（正方形）。有了这个信息，我们可以将我们的玩家角色移动到建议单元格（正方形）内的随机位置，以便他可以掠夺该区域。正如您将在下一节中看到的那样，空间分区简化了管理位于复杂二维和三维空间中的实体的过程。
+计算结果可以向我们建议一个包含 2 级敌人最大群体的附近单元格（正方形）。有了这个信息，我们可以将我们的玩家角色移动到建议单元格（正方形）内的随机位置，以便他可以掠夺该区域。正如您将在下一节中看到的那样，空间分区简化了管理位于复杂二维和三维空间中的实体的过程。
 
 # 优点和缺点
 
@@ -76,7 +76,7 @@ LINQ是一种非常强大的查询语言，与SQL有些相似；当您想简单�
 
 +   我们可以实现一个射线投射系统，扫描捕食者附近的每个物体，以发现潜在的猎物。
 
-这些解决方案可能有效，但它们在短时间内实施可能会很繁琐。然而，使用空间划分模式，我们可以通过确保场景中的所有实体都包含在一个按相对位置组织猎物和捕食者的数据结构中来避免这个过程。正如你将在我们的代码示例中看到的那样，编写这个实现非常快且有用，尤其是在你匆忙并想在代码中草拟一些基本的AI导航行为时。
+这些解决方案可能有效，但它们在短时间内实施可能会很繁琐。然而，使用空间划分模式，我们可以通过确保场景中的所有实体都包含在一个按相对位置组织猎物和捕食者的数据结构中来避免这个过程。正如你将在我们的代码示例中看到的那样，编写这个实现非常快且有用，尤其是在你匆忙并想在代码中草拟一些基本的 AI 导航行为时。
 
 # 代码示例
 
@@ -84,31 +84,168 @@ LINQ是一种非常强大的查询语言，与SQL有些相似；当您想简单�
 
 1.  让我们从实现我们模式的核心元素`Grid`开始：
 
-[PRE0]
+```cs
+using System;
+using System.Linq;
+using UnityEngine;
+
+public class Grid: MonoBehaviour
+{
+    private int m_SquareSize;
+    private int m_NumberOfSquares;
+
+    public Grid(int squareSize, int numberOfSquares)
+    {
+        // The size can represent anything (meters, km)
+        m_SquareSize = squareSize;
+
+        // Squares permits to subdivide the grid granulary
+        m_NumberOfSquares = numberOfSquares;
+    }
+
+    public void AddToRandomnPosition(IUnit unit)
+    {
+        unit.AddToGrid(UnityEngine.Random.Range(0, m_NumberOfSquares));
+    }
+
+    public int FindClosest(IUnit referenceUnit, IUnit[] list)
+    {
+        if (list != null)
+        {
+            // Using LINQ queries
+            var points = list.Select(a => a.GetGridPosition()).ToList();
+            var nearest = points.OrderBy(x => Math.Abs(x - referenceUnit.GetGridPosition())).First();
+            return nearest;
+        }
+        else
+        {
+            throw new ArgumentException("Parameters cannot be null", "list");
+        }
+    }
+}
+```
 
 你应该注意的第一件事是`AddToRandomnPosition()`函数，在其中我们通过`Random.Range()`调用将单位添加到网格中的方块。我们这样做有两个原因。我们想快速测试我们的`Grid`实现，所以我们模拟了实体在随机位置的环境中分散。我们还想展示我们如何结合使用空间划分和生成系统来管理特定优化网格空间内的实体生成。换句话说，我们可以在初始化将占据它的东西之前，在内存中对场景的虚拟空间进行划分。
 
-另一个需要分析的功能是`FindClosest()`；请注意，我们使用了两个LINQ查询。第一个查询从一个单位列表中提取网格位置列表。第二个查询是查询这个列表，以找到相对于参考单位最近的单元格。对于那些从未使用过LINQ的人来说，它是一种内置的C#查询语言，允许使用一行代码在集合中查找和提取元素。当你需要原型设计和快速编写使用数据结构和集合的实现时，这是一个非常出色的工具。
+另一个需要分析的功能是`FindClosest()`；请注意，我们使用了两个 LINQ 查询。第一个查询从一个单位列表中提取网格位置列表。第二个查询是查询这个列表，以找到相对于参考单位最近的单元格。对于那些从未使用过 LINQ 的人来说，它是一种内置的 C#查询语言，允许使用一行代码在集合中查找和提取元素。当你需要原型设计和快速编写使用数据结构和集合的实现时，这是一个非常出色的工具。
 
 1.  现在，我们需要一种方法让我们的单位将自己注册到`Grid`的特定单元格中。让我们首先实现一个接口来管理我们的单位类型：
 
-[PRE1]
+```cs
+public interface IUnit
+{
+    // The Unit can add itself to the grid
+    void AddToGrid(int cell);
 
-这是一个相当直接的接口；`GetGridPosition()`函数返回`Unit`的网格位置。可能出现的疑问是，为什么我们不实现一个返回`Unit`在场景中实际位置的函数？这是因为，在Unity中，如果一个GameObject附加了`Transform`组件，我们可以直接要求这个组件返回它在三维场景中的位置。换句话说，我们正在使用Unity的API为我们做繁重的工作。
+    // The Unit can return is current grid position
+    int GetGridPosition();
+}
+```
+
+这是一个相当直接的接口；`GetGridPosition()`函数返回`Unit`的网格位置。可能出现的疑问是，为什么我们不实现一个返回`Unit`在场景中实际位置的函数？这是因为，在 Unity 中，如果一个 GameObject 附加了`Transform`组件，我们可以直接要求这个组件返回它在三维场景中的位置。换句话说，我们正在使用 Unity 的 API 为我们做繁重的工作。
 
 1.  我们将为我们的代码示例实现两种类型的单位；让我们从`Prey`开始：
 
-[PRE2]
+```cs
+using UnityEngine;
+
+public class Prey : MonoBehaviour, IUnit
+{
+    private int m_Square;
+
+    public void AddToGrid(int square)
+    {
+        m_Square = square;
+    }
+
+    public int GetGridPosition()
+    {
+        return m_Square;
+    }
+}
+```
 
 1.  接下来是我们的`Predator`类；他猎捕我们的`Prey`：
 
-[PRE3]
+```cs
+using UnityEngine;
+
+public class Predator : MonoBehaviour, IUnit
+{
+    private int m_Square;
+
+    public void AddToGrid(int square)
+    {
+        m_Square = square;
+    }
+
+    public int GetGridPosition()
+    {
+        return m_Square;
+    }
+}
+```
 
 我们可以看到，我们的`Predator`和`Prey`都有两个主要职责，将它们的位置链接到网格中的特定单元格，并在需要时返回该单元格编号。
 
 1.  最后，我们的`Client`类，我们使用它来在`Grid`上生成`Prey`并释放`Predator`，如下所示：
 
-[PRE4]
+```cs
+using UnityEngine;
+
+namespace Pattern.SpatialPartition
+{
+    public class Client : MonoBehaviour
+    {
+        private Grid m_Grid;
+        private IUnit[] m_Preys;
+
+        void Start()
+        {
+            m_Grid = new Grid(4, 16);
+            Debug.Log("Grid generated");
+        }
+
+        void Update()
+        {
+            if (Input.GetKeyDown(KeyCode.P))
+            {
+                IUnit prey;
+                int numberOfPrey = 5;
+                m_Preys = new IUnit[numberOfPrey];
+
+                for (int i = 0; i < numberOfPrey; i++)
+                {
+                    prey = new Prey();
+                    m_Grid.AddToRandomnPosition(prey);
+                    m_Preys[i] = prey;
+
+                    Debug.Log("A prey was spawned @ square: " + m_Preys[i].GetGridPosition());
+                }
+            }
+
+            if (Input.GetKeyDown(KeyCode.H))
+            {
+                IUnit predator;
+                predator = new Predator();
+                m_Grid.AddToRandomnPosition(predator);
+                Debug.Log("A predator was spawned @ square: " + predator.GetGridPosition());
+
+                int closest = m_Grid.FindClosest(predator, m_Preys);
+                Debug.Log("The closest prey is @ square: " + closest);
+            }
+        }
+
+        void OnGUI()
+        {
+            GUI.color = Color.black;
+            GUI.Label(new Rect(10, 10, 500, 20), "Press P to spawn prey on the grid.");
+            GUI.Label(new Rect(10, 30, 500, 20), "Press H to hunt some prey.");
+            GUI.Label(new Rect(10, 50, 500, 20), "Open Debug Console to view the output.");
+        }
+    }
+}
+```
 
 就这些了；请注意，我们从未需要处理对象的实际三维坐标来找到它们的相对位置。通过将空间划分为网格并将对象包含在其中，我们避免了大量的不必要的计算。我们通过分块来降低复杂性。
 
@@ -126,4 +263,4 @@ LINQ是一种非常强大的查询语言，与SQL有些相似；当您想简单�
 
 # 进一步阅读
 
-+   *《三维游戏编程与计算机图形学中的数学》* 由 Eric Lengyel 编著：[https://www.mathfor3dgameprogramming.com](https://www.mathfor3dgameprogramming.com/)
++   *《三维游戏编程与计算机图形学中的数学》* 由 Eric Lengyel 编著：[`www.mathfor3dgameprogramming.com`](https://www.mathfor3dgameprogramming.com/)

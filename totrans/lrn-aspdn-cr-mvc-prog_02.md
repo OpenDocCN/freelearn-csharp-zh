@@ -1,4 +1,4 @@
-# 第 2 章. 设置环境
+# 第二章. 设置环境
 
 在任何开发项目中，设置正确类型的开发环境至关重要，这样你就可以专注于开发解决方案，而不是解决环境问题或配置问题。对于 .NET 来说，Visual Studio 是构建 .NET 网络应用程序的默认标准 **IDE**（**集成开发环境**）。
 
@@ -114,7 +114,7 @@ Visual Studio Test Professional 主要面向测试团队或参与测试的人员
 
 当我们安装 Visual Studio Community 2015 版本时，ASP.NET 5 将默认安装。由于 ASP.NET Core 应用程序运行在 ASP.NET 5 之上，我们需要安装 ASP.NET 5。安装 ASP.NET 5 有几种方法：
 
-+   从 [https://get.asp.net/](https://get.asp.net/) 获取 ASP.NET 5 ![安装 ASP.NET 5](img/Image00012.jpg)
++   从 [`get.asp.net/`](https://get.asp.net/) 获取 ASP.NET 5 ![安装 ASP.NET 5](img/Image00012.jpg)
 
 +   另一个选项是从 Visual Studio 的 **新建项目** 模板中安装
 
@@ -136,15 +136,15 @@ Visual Studio Test Professional 主要面向测试团队或参与测试的人员
 
 在安装 **ASP.NET 5 RC1 更新 1** 的过程中，可能会要求你关闭 Visual Studio。如果要求，请照做。
 
-# ASP.NET 5应用程序中的项目结构
+# ASP.NET 5 应用程序中的项目结构
 
 一旦成功安装 ASP.NET 5 RC1，打开 Visual Studio，创建一个新的项目，并选择以下截图所示的 ASP.NET 5 **Web 应用程序**：
 
-![ASP.NET 5应用程序中的项目结构](img/Image00019.jpg)
+![ASP.NET 5 应用程序中的项目结构](img/Image00019.jpg)
 
 将创建一个新的项目，其结构如下：
 
-![ASP.NET 5应用程序中的项目结构](img/Image00020.jpg)
+![ASP.NET 5 应用程序中的项目结构](img/Image00020.jpg)
 
 ## 基于文件的项目
 

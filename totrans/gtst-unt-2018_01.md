@@ -1,6 +1,6 @@
-# 下载和安装Unity
+# 下载和安装 Unity
 
-在本章中，你将了解游戏引擎，并查看四种不同类型，然后再专注于Unity。一旦打下这个基础，我们就会开始深入探讨Unity的起源，了解游戏引擎的现状，以及它是如何发展成为今天使用最多的顶级游戏引擎之一的。我们将突出Unity的功能和特性。然后，我们将回顾开发Unity以及运行Unity游戏所需的系统要求。最后，我们将下载并安装Unity。
+在本章中，你将了解游戏引擎，并查看四种不同类型，然后再专注于 Unity。一旦打下这个基础，我们就会开始深入探讨 Unity 的起源，了解游戏引擎的现状，以及它是如何发展成为今天使用最多的顶级游戏引擎之一的。我们将突出 Unity 的功能和特性。然后，我们将回顾开发 Unity 以及运行 Unity 游戏所需的系统要求。最后，我们将下载并安装 Unity。
 
 本章的主题包括：
 
@@ -8,19 +8,19 @@
 
 +   Unity——过去、现在和未来
 
-+   Unity的优势
++   Unity 的优势
 
 +   系统要求
 
-+   下载Unity
++   下载 Unity
 
-+   安装Unity
++   安装 Unity
 
 # 游戏引擎概述
 
 可以将游戏引擎定义为提供你开发部署视频游戏所需功能的一套工具。对于游戏引擎，没有单一的行业标准定义。这很大程度上归因于它们的多样性和用途。通常，游戏引擎至少具备以下功能集：
 
-+   2D和/或3D图形设计工具
++   2D 和/或 3D 图形设计工具
 
 +   动画
 
@@ -40,7 +40,7 @@
 
 游戏引擎的基本概念是它们提供了一套强大的工具来处理游戏开发中的大部分繁琐工作，使开发者能够专注于游戏的美学和游戏玩法。在电子游戏的早期，每个游戏都是从头开始编写的，没有游戏引擎的库或功能。为了避免为每个游戏重新发明轮子，游戏引擎开始出现，这使得游戏工作室能够更容易地制作游戏。
 
-游戏引擎不是可以创建任何可想象游戏的通用软件套件。它们高度专业化，尽管非常灵活，但旨在针对特定范围的游戏类型。例如，Codemasters的Ego游戏技术引擎主要用于创建赛车游戏；Wildfire Games的Pyrogenesis用于创建**实时策略**（**RTS**）游戏；Nival Interactive的Silent Storm引擎主要用于回合制战术游戏；Naomi Takahashi的ONScripter用于创建视觉小说和第一人称冒险游戏。
+游戏引擎不是可以创建任何可想象游戏的通用软件套件。它们高度专业化，尽管非常灵活，但旨在针对特定范围的游戏类型。例如，Codemasters 的 Ego 游戏技术引擎主要用于创建赛车游戏；Wildfire Games 的 Pyrogenesis 用于创建**实时策略**（**RTS**）游戏；Nival Interactive 的 Silent Storm 引擎主要用于回合制战术游戏；Naomi Takahashi 的 ONScripter 用于创建视觉小说和第一人称冒险游戏。
 
 # 针对特定游戏类型的游戏引擎
 
@@ -70,7 +70,7 @@
 
 +   霍尔
 
-+   左4死
++   左 4 死
 
 +   守望先锋
 
@@ -82,7 +82,7 @@
 
 这些游戏通常具有以下特点：
 
-+   大型3D分段游戏世界（室内和室外）
++   大型 3D 分段游戏世界（室内和室外）
 
 +   角色主要步行移动
 
@@ -124,7 +124,7 @@
 
 +   无主之地
 
-这些游戏通常具有以下特点，除了上一节中列出的FPS游戏的特点：
+这些游戏通常具有以下特点，除了上一节中列出的 FPS 游戏的特点：
 
 +   重视玩家角色
 
@@ -138,11 +138,11 @@
 
 # 其他游戏类型
 
-还有大量其他游戏类型，如射击、平台、赛车、格斗、策略、战争、模拟和益智。识别特定游戏类型困难在于游戏类型分类的多种方式。例如，你可以有一个既是**大型多人在线游戏**（**MMOG**）的TPS游戏，因为它包含大量益智元素，所以它可以被添加到益智游戏类型中。
+还有大量其他游戏类型，如射击、平台、赛车、格斗、策略、战争、模拟和益智。识别特定游戏类型困难在于游戏类型分类的多种方式。例如，你可以有一个既是**大型多人在线游戏**（**MMOG**）的 TPS 游戏，因为它包含大量益智元素，所以它可以被添加到益智游戏类型中。
 
 这不是需要过分担心的事情。重要的是能够识别出你游戏的关键组成部分，这样你就可以为你的项目选择最佳的可用游戏引擎。
 
-# 可用的3D游戏引擎
+# 可用的 3D 游戏引擎
 
 在本节中，我们将简要回顾一些领先的游戏引擎，以给你一个关于可用性和它们功能的感觉。
 
@@ -164,13 +164,13 @@ CryENGINE 由 Crytek 开发。有趣的是，这个游戏引擎最初是为了�
 
 +   Xbox One
 
-关于 CryENGINE 的更多信息，我推荐 Packt Publishing 出版的《精通 CryENGINE》：[https://www.packtpub.com/game-development/mastering-cryengine](https://www.packtpub.com/game-development/mastering-cryengine)。
+关于 CryENGINE 的更多信息，我推荐 Packt Publishing 出版的《精通 CryENGINE》：[`www.packtpub.com/game-development/mastering-cryengine`](https://www.packtpub.com/game-development/mastering-cryengine)。
 
 # Lumberyard
 
 Lumberyard 是 Amazon Web Services（AWS）平台的一部分，在本书出版时仍处于测试阶段。这是一个基于 CryENGINE 的免费 AAA 游戏引擎。Lumberyard 的独特卖点在于没有其他游戏引擎提供与 Amazon Web Services 和 Twitch 的深度集成。
 
-AAA（发音为“三A”），指的是那些拥有极其庞大的生产和营销预算的游戏。
+AAA（发音为“三 A”），指的是那些拥有极其庞大的生产和营销预算的游戏。
 
 使用这个引擎，你可以为以下平台开发：
 
@@ -192,7 +192,7 @@ AAA（发音为“三A”），指的是那些拥有极其庞大的生产和营�
 
 +   Xbox One
 
-关于 AWS Lumberyard 的更多信息，我推荐 Packt Publishing 出版的《学习 AWS Lumberyard 游戏开发》：[https://www.packtpub.com/game-development/learning-aws-lumberyard-game-development](https://www.packtpub.com/game-development/learning-aws-lumberyard-game-development)。
+关于 AWS Lumberyard 的更多信息，我推荐 Packt Publishing 出版的《学习 AWS Lumberyard 游戏开发》：[`www.packtpub.com/game-development/learning-aws-lumberyard-game-development`](https://www.packtpub.com/game-development/learning-aws-lumberyard-game-development)。
 
 # 微软的 XNA 游戏工作室
 
@@ -206,7 +206,7 @@ AAA（发音为“三A”），指的是那些拥有极其庞大的生产和营�
 
 +   Xbox 360
 
-关于 XNA 的更多信息，我推荐 Packt Publishing 出版的《Microsoft XNA 4.0 游戏开发食谱》：[https://www.packtpub.com/game-development/microsoft-xna-40-game-development-cookbook](https://www.packtpub.com/game-development/microsoft-xna-40-game-development-cookbook)。
+关于 XNA 的更多信息，我推荐 Packt Publishing 出版的《Microsoft XNA 4.0 游戏开发食谱》：[`www.packtpub.com/game-development/microsoft-xna-40-game-development-cookbook`](https://www.packtpub.com/game-development/microsoft-xna-40-game-development-cookbook)。
 
 # Unreal 游戏引擎
 
@@ -268,7 +268,7 @@ Unreal 随带了一些模板，使得入门变得非常容易。这些模板包�
 
 +   Xbox One
 
-关于 Unreal 的更多信息，我推荐 Packt 出版的《Unreal Engine: Game Development from A to Z》：[https://www.packtpub.com/game-development/unreal-engine-game-development-z](https://www.packtpub.com/game-development/unreal-engine-game-development-z)。
+关于 Unreal 的更多信息，我推荐 Packt 出版的《Unreal Engine: Game Development from A to Z》：[`www.packtpub.com/game-development/unreal-engine-game-development-z`](https://www.packtpub.com/game-development/unreal-engine-game-development-z)。
 
 # Unity – 过去、现在和未来
 
@@ -312,7 +312,7 @@ Unity 2.0 的主要功能包括：
 
 +   实时动态阴影
 
-+   游戏GUI
++   游戏 GUI
 
 +   网络播放器流和压缩
 
@@ -440,21 +440,21 @@ Unity 2018 的发布预计在 2018 年春季。游戏引擎将有一些令人兴
 
 +   着色器图：创建着色器的可视化界面。
 
-+   集成IDE：MonoDevelop将不再作为脚本集成开发环境与Unity一起发货。Windows用户将收到Visual Studio 2017，Mac用户将收到Visual Studio for Mac。Visual Studio是一个更强大的开发环境。
++   集成 IDE：MonoDevelop 将不再作为脚本集成开发环境与 Unity 一起发货。Windows 用户将收到 Visual Studio 2017，Mac 用户将收到 Visual Studio for Mac。Visual Studio 是一个更强大的开发环境。
 
 +   C#作业系统：此系统将使开发者能够创建更安全的多线程代码，并提高性能。
 
-# Unity的优势
+# Unity 的优势
 
-在2D和3D游戏开发中，有如此多的游戏引擎选项可用，你可能会想知道为什么你应该选择Unity。2005年的首次发布让我们了解了一个优秀的游戏引擎，在过去十年中，它通过新功能、支持和改进不断得到提升。每次新版本发布，开发者都会获得更多功能，以帮助他们开发令人惊叹的游戏。
+在 2D 和 3D 游戏开发中，有如此多的游戏引擎选项可用，你可能会想知道为什么你应该选择 Unity。2005 年的首次发布让我们了解了一个优秀的游戏引擎，在过去十年中，它通过新功能、支持和改进不断得到提升。每次新版本发布，开发者都会获得更多功能，以帮助他们开发令人惊叹的游戏。
 
-Unity Technologies，Unity的创造者，是一家致力于游戏引擎持续改进的成熟公司。随着新的处理技术和平台的出现，Unity的支持也不会落后。与所有Unity功能一样，所有新的功能都有优秀的官方文档相伴。
+Unity Technologies，Unity 的创造者，是一家致力于游戏引擎持续改进的成熟公司。随着新的处理技术和平台的出现，Unity 的支持也不会落后。与所有 Unity 功能一样，所有新的功能都有优秀的官方文档相伴。
 
-能够使用无需支付版税的免费游戏引擎，这是一个游戏规则的改变。个人、爱好者和小型工作室可以使用与大型工作室相同功能强大的游戏引擎来制作游戏。此外，强大的功能集和Unity社区是使Unity成为您游戏开发项目的正确选择的其他因素。
+能够使用无需支付版税的免费游戏引擎，这是一个游戏规则的改变。个人、爱好者和小型工作室可以使用与大型工作室相同功能强大的游戏引擎来制作游戏。此外，强大的功能集和 Unity 社区是使 Unity 成为您游戏开发项目的正确选择的其他因素。
 
-# Unity功能
+# Unity 功能
 
-在本节中，我们将列出Unity游戏引擎的核心功能。我们将在随后的章节中详细探讨它们。Unity可用于开发以下设备的应用程序，这些设备涵盖了控制台、桌面、移动、AR、电视、VR和网页：
+在本节中，我们将列出 Unity 游戏引擎的核心功能。我们将在随后的章节中详细探讨它们。Unity 可用于开发以下设备的应用程序，这些设备涵盖了控制台、桌面、移动、AR、电视、VR 和网页：
 
 +   Android/Android TV
 
@@ -490,7 +490,7 @@ Unity Technologies，Unity的创造者，是一家致力于游戏引擎持续改
 
 +   WebGL
 
-+   Wii Universe（Unity 2018不再支持）
++   Wii Universe（Unity 2018 不再支持）
 
 +   Windows/Windows Phone/Windows Store Apps
 
@@ -498,11 +498,11 @@ Unity Technologies，Unity的创造者，是一家致力于游戏引擎持续改
 
 # 编辑器
 
-Unity的编辑器是主要的游戏引擎界面，你将在其中度过大部分时间。以下是Unity编辑器的关键功能：
+Unity 的编辑器是主要的游戏引擎界面，你将在其中度过大部分时间。以下是 Unity 编辑器的关键功能：
 
-+   可在Mac和Windows PC上使用
++   可在 Mac 和 Windows PC 上使用
 
-+   2D和3D场景设计工具
++   2D 和 3D 场景设计工具
 
 +   即时播放模式
 
@@ -510,7 +510,7 @@ Unity的编辑器是主要的游戏引擎界面，你将在其中度过大部分
 
 +   时间轴工具用于创建电影序列
 
-+   Cinemachine工具用于智能相机
++   Cinemachine 工具用于智能相机
 
 +   **人工智能**（**AI**）路径查找工具
 
@@ -518,7 +518,7 @@ Unity的编辑器是主要的游戏引擎界面，你将在其中度过大部分
 
 +   粒子系统
 
-+   支持C#和JavaScript
++   支持 C#和 JavaScript
 
 +   支持单人和多人游戏
 
@@ -526,7 +526,7 @@ Unity的编辑器是主要的游戏引擎界面，你将在其中度过大部分
 
 # 图形
 
-Unity游戏引擎的图形功能令人印象深刻。我们能够在游戏引擎中使用几何形状、网格、纹理和材质原生创建游戏对象。我们还可以使用从外部、专业软件工具（包括Maya、3DS Max和Blender）导入的高质量图形。高级光照和阴影控制以及细节级别功能为我们的游戏增添了重要的真实感。
+Unity 游戏引擎的图形功能令人印象深刻。我们能够在游戏引擎中使用几何形状、网格、纹理和材质原生创建游戏对象。我们还可以使用从外部、专业软件工具（包括 Maya、3DS Max 和 Blender）导入的高质量图形。高级光照和阴影控制以及细节级别功能为我们的游戏增添了重要的真实感。
 
 关键图形功能包括：
 
@@ -536,29 +536,29 @@ Unity游戏引擎的图形功能令人印象深刻。我们能够在游戏引擎
 
 +   基于物理的着色
 
-+   原生图形API，用于更快的渲染
++   原生图形 API，用于更快的渲染
 
 +   多种光照技术
 
-# Unity社区
+# Unity 社区
 
-Unity拥有最活跃的社区之一。社区成员分享内容并帮助解答有关使用Unity进行开发的问题。Unity Technologies推崇这个社区。除了官方教程外，您还可以找到大量博客、教程和视频，帮助您开始Unity开发，以及学习如何使用您的游戏完成特定操作。
+Unity 拥有最活跃的社区之一。社区成员分享内容并帮助解答有关使用 Unity 进行开发的问题。Unity Technologies 推崇这个社区。除了官方教程外，您还可以找到大量博客、教程和视频，帮助您开始 Unity 开发，以及学习如何使用您的游戏完成特定操作。
 
-Unity资产商店包括Unity Technologies和Unity社区提供的免费和付费资产。可用的资产包括模型、艺术作品、动画、脚本和工具。资产商店具有直观的界面，使查找所需内容变得容易。我们将在[第6章](04be4d7b-8c85-4d9e-baf2-43965183f99f.xhtml)“为我们的游戏创建和导入3D对象”中探讨资产商店。
+Unity 资产商店包括 Unity Technologies 和 Unity 社区提供的免费和付费资产。可用的资产包括模型、艺术作品、动画、脚本和工具。资产商店具有直观的界面，使查找所需内容变得容易。我们将在第六章“为我们的游戏创建和导入 3D 对象”中探讨资产商店。
 
-Unity定期举办现场活动，让您可以直接从Unity Technologies了解Unity，并与同行设计师和开发者建立联系。Unity Unite活动每年在美国、亚洲和欧洲举办。您可以在以下位置了解过去和未来的Unite活动：[https://unite.unity.com/](https://unite.unity.com/)。
+Unity 定期举办现场活动，让您可以直接从 Unity Technologies 了解 Unity，并与同行设计师和开发者建立联系。Unity Unite 活动每年在美国、亚洲和欧洲举办。您可以在以下位置了解过去和未来的 Unite 活动：[`unite.unity.com/`](https://unite.unity.com/)。
 
 # 系统要求
 
-系统要求分为两部分。第一部分指的是您需要哪些硬件和软件才能使用Unity进行游戏开发。第二部分指的是您需要哪些硬件和软件来运行在Unity中开发的游戏。虽然这些要求可能会变化，但截至Unity 2017，这些要求在接下来的两个部分中详细说明。
+系统要求分为两部分。第一部分指的是您需要哪些硬件和软件才能使用 Unity 进行游戏开发。第二部分指的是您需要哪些硬件和软件来运行在 Unity 中开发的游戏。虽然这些要求可能会变化，但截至 Unity 2017，这些要求在接下来的两个部分中详细说明。
 
 # 开发系统要求
 
-您可以使用Mac或Windows计算机进行Unity开发。Mac必须运行macOS X 10.9或更高版本。对于Windows计算机，您必须拥有Windows 7 SP1+、Windows 8或Windows 10。
+您可以使用 Mac 或 Windows 计算机进行 Unity 开发。Mac 必须运行 macOS X 10.9 或更高版本。对于 Windows 计算机，您必须拥有 Windows 7 SP1+、Windows 8 或 Windows 10。
 
-Windows XP和Windows Vista不受官方支持。
+Windows XP 和 Windows Vista 不受官方支持。
 
-您的开发计算机上的**图形处理单元**（**GPU**）必须具有DX9（着色器模型3.0）或DX11，并具有9.3功能级别的功能。
+您的开发计算机上的**图形处理单元**（**GPU**）必须具有 DX9（着色器模型 3.0）或 DX11，并具有 9.3 功能级别的功能。
 
 根据您要针对的发行平台，还有其他特定要求。请参考以下表格以获取更多信息。
 
@@ -568,16 +568,16 @@ Windows XP和Windows Vista不受官方支持。
 
 +   Android SDK
 
-+   Java开发工具包
++   Java 开发工具包
 
 |
 
 | iOS |
 | --- |
 
-+   macOS X 10.9.4或更高版本
++   macOS X 10.9.4 或更高版本
 
-+   Xcode 7.0或更高版本
++   Xcode 7.0 或更高版本
 
 |
 
@@ -585,23 +585,23 @@ Windows XP和Windows Vista不受官方支持。
 
 +   macOS X 10.9+
 
-+   Windows 7 SP1+（64位）
++   Windows 7 SP1+（64 位）
 
 |
 
-| Windows Store | Windows 8.1（64位）以及以下之一（根据适用情况）：
+| Windows Store | Windows 8.1（64 位）以及以下之一（根据适用情况）：
 
-&#124; IL2CPP（用于编译.NET程序集） &#124; 带有C++编译器功能的Visual Studio &#124;
+&#124; IL2CPP（用于编译.NET 程序集） &#124; 带有 C++编译器功能的 Visual Studio &#124;
 
-&#124; **通用Windows平台** (**UWP**) &#124; Visual Studio 2015或更高版本Windows 10 SDK &#124;
+&#124; **通用 Windows 平台** (**UWP**) &#124; Visual Studio 2015 或更高版本 Windows 10 SDK &#124;
 
-&#124; Windows 8.1/Windows Phone 8.1 &#124; Visual Studio 2013或更高版本Windows 8.1 SDK &#124;
+&#124; Windows 8.1/Windows Phone 8.1 &#124; Visual Studio 2013 或更高版本 Windows 8.1 SDK &#124;
 
 |
 
 # 播放系统要求
 
-对于在您开发的设备上玩Unity游戏的用户来说，要求并不多。通常，拥有硬件和操作系统都最新的设备将带来最佳的游玩体验。
+对于在您开发的设备上玩 Unity 游戏的用户来说，要求并不多。通常，拥有硬件和操作系统都最新的设备将带来最佳的游玩体验。
 
 基本要求如下详细说明：
 
@@ -609,23 +609,23 @@ Windows XP和Windows Vista不受官方支持。
 | --- | --- |
 | Android |
 
-+   支持NEON的ARMv7（Cortex）CPU或Atom CPU
++   支持 NEON 的 ARMv7（Cortex）CPU 或 Atom CPU
 
-+   OpenGL ES 2.0或更高版本
++   OpenGL ES 2.0 或更高版本
 
-+   OS 4.1或更高版本
++   OS 4.1 或更高版本
 
 |
 
 | 桌面 | CPU
 
-+   必须支持SSE2指令集
++   必须支持 SSE2 指令集
 
 图形卡选项
 
-+   DX9（着色器模型3.0）
++   DX9（着色器模型 3.0）
 
-+   DX11具有9.3功能级别的功能
++   DX11 具有 9.3 功能级别的功能
 
 操作系统选项
 
@@ -639,7 +639,7 @@ Windows XP和Windows Vista不受官方支持。
 
 |
 
-| iOS | iOS 7.0或更高版本 |
+| iOS | iOS 7.0 或更高版本 |
 | --- | --- |
 
 | WebGL | 以下浏览器之一的最新版本
@@ -654,30 +654,30 @@ Windows XP和Windows Vista不受官方支持。
 
 |
 
-| Windows Phone | Windows Phone 8.1或更高版本 |
+| Windows Phone | Windows Phone 8.1 或更高版本 |
 | --- | --- |
 
-# 下载Unity
+# 下载 Unity
 
-获取Unity相对简单。首先访问Unity网站[https://unity3d.com](https://unity3d.com)。在右上角，如图所示，您将看到一个获取Unity的链接：
+获取 Unity 相对简单。首先访问 Unity 网站[`unity3d.com`](https://unity3d.com)。在右上角，如图所示，您将看到一个获取 Unity 的链接：
 
 ![](img/c43f98d6-4eb3-4b6d-b87a-3ca5f9372a86.png)
 
-该链接将带您到[https://store.unity.com](https://store.unity.com)页面，您可以在个人计划选项中点击尝试个人链接。
+该链接将带您到[`store.unity.com`](https://store.unity.com)页面，您可以在个人计划选项中点击尝试个人链接。
 
-您将被带到下载Unity个人版页面。您应该查看该页面的信息，以确保您符合个人计划的要求。
+您将被带到下载 Unity 个人版页面。您应该查看该页面的信息，以确保您符合个人计划的要求。
 
-根据您的系统，您可能会被提示选择Windows或macOS X按钮。如果遇到此选择，请选择适合您计算机的适当操作系统。
+根据您的系统，您可能会被提示选择 Windows 或 macOS X 按钮。如果遇到此选择，请选择适合您计算机的适当操作系统。
 
 一旦您确认您的资格，下载安装程序按钮将被启用。
 
 安装程序下载非常快。它只是一个安装程序，而不是游戏引擎本身。我们将在下一节中回顾安装过程。
 
-# 安装Unity
+# 安装 Unity
 
-在上一节中，您已下载了Unity安装程序。找到该文件，可能位于您的`下载`文件夹中，然后启动程序。
+在上一节中，您已下载了 Unity 安装程序。找到该文件，可能位于您的`下载`文件夹中，然后启动程序。
 
-对于剩余的步骤，以及在这本书的整个过程中，我们将使用在macOS上运行的Unity。安装和使用Unity的步骤和过程对两个系统都是相同的；界面在外观上可能略有不同。
+对于剩余的步骤，以及在这本书的整个过程中，我们将使用在 macOS 上运行的 Unity。安装和使用 Unity 的步骤和过程对两个系统都是相同的；界面在外观上可能略有不同。
 
 一旦您启动下载助手，您的计算机可能会提示您进行安全提示：
 
@@ -687,7 +687,7 @@ Windows XP和Windows Vista不受官方支持。
 
 接下来，您将看到软件许可协议面板（此处未显示）。您可以阅读、打印和保存软件许可协议。点击继续按钮以继续。这将弹出一个窗口询问您是否同意软件许可协议的条款。如果您同意，请点击同意按钮。
 
-下一个步骤是Unity组件选择屏幕。默认情况下，所有组件都将被选中。您将看到安装这些组件在您的计算机上需要多少空间以及您还剩下多少空间。您可以禁用您知道马上不需要的组件，稍后再安装它们。或者，如果您不介意空间问题，您可以安装所有组件：
+下一个步骤是 Unity 组件选择屏幕。默认情况下，所有组件都将被选中。您将看到安装这些组件在您的计算机上需要多少空间以及您还剩下多少空间。您可以禁用您知道马上不需要的组件，稍后再安装它们。或者，如果您不介意空间问题，您可以安装所有组件：
 
 ![图片](img/58e448d9-061d-4af8-8cab-8255d5352dbc.png)
 
@@ -707,18 +707,18 @@ Windows XP和Windows Vista不受官方支持。
 
 下载助手将开始下载您之前标识的组件（此处未显示）。如果您有较慢的互联网连接，这可能需要一段时间。
 
-现在是创建您的免费Unity ID的好时机。如果您在浏览器中仍然打开了Unity，您将在页面的右上角看到人物图标。如果您看不到该图标，您可以重新访问[https://unity3d.com](https://unity3d.com)。当您点击该图标时，您将看到一个带有创建Unity ID按钮的新界面。点击该按钮并填写注册表单：
+现在是创建您的免费 Unity ID 的好时机。如果您在浏览器中仍然打开了 Unity，您将在页面的右上角看到人物图标。如果您看不到该图标，您可以重新访问[`unity3d.com`](https://unity3d.com)。当您点击该图标时，您将看到一个带有创建 Unity ID 按钮的新界面。点击该按钮并填写注册表单：
 
 ![图片](img/c605c63a-931f-4ce8-87da-6de217abc877.png)
 
-您需要您的账户来使用Unity资产商店，即使是获取免费内容也是如此。
+您需要您的账户来使用 Unity 资产商店，即使是获取免费内容也是如此。
 
 一旦所有组件都已下载并安装，下载助手将通知您。
 
-当您首次启动Unity时，您需要选择一个许可。现在Unity已成功安装在您的计算机上，您可以使用它了。
+当您首次启动 Unity 时，您需要选择一个许可。现在 Unity 已成功安装在您的计算机上，您可以使用它了。
 
 # 摘要
 
-在本章中，我们探讨了游戏引擎，并查看了四个不同的游戏引擎以支持我们对游戏引擎的基础知识。我们还探讨了Unity的历史以及它是如何从一个版本发展到下一个版本的。此外，我们还发现了Unity的关键功能和特性。涵盖了开发Unity游戏所需的Unity的系统要求，以及运行它们所需的系统要求。最后，我们下载并安装了Unity。
+在本章中，我们探讨了游戏引擎，并查看了四个不同的游戏引擎以支持我们对游戏引擎的基础知识。我们还探讨了 Unity 的历史以及它是如何从一个版本发展到下一个版本的。此外，我们还发现了 Unity 的关键功能和特性。涵盖了开发 Unity 游戏所需的 Unity 的系统要求，以及运行它们所需的系统要求。最后，我们下载并安装了 Unity。
 
-在[第2章](bab37b44-932a-4277-884d-69b6bac37516.xhtml)“Unity界面”中，我们将提供Unity编辑器用户界面的详细信息。您将了解各种视图、窗口、布局和变换工具。
+在第二章“Unity 界面”中，我们将提供 Unity 编辑器用户界面的详细信息。您将了解各种视图、窗口、布局和变换工具。

@@ -1,4 +1,4 @@
-# *第 3 章*：使用 Unity UI 系统开发 UI
+# *第三章*：使用 Unity UI 系统开发 UI
 
 UI 对于游戏来说非常重要，Unity 为游戏开发者提供了三种不同的 UI 解决方案。它们是**即时模式图形用户界面**（**IMGUI**）、**Unity UI**（**uGUI**）包和**UI 工具包**。IMGUI 是 Unity 中相对较旧的 UI 解决方案，不建议用于构建运行时 UI。UI 工具包是最新 UI 解决方案；然而，它仍然缺少一些在 uGUI 包和 IMGUI 中可以找到的功能。uGUI 包是 Unity 中成熟的 UI 解决方案，在游戏行业中得到广泛应用。因此，本章将介绍如何使用 uGUI 开发您游戏的 UI。
 
@@ -62,17 +62,15 @@ UI 对于游戏来说非常重要，Unity 为游戏开发者提供了三种不�
 
 ](img/Figure_3.3_B17146.jpg)
 
-图3.3 – 从GameObject菜单创建canvas
+图 3.3 – 从 GameObject 菜单创建 canvas
 
-如你在*图3.2*和*图3.3*中看到的，我们还可以从这些菜单创建其他不同的UI元素，例如**文本**、**按钮**、**图像**和**滑块**。由于所有UI元素都是**Canvas**的子元素，如果你想直接创建一个新的UI元素而没有Canvas，将自动创建一个新的**Canvas**对象。新的UI元素将成为**Canvas**对象父对象的子对象。
+如你在*图 3.2*和*图 3.3*中看到的，我们还可以从这些菜单创建其他不同的 UI 元素，例如**文本**、**按钮**、**图像**和**滑块**。由于所有 UI 元素都是**Canvas**的子元素，如果你想直接创建一个新的 UI 元素而没有 Canvas，将自动创建一个新的**Canvas**对象。新的 UI 元素将成为**Canvas**对象父对象的子对象。
 
-![图3.4 – Canvas对象
+![图 3.4 – Canvas 对象![图 3.4 – B17146.jpg](img/Figure_3.4_B17146.jpg)
 
-![图3.4 – B17146.jpg](img/Figure_3.4_B17146.jpg)
+图 3.4 – Canvas 对象
 
-图3.4 – Canvas对象
-
-一旦创建了一个**Canvas**对象，我们可以看到，除了这个GameObject上附加的**Canvas**组件外，还有**Rect Transform**、**Canvas Scaler**和**Graphic Raycaster**组件。如前所述，**Canvas**是用于渲染UI元素的组件，因此所有UI组件都必须是Canvas的子组件；否则，它们将不会被Unity渲染。
+一旦创建了一个**Canvas**对象，我们可以看到，除了这个 GameObject 上附加的**Canvas**组件外，还有**Rect Transform**、**Canvas Scaler**和**Graphic Raycaster**组件。如前所述，**Canvas**是用于渲染 UI 元素的组件，因此所有 UI 组件都必须是 Canvas 的子组件；否则，它们将不会被 Unity 渲染。
 
 我们将按顺序分别探索它们。
 
@@ -80,13 +78,11 @@ UI 对于游戏来说非常重要，Unity 为游戏开发者提供了三种不�
 
 如果你选择场景中的**Canvas**对象，你可能会惊讶地发现其位置很奇怪。默认情况下，它不在**主相机**的视场内。
 
-![图3.5 – 场景中具有屏幕空间 - 堆叠渲染模式的Canvas对象
+![图 3.5 – 场景中具有屏幕空间 - 堆叠渲染模式的 Canvas 对象![图 3.5 – B17146.jpg](img/Figure_3.5_B17146.jpg)
 
-![图3.5 – B17146.jpg](img/Figure_3.5_B17146.jpg)
+图 3.5 – 场景中具有屏幕空间 - 堆叠渲染模式的 Canvas 对象
 
-图3.5 – 场景中具有屏幕空间 - 堆叠渲染模式的Canvas对象
-
-这是因为附加到这个GameObject上的**Canvas**组件提供了三种不同的**渲染模式**，如下所示：
+这是因为附加到这个 GameObject 上的**Canvas**组件提供了三种不同的**渲染模式**，如下所示：
 
 +   **屏幕空间 - 堆叠**
 
@@ -94,83 +90,67 @@ UI 对于游戏来说非常重要，Unity 为游戏开发者提供了三种不�
 
 +   **世界空间**
 
-![图3.6 – 渲染模式
+![图 3.6 – 渲染模式![图 3.6 – B17146.jpg](img/Figure_3.6_B17146.jpg)
 
-![图3.6 – B17146.jpg](img/Figure_3.6_B17146.jpg)
+图 3.6 – 渲染模式
 
-图3.6 – 渲染模式
-
-**屏幕空间 - 堆叠**渲染模式将UI元素放置在屏幕上，这些元素是在场景之上渲染的。因此，用于渲染游戏场景的场景中的相机不会影响UI的渲染。这是**Canvas**组件提供的默认渲染模式。
+**屏幕空间 - 堆叠**渲染模式将 UI 元素放置在屏幕上，这些元素是在场景之上渲染的。因此，用于渲染游戏场景的场景中的相机不会影响 UI 的渲染。这是**Canvas**组件提供的默认渲染模式。
 
 如其名所示，**屏幕空间 - 相机**渲染模式与上一个类似。然而，从名称中可以看出，第二种渲染模式将受到相机的影响。
 
-![图3.7 – 屏幕空间 - 相机渲染模式
+![图 3.7 – 屏幕空间 - 相机渲染模式![图 3.7 – B17146.jpg](img/Figure_3.7_B17146.jpg)
 
-![图3.7 – B17146.jpg](img/Figure_3.7_B17146.jpg)
+图 3.7 – 屏幕空间 - 相机渲染模式
 
-图3.7 – 屏幕空间 - 相机渲染模式
+如你在*图 3.7*中看到的，如果选择了**屏幕空间 - 相机**渲染模式，我们需要为这个 Canvas 指定一个相机并设置它们之间的距离。此外，如果我们仍然在场景中选择这个 Canvas，我们会发现它已经被移动到这个特定相机的视场内。
 
-如你在*图3.7*中看到的，如果选择了**屏幕空间 - 相机**渲染模式，我们需要为这个Canvas指定一个相机并设置它们之间的距离。此外，如果我们仍然在场景中选择这个Canvas，我们会发现它已经被移动到这个特定相机的视场内。
+![图 3.8 – 场景中具有屏幕空间 - 相机渲染模式的 Canvas 对象![图 3.8 – B17146.jpg](img/Figure_3.8_B17146.jpg)
 
-![图3.8 – 场景中具有屏幕空间 - 相机渲染模式的Canvas对象
+图 3.8 – 场景中具有屏幕空间 - 相机渲染模式的 Canvas 对象
 
-![图3.8 – B17146.jpg](img/Figure_3.8_B17146.jpg)
+在这种情况下，UI 元素是由这个相机渲染的，这意味着相机的设置会影响 UI 的外观。这与**Screen Space - Overlay**渲染模式不同。
 
-图3.8 – 场景中具有屏幕空间 - 相机渲染模式的Canvas对象
+*图 3.9*显示，当此相机的**Field of View**值从 100 变为 30 时，游戏场景和 UI 发生了变化：
 
-在这种情况下，UI元素是由这个相机渲染的，这意味着相机的设置会影响UI的外观。这与**Screen Space - Overlay**渲染模式不同。
+![Figure 3.9 – 相机的视场（FoV）在上半部分为 100，下半部分为 30](img/Figure_3.9_B17146.jpg)
 
-*图3.9*显示，当此相机的**Field of View**值从100变为30时，游戏场景和UI发生了变化：
+图 3.9 – 相机的视场（FoV）在上半部分为 100，下半部分为 30
 
-![Figure 3.9 – 相机的视场（FoV）在上半部分为100，下半部分为30
+最后一种渲染模式是**World Space**。在这种模式下，画布将像场景中的任何其他 GameObject 一样工作。这种模式与**Screen Space - Camera**渲染模式之间最大的区别是我们可以手动调整画布的大小、位置，甚至旋转角度，就像一个普通 GameObject 一样。
 
-](img/Figure_3.9_B17146.jpg)
+如*图 3.10*所示，我们可以使用此**Canvas**对象的**Rect Transform**组件来调整其**Width**和**Rotation**值：
 
-图3.9 – 相机的视场（FoV）在上半部分为100，下半部分为30
+![Figure 3.10 – 世界空间渲染模式](img/Figure_3.10_B17146.jpg)
 
-最后一种渲染模式是**World Space**。在这种模式下，画布将像场景中的任何其他GameObject一样工作。这种模式与**Screen Space - Camera**渲染模式之间最大的区别是我们可以手动调整画布的大小、位置，甚至旋转角度，就像一个普通GameObject一样。
+图 3.10 – 世界空间渲染模式
 
-如*图3.10*所示，我们可以使用此**Canvas**对象的**Rect Transform**组件来调整其**Width**和**Rotation**值：
+*图 3.11*显示了在场景中手动设置**Width**和**Rotation**值后的**Canvas**对象：
 
-![Figure 3.10 – 世界空间渲染模式
+![Figure 3.11 – 场景中具有世界空间渲染模式的 Canvas 对象](img/Figure_3.11_B17146.jpg)
 
-](img/Figure_3.10_B17146.jpg)
+图 3.11 – 场景中具有世界空间渲染模式的 Canvas 对象
 
-图3.10 – 世界空间渲染模式
+在这里，我们使用**RectTransform**组件来设置画布的大小。每个 UI 对象都将包含一个**RectTransform**组件，就像每个普通 GameObject 都将包含一个 Transform 组件一样。接下来，我们将探讨**RectTransform**组件。
 
-*图3.11*显示了在场景中手动设置**Width**和**Rotation**值后的**Canvas**对象：
+### Rect Transform 组件
 
-![Figure 3.11 – 场景中具有世界空间渲染模式的Canvas对象
-
-](img/Figure_3.11_B17146.jpg)
-
-图3.11 – 场景中具有世界空间渲染模式的Canvas对象
-
-在这里，我们使用**RectTransform**组件来设置画布的大小。每个UI对象都将包含一个**RectTransform**组件，就像每个普通GameObject都将包含一个Transform组件一样。接下来，我们将探讨**RectTransform**组件。
-
-### Rect Transform组件
-
-**Rect Transform**组件与常规的**Transform**组件类似。最大的区别是前者用于UI元素而不是常规的GameObject。当创建一个新的UI元素对象时，**Rect Transform**组件将自动附加到它上。
+**Rect Transform**组件与常规的**Transform**组件类似。最大的区别是前者用于 UI 元素而不是常规的 GameObject。当创建一个新的 UI 元素对象时，**Rect Transform**组件将自动附加到它上。
 
 观察此组件，你可以看到一些在**Transform**组件上可以看到的属性，例如**Position**、**Rotation**和**Scale**。还有一些独特的属性。
 
-![Figure 3.12 – 一个Rect Transform组件
+![Figure 3.12 – 一个 Rect Transform 组件](img/Figure_3.12_B17146.jpg)
 
-](img/Figure_3.12_B17146.jpg)
-
-图3.12 – 一个Rect Transform组件
+图 3.12 – 一个 Rect Transform 组件
 
 这些独特的属性是**Anchor**和**Pivot**。我们将依次讨论这些。
 
 #### 锚点
 
-锚点是指示区域四个角位置的数值，从`AnchorMin.x`和`AnchorMin.y`的角度看，右上角由`AnchorMax.x`和`AnchorMax.y`表示。默认情况下，左下角是0.5和0.5，右上角也是0.5和0.5，相对于父对象居中，如*图3.12*所示。
+锚点是指示区域四个角位置的数值，从`AnchorMin.x`和`AnchorMin.y`的角度看，右上角由`AnchorMax.x`和`AnchorMax.y`表示。默认情况下，左下角是 0.5 和 0.5，右上角也是 0.5 和 0.5，相对于父对象居中，如*图 3.12*所示。
 
 我们可以直接修改锚点的值 – 例如，我们可以将左下角从 0.5 和 0.5 更改为 0 和 0，这样父元素和子元素的左下角就相同了。然后，我们将右上角从 0.5 和 0.5 更改为 0.5 和 1，这意味着子元素的右上角位置是父元素右上角 *x* 轴位置的一半。结果如图 3.13 所示：
 
-![图 3.13 – 修改锚点
-
-](img/Figure_3.13_B17146.jpg)
+![图 3.13 – 修改锚点](img/Figure_3.13_B17146.jpg)
 
 图 3.13 – 修改锚点
 
@@ -178,9 +158,7 @@ UI 对于游戏来说非常重要，Unity 为游戏开发者提供了三种不�
 
 为了使开发者更容易使用锚点，Unity 提供了一些锚点预设，如图 3.14 所示：
 
-![图 3.14 – 锚点预设
-
-](img/Figure_3.14_B17146.jpg)
+![图 3.14 – 锚点预设](img/Figure_3.14_B17146.jpg)
 
 图 3.14 – 锚点预设
 
@@ -202,9 +180,7 @@ UI 对于游戏来说非常重要，Unity 为游戏开发者提供了三种不�
 
 除了 **Canvas** 组件外，还会自动创建一个 **Canvas Scaler** 组件。**Canvas Scaler** 组件用于控制画布内 UI 元素的整体缩放和像素密度。通过使用 **Canvas Scaler**，我们可以实现分辨率无关的 UI 布局：
 
-![图 3.16 – Canvas Scaler 组件
-
-](img/Figure_3.16_B17146.jpg)
+![图 3.16 – Canvas Scaler 组件](img/Figure_3.16_B17146.jpg)
 
 图 3.16 – Canvas Scaler 组件
 
@@ -220,145 +196,157 @@ Canvas Scaler 组件提供的 **UI 缩放模式** 有三种类型：
 
 **恒定像素尺寸** 是默认的 UI 缩放模式。在此模式下，UI 元素的大小将保持像素大小不变，无论屏幕大小如何。
 
-![图 3.17 – 在不同屏幕尺寸下显示的 Hello World UI 文本
+![图 3.17 – 在不同屏幕尺寸下显示的 Hello World UI 文本（上半部分为 1920 x 1080，下半部分为 3840 x 2160）](img/Figure_3.17_B17146.jpg)
 
-（上半部分为1920 x 1080，下半部分为3840 x 2160）
+图 3.17 – 在不同屏幕大小下显示的 Hello World UI 文本（上半部分为 1920 x 1080，下半部分为 3840 x 2160）
 
-](img/Figure_3.17_B17146.jpg)
+如*图 3.17*所示，一个**Hello World** UI 文本将保持其像素大小不变。当屏幕分辨率相对较低（*1920 x 1080*）时，文本将显示得更大。当屏幕分辨率较高（*3840 x 2160*）时，文本将显示得较小。
 
-图3.17 – 在不同屏幕大小下显示的Hello World UI文本（上半部分为1920 x 1080，下半部分为3840 x 2160）
+如果您想在不同的屏幕分辨率下保持 UI 元素显示的一致性，**根据屏幕大小缩放**模式是一个理想的选择。
 
-如*图3.17*所示，一个**Hello World** UI文本将保持其像素大小不变。当屏幕分辨率相对较低（*1920 x 1080*）时，文本将显示得更大。当屏幕分辨率较高（*3840 x 2160*）时，文本将显示得较小。
+![图 3.18 – 根据屏幕大小缩放模式](img/Figure_3.18_B17146.jpg)
 
-如果您想在不同的屏幕分辨率下保持UI元素显示的一致性，**根据屏幕大小缩放**模式是一个理想的选择。
+图 3.18 – 根据屏幕大小缩放模式
 
-![图3.18 – 根据屏幕大小缩放模式
-
-](img/Figure_3.18_B17146.jpg)
-
-图3.18 – 根据屏幕大小缩放模式
-
-当**UI缩放模式**设置为**根据屏幕大小缩放**时，UI元素的位置和大小将根据**参考分辨率**属性中的像素值指定，如*图3.18*所示。
+当**UI 缩放模式**设置为**根据屏幕大小缩放**时，UI 元素的位置和大小将根据**参考分辨率**属性中的像素值指定，如*图 3.18*所示。
 
 如果当前屏幕分辨率大于参考分辨率，画布将被缩放以适应屏幕分辨率。反之，如果当前屏幕分辨率小于参考分辨率，画布将缩小以适应屏幕分辨率。
 
-当屏幕分辨率比例与参考分辨率比例相同时，缩放和缩小UI元素非常容易。但当屏幕分辨率比例与参考分辨率比例不同时，缩放画布会导致其变形。为了避免这种情况，画布的分辨率也将取决于**屏幕匹配模式**的设置，您也可以在*图3.18*中看到。默认情况下，**屏幕匹配模式**设置为**匹配宽度和高度**，这允许您以宽度或高度作为参考，或介于两者之间的值来缩放画布区域。
+当屏幕分辨率比例与参考分辨率比例相同时，缩放和缩小 UI 元素非常容易。但当屏幕分辨率比例与参考分辨率比例不同时，缩放画布会导致其变形。为了避免这种情况，画布的分辨率也将取决于**屏幕匹配模式**的设置，您也可以在*图 3.18*中看到。默认情况下，**屏幕匹配模式**设置为**匹配宽度和高度**，这允许您以宽度或高度作为参考，或介于两者之间的值来缩放画布区域。
 
-当**UI缩放模式**设置为**常量物理大小**时，UI元素的位置和大小以物理单位如*毫米*和*英寸*指定。
+当**UI 缩放模式**设置为**常量物理大小**时，UI 元素的位置和大小以物理单位如*毫米*和*英寸*指定。
 
-![图3.19 – 常量物理大小模式
+![图 3.19 – 常量物理大小模式](img/Figure_3.19_B17146.jpg)
 
-](img/Figure_3.19_B17146.jpg)
-
-图3.19 – 常量物理大小模式
+图 3.19 – 常量物理大小模式
 
 除了**画布缩放器**组件外，还会自动创建另一个组件，我们将在下一节中查看。
 
 ### 图形射线投射器组件
 
-如其名称所示，**图形射线投射器**组件用于对画布内的一组UI元素进行射线投射，以确定哪个UI元素被击中。因此，它可以将在玩家输入转换为UI事件。需要注意的是，场景中需要有**事件系统**组件，**图形射线投射器**才能正常工作。关于**事件系统**组件，我们将在“*C#脚本和Unity中的UI事件系统*”部分中稍后介绍。
+如其名称所示，**图形射线投射器**组件用于对画布内的一组 UI 元素进行射线投射，以确定哪个 UI 元素被击中。因此，它可以将在玩家输入转换为 UI 事件。需要注意的是，场景中需要有**事件系统**组件，**图形射线投射器**才能正常工作。关于**事件系统**组件，我们将在“*C#脚本和 Unity 中的 UI 事件系统*”部分中稍后介绍。
 
-这在您需要确定光标是否位于场景中的UI元素上时很有用，例如UI文本或UI图像。例如，假设您想让玩家能够将UI图像拖放到游戏中以改变其位置，那么您必须知道玩家的光标是否位于UI图像上，并在拖动时获取光标移动的数据。在这种情况下，您需要创建一个脚本，实现`UnityEngine.EventSystems`命名空间中定义的`IPointerDownHandler`和`IDragHandler`接口，这意味着当玩家点击和拖动图像时，您可以获取事件，如下所示：
+这在您需要确定光标是否位于场景中的 UI 元素上时很有用，例如 UI 文本或 UI 图像。例如，假设您想让玩家能够将 UI 图像拖放到游戏中以改变其位置，那么您必须知道玩家的光标是否位于 UI 图像上，并在拖动时获取光标移动的数据。在这种情况下，您需要创建一个脚本，实现`UnityEngine.EventSystems`命名空间中定义的`IPointerDownHandler`和`IDragHandler`接口，这意味着当玩家点击和拖动图像时，您可以获取事件，如下所示：
 
-[PRE0]
+```cs
+using UnityEngine;
+using UnityEngine.EventSystems;
+public class DragAndDropExample : MonoBehaviour,
+  IPointerDownHandler, IDragHandler
+{
+    private RectTransform _rectTransform;
+    public void OnPointerDown(PointerEventData eventData)
+    {
+        Debug.Log("This UI image is clicked!!!");
+        _rectTransform = GetComponent<RectTransform>();
+    }
+    public void OnDrag(PointerEventData eventData)
+    {
+        Debug.Log("This UI image is being dragged!!!");
+
+            if (RectTransformUtility
+             .ScreenPointToWorldPointInRectangle
+             (_rectTransform, eventData.position,
+             eventData.pressEventCamera, 
+             out var cursorPos))
+            {
+                  _rectTransform.position = cursorPos;
+            }
+    }
+}
+```
 
 让我们按以下方式分解代码：
 
-+   我们使用`using`关键字添加`UnityEngine.EventSystems`命名空间以获取与点击和拖动UI元素相关的事件。
++   我们使用`using`关键字添加`UnityEngine.EventSystems`命名空间以获取与点击和拖动 UI 元素相关的事件。
 
 +   `DragAndDropExample`类实现了两个接口，即`IPointerDownHandler`和`IDragHandler`。
 
-    +   具体来说，我们在`IPointerDownHandler`接口中实现了`OnPointerDown`方法，该方法将在UI元素被点击时被调用。
+    +   具体来说，我们在`IPointerDownHandler`接口中实现了`OnPointerDown`方法，该方法将在 UI 元素被点击时被调用。
 
     +   我们在`IDragHandler`接口中实现了`OnDrag`方法。当发生拖动时，每次光标移动时都会调用此方法。
 
 +   在`OnPointerDown`方法的实现中，该方法接受`PointerEventData`作为参数，获取`RectTransform`组件的实例，并将其分配给`_rectTransform`字段。
 
-+   在`OnDrag`方法的实现中，该方法也接受`PointerEventData`作为参数，获取光标位置，并修改`_rectTransform`字段的`position`属性以移动UI元素。
++   在`OnDrag`方法的实现中，该方法也接受`PointerEventData`作为参数，获取光标位置，并修改`_rectTransform`字段的`position`属性以移动 UI 元素。
 
-为了使此脚本工作，您需要将脚本附加到场景中您想要拖放的那个UI元素上。
-
-![Figure 3.20 – Dragging and dropping a UI image](img/Figure_3.20_B17146.jpg)
+为了使此脚本工作，您需要将脚本附加到场景中您想要拖放的那个 UI 元素上。
 
 ![Figure 3.20 – Dragging and dropping a UI image](img/Figure_3.20_B17146.jpg)
 
 ![Figure 3.20 – Dragging and dropping a UI image](img/Figure_3.20_B17146.jpg)
 
-*图3.20*显示了基于**Graphic Raycaster**组件的UI图像拖放交互。
+![Figure 3.20 – Dragging and dropping a UI image](img/Figure_3.20_B17146.jpg)
 
-之前描述的组件在创建**Canvas**对象时自动创建。接下来，我们将介绍其他UI元素。
+*图 3.20*显示了基于**Graphic Raycaster**组件的 UI 图像拖放交互。
+
+之前描述的组件在创建**Canvas**对象时自动创建。接下来，我们将介绍其他 UI 元素。
 
 ## Image
 
-显示图像是UI的一个重要功能。uGUI提供了两种显示图像的组件类型——**Image**组件和**Raw Image**组件。
+显示图像是 UI 的一个重要功能。uGUI 提供了两种显示图像的组件类型——**Image**组件和**Raw Image**组件。
 
 我们现在将解释这些功能以及如何正确使用它们。
 
 ### 图像组件
 
-您可以使用**Image**组件在UI上显示图像。
+您可以使用**Image**组件在 UI 上显示图像。
 
 ![Figure 3.21 – Creating a new image](img/Figure_3.21_B17146.jpg)
 
 ![Figure 3.21 – Creating a new image](img/Figure_3.21_B17146.jpg)
 
-图3.21 – 创建新图像
+图 3.21 – 创建新图像
 
-如*图3.21*所示，您可以按照以下步骤创建一个新图像：
+如*图 3.21*所示，您可以按照以下步骤创建一个新图像：
 
 1.  在**Hierarchy**窗口中右键单击以打开菜单。
 
 1.  选择**UI** > **Image**。
 
-如果您想在游戏UI中创建背景图像，也可以选择**UI** > **Panel**。面板实际上就是一个图像。
+如果您想在游戏 UI 中创建背景图像，也可以选择**UI** > **Panel**。面板实际上就是一个图像。
 
 ![Figure 3.22 – The Image component](img/Figure_3.22_B17146.jpg)
 
 ![Figure 3.22 – The Image component](img/Figure_3.22_B17146.jpg)
 
-图3.22 – 图像组件
+图 3.22 – 图像组件
 
-在这种情况下，我们创建一个面板作为背景。如图*图3.22*所示，这里我们指定一个名为**SF背景**的纹理作为此**图像**组件的源图像。需要注意的是，当导入Unity时，**图像**组件使用的纹理必须设置为精灵类型。
+在这种情况下，我们创建一个面板作为背景。如图*图 3.22*所示，这里我们指定一个名为**SF 背景**的纹理作为此**图像**组件的源图像。需要注意的是，当导入 Unity 时，**图像**组件使用的纹理必须设置为精灵类型。
 
-![图3.23 – 纹理导入设置
+![图 3.23 – 纹理导入设置](img/Figure_3.23_B17146.jpg)
 
-](img/Figure_3.23_B17146.jpg)
+图 3.23 – 纹理导入设置
 
-图3.23 – 纹理导入设置
-
-**纹理类型**可以在纹理的**导入设置**面板中设置，如图*图3.23*所示。
+**纹理类型**可以在纹理的**导入设置**面板中设置，如图*图 3.23*所示。
 
 注意
 
-图像精灵是用于UI和其他2D游戏元素中的2D图形对象。
+图像精灵是用于 UI 和其他 2D 游戏元素中的 2D 图形对象。
 
 使用精灵作为图像源的优势在于，在调整精灵大小时，角落不会拉伸或扭曲。
 
-![图3.24 – 精灵编辑器
+![图 3.24 – 精灵编辑器](img/Figure_3.24_B17146.jpg)
 
-](img/Figure_3.24_B17146.jpg)
+图 3.24 – 精灵编辑器
 
-图3.24 – 精灵编辑器
-
-这是因为Unity中的**精灵编辑器**提供了**九宫格分割**图像的选项，将图像分割成九个区域。如图*图3.24*所示，在这种情况下，当图像被调整大小时，图像的角落将保持不变。
+这是因为 Unity 中的**精灵编辑器**提供了**九宫格分割**图像的选项，将图像分割成九个区域。如图*图 3.24*所示，在这种情况下，当图像被调整大小时，图像的角落将保持不变。
 
 注意
 
-九宫格分割是UI实现中的一种常见技术。使用九宫格分割的主要优势是它可以很好地处理图像的拉伸。一旦图像被拉伸，就会出现扭曲和模糊等问题，但图像的一些部分可以被拉伸。例如，UI背景框，其中通常中间部分是纯色，可以被拉伸，但图像的四个角落可能有不能拉伸的特殊图案。在这种情况下，我们可以使用九宫格分割技术将整个图像分成九个网格，其中四个角落各在一个网格中。然后，我们只能拉伸和放大图像的中间部分，而保持四个角落不变。
+九宫格分割是 UI 实现中的一种常见技术。使用九宫格分割的主要优势是它可以很好地处理图像的拉伸。一旦图像被拉伸，就会出现扭曲和模糊等问题，但图像的一些部分可以被拉伸。例如，UI 背景框，其中通常中间部分是纯色，可以被拉伸，但图像的四个角落可能有不能拉伸的特殊图案。在这种情况下，我们可以使用九宫格分割技术将整个图像分成九个网格，其中四个角落各在一个网格中。然后，我们只能拉伸和放大图像的中间部分，而保持四个角落不变。
 
-因此，在大多数情况下，使用**图像**组件来显示UI图像是首选的选择。
+因此，在大多数情况下，使用**图像**组件来显示 UI 图像是首选的选择。
 
 ### 原始图像组件
 
-**原始图像**组件是另一个用于在游戏UI上显示图像的组件。
+**原始图像**组件是另一个用于在游戏 UI 上显示图像的组件。
 
-![图3.25 – 创建新的原始图像
+![图 3.25 – 创建新的原始图像](img/Figure_3.25_B17146.jpg)
 
-](img/Figure_3.25_B17146.jpg)
+图 3.25 – 创建新的原始图像
 
-图3.25 – 创建新的原始图像
-
-如*图3.25*所示，您可以创建一个新的图像，如下所示：
+如*图 3.25*所示，您可以创建一个新的图像，如下所示：
 
 1.  在**层次结构**窗口中右键单击以打开菜单。
 
@@ -366,17 +354,34 @@ Canvas Scaler 组件提供的 **UI 缩放模式** 有三种类型：
 
 **原始图像**组件和**图像**组件之间的区别是，**图像**组件的源必须是**精灵**类型。相反，**原始图像**接受任何纹理。此外，**原始图像**组件的功能比**图像**组件简单，如下面的截图所示：
 
-![图3.26 – 原始图像组件
+![图 3.26 – 原始图像组件](img/Figure_3.26_B17146.jpg)
 
-](img/Figure_3.26_B17146.jpg)
-
-图3.26 – 原始图像组件
+图 3.26 – 原始图像组件
 
 以下代码片段展示了如何修改**图像**和**原始图像**组件显示的图像：
 
-[PRE1]
+```cs
+using UnityEngine;
+using UnityEngine.UI;
+public class ImageAndRawImage : MonoBehaviour
+{
+[SerializeField] 
+private Image _image;
+[SerializeField] 
+private Sprite _sprite;
+[SerializeField] 
+private RawImage _rawImage;
+[SerializeField] 
+private Texture _texture;
+    void Start()
+    {
+        _image.sprite = _sprite;
+        _rawImage.texture = _texture;
+    }
+}
+```
 
-应注意，为了能够在代码中访问UI相关的类，我们需要使用`UnityEngine.UI`命名空间。
+应注意，为了能够在代码中访问 UI 相关的类，我们需要使用`UnityEngine.UI`命名空间。
 
 UI 的另一个重要部分是 **文本**。接下来，让我们探索 uGUI 提供的用于显示文本的两个组件。
 
@@ -392,17 +397,13 @@ UI 的另一个重要部分是 **文本**。接下来，让我们探索 uGUI 提
 
 1.  在 **UI** > **文本** 下选择。
 
-![图 3.27 – 创建文本
-
-](img/Figure_3.27_B17146.jpg)
+![图 3.27 – 创建文本](img/Figure_3.27_B17146.jpg)
 
 图 3.27 – 创建文本
 
 在画布中创建一个 **Text** 对象；我们可以在 Unity 编辑器的 **场景** 视图中找到它，如图 *图 3.28* 所示：
 
-![图 3.28 – 场景视图中的文本
-
-](img/Figure_3.28_B17146.jpg)
+![图 3.28 – 场景视图中的文本](img/Figure_3.28_B17146.jpg)
 
 图 3.28 – 场景视图中的文本
 
@@ -410,9 +411,7 @@ UI 的另一个重要部分是 **文本**。接下来，让我们探索 uGUI 提
 
 除了更改字体大小外，您还可以更改使用的字体或启用 **富文本**。
 
-![图 3.29 – 文本组件
-
-](img/Figure_3.29_B17146.jpg)
+![图 3.29 – 文本组件](img/Figure_3.29_B17146.jpg)
 
 图 3.29 – 文本组件
 
@@ -424,109 +423,114 @@ UI 的另一个重要部分是 **文本**。接下来，让我们探索 uGUI 提
 
 **TextMeshPro** (**TMP**) 是 Unity 提供的终极 UI 文本解决方案。它是一种强大的文本渲染机制，可以用来替换 **Text** 组件。**TextMesh Pro** 被设计用来利用 **Signed Distance Field** (**SDF**) 渲染，使其能够在任何分辨率下渲染出美丽的文本。您还可以为 **TextMesh Pro** 创建自定义着色器，以获得轮廓和柔化阴影等效果。
 
-应注意，它不包括在默认的`Unity UI`包中，但包含在`TextMeshPro`包中。因此，如果您在创建UI文本时找不到**TextMesh Pro**，那么您应该首先检查此包是否已添加到您的项目中。
+应注意，它不包括在默认的`Unity UI`包中，但包含在`TextMeshPro`包中。因此，如果您在创建 UI 文本时找不到**TextMesh Pro**，那么您应该首先检查此包是否已添加到您的项目中。
 
-![图3.30 – 创建TextMeshPro对象
+![图 3.30 – 创建 TextMeshPro 对象](img/Figure_3.30_B17146.jpg)
 
-](img/Figure_3.30_B17146.jpg)
+图 3.30 – 创建 TextMeshPro 对象
 
-图3.30 – 创建TextMeshPro对象
-
-为游戏UI创建**TextMeshPro**文本非常简单；只需遵循以下步骤：
+为游戏 UI 创建**TextMeshPro**文本非常简单；只需遵循以下步骤：
 
 1.  在 **层次结构** 窗口中右键单击以打开菜单。
 
 1.  选择 **UI** > **文本** > **TextMeshPro**。
 
-![图3.31 – TextMeshPro组件
+![图 3.31 – TextMeshPro 组件](img/Figure_3.31_B17146.jpg)
 
-](img/Figure_3.31_B17146.jpg)
+图 3.31 – TextMeshPro 组件
 
-图3.31 – TextMeshPro组件
+如图 3.31 所示，**TextMeshPro**渲染的文本比**文本**组件渲染的文本更清晰。
 
-如图3.31所示，**TextMeshPro**渲染的文本比**文本**组件渲染的文本更清晰。
-
-除了渲染更清晰的文本外，**TextMeshPro** 还提供了对文本格式和布局的改进控制。如图3.32所示，您可以通过编辑器直接更改文本的样式。有几种常见的样式可供选择，例如 *粗体* 和 *斜体*。同样，您也可以使用标签来修改文本样式，就像 **文本** 组件一样，并且可以使用 **间距选项**、**对齐** 和 **换行** 等功能来控制文本布局。
+除了渲染更清晰的文本外，**TextMeshPro** 还提供了对文本格式和布局的改进控制。如图 3.32 所示，您可以通过编辑器直接更改文本的样式。有几种常见的样式可供选择，例如 *粗体* 和 *斜体*。同样，您也可以使用标签来修改文本样式，就像 **文本** 组件一样，并且可以使用 **间距选项**、**对齐** 和 **换行** 等功能来控制文本布局。
 
 此外，您还可以实现更多渲染效果，例如点击着色器的轮廓选项以向文本添加轮廓效果。
 
-![图3.32 – TextMeshPro组件
+![图 3.32 – TextMeshPro 组件](img/Figure_3.32_B17146.jpg)
 
-](img/Figure_3.32_B17146.jpg)
+图 3.32 – TextMeshPro 组件
 
-图3.32 – TextMeshPro组件
+使用 TextMesh Pro 来实现您的 UI 文本是一个不错的选择。
 
-使用TextMesh Pro来实现您的UI文本是一个不错的选择。
+## 可选择 UI 组件
 
-## 可选择UI组件
-
-您可以使用uGUI中的可选择组件来处理交互。这些组件包括 **按钮**、**切换**、**滑动条**、**下拉菜单**、**输入字段** 和 **滚动条**。在本节中，我们将主要讨论最常用的组件，即 **按钮** 组件。
+您可以使用 uGUI 中的可选择组件来处理交互。这些组件包括 **按钮**、**切换**、**滑动条**、**下拉菜单**、**输入字段** 和 **滚动条**。在本节中，我们将主要讨论最常用的组件，即 **按钮** 组件。
 
 ### 按钮
 
-为游戏UI创建一个 **按钮** 元素非常简单；只需遵循以下步骤：
+为游戏 UI 创建一个 **按钮** 元素非常简单；只需遵循以下步骤：
 
 1.  在 **层次结构** 窗口中右键单击以打开菜单。
 
 1.  选择 **UI** > **按钮 - TextMeshPro**。
 
-![图3.33 – 创建按钮对象
+![图 3.33 – 创建按钮对象](img/Figure_3.33_B17146.jpg)
 
-](img/Figure_3.33_B17146.jpg)
+图 3.33 – 创建按钮对象
 
-图3.33 – 创建按钮对象
+如图 3.33 所示，在菜单中有两种创建按钮的选项，即 **按钮** 和 **按钮 -TextMeshPro**。在这里，我们选择 **按钮 -TextMeshPro**，以便按钮上的文本内容由**TextMeshPro**渲染。
 
-如图3.33所示，在菜单中有两种创建按钮的选项，即 **按钮** 和 **按钮 -TextMeshPro**。在这里，我们选择 **按钮 -TextMeshPro**，以便按钮上的文本内容由**TextMeshPro**渲染。
+![图 3.34 – 一个图像组件和一个按钮组件被附加到按钮上](img/Figure_3.34_B17146.jpg)
 
-![图3.34 – 一个图像组件和一个按钮组件被附加到按钮上
-
-](img/Figure_3.34_B17146.jpg)
-
-图3.34 – 一个图像组件和一个按钮组件被附加到按钮上
+图 3.34 – 一个图像组件和一个按钮组件被附加到按钮上
 
 一旦创建了一个默认按钮对象，该对象不仅包含**Button**组件，还包含**Image**组件。这是因为**Button**组件仅提供与用户交互的功能；它不提供图形显示的功能。因此，按钮的图像需要一个**Image**组件来显示。
 
 #### 选择状态
 
-`Selectable`类，即`Normal`、`Highlighted`、`Pressed`、`Selected`和`Disabled`，这些状态由名为`Selectable.SelectionState`的枚举定义。因此，如图*图3.34*所示，**“Transition”**部分对应这五种不同的选择状态，这意味着当用户与该按钮交互时，该按钮将根据不同的状态提供不同的反馈。
+`Selectable`类，即`Normal`、`Highlighted`、`Pressed`、`Selected`和`Disabled`，这些状态由名为`Selectable.SelectionState`的枚举定义。因此，如图*图 3.34*所示，**“Transition”**部分对应这五种不同的选择状态，这意味着当用户与该按钮交互时，该按钮将根据不同的状态提供不同的反馈。
 
 #### onClick
 
-按钮的重要作用是接收用户点击并触发相应的事件。在Unity中，设置按钮`onClick`事件非常简单。您可以在编辑器中手动设置按钮`onClick`事件，或者通过编程方式设置按钮`onClick`事件。
+按钮的重要作用是接收用户点击并触发相应的事件。在 Unity 中，设置按钮`onClick`事件非常简单。您可以在编辑器中手动设置按钮`onClick`事件，或者通过编程方式设置按钮`onClick`事件。
 
-为了在编辑器中的按钮上设置一个新事件，我们可以点击**“+”**按钮，位于**“On Click ()”**部分的底部，如图*图3.35*所示。这将创建一个新的动作。
+为了在编辑器中的按钮上设置一个新事件，我们可以点击**“+”**按钮，位于**“On Click ()”**部分的底部，如图*图 3.35*所示。这将创建一个新的动作。
 
-![Figure 3.35 – 在编辑器中设置新的onClick事件
+![Figure 3.35 – 在编辑器中设置新的 onClick 事件
 
 ![img/Figure_3.35_B17146.jpg]
 
-图3.35 – 在编辑器中设置新的onClick事件
+图 3.35 – 在编辑器中设置新的 onClick 事件
 
 我们还可以通过编程方式设置按钮`onClick`事件；以下代码展示了如何进行此操作：
 
-[PRE2]
+```cs
+using UnityEngine;
+using UnityEngine.UI;
+public class ButtonClickExample : MonoBehaviour
+{
+    // Start is called before the first frame update
+    void Start()
+    {
+        var button = GetComponent<Button>();
+        button.onClick.AddListener(() =>
+        {
+            Debug.Log(You have clicked the button!);
+        });
+    }
+}
+```
 
-在本节中，我们了解了常用的UI组件，并对Unity提供的UI解决方案uGUI有了了解。接下来，我们将探索Unity中的UI事件系统。如果场景中没有事件系统，UI元素如按钮就无法与玩家交互，因此这是一个重要的主题。
+在本节中，我们了解了常用的 UI 组件，并对 Unity 提供的 UI 解决方案 uGUI 有了了解。接下来，我们将探索 Unity 中的 UI 事件系统。如果场景中没有事件系统，UI 元素如按钮就无法与玩家交互，因此这是一个重要的主题。
 
-# C#脚本和Unity中的UI事件系统
+# C#脚本和 Unity 中的 UI 事件系统
 
-**EventSystem**是一个将事件发送到支持键盘、鼠标、屏幕触摸等输入的游戏对象的机制。EventSystem由多个用于发送事件的模块组成。如果场景中没有**EventSystem**对象，那么在创建画布时，将自动创建一个**EventSystem**对象。
+**EventSystem**是一个将事件发送到支持键盘、鼠标、屏幕触摸等输入的游戏对象的机制。EventSystem 由多个用于发送事件的模块组成。如果场景中没有**EventSystem**对象，那么在创建画布时，将自动创建一个**EventSystem**对象。
 
 ![Figure 3.36 – EventSystem
 
 ![img/Figure_3.36_B17146.jpg]
 
-图3.36 – EventSystem
+图 3.36 – EventSystem
 
-如*图3.36*所示，**EventSystem**对象的**Inspector**窗口暴露了非常少的函数。这是因为EventSystem被设计为各种**输入模块**之间协作的管理器。
+如*图 3.36*所示，**EventSystem**对象的**Inspector**窗口暴露了非常少的函数。这是因为 EventSystem 被设计为各种**输入模块**之间协作的管理器。
 
-应注意，场景中最多只能有一个**EventSystem**对象。如果场景中有多个**EventSystem**对象，将显示警告信息，如图*图3.37*所示：
+应注意，场景中最多只能有一个**EventSystem**对象。如果场景中有多个**EventSystem**对象，将显示警告信息，如图*图 3.37*所示：
 
 ![Figure 3.37 – A warning message when there are multiple EventSystem objects
 
 ![img/Figure_3.37_B17146.jpg]
 
-图3.37 – 存在多个EventSystem对象时的警告信息
+图 3.37 – 存在多个 EventSystem 对象时的警告信息
 
 当游戏运行时，**EventSystem**将寻找附加到同一 GameObject 的**InputModule**组件。这是因为**InputModule**是负责**EventSystem**主要逻辑的类。我们也可以找到本例中使用的输入模块，如图 3.36 所示，即**独立输入模块**。接下来，我们将介绍输入模块。
 
@@ -540,17 +544,13 @@ Unity 提供了两个内置输入模块，即**独立输入模块**和**触摸�
 
 除了这个默认的内置输入模块之外，Unity 还提供了一个新的、更强大、更灵活、可配置的**Input System**包。
 
-![图 3.38 – Input System 包
-
-](img/Figure_3.38_B17146.jpg)
+![图 3.38 – Input System 包](img/Figure_3.38_B17146.jpg)
 
 图 3.38 – Input System 包
 
 如果你想使用新的输入系统，那么你需要从包管理器窗口安装该包，如图 3.38 所示。此外，新创建的**EventSystem**组件默认仍将使用传统的**独立输入模块**组件，因此你需要手动将其替换为新的**InputSystemUIInputModule**组件，如图 3.39 所示：
 
-![图 3.39 – 替换为 InputSystemUIInputModule
-
-](img/Figure_3.39_B17146.jpg)
+![图 3.39 – 替换为 InputSystemUIInputModule](img/Figure_3.39_B17146.jpg)
 
 图 3.39 – 替换为 InputSystemUIInputModule
 
@@ -560,9 +560,7 @@ Unity 提供了两个内置输入模块，即**独立输入模块**和**触摸�
 
 在 Unity 开发中，一个常见的挑战是找到优雅的方法将组件彼此解耦，尤其是在开发 UI 时，因为它涉及到 UI 逻辑和 UI 渲染。**模型-视图-视图模型**（**MVVM**）是一种软件架构模式，它帮助开发者将**视图模型**（UI 逻辑）与**视图**（UI 图形）分离。在本节中，我们将探讨如何在 Unity 中实现 MVVM 模式。
 
-![图 3.40 – MVVM
-
-](img/Figure_3.40_B17146.jpg)
+![图 3.40 – MVVM](img/Figure_3.40_B17146.jpg)
 
 图 3.40 – MVVM
 
@@ -572,43 +570,65 @@ Unity 提供了两个内置输入模块，即**独立输入模块**和**触摸�
 
 +   `MonoBehaviour` 并附加到 UI 对象。其主要作用是管理 UI 元素并触发 UI 事件，但它本身不实现任何具体的 UI 逻辑。
 
-+   `MonoBehaviour`。它不需要考虑UI的外观；它只需要实现具体逻辑。
++   `MonoBehaviour`。它不需要考虑 UI 的外观；它只需要实现具体逻辑。
 
-我们可以看到MVVM中有三个部分，那么它们应该如何连接呢？通常，我们使用两种方式来连接它们：
+我们可以看到 MVVM 中有三个部分，那么它们应该如何连接呢？通常，我们使用两种方式来连接它们：
 
-+   `ViewModel`和`View`。绑定到数据的元素将自动反映每个数据变化。通过使用数据绑定，`ViewModel`可以修改View中UI控件的价值。
++   `ViewModel`和`View`。绑定到数据的元素将自动反映每个数据变化。通过使用数据绑定，`ViewModel`可以修改 View 中 UI 控件的价值。
 
-+   **事件驱动编程**：这种方法用于从由用户操作触发的View中引发事件，然后由ViewModel处理。
++   **事件驱动编程**：这种方法用于从由用户操作触发的 View 中引发事件，然后由 ViewModel 处理。
 
-对于Unity，有一些成熟的MVVM框架实现，例如**Loxodon Framework**，这是一个专门针对Unity构建的轻量级MVVM框架。您可以在GitHub上找到它的仓库（[https://github.com/vovgou/loxodon-framework](https://github.com/vovgou/loxodon-framework)）或直接通过Unity Asset Store将其添加到您的项目中。
+对于 Unity，有一些成熟的 MVVM 框架实现，例如**Loxodon Framework**，这是一个专门针对 Unity 构建的轻量级 MVVM 框架。您可以在 GitHub 上找到它的仓库（[`github.com/vovgou/loxodon-framework`](https://github.com/vovgou/loxodon-framework)）或直接通过 Unity Asset Store 将其添加到您的项目中。
 
-![图3.41 – Loxodon Framework
+![图 3.41 – Loxodon Framework](img/Figure_3.41_B17146.jpg)
 
-](img/Figure_3.41_B17146.jpg)
-
-图3.41 – Loxodon Framework
+图 3.41 – Loxodon Framework
 
 由于我们的下一个示例将使用这个框架，我建议您首先将此框架导入到您的项目中。导入此框架后，您应该在项目的`Assets`文件夹中找到它。
 
-![图3.42 – LoxodonFramework文件夹
+![图 3.42 – LoxodonFramework 文件夹](img/Figure_3.42_B17146.jpg)
 
-](img/Figure_3.42_B17146.jpg)
+图 3.42 – LoxodonFramework 文件夹
 
-图3.42 – LoxodonFramework文件夹
+现在，让我们按照以下步骤在 Unity 中使用**LoxodonFramework**实现一个示例 MVVM UI：
 
-现在，让我们按照以下步骤在Unity中使用**LoxodonFramework**实现一个示例MVVM UI：
+1.  首先，让我们在我们的游戏场景中设置`LoxodonFramework`。我们需要创建一个新的画布，并将**GlobalWindowManager**组件添加到这个画布上，如图*图 3.43*所示。一个**GlobalWindowManager**组件是一个用于管理视图的容器。
 
-1.  首先，让我们在我们的游戏场景中设置`LoxodonFramework`。我们需要创建一个新的画布，并将**GlobalWindowManager**组件添加到这个画布上，如图*图3.43*所示。一个**GlobalWindowManager**组件是一个用于管理视图的容器。
+![图 3.43 – GlobalWindowManager 组件](img/Figure_3.43_B17146.jpg)
 
-![图3.43 – GlobalWindowManager组件
+图 3.43 – GlobalWindowManager 组件
 
-](img/Figure_3.43_B17146.jpg)
+1.  接下来，我们需要定义一个视图。正如我们之前提到的，视图在 Unity 中代表 UI 元素。从下面的代码中可以看出，这个视图相对简单，只包含一个按钮 UI 元素和一个文本 UI 元素，并且这个`SampleView`类继承自 Loxodon Framework 中的`Window`类。在下面的代码中，您还可以找到`BindingSet`类，它用于绑定和连接`ViewModel`和`View`的属性：
 
-图3.43 – GlobalWindowManager组件
-
-1.  接下来，我们需要定义一个视图。正如我们之前提到的，视图在Unity中代表UI元素。从下面的代码中可以看出，这个视图相对简单，只包含一个按钮UI元素和一个文本UI元素，并且这个`SampleView`类继承自Loxodon Framework中的`Window`类。在下面的代码中，您还可以找到`BindingSet`类，它用于绑定和连接`ViewModel`和`View`的属性：
-
-    [PRE3]
+    ```cs
+    using UnityEngine;
+    using UnityEngine.UI;
+    using Loxodon.Framework.Views;
+    using Loxodon.Framework.Binding;
+    using Loxodon.Framework.Binding.Builder;
+    using Loxodon.Framework.ViewModels;
+    using TMPro;
+    public class SampleView : Window
+    {
+        [SerializeField]
+        private Button _submitButton;
+        [SerializeField]
+        private TextMeshProUGUI _message;
+        private SampleViewModel _viewModel;
+        protected override void OnCreate(IBundle bundle)
+        {
+            _viewModel = new SampleViewModel();
+            BindingSet<SampleView, SampleViewModel>
+    bindingSet =
+              this.CreateBindingSet(_viewModel);
+            bindingSet.Bind(_message).For(v =>
+              v.text).To(vm => vm.Message).OneWay();
+            bindingSet.Bind(_submitButton).For(v =>
+              v.onClick).To(vm => vm.Submit);
+            bindingSet.Build();
+        }
+    }
+    ```
 
 让我们分解这个例子：
 
@@ -616,122 +636,162 @@ Unity 提供了两个内置输入模块，即**独立输入模块**和**触摸�
 
 +   在`OnCreate`方法中，我们首先创建一个`BindingSet`实例来绑定`SampleView`到其对应的`ViewModel`类——即`SampleViewModel`。我们将在后面介绍如何创建`SampleViewModel`类。
 
-+   然后，我们通过调用`BindingSet`的`Bind`方法将`SampleView`中`_message`字段的`text`属性绑定到`SampleViewModel`中的`Message`属性。在代码中可以看到，我们这里使用的是`OneWay`绑定，这意味着只有视图模型可以修改视图中的UI元素的值。
++   然后，我们通过调用`BindingSet`的`Bind`方法将`SampleView`中`_message`字段的`text`属性绑定到`SampleViewModel`中的`Message`属性。在代码中可以看到，我们这里使用的是`OneWay`绑定，这意味着只有视图模型可以修改视图中的 UI 元素的值。
 
 +   我们还绑定`SampleView`中`_submitButton`字段的`onClick`事件到`SampleViewModel`中的`Submit`方法。最后，我们调用`BindingSet`的`Build`方法来构建绑定。
 
-1.  同时，我们还需要在Unity场景中创建这些所需的UI元素，如图所示。让我们称它为**SampleUI**。
+1.  同时，我们还需要在 Unity 场景中创建这些所需的 UI 元素，如图所示。让我们称它为**SampleUI**。
 
-![图3.44 – 设置UI元素
+![图 3.44 – 设置 UI 元素](img/Figure_3.44_B17146.jpg)
 
-](img/Figure_3.44_B17146.jpg)
+图 3.44 – 设置 UI 元素
 
-图3.44 – 设置UI元素
+1.  然后，让我们创建一个名为`Resources`的新文件夹，并将此示例 UI 的预制件从**Hierarchy**窗口拖动到**Resources**文件夹中，如图所示。到目前为止，我们已经创建了 UI 元素和一个代表 MVVM 架构中 UI 元素的**View**组件。**SampleUI**可以从场景中移除，因为我们将在运行时加载其预制件并创建 UI。
 
-1.  然后，让我们创建一个名为`Resources`的新文件夹，并将此示例UI的预制件从**Hierarchy**窗口拖动到**Resources**文件夹中，如图所示。到目前为止，我们已经创建了UI元素和一个代表MVVM架构中UI元素的**View**组件。**SampleUI**可以从场景中移除，因为我们将在运行时加载其预制件并创建UI。
+![图 3.45 – SampleUI 预制件](img/Figure_3.45_B17146.jpg)
 
-![图3.45 – SampleUI预制件
+图 3.45 – SampleUI 预制件
 
-](img/Figure_3.45_B17146.jpg)
+1.  我们还需要一个`SampleViewModel`类，它实现了具体逻辑。`SampleViewModel`类继承自 Loxodon 框架中的`ViewModelBase`类，逻辑在`Submit`方法中实现，该方法修改`Message`属性。在之前创建的视图中，我们将按钮的`onClick`事件绑定到`SampleViewModel`类中的`Submit`方法，并且还将视图的 Text UI 元素的`text`属性绑定到`SampleViewModel`的`Message`属性。因此，在`Submit`方法修改`Message`属性后，修改后的消息内容将显示在 UI 上：
 
-图3.45 – SampleUI预制件
+    ```cs
+    using Loxodon.Framework.ViewModels;
+    public class SampleViewModel : ViewModelBase
+    {
+        private string _message;
+        private int _count;
+        public SampleViewModel() { }
+        public string Message
+        {
+            get { return _message; }
+            set => Set<string>(ref _message, value,
+              Message);
+        }
+        public void Submit()
+        {
+            _count++;
+            Message = $The number of times the button is
+              clicked: {_count};
+        }
+    }
+    ```
 
-1.  我们还需要一个`SampleViewModel`类，它实现了具体逻辑。`SampleViewModel`类继承自Loxodon框架中的`ViewModelBase`类，逻辑在`Submit`方法中实现，该方法修改`Message`属性。在之前创建的视图中，我们将按钮的`onClick`事件绑定到`SampleViewModel`类中的`Submit`方法，并且还将视图的Text UI元素的`text`属性绑定到`SampleViewModel`的`Message`属性。因此，在`Submit`方法修改`Message`属性后，修改后的消息内容将显示在UI上：
+1.  最后，需要启动代码来注册服务和创建用户界面。以下启动代码支持在以下代码中加载`ApplicationContext`类的预制件；我们使用它来存储可以被 Loxodon 框架中的其他类访问的数据和服务。然后，代码注册了`IUIViewLocator`服务来加载 UI 预制件并创建 UI 元素：
 
-    [PRE4]
+    ```cs
+    public class Startup : MonoBehaviour
+    {
+        private container.Register<IUIViewLocator>(new
+              ResourcesViewLocator ());
+            var bundle = new
+              BindingServiceBundle
+              (_context.GetContainer());
+            bundle.Start();
+        }
+        private IEnumerator Start()
+        {
+            // Create a window container
+            var winContainer =
+              WindowContainer.Create(MAIN);
+            yield return null;
+            IUIViewLocator locator =
+              _context.GetService<IUIViewLocator>();
+            var sampleView =
+              locator.LoadWindow<SampleView>(winContainer,
+              SampleUI);
+            sampleView.Create();
+            ITransition transition =
+              sampleView.Show().OnStateChanged((w, state)
+              =>
+            {
+            });
+            yield return transition.WaitForDone();
+        }
+    }
+    ```
 
-1.  最后，需要启动代码来注册服务和创建用户界面。以下启动代码支持在以下代码中加载`ApplicationContext`类的预制件；我们使用它来存储可以被Loxodon框架中的其他类访问的数据和服务。然后，代码注册了`IUIViewLocator`服务来加载UI预制件并创建UI元素：
+1.  让我们运行游戏。如图所示，我们创建了一个显示消息文本的视图和一个用于更新消息信息的`SampleViewModel`类，视图将通过数据绑定更新 UI 文本以显示最新信息。
 
-    [PRE5]
+![图 3.46 – 带有 MVVM 的示例 UI](img/Figure_3.46_B17146.jpg)
 
-1.  让我们运行游戏。如图所示，我们创建了一个显示消息文本的视图和一个用于更新消息信息的`SampleViewModel`类，视图将通过数据绑定更新UI文本以显示最新信息。
+图 3.46 – 带有 MVVM 的示例 UI
 
-![图3.46 – 带有MVVM的示例UI
+这样，UI 图形和 UI 逻辑就被分离开了。UI 设计师和程序员可以同时工作，而不需要相互依赖，从而提高了 Unity 中 UI 开发的效率。
 
-](img/Figure_3.46_B17146.jpg)
+在本节中，我们讨论了如何使用 MVVM 在 Unity 中实现 UI。接下来，我们将学习在 Unity 中实现 UI 时需要注意的事项——即优化 UI 性能。
 
-图3.46 – 带有MVVM的示例UI
+# 提高 UI 性能的性能提示
 
-这样，UI图形和UI逻辑就被分离开了。UI设计师和程序员可以同时工作，而不需要相互依赖，从而提高了Unity中UI开发的效率。
-
-在本节中，我们讨论了如何使用MVVM在Unity中实现UI。接下来，我们将学习在Unity中实现UI时需要注意的事项——即优化UI性能。
-
-# 提高UI性能的性能提示
-
-UI是游戏的重要组成部分，因此如果你没有正确实现它，可能会引起潜在的性能问题。在本节中，我们将讨论在Unity中实现游戏UI的最佳实践，以优化由UI引起的性能问题。
+UI 是游戏的重要组成部分，因此如果你没有正确实现它，可能会引起潜在的性能问题。在本节中，我们将讨论在 Unity 中实现游戏 UI 的最佳实践，以优化由 UI 引起的性能问题。
 
 ## Unity Profiler
 
-第一条最佳实践建议是熟练使用Unity **Profiler**。Profiler是一个工具，你可以用它来获取关于你游戏性能数据，包括**CPU使用率**、**GPU使用率**、**渲染**、**内存**、**UI**和**UI详细信息**。为了查看关于UI的性能数据，请执行以下步骤：
+第一条最佳实践建议是熟练使用 Unity **Profiler**。Profiler 是一个工具，你可以用它来获取关于你游戏性能数据，包括**CPU 使用率**、**GPU 使用率**、**渲染**、**内存**、**UI**和**UI 详细信息**。为了查看关于 UI 的性能数据，请执行以下步骤：
 
 1.  单击**窗口** > **分析** > **Profiler**以打开**Profiler**窗口。
 
-1.  在**Profiler**窗口中单击**UI**或**UI详细信息**模块区域，以查看与UI相关的性能数据，例如**布局**和**渲染**消耗的CPU时间。
+1.  在**Profiler**窗口中单击**UI**或**UI 详细信息**模块区域，以查看与 UI 相关的性能数据，例如**布局**和**渲染**消耗的 CPU 时间。
 
-![Figure 3.47 – 分析窗口中的UI区域
+![Figure 3.47 – 分析窗口中的 UI 区域![img/Figure_3.47_B17146.jpg](img/Figure_3.47_B17146.jpg)
 
-![img/Figure_3.47_B17146.jpg](img/Figure_3.47_B17146.jpg)
+图 3.47 – 分析窗口中的 UI 区域
 
-图3.47 – 分析窗口中的UI区域
+除了**UI**和**UI 详细信息**区域外，**Profiler**窗口中的**CPU 使用率**区域还提供了与 UI 相关的性能信息。在**CPU 使用率**区域，你可以看到特定标记（如**UGUI.Rendering.RenderOverlays**）消耗的 CPU 时间，如下面的截图所示：
 
-除了**UI**和**UI详细信息**区域外，**Profiler**窗口中的**CPU使用率**区域还提供了与UI相关的性能信息。在**CPU使用率**区域，你可以看到特定标记（如**UGUI.Rendering.RenderOverlays**）消耗的CPU时间，如下面的截图所示：
+![Figure 3.48 – 分析窗口中的 CPU 使用率区域![img/Figure_3.48_B17146.jpg](img/Figure_3.48_B17146.jpg)
 
-![Figure 3.48 – 分析窗口中的CPU使用率区域
+图 3.48 – 分析窗口中的 CPU 使用率区域
 
-![img/Figure_3.48_B17146.jpg](img/Figure_3.48_B17146.jpg)
-
-图3.48 – 分析窗口中的CPU使用率区域
-
-这只是对Profiler工具的简要介绍。在接下来的章节中，我们将详细讨论Unity Profiler。
+这只是对 Profiler 工具的简要介绍。在接下来的章节中，我们将详细讨论 Unity Profiler。
 
 ## 多个画布
 
-第二条最佳实践建议是在Unity中实现UI时需要考虑的一个重要方面，尤其是在你的游戏UI非常复杂时。如果需要，你可能需要创建多个画布来管理和显示不同的UI元素。正如我们之前提到的，一个画布生成表示放置在其上的UI元素的网格，并在UI元素更改时重新生成网格。
+第二条最佳实践建议是在 Unity 中实现 UI 时需要考虑的一个重要方面，尤其是在你的游戏 UI 非常复杂时。如果需要，你可能需要创建多个画布来管理和显示不同的 UI 元素。正如我们之前提到的，一个画布生成表示放置在其上的 UI 元素的网格，并在 UI 元素更改时重新生成网格。
 
-假设你在一个画布中构建了整个游戏的UI，包含数千个UI元素，当画布上的一个或多个UI元素发生变化时，用于显示UI的所有网格都会重新生成。这可能会很昂贵，你可能会遇到持续几毫秒的CPU峰值。
+假设你在一个画布中构建了整个游戏的 UI，包含数千个 UI 元素，当画布上的一个或多个 UI 元素发生变化时，用于显示 UI 的所有网格都会重新生成。这可能会很昂贵，你可能会遇到持续几毫秒的 CPU 峰值。
 
-因此，根据UI元素的更新频率创建多个不同的画布来管理它们是一个好主意。例如，进度条和计时器等频繁更新的动态UI元素可以放在一个画布中，而UI面板和背景图像等不常更新的静态UI元素可以放在另一个画布中。当然，没有一劳永逸的方法；您需要根据项目来管理画布。
+因此，根据 UI 元素的更新频率创建多个不同的画布来管理它们是一个好主意。例如，进度条和计时器等频繁更新的动态 UI 元素可以放在一个画布中，而 UI 面板和背景图像等不常更新的静态 UI 元素可以放在另一个画布中。当然，没有一劳永逸的方法；您需要根据项目来管理画布。
 
 ## 使用精灵图集
 
-当我们讨论UI图像时，我们已经介绍了精灵是用于UI和其他2D游戏元素的两个维图形对象。当将新纹理导入Unity编辑器时，我们可以将此纹理的纹理类型设置为精灵。因此，您的游戏项目可能包含大量的精灵文件。如果是这样，许多精灵被视为独立的个体，这可能会降低渲染性能。这是因为Unity将为场景中的每个精灵发出**绘制调用**，多个绘制调用可能会消耗大量资源并负面影响您的游戏性能。
+当我们讨论 UI 图像时，我们已经介绍了精灵是用于 UI 和其他 2D 游戏元素的两个维图形对象。当将新纹理导入 Unity 编辑器时，我们可以将此纹理的纹理类型设置为精灵。因此，您的游戏项目可能包含大量的精灵文件。如果是这样，许多精灵被视为独立的个体，这可能会降低渲染性能。这是因为 Unity 将为场景中的每个精灵发出**绘制调用**，多个绘制调用可能会消耗大量资源并负面影响您的游戏性能。
 
 注意
 
-绘制调用是调用图形API来绘制对象（例如，绘制一个三角形）。
+绘制调用是调用图形 API 来绘制对象（例如，绘制一个三角形）。
 
 如以下截图所示，有两个绘制调用用于渲染**Button1**和**Button2**，因为这些两个按钮使用了两个不同的纹理：
 
-![图3.49 – 多个绘制调用
+![图 3.49 – 多个绘制调用
 
 ![img/Figure_3.49_B17146.jpg]
 
-图3.49 – 多个绘制调用
+图 3.49 – 多个绘制调用
 
 因此，将几个纹理或精灵组合成一个组合纹理是一个好主意。
 
-我们可以执行以下步骤来使用Unity提供的**精灵图集**来组合纹理：
+我们可以执行以下步骤来使用 Unity 提供的**精灵图集**来组合纹理：
 
 1.  如果**精灵图集**打包被禁用，请在**编辑** > **项目设置** > **编辑器** > **精灵打包器** > **模式**中启用它。
 
 1.  点击**资产** > **创建** > **2D** > **精灵图集**以创建精灵图集资产。
 
-![图3.50 – 创建精灵图集
+![图 3.50 – 创建精灵图集
 
 ![img/Figure_3.50_B17146.jpg]
 
-图3.50 – 创建精灵图集
+图 3.50 – 创建精灵图集
 
 1.  在精灵图集资产的**打包对象**下拉菜单中，选择**+**符号以添加纹理或文件夹到精灵图集。
 
-然而，我们仍然需要意识到，尽管精灵图集可以有效地减少绘制调用的数量，但不当的使用很容易导致内存浪费。当一个精灵在图集中激活时，Unity将加载属于该精灵的图集中的所有精灵。如果图集中有大量的精灵，即使场景中只引用了一个精灵，整个图集也将被加载，这会导致大量内存消耗。为了解决这个问题，可以根据其用途将精灵打包到多个较小的图集中。例如，用于登录面板的精灵可以打包为登录面板图集，而用于游戏角色面板的精灵可以打包为角色面板图集。
+然而，我们仍然需要意识到，尽管精灵图集可以有效地减少绘制调用的数量，但不当的使用很容易导致内存浪费。当一个精灵在图集中激活时，Unity 将加载属于该精灵的图集中的所有精灵。如果图集中有大量的精灵，即使场景中只引用了一个精灵，整个图集也将被加载，这会导致大量内存消耗。为了解决这个问题，可以根据其用途将精灵打包到多个较小的图集中。例如，用于登录面板的精灵可以打包为登录面板图集，而用于游戏角色面板的精灵可以打包为角色面板图集。
 
 # 摘要
 
-在本章中，我们首先介绍了uGUI解决方案中最常用的UI组件类，例如**Canvas**、**Rect Transform**和**Image**组件。然后，我们解释了Unity中的事件系统、遗留的输入模块以及Unity提供的更强大的新输入系统包。
+在本章中，我们首先介绍了 uGUI 解决方案中最常用的 UI 组件类，例如**Canvas**、**Rect Transform**和**Image**组件。然后，我们解释了 Unity 中的事件系统、遗留的输入模块以及 Unity 提供的更强大的新输入系统包。
 
-我们还讨论了在Unity中开发UI时，如何通过使用MVVM架构模式将组件相互解耦。
+我们还讨论了在 Unity 中开发 UI 时，如何通过使用 MVVM 架构模式将组件相互解耦。
 
-最后，我们探讨了在Unity中实现游戏UI的一些最佳实践，以优化由UI引起的性能问题。
+最后，我们探讨了在 Unity 中实现游戏 UI 的一些最佳实践，以优化由 UI 引起的性能问题。
 
-在下一章中，我们将学习Unity中的动画系统，同时，我们也会介绍如何在Unity中优化动画性能。
+在下一章中，我们将学习 Unity 中的动画系统，同时，我们也会介绍如何在 Unity 中优化动画性能。

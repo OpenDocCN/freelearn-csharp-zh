@@ -1,6 +1,6 @@
-# 第7章. 交易纸杯蛋糕和终极蛋糕争夺战 – 游戏玩法编程
+# 第七章. 交易纸杯蛋糕和终极蛋糕争夺战 – 游戏玩法编程
 
-在了解了Unity引擎的不同部分之后，是时候回到我们的游戏并完成它了。在这个过程中，我们将探讨另一个重要主题：**游戏玩法编程**。特别是，我们将看到数据如何在游戏的不同部分之间交换。由于在我们的塔防游戏中还有许多部分需要连接，并且它们可以以数千种不同的方式实现，我尝试选择不同的技术，以便给你一个在Unity中实现事物的新视角。
+在了解了 Unity 引擎的不同部分之后，是时候回到我们的游戏并完成它了。在这个过程中，我们将探讨另一个重要主题：**游戏玩法编程**。特别是，我们将看到数据如何在游戏的不同部分之间交换。由于在我们的塔防游戏中还有许多部分需要连接，并且它们可以以数千种不同的方式实现，我尝试选择不同的技术，以便给你一个在 Unity 中实现事物的新视角。
 
 具体来说，在本章中我们将涵盖：
 
@@ -16,7 +16,7 @@
 
 +   设计和实现主菜单
 
-+   如何在Unity中更改场景
++   如何在 Unity 中更改场景
 
 和往常一样，在章节的结尾你可以找到*作业*部分，其中充满了练习，帮助你将技能提升到更高的水平。其中一些练习将挑战你对章节中学到的概念的理解，并将指导你改进我们的塔防游戏。
 
@@ -30,7 +30,7 @@
 
 # 游戏玩法编程是什么意思？
 
-游戏玩法编程并没有一个独特的定义。当然，它涉及到游戏的建设和发展，但例如，它是否包括人工智能编程？或者用户界面？或者数据库连接？或者动画机器？因此，定义取决于上下文。然而，值得注意的是，当你寻找工作职位时，定义又会发生变化。一般来说，根据经验，公司越大，游戏玩法程序员的工作职位越好。实际上，在小公司中，团队可能资源有限，因此拥有一个游戏玩法程序员意味着他/她将做所有事情，而在有AI、UI和动画程序员的较大团队中，游戏玩法程序员更可能成为所有这些角色的协调者，因此这是一个更高的职位。
+游戏玩法编程并没有一个独特的定义。当然，它涉及到游戏的建设和发展，但例如，它是否包括人工智能编程？或者用户界面？或者数据库连接？或者动画机器？因此，定义取决于上下文。然而，值得注意的是，当你寻找工作职位时，定义又会发生变化。一般来说，根据经验，公司越大，游戏玩法程序员的工作职位越好。实际上，在小公司中，团队可能资源有限，因此拥有一个游戏玩法程序员意味着他/她将做所有事情，而在有 AI、UI 和动画程序员的较大团队中，游戏玩法程序员更可能成为所有这些角色的协调者，因此这是一个更高的职位。
 
 我想用一位游戏开发者的博客中的一句话来结束本节（[游戏开发者博客](http://askagamedev.tumblr.com/post/72792621882/roles-in-the-industry-the-gameplay-programmer)），他描述了作为一名游戏玩法程序员的感觉：
 
@@ -42,7 +42,7 @@
 
 在我们完成游戏之前，首先要做的是整理我们已经写下的想法。
 
-在[第1章](part0016.xhtml#aid-F8901 "第1章。Unity中的平面世界")，*Unity中的平面世界*中，我们导入了所有精灵并正确设置了它们。然后，在[第2章](part0028.xhtml#aid-QMFO1 "第2章。制作纸杯蛋糕塔")，*制作纸杯蛋糕塔*中，我们实现了投射物和纸杯蛋糕塔类。在[第3章](part0043.xhtml#aid-190861 "第3章。与玩家沟通——用户界面")，*与玩家沟通——用户界面*中，我们实现了玩家的生命值和糖分，而在[第4章](part0056.xhtml#aid-1LCVG1 "第4章。不再孤单——甜食熊猫出击")，*不再孤单——甜食熊猫出击*中，我们专注于为我们的甜食熊猫制作动画。最后，在[第5章](part0062.xhtml#aid-1R42S1 "第5章。秘密成分是物理学的一点点")，*秘密成分是物理学的一点点*中，我们探讨了物理学以及我们如何在游戏中使用它，并在[第6章](part0077.xhtml#aid-29DRA1 "第6章。穿过糖霜的海洋——人工智能中的导航")，*穿过糖霜的海洋——人工智能中的导航*中，我们给了熊猫沿着通往甜蛋糕的路径移动的可能性。
+在第一章，*Unity 中的平面世界*中，我们导入了所有精灵并正确设置了它们。然后，在第二章，*制作纸杯蛋糕塔*中，我们实现了投射物和纸杯蛋糕塔类。在第三章，*与玩家沟通——用户界面*中，我们实现了玩家的生命值和糖分，而在第四章，*不再孤单——甜食熊猫出击*中，我们专注于为我们的甜食熊猫制作动画。最后，在第五章，*秘密成分是物理学的一点点*中，我们探讨了物理学以及我们如何在游戏中使用它，并在第六章，*穿过糖霜的海洋——人工智能中的导航*中，我们给了熊猫沿着通往甜蛋糕的路径移动的可能性。
 
 那么，接下来要做的有以下几点：
 
@@ -64,63 +64,116 @@
 
 # 交易纸杯蛋糕塔
 
-在本节中，我们将了解如何允许玩家进行塔的交易。特别是，玩家可以购买、出售或升级一个纸杯蛋糕塔。由于这三个动作有一些共同点，我们将通过使用**继承**来实现它们。如果你还记得，我们在[第2章](part0028.xhtml#aid-QMFO1 "第2章。制作纸杯蛋糕塔")，*制作纸杯蛋糕塔*中谈到了一点，但现在我们有机会看到它付诸实践。因此，在这个过程中，我们将更好地理解抽象方法和静态变量，因为我们将再次使用它们。
+在本节中，我们将了解如何允许玩家进行塔的交易。特别是，玩家可以购买、出售或升级一个纸杯蛋糕塔。由于这三个动作有一些共同点，我们将通过使用**继承**来实现它们。如果你还记得，我们在第二章，*制作纸杯蛋糕塔*中谈到了一点，但现在我们有机会看到它付诸实践。因此，在这个过程中，我们将更好地理解抽象方法和静态变量，因为我们将再次使用它们。
 
 在任何情况下，玩家可以执行的所有这些交易动作都是单独实现的。这是我们将会实现的架构：
 
 ![交易纸杯蛋糕塔](img/image00594.jpeg)
 
-每个子脚本都可以附加到一个UI元素上，这将转换成一个按钮来执行该特定动作。让我们从父类开始。
+每个子脚本都可以附加到一个 UI 元素上，这将转换成一个按钮来执行该特定动作。让我们从父类开始。
 
 ## 交易父类
 
 让我们开始创建一个名为`TradeCupcakeTower`的通用类，并使用你最喜欢的代码编辑器打开它。
 
-购买、出售和升级需要用户在用户界面中点击他们的图标（我们将在脚本整个交易系统完成后创建场景中的UI以执行交易动作），因此我们需要提供一种检测玩家点击（或移动应用中的轻触）的方法。正如我们在[第3章](part0043.xhtml#aid-190861 "第3章。与玩家沟通——用户界面")，*与玩家沟通——用户界面*中讨论的那样，我们可以使用一个处理器。因此，我们需要在脚本开头添加以下库：
+购买、出售和升级需要用户在用户界面中点击他们的图标（我们将在脚本整个交易系统完成后创建场景中的 UI 以执行交易动作），因此我们需要提供一种检测玩家点击（或移动应用中的轻触）的方法。正如我们在第三章，*与玩家沟通——用户界面*中讨论的那样，我们可以使用一个处理器。因此，我们需要在脚本开头添加以下库：
 
-[PRE0]
+```cs
+using UnityEngine.EventSystems; 
+
+```
 
 现在，在类的定义中，我们可以添加点击处理器。此外，由于这将是一个抽象类，我们需要以下方式指定它：
 
-[PRE1]
+```cs
+public abstract class TradeCupcakeTowers : MonoBehaviour,
+  IPointerClickHandler { 
+
+```
 
 在交易时，我们想要检查玩家的糖分水平（这是我们游戏的货币）。因此，我们需要有一个对糖量计的参考，它也是所有交易类共享的。因此，我们可以使这个变量成为受保护的静态变量：
 
-[PRE2]
+```cs
+*// Variable to store the Sugar Meter* 
+protected static SugarMeterScript sugarMeter; 
 
-类似于我们在上一章中必须获取所有Pandas的游戏管理器引用时所做的（因为在这种情况下变量也是静态的），我们只需要获取一次糖量计的引用。因此，在`Start()`函数中，我们可以编写：
+```
 
-[PRE3]
+类似于我们在上一章中必须获取所有 Pandas 的游戏管理器引用时所做的（因为在这种情况下变量也是静态的），我们只需要获取一次糖量计的引用。因此，在`Start()`函数中，我们可以编写：
+
+```cs
+void Start () { 
+  *//If the reference to the Sugar Meter is missing, the script gets it* 
+  if (sugarMeter == null) { 
+    sugarMeter = FindObjectOfType<SugarMeterScript>(); 
+  }      
+} 
+
+```
 
 当玩家出售或升级一座塔时，交易系统应该知道玩家指的是哪座塔（玩家如何选择塔留待*选择塔*部分稍后讨论）。因此，我们再次可以使用所有交易操作类共享的受保护和静态变量：
 
-[PRE4]
+```cs
+*//Variable to store the current selected tower by the player* 
+protected static CupcakeTowerScript currentActiveTower; 
+
+```
 
 然后，我们需要一个函数来设置选择（当前活动塔），并且它需要是静态的，这样其他脚本就可以轻松设置（正如我们稍后将会看到的）。该函数只是将作为参数传递的塔赋值给静态变量：
 
-[PRE5]
+```cs
+*// Static function that allows other scripts to assign the new/current
+  selected tower* 
+public static void setActiveTower(CupcakeTowerScript cupcakeTower) { 
+  currentActiveTower = cupcakeTower; 
+} 
 
-最后，我们需要实现处理点击的接口。然而，应该执行的动作序列取决于玩家是在购买、出售还是升级。因此，我们可以将实现留给子类，并将这个作为抽象函数（参考[第2章](part0028.xhtml#aid-QMFO1 "第2章。制作纸杯蛋糕塔")，*制作纸杯蛋糕塔*，了解抽象和虚函数的工作方式）如下所示：
+```
 
-[PRE6]
+最后，我们需要实现处理点击的接口。然而，应该执行的动作序列取决于玩家是在购买、出售还是升级。因此，我们可以将实现留给子类，并将这个作为抽象函数（参考第二章，*制作纸杯蛋糕塔*，了解抽象和虚函数的工作方式）如下所示：
+
+```cs
+*// Abstract function triggered when one of the trading buttons is
+  pressed, however the 
+// implementation is specific for each trade operation.* 
+public abstract void OnPointerClick(PointerEventData eventData); 
+
+```
 
 我们可以保存脚本，因此我们的父类就准备好了。现在，在我们实现其子类以执行玩家可以执行的具体交易动作之前，我们需要修改`CupcakeTowerScript`。
 
-## 修改CupcakeTowerScript
+## 修改 CupcakeTowerScript
 
-回到[第2章](part0028.xhtml#aid-QMFO1 "第2章。制作纸杯蛋糕塔")，*制作纸杯蛋糕塔*，我们为我们的纸杯蛋糕塔实现了许多功能。然而，在它们的脚本上还有更多的工作要做。特别是，我们需要添加一些变量来存储它们的价格和成本。
+回到第二章，*制作纸杯蛋糕塔*，我们为我们的纸杯蛋糕塔实现了许多功能。然而，在它们的脚本上还有更多的工作要做。特别是，我们需要添加一些变量来存储它们的价格和成本。
 
 让我们从添加以下自解释的变量开始，我们可能希望在稍后将其设置到**检查器**中：
 
-[PRE7]
+```cs
+*// How much this tower costs when it is bought    * 
+public int initialCost; 
+
+*// How much this tower costs when it is upgraded* 
+public int upgradingCost; 
+
+*// How much this tower is valuable if sold* 
+public int sellingValue; 
+
+```
 
 每当我们升级杯子蛋糕塔时，我们希望同时提高`sellingValue`（因为升级后的塔更有价值），以及`UpgradingCost`（因为升级到更高等级需要更多的糖）。因此，我们可以在`Upgrade()`函数中添加以下代码行（这些值可能取决于你游戏中非常具体的平衡，但下一章将更详细地介绍这一点以及如何以动态方式处理塔的成本）：
 
-[PRE8]
+```cs
+*//Increase the value of the tower;* 
+sellingValue += 5; 
+
+//Increase the upgrading cost 
+upgradingCost += 10; 
+
+```
 
 保存脚本，进入你的杯子蛋糕塔预制体，并在**检查器**中更改这三个新变量的值（当然，你可以使用你喜欢的值）。以下是一个示例：
 
-![修改CupcakeTowerScript](img/image00595.jpeg)
+![修改 CupcakeTowerScript](img/image00595.jpeg)
 
 现在，我们已经准备好实施交易动作，从购买开始。
 
@@ -128,29 +181,63 @@
 
 在本节中，我们将实现处理购买动作的脚本。让我们先创建一个新的脚本，命名为`TradeCupcakeTowers_Buying`，然后打开它。
 
-首先，我们仍然需要从Unity引擎中导入事件系统库：
+首先，我们仍然需要从 Unity 引擎中导入事件系统库：
 
-[PRE9]
+```cs
+using UnityEngine.EventSystems; 
+
+```
 
 在类声明中，我们需要指定我们将要扩展`TradeCupcakeTowers`类，而不是`MonoBehaviour`，如下所示：
 
-[PRE10]
+```cs
+public class TradeCupcakeTowers_Buying : TradeCupcakeTowers { 
 
-如果你回顾一下[第3章](part0043.xhtml#aid-190861 "第3章。与玩家沟通——用户界面")中的用户界面设计，*与玩家沟通——用户界面*，我们有三种不同的塔供玩家购买。每个按钮一旦被点击，就会实例化一个不同的塔。因此，我们需要指定这个脚本的实例引用的是哪个杯子蛋糕塔预制体。当然，其值应该在**检查器**中设置（我们稍后会看到这一点）。所以，让我们添加以下变量：
+```
 
-[PRE11]
+如果你回顾一下第三章中的用户界面设计，*与玩家沟通——用户界面*，我们有三种不同的塔供玩家购买。每个按钮一旦被点击，就会实例化一个不同的塔。因此，我们需要指定这个脚本的实例引用的是哪个杯子蛋糕塔预制体。当然，其值应该在**检查器**中设置（我们稍后会看到这一点）。所以，让我们添加以下变量：
+
+```cs
+*/* Public variable to identify which tower this script is selling. 
+ * Ideally, you could have many instances of this script selling
+   different 
+ * Cupcake towers, and the tower is specified in the Inspector */* 
+public GameObject cupcakeTowerPrefab; 
+
+```
 
 然后，我们需要实现从其父类继承的抽象函数，以处理玩家点击其图标时发生的情况。为此，我们需要使用`override`属性，并以下述方式声明方法：
 
-[PRE12]
+```cs
+public override void OnPointerClick(PointerEventData eventData) { 
+ * //Rest of the code* 
+} 
+
+```
 
 现在，当玩家点击时首先要做的是检索玩家想要购买的杯子蛋糕塔的价格：
 
-[PRE13]
+```cs
+*//Retrieve from the prefab which is its initial cost* 
+int price = cupcakeTowerPrefab.GetComponent<CupcakeTowerScript
+  ().initialCost; 
+
+```
 
 接下来，我们需要通过使用共享静态变量`sugarMeter`来检查玩家是否有足够的糖。如果玩家有足够的糖，则实例化一个新的杯子蛋糕塔（我们将在本章后面看到玩家如何放置塔），并将其分配为交易类中的活动塔：
 
-[PRE14]
+```cs
+*// Check if the player can afford to buy the tower* 
+if (price <= sugarMeter.getSugarAmount()) { 
+ * //Payment succeeds, and the cost is removed from the player's sugar* 
+  sugarMeter.ChangeSugar(-price); 
+ * //A new cupcake tower is created* 
+  GameObject newTower = Instantiate(cupcakeTowerPrefab); 
+ * //The new cupcake tower is also assigned as the current selection* 
+  currentActiveTower = newTower.GetComponent<CupcakeTowerScript>(); 
+} 
+
+```
 
 保存脚本，购买功能已实现。让我们看看玩家如何通过出售杯子蛋糕塔来获取一些糖分。
 
@@ -158,21 +245,42 @@
 
 在本节中，我们将实现处理销售动作的脚本。创建一个新的脚本，命名为`TradeCupcakeTowers_Selling`，然后打开它。
 
-再次强调，我们仍然需要从Unity引擎中导入事件系统库：
+再次强调，我们仍然需要从 Unity 引擎中导入事件系统库：
 
-[PRE15]
+```cs
+using UnityEngine.EventSystems; 
+
+```
 
 与`TradeCupcakeTowers_Buying`一样，我们需要以下方式从`TradeCupcakeTowers`类中继承：
 
-[PRE16]
+```cs
+public class TradeCupcakeTowers_Selling : TradeCupcakeTowers { 
+
+```
 
 然后，我们需要实现抽象函数，以处理玩家点击销售图标时发生的情况。再次，我们需要使用 `override` 属性，如下所示：
 
-[PRE17]
+```cs
+public override void OnPointerClick(PointerEventData eventData) { 
+  *//Rest of code* 
+} 
+
+```
 
 由于销售是玩家始终能够执行的操作，我们不需要进行任何检查（除非有一个活动的塔），而是检索纸杯蛋糕塔的价值，并将其金额添加到玩家的储蓄中。然后，从场景中移除纸杯蛋糕塔：
 
-[PRE18]
+```cs
+*//Check if there is a tower selected before to proceed* 
+if (currentActiveTower == null) 
+  return; 
+
+*//Add to the player's sugar the value of the tower* 
+sugarMeter.ChangeSugar(currentActiveTower.sellingValue); 
+*//Remove the cupcake tower from the scene* 
+Destroy(currentActiveTower); 
+
+```
 
 最后，我们可以保存这个脚本。因此，销售功能也得到了实现。只剩下升级功能未完成。
 
@@ -180,21 +288,42 @@
 
 在这里，我们需要创建升级按钮。创建一个脚本，命名为 `TradeCupcakeTowers_Upgrading`，然后打开它。
 
-再次强调，我们仍然需要从Unity引擎中导入事件系统库：
+再次强调，我们仍然需要从 Unity 引擎中导入事件系统库：
 
-[PRE19]
+```cs
+using UnityEngine.EventSystems; 
+
+```
 
 就像我们对其他交易类所做的那样，我们需要以下方式从 `TradeCupcakeTowers` 类中继承：
 
-[PRE20]
+```cs
+public class TradeCupcakeTowers_Upgrading : TradeCupcakeTowers { 
+
+```
 
 然后，我们需要实现抽象函数，以处理玩家点击升级按钮时发生的情况。再次，我们需要使用 `override` 属性，如下所示：
 
-[PRE21]
+```cs
+public override void OnPointerClick(PointerEventData eventData) { 
+ * //Rest of the code* 
+} 
 
-与我们处理购买按钮的方式类似，我们需要检查玩家是否有能力升级塔，以及塔是否真的可以升级（我们有一个布尔标志用于此，设置在[第2章](part0028.xhtml#aid-QMFO1 "第2章。制作纸杯蛋糕塔")，*制作纸杯蛋糕塔*)。如果是这样，升级的费用将从玩家的糖分中扣除，塔最终升级：
+```
 
-[PRE22]
+与我们处理购买按钮的方式类似，我们需要检查玩家是否有能力升级塔，以及塔是否真的可以升级（我们有一个布尔标志用于此，设置在第二章，*制作纸杯蛋糕塔*)。如果是这样，升级的费用将从玩家的糖分中扣除，塔最终升级：
+
+```cs
+*//Check if the player can afford to upgrade the tower* 
+if(currentActiveTower.isUpgradable && currentActiveTower.upgradingCost
+  <=sugarMeter.getSugarAmount()) { 
+ * //The payment is executed and the sugar removed from the player* 
+  sugarMeter.ChangeSugar(-currentActiveTower.upgradingCost); 
+ *//The tower is upgraded* 
+  currentActiveTower.Upgrade(); 
+} 
+
+```
 
 保存这个脚本，结果我们就完成了所有的交易功能。然而，它们在场景中并不存在，所以让我们将它们添加到我们的界面中。
 
@@ -202,7 +331,7 @@
 
 现在我们有了实现所有不同交易按钮的脚本，我们需要实际上将它们放置在我们的场景/级别中。
 
-因此，让我们开始创建三个UI图像，并将 `TradeCupcakeTowers_Buying` 脚本附加到每个图像上。作为它们的**源图像**，你可以选择我们图形包中为三种不同类型的塔提供的图标。如果你没有实现所有这些，没关系，只需删除你不需要的按钮。相反，如果你使用自己的图形实现了更多，请随意添加更多这些按钮。然后，在你正确缩放按钮后，将它们放置在以下截图所示的界面中：
+因此，让我们开始创建三个 UI 图像，并将 `TradeCupcakeTowers_Buying` 脚本附加到每个图像上。作为它们的**源图像**，你可以选择我们图形包中为三种不同类型的塔提供的图标。如果你没有实现所有这些，没关系，只需删除你不需要的按钮。相反，如果你使用自己的图形实现了更多，请随意添加更多这些按钮。然后，在你正确缩放按钮后，将它们放置在以下截图所示的界面中：
 
 ![将交易选项添加到用户界面](img/image00596.jpeg)
 
@@ -212,7 +341,7 @@
 
 很好，现在玩家可以购买塔了！那么关于销售和升级它们呢？
 
-让我们再创建另外两张UI图像，并将分别附上`TradeCupcakeTowers_Selling`和`TradeCupcakeTowers_Upgrading`脚本。然后，使用我们在图形包中可以找到的用于销售和升级的图标作为**源图像**。适当地调整按钮大小，并将它们放置在以下截图所示的用户界面中：
+让我们再创建另外两张 UI 图像，并将分别附上`TradeCupcakeTowers_Selling`和`TradeCupcakeTowers_Upgrading`脚本。然后，使用我们在图形包中可以找到的用于销售和升级的图标作为**源图像**。适当地调整按钮大小，并将它们放置在以下截图所示的用户界面中：
 
 ![将交易选项添加到用户界面](img/image00598.jpeg)
 
@@ -244,23 +373,52 @@
 
 ![允许区域](img/image00600.jpeg)
 
-最后，我们找到了11个区域。
+最后，我们找到了 11 个区域。
 
-这里的想法是，所有这些区域都连接到`Game Manager`对象上的**2D盒子碰撞器**，它将通过切换一个标志来检查鼠标是否位于这些区域之一。这个标志将被我们在下一节中要实现的脚本读取。
+这里的想法是，所有这些区域都连接到`Game Manager`对象上的**2D 盒子碰撞器**，它将通过切换一个标志来检查鼠标是否位于这些区域之一。这个标志将被我们在下一节中要实现的脚本读取。
 
-让我们从在**游戏管理器**上添加一个**2D盒子碰撞器**开始，方法是点击**组件 | 物理效果 2D | 2D盒子碰撞器**。然后，我们需要将其调整到与我们所找到的矩形相同的尺寸，并使用偏移参数将其放置到地图上。在这个阶段，你应该能够重复此操作以覆盖地图的所有区域，而无需在此书中写下它们的精确值。
+让我们从在**游戏管理器**上添加一个**2D 盒子碰撞器**开始，方法是点击**组件 | 物理效果 2D | 2D 盒子碰撞器**。然后，我们需要将其调整到与我们所找到的矩形相同的尺寸，并使用偏移参数将其放置到地图上。在这个阶段，你应该能够重复此操作以覆盖地图的所有区域，而无需在此书中写下它们的精确值。
 
 现在，下一步是修改`GameManagerScript`以切换标志。一旦我们打开了脚本，我们就可以添加标志作为一个布尔变量：
 
-[PRE23]
+```cs
+*//Private variable to check if the mouse is hovering an area where* 
+*//Cupcake tower can be placed* 
+private bool _isPointerOnAllowedArea = true; 
+
+```
 
 由于我们不希望其他脚本更改此变量，它是私有的，因此我们需要提供一个函数来检索其值：
 
-[PRE24]
+```cs
+*//Function that returns true if the mouse is hovering an area where a 
+//Cupcake tower can be placed* 
+public bool isPointerOnAllowedArea() { 
+  return _isPointerOnAllowedArea; 
+} 
 
-Unity为我们提供了一些非常实用的函数来检测玩家的指针是否进入了一个区域。它们的名称是自解释的：`OnMouseEnter()`和`OnMouseExit()`。在第一个函数中，我们将标志设置为`true`，而在第二个函数中，我们将标志设置为`false`：
+```
 
-[PRE25]
+Unity 为我们提供了一些非常实用的函数来检测玩家的指针是否进入了一个区域。它们的名称是自解释的：`OnMouseEnter()`和`OnMouseExit()`。在第一个函数中，我们将标志设置为`true`，而在第二个函数中，我们将标志设置为`false`：
+
+```cs
+*//Function which is called when the mouse enters in one of the 
+//colliders of the Game Manager* 
+void OnMouseEnter() { 
+  *//Set that the mouse is now hovering an area where placing Cupcake 
+  //towers is allowed* 
+  _isPointerOnAllowedArea = true; 
+} 
+
+*//Function which is called when the mouse exits from one of the 
+//colliders of the Game Manager* 
+void OnMouseExit() { 
+ * //Set that the mouse is not hovering anymore an area where placing 
+  //Cupcake towers is allowed* 
+  _isPointerOnAllowedArea = false; 
+} 
+
+```
 
 保存脚本，允许区域的设置就绪。
 
@@ -270,13 +428,51 @@ Unity为我们提供了一些非常实用的函数来检测玩家的指针是否
 
 在修改它之前，我们需要从我们的蛋糕塔预制体中取消选中`CupcakeTowerScript`。实际上，一座塔第一次进入场景是因为玩家购买了它。在放置模式下，蛋糕塔不应该发射。一旦放置，`CupcakeTowerScript`被启用，塔再次开始运作。
 
-现在，我们可以打开新创建的脚本。我们需要检索`Game Manager`，因为我们需要它来检查鼠标是否位于可以放置蛋糕塔的区域。为此，我们可以编写以下代码，这是我们在[第6章](part0077.xhtml#aid-29DRA1 "第6章。穿越糖浆之海 – 人工智能导航")中使用的相同代码，*穿越糖浆之海 – 人工智能导航*，以首次检索`Game Manager`：
+现在，我们可以打开新创建的脚本。我们需要检索`Game Manager`，因为我们需要它来检查鼠标是否位于可以放置蛋糕塔的区域。为此，我们可以编写以下代码，这是我们在第六章中使用的相同代码，*穿越糖浆之海 – 人工智能导航*，以首次检索`Game Manager`：
 
-[PRE26]
+```cs
+*// Private variable to store the reference to the Game Manager* 
+private GameManagerScript gameManager; 
+
+void Start () { 
+ * //Get the reference to the Game Manager* 
+  gameManager = FindObjectOfType<GameManagerScript>(); 
+} 
+
+```
 
 在`Update()`函数中，我们将塔移动到鼠标位置（因此，在每一帧，塔都会随着玩家的鼠标移动），如果玩家按下键，我们检查指针是否实际上在允许的区域。如果是这样，塔就被放置了，这意味着移动塔的脚本被销毁。此外，`CupcakeTowerScript`再次启用，并在蛋糕塔上放置了一个碰撞器。实际上，这个额外的碰撞器防止了其他塔放在这个塔的上面（以及在下一节中选择塔）：
 
-[PRE27]
+```cs
+void Update () { 
+  *//Get the mouse position* 
+  float x = Input.mousePosition.x; 
+  float y = Input.mousePosition.y; 
+
+  */* Place the cupcake Tower where the mouse is, transformed in game
+    coordinates 
+   * from the Main Camera. Since the Camera is placed at -10 and we
+     want the 
+   * tower to be at -3, we need to use 7 as z-axis coordinate */* 
+  transform.position = Camera.main.ScreenToWorldPoint(new Vector3(x,
+     y, 7)); 
+
+  *//If the player clicks, the second condition checks if the current
+    position is 
+  //within an area where cupcake towers can be placed* 
+  if (Input.GetMouseButtonDown(0) &&
+    gameManager.isPointerOnAllowedArea()) { 
+ * //Enabling again the main cupcake tower script, so to make it
+    operative* 
+  GetComponent<CupcakeTowerScript>().enabled = true; 
+ * //Place a collider on the Cupcake tower* 
+  gameObject.AddComponent<BoxCollider2D>(); 
+  *//Remove this script, so to not keeping the Cupcake Tower on the
+    mouse* 
+  Destroy(this); 
+} 
+
+```
 
 保存脚本后，玩家一旦购买，就可以放置蛋糕塔。
 
@@ -286,7 +482,14 @@ Unity为我们提供了一些非常实用的函数来检测玩家的指针是否
 
 为了实现这一点，我们需要稍微修改一下`CupcakeTowerScript`。从上一节中，我们知道当塔处于活动状态时，它有一个碰撞器来防止其他塔放在它的上面。但是，我们也可以使用这个碰撞器来检测玩家是否点击了这个非常具体的塔。特别是，我们可以用以下方式使用自解释的函数`OnMouseDown()`：
 
-[PRE28]
+```cs
+*//Function called when the player clicks on the cupcake Tower* 
+void OnMouseDown() { 
+ * //Assign this tower as the active tower for trading operations* 
+  TradeCupcakeTowers.setActiveTower(this); 
+} 
+
+```
 
 保存脚本后，玩家能够选择他在游戏中拥有的特定塔，并通过交易系统进行出售或升级。
 
@@ -304,7 +507,7 @@ Unity为我们提供了一些非常实用的函数来检测玩家的指针是否
 
 在我们的图形包中，有两个屏幕在游戏结束时准备就绪。分别是*游戏结束*，用于失败条件，和*你赢了*，用于胜利条件。
 
-创建两个UI图像，正如我们在[第3章](part0043.xhtml#aid-190861 "第3章。与玩家沟通——用户界面")“与玩家沟通——用户界面”中学到的，放置我们包中的两个精灵，每个UI图像一个。你可能想按**设置原生大小**按钮，然后调整大小和位置，使它们位于场景中间，如图所示：
+创建两个 UI 图像，正如我们在第三章“与玩家沟通——用户界面”中学到的，放置我们包中的两个精灵，每个 UI 图像一个。你可能想按**设置原生大小**按钮，然后调整大小和位置，使它们位于场景中间，如图所示：
 
 ![游戏结束反馈](img/image00601.jpeg)
 
@@ -312,29 +515,56 @@ Unity为我们提供了一些非常实用的函数来检测玩家的指针是否
 
 因此，打开`GameManagerScript`并添加以下变量：
 
-[PRE29]
+```cs
+*//Variable to store the the screen displayed when the player loses* 
+public GameObject losingScreen; 
 
-保存脚本，然后在**检查器**中分配我们之前创建的UI图像，如图所示：
+*//Variable to store the screen displayed when the player wins* 
+public GameObject winningScreen; 
+
+```
+
+保存脚本，然后在**检查器**中分配我们之前创建的 UI 图像，如图所示：
 
 ![游戏结束反馈](img/image00602.jpeg)
 
 因此，当满足某些条件时，`Game Manager`能够激活其中的一个。让我们在下一节中看看如何实现这个功能的函数。
 
-### GameOver函数
+### GameOver 函数
 
 为了在`GameManagerScript`中保持条理清晰，让我们创建一个函数来触发游戏结束时发生的事情。它将有一个布尔值作为参数，以确定玩家是否获胜。
 
 ### 注意
 
-当然，游戏结束时确切会发生什么取决于你。你可以保存统计数据和分数（如果你有的话），触发漂亮酷炫的动画，显示加载下一级的按钮等等。在这本书中，我们只会显示上一节创建的UI图像，因为目标是向你展示在哪里以及如何插入游戏结束的代码。请随意添加你自己的实现。
+当然，游戏结束时确切会发生什么取决于你。你可以保存统计数据和分数（如果你有的话），触发漂亮酷炫的动画，显示加载下一级的按钮等等。在这本书中，我们只会显示上一节创建的 UI 图像，因为目标是向你展示在哪里以及如何插入游戏结束的代码。请随意添加你自己的实现。
 
-因此，让我们写下这个函数，根据参数，将显示正确的屏幕给玩家。然后，它停止游戏的时间，在游戏中创建一种暂停情况。结果，当游戏结束屏幕出现时（如果有UI存在，玩家仍然可以点击它）：
+因此，让我们写下这个函数，根据参数，将显示正确的屏幕给玩家。然后，它停止游戏的时间，在游戏中创建一种暂停情况。结果，当游戏结束屏幕出现时（如果有 UI 存在，玩家仍然可以点击它）：
 
-[PRE30]
+```cs
+*//Private function called when some gameover conditions are met, and
+  displays
+//the winning or losing screen depending from the value of the
+  parameter passed.* 
+private void GameOver(bool playerHasWon) { 
+  *//Check if the player has won from the parameter* 
+  if (playerHasWon) { 
+    *//Display the winning screen* 
+    winningScreen.SetActive(true); 
+  }else { 
+    *//Display the losing screen* 
+    losingScreen.SetActive(true); 
+  } 
+
+  *//Freeze the game time, so to stop in some way the level to be
+    executed* 
+  Time.timeScale = 0; 
+} 
+
+```
 
 ### 注意
 
-你可以在Unity官方文档中了解更多关于`timeScale`的信息：[https://docs.unity3d.com/ScriptReference/Time-timeScale.html](https://docs.unity3d.com/ScriptReference/Time-timeScale.html)
+你可以在 Unity 官方文档中了解更多关于`timeScale`的信息：[`docs.unity3d.com/ScriptReference/Time-timeScale.html`](https://docs.unity3d.com/ScriptReference/Time-timeScale.html)
 
 保存`GameManagerScript`，然后让我们在下一节中探讨何时触发此函数。
 
@@ -346,15 +576,30 @@ Unity为我们提供了一些非常实用的函数来检测玩家的指针是否
 
 因此，我们首先需要做的是获取玩家的健康引用。我们可以添加以下变量：
 
-[PRE31]
+```cs
+*//Private variable to store the reference to the Player's health* 
+private HealthBarScript playerHealth; 
+
+```
 
 我们可以在`Start()`函数中初始化它，在开始处添加以下行：
 
-[PRE32]
+```cs
+void Start () { 
+ *//Get the reference to the Player's health* 
+  playerHealth = FindObjectOfType<HealthBarScript>(); 
+} 
+
+```
 
 然后，我们需要一个变量来跟踪还有多少只大熊猫需要击败，因此我们可以添加以下变量：
 
-[PRE33]
+```cs
+*//Private variable which acts as a counter of how many Pandas are
+  remained to defeat* 
+private int numberOfPandasToDefeat; 
+
+```
 
 它将由我们的生成系统初始化，我们将很快实现。
 
@@ -362,25 +607,84 @@ Unity为我们提供了一些非常实用的函数来检测玩家的指针是否
 
 对于第一个功能，我们不需要任何参数或返回值，因为`Game Manager`只需确认一只大熊猫已被击落，通过减少还需要击败的大熊猫数量：
 
-[PRE34]
+```cs
+*//Function that decreases the number of Pandas still to defeat every
+  time a Panda dies * 
+public void OneMorePandaInHeaven() { 
+  numberOfPandasToDefeat--; 
+} 
+
+```
 
 关于第二个功能，我们希望在吃蛋糕的大熊猫和玩家的健康之间建立一个沟通中心。因此，我们需要实现一个函数，该函数接受大熊猫造成的伤害作为参数，并从玩家的健康中扣除。然后，它检查玩家是否仍然存活，因为如果他不/她不存活，就会触发`GameOver`函数。在任何情况下，我们都需要减少还需要击败的大熊猫数量，因为我们记得大熊猫吃了很多蛋糕以至于它们会爆炸：
 
-[PRE35]
+```cs
+*//Function that damages the player when a Panda reaches the player's
+  cake. 
+//Moreover, it monitors the player's health to trigger the GameOver
+  function when needed* 
+public void BiteTheCake(int damage) { 
+ * //Apply damage to the player and retrieve a Boolean to see if the
+    cake has been eaten all* 
+  bool IsCakeAllEaten = playerHealth.ApplyDamage(damage); 
+ * //If the cake has been eaten all, the GameOver function is called in
+    "losing mode"* 
+  if (IsCakeAllEaten) { 
+    GameOver(false); 
+  } 
+  *//The Panda that bit the cake will also explode, and therefore we
+    have a Panda less to defeat* 
+  OneMorePandaInHeaven(); 
+} 
 
-保存脚本，并打开`PandaScript`，因为我们现在需要稍微修改它。特别是，我们需要在`Game Manager`中调用刚刚创建的函数。从[第6章](part0077.xhtml#aid-29DRA1 "第6章。穿过糖雨——人工智能中的导航")，《穿过糖雨——人工智能中的导航》，我们已经有了对`Game Manager`的引用，我们可以用它来触发这些函数。
+```
+
+保存脚本，并打开`PandaScript`，因为我们现在需要稍微修改它。特别是，我们需要在`Game Manager`中调用刚刚创建的函数。从第六章，《穿过糖雨——人工智能中的导航》，我们已经有了对`Game Manager`的引用，我们可以用它来触发这些函数。
 
 第一个修改是添加以下变量以确定这只特定的大熊猫在咬蛋糕时可以吃掉多少蛋糕（其值需要在检查器中设置，别忘了！）：
 
-[PRE36]
+```cs
+*//The amount of cake that the Panda eats* 
+public int cakeEatenPerBite; 
+
+```
 
 第二个修改是在`FixedUpdate()`函数中。实际上，我们需要使用`Game Manager`中的`BiteTheCake()`函数来减少玩家的健康。下面高亮的部分是我们所做的修改：
 
-[PRE37]
+```cs
+void FixedUpdate() { 
+  *//if the Panda has reached the cake, then it will eat it, by
+    triggering the right animation, 
+  //and remove this script, since the State Machine Behaviour will take
+    care of removing the Panda* 
+  if (currentWaypointNumber == gameManager.waypoints.Length) { 
+    animator.SetTrigger(AnimEatTriggerHash); 
+    gameManager.BiteTheCake(cakeEatenPerBite); 
+    Destroy(this); 
+    return; 
+  } 
+ * // [...] The remaining code of the function*
+
+```
 
 第三个也是最后一个修改是在`Hit()`函数中，我们还需要触发游戏管理器的`OneMorePandaInHeaven()`函数。我们可以这样做（再次，高亮的部分是我们所做的修改）：
 
-[PRE38]
+```cs
+private void Hit(float damage) { 
+ * //Subtract the damage to the health of the Panda* 
+  health -= damage; 
+ * //Then it triggers the Die or the Hit animations based if the Panda
+    is still alive* 
+  if(health <= 0) { 
+    animator.SetTrigger(AnimDieTriggerHash); 
+    gameManager.OneMorePandaInHeaven(); 
+  } 
+  else { 
+    animator.SetTrigger(AnimHitTriggerHash); 
+  } 
+} 
+
+```
 
 保存脚本，因为我们将在下一节中探索熊猫是如何被创建/生成的。
 
@@ -390,7 +694,7 @@ Unity为我们提供了一些非常实用的函数来检测玩家的指针是否
 
 ## 协程是什么？
 
-这是一个Unity提供的一种结构，允许函数在游戏的其它帧中被中断并继续执行。在我们的生成系统中，我们不想一次性生成所有的大熊猫，而是希望它们在一段时间内逐渐生成。这个“一段时间”可以通过协程来控制。你肯定可以在官方文档中学习更多并查看一些示例：[https://docs.unity3d.com/Manual/Coroutines.html](https://docs.unity3d.com/Manual/Coroutines.html)
+这是一个 Unity 提供的一种结构，允许函数在游戏的其它帧中被中断并继续执行。在我们的生成系统中，我们不想一次性生成所有的大熊猫，而是希望它们在一段时间内逐渐生成。这个“一段时间”可以通过协程来控制。你肯定可以在官方文档中学习更多并查看一些示例：[`docs.unity3d.com/Manual/Coroutines.html`](https://docs.unity3d.com/Manual/Coroutines.html)
 
 然而，关于协程最重要的几点如下：
 
@@ -402,13 +706,13 @@ Unity为我们提供了一些非常实用的函数来检测玩家的指针是否
 
 +   它们可以使用一个特殊的指令；`yield`：它允许它们等待某些事情，比如固定的时间、帧的结束，甚至是另一个协程。无论如何，在`yield`之后，它们期望得到一个返回值。与`yield`一起使用的常见函数有：
 
-    +   `WaitForEndOfFrame()`: 等待直到下一帧（官方文档：[https://docs.unity3d.com/ScriptReference/WaitForEndOfFrame.html](https://docs.unity3d.com/ScriptReference/WaitForEndOfFrame.html))
+    +   `WaitForEndOfFrame()`: 等待直到下一帧（官方文档：[`docs.unity3d.com/ScriptReference/WaitForEndOfFrame.html`](https://docs.unity3d.com/ScriptReference/WaitForEndOfFrame.html))
 
-    +   `WaitForSeconds()`: 等待指定的时间（以秒为单位）作为参数（官方文档：[https://docs.unity3d.com/ScriptReference/WaitForSeconds.html](https://docs.unity3d.com/ScriptReference/WaitForSeconds.html))
+    +   `WaitForSeconds()`: 等待指定的时间（以秒为单位）作为参数（官方文档：[`docs.unity3d.com/ScriptReference/WaitForSeconds.html`](https://docs.unity3d.com/ScriptReference/WaitForSeconds.html))
 
-    +   `WaitUntil()`: 等待直到满足某个条件（官方文档：[https://docs.unity3d.com/ScriptReference/WaitUntil.html](https://docs.unity3d.com/ScriptReference/WaitUntil.html))
+    +   `WaitUntil()`: 等待直到满足某个条件（官方文档：[`docs.unity3d.com/ScriptReference/WaitUntil.html`](https://docs.unity3d.com/ScriptReference/WaitUntil.html))
 
-此外，你甚至可以实现自定义的`yield`指令，如官方文档中所示：[https://docs.unity3d.com/ScriptReference/CustomYieldInstruction.html](https://docs.unity3d.com/ScriptReference/CustomYieldInstruction.html)
+此外，你甚至可以实现自定义的`yield`指令，如官方文档中所示：[`docs.unity3d.com/ScriptReference/CustomYieldInstruction.html`](https://docs.unity3d.com/ScriptReference/CustomYieldInstruction.html)
 
 ### 注意
 
@@ -418,27 +722,50 @@ Unity为我们提供了一些非常实用的函数来检测玩家的指针是否
 
 ## 绘制其工作原理的想法
 
-我们将把游戏分为波浪。每个波浪都有确定数量的Panda，这些Panda将在一段时间内以递增的强度生成。一旦该波浪的所有Panda都被击落，游戏将增加下一波生成的Panda数量并开始它。当玩家完成所有波浪后，该关卡可以被认为是胜利。
+我们将把游戏分为波浪。每个波浪都有确定数量的 Panda，这些 Panda 将在一段时间内以递增的强度生成。一旦该波浪的所有 Panda 都被击落，游戏将增加下一波生成的 Panda 数量并开始它。当玩家完成所有波浪后，该关卡可以被认为是胜利。
 
-特别是，我们将在协程中有一个循环来管理不同的波浪，并在开始另一个波浪之前等待波浪结束。第二个例程将负责单个波浪，为其生成Panda，并检查玩家是否击落了所有Panda。
+特别是，我们将在协程中有一个循环来管理不同的波浪，并在开始另一个波浪之前等待波浪结束。第二个例程将负责单个波浪，为其生成 Panda，并检查玩家是否击落了所有 Panda。
 
 ## 设置生成系统
 
-设计师应该有一种方式来放置Panda将被生成的位置。因此，我们可以创建一个空的游戏对象，并称其为`SpawningPoint`。此外，你可以将其附加到一个与上一章中使用的航点类似的gizmo。结果，它将在**场景**视图中可见。所以，最后你应该有如下所示的内容：
+设计师应该有一种方式来放置 Panda 将被生成的位置。因此，我们可以创建一个空的游戏对象，并称其为`SpawningPoint`。此外，你可以将其附加到一个与上一章中使用的航点类似的 gizmo。结果，它将在**场景**视图中可见。所以，最后你应该有如下所示的内容：
 
 ![设置生成系统](img/image00603.jpeg)
 
-打开`GameManagerScript`并添加一个变量来跟踪这个`SpawningPoint`的位置。由于我们只需要位置，我们可以直接使用Transform，而不是整个游戏对象：
+打开`GameManagerScript`并添加一个变量来跟踪这个`SpawningPoint`的位置。由于我们只需要位置，我们可以直接使用 Transform，而不是整个游戏对象：
 
-[PRE39]
+```cs
+*//The Spawning Point transform so to get where the Pandas should be
+  spawned* 
+private Transform spawner; 
+
+```
 
 要设置其值，让我们像以下这样更改`Start()`函数：
 
-[PRE40]
+```cs
+void Start () {
+  *//Get the reference to the Player's health*
+  playerHealth = FindObjectOfType<HealthBarScript>();
 
-此外，我们还需要三个额外的变量。一个是用于Panda预制体实例化正确的敌人，另一个是玩家需要面对的波浪数量，最后一个是为每波Panda的数量（将在波浪之间增加）：
+ *//Get the reference to the Spawner*
+  spawner = GameObject.Find("Spawning Spot").transform;
+}
+```
 
-[PRE41]
+此外，我们还需要三个额外的变量。一个是用于 Panda 预制体实例化正确的敌人，另一个是玩家需要面对的波浪数量，最后一个是为每波 Panda 的数量（将在波浪之间增加）：
+
+```cs
+*//The Panda Prefab that should be spawned as enemy*
+public GameObject pandaPrefab;
+
+*//The number of waves that the player has to face in this level*
+public int numberOfWaves;
+
+*//The number of Pandas that the player as to face per wave.
+//It increase when a wave is won.*
+public int numberOfPandasPerWave;
+```
 
 保存脚本后，我们必须在**检查器**中分配变量，如下面的截图所示（请随意更改值以适应你游戏的平衡）：
 
@@ -450,45 +777,95 @@ Unity为我们提供了一些非常实用的函数来检测玩家的指针是否
 
 因此，打开`GameManagerScript`，我们可以开始编写以下代码：
 
-[PRE42]
+```cs
+*//Coroutine that spawns the different waves of Pandas* 
+private IEnumerator WavesSpawner() { 
+ * //For each wave* 
+  for(int i = 0; i < numberOfWaves; i++) { 
+    *//Let the PandaSpawner coroutine to handle the single wave. When it
+      finishes 
+    //also the wave is finished, and so this coroutine can continue.* 
+    yield return PandaSpawner(); 
+    *//Increase the number of Pandas that are generated per wave* 
+    numberOfPandasPerWave += 3; 
+  } 
+ * //If the Player won all the waves, call the GameOver function in
+    "winning" mode* 
+  GameOver(true); 
+} 
+
+```
 
 如您从代码中看到的，我们调用了`PandaSpawner()`协程，我们将在下一节中实现它。
 
 ## 单个波次
 
-现在是困难的部分。我们需要编写一个能够处理整个Pandas波的协程。因此，让我们一步一步来看，从创建协程开始：
+现在是困难的部分。我们需要编写一个能够处理整个 Pandas 波的协程。因此，让我们一步一步来看，从创建协程开始：
 
-[PRE43]
+```cs
+*//Coroutine that spawns the Pandas for a single wave, and waits until
+  "all the Pandas are in Heaven"* 
+private IEnumerator PandaSpawner() { 
+  *//Rest of the code* 
+} 
 
-首先要做的是初始化`numberOfPandasToDefeat`变量，以跟踪玩家迄今为止击败了多少Pandas。当然，我们将这个数字初始化为波次中将生成的Pandas数量：
+```
 
-[PRE44]
+首先要做的是初始化`numberOfPandasToDefeat`变量，以跟踪玩家迄今为止击败了多少 Pandas。当然，我们将这个数字初始化为波次中将生成的 Pandas 数量：
+
+```cs
+*//Initialize the number that needs to be defeated for this wave* 
+numberOfPandasToDefeat = numberOfPandasPerWave; 
+
+```
 
 下一步是循环遍历所有待生成的 Pandas，以逐步生成它们：
 
-[PRE45]
+```cs
+*//Progressively spawn Pandas* 
+for(int i=0; i < numberOfPandasPerWave; i++) {
+  *//Rest of the code inside the cycle* 
+} 
+*//Rest of the code outside the cycle*
 
-在循环内部，我们首先需要在生成位置生成Pandas（没有旋转，这意味着具有作为**四元数**的恒等性）。然后，我们需要等待一个时间，这个时间取决于剩余的Pandas数量和一个随机数。具体来说，我们将计算剩余Pandas的数量比率，并使用它来在两个时间之间进行插值。因此，生成的Pandas数量越多，等待的时间就越少。然后，我们将这个时间添加到一个随机数上，以在我们的游戏中增加一些随机性。以下是代码：
+```
 
-[PRE46]
+在循环内部，我们首先需要在生成位置生成 Pandas（没有旋转，这意味着具有作为**四元数**的恒等性）。然后，我们需要等待一个时间，这个时间取决于剩余的 Pandas 数量和一个随机数。具体来说，我们将计算剩余 Pandas 的数量比率，并使用它来在两个时间之间进行插值。因此，生成的 Pandas 数量越多，等待的时间就越少。然后，我们将这个时间添加到一个随机数上，以在我们的游戏中增加一些随机性。以下是代码：
+
+```cs
+*//Spawn/Instantiate a Panda at the Spawner position* 
+Instantiate(pandaPrefab, spawner.position, Quaternion.identity);
+
+*//Wait a time that depends both on how many Pandas are left to be 
+//spawned and by a random number* 
+float ratio = (i * 1f) / (numberOfPandasPerWave - 1); 
+float timeToWait = Mathf.Lerp(3f, 5f, ratio) + Random.Range(0f, 2f); 
+yield return new WaitForSeconds(timeToWait); 
+
+```
 
 ### 注意
 
 当然，这并不是实现它的唯一方法，代码中的数字是任意的。在真正的游戏中，所有东西都应该通过设计和游戏测试的辛勤工作来决定，以平衡游戏。你可以在下一章中找到更多关于这方面的信息。
 
-在循环之外，相反，我们需要等待所有Pandas都被玩家击落（或者满足某些游戏结束条件）之后，才能结束协程，并将控制权交还给`WavesSpawner()`协程以生成下一波：
+在循环之外，相反，我们需要等待所有 Pandas 都被玩家击落（或者满足某些游戏结束条件）之后，才能结束协程，并将控制权交还给`WavesSpawner()`协程以生成下一波：
 
-[PRE47]
+```cs
+*//Once all the Pandas are spawned, wait until all of them are defeated 
+//by the player (or a gameover condition occurred before)* 
+yield return new WaitUntil(() => numberOfPandasToDefeat <= 0); 
 
-保存脚本，结果，玩家不得不面对许多可怕、甜食成瘾的Pandas波次！
+```
+
+保存脚本，结果，玩家不得不面对许多可怕、甜食成瘾的 Pandas 波次！
 
 # 主菜单
 
-在许多游戏中，游戏开始时都有一个主菜单，因此，在我们的游戏中，我们也不能忘记主菜单。这将给我们探索更多我们在[第1章](part0016.xhtml#aid-F8901 "第1章。Unity中的平面世界")中提到的内容的机会，*Unity中的平面世界*，关于在Unity中更改场景。
+在许多游戏中，游戏开始时都有一个主菜单，因此，在我们的游戏中，我们也不能忘记主菜单。这将给我们探索更多我们在第一章中提到的内容的机会，*Unity 中的平面世界*，关于在 Unity 中更改场景。
 
 ## 设计主菜单
 
-如我们在[第3章](part0043.xhtml#aid-190861 "第3章。与玩家通信 – 用户界面")中学习的那样，*与玩家通信 – 用户界面*，有一个用户界面设计是很好的实践，而主菜单是用户界面的一部分。因此，它应该按照相同的UI设计原则来设计。
+如我们在第三章中学习的那样，*与玩家通信 – 用户界面*，有一个用户界面设计是很好的实践，而主菜单是用户界面的一部分。因此，它应该按照相同的 UI 设计原则来设计。
 
 我们游戏的主菜单非常简单：我们有一个酷炫的背景，屏幕中心下方放置了三个按钮。它们分别是：
 
@@ -504,13 +881,13 @@ Unity为我们提供了一些非常实用的函数来检测玩家的指针是否
 
 ## 在另一个场景中创建主菜单
 
-要在Unity中创建另一个场景，你可以从顶部菜单栏中选择**文件** | **新建场景**，但最好在`场景`文件夹内的**项目**面板中进行导航，这样通过右键单击，你可以选择**创建 |** **场景**。通过第二种方式，场景将直接在正确的文件夹中创建；因此，你的项目是有序和整洁的。
+要在 Unity 中创建另一个场景，你可以从顶部菜单栏中选择**文件** | **新建场景**，但最好在`场景`文件夹内的**项目**面板中进行导航，这样通过右键单击，你可以选择**创建 |** **场景**。通过第二种方式，场景将直接在正确的文件夹中创建；因此，你的项目是有序和整洁的。
 
 你可以将场景命名为`主菜单`，然后双击打开它。然后，从头开始，这里有一个空的空间，你可以用你的创造力和想象力来填充！
 
 现在，你应该具备以下技能，而无需逐步解释：
 
-1.  创建一个UI图像（这将自动生成一个**画布**以及**事件系统**），并将其命名为`背景`。然后，将其扩展到整个屏幕，并放置你心中的酷炫背景。
+1.  创建一个 UI 图像（这将自动生成一个**画布**以及**事件系统**），并将其命名为`背景`。然后，将其扩展到整个屏幕，并放置你心中的酷炫背景。
 
 1.  如果需要达到你心中的效果，请调整画布设置。
 
@@ -534,33 +911,54 @@ Unity为我们提供了一些非常实用的函数来检测玩家的指针是否
 
 创建一个新的脚本，命名为`MainMenuFunctionalities`。由于它的函数将由`OnClick()`事件触发，我们需要将它们设置为公共的。
 
-特别是，我们有一个用于加载游戏级别的函数。如果你记得，它的ID是`1`。在Unity中加载场景，你使用一个特殊的类，称为`SceneManager`。因此，我们需要通过在脚本开头添加以下代码行来导入其库：
+特别是，我们有一个用于加载游戏级别的函数。如果你记得，它的 ID 是`1`。在 Unity 中加载场景，你使用一个特殊的类，称为`SceneManager`。因此，我们需要通过在脚本开头添加以下代码行来导入其库：
 
-[PRE48]
+```cs
+using UnityEngine.SceneManagement; 
+
+```
 
 ### 注意
 
-`SceneManager`类以及`UnityEngine.SceneManagement`库在Unity中相对较新。实际上，这些库允许你在运行时对场景执行许多操作，例如一起加载它们、动态加载它们以及卸载它们。这为你提供了一个全新的可能性世界，我希望你有机会去探索，因为在这本书中我们没有时间详细讲解所有内容。无论如何，通常一个好的起点是官方文档，你可以在以下位置找到它：[https://docs.unity3d.com/ScriptReference/SceneManagement.SceneManager.html](https://docs.unity3d.com/ScriptReference/SceneManagement.SceneManager.html)。
+`SceneManager`类以及`UnityEngine.SceneManagement`库在 Unity 中相对较新。实际上，这些库允许你在运行时对场景执行许多操作，例如一起加载它们、动态加载它们以及卸载它们。这为你提供了一个全新的可能性世界，我希望你有机会去探索，因为在这本书中我们没有时间详细讲解所有内容。无论如何，通常一个好的起点是官方文档，你可以在以下位置找到它：[`docs.unity3d.com/ScriptReference/SceneManagement.SceneManager.html`](https://docs.unity3d.com/ScriptReference/SceneManagement.SceneManager.html)。
 
-对于那些好奇心旺盛的人来说，在`SceneManager`类之前，场景是由`Application`类处理的。所以，如果你有一些过时的代码，仍然使用`Application`类来加载场景，你知道它是为Unity的早期版本编写的。如果这些代码属于你的项目，考虑（如果可能，由于法律问题）使用`SceneManager`类来更新它。
+对于那些好奇心旺盛的人来说，在`SceneManager`类之前，场景是由`Application`类处理的。所以，如果你有一些过时的代码，仍然使用`Application`类来加载场景，你知道它是为 Unity 的早期版本编写的。如果这些代码属于你的项目，考虑（如果可能，由于法律问题）使用`SceneManager`类来更新它。
 
 `SceneManager`类最常用的功能是`LoadScene()`，它可以加载另一个场景。指定场景的一种方式是使用其标识符（正如我们将在脚本中做的那样），但还有其他方式，例如使用包含场景名称的字符串。
 
 我们可以以下这种方式实现将被**新游戏**按钮调用的函数，这非常简单直接：
 
-[PRE49]
+```cs
+*//Function that loads the first level* 
+public void NewGame() { 
+  SceneManager.LoadScene(1); 
+} 
+
+```
 
 与之相关的**设置**按钮的功能留作练习（见*作业*部分）：
 
-[PRE50]
+```cs
+*//Function that displays the settings* 
+public void Settings() { 
+ * //Your own code here* 
+} 
 
-最后，退出游戏的功能使用的是`Application`类（关于这个类的更多信息可以在官方文档中找到：[https://docs.unity3d.com/ScriptReference/Application.html](https://docs.unity3d.com/ScriptReference/Application.html))，其中有一个特定的函数可以退出你的游戏：
+```
 
-[PRE51]
+最后，退出游戏的功能使用的是`Application`类（关于这个类的更多信息可以在官方文档中找到：[`docs.unity3d.com/ScriptReference/Application.html`](https://docs.unity3d.com/ScriptReference/Application.html))，其中有一个特定的函数可以退出你的游戏：
+
+```cs
+*//Function that closes the game* 
+public void Quit() { 
+  Application.Quit(); 
+} 
+
+```
 
 ### 注意
 
-请记住，这个功能在某些情况下可能不起作用，例如当游戏在编辑器中运行（在Unity本身中）时，或者例如对于基于网页的游戏。因此，关闭应该在不同平台上发布的游戏可能需要更多的工作。关于多平台游戏的内容将在下一章中详细介绍。
+请记住，这个功能在某些情况下可能不起作用，例如当游戏在编辑器中运行（在 Unity 本身中）时，或者例如对于基于网页的游戏。因此，关闭应该在不同平台上发布的游戏可能需要更多的工作。关于多平台游戏的内容将在下一章中详细介绍。
 
 保存脚本，然后回到三个按钮的`OnClick()`事件上。
 
@@ -580,7 +978,7 @@ Unity为我们提供了一些非常实用的函数来检测玩家的指针是否
 
     +   **受保护的变量**：某些脚本可以看到，但并非所有脚本都可以看到
 
-    +   **UI处理器**：可以自动链接以与UI进行交互，而无需在**检查器**中设置事件
+    +   **UI 处理器**：可以自动链接以与 UI 进行交互，而无需在**检查器**中设置事件
 
 +   **鼠标和相机之间的交互**：为了实现放置脚本，我们需要将鼠标坐标转换为游戏坐标。
 
@@ -592,7 +990,7 @@ Unity为我们提供了一些非常实用的函数来检测玩家的指针是否
 
 +   **实现协程**：在实现生成系统时，我们使用了协程。这些是特殊的函数，它们有可能被中断并在游戏的其它帧中继续执行。这是我们在这个章节中看到的最强大的工具，尽管它需要比其他工具更多的实践来掌握，但它绝对值得。
 
-+   **使用UI事件**：为了实现函数，在我们的主菜单中，我们通过按钮的`OnClick()`事件触发一个脚本中的函数。这样，你可以避免使用UI处理器。这种方法的优势在于你可以将所有函数放在一个单独的脚本中，并有一个特定的脚本实例来触发（如果脚本可以被实例化）。另一方面，缺点是需要在**检查器**中手动链接事件，工作量很大。相反，UI处理器具有相反的优势和劣势。因此，UI处理器适合大型脚本，其中包含许多在脚本中实现的功能，并且需要与UI进行一些交互。对于小型函数，最好将它们全部放在一个单独的脚本中，并为每个函数创建一个不同的脚本。在任何情况下，最好的解决方案取决于具体情况和你的目标。
++   **使用 UI 事件**：为了实现函数，在我们的主菜单中，我们通过按钮的`OnClick()`事件触发一个脚本中的函数。这样，你可以避免使用 UI 处理器。这种方法的优势在于你可以将所有函数放在一个单独的脚本中，并有一个特定的脚本实例来触发（如果脚本可以被实例化）。另一方面，缺点是需要在**检查器**中手动链接事件，工作量很大。相反，UI 处理器具有相反的优势和劣势。因此，UI 处理器适合大型脚本，其中包含许多在脚本中实现的功能，并且需要与 UI 进行一些交互。对于小型函数，最好将它们全部放在一个单独的脚本中，并为每个函数创建一个不同的脚本。在任何情况下，最好的解决方案取决于具体情况和你的目标。
 
 +   **使用碰撞器来识别区域**：我们在放置纸杯蛋糕塔时，使用物理引擎检测鼠标是否悬停在允许放置的特定区域上。此外，我们在纸杯蛋糕塔上使用了一个碰撞器来检测点击（以便被选中）并避免在其他纸杯蛋糕塔上放置其他纸杯蛋糕塔。这些都是使用物理引擎进行非物理相关计算的方式之一。
 
@@ -612,11 +1010,11 @@ Unity为我们提供了一些非常实用的函数来检测玩家的指针是否
 
 1.  **单例模式（第一部分）**：在我们的游戏中，有一些脚本应该只有一个实例，例如`游戏管理器`、`生命条`或`糖量计`。因此，最好使它们唯一，因为我们的某些脚本依赖于这样的类只有一个实例的隐含（但未保证）事实。因此，你应该实现一个名为**单例**的模式。你当然可以在互联网上搜索如何实现它，但尽量提出你自己的解决方案。许多在线实现依赖于静态变量来检索类的单个实例。由于我们的脚本将使用`FindObjectOfType()`函数找到这些类，你可以尝试探索其他方法。所以，尝试为这个问题提供你的解决方案，并为`GameMangerScript`、`HealthBarScript`和`SugarMeterScript`实现它。
 
-1.  **单例模式（第二部分）**：在第一部分之后，你应该已经以你的方式实现了单例模式。现在，查看以下两个链接：[http://wiki.unity3d.com/index.php/Singleton](http://wiki.unity3d.com/index.php/Singleton) 和 [https://unity3d.com/learn/tutorials/projects/2d-roguelike-tutorial/writing-game-manager](https://unity3d.com/learn/tutorials/projects/2d-roguelike-tutorial/writing-game-manager)，因为它们都实现了单例模式。将它们与你提出的进行比较，并为每种方法突出显示其优点和缺点。你认为哪种方法在我们的游戏中会更好？这种方法对于`游戏管理器`、`生命条`或`糖量计`是否有所不同？为我们的塔防游戏实现你认为值得的单例模式。
+1.  **单例模式（第二部分）**：在第一部分之后，你应该已经以你的方式实现了单例模式。现在，查看以下两个链接：[`wiki.unity3d.com/index.php/Singleton`](http://wiki.unity3d.com/index.php/Singleton) 和 [`unity3d.com/learn/tutorials/projects/2d-roguelike-tutorial/writing-game-manager`](https://unity3d.com/learn/tutorials/projects/2d-roguelike-tutorial/writing-game-manager)，因为它们都实现了单例模式。将它们与你提出的进行比较，并为每种方法突出显示其优点和缺点。你认为哪种方法在我们的游戏中会更好？这种方法对于`游戏管理器`、`生命条`或`糖量计`是否有所不同？为我们的塔防游戏实现你认为值得的单例模式。
 
 1.  **改进允许区域（第一部分）**：我们已经看到如何使用碰撞器来检查鼠标是否悬停在允许的区域上，这样放置脚本就知道在需要释放蛋糕塔时，它是否是一个合适的位置。但在`游戏管理器`中会发生什么呢？即使没有塔需要放置，它仍然会检查允许的区域并更新其内部状态。考虑一个解决方案，其中`游戏管理器`仅在放置脚本请求时检查鼠标是否悬停在允许的区域上。因此，你的新解决方案应该提高`游戏管理器`的性能。
 
-1.  **改进允许区域（第二部分）**：这项练习与第一部分是独立的。在允许区域系统中，我们只考虑了鼠标。如果你想在移动平台上导出游戏，比如在Android设备上，会怎样呢？在这种情况下，是否应该完全重新设计或更改允许区域系统？因此，设计并实现一个适用于尽可能多平台的系统。
+1.  **改进允许区域（第二部分）**：这项练习与第一部分是独立的。在允许区域系统中，我们只考虑了鼠标。如果你想在移动平台上导出游戏，比如在 Android 设备上，会怎样呢？在这种情况下，是否应该完全重新设计或更改允许区域系统？因此，设计并实现一个适用于尽可能多平台的系统。
 
 1.  **改进允许区域（第三部分）**：这项练习与第一部分和第二部分是独立的。我们提出的允许区域系统对于多级游戏（很可能你就有这样的游戏）来说并不容易使用，因为你不能在`游戏管理器预制件`中放置碰撞器，因为它们依赖于特定的级别。你能想到一个更简单的解决方案，让关卡设计师能够逐级告诉`游戏管理器`哪些区域是允许的吗？一旦你设计了这样的系统，就在我们的塔防游戏中实现它。
 
@@ -632,13 +1030,13 @@ Unity为我们提供了一些非常实用的函数来检测玩家的指针是否
 
 1.  **玩家反馈（第二部分）**：这是一系列相互独立的练习，目的是提高游戏提供给玩家的反馈，这对于游戏吸引玩家至关重要。当玩家进行交易时，他/她出售、购买或升级塔，但没有关于这些操作将做什么/改变什么的信息，例如：购买一个塔的价格是多少？因此，你需要实现一些视觉反馈。以下是一些较小的练习：
 
-    +   当玩家悬停在交易按钮之一上时，将价格（或出售按钮的情况下的价值）显示在某个地方（需要仔细决定，因为它会影响我们在[第3章](part0043.xhtml#aid-190861 "第3章。与玩家沟通——用户界面")中做的设计），这样玩家在执行操作之前可以阅读它。
+    +   当玩家悬停在交易按钮之一上时，将价格（或出售按钮的情况下的价值）显示在某个地方（需要仔细决定，因为它会影响我们在第三章中做的设计），这样玩家在执行操作之前可以阅读它。
 
-    +   当没有选择任何塔时，销售和升级按钮都不应该显示为激活状态。将其更改为，当`currentActiveTower`变量为null时，显示一个禁用按钮。
+    +   当没有选择任何塔时，销售和升级按钮都不应该显示为激活状态。将其更改为，当`currentActiveTower`变量为 null 时，显示一个禁用按钮。
 
-1.  **实现设置菜单（第一部分）**：在这一章中，我们将这留作练习，所以让我们看看我们需要做什么。首先，要决定玩家可以更改哪些设置以及如何更改（切换？滑块？下拉菜单？）。特别是，你应该至少有一个音频切换和一个质量设置下拉菜单，以及你想要包含的任何选项。然后，完成UI的完整设计。最后，在Unity中创建一个新的场景（或屏幕，根据你的喜好），通过使用UI元素实现设置屏幕。
+1.  **实现设置菜单（第一部分）**：在这一章中，我们将这留作练习，所以让我们看看我们需要做什么。首先，要决定玩家可以更改哪些设置以及如何更改（切换？滑块？下拉菜单？）。特别是，你应该至少有一个音频切换和一个质量设置下拉菜单，以及你想要包含的任何选项。然后，完成 UI 的完整设计。最后，在 Unity 中创建一个新的场景（或屏幕，根据你的喜好），通过使用 UI 元素实现设置屏幕。
 
-1.  **实现设置菜单（第二部分）**：在第一部分中，我们进行了设计和在Unity中实现了它。现在，我们需要实现功能（目前不包括音频，留到下一章），所以创建一个脚本，类似于我们在主菜单中做的，在那里实现所有功能，并通过使用**检查器**中的事件将它们链接到UI元素。要修改质量设置和音频设置，搜索官方文档了解如何操作（这是练习的一部分）。此外，请记住，下一章可能会给你一些其他实现设置类型的思想。
+1.  **实现设置菜单（第二部分）**：在第一部分中，我们进行了设计和在 Unity 中实现了它。现在，我们需要实现功能（目前不包括音频，留到下一章），所以创建一个脚本，类似于我们在主菜单中做的，在那里实现所有功能，并通过使用**检查器**中的事件将它们链接到 UI 元素。要修改质量设置和音频设置，搜索官方文档了解如何操作（这是练习的一部分）。此外，请记住，下一章可能会给你一些其他实现设置类型的思想。
 
 1.  **魔法数字（第一部分）**：我们在前面的章节中已经遇到了魔法数字。它们是在脚本中出现的没有解释的数字，良好的实践是尽可能避免它们。在本章中，我们也留下了许多这样的数字；让我们尝试去除它们。第一个魔法数字是在创建我们塔的位置的新向量时放置脚本中的数字*7*。这个数字取决于摄像机的位置以及塔应该在*z*轴上的位置。因此，添加一些代码来以动态方式计算这个数字（这样如果我们决定改变摄像机的位置或塔的*z*深度，我们可以在不改变脚本的情况下做到这一点，作为额外的奖励，你还将有机会在不同的*z*深度层上有不同类型的塔，这对你来说可能同样有用）。特别是，你需要从塔的*z*轴减去摄像机的*z*轴。
 

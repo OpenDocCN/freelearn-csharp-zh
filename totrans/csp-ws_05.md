@@ -80,9 +80,9 @@ C# 和 .NET 提供了一种高效的方式来运行并发代码，使得执行�
 
 +   `public AggregateException Exception { get; }`: 如果有，返回导致`Task`提前结束的异常。
 
-注意，`Action`委托中的代码只有在调用`Start()`方法之后才会执行。这可能是几毫秒之后，由.NET调度器决定。
+注意，`Action`委托中的代码只有在调用`Start()`方法之后才会执行。这可能是几毫秒之后，由.NET 调度器决定。
 
-从创建一个新的VS Code控制台应用程序开始，添加一个名为`Logger`的实用工具类，你将在接下来的练习和示例中使用它。它将用于将消息记录到控制台，并附带当前时间和当前线程的`ManagedThreadId`。
+从创建一个新的 VS Code 控制台应用程序开始，添加一个名为`Logger`的实用工具类，你将在接下来的练习和示例中使用它。它将用于将消息记录到控制台，并附带当前时间和当前线程的`ManagedThreadId`。
 
 这些步骤如下：
 
@@ -90,17 +90,27 @@ C# 和 .NET 提供了一种高效的方式来运行并发代码，使得执行�
 
 1.  通过运行以下命令创建一个名为`Chapter05`的新控制台应用程序项目：
 
-    [PRE0]
+    ```cs
+    source>dotnet new console -o Chapter05
+    ```
 
 1.  将`Class1.cs`文件重命名为`Logger.cs`并移除所有模板代码。
 
 1.  一定要包含`System`和`System.Threading`命名空间。`System.Threading`包含基于`Threading`的类：
 
-    [PRE1]
+    ```cs
+    using System;
+    using System.Threading;
+    namespace Chapter05
+    {
+    ```
 
 1.  将`Logger`类标记为静态，这样就可以在不创建实例的情况下使用它：
 
-    [PRE2]
+    ```cs
+        public static class Logger
+        {
+    ```
 
     注意
 
@@ -108,7 +118,14 @@ C# 和 .NET 提供了一种高效的方式来运行并发代码，使得执行�
 
 1.  现在声明一个名为 `Log` 的 `static` 方法，它接受一个 `string message` 参数：
 
-    [PRE3]
+    ```cs
+            public static void Log(string message)
+            {
+                Console.WriteLine($"{DateTime.Now:T} [{Thread.CurrentThread.ManagedThreadId:00}] {message}");
+            }
+        }
+    }
+    ```
 
 当被调用时，它将使用 `WriteLine` 方法将消息记录到控制台窗口。在上面的代码片段中，C# 中的字符串插值功能使用 `$` 符号定义一个字符串；这里，`:T` 将当前时间 (`DateTime.Now`) 格式化为一个时间格式的字符串，`:00` 用于包含带前导 0 的 `Thread.ManagedThreadId`。
 
@@ -116,39 +133,72 @@ C# 和 .NET 提供了一种高效的方式来运行并发代码，使得执行�
 
 注意
 
-你可以在 [https://packt.link/cg6c5](https://packt.link/cg6c5) 找到用于此示例的代码。
+你可以在 [`packt.link/cg6c5`](https://packt.link/cg6c5) 找到用于此示例的代码。
 
 在下一个示例中，你将使用 `Logger` 类来记录线程即将开始和结束时的一些细节。
 
 1.  首先添加一个名为 `TaskExamples.cs` 的新类文件：
 
-    [PRE4]
+    ```cs
+    using System;
+    using System.Threading;
+    using System.Threading.Tasks;
+    namespace Chapter05.Examples
+    {
+        class TaskExamples
+        {
+    ```
 
 1.  `Main` 入口点将记录 `taskA` 正在创建：
 
-    [PRE5]
+    ```cs
+            public static void Main()
+            {
+                Logger.Log("Creating taskA");
+    ```
 
 1.  接下来，添加以下代码：
 
-    [PRE6]
+    ```cs
+                var taskA = new Task(() =>
+                {
+                    Logger.Log("Inside taskA");
+                    Thread.Sleep(TimeSpan.FromSeconds(5D));
+                    Logger.Log("Leaving taskA");
+                });
+    ```
 
 在这里，最简单的 `Task` 构造函数传递了一个 `Action` lambda 表达式，这是你想要实际执行的代码的目标。目标代码将消息 `Inside taskA` 写入控制台。它使用 `Thread.Sleep` 暂停五秒钟以阻塞当前线程，从而模拟一个长时间运行的活动，最后将 `Leaving taskA` 写入控制台。
 
 1.  现在你已经创建了 `taskA`，确认它只有在调用 `Start()` 方法时才会调用其目标代码。你将通过在方法调用前后立即记录一条消息来完成此操作：
 
-    [PRE7]
+    ```cs
+                Logger.Log($"Starting taskA. Status={taskA.Status}");
+                taskA.Start();
+                Logger.Log($"Started taskA. Status={taskA.Status}");
+                Console.ReadLine();
+            }
+        }
+    } 
+    ```
 
 1.  将 `Logger.cs` 文件的全部内容复制到与 `TaskExamples.cs` 示例相同的文件夹中。
 
 1.  接下来运行控制台应用程序，产生以下输出：
 
-    [PRE8]
+    ```cs
+    10:47:34 [01] Creating taskA
+    10:47:34 [01] Starting taskA. Status=Created
+    10:47:34 [01] Started taskA. Status=WaitingToRun
+    10:47:34 [03] Inside taskA
+    10:47:39 [03] Leaving taskA
+    ```
 
 注意，即使你调用了 `Start`，任务的状态仍然是 `WaitingToRun`。这是因为你要求 .NET 调度器安排代码运行——也就是说，将其添加到其挂起操作队列中。根据你的应用程序中其他任务的繁忙程度，它可能在你调用 `Start` 后不会立即运行。
 
 注意
 
-你可以在 [https://packt.link/DHxt3](https://packt.link/DHxt3) 找到用于此示例的代码。
+你可以在 [`packt.link/DHxt3`](https://packt.link/DHxt3) 找到用于此示例的代码。
 
 在 C# 的早期版本中，这是直接创建和启动 `Task` 对象的主要方式。现在不再推荐使用，这里仅包括它，因为你在旧代码中可能会遇到它的使用。它的使用已被 `Task.Run` 或 `Task.Factory.StartNew` 静态工厂方法所取代，这些方法为最常见的使用场景提供了一个更简单的接口。
 
@@ -168,11 +218,24 @@ C# 和 .NET 提供了一种高效的方式来运行并发代码，使得执行�
 
 考虑以下代码，它使用了第一个也是最简单的重载：
 
-[PRE9]
+```cs
+var taskB = Task.Factory.StartNew((() =>
+{
+  Logger.Log("Inside taskB");
+  Thread.Sleep(TimeSpan.FromSeconds(3D));
+  Logger.Log("Leaving taskB");
+}));
+Logger.Log($"Started taskB. Status={taskB.Status}");
+Console.ReadLine();
+```
 
 运行此代码将产生以下输出：
 
-[PRE10]
+```cs
+21:37:42 [01] Started taskB. Status=WaitingToRun
+21:37:42 [03] Inside taskB
+21:37:45 [03] Leaving taskB
+```
 
 从输出中，您可以看到此代码实现了与创建 `Task` 相同的结果，但更加简洁。要考虑的主要点是，`Task.Factory.StartNew` 被添加到 C# 中是为了使创建由您启动的任务更加容易。与直接创建任务相比，使用 `StartNew` 更为可取。
 
@@ -194,11 +257,24 @@ C# 和 .NET 提供了一种高效的方式来运行并发代码，使得执行�
 
 例如，考虑以下代码：
 
-[PRE11]
+```cs
+var taskC = Task.Run(() =>
+{
+  Logger.Log("Inside taskC");
+  Thread.Sleep(TimeSpan.FromSeconds(1D));
+  Logger.Log("Leaving taskC");
+  });
+Logger.Log($"Started taskC. Status={taskC.Status}");
+Console.ReadLine();
+```
 
 运行此代码将产生以下输出：
 
-[PRE12]
+```cs
+21:40:27 [03] Inside taskC
+21:40:27 [01] Started taskC. Status=WaitingToRun
+21:40:28 [03] Leaving taskC
+```
 
 如你所见，输出与前面两个代码片段的输出非常相似。在相关的 `Action` 委托完成之前，每个等待的时间都比前一个短。
 
@@ -206,7 +282,19 @@ C# 和 .NET 提供了一种高效的方式来运行并发代码，使得执行�
 
 同时运行这三个示例会产生以下结果：
 
-[PRE13]
+```cs
+21:45:52 [01] Creating taskA
+21:45:52 [01] Starting taskA. Status=Created
+21:45:52 [01] Started taskA. Status=WaitingToRun
+21:45:52 [01] Started taskB. Status=WaitingToRun
+21:45:52 [01] Started taskC. Status=WaitingToRun
+21:45:52 [04] Inside taskB
+21:45:52 [03] Inside taskA
+21:45:52 [05] Inside taskC
+21:45:53 [05] Leaving taskC
+21:45:55 [04] Leaving taskB
+21:45:57 [03] Leaving taskA
+```
 
 你可以看到各种 `ManagedThreadIds` 被记录，并且由于在每个情况下 `Thread.Sleep` 调用中指定的秒数逐渐减少，`taskC` 在 `taskB` 之前完成，而 `taskB` 在 `taskA` 之前完成。
 
@@ -216,7 +304,7 @@ C# 和 .NET 提供了一种高效的方式来运行并发代码，使得执行�
 
 注意
 
-你可以在 [https://devblogs.microsoft.com/pfxteam/task-run-vs-task-factory-startnew/](https://devblogs.microsoft.com/pfxteam/task-run-vs-task-factory-startnew/) 和 [https://blog.stephencleary.com/2013/08/startnew-is-dangerous.xhtml](https://blog.stephencleary.com/2013/08/startnew-is-dangerous.xhtml) 找到关于 `Task.Run` 和 `Task.Factory.StartNew` 的更多信息。
+你可以在 [`devblogs.microsoft.com/pfxteam/task-run-vs-task-factory-startnew/`](https://devblogs.microsoft.com/pfxteam/task-run-vs-task-factory-startnew/) 和 [`blog.stephencleary.com/2013/08/startnew-is-dangerous.xhtml`](https://blog.stephencleary.com/2013/08/startnew-is-dangerous.xhtml) 找到关于 `Task.Run` 和 `Task.Factory.StartNew` 的更多信息。
 
 到目前为止，你已经看到了如何启动小任务，每个任务在完成前都有一个小延迟。这样的延迟可以模拟代码访问慢速网络连接或运行复杂计算时产生的效果。在接下来的练习中，你将通过启动运行时间越来越长的数值计算来扩展你的 `Task.Run` 知识。
 
@@ -232,27 +320,89 @@ C# 和 .NET 提供了一种高效的方式来运行并发代码，使得执行�
 
 1.  按如下方式添加递归的 `Fibonacci` 函数。如果你请求的迭代小于或等于 `2`，可以返回 `1` 以节省一些处理时间：
 
-    [PRE14]
+    ```cs
+    using System;
+    using System.Globalization;
+    using System.Threading;
+    using System.Threading.Tasks;
+    namespace Chapter05.Exercises.Exercise01
+    {
+      class Program
+      {
+            private static long Fibonacci(int n)
+            {
+                if (n <= 2L)
+                    return 1L;
+                return Fibonacci(n - 1) + Fibonacci(n - 2);
+            }
+    ```
 
 1.  将 `static Main` 入口点添加到控制台应用程序中，并使用 `do`-循环提示输入一个数字。
 
 1.  如果用户输入一个字符串，使用 `int.TryParse` 将其转换为整数：
 
-    [PRE15]
+    ```cs
+            public static void Main()
+            {
+                string input;
+                do
+                {
+                    Console.WriteLine("Enter number:");
+                    input = Console.ReadLine();
+                    if (!string.IsNullOrEmpty(input) &&                     int.TryParse(input, NumberStyles.Any, CultureInfo.CurrentCulture, out var number))
+    ```
 
 1.  定义一个 lambda 表达式，使用 `DateTime.Now` 获取当前时间，调用慢速运行的 `Fibonacci` 函数，并记录运行时间：
 
-    [PRE16]
+    ```cs
+                     {
+                        Task.Run(() =>
+                        {
+                            var now = DateTime.Now;
+                            var fib = Fibonacci(number);
+                            var duration = DateTime.Now.Subtract(now);
+                            Logger.Log($"Fibonacci {number:N0} = {fib:N0} (elapsed time: {duration.TotalSeconds:N0} secs)");
+                        });
+                    } 
+    ```
 
 lambda 表达式被传递给 `Task.Run`，并将很快由 `Task.Run` 启动，从而释放 `do-while` 循环以提示输入另一个数字。
 
 1.  当输入空值时，程序应退出循环：
 
-    [PRE17]
+    ```cs
+                 } while (input != string.Empty);
+            }
+        }
+    }
+    ```
 
 1.  对于运行控制台应用程序，首先输入数字 `1` 和 `2`。由于这些计算非常快，它们都在一秒内返回。
 
-    [PRE18]
+    ```cs
+    Enter number:1
+    Enter number:2
+    11:25:11 [04] Fibonacci 1 = 1 (elapsed time: 0 secs)
+    Enter number:45
+    11:25:12 [04] Fibonacci 2 = 1 (elapsed time: 0 secs)
+    Enter number:44
+    Enter number:43
+    Enter number:42
+    Enter number:41
+    Enter number:40
+    Enter number:10
+    11:25:35 [08] Fibonacci 41 = 165,580,141 (elapsed time: 4 secs)
+    11:25:35 [09] Fibonacci 40 = 102,334,155 (elapsed time: 2 secs)
+    11:25:36 [07] Fibonacci 42 = 267,914,296 (elapsed time: 6 secs)
+    Enter number: 39
+    11:25:36 [09] Fibonacci 10 = 55 (elapsed time: 0 secs)
+    11:25:37 [05] Fibonacci 43 = 433,494,437 (elapsed time: 9 secs)
+    11:25:38 [06] Fibonacci 44 = 701,408,733 (elapsed time: 16 secs)
+    Enter number:38
+    11:25:44 [06] Fibonacci 38 = 39,088,169 (elapsed time: 1 secs)
+    11:25:44 [05] Fibonacci 39 = 63,245,986 (elapsed time: 2 secs)
+    11:25:48 [04] Fibonacci 45 = 1,134,903,170 (elapsed time: 27 secs)
+    ```
 
 注意，对于 `1` 和 `2`，`ThreadId` 都是 `[04]`。这表明 `Task.Run` 在这两个迭代中都使用了相同的线程。当输入 `2` 时，之前的计算已经完成。所以 .NET 决定再次重用线程 `04`。对于值 `45`，尽管它是第三次请求，但它仍然花费了 `27` 秒来完成。
 
@@ -260,7 +410,7 @@ lambda 表达式被传递给 `Task.Run`，并将很快由 `Task.Run` 启动，�
 
 注意
 
-你可以在 [https://packt.link/YLYd4](https://packt.link/YLYd4) 找到用于此练习的代码。
+你可以在 [`packt.link/YLYd4`](https://packt.link/YLYd4) 找到用于此练习的代码。
 
 ## 协调任务
 
@@ -302,11 +452,36 @@ lambda 表达式被传递给 `Task.Run`，并将很快由 `Task.Run` 启动，�
 
 代码使用 lambda 表达式创建 `outerTask`，然后它本身创建了两个内部任务 `inner1` 和 `inner2`。使用 `WaitAny` 获取 `inner2` 将首先完成的索引，因为它暂停的时间较短，所以结果索引值将是 `1`：
 
-[PRE19]
+```cs
+TaskWaitAnyExample.cs
+1    var outerTask = Task.Run( () =>
+2    {
+3        Logger.Log("Inside outerTask");
+4        var inner1 = Task.Run(() =>
+5        {
+6            Logger.Log("Inside inner1");
+7            Thread.Sleep(TimeSpan.FromSeconds(3D));
+8        });
+9        var inner2 = Task.Run(() =>
+10        {
+11            Logger.Log("Inside inner2");
+12            Thread.Sleep(TimeSpan.FromSeconds(2D));
+13        });
+14
+15        Logger.Log("Calling WaitAny on outerTask");
+You can find the complete code here: http://packt.link/CicWk.
+```
 
 当代码运行时，它会产生以下输出：
 
-[PRE20]
+```cs
+15:47:43 [04] Inside outerTask
+15:47:43 [01] Press ENTER
+15:47:44 [04] Calling WaitAny on outerTask
+15:47:44 [05] Inside inner1
+15:47:44 [06] Inside inner2
+15:47:46 [04] Waitany index=1
+```
 
 应用程序保持响应，因为您在 `Task` 内部调用了 `WaitAny`。您没有阻塞应用程序的主线程。如您所见，线程 ID `01` 记录了以下消息：“15:47:43 [01] 按下 ENTER”。
 
@@ -322,57 +497,126 @@ lambda 表达式被传递给 `Task.Run`，并将很快由 `Task.Run` 启动，�
 
 1.  将主入口点添加到控制台应用程序中：
 
-    [PRE21]
+    ```cs
+    using System;
+    using System.Threading;
+    using System.Threading.Tasks;
+    namespace Chapter05.Exercises.Exercise02
+    {
+        class Program
+        {
+            public static void Main()
+            {
+                Logger.Log("Starting");
+    ```
 
 1.  声明一个名为 `taskA` 的变量，将 `Task.Run` 传递一个 lambda 表达式，该表达式暂停当前线程 `5` 秒：
 
-    [PRE22]
+    ```cs
+                var taskA = Task.Run( () =>
+                {
+                    Logger.Log("Inside TaskA");
+                    Thread.Sleep(TimeSpan.FromSeconds(5));
+                    Logger.Log("Leaving TaskA");
+                    return "All done A";
+                });
+    ```
 
 1.  使用方法组语法创建两个更多任务：
 
-    [PRE23]
+    ```cs
+                var taskB = Task.Run(TaskBActivity);
+                var taskC = Task.Run(TaskCActivity);
+    ```
 
 如您所知，如果编译器可以确定零参数或单参数方法所需的参数类型，则可以使用这种简短的语法。
 
 1.  现在随机选择一个以秒为单位的最大超时时间。这意味着两个任务中的任何一个在超时期间都可能**不会**完成：
 
-    [PRE24]
+    ```cs
+                var timeout = TimeSpan.FromSeconds(new Random().Next(1, 10));
+                Logger.Log($"Waiting max {timeout.TotalSeconds} seconds...");
+    ```
 
-注意，每个任务仍然会运行到完成，因为您没有在`Task.Run` `Action` lambda的主体中添加停止执行代码的机制。
+注意，每个任务仍然会运行到完成，因为您没有在`Task.Run` `Action` lambda 的主体中添加停止执行代码的机制。
 
 1.  调用`WaitAll`，传入三个任务和`timeout`超时时间：
 
-    [PRE25]
+    ```cs
+                var allDone = Task.WaitAll(new[] {taskA, taskB, taskC}, timeout);
+                Logger.Log($"AllDone={allDone}: TaskA={taskA.Status}, TaskB={taskB.Status}, TaskC={taskC.Status}");
+                Console.WriteLine("Press ENTER to quit");
+                Console.ReadLine();
+            }
+    ```
 
 如果所有任务都能及时完成，这将返回`true`。然后您将记录所有任务的状态，并等待按下`Enter`键以退出应用程序。
 
 1.  最后添加两个运行缓慢的`Action`方法：
 
-    [PRE26]
+    ```cs
+            private static string TaskBActivity()
+            {
+                Logger.Log($"Inside {nameof(TaskBActivity)}");
+                Thread.Sleep(TimeSpan.FromSeconds(2));
+                Logger.Log($"Leaving {nameof(TaskBActivity)}");
+                return "";
+            }
+            private static void TaskCActivity()
+            {
+                Logger.Log($"Inside {nameof(TaskCActivity)}");
+                Thread.Sleep(TimeSpan.FromSeconds(1));
+                Logger.Log($"Leaving {nameof(TaskCActivity)}");
+            }
+        }
+    }
+    ```
 
 每个任务在开始和离开任务时都会记录一条消息，几秒钟后。有用的`nameof`语句用于包含方法的名称以提供额外的日志信息。通常，检查日志文件以查看已访问的方法的名称比将名称硬编码为字面字符串更有用。
 
 1.  运行代码后，您将看到以下输出：
 
-    [PRE27]
+    ```cs
+    14:46:28 [01] Starting
+    14:46:28 [04] Inside TaskBActivity
+    14:46:28 [05] Inside TaskCActivity
+    14:46:28 [06] Inside TaskA
+    14:46:28 [01] Waiting max 7 seconds...
+    14:46:29 [05] Leaving TaskCActivity
+    14:46:30 [04] Leaving TaskBActivity
+    14:46:33 [06] Leaving TaskA
+    14:46:33 [01] AllDone=True: TaskA=RanToCompletion, TaskB=RanToCompletion, TaskC=RanToCompletion
+    Press ENTER to quit
+    ```
 
-在运行代码时，运行时随机选择了七秒的超时时间。这使得所有任务都能及时完成，因此`WaitAll`返回`true`，此时所有任务的状态都是`RanToCompletion`。请注意，三个任务中的线程ID，用方括号括起来，是不同的。
+在运行代码时，运行时随机选择了七秒的超时时间。这使得所有任务都能及时完成，因此`WaitAll`返回`true`，此时所有任务的状态都是`RanToCompletion`。请注意，三个任务中的线程 ID，用方括号括起来，是不同的。
 
 1.  再次运行代码：
 
-    [PRE28]
+    ```cs
+    14:48:20 [01] Starting
+    14:48:20 [01] Waiting max 2 seconds...
+    14:48:20 [05] Inside TaskCActivity
+    14:48:20 [06] Inside TaskA
+    14:48:20 [04] Inside TaskBActivity
+    14:48:21 [05] Leaving TaskCActivity
+    14:48:22 [04] Leaving TaskBActivity
+    14:48:22 [01] AllDone=False: TaskA=Running, TaskB=Running, TaskC=RanToCompletion
+    Press ENTER to quit
+    14:48:25 [06] Leaving TaskA
+    ```
 
 这次运行时选择了两秒的最大等待时间，因此`WaitAll`调用超时，返回`false`。
 
-您可能已经注意到输出中`Inside TaskBActivity`有时会出现在`Inside TaskCActivity`之前。这展示了.NET调度器的排队机制。当您调用`Task.Run`时，您是在要求调度器将其添加到队列中。您调用`Task.Run`和它调用您的lambda之间可能只有几毫秒的差距，但这可能取决于您最近添加到队列中的其他任务数量；待处理任务的数量越多，这个时间间隔可能会更长。
+您可能已经注意到输出中`Inside TaskBActivity`有时会出现在`Inside TaskCActivity`之前。这展示了.NET 调度器的排队机制。当您调用`Task.Run`时，您是在要求调度器将其添加到队列中。您调用`Task.Run`和它调用您的 lambda 之间可能只有几毫秒的差距，但这可能取决于您最近添加到队列中的其他任务数量；待处理任务的数量越多，这个时间间隔可能会更长。
 
 有趣的是，输出显示了`Leaving TaskBActivity`，但`taskB`的状态在`WaitAll`等待结束后仍然是`Running`。这表明有时在超时任务的状态改变时可能会有一个非常小的延迟。
 
-在按下`Enter`键大约三秒后，记录了`Leaving TaskA`。这表明任何超时任务中的`Action`将继续运行，.NET不会为您停止它。
+在按下`Enter`键大约三秒后，记录了`Leaving TaskA`。这表明任何超时任务中的`Action`将继续运行，.NET 不会为您停止它。
 
 注意
 
-您可以在[https://packt.link/5lH0o](https://packt.link/5lH0o)找到用于此练习的代码。
+您可以在[`packt.link/5lH0o`](https://packt.link/5lH0o)找到用于此练习的代码。
 
 ## 延续任务
 
@@ -390,33 +634,54 @@ lambda 表达式被传递给 `Task.Run`，并将很快由 `Task.Run` 启动，�
 
 +   `public Task ContinueWith(Action<Task<TResult>> continuationAction, TaskContinuationOptions continuationOptions)`: 一个要运行的任务，其行为由`TaskContinuationOptions`指定。例如，指定`NotOnCanceled`表示如果先前的任务被取消，则不调用后续操作。
 
-后续操作有一个初始的`WaitingForActivation`状态。.NET Framework将在先前的任务或任务完成时执行此任务。需要注意的是，您不需要启动后续操作，尝试这样做将导致异常。
+后续操作有一个初始的`WaitingForActivation`状态。.NET Framework 将在先前的任务或任务完成时执行此任务。需要注意的是，您不需要启动后续操作，尝试这样做将导致异常。
 
 以下示例模拟调用一个长时间运行的功能，`GetStockPrice`（这可能是一种需要几秒钟才能返回的网页服务或数据库调用）：
 
-[PRE29]
+```cs
+ContinuationExamples.cs
+1    class ContinuationExamples
+2    {
+3        public static void Main()
+4        {
+5            Logger.Log("Start...");
+6            Task.Run(GetStockPrice)
+7                .ContinueWith(prev =>
+8                {
+9                    Logger.Log($"GetPrice returned {prev.Result:N2}, status={prev.Status}");
+10                });
+11
+12           Console.ReadLine();
+13        }
+14
+You can find the complete code here: http://packt.link/rpNcx.
+```
 
 调用`GetStockPrice`返回一个`double`，这导致将泛型`Task<double>`作为后续操作传递（请参阅突出显示的部分）。`prev`参数是一个类型为`Task<double>`的泛型`Action`，允许您访问先前的任务及其`Result`以检索从`GetStockPrice`返回的值。
 
-如果您将鼠标悬停在`ContinueWith`方法上，您将看到以下IntelliSense描述：
+如果您将鼠标悬停在`ContinueWith`方法上，您将看到以下 IntelliSense 描述：
 
-![图5.1：ContinueWith方法签名](img/B16835_05_01.jpg)
+![图 5.1：ContinueWith 方法签名](img/B16835_05_01.jpg)
 
-图5.1：ContinueWith方法签名
+图 5.1：ContinueWith 方法签名
 
 注意
 
-`ContinueWith`方法有多种选项可以用来微调行为，您可以从[https://docs.microsoft.com/en-us/dotnet/api/system.threading.tasks.taskcontinuationoptions](https://docs.microsoft.com/en-us/dotnet/api/system.threading.tasks.taskcontinuationoptions)获取更多详细信息。
+`ContinueWith`方法有多种选项可以用来微调行为，您可以从[`docs.microsoft.com/en-us/dotnet/api/system.threading.tasks.taskcontinuationoptions`](https://docs.microsoft.com/en-us/dotnet/api/system.threading.tasks.taskcontinuationoptions)获取更多详细信息。
 
 运行示例会产生类似于以下输出的结果：
 
-[PRE30]
+```cs
+09:30:45 [01] Start...
+09:30:45 [03] Inside GetStockPrice
+09:30:50 [04] GetPrice returned 76.44, status=RanToCompletion
+```
 
-在输出中，线程 `[01]` 代表控制台的主线程。调用`GetStockPrice`的任务是由线程ID `[03]` 执行的，但后续操作是使用不同的线程（线程 `[04]`）执行的。
+在输出中，线程 `[01]` 代表控制台的主线程。调用`GetStockPrice`的任务是由线程 ID `[03]` 执行的，但后续操作是使用不同的线程（线程 `[04]`）执行的。
 
 注意
 
-您可以在[https://packt.link/rpNcx](https://packt.link/rpNcx)找到此示例使用的代码。
+您可以在[`packt.link/rpNcx`](https://packt.link/rpNcx)找到此示例使用的代码。
 
 在不同线程上运行的延续操作可能不会成问题，但如果你正在开发 UWP、WPF 或 WinForms UI 应用程序，并且必须使用主 UI 线程来更新 UI 元素（除非你使用绑定语义），那么这肯定是一个问题。
 
@@ -424,7 +689,7 @@ lambda 表达式被传递给 `Task.Run`，并将很快由 `Task.Run` 启动，�
 
 注意
 
-`ContinueWith` 方法有多种选项可以用来微调行为，你可以查看 [https://docs.microsoft.com/en-us/dotnet/api/system.threading.tasks.taskcontinuationoptions](https://docs.microsoft.com/en-us/dotnet/api/system.threading.tasks.taskcontinuationoptions) 获取更多详细信息。
+`ContinueWith` 方法有多种选项可以用来微调行为，你可以查看 [`docs.microsoft.com/en-us/dotnet/api/system.threading.tasks.taskcontinuationoptions`](https://docs.microsoft.com/en-us/dotnet/api/system.threading.tasks.taskcontinuationoptions) 获取更多详细信息。
 
 如果你访问正在抛出的 `AggregateException` 上的 `Task<T> Result` 属性。这将在稍后详细说明。
 
@@ -450,55 +715,121 @@ lambda 表达式被传递给 `Task.Run`，并将很快由 `Task.Run` 启动，�
 
 假设你被一位汽车经销商要求创建一个控制台应用程序，用于计算不同地区销售的汽车的平均销售价值。经销商是一个繁忙的地方，但他们知道获取和计算平均值可能需要一段时间。因此，他们希望输入他们准备等待平均计算的最大秒数。如果时间更长，他们将离开应用程序并忽略结果。
 
-经销商有10个区域销售中心。为了计算平均值，首先需要调用一个名为`FetchSales`的方法，该方法为这些区域中的每一个返回一个`CarSale`项目的列表。
+经销商有 10 个区域销售中心。为了计算平均值，首先需要调用一个名为`FetchSales`的方法，该方法为这些区域中的每一个返回一个`CarSale`项目的列表。
 
 每次调用`FetchSales`可能是一个可能运行缓慢的服务（你将实现随机暂停来模拟这种延迟），因此你需要为每个调用使用一个`Task`，因为你不能确定每个调用需要多长时间才能完成。你也不希望运行缓慢的任务影响其他任务，但为了计算有效的平均值，在继续之前，重要的是要**所有**结果都返回。
 
-创建一个`SalesLoader`类，实现`IEnumerable<CarSale> FetchSales()`以返回汽车销售详情。然后，一个`SalesAggregator`类应该传递一个`SalesLoader`列表（在这个练习中，将有10个加载器实例，每个地区一个）。聚合器将等待所有加载器完成使用`Task.WhenAll`，然后再继续执行一个计算所有地区平均值的任务。
+创建一个`SalesLoader`类，实现`IEnumerable<CarSale> FetchSales()`以返回汽车销售详情。然后，一个`SalesAggregator`类应该传递一个`SalesLoader`列表（在这个练习中，将有 10 个加载器实例，每个地区一个）。聚合器将等待所有加载器完成使用`Task.WhenAll`，然后再继续执行一个计算所有地区平均值的任务。
 
 执行以下步骤：
 
 1.  首先，创建一个`CarSale`记录。构造函数接受两个值，汽车的名字和其销售价格（`name`和`salePrice`）：
 
-    [PRE31]
+    ```cs
+    using System;
+    using System.Collections.Generic;
+    using System.Globalization;
+    using System.Linq;
+    using System.Threading;
+    using System.Threading.Tasks;
+    namespace Chapter05.Exercises.Exercise03
+    {
+        public record CarSale
+        {
+            public CarSale(string name, double salePrice)
+                => (Name, SalePrice) = (name, salePrice);
+            public string Name { get; }
+            public double SalePrice { get; }
+        }
+    ```
 
 1.  现在创建一个接口，`ISalesLoader`，它表示销售数据加载服务：
 
-    [PRE32]
+    ```cs
+        public interface ISalesLoader
+        {
+            public IEnumerable<CarSale> FetchSales();
+        }
+    ```
 
 它只有一个调用，`FetchSales`，返回一个类型为`CarSale`的可枚举。现在，了解加载器的工作原理并不重要；只需知道调用时会返回汽车销售列表。在这里使用接口允许根据需要使用各种类型的加载器。
 
 1.  使用聚合类调用`ISalesLoader`实现：
 
-    [PRE33]
+    ```cs
+        public static class SalesAggregator
+        {
+           public static Task<double> Average(IEnumerable<ISalesLoader> loaders)
+           {
+    ```
 
 它被声明为`static`，因为在调用之间没有状态。定义一个`Average`函数，该函数接受一个`ISalesLoader`项目的可枚举，并返回一个通用的`Task<Double>`用于最终的平均值计算。
 
-1.  对于每个加载器参数，使用LINQ投影将`loader.FetchSales`方法传递给`Task.Run`：
+1.  对于每个加载器参数，使用 LINQ 投影将`loader.FetchSales`方法传递给`Task.Run`：
 
-    [PRE34]
+    ```cs
+             var loaderTasks = loaders.Select(ldr => Task.Run(ldr.FetchSales));
+             return Task
+                    .WhenAll(loaderTasks)
+                    .ContinueWith(tasks =>
+    ```
 
 这些都会返回一个`Task<IEnumerable<CarSale>>`实例。`WhenAll`用于创建一个在`ContinueWith`调用时继续的单个任务。
 
-1.  使用LINQ的`SelectMany`从每个加载器调用结果中获取所有的`CarSale`项目，在调用Linq的`Average`之前对每个`CarSale`项目的`SalePrice`字段进行操作：
+1.  使用 LINQ 的`SelectMany`从每个加载器调用结果中获取所有的`CarSale`项目，在调用 Linq 的`Average`之前对每个`CarSale`项目的`SalePrice`字段进行操作：
 
-    [PRE35]
+    ```cs
+                    {
+                        var average = tasks.Result
+                            .SelectMany(t => t)
+                            .Average(car => car.SalePrice);
+                        return average;
+                    });
+            }
+        }
+    }
+    ```
 
 1.  从一个名为`SalesLoader`的类中实现`ISalesLoader`接口：
 
-    [PRE36]
+    ```cs
+        public class SalesLoader : ISalesLoader
+        {
+            private readonly Random _random;
+            private readonly string _name;
+            public SalesLoader(int id, Random rand)
+            {
+                _name = $"Loader#{id}";
+                _random = rand;
+            }
+    ```
 
 构造函数将传递一个用于日志记录的`int`变量和一个`Random`实例，以帮助创建随机数量的`CarSale`项目。
 
 1.  你的`ISalesLoader`实现需要一个`FetchSales`函数。包括`1`到`3`秒之间的随机延迟来模拟不太可靠的服务：
 
-    [PRE37]
+    ```cs
+            public IEnumerable<CarSale> FetchSales()
+            {
+                var delay = _random.Next(1, 3);
+                Logger.Log($"FetchSales {_name} sleeping for {delay} seconds ...");
+                Thread.Sleep(TimeSpan.FromSeconds(delay));
+    ```
 
 你正在尝试测试你的应用程序在各种时间延迟下的行为。因此，使用了随机类。
 
 1.  使用`Enumerable.Range`和`random.Next`来选择一个介于一和五之间的随机数：
 
-    [PRE38]
+    ```cs
+                var sales = Enumerable
+                    .Range(1, _random.Next(1, 5))
+                    .Select(n => GetRandomCar())
+                    .ToList();
+                foreach (var car in sales)
+                    Logger.Log($"FetchSales {_name} found: {car.Name} @ {car.SalePrice:N0}");
+                return sales;
+            }
+    ```
 
 这是使用你的`GetRandomCar`函数返回的`CarSale`项目总数。
 
@@ -506,55 +837,141 @@ lambda 表达式被传递给 `Task.Run`，并将很快由 `Task.Run` 启动，�
 
 1.  使用`carNames.length`属性来选择一个介于零和四之间的随机索引号用于汽车名称：
 
-    [PRE39]
+    ```cs
+            private readonly string[] _carNames = { "Ford", "BMW", "Fiat", "Mercedes", "Porsche" };
+            private CarSale GetRandomCar()
+            {
+                var nameIndex = _random.Next(_carNames.Length);
+                return new CarSale(
+                    _carNames[nameIndex], _random.NextDouble() * 1000);
+            }
+        }
+    ```
 
 1.  现在，创建你的控制台应用程序来测试这个功能：
 
-    [PRE40]
+    ```cs
+        public class Program
+        {
+            public static void Main()
+            {
+                var random = new Random();
+                const int MaxSalesHubs = 10;
+                string input;
+                do
+                {
+                    Console.WriteLine("Max wait time (in seconds):");
+                    input = Console.ReadLine();
+                    if (string.IsNullOrEmpty(input))
+                        continue;
+    ```
 
 你的应用程序将反复询问用户愿意等待的最大时间，以便在下载数据时使用。一旦所有数据都下载完毕，应用程序将使用此信息来计算平均价格。单独按下`Enter`键将导致程序循环结束。`MaxSalesHubs`是请求数据的最大销售中心数。
 
-1.  将输入的值转换为`int`类型，然后再次使用`Enumerable.Range`来创建一个随机数量的新`SalesLoader`实例（你有最多10个不同的销售中心）：
+1.  将输入的值转换为`int`类型，然后再次使用`Enumerable.Range`来创建一个随机数量的新`SalesLoader`实例（你有最多 10 个不同的销售中心）：
 
-    [PRE41]
+    ```cs
+                    if (int.TryParse(input, NumberStyles.Any, CultureInfo.CurrentCulture, out var maxDelay))
+                    {
+                           var loaders = Enumerable.Range(1,                                           random.Next(1, MaxSalesHubs))
+                            .Select(n => new SalesLoader(n, random))
+                            .ToList();
+    ```
 
 1.  将加载器传递给静态`SalesAggregator.Average`方法以接收一个`Task<Double>`。
 
 1.  调用`Wait`，传入最大等待时间：
 
-    [PRE42]
+    ```cs
+                        var averageTask = SalesAggregator.Average(loaders);
+                        var hasCompleted = averageTask.Wait(                              TimeSpan.FromSeconds(maxDelay));
+                        var average = averageTask.Result;
+    ```
 
 如果`Wait`调用在规定时间内返回，那么你将看到`has completed`的值为`true`。
 
 1.  最后，检查`hasCompleted`并相应地记录消息：
 
-    [PRE43]
+    ```cs
+                        if (hasCompleted)
+                        {
+                            Logger.Log($"Average={average:N0}");
+                        }
+                        else
+                        {
+                            Logger.Log("Timeout!");
+                        }
+                    }
+                } while (input != string.Empty);
+            }
+        }
+    }
+    ```
 
 1.  当运行控制台应用程序并输入短的最大等待时间`1`秒时，你会看到随机创建的三个加载器实例：
 
-    [PRE44]
+    ```cs
+    Max wait time (in seconds):1
+    10:52:49 [04] FetchSales Loader#1 sleeping for 1 seconds ...
+    10:52:49 [06] FetchSales Loader#3 sleeping for 1 seconds ...
+    10:52:49 [05] FetchSales Loader#2 sleeping for 1 seconds ...
+    10:52:50 [04] FetchSales Loader#1 found: Mercedes @ 362
+    10:52:50 [04] FetchSales Loader#1 found: Ford @ 993
+    10:52:50 [06] FetchSales Loader#3 found: Fiat @ 645
+    10:52:50 [05] FetchSales Loader#2 found: Mercedes @ 922
+    10:52:50 [06] FetchSales Loader#3 found: Ford @ 9
+    10:52:50 [05] FetchSales Loader#2 found: Porsche @ 859
+    10:52:50 [05] FetchSales Loader#2 found: Mercedes @ 612
+    10:52:50 [01] Timeout!
+    ```
 
-每个加载器在返回一个随机的`CarSale`记录列表之前会睡眠`1`秒（你可以看到各种线程ID被记录），然后达到最大超时值，因此显示没有平均值的`Timeout!`消息。
+每个加载器在返回一个随机的`CarSale`记录列表之前会睡眠`1`秒（你可以看到各种线程 ID 被记录），然后达到最大超时值，因此显示没有平均值的`Timeout!`消息。
 
 1.  输入一个更大的超时时间`10`秒：
 
-    [PRE45]
+    ```cs
+    Max wait time (in seconds):10
+    20:08:41 [05] FetchSales Loader#1 sleeping for 2 seconds ...
+    20:08:41 [12] FetchSales Loader#4 sleeping for 1 seconds ...
+    20:08:41 [08] FetchSales Loader#2 sleeping for 1 seconds ...
+    20:08:41 [11] FetchSales Loader#3 sleeping for 1 seconds ...
+    20:08:41 [15] FetchSales Loader#5 sleeping for 2 seconds ...
+    20:08:41 [13] FetchSales Loader#6 sleeping for 2 seconds ...
+    20:08:41 [14] FetchSales Loader#7 sleeping for 1 seconds ...
+    20:08:42 [08] FetchSales Loader#2 found: Porsche @ 735
+    20:08:42 [08] FetchSales Loader#2 found: Fiat @ 930
+    20:08:42 [11] FetchSales Loader#3 found: Porsche @ 735
+    20:08:42 [12] FetchSales Loader#4 found: Porsche @ 735
+    20:08:42 [08] FetchSales Loader#2 found: Porsche @ 777
+    20:08:42 [11] FetchSales Loader#3 found: Ford @ 500
+    20:08:42 [12] FetchSales Loader#4 found: Ford @ 500
+    20:08:42 [12] FetchSales Loader#4 found: Porsche @ 710
+    20:08:42 [14] FetchSales Loader#7 found: Ford @ 144
+    20:08:43 [05] FetchSales Loader#1 found: Fiat @ 649
+    20:08:43 [15] FetchSales Loader#5 found: Ford @ 779
+    20:08:43 [13] FetchSales Loader#6 found: Porsche @ 763
+    20:08:43 [15] FetchSales Loader#5 found: Fiat @ 137
+    20:08:43 [13] FetchSales Loader#6 found: BMW @ 415
+    20:08:43 [15] FetchSales Loader#5 found: Fiat @ 853
+    20:08:43 [15] FetchSales Loader#5 found: Porsche @ 857
+    20:08:43 [01] Average=639
+    ```
 
 输入`10`秒的值允许`7`个随机加载器及时完成并最终创建平均值为`639`的值。
 
 注意
 
-你可以在[https://packt.link/kbToQ](https://packt.link/kbToQ)找到用于此练习的代码。
+你可以在[`packt.link/kbToQ`](https://packt.link/kbToQ)找到用于此练习的代码。
 
-到目前为止，本章已经考虑了创建单个任务的各种方法以及如何使用静态`Task`方法来创建为我们启动的任务。你看到了如何使用`Task.Factory.StartNew`来创建配置任务，尽管它有一组更长的配置参数。最近添加到C#中的`Task.Run`方法，在大多数常规场景下，由于其更简洁的签名而更受欢迎。
+到目前为止，本章已经考虑了创建单个任务的各种方法以及如何使用静态`Task`方法来创建为我们启动的任务。你看到了如何使用`Task.Factory.StartNew`来创建配置任务，尽管它有一组更长的配置参数。最近添加到 C#中的`Task.Run`方法，在大多数常规场景下，由于其更简洁的签名而更受欢迎。
 
 使用延续，单个和多个任务可以独立运行，只有当所有或任何前面的任务都完成时，才会继续执行最终任务。
 
-现在是时候看看`async`和`await`关键字来运行异步代码了。这些关键字是C#语言中相对较新的添加。`Task.Factory.StartNew`和`Task.Run`方法可以在旧的C#应用程序中找到，但希望你会看到`async`/`await`提供了更清晰的语法。
+现在是时候看看`async`和`await`关键字来运行异步代码了。这些关键字是 C#语言中相对较新的添加。`Task.Factory.StartNew`和`Task.Run`方法可以在旧的 C#应用程序中找到，但希望你会看到`async`/`await`提供了更清晰的语法。
 
 # 异步编程
 
-到目前为止，你已经创建了任务，并使用静态`Task`工厂方法来运行和协调这些任务。在C#的早期版本中，这些是创建任务的唯一方式。
+到目前为止，你已经创建了任务，并使用静态`Task`工厂方法来运行和协调这些任务。在 C#的早期版本中，这些是创建任务的唯一方式。
 
 C#语言现在提供了`async`和`await`关键字，这使得`async`/`await`风格的代码更简洁，所创建的代码通常更容易理解，因此也更容易维护。
 
@@ -568,17 +985,41 @@ C#语言现在提供了`async`和`await`关键字，这使得`async`/`await`风�
 
 注意
 
-你通常不会看到额外的编译代码，但如果你对C#中的状态机感兴趣，可以访问[https://devblogs.microsoft.com/premier-developer/dissecting-the-async-methods-in-c](https://devblogs.microsoft.com/premier-developer/dissecting-the-async-methods-in-c)了解更多信息。
+你通常不会看到额外的编译代码，但如果你对 C#中的状态机感兴趣，可以访问[`devblogs.microsoft.com/premier-developer/dissecting-the-async-methods-in-c`](https://devblogs.microsoft.com/premier-developer/dissecting-the-async-methods-in-c)了解更多信息。
 
 添加`async`关键字并不意味着`async`方法立即执行，它一开始是同步运行的，直到遇到带有`await`关键字的代码段。在此点，会检查可等待的代码块（在以下示例中，由于前面的`async`关键字，`BuildGreetings`调用是可等待的）是否已经完成。如果是，它将继续同步执行。如果不是，异步方法将被暂停，并返回一个不完整的`Task`给调用者。这将在`async`代码完成时完成。
 
 在以下控制台应用程序中，入口点`static Main`已被标记为`async`，并添加了`Task`返回类型。你不能将返回`int`或`void`的`Main`入口点标记为`async`，因为当控制台应用程序关闭时，运行时必须能够返回`Task`结果给调用环境：
 
-[PRE46]
+```cs
+AsyncExamples.cs
+1    using System;
+2    using System.Threading;
+3    using System.Threading.Tasks;
+4    
+5    namespace Chapter05.Examples
+6    {
+7        public class AsyncExamples
+8        {
+9            public static async Task Main()
+10            {
+11                Logger.Log("Starting");
+12                await BuildGreetings();
+13
+14                Logger.Log("Press Enter");
+15                Console.ReadLine();
+You can find the complete code here: http://packt.link/CsCek.
+```
 
 运行示例会产生如下输出：
 
-[PRE47]
+```cs
+18:20:31 [01] Starting
+18:20:31 [01] Morning
+18:20:41 [04] Morning...Afternoon
+18:20:42 [04] Morning...Afternoon...Evening
+18:20:42 [04] Press Enter
+```
 
 当 `Main` 运行时，它记录 `Starting`。注意 `ThreadId` 是 `[01]`。正如你之前看到的，控制台应用程序的主线程编号为 `1`（因为 `Logger.Log` 方法使用 `00` 格式字符串，它为范围零到九的数字添加前导 `0`）。
 
@@ -596,97 +1037,252 @@ C#语言现在提供了`async`和`await`关键字，这使得`async`/`await`风�
 
 根据用户的区域，`Task.WhenAll` 调用中的创建账户操作表示一切已完成。
 
-[PRE48]
+```cs
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+namespace Chapter05.Examples
+{
+```
 
 使用 `enum` 定义一个 `RegionName`：
 
-[PRE49]
+```cs
+    public enum RegionName { North, East, South, West };
+```
 
 `User` 记录构造函数接收一个 `userName` 和用户的 `region`：
 
-[PRE50]
+```cs
+    public record User
+    {
+        public User(string userName, RegionName region)
+            => (UserName, Region) = (userName, region);
+        public string UserName { get; }
+        public RegionName Region { get; }
+        public string ID { get; set; }
+    }
+```
 
 `AccountGenerator` 是主要的控制类。它包含一个可以被控制台应用程序等待的 `async` `CreateAccounts` 方法（这在示例的末尾实现）：
 
-[PRE51]
+```cs
+    public class AccountGenerator
+    {
+        public async Task CreateAccounts()
+        {
+```
 
 使用 `await` 关键字，你定义了对 `FetchPendingAccounts` 的可等待调用：
 
-[PRE52]
+```cs
+            var users = await FetchPendingAccounts();
+```
 
 对于 `FetchPendingAccounts` 返回的每个用户，你都会对 `GenerateId` 进行一个可等待调用。这表明循环可以包含多个可等待调用。运行时将为正确的用户实例设置用户 ID：
 
-[PRE53]
+```cs
+            foreach (var user in users)
+            {
+                var id = await GenerateId();
+                user.ID = id;
+            }
+```
 
 使用 Linq 的 `Select` 函数，你创建了一个任务列表。根据用户的区域，为每个用户创建一个北方或其他账户（每个调用都是一个针对用户的 `Task`）：
 
-[PRE54]
+```cs
+            var accountCreationTasks = users.Select(
+                user => user.Region == RegionName.North
+                    ? Task.Run(() => CreateNorthernAccount(user))
+                    : Task.Run(() => CreateOtherAccount(user)))
+                .ToList();
+```
 
 使用`static`的`WhenAll`调用等待账户创建任务列表。一旦完成，`UpdatePendindAccounts`将被调用，并传递更新的用户列表。这表明你可以在`async`语句之间传递任务列表：
 
-[PRE55]
+```cs
+            Logger.Log($"Creating {accountCreationTasks.Count} accounts");
+            await Task.WhenAll(accountCreationTasks);
+            var updatedAccountTask = UpdatePendingAccounts(users);
+            await updatedAccountTask;
+            Logger.Log($"Updated {updatedAccountTask.Result} pending accounts");
+        }
+```
 
 `FetchPendingAccounts`方法返回一个包含用户列表的`Task`（在这里，你使用`Task.Delay`模拟了`3`秒的延迟）：
 
-[PRE56]
+```cs
+        private async Task<List<User>> FetchPendingAccounts()
+        {
+            Logger.Log("Fetching pending accounts...");
+            await Task.Delay(TimeSpan.FromSeconds(3D));
+            var users = new List<User>
+            {
+                new User("AnnH", RegionName.North),
+                new User("EmmaJ", RegionName.North),
+                new User("SophieA", RegionName.South),
+                new User("LucyG", RegionName.West),
+            };
+            Logger.Log($"Found {users.Count} pending accounts");
+            return users;
+        }
+```
 
-`GenerateId`使用`Task.FromResult`通过`Guid`类生成一个全局唯一ID。`Task.FromResult`用于当你想要返回一个结果但不需要创建一个运行的任务时，就像使用`Task.Run`一样：
+`GenerateId`使用`Task.FromResult`通过`Guid`类生成一个全局唯一 ID。`Task.FromResult`用于当你想要返回一个结果但不需要创建一个运行的任务时，就像使用`Task.Run`一样：
 
-[PRE57]
+```cs
+        private static Task<string> GenerateId()
+        {
+            return Task.FromResult(Guid.NewGuid().ToString());
+        }
+```
 
 两个`bool`任务方法创建一个北方账户或其他账户。在这里，你返回`true`以指示每个账户创建调用都成功，无论：
 
-[PRE58]
+```cs
+        private static async Task<bool> CreateNorthernAccount(User user)
+        {
+            await Task.Delay(TimeSpan.FromSeconds(2D));
+            Logger.Log($"Created northern account for {user.UserName}");
+            return true;
+        }
+        private static async Task<bool> CreateOtherAccount(User user)
+        {
+            await Task.Delay(TimeSpan.FromSeconds(1D));
+            Logger.Log($"Created other account for {user.UserName}");
+            return true;
+        }
+```
 
 接下来，`UpdatePendingAccounts`传递一个用户列表。对于每个用户，你创建一个任务来模拟一个慢速运行的调用以更新每个用户，并返回随后更新的用户数量：
 
-[PRE59]
+```cs
+        private static async Task<int> UpdatePendingAccounts(IEnumerable<User> users)
+        {
+            var updateAccountTasks = users.Select(usr => Task.Run(
+                async () =>
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(2D));
+                    return true;
+                }))
+                .ToList();
+            await Task.WhenAll(updateAccountTasks);
+            return updateAccountTasks.Count(t => t.Result);
+        }
+    }
+```
 
 最后，控制台应用程序创建一个`AccountGenerator`实例，在写入`All done`消息之前等待`CreateAccounts`完成：
 
-[PRE60]
+```cs
+    public static class AsyncUsersExampleProgram
+    {
+        public static async Task Main()
+        {
+            Logger.Log("Starting");
+            await new AccountGenerator().CreateAccounts();
+            Logger.Log("All done");
+            Console.ReadLine();
+        }
+    }
+
+}
+```
 
 运行控制台应用程序会产生以下输出：
 
-[PRE61]
+```cs
+20:12:38 [01] Starting
+20:12:38 [01] Fetching pending accounts...
+20:12:41 [04] Found 4 pending accounts
+20:12:41 [04] Creating 4 accounts
+20:12:42 [04] Created other account for SophieA
+20:12:42 [07] Created other account for LucyG
+20:12:43 [04] Created northern account for EmmaJ
+20:12:43 [05] Created northern account for AnnH
+20:12:45 [05] Updated 4 pending accounts
+20:12:45 [05] All done
+```
 
 在这里，你可以看到线程`[01]`写入`Starting`消息。这是应用程序的主线程。注意，主线程还从`FetchPendingAccounts`方法中写入`Fetching pending accounts...`。这仍然是以同步方式运行的，因为可等待的块（`Task.Delay`）尚未到达。
 
-线程`[4]`、`[5]`和`[7]`创建四个用户账户中的每一个。你使用`Task.Run`调用`CreateNorthernAccount`或`CreateOtherAccount`方法。线程`[5]`运行`CreateAccounts: Updated 4 pending accounts`中的最后一个语句。线程号可能因系统而异，因为.NET使用一个基于每个线程繁忙程度的内部线程池。
+线程`[4]`、`[5]`和`[7]`创建四个用户账户中的每一个。你使用`Task.Run`调用`CreateNorthernAccount`或`CreateOtherAccount`方法。线程`[5]`运行`CreateAccounts: Updated 4 pending accounts`中的最后一个语句。线程号可能因系统而异，因为.NET 使用一个基于每个线程繁忙程度的内部线程池。
 
 注意
 
-你可以在[https://packt.link/ZIK8k](https://packt.link/ZIK8k)找到此示例使用的代码。
+你可以在[`packt.link/ZIK8k`](https://packt.link/ZIK8k)找到此示例使用的代码。
 
-## 异步Lambda表达式
+## 异步 Lambda 表达式
 
-第3章*委托、事件和Lambda表达式*探讨了Lambda表达式及其如何用于创建简洁的代码。你还可以在Lambda表达式中使用`async`关键字来创建包含各种`async`代码的事件处理程序代码。
+第三章*委托、事件和 Lambda 表达式*探讨了 Lambda 表达式及其如何用于创建简洁的代码。你还可以在 Lambda 表达式中使用`async`关键字来创建包含各种`async`代码的事件处理程序代码。
 
-以下示例使用`WebClient`类展示从网站下载数据的两种不同方式（这将在第8章*创建和使用Web API客户端*和第9章*创建API服务*中详细讨论）。
+以下示例使用`WebClient`类展示从网站下载数据的两种不同方式（这将在第八章*创建和使用 Web API 客户端*和第九章*创建 API 服务*中详细讨论）。
 
-[PRE62]
+```cs
+using System;
+using System.Net;
+using System.Net.Http
+using System.Threading.Tasks;
+namespace Chapter05.Examples
+{
+    public class AsyncLambdaExamples
+    {
+        public static async Task Main()
+        {
+            const string Url = "https://www.packtpub.com/";
+            using var client = new WebClient();
+```
 
-在这里，你使用带有`async`关键字的Lambda语句将你自己的事件处理程序添加到`WebClient`类的`DownloadDataCompleted`事件中。编译器将允许你在Lambda表达式的主体内部添加可等待的调用。
+在这里，你使用带有`async`关键字的 Lambda 语句将你自己的事件处理程序添加到`WebClient`类的`DownloadDataCompleted`事件中。编译器将允许你在 Lambda 表达式的主体内部添加可等待的调用。
 
 在调用`DownloadData`并为我们下载所需数据之后，此事件将被触发。代码使用可等待的块`Task.Delay`在另一个线程上模拟一些额外的处理：
 
-[PRE63]
+```cs
+            client.DownloadDataCompleted += async (sender, args) =>
+            {
+                Logger.Log("Inside DownloadDataCompleted...looking busy");
+                await Task.Delay(500);
+                Logger.Log("Inside DownloadDataCompleted..all done now");
+            };
+```
 
-你调用`DownloadData`方法，传入你的URL，然后记录接收到的网络数据的长度。这个特定的调用本身会阻塞主线程，直到数据下载完成。`WebClient`提供了`DownloadData`方法的基于任务的异步版本，称为`DownloadDataTaskAsync`。因此，建议使用更现代的`DownloadDataTaskAsync`方法，如下所示：
+你调用`DownloadData`方法，传入你的 URL，然后记录接收到的网络数据的长度。这个特定的调用本身会阻塞主线程，直到数据下载完成。`WebClient`提供了`DownloadData`方法的基于任务的异步版本，称为`DownloadDataTaskAsync`。因此，建议使用更现代的`DownloadDataTaskAsync`方法，如下所示：
 
-[PRE64]
+```cs
+            Logger.Log($"DownloadData: {Url}");
+            var data = client.DownloadData(Url);
+            Logger.Log($"DownloadData: Length={data.Length:N0}");
+```
 
-再次强调，你请求相同的URL，但可以简单地使用`await`语句，该语句将在数据下载完成后执行。正如你所见，这需要更少的代码，并且语法更简洁：
+再次强调，你请求相同的 URL，但可以简单地使用`await`语句，该语句将在数据下载完成后执行。正如你所见，这需要更少的代码，并且语法更简洁：
 
-[PRE65]
+```cs
+            Logger.Log($"DownloadDataTaskAsync: {Url}");
+            var downloadTask = client.DownloadDataTaskAsync(Url);
+            var downloadBytes =  await downloadTask;
+            Logger.Log($"DownloadDataTaskAsync: Length={downloadBytes.Length:N0}");
+            Console.ReadLine();
+        }
+    }
+}
+```
 
 运行代码会产生以下输出：
 
-[PRE66]
+```cs
+19:22:44 [01] DownloadData: https://www.packtpub.com/
+19:22:45 [01] DownloadData: Length=278,047
+19:22:45 [01] DownloadDataTaskAsync: https://www.packtpub.com/
+19:22:45 [06] Inside DownloadDataCompleted...looking busy
+19:22:45 [06] DownloadDataTaskAsync: Length=278,046
+19:22:46 [04] Inside DownloadDataCompleted..all done now
+```
 
 注意
 
-在运行程序时，你可能会看到以下警告：“`Warning SYSLIB0014: 'WebClient.WebClient()' is obsolete: 'WebRequest, HttpWebRequest, ServicePoint, and WebClient are obsolete. Use HttpClient instead.'"`。在这里，Visual Studio建议使用`HttpClient`类，因为`WebClient`已被标记为过时。
+在运行程序时，你可能会看到以下警告：“`Warning SYSLIB0014: 'WebClient.WebClient()' is obsolete: 'WebRequest, HttpWebRequest, ServicePoint, and WebClient are obsolete. Use HttpClient instead.'"`。在这里，Visual Studio 建议使用`HttpClient`类，因为`WebClient`已被标记为过时。
 
 `DownloadData`由线程`[01]`（主线程）记录，该线程在下载完成前大约被阻塞一秒钟。然后使用`downloadBytes.Length`属性记录下载文件的长度。
 
@@ -694,7 +1290,7 @@ C#语言现在提供了`async`和`await`关键字，这使得`async`/`await`风�
 
 注意
 
-你可以在[https://packt.link/IJEaU](https://packt.link/IJEaU)找到这个示例使用的代码。
+你可以在[`packt.link/IJEaU`](https://packt.link/IJEaU)找到这个示例使用的代码。
 
 ## 取消任务
 
@@ -706,15 +1302,15 @@ C#语言现在提供了`async`和`await`关键字，这使得`async`/`await`风�
 
 如果没有这两种机制，你无法提供取消功能。
 
-通常，你会启动一个支持取消的长运行任务，并允许用户通过在UI上按按钮来取消操作。在许多实际场景中需要这样的取消，例如图像处理，需要修改多个图像，如果用户时间不够，允许他们取消剩余的任务。另一个常见场景是向不同的Web服务器发送多个数据请求，并在收到第一个响应后立即取消慢速运行或挂起的请求。
+通常，你会启动一个支持取消的长运行任务，并允许用户通过在 UI 上按按钮来取消操作。在许多实际场景中需要这样的取消，例如图像处理，需要修改多个图像，如果用户时间不够，允许他们取消剩余的任务。另一个常见场景是向不同的 Web 服务器发送多个数据请求，并在收到第一个响应后立即取消慢速运行或挂起的请求。
 
-在C#中，`CancellationTokenSource`作为一个顶级对象，通过其`Token`属性`CancellationToken`来发起取消请求，并将其传递给可以定期检查并对此取消状态做出响应的并发/慢速运行代码。理想情况下，你不会希望低级方法随意取消高级操作，因此源和令牌之间有明确的分离。
+在 C#中，`CancellationTokenSource`作为一个顶级对象，通过其`Token`属性`CancellationToken`来发起取消请求，并将其传递给可以定期检查并对此取消状态做出响应的并发/慢速运行代码。理想情况下，你不会希望低级方法随意取消高级操作，因此源和令牌之间有明确的分离。
 
 `CancellationTokenSource`有各种构造函数，包括一个在指定时间过后会发起取消请求的构造函数。以下是`CancellationTokenSource`的一些方法，提供了多种发起取消请求的方式：
 
 +   `public bool IsCancellationRequested { get; }`: 如果已请求取消此令牌源（调用者已调用`Cancel`方法），则该属性返回`true`。这可以在目标代码的间隔中检查。
 
-+   `public CancellationToken Token { get; }`: 与此源对象关联的`CancellationToken`通常传递给`Task.Run`的重载版本，允许.NET检查挂起任务的状态，或者允许您的代码在运行时进行检查。
++   `public CancellationToken Token { get; }`: 与此源对象关联的`CancellationToken`通常传递给`Task.Run`的重载版本，允许.NET 检查挂起任务的状态，或者允许您的代码在运行时进行检查。
 
 +   `public void Cancel()`: 启动取消请求。
 
@@ -732,15 +1328,15 @@ C#语言现在提供了`async`和`await`关键字，这使得`async`/`await`风�
 
 在前面的示例中，您可能已经注意到`CancellationToken`可以传递给许多静态`Task`方法。例如，`Task.Run`、`Task.Factory.StartNew`和`Task.ContinueWith`都包含接受`CancellationToken`的重载版本。
 
-.NET不会尝试中断或停止任何正在运行的代码，无论您在`CancellationToken`上调用`Cancel`多少次。本质上，您将这些令牌传递到目标代码中，但该代码必须在其能够时定期检查取消状态，例如在循环中，然后决定如何响应。这在逻辑上是合理的；.NET如何知道何时可以安全地中断一个方法，比如一个可能有数百行代码的方法？
+.NET 不会尝试中断或停止任何正在运行的代码，无论您在`CancellationToken`上调用`Cancel`多少次。本质上，您将这些令牌传递到目标代码中，但该代码必须在其能够时定期检查取消状态，例如在循环中，然后决定如何响应。这在逻辑上是合理的；.NET 如何知道何时可以安全地中断一个方法，比如一个可能有数百行代码的方法？
 
-将`CancellationToken`传递给`Task.Run`仅向队列调度器提供提示，表明可能不需要启动任务的操作，但一旦启动，.NET不会为您停止正在运行的代码。运行中的代码本身必须随后观察取消状态。
+将`CancellationToken`传递给`Task.Run`仅向队列调度器提供提示，表明可能不需要启动任务的操作，但一旦启动，.NET 不会为您停止正在运行的代码。运行中的代码本身必须随后观察取消状态。
 
 这与一个行人等待在交通灯处过马路的情况类似。机动车辆可以被视为在其他地方已启动的任务。当行人到达交叉路口并按下按钮（在`CancellationTokenSource`上调用`Cancel`）时，交通灯最终应该变为红色，以便请求移动的车辆停止。是否停止车辆取决于每个驾驶员是否注意到红灯已变亮（检查`IsCancellationRequested`），然后决定停止他们的车辆。交通灯不会强制停止每辆车（.NET 运行时）。如果驾驶员注意到后面的车辆太近，并且很快停止可能会导致碰撞，他们可能会决定不立即停车。一个完全不观察交通灯状态的驾驶员可能会未能停车。
 
 下面的章节将继续通过练习展示`async`/`await`的实际应用，一些常用的取消任务选项，在这些选项中，你需要控制是否允许挂起的任务完成或中断，以及何时应该尝试捕获异常。
 
-## 练习5.04：取消长时间运行的任务
+## 练习 5.04：取消长时间运行的任务
 
 你将分两部分创建这个练习：
 
@@ -752,71 +1348,163 @@ C#语言现在提供了`async`和`await`关键字，这使得`async`/`await`风�
 
 1.  创建一个名为`SlowRunningService`的类。正如其名所示，服务内部的方法已被设计为执行缓慢：
 
-    [PRE67]
+    ```cs
+    using System;
+    using System.Globalization;
+    using System.Threading;
+    using System.Threading.Tasks;
+    namespace Chapter05.Exercises.Exercise04
+    {
+        public class SlowRunningService
+        {
+    ```
 
 1.  添加第一个慢速运行的操作`Fetch`，它接受一个延迟时间（通过简单的`Thread.Sleep`调用实现），以及取消令牌，你将其传递给`Task.Run`：
 
-    [PRE68]
+    ```cs
+            public Task<double> Fetch(TimeSpan delay, CancellationToken token)
+            {
+                return Task.Run(() =>
+                    {
+                        var now = DateTime.Now;
+                        Logger.Log("Fetch: Sleeping");
+                        Thread.Sleep(delay);
+                        Logger.Log("Fetch: Awake");
+                        return DateTime.Now.Subtract(now).TotalSeconds;
+                    },
+                    token);
+            }
+    ```
 
 当调用`Fetch`时，在休眠线程醒来之前，令牌可能会被取消。
 
 1.  为了测试`Fetch`是否会停止运行或返回一个数字，添加一个控制台应用程序来测试这个。在这里，使用默认延迟（`DelayTime`）为`3`秒：
 
-    [PRE69]
+    ```cs
+        public class Program
+        {
+            private static readonly TimeSpan DelayTime=TimeSpan.FromSeconds(3);
+    ```
 
 1.  添加一个辅助函数来提示你准备等待的最大秒数。如果输入了有效的数字，将输入的值转换为`TimeSpan`：
 
-    [PRE70]
+    ```cs
+            private static TimeSpan? ReadConsoleMaxTime(string message)
+            {
+                Console.Write($"{message} Max Waiting Time (seconds):");
+                var input = Console.ReadLine();
+                if (int.TryParse(input, NumberStyles.Any, CultureInfo.CurrentCulture, out var intResult))
+                {
+                    return TimeSpan.FromSeconds(intResult);
+                }
+                return null;
+            }
+    ```
 
 1.  为控制台应用程序添加一个标准的`Main`入口点。这个入口点标记为异步并返回一个`Task`：
 
-    [PRE71]
+    ```cs
+    public static async Task Main()
+            {
+    ```
 
 1.  创建服务的一个实例。你将在循环中使用相同的实例，很快：
 
-    [PRE72]
+    ```cs
+                var service = new SlowRunningService();
+    ```
 
 1.  现在添加一个`do`循环，反复请求最大延迟时间：
 
-    [PRE73]
+    ```cs
+              Console.WriteLine($"ETA: {DelayTime.TotalSeconds:N} seconds");  
+
+              TimeSpan? maxWaitingTime;
+                while (true)
+                {
+                    maxWaitingTime = ReadConsoleMaxTime("Fetch");
+                    if (maxWaitingTime == null)
+                        break;
+    ```
 
 这允许你尝试不同的值，以查看它如何影响取消令牌和返回的结果。在`null`值的情况下，你将退出`do`循环。
 
 1.  创建`CancellationTokenSource`，传入最大等待时间：
 
-    [PRE74]
+    ```cs
+                    using var tokenSource = new CancellationTokenSource( maxWaitingTime.Value);
+                    var token = tokenSource.Token;
+    ```
 
 这将触发取消，而无需你自己调用`Cancel`方法。
 
 1.  使用`CancellationToken.Register`方法，传递一个在令牌被信号取消时要调用的`Action`委托。在这里，简单地在发生这种情况时记录一条消息：
 
-    [PRE75]
+    ```cs
+                    token.Register(() => Logger.Log($"Fetch: Cancelled token={token.GetHashCode()}"));
+    ```
 
 1.  现在对于主要活动，调用服务的`Fetch`方法，传入默认的`DelayTime`和令牌：
 
-    [PRE76]
+    ```cs
+                    var resultTask = service.Fetch(DelayTime, token);
+    ```
 
 1.  在你等待`resultTask`之前，添加一个`try-catch`块来捕获任何`TaskCanceledException`：
 
-    [PRE77]
+    ```cs
+                    try
+                    {
+                        await resultTask;
+                        if (resultTask.IsCompletedSuccessfully)
+                            Logger.Log($"Fetch: Result={resultTask.Result:N0}");
+                        else
+                            Logger.Log($"Fetch: Status={resultTask.Status}");
+                    }
+                    catch (TaskCanceledException ex)
+                    {
+                        Logger.Log($"Fetch: TaskCanceledException {ex.Message}");
+                    }
+                }
+            }
+        }
+    }
+    ```
 
-当使用可取消的任务时，它们可能会抛出`TaskCanceledException`。在这种情况下，这是可以接受的，因为你确实期望这种情况发生。请注意，你只有在任务被标记为`IsCompletedSuccessfully`时才访问`resultTask.Result`。如果你尝试访问一个已故障任务的`Result`属性，则会抛出`AggregateException`实例。在一些较旧的项目中，你可能看到捕获`AggregateException`的非异步/await代码。
+当使用可取消的任务时，它们可能会抛出`TaskCanceledException`。在这种情况下，这是可以接受的，因为你确实期望这种情况发生。请注意，你只有在任务被标记为`IsCompletedSuccessfully`时才访问`resultTask.Result`。如果你尝试访问一个已故障任务的`Result`属性，则会抛出`AggregateException`实例。在一些较旧的项目中，你可能看到捕获`AggregateException`的非异步/await 代码。
 
 1.  运行应用并输入一个大于三秒预计到达时间的等待时间，在这个例子中是`5`：
 
-    [PRE78]
+    ```cs
+    ETA: 3.00 seconds
+    Fetch Max Waiting Time (seconds):5
+    16:48:11 [04] Fetch: Sleeping
+    16:48:14 [04] Fetch: Awake
+    16:48:14 [04] Fetch: Result=3
+    ```
 
 如预期的那样，在完成之前令牌没有被取消，所以你看到`Result=3`（已过时间，单位为秒）。
 
 1.  再试一次。为了触发并检测取消，将秒数输入为`2`：
 
-    [PRE79]
+    ```cs
+    Fetch Max Waiting Time (seconds):2
+    16:49:51 [04] Fetch: Sleeping
+    16:49:53 [08] Fetch: Cancelled token=28589617
+    16:49:54 [04] Fetch: Awake
+    16:49:54 [04] Fetch: Result=3 
+    ```
 
 注意，当`Fetch`唤醒时，记录了`Cancelled token`消息，但你最终仍然收到了`3`秒的结果，没有`TaskCanceledException`消息。这强调了将取消令牌传递给`Start.Run`不会停止任务动作的启动，更重要的是，它也没有中断它。
 
 1.  最后，使用`0`作为最大等待时间，这将有效地立即触发取消：
 
-    [PRE80]
+    ```cs
+    Fetch Max Waiting Time (seconds):
+    0
+    16:53:32 [04] Fetch: Cancelled token=48717705
+    16:53:32 [04] Fetch: TaskCanceledException A task was canceled. 
+    ```
 
 你将看到取消令牌消息和捕获到的`TaskCanceledException`，但没有任何`Sleeping`或`Awake`消息被记录。这表明传递给`Task.Run`的`Action`实际上并没有被运行时启动。当你将`CancelationToken`传递给`Start.Run`时，任务的动作会被排队，但如果`TaskScheduler`在启动之前注意到令牌已被取消，它将不会运行该动作；它只会抛出`TaskCanceledException`。
 
@@ -824,13 +1512,38 @@ C#语言现在提供了`async`和`await`关键字，这使得`async`/`await`风�
 
 1.  在`SlowRunningService`类中，添加一个`FetchLoop`函数：
 
-    [PRE81]
+    ```cs
+            public Task<double?> FetchLoop(TimeSpan delay, CancellationToken token)
+            {
+                return Task.Run(() =>
+                {
+                    const int TimeSlice = 500;
+                    var iterations = (int)(delay.TotalMilliseconds / TimeSlice);
+                    Logger.Log($"FetchLoop: Iterations={iterations} token={token.GetHashCode()}");
+                    var now = DateTime.Now;
+    ```
 
 这会产生与之前`Fetch`函数类似的结果，但其目的是展示一个函数如何被分解成一个重复的循环，该循环在每次循环迭代运行时能够检查`CancellationToken`。
 
 1.  定义`for...next`循环的主体，该循环在每次迭代中检查`IsCancellationRequested`属性是否为`true`，如果检测到请求取消，则简单地返回一个可空的`double`值：
 
-    [PRE82]
+    ```cs
+                    for (var i = 0; i < iterations; i++)
+                    {
+                        if (token.IsCancellationRequested)
+                        {
+                            Logger.Log($"FetchLoop: Iteration {i + 1} detected cancellation token={token.GetHashCode()}");
+                            return (double?)null;
+                        }
+                        Logger.Log($"FetchLoop: Iteration {i + 1} Sleeping");
+                        Thread.Sleep(TimeSlice);
+                        Logger.Log($"FetchLoop: Iteration {i + 1} Awake");
+                    }
+                    Logger.Log("FetchLoop: done");
+                    return DateTime.Now.Subtract(now).TotalSeconds;
+                }, token);
+            }
+    ```
 
 这是一种相当坚决的退出循环的方式，但就这段代码而言，不需要做其他任何事情。
 
@@ -840,23 +1553,84 @@ C#语言现在提供了`async`和`await`关键字，这使得`async`/`await`风�
 
 1.  在 `Main` 控制台应用程序中，添加一个类似的 `while` 循环，这次调用 `FetchLoop` 方法。代码与之前的循环代码类似：
 
-    [PRE83]
+    ```cs
+            while (true)
+                {
+                    maxWaitingTime = ReadConsoleMaxTime("FetchLoop");
+                    if (maxWaitingTime == null)
+                        break;
+                    using var tokenSource = new CancellationTokenSource(maxWaitingTime.Value);
+                    var token = tokenSource.Token;
+                    token.Register(() => Logger.Log($"FetchLoop: Cancelled token={token.GetHashCode()}"));
+    ```
 
 1.  现在调用 `FetchLoop` 并等待结果：
 
-    [PRE84]
+    ```cs
+                    var resultTask = service.FetchLoop(DelayTime, token);
+                    try
+                    {
+                        await resultTask;
+                        if (resultTask.IsCompletedSuccessfully)
+                            Logger.Log($"FetchLoop: Result={resultTask.Result:N0}");
+                        else
+                            Logger.Log($"FetchLoop: Status={resultTask.Status}");
+                    }
+                    catch (TaskCanceledException ex)
+                    {
+                        Logger.Log($"FetchLoop: TaskCanceledException {ex.Message}");
+                    }
+                } 
+    ```
 
 1.  运行控制台应用程序并使用 `5` 秒最大值允许所有迭代运行，没有任何检测到取消请求。结果是预期的 `3`：
 
-    [PRE85]
+    ```cs
+    FetchLoop Max Waiting Time (seconds):5
+    17:33:38 [04] FetchLoop: Iterations=6 token=6044116
+    17:33:38 [04] FetchLoop: Iteration 1 Sleeping
+    17:33:38 [04] FetchLoop: Iteration 1 Awake
+    17:33:38 [04] FetchLoop: Iteration 2 Sleeping
+    17:33:39 [04] FetchLoop: Iteration 2 Awake
+    17:33:39 [04] FetchLoop: Iteration 3 Sleeping
+    17:33:39 [04] FetchLoop: Iteration 3 Awake
+    17:33:39 [04] FetchLoop: Iteration 4 Sleeping
+    17:33:40 [04] FetchLoop: Iteration 4 Awake
+    17:33:40 [04] FetchLoop: Iteration 5 Sleeping
+    17:33:40 [04] FetchLoop: Iteration 5 Awake
+    17:33:40 [04] FetchLoop: Iteration 6 Sleeping
+    17:33:41 [04] FetchLoop: Iteration 6 Awake
+    17:33:41 [04] FetchLoop: done
+    17:33:41 [04] FetchLoop: Result=3
+    ```
 
 1.  使用 `2` 作为最大值。这次在迭代 `4` 时自动触发令牌，并在迭代 `5` 时被发现，因此返回了一个空结果：
 
-    [PRE86]
+    ```cs
+    FetchLoop Max Waiting Time (seconds):
+    2
+    17:48:47 [04] FetchLoop: Iterations=6 token=59817589
+    17:48:47 [04] FetchLoop: Iteration 1 Sleeping
+    17:48:48 [04] FetchLoop: Iteration 1 Awake
+    17:48:48 [04] FetchLoop: Iteration 2 Sleeping
+    17:48:48 [04] FetchLoop: Iteration 2 Awake
+    17:48:48 [04] FetchLoop: Iteration 3 Sleeping
+    17:48:49 [04] FetchLoop: Iteration 3 Awake
+    17:48:49 [04] FetchLoop: Iteration 4 Sleeping
+    17:48:49 [06] FetchLoop: Cancelled token=59817589
+    17:48:49 [04] FetchLoop: Iteration 4 Awake
+    17:48:49 [04] FetchLoop: Iteration 5 detected cancellation token=59817589
+    17:48:49 [04] FetchLoop: Result=
+    ```
 
 1.  使用 `0`，您将看到与之前的 `Fetch` 示例相同的输出：
 
-    [PRE87]
+    ```cs
+    FetchLoop Max Waiting Time (seconds):
+    0
+    17:53:29 [04] FetchLoop: Cancelled token=48209832
+    17:53:29 [08] FetchLoop: TaskCanceledException A task was canceled.
+    ```
 
 动作没有机会运行。您可以看到一个 `Cancelled token` 消息和 `TaskCanceledException` 被记录。
 
@@ -864,7 +1638,7 @@ C#语言现在提供了`async`和`await`关键字，这使得`async`/`await`风�
 
 注意
 
-您可以在 [https://packt.link/xa1Yf](https://packt.link/xa1Yf) 找到用于此练习的代码。
+您可以在 [`packt.link/xa1Yf`](https://packt.link/xa1Yf) 找到用于此练习的代码。
 
 ## 异步/等待代码中的异常处理
 
@@ -878,45 +1652,92 @@ C#语言现在提供了`async`和`await`关键字，这使得`async`/`await`风�
 
 可以检测和处理未观察到的任务异常。如果您将事件委托附加到静态 `TaskScheduler.UnobservedTaskException` 事件，您将收到通知，表示任务异常未被观察。您可以通过以下方式将委托附加到该事件：
 
-[PRE88]
+```cs
+TaskScheduler.UnobservedTaskException += (sender, args) =>
+{
+  Logger.Log($"Caught UnobservedTaskException\n{args.Exception}");
+};
+```
 
 当任务对象被最终化后，运行时会将任务异常视为 **未观察到的**。
 
 注意
 
-您可以在 [https://packt.link/OkH7r](https://packt.link/OkH7r) 找到用于此示例的代码。
+您可以在 [`packt.link/OkH7r`](https://packt.link/OkH7r) 找到用于此示例的代码。
 
 继续使用一些异常处理示例，看看你如何可以像同步代码一样捕获特定类型的异常。
 
 在以下示例中，`CustomerOperations`类提供了`AverageDiscount`函数，它返回`Task<int>`。然而，它可能会抛出`DivideByZeroException`，所以你需要捕获它；否则，程序将崩溃。
 
-[PRE89]
+```cs
+using System;
+using System.Threading.Tasks;
+namespace Chapter05.Examples
+{
+    class ErrorExamplesProgram
+    {
+        public static async Task Main()
+        {
+            try
+            {
+```
 
 创建一个`CustomerOperations`实例并等待`AverageDiscount`方法返回一个值：
 
-[PRE90]
+```cs
+                var operations = new CustomerOperations();
+                var discount = await operations.AverageDiscount();
+                Logger.Log($"Discount: {discount}");
+            }
+            catch (DivideByZeroException)
+            {
+                Console.WriteLine("Caught a divide by zero");
+            }
+            Console.ReadLine();
+        }
+        class CustomerOperations
+        {
+            public async Task<int> AverageDiscount()
+            {
+                Logger.Log("Loading orders...");
+                await Task.Delay(TimeSpan.FromSeconds(1));
+```
 
-在`0`和`2`之间选择一个随机的`ordercount`值。尝试除以零将导致.NET运行时抛出异常：
+在`0`和`2`之间选择一个随机的`ordercount`值。尝试除以零将导致.NET 运行时抛出异常：
 
-[PRE91]
+```cs
+                var orderCount = new Random().Next(0, 2);
+                var orderValue = 1200;
+                return orderValue / orderCount;
+            }
+        }
+    }
+}
+```
 
 结果显示，当`orderCount`为零时，你确实如预期那样捕获了`DivideByZeroException`：
 
-[PRE92]
+```cs
+15:47:21 [01] Loading orders...
+Caught a divide by zero
+```
 
 第二次运行时，没有捕获到错误：
 
-[PRE93]
+```cs
+17:55:54 [01] Loading orders...
+17:55:55 [04] Discount: 1200
+```
 
 在你的系统上，你可能需要多次运行程序，`DivideByZeroException`才会被引发。这是由于使用了随机实例来分配`orderCount`的值。
 
 注意
 
-你可以在[https://packt.link/18kOK](https://packt.link/18kOK)找到这个示例使用的代码。
+你可以在[`packt.link/18kOK`](https://packt.link/18kOK)找到这个示例使用的代码。
 
 所以到目前为止，你已经创建了可能会抛出异常的单个任务。接下来的练习将查看一个更复杂的变体。
 
-## 练习5.05：处理异步异常
+## 练习 5.05：处理异步异常
 
 假设你有一个`CustomerOperations`类，它可以用来通过`Task`获取客户列表。对于每个客户，你需要运行一个额外的`async`任务，该任务将去到一个服务中计算该客户订单的总价值。
 
@@ -926,59 +1747,151 @@ C#语言现在提供了`async`和`await`关键字，这使得`async`/`await`风�
 
 1.  首先添加`Customer`类：
 
-    [PRE94]
+    ```cs
+    1    using System;
+    2    using System.Collections.Generic;
+    3    using System.Linq;
+    4    using System.Threading.Tasks;
+    5
+    6    namespace Chapter05.Exercises.Exercise05
+    7    {
+    8        public enum RegionName { North, East, South, West };
+    9
+    10        public class Customer
+    11        {
+    12            private readonly RegionName _protectedRegion;
+    13
+    14            public Customer(string name, RegionName region, RegionName protectedRegion)
+    15            {
+    ```
 
 构造函数传递客户的`name`和他们的`region`，以及一个标识`protectedRegion`名称的第二个区域。如果客户的`region`与这个`protectedRegion`相同，则在尝试读取`TotalOrders`属性时抛出访问违规异常。
 
 1.  然后添加一个`CustomerOperations`类：
 
-    [PRE95]
+    ```cs
+    public class CustomerOperations
+    {
+       public const RegionName ProtectedRegion = RegionName.West;
+    ```
 
 这个类知道如何加载一个客户的名字并填充他们的总订单价值。这里的要求是来自`West`区域的客户需要有一个硬编码的限制，所以添加一个名为`ProtectedRegion`的常量，其值为`RegionName.West`。
 
 1.  添加一个`FetchTopCustomers`函数：
 
-    [PRE96]
+    ```cs
+            public async Task<IEnumerable<Customer>> FetchTopCustomers()
+            {
+                await Task.Delay(TimeSpan.FromSeconds(2));
+                Logger.Log("Loading customers...");
+                var customers = new List<Customer>
+                {
+                new Customer("Rick Deckard", RegionName.North, ProtectedRegion),
+                new Customer("Taffey Lewis", RegionName.North, ProtectedRegion),
+                new Customer("Rachael", RegionName.North, ProtectedRegion),
+                new Customer("Roy Batty", RegionName.West, ProtectedRegion),
+                new Customer("Eldon Tyrell", RegionName.East, ProtectedRegion)
+                };
+    ```
 
 这将返回一个`Customer`的`Task`枚举，并且被标记为`async`，因为你在函数内部将进行进一步的`async`调用以填充每个客户的订单详情。使用`Task.Delay`来模拟一个慢速运行的操作。在这里，有一个硬编码的客户样本列表。创建每个`Customer`实例，传递他们的名字、实际区域和受保护的区域常量`ProtectedRegion`。
 
 1.  在 `FetchOrders` 中添加一个 `await` 调用（稍后将声明）：
 
-    [PRE97]
+    ```cs
+                await FetchOrders(customers);
+    ```
 
 1.  现在，遍历客户列表，但请确保将每个对 `TotalOrders` 的调用用 `try-catch` 块包装起来，该块明确检查如果尝试查看受保护的客户将抛出的访问违规异常：
 
-    [PRE98]
+    ```cs
+                var filteredCustomers = new List<Customer>();
+                foreach (var customer in customers)
+                {
+                    try
+                    {
+                        if (customer.TotalOrders > 0)
+                            filteredCustomers.Add(customer);
+                    }
+                    catch (AccessViolationException e)
+                    {
+                        Logger.Log($"Error {e.Message}");
+                    }
+                }
+    ```
 
 1.  现在，`filteredCustomers` 列表已经填充了一个过滤后的客户列表，使用 Linq 的 `OrderByDescending` 扩展方法按每个客户的 `TotalOrders` 值返回项目：
 
-    [PRE99]
+    ```cs
+                return filteredCustomers.OrderByDescending(c => c.TotalOrders);
+            } 
+    ```
 
 1.  完成带有 `FetchOrders` 实现的 `CustomerOperations`。
 
 1.  对于列表中的每个客户，使用一个暂停 `500` 毫秒的 `async` lambda，然后为 `TotalOrders` 分配一个随机值：
 
-    [PRE100]
+    ```cs
+            private async Task FetchOrders(IEnumerable<Customer> customers)
+            {
+                var rand = new Random();
+                Logger.Log("Loading orders...");
+                var orderUpdateTasks = customers.Select(
+                  cust => Task.Run(async () =>
+                  {
+                        await Task.Delay(500);
+                        cust.TotalOrders = rand.Next(1, 100);
+                   }))
+                  .ToList();
+    ```
 
 延迟可能代表另一个运行缓慢的服务。
 
 1.  使用 `Task.WhenAll` 等待 `orderUpdateTasks` 完成：
 
-    [PRE101]
+    ```cs
+                await Task.WhenAll(orderUpdateTasks);
+            }
+        }
+    ```
 
 1.  现在创建一个控制台应用程序来运行操作：
 
-    [PRE102]
+    ```cs
+        public class Program
+        {
+            public static async Task Main()
+            {
+                var ops = new CustomerOperations();
+                var resultTask = ops.FetchTopCustomers();
+                var customers = await resultTask;
+                foreach (var customer in customers)
+                {
+                    Logger.Log($"{customer.Name} ({customer.Region}): {customer.TotalOrders:N0}");
+                }
+                Console.ReadLine();
+            }
+        }
+    }
+    ```
 
 1.  在运行控制台时，没有错误，因为来自 `West` 区域的 `Roy Batty` 被安全地跳过了：
 
-    [PRE103]
+    ```cs
+    20:00:15 [05] Loading customers...
+    20:00:16 [05] Loading orders...
+    20:00:16 [04] Error Cannot access orders for Roy Batty
+    20:00:16 [04] Rachael (North): 56
+    20:00:16 [04] Taffey Lewis (North): 19
+    20:00:16 [04] Rick Deckard (North): 10
+    20:00:16 [04] Eldon Tyrell (East): 6
+    ```
 
 在这个练习中，您看到了如何使用异步代码优雅地处理异常。您在所需位置放置了一个 `try-catch` 块，而不是过度复杂化并添加过多的不必要的嵌套 `try-catch` 块。当代码运行时，捕获了一个异常而没有使应用程序崩溃。
 
 注意
 
-您可以在 [https://packt.link/4ozac](https://packt.link/4ozac) 找到用于此练习的代码。
+您可以在 [`packt.link/4ozac`](https://packt.link/4ozac) 找到用于此练习的代码。
 
 ## AggregateException 类
 
@@ -996,57 +1909,137 @@ C#语言现在提供了`async`和`await`关键字，这使得`async`/`await`风�
 
 你可能会经常遇到带有`try-catch`块来捕获`AggregateException`并记录每个`InnerExceptions`详细信息的`async`代码。在这个例子中，`BadTask`返回一个基于`int`的任务，但它运行时可能会引发异常。执行以下步骤来完成此示例：
 
-[PRE104]
+```cs
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+namespace Chapter05.Examples
+{
+    class WhenAllErrorExamples
+    {+
+```
 
 如果传入的数字是偶数（使用`%`运算符来查看数字是否可以被`2`整除且没有余数），则它会在抛出`InvalidOperationException`之前睡眠`1,000`毫秒：
 
-[PRE105]
+```cs
+        private static async Task<int> BadTask(string info, int n)
+        {
+            await Task.Delay(1000);
+            Logger.Log($"{info} number {n} awake");
+            if (n % 2 == 0)
+            {
+                Logger.Log($"About to throw one {info} number {n}"…");
+                throw new InvalidOperationException"($"Oh dear from {info} number "n}");
+            }
+            return n;
+        }
+```
 
 添加一个辅助函数`CreateBadTasks`，该函数创建一个包含五个坏任务的集合。当启动时，每个任务最终都会抛出`InvalidOperationException`类型的异常：
 
-[PRE106]
+```cs
+        private static IEnumerable<Task<int>> CreateBadTasks(string info)
+        {
+            return Enumerable.Range(0, 5)
+                .Select(i => BadTask(info, i))
+                .ToList();
+        }
+```
 
 现在，创建控制台应用程序的`Main`入口点。你将`CreateBadTasks`的结果传递给`WhenAll`，传递字符串`[WhenAll]`以便更容易地在输出中看到正在发生的事情：
 
-[PRE107]
+```cs
+        public static async Task Main()
+        {
+            var whenAllCompletedTask = Task.WhenAll(CreateBadTasks("[WhenAll]"));
+```
 
 在尝试等待`whenAllCompletedTask`任务之前，你需要将其包裹在`try-catch`中，以捕获基础`Exception`类型（如果你期望更具体的一个，则可以捕获更具体的一个）。
 
 你不能在这里捕获`AggregateException`，因为它是你接收到的`Task`中的第一个异常，但你仍然可以使用`whenAllCompletedTask`的`Exception`属性来获取`AggregateException`本身：
 
-[PRE108]
+```cs
+            try
+            {
+                await whenAllCompletedTask;
+            }
+            catch (Exception ex)
+            {
+```
 
 你已经捕获了一个异常，因此记录其类型（这将是你抛出的`InvalidOperationException`实例）和消息：
 
-[PRE109]
+```cs
+                Console.WriteLine($"WhenAll Caught {ex.GetType().Name}, Message={ex.Message}");
+```
 
 现在，你可以检查`whenAllCompletedTask`，通过迭代此任务的`AggregateException`来查看其`InnerExceptions`列表：
 
-[PRE110]
+```cs
+                Console.WriteLine($"WhenAll Task.Status={whenAllCompletedTask.Status}");
+               foreach (var ie in whenAllCompletedTask.Exception.InnerExceptions)
+               {
+                   Console.WriteLine($"WhenAll Caught Inner Exception: {ie.Message}");
+               }
+            }
+            Console.ReadLine();
+        }      
+    }
+}
+```
 
 运行代码，你会看到五个任务在睡眠，最终数字`0`、`2`和`4`各自抛出`InvalidOperationException`，这将由你捕获：
 
-[PRE111]
+```cs
+17:30:36 [05] [WhenAll] number 3 awake
+17:30:36 [09] [WhenAll] number 1 awake
+17:30:36 [07] [WhenAll] number 0 awake
+17:30:36 [06] [WhenAll] number 2 awake
+17:30:36 [04] [WhenAll] number 4 awake
+17:30:36 [06] About to throw one [WhenAll] number 2...
+17:30:36 [04] About to throw one [WhenAll] number 4...
+17:30:36 [07] About to throw one [WhenAll] number 0...
+WhenAll Caught InvalidOperationException, Message=Oh dear from [WhenAll] number 0
+WhenAll Task.Status=Faulted
+WhenAll Caught Inner Exception: Oh dear from [WhenAll] number 0
+WhenAll Caught Inner Exception: Oh dear from [WhenAll] number 2
+WhenAll Caught Inner Exception: Oh dear from [WhenAll] number 4
+```
 
 注意`数字 0`似乎是被捕获的唯一错误（`(Message=Oh dear from `[WhenAll] number 0)`）。然而，通过记录`InnerExceptions`列表中的每个条目，你会看到`数字 0`再次出现。
 
 你可以尝试相同的代码，但这次使用`WhenAny`。记住，`WhenAny`将在列表中的第一个任务完成时完成，所以请注意在这种情况下**错误处理**的完全缺失：
 
-[PRE112]
+```cs
+            var whenAnyCompletedTask = Task.WhenAny(CreateBadTasks("[WhenAny]"));
+            var result = await whenAnyCompletedTask;
+            Logger.Log($"WhenAny result: {result.Result}");
+```
 
 除非你等待所有任务完成，否则在使用`WhenAny`时可能会错过任务引发的异常。运行此代码会导致没有捕获到任何错误，并且应用执行`3`，因为这是第一个完成的：
 
-[PRE113]
+```cs
+18:08:46 [08] [WhenAny] number 2 awake
+18:08:46 [10] [WhenAny] number 0 awake
+18:08:46 [10] About to throw one [WhenAny] number 0...
+18:08:46 [07] [WhenAny] number 3 awake
+18:08:46 [09] [WhenAny] number 1 awake
+18:08:46 [07] WhenAny result: 3
+18:08:46 [08] About to throw one [WhenAny] number 2...
+18:08:46 [06] [WhenAny] number 4 awake
+18:08:46 [06] About to throw one [WhenAny] number 4...
+```
 
-你将通过查看C#中处理`async`结果流的一些较新选项来完成对`async`/`await`代码的审视。这提供了一种方法，可以在调用代码等待整个集合被填充并返回之前，高效地遍历集合中的项目。
+你将通过查看 C#中处理`async`结果流的一些较新选项来完成对`async`/`await`代码的审视。这提供了一种方法，可以在调用代码等待整个集合被填充并返回之前，高效地遍历集合中的项目。
 
 注意
 
-你可以在[https://packt.link/SuCXK](https://packt.link/SuCXK)找到此示例使用的代码。
+你可以在[`packt.link/SuCXK`](https://packt.link/SuCXK)找到此示例使用的代码。
 
 ## IAsyncEnumerable 流
 
-如果你的应用程序针对.NET 5、.NET6、.NET Core 3.0、.NET Standard 2.1或任何后续版本，那么你可以使用`IAsyncEnumerable`流来创建可等待的代码，将`yield`关键字结合到枚举器中，以异步方式遍历对象集合。
+如果你的应用程序针对.NET 5、.NET6、.NET Core 3.0、.NET Standard 2.1 或任何后续版本，那么你可以使用`IAsyncEnumerable`流来创建可等待的代码，将`yield`关键字结合到枚举器中，以异步方式遍历对象集合。
 
 注意
 
@@ -1054,45 +2047,109 @@ C#语言现在提供了`async`和`await`关键字，这使得`async`/`await`风�
 
 使用`yield`语句，你可以创建返回项目枚举的方法。此外，调用者不需要等待返回**整个列表**的所有项目，就可以开始遍历列表中的每个项目。相反，调用者可以在项目可用时立即访问每个项目。
 
-在此示例中，你将创建一个控制台应用程序，该程序复制了一个保险报价系统。你将发出五个保险报价请求，再次使用`Task.Delay`来模拟接收每个报价的1秒延迟。
+在此示例中，你将创建一个控制台应用程序，该程序复制了一个保险报价系统。你将发出五个保险报价请求，再次使用`Task.Delay`来模拟接收每个报价的 1 秒延迟。
 
 对于基于列表的方法，你只能在所有五个结果都返回到`Main`方法后才能记录每个引用一次。使用`IAsyncEnumerable`和`yield`关键字，引用接收之间存在相同的一秒间隔，但一旦接收到每个引用，`yield`语句就允许调用`Main`方法接收并处理引用的值。如果你希望立即开始处理项目或者可能不想在处理单个项目所需的时间之外在列表中保留数千个项目，这是理想的：
 
-[PRE114]
+```cs
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+namespace Chapter05.Examples
+{
+    class AsyncEnumerableExamplesProgram
+    {
+        public static async Task Main()
+        {
+```
 
 首先，通过`GetInsuranceQuotesAsTask`返回一个字符串列表并遍历每个，记录每个报价的详细信息。此代码将在接收到所有报价之前等待所有报价：
 
-[PRE115]
+```cs
+            Logger.Log("Fetching Task quotes...");
+            var taskQuotes = await GetInsuranceQuotesAsTask();
+            foreach(var quote in taskQuotes)
+            {
+                Logger.Log($"Received Task: {quote}");
+            }
+```
 
 现在是`async`流版本。如果你将以下代码与前面的代码块进行比较，你会看到需要迭代的代码行更少。此代码不会等待接收到所有引用项，而是从`GetInsuranceQuotesAsync`接收到每个引用后立即将其写出：
 
-[PRE116]
+```cs
+            Logger.Log("Fetching Stream quotes...");
+            await foreach (var quote in GetInsuranceQuotesAsync())
+            {
+                Logger.Log($"Received Stream: {quote}");
+            }
+            Logger.Log("All done...");
+            Console.ReadLine();
+        }
+```
 
 `GetInsuranceQuotesAsTask`方法返回一个字符串的`Task`。在五个引用之间的每个引用之间，你等待一秒钟来模拟延迟，然后将结果添加到列表中，并最终将整个列表返回给调用者：
 
-[PRE117]
+```cs
+        private static async Task<IEnumerable<string>> GetInsuranceQuotesAsTask()
+        {
+            var rand = new Random();
+            var quotes = new List<string>();
+            for (var i = 0; i < 5; i++)
+            {
+                await Task.Delay(1000);
+                quotes.Add($"Provider{i}'s quote is {rand.Next(5, 10)}");
+            }
+            return quotes;
+        } 
+```
 
 `GetInsuranceQuotesAsync`方法在每个引用之间有相同的延迟，但不是填充列表以返回给调用者，而是使用`yield`语句允许`Main`方法立即处理每个引用项：
 
-[PRE118]
+```cs
+        private static async IAsyncEnumerable<string> GetInsuranceQuotesAsync()
+        {
+            var rand = new Random();
+            for (var i = 0; i < 5; i++)
+            {
+                await Task.Delay(1000);
+                yield return $"Provider{i}'s quote is {rand.Next(5, 10)}";
+            }
+        }
+    }
+}
+```
 
 运行控制台应用程序会产生以下输出：
 
-[PRE119]
+```cs
+09:17:57 [01] Fetching Task quotes...
+09:18:02 [04] Received Task: Provider0's quote is 7
+09:18:02 [04] Received Task: Provider1's quote is 9
+09:18:02 [04] Received Task: Provider2's quote is 9
+09:18:02 [04] Received Task: Provider3's quote is 8
+09:18:02 [04] Received Task: Provider4's quote is 8
+09:18:02 [04] Fetching Stream quotes...
+09:18:03 [04] Received Stream: Provider0's quote is 7
+09:18:04 [04] Received Stream: Provider1's quote is 8
+09:18:05 [05] Received Stream: Provider2's quote is 9
+09:18:06 [05] Received Stream: Provider3's quote is 8
+09:18:07 [04] Received Stream: Provider4's quote is 7
+09:18:07 [04] All done...
+```
 
-线程 `[04]` 在应用程序启动后5秒内记录了所有五个基于任务的引用详情。在这里，它等待所有引用返回后才记录每个引用。然而，请注意，基于流的每个引用都在线程`4`和`5`之间产生了1秒的间隔后立即被记录。
+线程 `[04]` 在应用程序启动后 5 秒内记录了所有五个基于任务的引用详情。在这里，它等待所有引用返回后才记录每个引用。然而，请注意，基于流的每个引用都在线程`4`和`5`之间产生了 1 秒的间隔后立即被记录。
 
-两次调用所需的总时间相同（总共5秒），但当你想要一有结果就立即开始处理时，`yield`更可取。这在UI应用程序中非常有用，你可以向用户提供早期结果。
+两次调用所需的总时间相同（总共 5 秒），但当你想要一有结果就立即开始处理时，`yield`更可取。这在 UI 应用程序中非常有用，你可以向用户提供早期结果。
 
 注意
 
-你可以在[https://packt.link/KarKW](https://packt.link/KarKW)找到此示例使用的代码。
+你可以在[`packt.link/KarKW`](https://packt.link/KarKW)找到此示例使用的代码。
 
 ## 并行编程
 
 到目前为止，本章已经介绍了使用`Task`类和`async`/`await`关键字进行异步编程。你已经看到了如何定义任务和`async`代码块，以及随着这些结构的完成，程序流程可以精细控制。
 
-并行框架（PFX）提供了进一步利用多核处理器以高效运行并发操作的方法。术语TPL（任务并行库）通常用来指代C#中的`Parallel`类。
+并行框架（PFX）提供了进一步利用多核处理器以高效运行并发操作的方法。术语 TPL（任务并行库）通常用来指代 C#中的`Parallel`类。
 
 使用并行框架，你不需要担心创建和重用线程或协调多个任务的复杂性。框架为你管理这些，甚至调整使用的线程数量，以最大化吞吐量。
 
@@ -1106,7 +2163,7 @@ C#语言现在提供了`async`和`await`关键字，这使得`async`/`await`风�
 
 当你有多个数据值，并且需要将这些值中的每个值都并发应用相同的操作时，就会使用数据并行。在这种情况下，对每个值的处理被分配到不同的线程中。
 
-一个典型的例子可能是计算从1到1,000,000之间的所有质数。对于范围内的每个数字，都需要应用相同的函数来确定该值是否为质数。与其逐个迭代每个数字，不如采用异步方法，将数字分配到多个线程中。
+一个典型的例子可能是计算从 1 到 1,000,000 之间的所有质数。对于范围内的每个数字，都需要应用相同的函数来确定该值是否为质数。与其逐个迭代每个数字，不如采用异步方法，将数字分配到多个线程中。
 
 ### 任务并行
 
@@ -1122,11 +2179,11 @@ C#语言现在提供了`async`和`await`关键字，这使得`async`/`await`风�
 
 每个这些任务都可以并发运行，并且它们之间互不依赖。
 
-对于`Parallel`类，Parallel Framework提供了各种层，提供了并行性，包括Parallel Language Integrated Query (PLINQ)。PLINQ是一组扩展方法，它将并行编程的力量添加到LINQ语法中。这里不会详细介绍PLINQ，但会对`Parallel`类进行更详细的介绍。
+对于`Parallel`类，Parallel Framework 提供了各种层，提供了并行性，包括 Parallel Language Integrated Query (PLINQ)。PLINQ 是一组扩展方法，它将并行编程的力量添加到 LINQ 语法中。这里不会详细介绍 PLINQ，但会对`Parallel`类进行更详细的介绍。
 
 Note
 
-如果你想了解更多关于PLINQ的信息，可以参考在线文档[https://docs.microsoft.com/en-us/dotnet/standard/parallel-programming/introduction-to-plinq](https://docs.microsoft.com/en-us/dotnet/standard/parallel-programming/introduction-to-plinq)。
+如果你想了解更多关于 PLINQ 的信息，可以参考在线文档[`docs.microsoft.com/en-us/dotnet/standard/parallel-programming/introduction-to-plinq`](https://docs.microsoft.com/en-us/dotnet/standard/parallel-programming/introduction-to-plinq)。
 
 ### The Parallel Class
 
@@ -1176,41 +2233,103 @@ The `ParallelOptions` class can be used to configure how the `Parallel` methods 
 
 注意
 
-你可以在[https://docs.microsoft.com/en-us/dotnet/standard/parallel-programming/potential-pitfalls-in-data-and-task-parallelism](https://docs.microsoft.com/en-us/dotnet/standard/parallel-programming/potential-pitfalls-in-data-and-task-parallelism)找到有关数据和任务并行性的更多信息。
+你可以在[`docs.microsoft.com/en-us/dotnet/standard/parallel-programming/potential-pitfalls-in-data-and-task-parallelism`](https://docs.microsoft.com/en-us/dotnet/standard/parallel-programming/potential-pitfalls-in-data-and-task-parallelism)找到有关数据和任务并行性的更多信息。
 
-### Parallel.For和Parallel.ForEach
+### Parallel.For 和 Parallel.ForEach
 
-这两个方法提供数据并行性。相同的操作应用于数据对象或数字的集合。为了从中受益，每个操作应该是CPU密集型的，也就是说，它应该需要CPU周期来执行，而不是I/O密集型（例如访问文件）。
+这两个方法提供数据并行性。相同的操作应用于数据对象或数字的集合。为了从中受益，每个操作应该是 CPU 密集型的，也就是说，它应该需要 CPU 周期来执行，而不是 I/O 密集型（例如访问文件）。
 
 使用这两种方法，你定义一个要应用的操作，该操作传递一个对象实例或数字来处理。在`Parallel.ForEach`的情况下，`Action`传递一个对象引用参数。`Parallel.For`传递一个数字参数。
 
-如你在*第3章*，*委托、事件和Lambda表达式*中看到的，`Action`委托代码可以像你需要的那样简单或复杂：
+如你在*第三章*，*委托、事件和 Lambda 表达式*中看到的，`Action`委托代码可以像你需要的那样简单或复杂：
 
-[PRE120]
+```cs
+using System;
+using System.Threading.Tasks;
+using System.Globalization;
+using System.Threading;
+namespace Chapter05.Examples
+{
+    class ParallelForExamples
+    {
+        public static async Task Main()
+        {
+```
 
 在这个示例中，调用 `Parallel.For` 时，你传递一个包含的 `int` 值作为起始点（`99`）和一个排他的结束值（`105`）。第三个参数是一个 lambda 表达式，`Action`，你希望对每个迭代进行调用。这个重载使用 `Action<int>`，通过 `i` 参数传递一个整数：
 
-[PRE121]
+```cs
+            var loopResult = Parallel.For(99, 105, i =>
+            {
+                Logger.Log($"Sleep iteration {i}");
+                Thread.Sleep(i * 10);
+                Logger.Log($"Awake iteration {i}");
+            });
+```
 
 检查 `ParallelLoopResult` 的 `IsCompleted` 属性：
 
-[PRE122]
+```cs
+            Console.WriteLine($"Completed: {loopResult.IsCompleted}");
+            Console.ReadLine();
+        }
+    }
+}
+```
 
 运行代码，你会看到它在 `104` 处停止。每个迭代由一组不同的线程执行，顺序似乎有些随机，某些迭代在另一些迭代之前唤醒。你使用了相对较短的时间延迟（使用 `Thread.Sleep`），因此并行任务调度器可能需要额外几毫秒来激活每个迭代。这就是为什么迭代执行的顺序应该相互独立：
 
-[PRE123]
+```cs
+18:39:37 [10] Sleep iteration 104
+18:39:37 [03] Sleep iteration 100
+18:39:37 [06] Sleep iteration 102
+18:39:37 [04] Sleep iteration 101
+18:39:37 [01] Sleep iteration 99
+18:39:37 [07] Sleep iteration 103
+18:39:38 [03] Awake iteration 100
+18:39:38 [01] Awake iteration 99
+18:39:38 [06] Awake iteration 102
+18:39:38 [04] Awake iteration 101
+18:39:38 [07] Awake iteration 103
+18:39:38 [10] Awake iteration 104
+Completed: True
+```
 
 使用 `ParallelLoopState` 重载，你可以通过 `Action` 代码控制迭代。在下面的示例中，代码检查它是否在迭代编号 `15`：
 
-[PRE124]
+```cs
+            var loopResult1 = Parallel.For(10, 20,               (i, loopState) =>
+              {
+                Logger.Log($"Inside iteration {i}");
+                if (i == 15)
+                {
+                    Logger.Log($"At {i}…break when you're ready");
+```
 
 在 `loopState` 上调用 `Break` 传达了 `Parallel` 循环应尽快停止进一步迭代的意图：
 
-[PRE125]
+```cs
+                    loopState.Break();
+                }
+              });
+            Console.WriteLine($"Completed: {loopResult1.IsCompleted}, LowestBreakIteration={loopResult1.LowestBreakIteration}");
+            Console.ReadLine();
+```
 
 从结果中，你可以看到在实际上停止之前，你到达了项目 `17`，尽管在迭代 `15` 时请求中断，如下面的片段所示：
 
-[PRE126]
+```cs
+19:04:48 [03] Inside iteration 11
+19:04:48 [03] Inside iteration 13
+19:04:48 [03] Inside iteration 15
+19:04:48 [03] At 15...break when you're ready
+19:04:48 [01] Inside iteration 10
+19:04:48 [05] Inside iteration 14
+19:04:48 [07] Inside iteration 17
+19:04:48 [06] Inside iteration 16
+19:04:48 [04] Inside iteration 12
+Completed: False, LowestBreakIteration=15
+```
 
 代码使用了 `ParallelLoopState.Break`；这表明循环 `17` 尽管在迭代 `15` 时请求停止。这通常发生在运行时已经开始后续迭代，然后刚刚检测到一个 `Break` 请求。这些是停止请求；运行时可能在停止之前运行额外的迭代。
 
@@ -1220,27 +2339,48 @@ The `ParallelOptions` class can be used to configure how the `Parallel` methods 
 
 注意
 
-你可以在 [https://www.mathscareers.org.uk/article/calculating-pi/](https://www.mathscareers.org.uk/article/calculating-pi/) 上找到有关公式的更多信息。
+你可以在 [`www.mathscareers.org.uk/article/calculating-pi/`](https://www.mathscareers.org.uk/article/calculating-pi/) 上找到有关公式的更多信息。
 
 你使用循环提示用户输入系列数（要显示的小数位数）作为百万的倍数（以节省输入许多零）：
 
-[PRE127]
+```cs
+            double series;
+            do
+            {
+                Console.Write("Pi Series (in millions):");
+                var input = Console.ReadLine();
+```
 
 尝试解析输入：
 
-[PRE128]
+```cs
+                if (!double.TryParse(input, NumberStyles.Any, CultureInfo.CurrentCulture, out series))
+                {
+                    break;
+                }
+```
 
 将输入的值乘以一百万，并将其传递给可等待的 `CalcPi` 函数（稍后将定义）：
 
-[PRE129]
+```cs
+                var actualSeries = series * 1000000;
+                Console.WriteLine($"Calculating PI {actualSeries:N0}");
+                var pi = await CalcPi((int)(actualSeries));
+```
 
 你最终会收到 `pi` 的值，因此使用字符串插值功能将 `pi` 写入 `18` 位小数，使用 `:N18` 数值格式样式：
 
-[PRE130]
+```cs
+                Console.WriteLine($"PI={pi:N18}");
+            }
+```
 
 重复循环，直到输入 `0`：
 
-[PRE131]
+```cs
+            while (series != 0D);
+            Console.ReadLine();
+```
 
 现在是 `CalcPi` 函数。你知道 `Parallel` 方法都会阻塞调用线程，所以你需要使用 `Task.Run`，它最终将返回最终计算出的值。
 
@@ -1250,17 +2390,29 @@ The `ParallelOptions` class can be used to configure how the `Parallel` methods 
 
 这可以通过使用 `lock` 语句来实现。当使用 `lock` 语句实现线程同步时，所有复杂性都由运行时处理。`lock` 语句具有以下形式：
 
-[PRE132]
+```cs
+lock (obj){ //your thread safe code here }.
+```
 
 概念上，你可以将 `lock` 语句想象成一个狭窄的通道，足够容纳一个人一次通过。无论一个人通过通道需要多长时间以及他们在那里做什么，其他人必须等待，直到持有钥匙的人离开（释放锁）才能通过通道。
 
 返回到 `CalcPi` 函数：
 
-[PRE133]
+```cs
+        private static Task<double> CalcPi(int steps)
+        {
+            return Task.Run(() =>
+            {
+                const int StartIndex = 0;
+                var sum = 0.0D;
+                var step = 1.0D / (double)steps;
+```
 
 `gate` 变量是 `object` 类型，并在 lambda 表达式中与 `lock` 语句一起使用，以保护 `sum` 变量免受不安全访问：
 
-[PRE134]
+```cs
+                var gate = new object();
+```
 
 这里事情变得稍微复杂一些，因为你使用了 `Parallel.For` 重载，它还允许你传递额外的参数和委托：
 
@@ -1274,21 +2426,50 @@ The `ParallelOptions` class can be used to configure how the `Parallel` methods 
 
 +   `localFinal`：一个 `Func` 委托，用于对每个迭代的局部状态执行最终操作。
 
-[PRE135]
+```cs
+                Parallel.For(
+                    StartIndex, 
+                    steps,
+                    () => 0.0D,                 // localInit 
+                    (i, state, localFinal) =>   // body
+                    {
+                        var x = (i + 0.5D) * step;
+                        return localFinal + 4.0D / (1.0D + x * x);
+                    },
+                    localFinal =>               //localFinally
+                    { 
+```
 
 在这里，你现在使用 `lock` 语句来确保一次只有一个线程可以递增 `sum` 的值，并使用其正确的值：
 
-[PRE136]
+```cs
+                        lock (gate)
+                            sum += localFinal; 
+                    });
+                return step * sum;
+            });
+        }
+```
 
 通过使用 `lock(obj)` 语句，你已经提供了一种最低级别的线程安全性，运行程序会产生以下输出：
 
-[PRE137]
+```cs
+Pi Series (in millions):1
+Calculating PI 1,000,000
+PI=3.141592653589890000
+Pi Series (in millions):20
+Calculating PI 20,000,000
+PI=3.141592653589810000
+Pi Series (in millions):30
+Calculating PI 30,000,000
+PI=3.141592653589750000
+```
 
 `Parallel.ForEach` 遵循类似的语义；而不是将数字范围传递给 `Action` 委托，你传递一个要处理的对象集合。
 
 注意
 
-你可以在 [https://packt.link/1yZu2](https://packt.link/1yZu2) 找到用于此示例的代码。
+你可以在 [`packt.link/1yZu2`](https://packt.link/1yZu2) 找到用于此示例的代码。
 
 以下示例显示了使用 `ParallelOptions` 和取消令牌的 `Parallel.ForEach`。在这个例子中，你有一个控制台应用程序，它创建了 10 个客户。每个客户都有一个包含所有已下订单值的列表。你想要模拟一个按需获取客户订单的慢速运行服务。每当任何代码访问 `Customer.Orders` 属性时，列表只填充一次。在这里，你将为每个客户实例使用另一个 `lock` 语句来确保列表安全地填充。
 
@@ -1296,59 +2477,180 @@ The `ParallelOptions` class can be used to configure how the `Parallel` methods 
 
 首先，创建一个 `Customer` 类，其构造函数接收一个 `name` 参数：
 
-[PRE138]
+```cs
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+namespace Chapter05.Examples
+{
+    public class Customer
+    {
+        public Customer(string name)
+        {
+            Name = name;
+            Logger.Log($"Created {Name}");
+        }
+        public string Name { get; }
+```
 
 你希望按需填充 `Orders` 列表，并且每个客户只填充一次，因此使用另一个 `lock` 示例来确保订单列表安全地只填充一次。你只需使用 `Orders` 的 `get` 访问器来检查 `_orders` 变量的空引用，然后使用 `Enumerable.Range` LINQ 方法创建一个随机数量的订单值来生成一个数字范围。
 
 注意，你还可以通过添加 `Thread.Sleep` 来模拟慢速请求，这将阻塞第一次访问此客户订单的线程（由于你使用了 `Parallel` 类，这将是一个后台线程而不是主线程）：
 
-[PRE139]
+```cs
+ParallelForEachExample.cs
+1            private readonly object _orderGate = new object();
+2            private IList<double> _orders;
+3            public IList<double> Orders
+4            {
+5                get
+6                {
+7                    lock (_orderGate)
+8                    {
+9                        if (_orders != null)
+10                            return _orders;
+11
+12                        var random = new Random();
+13                        var orderCount = random.Next(1000, 10000);
+14
+You can find the complete code here: https://packt.link/Nmx3X.
+```
 
 你的 `Aggregator` 类将计算以下 `Total` 和 `Average` 属性：
 
-[PRE140]
+```cs
+        public double? Total { get; set; }
+        public double? Average { get; set; }
+    }
+```
 
 观察一下 `Aggregator` 类，注意它的 `Aggregate` 方法接收一个要处理的客户列表和 `CancellationToken`，该令牌将根据控制台用户的偏好时间周期自动发出取消请求。该方法返回一个基于 `bool` 的 `Task`。结果将指示操作是否在处理客户过程中被取消：
 
-[PRE141]
+```cs
+    public static class Aggregator
+    {
+        public static Task<bool> Aggregate(IEnumerable<Customer> customers, CancellationToken token)
+        {
+            var wasCancelled = false;
+```
 
 主 `Parallel.ForEach` 方法通过创建一个 `ParallelOptions` 类并传入取消令牌来配置。当由 `Parallel` 类调用时，`Action` 委托传递一个 `Customer` 实例（`customer =>`），该实例仅简单地对订单值求和并计算平均值，然后将平均值分配给客户的属性。
 
 注意 `Parallel.ForEach` 调用被包裹在一个 `try-catch` 块中，该块捕获任何类型的 `OperationCanceledException` 异常。如果超过最大时间周期，则运行时会抛出异常以停止处理。你必须捕获此异常；否则，应用程序将因未处理的异常错误而崩溃：
 
-[PRE142]
+```cs
+ParallelForEachExample.cs
+1                return Task.Run(() =>
+2                {
+3                    var options = new ParallelOptions { CancellationToken = token };
+4    
+5                    try
+6                    {
+7                        Parallel.ForEach(customers, options,
+8                            customer =>
+9                            {
+10                                customer.Total = customer.Orders.Sum();
+11                                customer.Average = customer.Total / 12                                                   customer.Orders.Count;
+13                                Logger.Log($"Processed {customer.Name}");
+14                            });
+15                    }
+You can find the complete code here: https://packt.link/FfVNA.
+```
 
 主控制台应用程序提示输入最大等待时间，`maxWait`：
 
-[PRE143]
+```cs
+    class ParallelForEachExampleProgram
+    {
+        public static async Task Main()
+        {
+            Console.Write("Max waiting time (seconds):");
+            var input = Console.ReadLine();
+            var maxWait = TimeSpan.FromSeconds(int.TryParse(input, NumberStyles.Any, CultureInfo.CurrentCulture, out var inputSeconds)
+                ? inputSeconds
+                : 5);
+```
 
 创建 `100` 个客户，这些客户可以传递给聚合器：
 
-[PRE144]
+```cs
+            var customers = Enumerable.Range(1, 10)
+                .Select(n => new Customer($"Customer#{n}"))
+                .ToList();
+```
 
 创建`CancellationTokenSource`实例，传入最大等待时间。如您之前所见，如果超过时间限制，使用此令牌的任何代码都将被取消异常中断：
 
-[PRE145]
+```cs
+            var tokenSource = new CancellationTokenSource(maxWait);
+            var aggregated = await Task.Run(() => Aggregator.Aggregate(customers,                                   tokenSource.Token));            
+```
 
 任务完成后，您只需取出按总订单排序的前五个客户。使用`PadRight`方法对输出中的客户姓名进行对齐：
 
-[PRE146]
+```cs
+            var topCustomers = customers
+                .OrderByDescending(c => c.Total)
+                .Take(5);
+            Console.WriteLine($"Cancelled: {aggregated }");
+            Console.WriteLine("Customer      \tTotal         \tAverage  \tOrders");
+
+            foreach (var c in topCustomers)
+            {
+                Console.WriteLine($"{c.Name.PadRight(10)}\t{c.Total:N0}\t{c.Average:N0}\t\t{c.Orders.Count:N0}");
+            }
+            Console.ReadLine();
+        }
+    }
+}
+```
 
 使用`1`秒的短时间运行控制台应用程序会产生以下输出：
 
-[PRE147]
+```cs
+Max waiting time (seconds):1
+21:35:56 [01] Created Customer#1
+21:35:56 [01] Created Customer#2
+21:35:56 [01] Created Customer#3
+21:35:56 [01] Created Customer#4
+21:35:56 [01] Created Customer#5
+21:35:56 [01] Created Customer#6
+21:35:56 [01] Created Customer#7
+21:35:56 [01] Created Customer#8
+21:35:56 [01] Created Customer#9
+21:35:56 [01] Created Customer#10
+21:35:59 [07] Processed Customer#5
+21:35:59 [04] Processed Customer#3
+21:35:59 [10] Processed Customer#7
+21:35:59 [06] Processed Customer#2
+21:35:59 [05] Processed Customer#1
+21:35:59 [11] Processed Customer#8
+21:35:59 [08] Processed Customer#6
+21:35:59 [09] Processed Customer#4
+21:35:59 [05] Caught The operation was canceled.
+Cancelled: True
+Customer        Total           Average         Orders
+Customer#1      23,097,348      2,395           9,645
+Customer#4      19,029,182      2,179           8,733
+Customer#8      15,322,674      1,958           7,827
+Customer#6      9,763,247       1,568           6,226
+Customer#2      6,189,978       1,250           4,952
+```
 
 使用线程`01`创建`10`个客户的操作是同步进行的。
 
 注意
 
-Visual Studio在您第一次运行程序时可能会显示以下警告：“非空字段`_orders`在退出构造函数时必须包含一个非空值。考虑将字段声明为可空。”这是检查代码以检查空引用可能性的建议。
+Visual Studio 在您第一次运行程序时可能会显示以下警告：“非空字段`_orders`在退出构造函数时必须包含一个非空值。考虑将字段声明为可空。”这是检查代码以检查空引用可能性的建议。
 
 `Aggregator`随后开始处理每个客户。注意如何使用不同的线程，并且处理并不从第一个客户开始。这是任务调度器决定队列中下一个任务的过程。在令牌引发取消异常之前，您只成功处理了八个客户。
 
 注意
 
-您可以在[https://packt.link/1LDxI](https://packt.link/1LDxI)找到此示例使用的代码。
+您可以在[`packt.link/1LDxI`](https://packt.link/1LDxI)找到此示例使用的代码。
 
 您已经查看了一些`Parallel`类中可用的功能。您可以看到它提供了一个简单而有效的方法来跨多个任务或数据片段运行代码。
 
@@ -1356,17 +2658,17 @@ Visual Studio在您第一次运行程序时可能会显示以下警告：“非�
 
 下一节将把这些并发概念引入到一个使用多个任务生成一系列图像的活动。由于每个图像的创建可能需要几秒钟，因此您需要提供一个让用户选择取消任何剩余任务的方法。
 
-## 活动5.01：从斐波那契数列创建图像
+## 活动 5.01：从斐波那契数列创建图像
 
-在*练习5.01*中，您查看了一个创建称为斐波那契数的值的递归函数。这些数字可以组合成所谓的斐波那契数列，并用于创建有趣的螺旋形状的图像。
+在*练习 5.01*中，您查看了一个创建称为斐波那契数的值的递归函数。这些数字可以组合成所谓的斐波那契数列，并用于创建有趣的螺旋形状的图像。
 
-对于这个活动，您需要创建一个控制台应用程序，允许将各种输入传递给序列计算器。一旦用户输入了他们的参数，应用程序将开始创建1,000个图像的耗时任务。
+对于这个活动，您需要创建一个控制台应用程序，允许将各种输入传递给序列计算器。一旦用户输入了他们的参数，应用程序将开始创建 1,000 个图像的耗时任务。
 
 序列中的每个图像可能需要几秒钟来计算和创建，因此您需要提供一个方法，使用`TaskCancellationSource`在操作中途取消操作。如果用户取消任务，他们仍然可以访问取消请求之前的图像。本质上，您允许用户尝试不同的参数，看看这对输出图像有什么影响。
 
-![图5.2：斐波那契数列图像文件](img/B16835_05_02.jpg)
+![图 5.2：斐波那契数列图像文件](img/B16835_05_02.jpg)
 
-图5.2：斐波那契数列图像文件
+图 5.2：斐波那契数列图像文件
 
 如果您更喜欢`async`/`await`任务，这是一个理想的`Parallel`类示例。以下是需要从用户那里获取的输入：
 
@@ -1394,25 +2696,83 @@ Visual Studio在您第一次运行程序时可能会显示以下警告：“非�
 
 +   通过调用`CreateSeed`创建第一个元素。列表的其余部分应使用`CreateNext`，传入前一个项：
 
-    [PRE148]
+    ```cs
+    FibonacciSequence.cs
+    1    public class Fibonacci
+    2    {
+    3        public static Fibonacci CreateSeed()
+    4        {
+    5            return new Fibonacci(1, 0D, 1D);
+    6        }
+    7    
+    8        public static Fibonacci CreateNext(Fibonacci previous, double angle)
+    9        {
+    10            return new Fibonacci(previous, angle);
+    11        }
+    12    
+    13        private Fibonacci(int index, double theta, double x)
+    14        {
+    15            Index = index;
+    ```
 
-[PRE149]
+```cs
+You can find the complete code here: http://packt.link/I7C6A.
+```
 
-+   使用以下`FibonacciSequence`.`Calculate`方法创建一个Fibonacci项的列表。这将传递要绘制的点的数量和`phi`的值（两者均由用户指定）：
++   使用以下`FibonacciSequence`.`Calculate`方法创建一个 Fibonacci 项的列表。这将传递要绘制的点的数量和`phi`的值（两者均由用户指定）：
 
-    [PRE150]
+    ```cs
+    FibonacciSequence.cs
+    1    public static class FibonacciSequence
+    2    {
+    3        public static IList<Fibonacci> Calculate(int indices, double phi)
+    4        {
+    5            var angle = phi.GoldenAngle();
+    6    
+    7            var items = new List<Fibonacci>(indices)
+    8            {
+    9                Fibonacci.CreateSeed()
+    10            };
+    11            
+    12            for (var i = 1; i < indices; i++)
+    13            {
+    14                var previous = items.ElementAt(i - 1);
+    15                var next = Fibonacci.CreateNext(previous, angle);
+    ```
 
-[PRE151]
+```cs
+You can find the complete code here: https://packt.link/gYK4N.
+```
 
 +   使用`dotnet add package`命令导出生成的数据到`.png`格式图像文件，以添加对`System.Drawing.Common`命名空间的引用。在您的项目源文件夹中运行以下命令：
 
-    [PRE152]
+    ```cs
+    source\Chapter05>dotnet add package System.Drawing.Common
+    ```
 
 +   此图像创建类`ImageGenerator`可用于创建每个最终图像文件：
 
-    [PRE153]
+    ```cs
+    ImageGenerator.cs
+    1    using System.Collections.Generic;
+    2    using System.Drawing;
+    3    using System.Drawing.Drawing2D;
+    4    using System.Drawing.Imaging;
+    5    using System.IO;
+    6    
+    7    namespace Chapter05.Activities.Activity01
+    8    {
+    9        public static class ImageGenerator
+    10        {
+    11            public static void ExportSequence(IList<Fibonacci> sequence, 
+    12                string path, ImageFormat format, 13                int width, int height, double pointSize)
+    14            {
+    15                double minX = 0; 
+    ```
 
-[PRE154]
+```cs
+You can find the complete code here: http://packt.link/a8Bu7.
+```
 
 要完成此活动，请执行以下步骤：
 
@@ -1420,7 +2780,7 @@ Visual Studio在您第一次运行程序时可能会显示以下警告：“非�
 
 1.  生成的图像应保存在系统`Temp`文件夹内的一个文件夹中，因此请使用`Path.GetTempPath()`获取`Temp`路径，并使用`Directory.CreateDirectory`创建一个名为`Fibonacci`的子文件夹。
 
-1.  声明一个`do`循环，重复以下*步骤4*到*步骤7*。
+1.  声明一个`do`循环，重复以下*步骤 4*到*步骤 7*。
 
 1.  提示用户输入`phi`的值（这通常在`1.0`到`6.00`之间）。您需要将用户输入读取为字符串，并使用`double.TryParse`尝试将输入转换为有效的双精度浮点变量。
 
@@ -1436,19 +2796,27 @@ Visual Studio在您第一次运行程序时可能会显示以下警告：“非�
 
 1.  运行控制台应用程序应该产生以下控制台输出：
 
-    [PRE155]
+    ```cs
+    Using temp folder: C:Temp\Fibonacci\
+    Phi (eg 1.0 to 6.0) (x=quit, enter=cancel):1
+    Image Count (eg 1000):1000
+    Creating 1000 images...
+    20:36:19 [04] Saved Fibonacci_3000_1.015.png
+    20:36:19 [06] Saved Fibonacci_3000_1.030.png
+    20:36:20 [06] Saved Fibonacci_3000_1.090.png
+    ```
 
 你会发现系统`Temp`文件夹中的斐波那契文件夹中生成了各种图像文件：
 
-![图5.3：Windows 10资源管理器图像文件夹内容（生成的图像子集）](img/B16835_05_03.jpg)
+![图 5.3：Windows 10 资源管理器图像文件夹内容（生成的图像子集）](img/B16835_05_03.jpg)
 
-图5.3：Windows 10资源管理器图像文件夹内容（生成的图像子集）
+图 5.3：Windows 10 资源管理器图像文件夹内容（生成的图像子集）
 
 通过完成这个活动，你看到了如何启动多个长时间运行的操作，然后协调它们以产生单个结果，每个步骤都在隔离中运行，允许其他操作按需继续。
 
 注意
 
-该活动的解决方案可以在[https://packt.link/qclbF](https://packt.link/qclbF)找到。
+该活动的解决方案可以在[`packt.link/qclbF`](https://packt.link/qclbF)找到。
 
 # 摘要
 
@@ -1456,6 +2824,6 @@ Visual Studio在您第一次运行程序时可能会显示以下警告：“非�
 
 接下来，你研究了`async`/`await`关键字，这些关键字可以帮助你编写更简单、更简洁的代码，希望这样更容易维护。
 
-本章探讨了C#如何以相对简单的方式提供并发模式，这使得可以利用多核处理器的强大功能。这对于卸载耗时计算非常有用，但这也带来了一定的代价。你看到了如何使用`lock`语句来安全地防止多个线程同时读取或写入一个值。
+本章探讨了 C#如何以相对简单的方式提供并发模式，这使得可以利用多核处理器的强大功能。这对于卸载耗时计算非常有用，但这也带来了一定的代价。你看到了如何使用`lock`语句来安全地防止多个线程同时读取或写入一个值。
 
-在下一章中，你将了解如何使用Entity Framework和SQL Server在C#应用程序中与关系型数据交互。本章是关于数据库操作的内容。如果你对数据库结构不熟悉或想复习PostgreSQL的基本知识，请参阅本书GitHub仓库中提供的附加章节。
+在下一章中，你将了解如何使用 Entity Framework 和 SQL Server 在 C#应用程序中与关系型数据交互。本章是关于数据库操作的内容。如果你对数据库结构不熟悉或想复习 PostgreSQL 的基本知识，请参阅本书 GitHub 仓库中提供的附加章节。

@@ -28,111 +28,111 @@
 
 +   Visual Studio 2017 或 2019 的免费社区版或更高版本，并安装所有数据库工具。
 
-+   一个免费的 Azure 账户。[第 1 章](14b5c5da-4042-439e-9e5a-2e19ba4c4930.xhtml)中的“*创建 Azure 账户*”小节解释了如何创建一个。
++   一个免费的 Azure 账户。第一章中的“*创建 Azure 账户*”小节解释了如何创建一个。
 
-+   为了获得更好的开发体验，我们建议您还安装 Cosmos DB 的本地模拟器，可在[https://aka.ms/cosmosdb-emulator](https://aka.ms/cosmosdb-emulator)找到。
++   为了获得更好的开发体验，我们建议您还安装 Cosmos DB 的本地模拟器，可在[`aka.ms/cosmosdb-emulator`](https://aka.ms/cosmosdb-emulator)找到。
 
 # 理解不同目的的不同存储库
 
-本节描述了最流行的数据存储技术所提供的功能。主要，我们将关注它们能够满足的功能需求。性能和扩展功能将在下一节中分析，该节专门用于比较关系型数据库和NoSQL数据库。在Azure中，可以通过在所有Azure门户页面顶部的搜索栏中输入产品名称来找到各种服务。
+本节描述了最流行的数据存储技术所提供的功能。主要，我们将关注它们能够满足的功能需求。性能和扩展功能将在下一节中分析，该节专门用于比较关系型数据库和 NoSQL 数据库。在 Azure 中，可以通过在所有 Azure 门户页面顶部的搜索栏中输入产品名称来找到各种服务。
 
-以下小节描述了我们可以用于我们的C#项目的各种数据库类型。
+以下小节描述了我们可以用于我们的 C#项目的各种数据库类型。
 
 # 关系型数据库
 
-通常，云提供多种数据库引擎。Azure提供各种流行的数据库引擎，如SQL Server（Azure SQL Server）、MySQL和Oracle。
+通常，云提供多种数据库引擎。Azure 提供各种流行的数据库引擎，如 SQL Server（Azure SQL Server）、MySQL 和 Oracle。
 
-关于Oracle数据库引擎，Azure提供可配置的虚拟机，这些虚拟机上安装了各种Oracle版本，您可以通过在Azure门户搜索栏中输入`Oracle`后得到的建议轻松验证。Azure费用不包括Oracle许可证；它们仅提供计算时间，因此您必须将许可证带到Azure。
+关于 Oracle 数据库引擎，Azure 提供可配置的虚拟机，这些虚拟机上安装了各种 Oracle 版本，您可以通过在 Azure 门户搜索栏中输入`Oracle`后得到的建议轻松验证。Azure 费用不包括 Oracle 许可证；它们仅提供计算时间，因此您必须将许可证带到 Azure。
 
-在Azure上使用MySQL时，您需要为使用私有服务器实例付费。您产生的费用取决于您拥有的核心数量、需要分配多少内存以及备份保留时间。MySQL实例是冗余的，您可以选择本地或地理分布式的冗余：
+在 Azure 上使用 MySQL 时，您需要为使用私有服务器实例付费。您产生的费用取决于您拥有的核心数量、需要分配多少内存以及备份保留时间。MySQL 实例是冗余的，您可以选择本地或地理分布式的冗余：
 
 ![图片](img/3a871e4b-5bbe-4c0f-906e-5e2a3377be2d.png)
 
-Azure SQL Server是最灵活的提供方案。在这里，您可以配置每个数据库使用的资源。当您创建数据库时，您可以选择将其放置在现有的服务器实例上或创建一个新的实例。费用基于已预留的数据库内存以及所需的**数据库事务单元**（**DTUs**）。在这里，一个DTU是由参考工作负载确定的I/O操作、CPU使用率和内存使用的线性组合。大致来说，当您增加DTUs时，最大数据库性能的增加是线性的：
+Azure SQL Server 是最灵活的提供方案。在这里，您可以配置每个数据库使用的资源。当您创建数据库时，您可以选择将其放置在现有的服务器实例上或创建一个新的实例。费用基于已预留的数据库内存以及所需的**数据库事务单元**（**DTUs**）。在这里，一个 DTU 是由参考工作负载确定的 I/O 操作、CPU 使用率和内存使用的线性组合。大致来说，当您增加 DTUs 时，最大数据库性能的增加是线性的：
 
 ![图片](img/04490184-bfc4-4eec-9eee-281af77ed4d3.png)
 
 您还可以通过启用读扩展来配置数据复制。这样，您可以提高读取操作的性能。备份保留时间对于每个服务级别（基本、标准和高级）都是固定的。
 
-如果您选择“是”以回答“是否想使用SQL弹性池？”，则数据库将被添加到弹性池中。添加到同一弹性池的数据库将共享其资源，因此未被数据库使用的资源可以在其他数据库的*使用高峰*期间使用。弹性池可以包含托管在不同服务器实例上的数据库。弹性池是优化资源使用以降低成本的有效方式。
+如果您选择“是”以回答“是否想使用 SQL 弹性池？”，则数据库将被添加到弹性池中。添加到同一弹性池的数据库将共享其资源，因此未被数据库使用的资源可以在其他数据库的*使用高峰*期间使用。弹性池可以包含托管在不同服务器实例上的数据库。弹性池是优化资源使用以降低成本的有效方式。
 
-# NoSQL数据库
+# NoSQL 数据库
 
-在NoSQL数据库中，关系表被更通用的集合所取代，这些集合可以包含异构的JSON对象。也就是说，集合没有预定义的结构和没有预定义的字段长度限制（在字符串的情况下），但可以包含任何类型的对象。与每个集合相关联的唯一结构约束是作为主键的属性名称。
+在 NoSQL 数据库中，关系表被更通用的集合所取代，这些集合可以包含异构的 JSON 对象。也就是说，集合没有预定义的结构和没有预定义的字段长度限制（在字符串的情况下），但可以包含任何类型的对象。与每个集合相关联的唯一结构约束是作为主键的属性名称。
 
-更具体地说，每个集合条目可以包含嵌套对象和嵌套在对象属性中的对象集合，即相关实体，在关系数据库中，这些实体包含在不同的表中并通过外部键连接。在NoSQL中，数据库可以嵌套在其父实体中。由于集合条目包含复杂的嵌套对象，而不是像关系数据库那样简单的属性/值对，因此条目不被称为元组或行，而是*文档*。
+更具体地说，每个集合条目可以包含嵌套对象和嵌套在对象属性中的对象集合，即相关实体，在关系数据库中，这些实体包含在不同的表中并通过外部键连接。在 NoSQL 中，数据库可以嵌套在其父实体中。由于集合条目包含复杂的嵌套对象，而不是像关系数据库那样简单的属性/值对，因此条目不被称为元组或行，而是*文档*。
 
 在同一集合或不同集合中属于同一文档的文档之间不能定义关系和/或外部键约束。如果一个文档在其属性中包含另一个文档的主键，那么它这样做是有风险的。开发者有责任维护并保持这些一致性的引用。
 
-最后，由于NoSQL存储相对便宜，整个二进制文件可以作为文档属性的值以Base64字符串的形式存储。开发者可以定义规则来决定在集合中索引哪些属性。由于文档是嵌套对象，属性实际上是树路径。通常情况下，默认情况下，所有路径都会被索引，但你也可以指定要索引哪些路径集合和子路径。
+最后，由于 NoSQL 存储相对便宜，整个二进制文件可以作为文档属性的值以 Base64 字符串的形式存储。开发者可以定义规则来决定在集合中索引哪些属性。由于文档是嵌套对象，属性实际上是树路径。通常情况下，默认情况下，所有路径都会被索引，但你也可以指定要索引哪些路径集合和子路径。
 
-NoSQL数据库可以通过SQL的子集或基于JSON的语言进行查询，其中查询是JSON对象，其路径表示要查询的属性，其值表示已应用于它们的查询约束。
+NoSQL 数据库可以通过 SQL 的子集或基于 JSON 的语言进行查询，其中查询是 JSON 对象，其路径表示要查询的属性，其值表示已应用于它们的查询约束。
 
-在关系数据库中，可以通过一对多关系使用嵌套子对象的可能性。然而，在使用关系数据库时，我们被迫重新定义所有相关表的精确结构，而NoSQL集合不对它们包含的对象施加任何预定义的结构。唯一的约束是每个文档必须为主键属性提供一个唯一的值。因此，当我们的对象结构极其多变时，NoSQL数据库是唯一的选择。然而，它们通常被选择用于扩展读/写操作的方式，以及更普遍的，在分布式环境中的性能优势。它们的功能将在下一节中讨论，该节将它们与关系数据库进行比较。
+在关系数据库中，可以通过一对多关系使用嵌套子对象的可能性。然而，在使用关系数据库时，我们被迫重新定义所有相关表的精确结构，而 NoSQL 集合不对它们包含的对象施加任何预定义的结构。唯一的约束是每个文档必须为主键属性提供一个唯一的值。因此，当我们的对象结构极其多变时，NoSQL 数据库是唯一的选择。然而，它们通常被选择用于扩展读/写操作的方式，以及更普遍的，在分布式环境中的性能优势。它们的功能将在下一节中讨论，该节将它们与关系数据库进行比较。
 
 图数据模型是完全无结构文档的极端情况。整个数据库是一个图，查询可以在其中添加、更改和删除图文档。
 
-在这种情况下，我们有两种类型的文档：节点和关系。虽然关系有一个定义良好的结构（通过关系连接的节点的主键，加上关系名称），但节点没有任何结构，因为属性及其值是在节点更新操作中一起添加的。图数据模型是为了表示人们及其操作的对象（媒体、帖子等）的特征以及他们在*社交应用*中的关系而设计的。Gremlin语言是为了查询图数据模型而专门设计的。我们不会在本章中讨论这个问题，但在*进一步阅读*部分有相关参考资料。
+在这种情况下，我们有两种类型的文档：节点和关系。虽然关系有一个定义良好的结构（通过关系连接的节点的主键，加上关系名称），但节点没有任何结构，因为属性及其值是在节点更新操作中一起添加的。图数据模型是为了表示人们及其操作的对象（媒体、帖子等）的特征以及他们在*社交应用*中的关系而设计的。Gremlin 语言是为了查询图数据模型而专门设计的。我们不会在本章中讨论这个问题，但在*进一步阅读*部分有相关参考资料。
 
-在本章剩余的部分，我们将详细分析NoSQL数据库，这些部分专门用于描述Azure Cosmos DB并将其与关系数据库进行比较。
+在本章剩余的部分，我们将详细分析 NoSQL 数据库，这些部分专门用于描述 Azure Cosmos DB 并将其与关系数据库进行比较。
 
 # Redis
 
-Redis是一种基于键值对的分布式并发内存存储，支持分布式队列。它可以作为永久性内存存储，也可以作为数据库数据的Web应用程序缓存。或者，它可以渲染内容变化不大的页面。
+Redis 是一种基于键值对的分布式并发内存存储，支持分布式队列。它可以作为永久性内存存储，也可以作为数据库数据的 Web 应用程序缓存。或者，它可以渲染内容变化不大的页面。
 
-Redis还可以用于存储Web应用程序的用户会话数据。实际上，ASP.NET MVC、Pages和WebForms支持会话数据以克服HTTP协议无状态的事实。更具体地说，用户数据在页面变化之间保持不变，并存储在Redis等服务器端存储中，并通过存储在cookie中的会话键进行索引。
+Redis 还可以用于存储 Web 应用程序的用户会话数据。实际上，ASP.NET MVC、Pages 和 WebForms 支持会话数据以克服 HTTP 协议无状态的事实。更具体地说，用户数据在页面变化之间保持不变，并存储在 Redis 等服务器端存储中，并通过存储在 cookie 中的会话键进行索引。
 
-与云中的Redis服务器交互通常基于REST接口；也就是说，每个Redis资源通过HTTP GET在URI上访问，命令通过查询字符串传递，而答案以JSON格式返回。然而，所有流行的语言中都有提供易于使用的接口的客户端。.NET和.NET Core的客户端可以通过`StackExchange.Redis` NuGet包获得。`StackExchange.Redis`客户端的基本操作已在[https://stackexchange.github.io/StackExchange.Redis/Basics](https://stackexchange.github.io/StackExchange.Redis/Basics)中记录，而完整文档可以在[https://stackexchange.github.io/StackExchange.Redis](https://stackexchange.github.io/StackExchange.Redis)找到。
+与云中的 Redis 服务器交互通常基于 REST 接口；也就是说，每个 Redis 资源通过 HTTP GET 在 URI 上访问，命令通过查询字符串传递，而答案以 JSON 格式返回。然而，所有流行的语言中都有提供易于使用的接口的客户端。.NET 和.NET Core 的客户端可以通过`StackExchange.Redis` NuGet 包获得。`StackExchange.Redis`客户端的基本操作已在[`stackexchange.github.io/StackExchange.Redis/Basics`](https://stackexchange.github.io/StackExchange.Redis/Basics)中记录，而完整文档可以在[`stackexchange.github.io/StackExchange.Redis`](https://stackexchange.github.io/StackExchange.Redis)找到。
 
-在Azure上定义Redis服务器的用户界面相当简单：
+在 Azure 上定义 Redis 服务器的用户界面相当简单：
 
 ![图片](img/df820d64-6224-4523-94ef-2c30f6a9e50d.png)
 
-价格层级下拉菜单允许我们选择可用的内存/复制选项之一。一个快速入门指南，解释如何使用Azure Redis凭据和`StackExchange.Redis` .NET Core客户端的URI，可以在[https://docs.microsoft.com/en-us/azure/azure-cache-for-redis/cache-dotnet-core-quickstart](https://docs.microsoft.com/en-us/azure/azure-cache-for-redis/cache-dotnet-core-quickstart)找到。
+价格层级下拉菜单允许我们选择可用的内存/复制选项之一。一个快速入门指南，解释如何使用 Azure Redis 凭据和`StackExchange.Redis` .NET Core 客户端的 URI，可以在[`docs.microsoft.com/en-us/azure/azure-cache-for-redis/cache-dotnet-core-quickstart`](https://docs.microsoft.com/en-us/azure/azure-cache-for-redis/cache-dotnet-core-quickstart)找到。
 
 # 磁盘内存
 
-所有云都提供可扩展和冗余的通用磁盘内存，您可以用作虚拟机中的虚拟磁盘或作为外部文件存储。Azure *存储帐户* 磁盘空间也可以在表和队列中进行结构化。然而，这两个存储选项仅支持向后兼容，因为Azure NoSQL数据库比表更好，Azure Redis比Azure存储队列更好：
+所有云都提供可扩展和冗余的通用磁盘内存，您可以用作虚拟机中的虚拟磁盘或作为外部文件存储。Azure *存储帐户* 磁盘空间也可以在表和队列中进行结构化。然而，这两个存储选项仅支持向后兼容，因为 Azure NoSQL 数据库比表更好，Azure Redis 比 Azure 存储队列更好：
 
 ![](img/67b90062-5d45-4cec-8625-9fa827a64189.png)
 
-在本章的剩余部分，我们将重点关注NoSQL数据库以及它们与关系数据库的不同之处。接下来，我们将探讨如何在这两者之间进行选择。
+在本章的剩余部分，我们将重点关注 NoSQL 数据库以及它们与关系数据库的不同之处。接下来，我们将探讨如何在这两者之间进行选择。
 
-# 在结构化存储或NoSQL存储之间进行选择
+# 在结构化存储或 NoSQL 存储之间进行选择
 
-在上一节中，我们提到当数据几乎没有任何预定义结构时，应该优先考虑NoSQL数据库。实际上，非结构化数据可以在关系数据库中表示，因为元组`t`的可变属性可以放置在一个包含属性名称、属性值和`t`的外部键的连接表中。然而，问题是性能。事实上，属于单个对象的属性值会散布在可用的内存空间中。在一个小型数据库中，“散布在可用的内存空间中”意味着距离较远但位于同一磁盘上；在一个大型数据库中，这意味着距离较远但位于不同的磁盘单元中；在分布式云环境中，这意味着距离较远，可能位于不同的——甚至地理上分布的——服务器上。
+在上一节中，我们提到当数据几乎没有任何预定义结构时，应该优先考虑 NoSQL 数据库。实际上，非结构化数据可以在关系数据库中表示，因为元组`t`的可变属性可以放置在一个包含属性名称、属性值和`t`的外部键的连接表中。然而，问题是性能。事实上，属于单个对象的属性值会散布在可用的内存空间中。在一个小型数据库中，“散布在可用的内存空间中”意味着距离较远但位于同一磁盘上；在一个大型数据库中，这意味着距离较远但位于不同的磁盘单元中；在分布式云环境中，这意味着距离较远，可能位于不同的——甚至地理上分布的——服务器上。
 
-另一方面，NoSQL数据库不仅将可变属性与其所有者保持接近，而且由于它们允许相关对象嵌套在属性和集合中，它们还将一些相关对象保持接近。
+另一方面，NoSQL 数据库不仅将可变属性与其所有者保持接近，而且由于它们允许相关对象嵌套在属性和集合中，它们还将一些相关对象保持接近。
 
-因此，我们可以得出结论，当通常一起访问的表可以存储在内存附近时，关系数据库表现良好。另一方面，NoSQL数据库自动确保相关数据保持接近，因为每个条目都将其相关的大部分数据作为嵌套对象包含在内。因此，当NoSQL数据库分布到不同的内存以及不同的地理上分布的服务器上时，它们的表现更好。
+因此，我们可以得出结论，当通常一起访问的表可以存储在内存附近时，关系数据库表现良好。另一方面，NoSQL 数据库自动确保相关数据保持接近，因为每个条目都将其相关的大部分数据作为嵌套对象包含在内。因此，当 NoSQL 数据库分布到不同的内存以及不同的地理上分布的服务器上时，它们的表现更好。
 
-不幸的是，扩展存储写操作的唯一方法是将集合条目根据*分片键*的值分散到几个服务器上。例如，我们可以将所有以A开头的用户名记录放在一个服务器上，以B开头的记录放在另一个服务器上，依此类推。这样，不同起始字母的用户名的写操作可以并行执行，确保写吞吐量随着服务器数量的线性增长。
+不幸的是，扩展存储写操作的唯一方法是将集合条目根据*分片键*的值分散到几个服务器上。例如，我们可以将所有以 A 开头的用户名记录放在一个服务器上，以 B 开头的记录放在另一个服务器上，依此类推。这样，不同起始字母的用户名的写操作可以并行执行，确保写吞吐量随着服务器数量的线性增长。
 
 然而，如果一个*分片*集合与几个其他集合相关联，不能保证相关记录会被放置在同一个服务器上。此外，在不使用集合分片的情况下，将不同的集合放在不同的服务器上可以线性地增加写入吞吐量，直到达到每个服务器单个集合的极限，但这并不能解决在检索或更新通常一起处理的数据时被迫在多个服务器上执行多个操作的问题。
 
 如果必须以事务性方式访问相关分布式对象，并且必须确保结构约束（如外部键约束）不被违反，这个问题将对性能造成灾难性的影响。在这种情况下，所有相关对象必须在事务期间被阻塞，防止其他请求在整个耗时的分布式操作期间访问它们。
 
-NoSQL数据库不受此问题的影响，并且通过分片以及随之而来的写入扩展输出表现更好。这是因为它们不会将相关数据分布到不同的存储单元，而是将它们存储为同一数据库条目的嵌套对象。
+NoSQL 数据库不受此问题的影响，并且通过分片以及随之而来的写入扩展输出表现更好。这是因为它们不会将相关数据分布到不同的存储单元，而是将它们存储为同一数据库条目的嵌套对象。
 
-在NoSQL数据库设计中，我们总是试图将所有可能一起处理的相关对象放入一个单独的条目中。访问频率较低的相关对象被放置在不同的条目中。由于外部键约束不是自动强制执行的，并且NoSQL事务非常灵活，开发者可以在性能和一致性之间选择最佳折衷方案。
+在 NoSQL 数据库设计中，我们总是试图将所有可能一起处理的相关对象放入一个单独的条目中。访问频率较低的相关对象被放置在不同的条目中。由于外部键约束不是自动强制执行的，并且 NoSQL 事务非常灵活，开发者可以在性能和一致性之间选择最佳折衷方案。
 
 值得注意的是，在某些情况下，关系数据库在分片方面表现良好。一个典型的例子是多租户应用程序。在多租户应用程序中，所有条目集合可以被划分为不重叠的集合，称为**租户**。只有属于同一租户的条目可以相互引用，因此如果所有集合都根据它们的对象租户以相同的方式分片，所有相关记录最终都会落在同一个分片上，即同一个服务器上，并且可以有效地进行导航。
 
-在云中，多租户应用程序并不罕见，因为向几个不同用户提供相同服务的所有应用程序通常都作为多租户应用程序实现，其中每个租户对应一个用户订阅。因此，关系数据库被设计在云中工作，例如Azure SQL Server，并且通常为多租户应用程序提供分片选项。通常，分片不是云服务，必须使用数据库引擎命令定义。在这里，我们不会描述如何使用Azure SQL Server定义分片，但*进一步阅读*部分包含了一个指向官方Microsoft文档的链接。
+在云中，多租户应用程序并不罕见，因为向几个不同用户提供相同服务的所有应用程序通常都作为多租户应用程序实现，其中每个租户对应一个用户订阅。因此，关系数据库被设计在云中工作，例如 Azure SQL Server，并且通常为多租户应用程序提供分片选项。通常，分片不是云服务，必须使用数据库引擎命令定义。在这里，我们不会描述如何使用 Azure SQL Server 定义分片，但*进一步阅读*部分包含了一个指向官方 Microsoft 文档的链接。
 
-总之，关系数据库提供了独立于实际存储方式的数据的纯粹逻辑视图，并使用声明性语言来查询和更新它们。这简化了开发和系统维护，但在需要写入扩展的分布式环境中可能会引起性能问题。在NoSQL数据库中，您必须手动处理更多关于如何存储数据的细节，以及所有更新和查询操作的一些过程性细节，但这也允许您在需要读取和写入扩展的分布式环境中优化性能。
+总之，关系数据库提供了独立于实际存储方式的数据的纯粹逻辑视图，并使用声明性语言来查询和更新它们。这简化了开发和系统维护，但在需要写入扩展的分布式环境中可能会引起性能问题。在 NoSQL 数据库中，您必须手动处理更多关于如何存储数据的细节，以及所有更新和查询操作的一些过程性细节，但这也允许您在需要读取和写入扩展的分布式环境中优化性能。
 
-在下一节中，我们将探讨Azure Cosmos DB，这是Azure的主要NoSQL服务。
+在下一节中，我们将探讨 Azure Cosmos DB，这是 Azure 的主要 NoSQL 服务。
 
 # Azure Cosmos DB – 管理跨大陆数据库的机会
 
-Azure Cosmos DB是Azure的主要NoSQL服务。Azure Cosmos DB拥有自己的接口，它是SQL的一个子集，但可以用MongoDB接口进行配置。它也可以配置为图数据模型，可以用Gremlin查询。Cosmos DB允许进行复制以实现容错和读取扩展，副本可以地理分布以优化通信性能。此外，您可以指定所有副本放置在哪个数据中心。用户还可以选择启用所有副本的写入功能，以便在写入的地理区域立即可用。通过分片实现写入扩展，用户可以通过定义哪些属性用作分片键来配置它。
+Azure Cosmos DB 是 Azure 的主要 NoSQL 服务。Azure Cosmos DB 拥有自己的接口，它是 SQL 的一个子集，但可以用 MongoDB 接口进行配置。它也可以配置为图数据模型，可以用 Gremlin 查询。Cosmos DB 允许进行复制以实现容错和读取扩展，副本可以地理分布以优化通信性能。此外，您可以指定所有副本放置在哪个数据中心。用户还可以选择启用所有副本的写入功能，以便在写入的地理区域立即可用。通过分片实现写入扩展，用户可以通过定义哪些属性用作分片键来配置它。
 
-您可以通过在Azure门户搜索栏中键入Cosmos DB并点击添加来定义一个Cosmos DB账户。以下页面将出现：
+您可以通过在 Azure 门户搜索栏中键入 Cosmos DB 并点击添加来定义一个 Cosmos DB 账户。以下页面将出现：
 
 ![图片](img/83d9ca9f-5a23-4509-8a8a-5487e31c2409.png)
 
-您选择的账户名称在资源URI中用作`{账户名称}.documents.azure.com`。API下拉菜单允许您选择您喜欢的接口类型（SQL、MongoDB或Gremlin）。然后，您可以决定主数据库将放置在哪个数据中心，以及您是否希望启用地理分布复制。一旦启用了地理分布复制，您可以选择您想要使用的副本数量以及它们放置的位置。
+您选择的账户名称在资源 URI 中用作`{账户名称}.documents.azure.com`。API 下拉菜单允许您选择您喜欢的接口类型（SQL、MongoDB 或 Gremlin）。然后，您可以决定主数据库将放置在哪个数据中心，以及您是否希望启用地理分布复制。一旦启用了地理分布复制，您可以选择您想要使用的副本数量以及它们放置的位置。
 
 最后，多区域写入切换功能允许您在地理分布的副本上启用写入。如果您不这样做，所有写入操作都将路由到主数据中心。
 
@@ -144,15 +144,15 @@ Azure Cosmos DB是Azure的主要NoSQL服务。Azure Cosmos DB拥有自己的接�
 
 ![图片](img/6e63a071-b4a1-48b4-80b2-db48df1aff90.png)
 
-在这里，您可以决定数据库和集合名称以及用于分片（分区键）的属性。由于NoSQL条目是对象树，属性名称指定为路径。您还可以添加值必须唯一的属性。然而，唯一性ID是在每个分片中检查的，因此此选项仅在特定情况下有用，例如多租户应用程序（其中每个租户都包含在单个分片中）。费用取决于您选择的集合吞吐量。
+在这里，您可以决定数据库和集合名称以及用于分片（分区键）的属性。由于 NoSQL 条目是对象树，属性名称指定为路径。您还可以添加值必须唯一的属性。然而，唯一性 ID 是在每个分片中检查的，因此此选项仅在特定情况下有用，例如多租户应用程序（其中每个租户都包含在单个分片中）。费用取决于您选择的集合吞吐量。
 
-1.  **将所有资源参数针对您的需求进行定位**：吞吐量以每秒请求单位表示，其中每秒请求单位定义为每秒执行1 KB读取时的吞吐量。因此，如果您检查“配置数据库吞吐量”选项，所选的吞吐量将共享给整个数据库，而不是作为单个集合保留。
+1.  **将所有资源参数针对您的需求进行定位**：吞吐量以每秒请求单位表示，其中每秒请求单位定义为每秒执行 1 KB 读取时的吞吐量。因此，如果您检查“配置数据库吞吐量”选项，所选的吞吐量将共享给整个数据库，而不是作为单个集合保留。
 
-1.  **获取连接信息**：通过选择“键”菜单，您将看到连接到您的应用中的Cosmos DB账户所需的所有信息：
+1.  **获取连接信息**：通过选择“键”菜单，您将看到连接到您的应用中的 Cosmos DB 账户所需的所有信息：
 
 ![图片](img/2d565e3b-bb79-41aa-aa36-09615968a7c7.png)
 
-1.  **连接信息页面**：在这里，您将找到账户URI和两个连接键，这些键可以互换使用来连接到账户：
+1.  **连接信息页面**：在这里，您将找到账户 URI 和两个连接键，这些键可以互换使用来连接到账户：
 
 ![图片](img/503dcd27-b61c-450e-871a-0232bedf3cab.png)
 
@@ -176,23 +176,61 @@ Azure Cosmos DB是Azure的主要NoSQL服务。Azure Cosmos DB拥有自己的接�
 
 +   **强一致性**：这是结合了`Delta = 0`的有限不一致性。在这里，每次读取都反映了所有之前的写入操作的结果。
 
-可以获得最强的一致性，但会损害性能。默认情况下，一致性设置为Session，这是在一致性和性能之间的一种良好折衷。在应用程序中处理较低级别的一致性比较困难，并且通常只有在会话是只读或只写的情况下才可接受。
+可以获得最强的一致性，但会损害性能。默认情况下，一致性设置为 Session，这是在一致性和性能之间的一种良好折衷。在应用程序中处理较低级别的一致性比较困难，并且通常只有在会话是只读或只写的情况下才可接受。
 
-如果你选择数据探索器中的“缩放和设置”选项，你可以配置要索引哪些路径以及将哪种索引应用于每个路径的每个数据类型。配置由一个JSON对象组成。让我们分析其各种属性：
+如果你选择数据探索器中的“缩放和设置”选项，你可以配置要索引哪些路径以及将哪种索引应用于每个路径的每个数据类型。配置由一个 JSON 对象组成。让我们分析其各种属性：
 
-[PRE0]
+```cs
+{
+    "indexingMode": "consistent",
+    "automatic": true,
+    ...
+```
 
 如果你将`indexingMode`设置为`none`而不是`consistent`，则不会生成索引，集合可以用作以集合主键为索引的键值字典。当`automatic`设置为`true`时，所有文档属性都会自动索引：
 
-[PRE1]
+```cs
+{
+    ...
+    "includedPaths": [
+        {
+            "path": "/*",
+            "indexes": [
+                {
+                    "kind": "Range",
+                    "dataType": "Number",
+                    "precision": -1
+                },
+                {
+                    "kind": "Range",
+                    "dataType": "String",
+                    "precision": -1
+                },
+                {
+                    "kind": "Spatial",
+                    "dataType": "Point"
+                }
+            ]
+        }
+    ]
+},
+...
+```
 
 “包含的路径”中的每个条目指定了一个路径模式，例如`/subpath1/subpath2/?`（设置仅应用于`/subpath1/subpath2/`属性）或`/subpath1/subpath2/*`（设置应用于以`/subpath1/subpath2/`开头的所有路径）。
 
 当设置必须应用于集合属性中包含的子对象时，模式包含`[]`符号；例如，`/subpath1/subpath2/[]/?`，`/subpath1/subpath2/[]/childpath1/?`等等。设置指定要应用于每个数据类型（字符串、数字、地理点等）的索引类型。范围索引用于比较操作，而如果需要进行相等比较，则散列索引更有效。
 
-可以指定精度，即所有索引键中使用的最大字符数或数字数。`-1`表示无限制。对于字符串，`-1`是可以接受的，而对于数字，应使用有限的精度。另一方面，使用有限的精度与字符串可能会导致意外的行为，因为字符串键会被截断。在散列索引中，精度可能从1到8不等，而在范围索引中，精度可能从1到100不等：
+可以指定精度，即所有索引键中使用的最大字符数或数字数。`-1`表示无限制。对于字符串，`-1`是可以接受的，而对于数字，应使用有限的精度。另一方面，使用有限的精度与字符串可能会导致意外的行为，因为字符串键会被截断。在散列索引中，精度可能从 1 到 8 不等，而在范围索引中，精度可能从 1 到 100 不等：
 
-[PRE2]
+```cs
+    ...
+    "excludedPaths": [
+        {
+            "path": "/\"_etag\"/?"
+        }
+    ]
+```
 
 `excludedPaths`中包含的路径根本不会被索引。索引设置也可以通过编程方式指定。
 
@@ -204,17 +242,25 @@ Azure Cosmos DB是Azure的主要NoSQL服务。Azure Cosmos DB拥有自己的接�
 
 1.  任何操作都需要创建一个客户端对象：
 
-[PRE3]
+```cs
+var client = new DocumentClient(new Uri("service endpoint"), "auth key")
+```
 
 1.  不要忘记，当不再需要客户端时，必须通过调用其 `Dispose` 方法（或通过将引用它的代码封装在 `using` 语句中）来释放客户端。
 
 1.  然后，你可以使用以下代码获取数据库的引用并创建它（如果它不存在）：
 
-[PRE4]
+```cs
+Database db = client.CreateDatabaseIfNotExistsAsync(new Database { Id = "MyDatabase" }).Result;
+```
 
 1.  最后，你可以使用以下代码获取集合的引用或创建它（如果它不存在）：
 
-[PRE5]
+```cs
+var collection = client.CreateDocumentCollectionIfNotExistsAsync(
+    UriFactory.CreateDatabaseUri("MyDatabase"), 
+    new DocumentCollection { Id = "MyCollection" }).Result;
+```
 
 1.  在创建集合期间，你可以传递一个 `option` 对象，其中你可以指定一致性级别、如何索引属性以及所有其他集合功能。
 
@@ -234,15 +280,20 @@ Azure Cosmos DB是Azure的主要NoSQL服务。Azure Cosmos DB拥有自己的接�
 
 # Cosmos DB 实体框架核心提供程序
 
-Cosmos DB 实体框架核心提供程序包含在 `Microsoft.EntityFrameworkCore.Cosmos` NuGet 包中。一旦将其添加到项目中，你就可以以与在 [第 6 章](8c8a9dbc-3bfc-4291-866f-fdd1a62c16ef.xhtml) 中使用 SQL Server 提供程序时类似的方式进行操作，但在一些方面有所不同。让我们来看看：
+Cosmos DB 实体框架核心提供程序包含在 `Microsoft.EntityFrameworkCore.Cosmos` NuGet 包中。一旦将其添加到项目中，你就可以以与在 第六章 中使用 SQL Server 提供程序时类似的方式进行操作，但在一些方面有所不同。让我们来看看：
 
 1.  由于 Cosmos DB 数据库没有结构需要更新，因此没有迁移。相反，它有一个确保数据库以及所有必要的集合被创建的方法：
 
-[PRE6]
+```cs
+context.Database.EnsureCreated();
+```
 
 1.  `DbSet<T>` 和 `DBContext` 属性并不一一对应数据库集合，因为集合可以包含具有不同结构的对象，所以几个 `DbSet<T>` 属性可以映射到同一个集合。此外，默认情况下，所有 `DbSet<T>` 属性都映射到唯一的集合，因为这是最经济的选项，但你可以通过以下配置指令显式指定要将某些实体映射到哪个集合来覆盖此默认设置：
 
-[PRE7]
+```cs
+builder.Entity<MyEntity>()
+     .ToContainer("collection-name");
+```
 
 1.  实体类上唯一有用的注解是 `Key` 属性，当主键被称作 `Id` 时，该属性变得强制使用。
 
@@ -264,11 +315,11 @@ Cosmos DB 实体框架核心提供程序包含在 `Microsoft.EntityFrameworkCore
 
 总之，对于第一和第二点中的数据，最佳选择是 Cosmos DB，而对于第三点，最佳选择是 Azure SQL Server。实际应用程序可能需要对所有数据操作及其频率进行更详细的分析。在某些情况下，为各种可能的选项实现原型并在所有这些上执行典型工作负载的性能测试是值得的。
 
-在本节的剩余部分，我们将把我们在[第6章](8c8a9dbc-3bfc-4291-866f-fdd1a62c16ef.xhtml)，“使用C#与数据交互 - Entity Framework Core”中查看的 destinations/packages 数据层迁移到 Cosmos DB。
+在本节的剩余部分，我们将把我们在第六章，“使用 C#与数据交互 - Entity Framework Core”中查看的 destinations/packages 数据层迁移到 Cosmos DB。
 
 # 使用 Cosmos DB 实现目的地/包数据库
 
-让我们继续到我们在[第6章](8c8a9dbc-3bfc-4291-866f-fdd1a62c16ef.xhtml)，“使用C#与数据交互 – Entity Framework Core”中构建的数据库示例，按照以下步骤将其迁移到 Cosmos DB：
+让我们继续到我们在第六章，“使用 C#与数据交互 – Entity Framework Core”中构建的数据库示例，按照以下步骤将其迁移到 Cosmos DB：
 
 1.  首先，我们需要复制 WWTravelClubDB 项目，并将 `WWTravelClubDBCosmo` 设置为新根文件夹。
 
@@ -286,7 +337,10 @@ Cosmos DB 实体框架核心提供程序包含在 `Microsoft.EntityFrameworkCore
 
 1.  在 `MainDBContext` 文件中，我们需要指定与目的地相关的包必须存储在目的地文档本身中。这可以通过在 `OnModelCreating` 方法中将 Destination-Package 关系配置替换为以下代码来实现：
 
-[PRE8]
+```cs
+builder.Entity<Destination>()
+    .OwnsMany(m => m.Packages); 
+```
 
 1.  在这里，我们必须将 `HasMany` 替换为 `OwnsMany`。没有 `WithOne` 的等效项，因为一旦实体被拥有，它必须只有一个所有者，而 `MyDestination` 属性包含对父实体的指针的事实可以从其类型中看出。Cosmos DB 也允许使用 `HasMany`，但在这种情况下，两个实体并不是嵌套在一另一个中。还有用于在实体内部嵌套单个实体的 `OwnOne` 配置方法。
 
@@ -294,17 +348,76 @@ Cosmos DB 实体框架核心提供程序包含在 `Microsoft.EntityFrameworkCore
 
 1.  `LibraryDesignTimeDbContextFactory` 必须修改为使用 Cosmos DB 连接数据，如下面的代码所示：
 
-[PRE9]
+```cs
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Design;
+
+namespace WWTravelClubDB
+{
+    public class LibraryDesignTimeDbContextFactory
+        : IDesignTimeDbContextFactory<MainDBContext>
+    {
+        private const string endpoint = "<your account endpoint>";
+        private const string key = "<your account key>";
+        private const string datbaseName = "packagesdb";
+        public MainDBContext CreateDbContext(params string[] args)
+        {
+            var builder = new DbContextOptionsBuilder<Main
+            DBContext>();
+
+            builder.UseCosmos(endpoint, key, datbaseName);
+            return new MainDBContext(builder.Options);
+        }
+    }
+}
+```
 
 1.  最后，在我们的测试控制台中，我们必须明确使用 GUIDS 创建所有实体主键：
 
-[PRE10]
+```cs
+var context = new LibraryDesignTimeDbContextFactory()
+    .CreateDbContext();
+context.Database.EnsureCreated();
+var firstDestination = new Destination
+{
+    Id = Guid.NewGuid().ToString(),
+    Name = "Florence",
+    Country = "Italy",
+    Packages = new List<Package>()
+    {
+    new Package
+    {
+        Id=Guid.NewGuid().ToString(),
+        Name = "Summer in Florence",
+        StartValidityDate = new DateTime(2019, 6, 1),
+        EndValidityDate = new DateTime(2019, 10, 1),
+        DuratioInDays=7,
+        Price=1000
+    },
+    new Package
+    {
+        Id=Guid.NewGuid().ToString(),
+        Name = "Winter in Florence",
+        StartValidityDate = new DateTime(2019, 12, 1),
+        EndValidityDate = new DateTime(2020, 2, 1),
+        DuratioInDays=7,
+        Price=500
+    }
+    }
+};
+```
 
 在这里，我们调用 `context.Database.EnsureCreated()` 而不是应用迁移，因为我们只需要创建数据库。一旦数据库和集合被创建，我们就可以从 Azure Portal 调整它们的设置。希望未来版本的 Cosmos DB Entity Framework Core 提供程序将允许我们指定所有集合选项。
 
 1.  最后，以 `context.Packages.Where...` 开头的最终查询必须进行修改，因为查询不能从嵌套在其他文档中的实体开始（在我们的情况下，`Package` 实体）。因此，我们必须从我们的 `DBContext` 中的唯一根 `DbSet<T>` 属性开始我们的查询，即 `Destinations`。我们可以借助 `SelectMany` 方法从列出外部集合切换到列出所有内部集合，该方法执行所有嵌套 `Packages` 集合的逻辑合并。然而，由于 `CosmosDB` SQL 不支持 `SelectMany`，我们必须使用 `AsIenumerable()` 在客户端强制模拟 `SelectMany`，如下面的代码所示：
 
-[PRE11]
+```cs
+var list = context.Destinations
+    .AsEnumerable() // move computation on the client side
+    .SelectMany(m => m.Packages)
+    .Where(m => period >= m.StartValidityDate....)
+    ...
+```
 
 1.  查询的其余部分保持不变。如果您现在运行项目，应该看到与 SQL Server 的情况相同的输出（除了主键值之外）。
 
@@ -314,7 +427,7 @@ Cosmos DB 实体框架核心提供程序包含在 `Microsoft.EntityFrameworkCore
 
 包已经按照要求嵌套在其目的地内部，Entity Framework Core 创建了一个与 `DBContext` 类同名的唯一集合。
 
-如果您想在不用完所有免费 Azure Portal 信用额度的情况下继续实验 Cosmos DB 开发，您可以安装此链接提供的 Cosmos DB 模拟器：[https://aka.ms/cosmosdb-emulator](https://aka.ms/cosmosdb-emulator)。
+如果您想在不用完所有免费 Azure Portal 信用额度的情况下继续实验 Cosmos DB 开发，您可以安装此链接提供的 Cosmos DB 模拟器：[`aka.ms/cosmosdb-emulator`](https://aka.ms/cosmosdb-emulator)。
 
 # 摘要
 
@@ -346,12 +459,12 @@ Cosmos DB 实体框架核心提供程序包含在 `Microsoft.EntityFrameworkCore
 
 # 进一步阅读
 
-+   在本章中，我们没有讨论如何使用 SQL Azure 定义分片。如果您想了解更多信息，请参阅官方文档链接：[https://docs.microsoft.com/en-us/azure/sql-database/sql-database-elastic-scale-introduction](https://docs.microsoft.com/en-us/azure/sql-database/sql-database-elastic-scale-introduction)。
++   在本章中，我们没有讨论如何使用 SQL Azure 定义分片。如果您想了解更多信息，请参阅官方文档链接：[`docs.microsoft.com/en-us/azure/sql-database/sql-database-elastic-scale-introduction`](https://docs.microsoft.com/en-us/azure/sql-database/sql-database-elastic-scale-introduction)。
 
-+   本章详细介绍了 Cosmos DB，但更详细的信息可以在官方文档中找到：[https://docs.microsoft.com/en-us/azure/cosmos-db/](https://docs.microsoft.com/en-us/azure/cosmos-db/)。
++   本章详细介绍了 Cosmos DB，但更详细的信息可以在官方文档中找到：[`docs.microsoft.com/en-us/azure/cosmos-db/`](https://docs.microsoft.com/en-us/azure/cosmos-db/)。
 
-+   以下是对 Cosmos DB 支持的 Gremlin 语言的参考：[http://tinkerpop.apache.org/docs/current/reference/#graph-traversal-steps](http://tinkerpop.apache.org/docs/current/reference/#graph-traversal-steps)。
++   以下是对 Cosmos DB 支持的 Gremlin 语言的参考：[`tinkerpop.apache.org/docs/current/reference/#graph-traversal-steps`](http://tinkerpop.apache.org/docs/current/reference/#graph-traversal-steps)。
 
-+   以下是对 Cosmos DB 图数据模型的通用描述：[https://docs.microsoft.com/en-us/azure/cosmos-db/graph-introduction](https://docs.microsoft.com/en-us/azure/cosmos-db/graph-introduction)。
++   以下是对 Cosmos DB 图数据模型的通用描述：[`docs.microsoft.com/en-us/azure/cosmos-db/graph-introduction`](https://docs.microsoft.com/en-us/azure/cosmos-db/graph-introduction)。
 
-+   如何使用 Cosmos DB 的官方 .NET 客户端的详细信息可以在 [https://docs.microsoft.com/en-us/azure/cosmos-db/sql-api-dotnetcore-get-started](https://docs.microsoft.com/en-us/azure/cosmos-db/sql-api-dotnetcore-get-started) 找到。关于本章中提到的 `MvcControlsToolkit.Business.DocumentDB` NuGet 包的良好介绍是 DNCMagazine 第 34 期中的 *Fast Azure Cosmos DB Development with the DocumentDB Package* 文章。这可以从 [http://www.dotnetcurry.net/s/dnc-mag-34th-single](http://www.dotnetcurry.net/s/dnc-mag-34th-single) 下载。
++   如何使用 Cosmos DB 的官方 .NET 客户端的详细信息可以在 [`docs.microsoft.com/en-us/azure/cosmos-db/sql-api-dotnetcore-get-started`](https://docs.microsoft.com/en-us/azure/cosmos-db/sql-api-dotnetcore-get-started) 找到。关于本章中提到的 `MvcControlsToolkit.Business.DocumentDB` NuGet 包的良好介绍是 DNCMagazine 第 34 期中的 *Fast Azure Cosmos DB Development with the DocumentDB Package* 文章。这可以从 [`www.dotnetcurry.net/s/dnc-mag-34th-single`](http://www.dotnetcurry.net/s/dnc-mag-34th-single) 下载。

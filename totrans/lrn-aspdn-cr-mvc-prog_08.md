@@ -1,60 +1,108 @@
-# 第8章：使用Bootstrap美化ASP.NET MVC应用程序
+# 第八章：使用 Bootstrap 美化 ASP.NET MVC 应用程序
 
 你可能已经创建了一个包含所有必需功能的应用程序。它甚至可能在所有场景下都完美运行，没有任何问题。但你的应用程序的成功取决于你的用户如何访问它。为了成功，你的应用程序应该看起来很好（如果不是极好），并且要用户友好。
 
 在本章中，你将学习以下主题：
 
-+   HTML和CSS在ASP.NET Core应用程序中的作用
++   HTML 和 CSS 在 ASP.NET Core 应用程序中的作用
 
 +   前端框架的特点和可用的不同框架
 
-+   Bootstrap及其网格系统及其特性
++   Bootstrap 及其网格系统及其特性
 
-+   Bootstrap中可用的CSS类，用于表单元素（如输入和选择元素）
++   Bootstrap 中可用的 CSS 类，用于表单元素（如输入和选择元素）
 
-+   不同类型的HTML元素（如表格）的CSS类
++   不同类型的 HTML 元素（如表格）的 CSS 类
 
-+   在你的ASP.NET Core应用程序中使用Bootstrap
++   在你的 ASP.NET Core 应用程序中使用 Bootstrap
 
-在讨论如何使我们的应用程序看起来更好之前，让我们退一步，讨论HTML和CSS在你的应用程序中的作用。
+在讨论如何使我们的应用程序看起来更好之前，让我们退一步，讨论 HTML 和 CSS 在你的应用程序中的作用。
 
-# 了解HTML和CSS
+# 了解 HTML 和 CSS
 
-如前所述，所有浏览器只能理解HTML、CSS和JavaScript。因此，你构建的应用程序应该生成HTML、CSS和JavaScript的输出。这一点对于使用Java或Ruby on Rails等其他技术构建的Web应用程序同样适用。话虽如此，我们只会讨论HTML和CSS。
+如前所述，所有浏览器只能理解 HTML、CSS 和 JavaScript。因此，你构建的应用程序应该生成 HTML、CSS 和 JavaScript 的输出。这一点对于使用 Java 或 Ruby on Rails 等其他技术构建的 Web 应用程序同样适用。话虽如此，我们只会讨论 HTML 和 CSS。
 
 **HTML**（**超文本标记语言**）用于在网页中结构化内容。例如，你可以在`title`标签中添加内容，这样它就会在浏览器的标签页或窗口中可用。让我们看看一个例子。
 
-打开任何文本编辑器（你甚至可以使用记事本），输入以下HTML内容，并将文件保存为`Bootstrap.html`。请注意扩展名`.html`：
+打开任何文本编辑器（你甚至可以使用记事本），输入以下 HTML 内容，并将文件保存为`Bootstrap.html`。请注意扩展名`.html`：
 
-[PRE0]
+```cs
+<!DOCTYPE html> 
+<html> 
+<head> 
+    <title> Beautify your ASP.NET MVC applications using Bootstrap </title> 
+</head> 
+<body> 
+    <h1> Bootstrap </h1> 
+    <p> 
+        Bootstrap is the most popular HTML, CSS, and JS framework for developing responsive, mobile first projects on the web. 
+    </p> 
+</body> 
+</html> 
 
-第一行表明HTML内容遵循HTML 5标准（最新和当前版本的HTML）并应如此解释。`html`标签告诉浏览器这是HTML文档的开始。`head`标签中的信息代表元数据，并告诉浏览器网页而不是网页本身。例如，包括页面标题、关于页面的描述和搜索引擎优化的关键词。`body`标签中的所有内容将在浏览器的主窗口中显示。在前面的HTML代码中，我们将`Bootstrap`作为标题，其余内容则被设置为段落。
+```
+
+第一行表明 HTML 内容遵循 HTML 5 标准（最新和当前版本的 HTML）并应如此解释。`html`标签告诉浏览器这是 HTML 文档的开始。`head`标签中的信息代表元数据，并告诉浏览器网页而不是网页本身。例如，包括页面标题、关于页面的描述和搜索引擎优化的关键词。`body`标签中的所有内容将在浏览器的主窗口中显示。在前面的 HTML 代码中，我们将`Bootstrap`作为标题，其余内容则被设置为段落。
 
 在浏览器中打开文件，你应该会看到以下截图类似的内容：
 
-![了解HTML和CSS](img/Image00111.jpg)
+![了解 HTML 和 CSS](img/Image00111.jpg)
 
 你会注意到放置在`title`标签中的内容显示为浏览器的标签页标题，标题内容被加粗并放大，段落则从新的一行开始。
 
-CSS全部关于样式。你可以使用CSS来定制网页中每个元素的外观。你可以改变按钮的颜色、标题文本的字体、表格的边框大小等等。你可以将CSS样式内联或使用单独的文件包含。如果你使用内联CSS，它应该在一个 `style` 标签内。如果你使用外部CSS，我们可以使用一个 `link` 标签并引用外部CSS文件。
+CSS 全部关于样式。你可以使用 CSS 来定制网页中每个元素的外观。你可以改变按钮的颜色、标题文本的字体、表格的边框大小等等。你可以将 CSS 样式内联或使用单独的文件包含。如果你使用内联 CSS，它应该在一个 `style` 标签内。如果你使用外部 CSS，我们可以使用一个 `link` 标签并引用外部 CSS 文件。
 
-CSS不过是一组用于展示的规则。每个规则由两部分组成——一个需要应用声明的选择器和一个包含样式信息的声明。样式信息有一个属性和一个属性的值。
+CSS 不过是一组用于展示的规则。每个规则由两部分组成——一个需要应用声明的选择器和一个包含样式信息的声明。样式信息有一个属性和一个属性的值。
 
-让我们来看以下简单的CSS规则：
+让我们来看以下简单的 CSS 规则：
 
-[PRE1]
+```cs
+    h1{ 
+        color : #0094ff; 
+    } 
 
-这个CSS规则说明所有标题文本都应该使用蓝色。`h1` 是选择器，它告诉浏览器以下声明必须应用于所有 `h1` 标签。在声明中，我们设置了蓝色颜色（十六进制格式中的 `#0094ff` 是蓝色）。
+```
 
-以下是我更新CSS样式（加粗显示）的更新后的HTML文件：
+这个 CSS 规则说明所有标题文本都应该使用蓝色。`h1` 是选择器，它告诉浏览器以下声明必须应用于所有 `h1` 标签。在声明中，我们设置了蓝色颜色（十六进制格式中的 `#0094ff` 是蓝色）。
 
-[PRE2]
+以下是我更新 CSS 样式（加粗显示）的更新后的 HTML 文件：
+
+```cs
+<!DOCTYPE html> 
+<html> 
+<head> 
+    <title> Beautify your ASP.NET MVC applications using Bootstrap </title> 
+    <style type="text/css"> 
+
+        body{ 
+            font-family:Arial,Verdana,sans-serif; 
+        } 
+
+        h1{ 
+            color : #0094ff; 
+        } 
+
+        p { 
+            color: #5f5e5e; 
+        } 
+    </style> 
+
+</head> 
+<body> 
+    <h1> Bootstrap </h1> 
+    <p> 
+        Bootstrap is the most popular HTML, CSS, and JS framework for developing responsive, mobile first projects on the web. 
+    </p> 
+</body> 
+</html> 
+
+```
 
 在浏览器中打开文件并做出样式更改后，你会得到以下输出：
 
-![了解HTML和CSS](img/Image00112.jpg)
+![了解 HTML 和 CSS](img/Image00112.jpg)
 
-话虽如此，你需要创建CSS规则来让你的Web应用中的元素看起来更好。但为每个元素创建不同的样式是一个耗时且繁琐的任务。你可以选择任何可用的前端框架。
+话虽如此，你需要创建 CSS 规则来让你的 Web 应用中的元素看起来更好。但为每个元素创建不同的样式是一个耗时且繁琐的任务。你可以选择任何可用的前端框架。
 
 任何应用程序都应该具有以下特点：
 
@@ -64,7 +112,7 @@ CSS不过是一组用于展示的规则。每个规则由两部分组成——�
 
 +   **移动友好**：这与前面的观点相关。如今，许多应用程序是通过移动设备而不是桌面或笔记本电脑访问的。我们必须确保我们构建的应用程序在移动设备上看起来很棒。
 
-+   **可定制**：如果你打算使用任何前端应用框架，它应该根据你的需求进行定制。例如，如果你想更新标题文本颜色，你应该能够更新或覆盖CSS文件以进行必要的更改。
++   **可定制**：如果你打算使用任何前端应用框架，它应该根据你的需求进行定制。例如，如果你想更新标题文本颜色，你应该能够更新或覆盖 CSS 文件以进行必要的更改。
 
 +   **易于上手**：学习前端框架的曲线应该尽可能平缓，因为你应该把时间花在为客户创造价值——构建和交付解决方案上。我们不是为了学习一个新潮的前端框架而获得报酬。
 
@@ -72,7 +120,7 @@ CSS不过是一组用于展示的规则。每个规则由两部分组成——�
 
 # Bootstrap
 
-Bootstrap 是最受欢迎的 HTML、CSS 和 JS 框架，用于在网络上开发响应式、移动优先的项目，您可以在 [http://getbootstrap.com/](http://getbootstrap.com/) 访问它。
+Bootstrap 是最受欢迎的 HTML、CSS 和 JS 框架，用于在网络上开发响应式、移动优先的项目，您可以在 [`getbootstrap.com/`](http://getbootstrap.com/) 访问它。
 
 ![Bootstrap](img/Image00113.jpg)
 
@@ -120,23 +168,23 @@ Bootstrap 提供了一个流体网格系统，随着设备或视口大小的增�
 
 对于基本的样式，将基础 CSS 类 `table` 添加到 `table` HTML 元素中，如下截图所示：
 
-![表格CSS类](img/Image00120.jpg)
+![表格 CSS 类](img/Image00120.jpg)
 
 ### 条纹表格
 
-在条纹表格中，交替行的背景颜色将是相同的。在下面的屏幕截图中，第一行和第三行的背景颜色是相同的。您可以通过将`table-striped`类应用到表格HTML元素上来应用条纹表格行为。
+在条纹表格中，交替行的背景颜色将是相同的。在下面的屏幕截图中，第一行和第三行的背景颜色是相同的。您可以通过将`table-striped`类应用到表格 HTML 元素上来应用条纹表格行为。
 
 ![条纹表格](img/Image00121.jpg)
 
 ### 悬停表格
 
-当您将鼠标移至表格中的任何一行时，该行的背景颜色会改变。这种悬停行为可以通过将CSS类`table-hover`与类`table`一起应用到HTML表格元素上来实现。
+当您将鼠标移至表格中的任何一行时，该行的背景颜色会改变。这种悬停行为可以通过将 CSS 类`table-hover`与类`table`一起应用到 HTML 表格元素上来实现。
 
 ![悬停表格](img/Image00122.jpg)
 
 ### 带边框的表格
 
-我们可以通过将CSS类`table-bordered`应用到`table`元素上来拥有一个带边框的表格（如下面的屏幕截图所示）。
+我们可以通过将 CSS 类`table-bordered`应用到`table`元素上来拥有一个带边框的表格（如下面的屏幕截图所示）。
 
 ![带边框的表格](img/Image00123.jpg)
 
@@ -162,15 +210,15 @@ Bootstrap 提供了一个流体网格系统，随着设备或视口大小的增�
 
 ## 上下文颜色
 
-根据上下文，您可能想要更改文本的颜色。例如，如果您想要在操作成功时使文本显示为绿色，对于不成功的操作，您可能想要以红色显示错误消息。在这种情况下，您可能使用这些辅助CSS类以不同的颜色显示它们。
+根据上下文，您可能想要更改文本的颜色。例如，如果您想要在操作成功时使文本显示为绿色，对于不成功的操作，您可能想要以红色显示错误消息。在这种情况下，您可能使用这些辅助 CSS 类以不同的颜色显示它们。
 
 ![上下文颜色](img/Image00127.jpg)
 
-我们已经看到了Bootstrap的各种功能。现在，让我们使用Bootstrap来使我们的应用程序看起来更美观。基本上，在我们的视图中有两个主要组件——一个位于顶部的表单用于获取用户的输入，以及一个位于底部的表格用于以表格形式显示结果。
+我们已经看到了 Bootstrap 的各种功能。现在，让我们使用 Bootstrap 来使我们的应用程序看起来更美观。基本上，在我们的视图中有两个主要组件——一个位于顶部的表单用于获取用户的输入，以及一个位于底部的表格用于以表格形式显示结果。
 
-# 在ASP.NET MVC应用程序中使用Bootstrap
+# 在 ASP.NET MVC 应用程序中使用 Bootstrap
 
-有不同的方式可以将Bootstrap应用到您的应用程序中：
+有不同的方式可以将 Bootstrap 应用到您的应用程序中：
 
 +   参考应用中可用的 CDN（内容分发网络）上的 Bootstrap 文件
 
@@ -184,7 +232,33 @@ Bootstrap 提供了一个流体网格系统，随着设备或视口大小的增�
 
 在我们之前创建的应用程序中打开布局文件 (`_Layout.cshtml`)。在顶部（`head` 标签内）包含 CSS 文件，在底部（`body` 标签末尾）包含脚本：
 
-[PRE3]
+```cs
+<!DOCTYPE html> 
+
+<html> 
+<head> 
+    <meta name="viewport" content="width=device-width" /> 
+    <title>@ViewBag.Title</title> 
+    <!-- Latest compiled and minified CSS --> 
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css" integrity="sha384-1q8mTJOASx8j1Au+a5WDVnPi2lkFfwwEAa8hDDdjZlpLegxhjVME1fgjWPGmkzs7" crossorigin="anonymous"> 
+    <!-- Optional theme --> 
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap-theme.min.css" integrity="sha384-fLW2N01lMqjakBkx3l/M9EahuwpSfeNvV63J5ezn3uZzapT0u7EYsXMjQV+0En5r" crossorigin="anonymous"> 
+
+</head> 
+<body> 
+    <div> 
+        @RenderBody() 
+    </div>     
+
+    <script src="img/jquery-2.2.3.js"></script> 
+    <script src="img/jquery.validate.min.js"></script> 
+    <script src="img/jquery.validate.unobtrusive.min.js"></script> 
+    <!-- Latest compiled and minified JavaScript --> 
+    <script src="img/bootstrap.min.js" integrity="sha384-0mSbJDEHialfmuBBQP6A4Qrprq5OVfW37PRR3j5ELqxss1yVqOtnepnHVP9aJ7xS" crossorigin="anonymous"></script> 
+</body> 
+</html> 
+
+```
 
 # 使用 Bower 安装
 
@@ -200,7 +274,15 @@ Bootstrap 提供了一个流体网格系统，随着设备或视口大小的增�
 
 Bootstrap 使用某些需要使用 HTML 5 doctype 的 HTML 元素和 CSS 属性。默认情况下，你创建的 ASP.NET Core 视图将只有 HTML 5 doctype。因此，我们不需要对此做任何事情。
 
-[PRE4]
+```cs
+
+<!DOCTYPE html> 
+
+<html lang="en"> 
+... 
+</html> 
+
+```
 
 让我们对我们屏幕进行以下更改以使用 Bootstrap：
 
@@ -220,7 +302,77 @@ Bootstrap 使用某些需要使用 HTML 5 doctype 的 HTML 元素和 CSS 属性�
 
 以下是完全更新的视图代码；我们使用了 Bootstrap CSS 类来使我们的应用程序看起来很棒：
 
-[PRE5]
+```cs
+@model Validation.ViewModels.EmployeeAddViewModel 
+
+<div> 
+    <br/> 
+    <br/> 
+    <form asp-controller="Employee" asp-action="Index" method="post" role="form" class="form-horizontal"> 
+
+        <div class="form-group"> 
+            <label asp-for="Name" class="col-sm-2 control-label"></label> 
+            <div class="col-sm-4"> 
+                <input asp-for="Name" class="form-control" /> 
+            </div> 
+            <div class="col-sm-3 text-danger"> 
+                <span id="validationName" asp-validation-for="Name" ></span> 
+            </div> 
+        </div> 
+
+        <div class="form-group"> 
+            <label asp-for="Designation" class="col-sm-2 control-label"></label> 
+            <div class="col-sm-4"> 
+                <input asp-for="Designation" class="form-control" /> 
+            </div> 
+            <div class="col-sm-3 text-danger"> 
+                <span id="validationDesignation" asp-validation-for="Designation" ></span> 
+            </div> 
+        </div> 
+
+        <div class="form-group"> 
+            <label asp-for="Salary" class="col-sm-2 control-label"></label> 
+            <div class="col-sm-4"> 
+                <input asp-for="Salary" class="form-control" /> 
+            </div> 
+            <div class="col-sm-3 text-danger"> 
+                <span id="validationSalary" asp-validation-for="Salary" ></span> 
+            </div> 
+        </div> 
+
+        <div class="form-group"> 
+            <div class="col-sm-offset-2 col-sm-10"> 
+                <button type="submit" class="btn btn-primary">Submit</button> 
+            </div> 
+        </div> 
+
+    </form> 
+
+</div> 
+
+<br /><br /> <br /> 
+
+<h4> List of employees:</h4> <br /> 
+
+    <table class="table table-bordered"> 
+        <tr> 
+            <th> ID </th> 
+            <th> Name </th> 
+            <th> Designation </th> 
+            <th> Salary </th> 
+        </tr> 
+        @foreach (var employee in Model.EmployeesList) 
+        { 
+            <tr> 
+                <td>@employee.EmployeeId</td> 
+                <td>@employee.Name</td> 
+                <td>@employee.Designation</td> 
+                <td>@employee.Salary</td> 
+            </tr> 
+        } 
+    </table> 
+
+```
 
 在进行上述更改后，当你运行应用程序时，你的屏幕应该看起来像以下这样：
 

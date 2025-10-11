@@ -1,4 +1,4 @@
-# *第11章*：基准测试关系型数据访问框架
+# *第十一章*：基准测试关系型数据访问框架
 
 数据在我们的日常生活各个方面都得到了广泛的应用。在当今的大数据时代，收集和存储用于各种分析的数据量是惊人的。当处理数据时，随着数据量的增长，性能会呈指数级下降。根据您需要处理的数据量，时间因素往往是关键的。
 
@@ -22,7 +22,7 @@
 
 注意
 
-本章主要涉及你跟随编写大量代码，为在最后一节运行我们的数据访问基准方法做准备。如果你不想编写代码，只想查看结果，那么请跳转到本章的最后一节，查看基准测试结果及其分析。你还可以跳转到本章中对你最有兴趣的领域，帮助你形成自己关于最适合你需求的数据访问方法的观点。源代码也已在GitHub上提供，供你自己研究。
+本章主要涉及你跟随编写大量代码，为在最后一节运行我们的数据访问基准方法做准备。如果你不想编写代码，只想查看结果，那么请跳转到本章的最后一节，查看基准测试结果及其分析。你还可以跳转到本章中对你最有兴趣的领域，帮助你形成自己关于最适合你需求的数据访问方法的观点。源代码也已在 GitHub 上提供，供你自己研究。
 
 # 技术要求
 
@@ -34,11 +34,11 @@
 
 +   SQL Server Management Student 2019 或更高版本
 
-+   本书源代码：[https://github.com/PacktPublishing/High-Performance-Programming-in-CSharp-and-.NET/tree/master/CH10](https://github.com/PacktPublishing/High-Performance-Programming-in-CSharp-and-.NET/tree/master/CH10)
++   本书源代码：[`github.com/PacktPublishing/High-Performance-Programming-in-CSharp-and-.NET/tree/master/CH10`](https://github.com/PacktPublishing/High-Performance-Programming-in-CSharp-and-.NET/tree/master/CH10)
 
 # 基准测试数据插入方法
 
-在本节中，我们将继续我们在 [*第10章*](B16617_10_Final_SB_Epub.xhtml#_idTextAnchor189)，*设置我们的数据库项目*，所做的工作，通过编写将使用 ADO.NET、Entity Framework Core 和 Dapper.NET 对插入方法性能进行基准测试的方法。所以，如果你还没有阅读 [*第10章*](B16617_10_Final_SB_Epub.xhtml#_idTextAnchor189)*，或者查看源代码，现在是一个很好的时机去做这些。 
+在本节中，我们将继续我们在 *第十章*，*设置我们的数据库项目*，所做的工作，通过编写将使用 ADO.NET、Entity Framework Core 和 Dapper.NET 对插入方法性能进行基准测试的方法。所以，如果你还没有阅读 *第十章**，或者查看源代码，现在是一个很好的时机去做这些。 
 
 本章编写的基准测试将在最后一节运行，并分析结果。由于章节和页面的限制，我将省略对 `using` 语句的引用。因此，你需要使用 Visual Studio 的快速提示来添加缺失的 `using` 语句。按照以下步骤编写我们的插入方法基准测试：
 
@@ -46,19 +46,85 @@
 
 1.  打开 `BenchmarkTests` 类，并按以下方式修改：
 
-    [PRE0]
+    ```cs
+    [MemoryDiagnoser]
+    [Orderer(SummaryOrderPolicy.Declared)]
+    [RankColumn]
+    public class BenchmarkTests
+    {
+        [GlobalSetup]
+        public void GlobalSetup()
+        {
+            InsertProductADNSP();
+            InsertProductEFSP();
+            InsertProductDDN();
+    }
+    }
+    ```
 
 我们已经设置了类来执行基准测试，并按声明的顺序总结它们，同时诊断内存使用情况，并提供基准测试方法的性能排名。然后，我们提供了 `GlobalSetup`，它在基准测试之前运行。这是为了为我们的基准测试提供选择、更新和删除的数据。
 
 1.  添加 `InsertProductADN` 方法：
 
-    [PRE1]
+    ```cs
+    [Benchmark]
+    public void InsertProductADN()
+    {
+        string connectionString = SecretsManager
+             .GetSecrets<DatabaseSettings>
+                 ("ConnectionString");
+         AdoDotNetData adnData = new(connectionString);
+        adnData.ExecuteNonQuery("INSERT INTO Products 
+          (ProductName, CategoryID, SupplierId, 
+             Discontinued) VALUES('ADO.NET Product', 1, 1, 
+               0)");
+        adnData.Dispose();
+    }
+    ```
 
 此方法从密钥文件中获取连接字符串，并通过将连接字符串传递给其构造函数来创建一个新的 `AdoDotNetData` 实例。然后，它调用 `ExecuteNonQuery` 方法，将原始 SQL 插入方法传递给该方法。一旦查询运行，实例将被释放。
 
 1.  添加 `InsertProductADNSP` 方法：
 
-    [PRE2]
+    ```cs
+    [Benchmark]
+    public void InsertProductADNSP()
+    {
+        string connectionString = SecretsManager
+             .GetSecrets<DatabaseSettings>
+                 ("ConnectionString");
+         AdoDotNetData aaa = new(connectionString);
+        SqlCommandModel model = new()
+        {
+            CommandText = "InsertProduct",
+            CommandType = CommandType.StoredProcedure,
+             CommandParameters = 
+             new SqlCommandParameterModel[] {
+             new SqlCommandParameterModel() {   
+                 ParameterName = "@ProductName", 
+                     DataType = DbType.String,
+                     Value = "Dapper Product Edited"
+                 }, 
+                 new SqlCommandParameterModel() {   
+                     ParameterName = "@CategoryID",
+                     DataType = DbType.Int32,
+                     Value = 1 
+                 }
+                 , new SqlCommandParameterModel() { 
+                     ParameterName = "@SupplierID",
+                     DataType = DbType.Int32,
+                     Value = 1
+                 }, new SqlCommandParameterModel() { 
+                     ParameterName = "@Discontinued",   
+                     DataType = DbType.Boolean,
+                     Value = false
+                 }
+             }
+         };
+         aaa.ExecuteNonQuery(model);
+        aaa.Dispose();
+    }
+    ```
 
 此方法从密钥文件中获取连接字符串，并将字符串传递给 `AdoDotNetData` 类的构造函数。然后，它创建一个新的 `SqlCommandModel`，用于在产品表上构建存储过程插入操作的属性。接着，它调用 `ExecuteNonQuery` 方法，传入用于生成和执行存储过程调用的模型。然后，`AdoDotNetData` 类被释放。
 
@@ -66,25 +132,136 @@
 
 1.  添加 `InsertProductEF` 方法：
 
-    [PRE3]
+    ```cs
+    [Benchmark]
+    public void InsertProductEF()
+    {
+    string connectionString = SecretsManager
+         .GetSecrets<DatabaseSettings>
+         ("ConnectionString");
+    EntityFrameworkCoreData efData 
+         = new(connectionString);
+        Product product = new() { 
+             ProductName = "EF Product", 
+             CategoryID = 1, 
+             SupplierID = 1,
+             Discontinued = false,
+               QuantityPerUnit = "1"
+         };
+        efData.Products.Add(product);
+        efData.SaveChanges();
+        efData.Dispose();
+    }
+    ```
 
 此方法从密钥文件中获取连接字符串，并将其传递给 `EntityFrameworkCoreData` 类的构造函数。然后，它创建一个新的产品并将其添加到 `Products` 集合中。然后保存更改，并释放 `EntityFrameworkCoreData` 类。
 
 1.  现在，添加 `InsertProductEFSP` 方法：
 
-    [PRE4]
+    ```cs
+    [Benchmark]
+    public void InsertProductEFSP()
+    {
+        string connectionString = SecretsManager.
+             GetSecrets<DatabaseSettings>
+                 ("ConnectionString");
+         EntityFrameworkCoreData efData 
+             = new(connectionString);
+         SqlCommandModel model = new()
+         {
+             CommandText = "EXEC InsertProduct 
+               @ProductName = {0}, @CategoryID = {1},
+                  @SupplierID = {2}, @Discontinued = {3}",
+             CommandType = CommandType.StoredProcedure,
+            CommandParameters 
+                 = new SqlCommandParameterModel[] {
+                     new SqlCommandParameterModel() { 
+                     ParameterName = "@ProductName", 
+                     DataType = DbType.String, 
+                      Value = "EF Product Edited"
+                     }
+                    , new SqlCommandParameterModel() { 
+                     ParameterName = "@CategoryID", 
+                     DataType = DbType.Int32, 
+                     Value = 1 
+                     }
+                    , new SqlCommandParameterModel() { 
+                     ParameterName = "@SupplierID", 
+                     DataType = DbType.Int32, 
+                     Value = 1 
+                     }
+                     , new SqlCommandParameterModel() { 
+                     ParameterName = "@Discontinued", 
+                     DataType = DbType.Boolean, 
+                     Value = false 
+                     }
+                 }
+            };
+         efData.ExecuteNonQuerySP(model);
+         efData.Dispose();
+    }
+    ```
 
 此方法从密钥文件中获取连接字符串，并创建 `EntityFrameworkCoreData` 类的新实例。然后，它通过 `SqlCommandModel` 构建存储过程插入所需的属性。接着，它执行 `ExecuteNonQuerySP` 模型，传入执行插入存储过程的模型，然后释放 `EntityFrameworkCoreData` 类。
 
 1.  添加 `InsertProductDDN` 方法：
 
-    [PRE5]
+    ```cs
+    [Benchmark]
+    public void InsertProductDDN()
+    {
+        string connectionString = SecretsManager
+             .GetSecrets<DatabaseSettings>
+                 ("ConnectionString");
+         DapperDotNet ddnData = new(connectionString);
+        int recordsAffected = ddnData
+             .ExecuteNonQuery("INSERT INTO Products 
+                (ProductName, CategoryID, SupplierId,
+                   Discontinued) VALUES('Dapper.NET 
+                     Product', 1, 1, 0)");
+         ddnData.Dispose();
+    }
+    ```
 
 此方法从密钥文件中获取连接字符串，创建 `DapperDotNet` 类的新实例，并通过调用 `ExecuteNonQuery` 方法执行原始 SQL 插入语句。然后，它释放 `DapperDotNet` 类。
 
 1.  添加 `InsertProductDDNSP` 方法：
 
-    [PRE6]
+    ```cs
+    [Benchmark]
+    public void InsertProductDDNSP()
+    {
+         string connectionString = SecretsManager
+             .GetSecrets<DatabaseSettings>
+                 ("ConnectionString");
+         DapperDotNet ddnData = new(connectionString);
+         SqlCommandModel model = new() {
+             CommandText = "InsertProduct",
+            CommandType = CommandType.StoredProcedure,
+            CommandParameters 
+                 = new SqlCommandParameterModel[] {
+                    new SqlCommandParameterModel() { 
+                     ParameterName = "@ProductName", 
+                     DataType = DbType.String, 
+                     Value = "Dapper Product" }
+                    , new SqlCommandParameterModel() {
+                     ParameterName = "@CategoryID", 
+                     DataType = DbType.Int32, 
+                     Value = 1 }
+                     , new SqlCommandParameterModel() { 
+                     ParameterName = "@SupplierID", 
+                     DataType = DbType.Int32, 
+                     Value = 1 }
+                     , new SqlCommandParameterModel() { 
+                     ParameterName = "@Discontinued", 
+                     DataType = DbType.Boolean, 
+                     Value = false }
+                 }
+         };
+         ddnData.ExecuteNonQuery(model);
+         ddnData.Dispose();
+    }
+    ```
 
 此方法从密钥文件中获取连接字符串，并创建一个新的 `DapperDotNet` 类。然后，它构建执行产品插入存储过程所需的 `SqlCommandModel` 属性。接着，它调用 `ExecuteNonQuery` 过程，传入将执行存储过程的模型。然后，它释放 `DapperDotNet` 类。
 
@@ -96,73 +273,279 @@
 
 1.  添加 `ReadScalarProductADN` 方法：
 
-    [PRE7]
+    ```cs
+    [Benchmark]
+    public void ReadScalarProductADN()
+    {
+         string connectionString = SecretsManager
+             .GetSecrets<DatabaseSettings>
+                  ("ConnectionString");
+         AdoDotNetData adnData = new(connectionString);
+         string productName = adnData
+             .ExecuteScalar<string>("SELECT TOP 1 
+                ProductName FROM Products  WHERE Product
+                  Name LIKE 'ADO.NET Product%'");
+        adnData.Dispose();
+    }
+    ```
 
 此方法从 `secrets` 文件中获取连接，创建一个新的 `AdoDotNetData` 类，并执行 `ExecuteScalar` 方法，传入一个返回字符串的原始 SQL 语句。然后，它释放 `AdoDotNet` 类。
 
 1.  添加 `ReadScalarADNSP` 方法：
 
-    [PRE8]
+    ```cs
+    [Benchmark]
+    public void ReadScalarProductADNSP()
+    {
+        string connectionString = SecretsManager
+            .GetSecrets<DatabaseSettings>
+                ("ConnectionString");
+        AdoDotNetData aaa = new(connectionString);
+        SqlCommandModel model = new SqlCommandModel() {
+            CommandText = "GetProductName",
+            CommandType = CommandType.StoredProcedure,
+            CommandParameters 
+                = new SqlCommandParameterModel[] {
+                    new SqlCommandParameterModel() { 
+                    ParameterName = "@ProductName", 
+                    DataType = DbType.String, 
+                    Value = "ADO.NET Product" }
+                }
+        };
+        string productName 
+            = aaa.ExecuteScalar<string>(model);
+        aaa.Dispose();
+    }
+    ```
 
 此方法从密钥文件中获取连接字符串并创建 `AdoDotNetData` 类的新实例。然后，它构建 `SqlCommandModel`，其中包含执行标量存储过程的必要属性。然后，它调用 `ExecuteScalar` 方法，传入执行存储过程的模型，并返回产品名称。然后，它释放 `AdoDotNetData` 类。
 
 1.  添加 `ReadFilteredProductADN` 方法：
 
-    [PRE9]
+    ```cs
+    [Benchmark]
+    public void ReadFilteredProductADN()
+    {
+        string connectionString = SecretsManager
+            .GetSecrets<DatabaseSettings>
+                 ("ConnectionString");
+        AdoDotNetData adnData = new(connectionString);
+        IEnumerator<Product> data 
+            = adnData.ExecuteReader<Product>("SELECT * 
+                 FROM Products  WHERE ProductName LIKE 
+                     'ADO.NET Product'");
+        adnData.Dispose();
+    }
+    ```
 
 此方法从密钥文件中获取连接字符串并创建 `AdoDotNetData` 类的新实例。然后，它执行 `ExecuteReader` 方法，该方法接受一个原始 SQL 语句并返回 `Product` 类型的枚举器，然后释放 `AdoDotNetData` 类。
 
 1.  添加 `ReadFilteredProductADNSP` 方法：
 
-    [PRE10]
+    ```cs
+    [Benchmark]
+    public void ReadFilteredProductADNSP()
+    {
+        string connectionString = SecretsManager
+            .GetSecrets<DatabaseSettings>
+                ("ConnectionString");
+        AdoDotNetData aaa = new(connectionString);
+        SqlCommandModel model = new SqlCommandModel() {
+            CommandText = "FilterProducts",
+            CommandType = CommandType.StoredProcedure,
+            CommandParameters 
+                = new SqlCommandParameterModel[] {
+                    new SqlCommandParameterModel() { 
+                    ParameterName = "@ProductName", 
+                    DataType = DbType.String, 
+                    Value = "ADO.NET Product" }
+                }
+         };
+        var data = aaa.ExecuteReader<dynamic>(model);
+        aaa.Dispose();
+    }
+    ```
 
 此方法从密钥文件中获取连接字符串并创建 `AdoDotNetData` 类的新实例。然后，它构建包含执行读取存储过程所需属性的 `SqlCommandModel`。然后，它执行返回枚举器的 `ExecuteReader` 方法，然后释放 `AdoDotNetData` 类。
 
 1.  添加 `ReadScalarProductEF` 方法：
 
-    [PRE11]
+    ```cs
+    [Benchmark]
+    public void ReadScalarProductEF()
+    {
+        string connectionString = SecretsManager
+            .GetSecrets<DatabaseSettings>
+                ("ConnectionString");
+        EntityFrameworkCoreData efData 
+            = new(connectionString);
+        string productName 
+            = efData.Products.FirstOrDefault(
+                p => p.ProductName
+                .Contains("EF Product")
+              ).ProductName;
+        efData.Dispose();
+    }
+    ```
 
 此方法从密钥文件中获取连接字符串并创建 `EntityFrameworkCore` 类的新实例。然后，它获取与过滤器匹配的 `Product` 集合中的第一个项目并分配 `ProductName`。然后，它释放 `EntityFrameworkCore` 类。
 
 1.  添加 `ReadScalarProductEFSP`：
 
-    [PRE12]
+    ```cs
+    [Benchmark]
+    public void ReadScalarProductEFSP()
+    {
+        string connectionString = SecretsManager
+            .GetSecrets<DatabaseSettings>
+                ("ConnectionString");
+        EntityFrameworkCoreData efData 
+            = new(connectionString);
+        string productName = efData
+            .ExecuteScalarSP("EF Product");
+         efData.Dispose();
+    }
+    ```
 
 此方法从密钥文件中获取连接字符串并创建 `EntityFrameworkCoreData` 类的新实例。然后，它调用 `ExecuteScalarSP` 方法，传入过滤器的名称，返回匹配过滤器的第一个 `ProductName`，然后释放 `EntityFrameworkCoreData` 类。
 
 1.  添加 `ReadFilteredProductsEF` 方法：
 
-    [PRE13]
+    ```cs
+    [Benchmark]
+    public void ReadFilteredProductsEF()
+    {
+        string connectionString = SecretsManager
+            .GetSecrets<DatabaseSettings>
+                ("ConnectionString");
+        EntityFrameworkCoreData efData 
+            = new(connectionString);
+        IEnumerator<Product> products = efData.Products
+            .Where(p => p.ProductName
+            .Contains("EF Product")).GetEnumerator();
+        efData.Dispose();
+            products.Dispose();
+    }
+    ```
 
 此方法从密钥文件中获取连接字符串并创建 `EntityFrameworkCoreData` 类的新实例。然后，它过滤产品并返回产品的枚举器。然后，该方法释放 `EntityFrameworkCoreData` 类和枚举器。
 
 1.  添加 `ReadFilteredProductsEFSP` 方法：
 
-    [PRE14]
+    ```cs
+    [Benchmark]
+    public void ReadFilteredProductsEFSP()
+    {
+        string connectionString = SecretsManager
+            .GetSecrets<DatabaseSettings>
+                ("ConnectionString");
+        EntityFrameworkCoreData efData 
+            = new(connectionString);
+        IEnumerator<Product> products = efData
+            .ExecuteReaderSP("EF Product");
+        efData.Dispose();
+            products.Dispose();
+    }
+    ```
 
 此方法从密钥文件中获取密钥并创建 `EntityFrameworkCoreData` 类的新实例。然后，它调用 `ExecuteReaderSP` 方法，该方法执行返回 `Products` 类型枚举器的存储过程。然后，该方法释放 `EntityFrameworkCoreData` 类和枚举器。
 
 1.  添加 `ReadScalarProductDDN` 方法：
 
-    [PRE15]
+    ```cs
+    [Benchmark]
+    public void ReadScalarProductDDN()
+    {
+        string connectionString = SecretsManager
+            .GetSecrets<DatabaseSettings>
+                ("ConnectionString");
+        DapperDotNet ddnData = new(connectionString);
+        string productName = ddnData
+            .ExecuteScalar<string>("SELECT TOP 1 
+                 ProductName FROM Products  WHERE Product
+                     Name LIKE 'Dapper.NET Product%'");
+        ddnData.Dispose();
+    }
+    ```
 
 此方法从密钥文件中获取连接字符串并创建 `DapperDotNet` 类的新实例。然后，它执行 `ExecuteScalar` 方法，传入一个返回匹配过滤器的顶级 `ProductName` 的原始 SQL 语句。然后，它释放 `DapperDotNet` 类。
 
 1.  添加 `ReadScalarProductDDNSP` 方法：
 
-    [PRE16]
+    ```cs
+    [Benchmark]
+    public void ReadScalarProductDDNSP()
+    {
+        string connectionString = SecretsManager
+            .GetSecrets<DatabaseSettings>
+                ("ConnectionString");
+        DapperDotNet ddnData = new(connectionString);
+        SqlCommandModel model = new() {
+            CommandText = "GetProductName",
+            CommandType = CommandType.StoredProcedure,
+            CommandParameters 
+                = new SqlCommandParameterModel[] {
+                    new SqlCommandParameterModel() { 
+                    ParameterName = "@ProductName", 
+                    DataType = DbType.String, 
+                    Value = "Dapper Product" }
+                 }
+        };
+        string productName 
+             = ddnData.ExecuteScalarSP(model);
+         ddnData.Dispose();
+    }
+    ```
 
 此方法从密钥文件中获取连接字符串，并创建 `DapperDotNet` 类的新实例。然后构建包含执行存储过程所需属性的 `SqlCommandModel`。然后调用 `ExecuteScalarSP` 方法，传入模型。返回第一个匹配产品的 `ProductName`。然后释放 `DapperDotNet` 类。
 
 1.  添加 `ReadFilteredProductsDDN` 类：
 
-    [PRE17]
+    ```cs
+    [Benchmark]
+    public void ReadFilteredProductsDDN()
+    {
+        string connectionString = SecretsManager
+            .GetSecrets<DatabaseSettings>
+                ("ConnectionString");
+        DapperDotNet ddnData = new(connectionString);
+        IEnumerator<Product> data 
+            = ddnData.ExecuteReader<Product>("SELECT * 
+            FROM Products WHERE ProductName LIKE
+                'Dapper.NET Product%'");
+         ddnData.Dispose();
+         data.Dispose();
+    }
+    ```
 
 此方法从 `secrets` 文件中获取连接字符串，然后创建 `DapperDotNet` 类的新实例。然后调用 `ExecuteReader` 方法，传入一个原始 SQL 语句。返回 `Product` 类型的枚举器。然后释放 `DapperDotNet` 和枚举器。
 
 1.  添加 `ReadFilteredProductsDDNSP` 方法：
 
-    [PRE18]
+    ```cs
+    [Benchmark]
+    public void ReadFilteredProductsDDNSP()
+    {
+        string connectionString = SecretsManager
+            .GetSecrets<DatabaseSettings>
+                ("ConnectionString");
+        DapperDotNet ddnData = new(connectionString);
+        SqlCommandModel model = new() {
+            CommandText = "GetProductName",
+            CommandType = CommandType.StoredProcedure,
+            CommandParameters 
+                = new SqlCommandParameterModel[] {
+                    new SqlCommandParameterModel() { 
+                    ParameterName = "@ProductName", 
+                    DataType = DbType.String, 
+                    Value = "Dapper.NET Product" }
+                }
+        };
+        IEnumerator<Product> products 
+            = ddnData.ExecuteReaderSP<Product>(model);
+        ddnData.Dispose();
+    }
+    ```
 
 此方法从密钥文件中获取连接字符串，然后创建 `DapperDotNet` 类的实例。接着构建一个 `SqlCommandModel`，其中包含执行存储过程所需的属性。然后调用 `ExcuteReaderSP` 方法，传入返回 `Product` 类型枚举器的模型。
 
@@ -174,37 +557,166 @@
 
 1.  添加 `UpdateProductADN` 方法：
 
-    [PRE19]
+    ```cs
+    [Benchmark]
+    public void UpdateProductADN()
+    {
+         string connectionString = SecretsManager
+             .GetSecrets<DatabaseSettings>
+                 ("ConnectionString");
+         AdoDotNetData adnData = new(connectionString);
+        int recordsAffected 
+             = adnData.ExecuteNonQuery("UPDATE Products 
+                 SET ProductName = 'ADO.NET Product - 
+                     Edited' WHERE ProductName = 
+                         'ADO.NET Product'");
+         adnData.Dispose();
+    }
+    ```
 
 此方法从 `secrets` 文件中获取 `connection` 字符串，然后创建 `AdoDotNetData` 类的新实例。然后调用 `ExecuteNonQuery` 产品，传入一个原始 SQL 语句，然后返回受影响的记录数，并释放 `AdoDotNetData` 类。
 
 1.  添加 `UpdateProductADNSP` 方法：
 
-    [PRE20]
+    ```cs
+    [Benchmark]
+    public void UpdateProductADNSP()
+    {
+        string connectionString = SecretsManager
+            .GetSecrets<DatabaseSettings>
+                ("ConnectionString");
+        AdoDotNetData aaa = new(connectionString);
+        SqlCommandModel model = new() {
+            CommandText = "UpdateProductName",
+            CommandType = CommandType.StoredProcedure,
+            CommandParameters 
+                = new SqlCommandParameterModel[] {
+                    new SqlCommandParameterModel() { 
+                    ParameterName = "@OldProductName",
+                    DataType = DbType.String, 
+                    Value = "ADO.NET Product" }
+                    , new SqlCommandParameterModel() { 
+                    ParameterName = "@NewProductName", 
+                    DataType = DbType.String, 
+                    Value = "ADO.NET Product - Edited"}
+                    }
+         };
+         aaa.ExecuteNonQuery(model);
+        aaa.Dispose();
+    }
+    ```
 
 此方法从密钥文件中获取连接字符串，并创建 `AdoDotNetData` 类的新实例。然后构建 `SqlCommandModel`，其中包含执行更新存储过程所需的属性。然后使用传入的模型调用 `ExecuteNonQuery`，并执行执行更新的存储过程。然后释放 `AdoDotNetData` 类。
 
 1.  添加 `UpdateProductEF` 方法：
 
-    [PRE21]
+    ```cs
+    [Benchmark]
+    public void UpdateProductEF()
+    {
+        string connectionString = SecretsManager
+            .GetSecrets<DatabaseSettings>
+                ("ConnectionString");
+        EntityFrameworkCoreData efData 
+        = new EntityFrameworkCoreData(connectionString);
+        IQueryable<Product> products = efData.Products
+        .Where(p => p.ProductName.Contains("EF 
+            Product"));
+        foreach (Product product in products)
+            product.ProductName = "EF Product Edited";
+        efData.Products.UpdateRange(products);
+         int recordsAffected = efData.SaveChanges();
+        efData.Dispose();
+    }
+    ```
 
 此方法从密钥文件中获取连接字符串，并创建 `EntityFrameworkCoreData` 类的新实例。然后声明并分配一个产品查询集合。然后遍历每个产品的名称进行更新。然后在 `Products` 集合上调用 `UpdateRange` 方法，并将更新后的集合传入。然后保存修改，并释放 `EntityFrameworkCoreData` 类。
 
 1.  添加 `UpdateProductEFSP` 方法：
 
-    [PRE22]
+    ```cs
+    [Benchmark]
+    public void UpdateProductEFSP()
+    {
+        string connectionString = SecretsManager
+            .GetSecrets<DatabaseSettings>
+                 ("ConnectionString");
+        EntityFrameworkCoreData efData = 
+            new(connectionString);
+        SqlCommandModel model = new() {
+            CommandText = "EXEC UpdateProductName 
+                 @OldProductName = {0}, @NewProductName = 
+                     {1}",
+            CommandType = CommandType.StoredProcedure,
+            CommandParameters 
+                = new SqlCommandParameterModel[] {
+                    new SqlCommandParameterModel() { 
+                    ParameterName = "@OldProductName",
+                    DataType = DbType.String, 
+                    Value = "EF Product" }
+                    , new SqlCommandParameterModel() {  
+                    ParameterName = "@NewProductName", 
+                    DataType = DbType.String, 
+                    Value = "EF Product - Edited" }
+                    }
+         };
+        efData.ExecuteNonQuerySP(model);
+        efData.Dispose();
+    }
+    ```
 
 此方法从`secrets`文件中获取连接字符串并创建`EntityFrameworkCoreData`类的实例。然后构建包含生成更新存储过程调用所需属性的`SqlCommandModel`。该方法随后调用`ExecuteNonQuerySP`过程，执行存储过程，传入模型，然后释放`EntityFrameworkCoreData`方法。
 
 1.  添加`UpdateProductDDN`方法：
 
-    [PRE23]
+    ```cs
+    [Benchmark]
+    public void UpdateProductDDN()
+    {
+        string connectionString = SecretsManager
+            .GetSecrets<DatabaseSettings>
+                ("ConnectionString");
+        DapperDotNet ddnData = new(connectionString);
+        int recordsAffected 
+            = ddnData.ExecuteNonQuery("UPDATE Products 
+               SET ProductName = 'Dapper.NET Product - 
+                 Edited' WHERE ProductName = 'Dapper.NET 
+                   Product'");
+        ddnData.Dispose();
+    }
+    ```
 
-此方法从密钥文件中获取连接字符串并创建`DapperDotNet`类的新实例。然后调用`ExecuteNonQuery`方法，传入一个原始的SQL更新语句。返回受影响的记录数，并释放`DapperDotNet`类。
+此方法从密钥文件中获取连接字符串并创建`DapperDotNet`类的新实例。然后调用`ExecuteNonQuery`方法，传入一个原始的 SQL 更新语句。返回受影响的记录数，并释放`DapperDotNet`类。
 
 1.  添加`UpdateProductDDNSP`方法：
 
-    [PRE24]
+    ```cs
+    [Benchmark]
+    public void UpdateProductDDNSP()
+    {
+    string connectionString = SecretsManager
+        .GetSecrets<DatabaseSettings>("ConnectionString");
+    DapperDotNet ddnData = new(connectionString);
+    SqlCommandModel model = new()
+    {
+         CommandText = "UpdateProductName",
+         CommandType = CommandType.StoredProcedure,
+        CommandParameters = new SqlCommand
+            ParameterModel[]{
+            new SqlCommandParameterModel() { 
+                ParameterName = "@OldProductName", 
+                DataType = DbType.String,
+                Value = "Dapper.NET Product - Edited" }
+            , new SqlCommandParameterModel() { 
+                  ParameterName = "@NewProductName",
+                DataType = DbType.String,
+                Value = "Dapper.NET Product" }
+        }
+    };
+    ddnData.ExecuteNonQuery(model);
+    ddnData.Dispose();
+    }
+    ```
 
 此方法从密钥文件中获取连接字符串并创建`DapperDotNet`类的新实例。然后构建一个`SQLCommandModel`以准备执行存储过程。它调用`ExecuteNonQuery`方法，传入模型。执行存储过程，然后释放`DapperDotNet`类。
 
@@ -216,57 +728,185 @@
 
 1.  添加`DeleteProductADN`方法：
 
-    [PRE25]
+    ```cs
+    [Benchmark]
+    public void DeleteProductADN()
+    {
+        string connectionString = SecretsManager
+            .GetSecrets<DatabaseSettings>
+                ("ConnectionString");
+        AdoDotNetData adnData = new(connectionString);
+        int recordsAffected 
+            = adnData.ExecuteNonQuery("DELETE FROM 
+               Products WHERE ProductName LIKE 'ADO.NET 
+                 Product%'");
+        adnData.Dispose();
+    }
+    ```
 
-此方法从密钥文件中获取连接字符串。然后创建`AdoDotNetData`类的实例。然后，该方法调用`ExecuteNonQuery`方法，向其中传递一个原始的SQL删除语句。然后释放`AdoDotNetData`类。
+此方法从密钥文件中获取连接字符串。然后创建`AdoDotNetData`类的实例。然后，该方法调用`ExecuteNonQuery`方法，向其中传递一个原始的 SQL 删除语句。然后释放`AdoDotNetData`类。
 
 1.  添加`DeleteProductADNSP`方法：
 
-    [PRE26]
+    ```cs
+    [Benchmark]
+    public void DeleteProductADNSP()
+    {
+        string connectionString = SecretsManager
+            .GetSecrets<DatabaseSettings>
+                ("ConnectionString");
+        AdoDotNetData aaa = new(connectionString);
+        SqlCommandModel model = new()
+        {
+            CommandText = "DeleteProduct",
+            CommandType = CommandType.StoredProcedure,
+            CommandParameters 
+                = new SqlCommandParameterModel[] {
+                    new SqlCommandParameterModel() { 
+                    ParameterName = "@ProductName", 
+                    DataType = DbType.String, 
+                    Value = "ADO.NET Product - Edited"}
+                }
+        };
+        aaa.ExecuteNonQuery(model);
+        aaa.Dispose();
+    }
+    ```
 
 此方法从密钥文件中获取连接字符串，然后创建`AdoDotNetData`类的实例。使用执行删除存储过程所需的属性构建`SqlCommandModel`。然后，将模型传递给`ExecuteNonQuery`模型，执行存储过程，并释放`AdoDotNetData`类。
 
 1.  添加`DeleteProductEF`方法：
 
-    [PRE27]
+    ```cs
+    [Benchmark]
+    public void DeleteProductEF()
+    {
+        string connectionString = SecretsManager
+            .GetSecrets<DatabaseSettings>
+                ("ConnectionString");
+        EntityFrameworkCoreData efData 
+        = new EntityFrameworkCoreData(connectionString);
+        IQueryable<Product> products = efData.Products
+        .Where(p => p.ProductName.Contains("EF Product"));
+        efData.Products.RemoveRange(products);
+        int recordsAffected = efData.SaveChanges();
+        efData.Dispose();
+    }
+    ```
 
 此方法从密钥文件中获取连接字符串，然后创建`EntityFrameworkCoreData`类的实例。然后返回一个可查询的产品集合，匹配删除标准。然后将此集合传递给`Products`集合的`RemoveRange`方法，并保存修改，从数据库中删除这些项目。然后释放`EntityFrameworkCoreData`类。
 
 1.  添加`DeleteProductEFSP`方法：
 
-    [PRE28]
+    ```cs
+    [Benchmark]
+    public void DeleteProductEFSP()
+    {
+        string connectionString = SecretsManager
+            .GetSecrets<DatabaseSettings>
+                ("ConnectionString");
+        EntityFrameworkCoreData efData 
+            = new(connectionString);
+        SqlCommandModel model = new() {
+            CommandText = "EXEC DeleteProduct @ProductName 
+                = {0}",
+            CommandType = CommandType.StoredProcedure,
+            CommandParameters 
+                = new SqlCommandParameterModel[] {
+                    new SqlCommandParameterModel() { 
+                    ParameterName = "@NewProductName", 
+                    DataType = DbType.String, 
+                    Value = "EF Product - Edited" }
+                    }
+        };
+        efData.ExecuteNonQuerySP(model);
+        efData.Dispose();
+    }
+    ```
 
 此方法从密钥文件中获取连接字符串并创建 `EntityFrameworkCoreData` 类的实例。然后构建一个包含删除存储过程属性的 `SqlCommandModel`。使用传入的模型调用 `ExecuteNonQuerySP` 方法，执行删除存储过程，并释放 `EntityFrameworkCoreData` 类。
 
 1.  添加 `DeleteProductDDN` 方法：
 
-    [PRE29]
+    ```cs
+    [Benchmark]
+    public void DeleteProductDDN()
+    {
+        string connectionString = SecretsManager
+            .GetSecrets<DatabaseSettings>
+                ("ConnectionString");
+        DapperDotNet ddnData = new(connectionString);
+        int recordsAffected 
+            = ddnData.ExecuteNonQuery("DELETE FROM 
+                 Products WHERE ProductName LIKE
+                    'Dapper.NET Product%'");
+        ddnData.Dispose();
+    }
+    ```
 
 此方法从密钥文件中获取连接字符串并创建 `DapperDotNet` 类的实例。然后调用 `ExecuteNonQuery` 方法，向该方法传递一个原始 SQL 删除语句。执行删除操作并返回受影响的记录数。然后释放 `DapperDotNet` 类。
 
 1.  添加 `DeleteProductDDNSP` 方法：
 
-    [PRE30]
+    ```cs
+    [Benchmark]
+    public void DeleteProductDDNSP()
+    {
+        string connectionString = SecretsManager
+            .GetSecrets<DatabaseSettings>
+                ("ConnectionString");
+        DapperDotNet ddnData = new(connectionString);
+        SqlCommandModel model = new() {
+            CommandText = "DeleteProduct",
+            CommandType = CommandType.StoredProcedure,
+            CommandParameters 
+                = new SqlCommandParameterModel[] {
+                    new SqlCommandParameterModel() { 
+                    ParameterName = "@ProductName", 
+                    DataType = DbType.String, 
+                   Value = "Dapper.NET Product - Edited" }
+                }
+        };
+        ddnData.ExecuteNonQuery(model);
+        ddnData.Dispose();
+    }
+    ```
 
 此方法从密钥文件中获取连接字符串并创建 `DapperDotNet` 类的实例。然后构建包含存储过程属性的 `SqlCommandModel`。此模型随后传递给 `ExecuteNonQuery` 方法，执行存储过程，并释放 `DapperDotNet` 类。
 
 那就是我们的基准测试方法的最后一种。在我们能够运行基准测试之前，还有一项工作要做。按照以下方式更新 `Program` 类：
 
-[PRE31]
+```cs
+using BenchmarkDotNet.Running;
+```
 
-[PRE32]
+```cs
+class Program
+```
 
-[PRE33]
+```cs
+{
+```
 
-[PRE34]
+```cs
+static void Main(string[] args)
+```
 
-[PRE35]
+```cs
+    {
+```
 
-[PRE36]
+```cs
+        BenchmarkRunner.Run<BenchmarkTests>();
+```
 
-[PRE37]
+```cs
+}
+```
 
-[PRE38]
+```cs
+}
+```
 
 `Main` 方法执行 `BenchmarkTests` 类。你现在可以执行发布构建来运行基准测试。程序将需要一段时间来执行，所以你需要耐心等待。在下一节中，我们将分析我们各种基准测试的结果，以找出执行插入、选择、更新和删除操作的最有效方式。
 
@@ -276,9 +916,7 @@
 
 这是我们的基准摘要报告：
 
-![图 11.1 – 数据访问基准摘要
-
-](img/B16617_11_01.jpg)
+![图 11.1 – 数据访问基准摘要](img/B16617_11_01.jpg)
 
 图 11.1 – 数据访问基准摘要
 
@@ -372,9 +1010,7 @@
 
 嗯，记得在本节开头我们提到了 2020 年的大数据统计吗？以下表格显示了这些方法在大数据搜索查询和应用程序消息存储中的应用性能：
 
-![表 10.1 – 如果使用 SQL Server 存储和读取数据的大数据操作持续时间
-
-](img/Table_10.1.jpg)
+![表 10.1 – 如果使用 SQL Server 存储和读取数据的大数据操作持续时间](img/Table_10.1.jpg)
 
 表 10.1 – 如果使用 SQL Server 存储和读取数据的大数据操作持续时间
 
@@ -388,17 +1024,17 @@
 
 从本章中要吸取的关键点是，无论何时你在决定前进的方式以最大化性能时，都要进行实验和基准测试。同时，花时间仔细选择你的物理基础设施。
 
-在使用云主机时，还需要记住的是，运行虚拟机时的每数据执行成本和每小时成本。然后，还有数据吞吐量和数据存储节省及检索的成本。考虑到像谷歌和WhatsApp这样的应用程序的数字以亿计，如果你能取得那样的成功，你能想象涉及的运行成本吗？这就是为什么在今天的竞争市场中，性能也是如此重要的原因。代码在云中执行得越快，价格就越便宜。代码运行时间越长，成本就越高。
+在使用云主机时，还需要记住的是，运行虚拟机时的每数据执行成本和每小时成本。然后，还有数据吞吐量和数据存储节省及检索的成本。考虑到像谷歌和 WhatsApp 这样的应用程序的数字以亿计，如果你能取得那样的成功，你能想象涉及的运行成本吗？这就是为什么在今天的竞争市场中，性能也是如此重要的原因。代码在云中执行得越快，价格就越便宜。代码运行时间越长，成本就越高。
 
-例如，如果你有一个Azure函数，它在西美国区域消费层上执行你的数据操作，使用128MB的内存大小，执行时间为1.078毫秒，每月执行65,000,000,000次，那么你一个月的账单将是13,133.54美元。但如果你的执行时间是396.509毫秒，那么你一个月的账单将是64,539.57美元。所以，执行相同的代码操作可以在云支出操作上每月产生64,539.57 - 12,133.54 = 52,406.03美元的差异。我敢肯定你不会愿意在这样的大额支出上花费这么多钱，而且这还不包括SQL Server实例的成本！
+例如，如果你有一个 Azure 函数，它在西美国区域消费层上执行你的数据操作，使用 128MB 的内存大小，执行时间为 1.078 毫秒，每月执行 65,000,000,000 次，那么你一个月的账单将是 13,133.54 美元。但如果你的执行时间是 396.509 毫秒，那么你一个月的账单将是 64,539.57 美元。所以，执行相同的代码操作可以在云支出操作上每月产生 64,539.57 - 12,133.54 = 52,406.03 美元的差异。我敢肯定你不会愿意在这样的大额支出上花费这么多钱，而且这还不包括 SQL Server 实例的成本！
 
 这就结束了这个相当长的章节，因此我们现在将总结我们所学的知识。
 
 # 摘要
 
-在本章中，我们学习了如何在SQL Server中执行插入、选择、更新和删除操作。我们学习了如何使用纯ADO.NET、Entity Framework Core和Dapper.NET以不同的方式执行这些操作。不同的数据操作是通过原始SQL和存储过程来执行的。
+在本章中，我们学习了如何在 SQL Server 中执行插入、选择、更新和删除操作。我们学习了如何使用纯 ADO.NET、Entity Framework Core 和 Dapper.NET 以不同的方式执行这些操作。不同的数据操作是通过原始 SQL 和存储过程来执行的。
 
-为了理解不同数据访问框架的每种数据访问方法的性能，在本章中，我们使用`BenchmarkDotNet`对它们的运行时性能进行了基准测试。我们发现，在大多数情况下，Dapper.NET和ADO.NET的性能优于Entity Framework Core，即使在这两个框架中，性能也有很大的差异。
+为了理解不同数据访问框架的每种数据访问方法的性能，在本章中，我们使用`BenchmarkDotNet`对它们的运行时性能进行了基准测试。我们发现，在大多数情况下，Dapper.NET 和 ADO.NET 的性能优于 Entity Framework Core，即使在这两个框架中，性能也有很大的差异。
 
 我们得出结论，与其仅仅采用单一的数据访问技术，在某些性能至关重要的场合，采用混合数据访问方法可能更有益。采用混合方法，你将使用针对特定数据访问任务的最佳框架和该框架内的最佳方法。这样，你可以最大化整体性能。这在降低基础设施费用方面也可能至关重要，尤其是在你使用的是第三方云提供商，并且你的月度账单达到数千美元的情况下。
 
@@ -426,41 +1062,41 @@
 
 # 进一步阅读
 
-+   *Dapper 与 Entity Framework 与 ADO.NET 性能基准测试*: [https://www.exceptionnotfound.net/dapper-vs-entity-framework-vs-ado-net-performance-benchmarking/](https://www.exceptionnotfound.net/dapper-vs-entity-framework-vs-ado-net-performance-benchmarking/)
++   *Dapper 与 Entity Framework 与 ADO.NET 性能基准测试*: [`www.exceptionnotfound.net/dapper-vs-entity-framework-vs-ado-net-performance-benchmarking/`](https://www.exceptionnotfound.net/dapper-vs-entity-framework-vs-ado-net-performance-benchmarking/)
 
 )
 
-+   Dapper 教程：[https://dapper-tutorial.net/dapper](https://dapper-tutorial.net/dapper)
++   Dapper 教程：[`dapper-tutorial.net/dapper`](https://dapper-tutorial.net/dapper)
 
 )
 
-+   *ADO.NET 初学者和专业人士教程*: [https://dotnettutorials.net/course/ado-net-tutorial-for-beginners-and-professionals/](https://dotnettutorials.net/course/ado-net-tutorial-for-beginners-and-professionals/)
++   *ADO.NET 初学者和专业人士教程*: [`dotnettutorials.net/course/ado-net-tutorial-for-beginners-and-professionals/`](https://dotnettutorials.net/course/ado-net-tutorial-for-beginners-and-professionals/)
 
 )
 
-+   *SQL Server 数据库性能调优*: [https://www.brentozar.com/sql/sql-server-performance-tuning/](https://www.brentozar.com/sql/sql-server-performance-tuning/)
++   *SQL Server 数据库性能调优*: [`www.brentozar.com/sql/sql-server-performance-tuning/`](https://www.brentozar.com/sql/sql-server-performance-tuning/)
 
 )
 
-+   书籍 – Benjamin Nevarez 著的 *高性能 SQL Server：关键任务应用的一致响应*: [https://amzn.to/3gnUbe7](https://amzn.to/3gnUbe7)
++   书籍 – Benjamin Nevarez 著的 *高性能 SQL Server：关键任务应用的一致响应*: [`amzn.to/3gnUbe7`](https://amzn.to/3gnUbe7)
 
 )
 
-+   *Azure Cosmos DB 和 .NET 的性能技巧*: [https://docs.microsoft.com/azure/cosmos-db/performance-tips-dotnet-sdk-v3-sql](https://docs.microsoft.com/azure/cosmos-db/performance-tips-dotnet-sdk-v3-sql)
++   *Azure Cosmos DB 和 .NET 的性能技巧*: [`docs.microsoft.com/azure/cosmos-db/performance-tips-dotnet-sdk-v3-sql`](https://docs.microsoft.com/azure/cosmos-db/performance-tips-dotnet-sdk-v3-sql)
 
 )
 
-+   *使用 EF Core 构建高性能数据库的技术*: [https://www.thereformedprogrammer.net/a-technique-for-building-high-performance-databases-with-ef-core/](https://www.thereformedprogrammer.net/a-technique-for-building-high-performance-databases-with-ef-core/)
++   *使用 EF Core 构建高性能数据库的技术*: [`www.thereformedprogrammer.net/a-technique-for-building-high-performance-databases-with-ef-core/`](https://www.thereformedprogrammer.net/a-technique-for-building-high-performance-databases-with-ef-core/)
 
 )
 
-+   *如何在 .NET 中提高 SQL Server 查询性能*: [https://www.red-gate.com/products/dotnet-development/ants-performance-profiler/resources/how-to-improve-sql-server-query-performance-in-net](https://www.red-gate.com/products/dotnet-development/ants-performance-profiler/resources/how-to-improve-sql-server-query-performance-in-net)
++   *如何在 .NET 中提高 SQL Server 查询性能*: [`www.red-gate.com/products/dotnet-development/ants-performance-profiler/resources/how-to-improve-sql-server-query-performance-in-net`](https://www.red-gate.com/products/dotnet-development/ants-performance-profiler/resources/how-to-improve-sql-server-query-performance-in-net)
 
-+   *在 .NET Core 中使用 Dapper 和 SQLKata 构建高性能应用程序*: [https://medium.com/geekculture/using-dapper-and-sqlkata-in-net-core-for-high-performance-application-716d5fd43210](https://medium.com/geekculture/using-dapper-and-sqlkata-in-net-core-for-high-performance-application-716d5fd43210)
++   *在 .NET Core 中使用 Dapper 和 SQLKata 构建高性能应用程序*: [`medium.com/geekculture/using-dapper-and-sqlkata-in-net-core-for-high-performance-application-716d5fd43210`](https://medium.com/geekculture/using-dapper-and-sqlkata-in-net-core-for-high-performance-application-716d5fd43210)
 
 )
 
-+   *对于小型 .NET 应用程序，最好的数据库是什么？*: [https://www.slant.co/topics/274/~best-databases-for-a-small-net-application](https://www.slant.co/topics/274/~best-databases-for-a-small-net-application)
++   *对于小型 .NET 应用程序，最好的数据库是什么？*: [`www.slant.co/topics/274/~best-databases-for-a-small-net-application`](https://www.slant.co/topics/274/~best-databases-for-a-small-net-application)
 
 )
 

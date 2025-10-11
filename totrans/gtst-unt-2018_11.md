@@ -1,8 +1,8 @@
 # 编写胜利和失败脚本
 
-在[第10章](fdacd7a8-63fe-454d-9d50-f9f40070e484.xhtml)，*编写我们的得分系统*中，我们设计、编写和实现了游戏的得分系统。我们对适当的GameObject进行了更改，并编写了几个脚本来管理得分系统。我们确保每帧游戏中的得分都更新到我们的**抬头显示**（**HUD**）上。此外，我们还增加了Cucumber Man从樱桃树上收集樱桃并将其用作对抗Cucumber Beetles武器的功能。
+在第十章，*编写我们的得分系统*中，我们设计、编写和实现了游戏的得分系统。我们对适当的 GameObject 进行了更改，并编写了几个脚本来管理得分系统。我们确保每帧游戏中的得分都更新到我们的**抬头显示**（**HUD**）上。此外，我们还增加了 Cucumber Man 从樱桃树上收集樱桃并将其用作对抗 Cucumber Beetles 武器的功能。
 
-在本章中，我们将设计和编写游戏的胜利和失败条件。我们将更新在其他章节中创建的脚本，以管理Cucumber Man的健康状况，提供逐帧的屏幕更新，并在健康耗尽时确保玩家生命值丢失。我们将通过脚本管理剩余的生命值。我们还将设计和编写玩家角色的重生脚本。
+在本章中，我们将设计和编写游戏的胜利和失败条件。我们将更新在其他章节中创建的脚本，以管理 Cucumber Man 的健康状况，提供逐帧的屏幕更新，并在健康耗尽时确保玩家生命值丢失。我们将通过脚本管理剩余的生命值。我们还将设计和编写玩家角色的重生脚本。
 
 具体来说，本章将涵盖以下内容：
 
@@ -14,7 +14,7 @@
 
 +   实现游戏结束逻辑
 
-+   更新剩余生命值的HUD
++   更新剩余生命值的 HUD
 
 +   编写玩家角色重生的脚本
 
@@ -22,33 +22,33 @@
 
 目前，我们的游戏没有明确的结束，也没有为玩家的行为实现任何奖励。在本节中，我们将设计游戏的胜利和失败条件，以便有一个明确的目标或获胜的方式。
 
-在[第3章](df7798e1-3730-4af7-8c04-857d71ac78d2.xhtml)，*设计游戏*中，我们确定了三种游戏结束条件：Cucumber Man有两种结束条件以失败告终，而Cucumber Beetles只有一种结果会导致失败。
+在第三章，*设计游戏*中，我们确定了三种游戏结束条件：Cucumber Man 有两种结束条件以失败告终，而 Cucumber Beetles 只有一种结果会导致失败。
 
 这里是我们游戏的胜利条件：
 
-+   如果以下条件满足，Cucumber Beetles获胜：
++   如果以下条件满足，Cucumber Beetles 获胜：
 
     +   游戏中没有剩余的黄瓜
 
-    +   Cucumber Man的生命值耗尽
+    +   Cucumber Man 的生命值耗尽
 
 +   如果以下条件满足，Cucumber Man 获胜：
 
-    +   游戏中没有剩余的Cucumber Beetles
+    +   游戏中没有剩余的 Cucumber Beetles
 
-这些胜利和失败条件相当简单，只有一个赢家。如果Cucumber Beetles获胜，Cucumber Man就会失败。
+这些胜利和失败条件相当简单，只有一个赢家。如果 Cucumber Beetles 获胜，Cucumber Man 就会失败。
 
 为了实现这些条件，我们需要通过脚本跟踪以下内容：
 
 +   黄瓜的数量
 
-+   Cucumber Beetles的数量
++   Cucumber Beetles 的数量
 
-+   Cucumber Man剩余的生命值
++   Cucumber Man 剩余的生命值
 
-在[第10章](fdacd7a8-63fe-454d-9d50-f9f40070e484.xhtml)，*编写我们的得分系统*中，我们编写了必要的脚本来跟踪黄瓜和Cucumber Beetles。我们还确保HUD持续更新这些计数。对于玩家来说，了解他们在游戏中的表现感非常重要。除了得分之外，玩家还希望不断查看游戏中有多少黄瓜和Cucumber Beetles。玩家还想知道Cucumber Man剩余的生命值。
+在第十章，*编写我们的得分系统*中，我们编写了必要的脚本来跟踪黄瓜和 Cucumber Beetles。我们还确保 HUD 持续更新这些计数。对于玩家来说，了解他们在游戏中的表现感非常重要。除了得分之外，玩家还希望不断查看游戏中有多少黄瓜和 Cucumber Beetles。玩家还想知道 Cucumber Man 剩余的生命值。
 
-在下一节中，我们将更新我们的游戏，以便更新生命值并开始使用玩家的健康条。这些将为玩家在游戏过程中提供所需的HUD视觉组件。
+在下一节中，我们将更新我们的游戏，以便更新生命值并开始使用玩家的健康条。这些将为玩家在游戏过程中提供所需的 HUD 视觉组件。
 
 # 更新玩家的健康
 
@@ -86,23 +86,52 @@
 
 1.  编辑脚本以匹配以下代码，代码的第一部分包含 `import` 语句和 `HealthManager` 类声明：
 
-[PRE0]
+```cs
+ using System.Collections;
+ using System.Collections.Generic;
+ using UnityEngine;
+ using UnityEngine.UI;
+
+ public class HealthManager : MonoBehaviour { 
+
+```
 
 下一段代码声明了我们的类变量。我们将使用 `currentHealth` 来保存 Cucumber Man 的最新健康值。我们将使用 `healthBar` 作为对滑块的引用：
 
-[PRE1]
+```cs
+public static int currentHealth;
+public Slider healthBar;
+
+```
 
 我们的 `HealthManager` 类有三个方法；第一个是 `Awake()` 方法。在这个方法中的第一条语句获取了对 `Slider` 组件的引用。第二条语句将 `currentHealth` 设置为 `100`。这是 Cucumber Man 的最大健康起始点：
 
-[PRE2]
+```cs
+void Awake () {
+healthBar = GetComponent&lt;Slider> ();
+currentHealth = 100;
+}
+
+```
 
 我们的第二个方法是 `ReduceHealth()` 方法。这个方法将被其他脚本用来请求健康减少。正如你所见，第一条语句只是将 `currentHealth` 值减一。第二条语句更新屏幕上的滑块：
 
-[PRE3]
+```cs
+void ReduceHealth () {
+currentHealth = currentHealth - 1;
+healthBar.value = currentHealth;
+}
+
+```
 
 这个类最后的 `Update()` 方法中有一句用于每帧更新滑块的语句。这导致滑块准确地显示玩家的健康值：
 
-[PRE4]
+```cs
+void Update () {
+healthBar.value = currentHealth;
+}
+ }
+```
 
 在下一节中，我们将修改适当的脚本，以便当黄瓜人被黄瓜甲虫咬时调用 `ReduceHealth()` 方法。
 
@@ -114,11 +143,17 @@
 
 1.  在脚本的类变量部分添加以下语句。这创建了一个我们可以用来引用 `HealthManager` 类的变量：
 
-[PRE5]
+```cs
+      public HealthManager _healthManager;
+```
 
 1.  在第一个 `if` 语句之后，在 `OnCollisionEnter()` 方法中添加以下两个语句：
 
-[PRE6]
+```cs
+      _healthManager = GameObject.Find 
+      ("Health_Slider").GetComponent&lt;HealthManager>();
+      _healthManager.ReduceHealth(); 
+```
 
 通过这两个语句，我们获得了对 `Health_Slider` 的 `HealthManager` 脚本的引用，然后调用 `ReduceHealth()` 方法。
 
@@ -172,21 +207,50 @@
 
 1.  编辑脚本，使其与以下代码匹配，代码的第一部分包含命名空间 `import` 语句和 `VictoryManager` 类声明：
 
-[PRE7]
+```cs
+using System.Collections;
+ using System.Collections.Generic;
+ using UnityEngine;
+ using UnityEngine.UI;
+
+ public class VictoryManager : MonoBehaviour {
+```
 
 我们脚本的下一部分包含两个类变量声明和 `Awake()` 方法。在 `Awake()` 方法中，我们获取 `Victory` UI 对象的文本组件引用。我们还设置初始文本为空，这样就不会显示任何内容：
 
-[PRE8]
+```cs
+     Text Victory;
+     int beetleCount;
+
+     void Awake () {
+
+         Victory = GetComponent&lt;Text> ();
+         Victory.text = "";
+     }
+```
 
 我们脚本的最后一部分是 `Update()` 方法。在这里，我们将计数值设置为当前黄瓜甲虫的数量，然后测试计数值是否为零。如果 `(count == 0)` 条件为真，我们将在屏幕上显示胜利文本：
 
-[PRE9]
+```cs
+     void Update () {
+
+         beetleCount = BeetleManager.currentBeetleCount;
+
+         if (beetleCount == 0) {
+             Victory.text = ("You won!"); 
+         }
+     }
+ } 
+
+```
 
 我们接下来的任务是更新 `BeetleManager` 脚本。我们将对该脚本进行三项更改：
 
 1.  将 `static` 修饰符添加到 `currentBeetleCount` 类变量。新的一行代码应该是：
 
-[PRE10]
+```cs
+      public static int currentBeetleCount;
+```
 
 1.  在 `Awake()` 方法中，将 `currentBeetleCount = 0;` 改为 `currentBeetleCount = 1;`。这将有助于确保游戏在开始时不会认为没有黄瓜甲虫。
 
@@ -194,7 +258,32 @@
 
 现在你可以测试游戏了。杀死所有的黄瓜甲虫来测试你做的代码更改。如果某些东西没有正确工作或你收到错误，请参考以下更新的 `BeetleManager` 脚本：
 
-[PRE11]
+```cs
+ using System.Collections;
+ using System.Collections.Generic;
+ using UnityEngine;
+ using UnityEngine.UI;
+
+ public class BeetleManager : MonoBehaviour {
+
+     public static int currentBeetleCount;
+     Text Beetle_Count;
+     public GameObject[] beetles;
+
+     void Awake () {
+
+         Beetle_Count = GetComponent&lt;Text> ();
+         currentBeetleCount = 1;
+     }
+
+     void Update () {
+
+         beetles = GameObject.FindGameObjectsWithTag ("Beetle");
+         Beetle_Count.text = beetles.Length.ToString();
+         currentBeetleCount = beetles.Length;
+     }
+ } 
+```
 
 现在胜利条件已经实现，我们准备实现我们的失败条件。我们将在下一节中这样做。
 
@@ -208,7 +297,9 @@
 
 1.  编辑 `CucumberManager` 脚本，使 `currentCucumberCount` 变量声明如下：
 
-[PRE12]
+```cs
+      public static int currentCucumberCount;
+```
 
 1.  在 `Awake()` 方法中，将 `currentCucumberCount = 0;` 改为 `currentCucumberCount = 1;`。这将有助于确保游戏在开始时不会认为没有黄瓜。
 
@@ -220,7 +311,13 @@
 
 1.  将以下代码行添加到 `Update()` 方法的底部。这些行将不断检查是否没有剩余的黄瓜，并在计数等于零时显示“你输了！”文本：
 
-[PRE13]
+```cs
+         cucumberCount = CucumberManager.currentCucumberCount;
+
+         if (cucumberCount == 0) {
+             Victory.text = ("You Lost!");
+         } 
+```
 
 您现在可以测试这个失败条件。
 
@@ -238,7 +335,12 @@
 
 1.  将以下 `if` 语句块添加到 `Update()` 方法的底部：
 
-[PRE14]
+```cs
+         if (livesRemaining == 0) {
+             anim = GetComponent&lt;Animator> ();
+             anim.Play ("CM_Die"); 
+         } 
+```
 
 如您在 `Update()` 方法的更改中看到的，我们只是检查 `livesRemaining` 的值，当没有生命剩余时，播放相应的死亡动画。
 
@@ -264,7 +366,37 @@
 
 我们只需要修改 `CucumberManManager` 脚本的 `Update()` 方法。下面提供了修改后的 `Update()` 方法及其更改说明：
 
-[PRE15]
+```cs
+     void Update () {
+
+         if (collectingCherries) {
+             if (tempCurrentCherryCount ></span>= 60) {
+                 currentCherryCount = currentCherryCount + 1;
+                 tempCurrentCherryCount = 0;
+
+                 _ptsManager = GameObject.Find 
+                 ("Score_Value").GetComponent&lt;PointsManager>();
+                 PointsManager.currentScore = 
+                 PointsManager.currentScore + 5;
+
+             } else {
+                 tempCurrentCherryCount = tempCurrentCherryCount + 1;
+             }
+         }
+
+         if (livesRemaining == 2) {
+             Destroy (GameObject.Find ("Life3"));
+         }
+         if (livesRemaining == 1) {
+             Destroy (GameObject.Find ("Life2"));
+         }
+         if (livesRemaining == 0) {
+             Destroy (GameObject.Find ("Life1"));
+             anim = GetComponent&lt;Animator> ();
+             anim.Play ("CM_Die"); 
+         }
+     } 
+```
 
 我们添加了条件语句来检查剩余的生命值。当剩下两个生命时，我们销毁第三个生命图像。当只剩下一个生命时，我们销毁第二个生命图像，当没有生命剩余时，我们销毁第一个生命图像。我们使用 `Destroy()` 方法来完成这个任务。
 
@@ -280,7 +412,11 @@
 
 1.  添加以下类变量：
 
-[PRE16]
+```cs
+     public Transform SpawnPad1;
+     public Transform SpawnPad2;
+     public Transform SpawnPad3;
+```
 
 1.  在 Hierarchy 面板中，选择 `CucumberMan` GameObject，然后在 Inspector 面板中滚动，直到找到 Cucumber Man Manager (Script) 组件。
 
@@ -290,13 +426,53 @@
 
 1.  修改 `Update()` 方法的底部部分，如下所示：
 
-[PRE17]
+```cs
+         if (livesRemaining == 2) {
+             Destroy (GameObject.Find ("Life3"));
+             anim = GetComponent&lt;Animator> ();
+             anim.Play ("CM_Die");
+
+             StartCoroutine ("ReSpawnCucumberMan");
+         }
+
+         if (livesRemaining == 1) {
+             Destroy (GameObject.Find ("Life2"));
+             anim = GetComponent&lt;Animator> ();
+             anim.Play ("CM_Die");
+
+             StartCoroutine ("ReSpawnCucumberMan");
+         }
+
+         if (livesRemaining == 0) {
+             Destroy (GameObject.Find ("Life1"));
+             anim = GetComponent&lt;Animator> ();
+             anim.Play ("CM_Die");
+         } 
+```
 
 检查前面的代码可以发现，根据 `livesRemaining` 变量的值，有三种条件正在被检查。在每种情况下，适当的 UI 图像组件都会从 HUD 中移除，并且播放 `CM_Die` 动画。对于前两种情况（`livesRemaining` 等于两或一），我们有一个 `StartCoroutine("RespawnCucumberMan");` 方法调用。我们将在下一节中编写该方法：
 
 1.  编写 `ReSpawnCucumberMan()` 方法。在 `CucumberManManager` 类中的 `OnTriggerEnter()` 方法之后输入以下代码：
 
-[PRE18]
+```cs
+     IEnumerator ReSpawnCucumberMan() {
+
+         int randomNumber = Random.Range (1, 4);
+
+         if (randomNumber == 1) {
+             yield return new WaitForSecondsRealtime (4);
+             this.transform.position = SpawnPad1.transform.position;
+         } else if (randomNumber == 2) {
+             yield return new WaitForSecondsRealtime (4);
+             this.transform.position = SpawnPad2.transform.position;
+         } else {
+             yield return new WaitForSecondsRealtime (4);
+             this.transform.position = SpawnPad3.transform.position;
+         }
+
+         anim.Play ("CM_Idle");
+     }
+```
 
 我们的 `ReSpawnCucumberMan()` 方法首先获取一个随机的 `1`、`2` 或 `3`。然后我们检查生成了哪个随机数，并相应地进行分支。我们有一个四秒的延迟，以便死亡动画完成。然后我们将 Cucumber Man 重生到与随机生成的数字相对应的重生垫上。最后，我们播放空闲动画。
 

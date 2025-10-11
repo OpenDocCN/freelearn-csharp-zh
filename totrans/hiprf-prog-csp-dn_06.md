@@ -12,17 +12,17 @@
 
 +   **理解代码指标**：在本节中，我们将探讨各种工具可以为我们提供哪些应用程序、程序集、命名空间、类型、方法和字段指标。
 
-+   **执行静态代码分析**：在本节中，我们将探讨使用Visual Studio 2022执行静态代码分析。我们将为我们的软件生成指标，包括可维护性指数、循环复杂度、继承深度、类耦合、源代码单元和可执行代码行数。
++   **执行静态代码分析**：在本节中，我们将探讨使用 Visual Studio 2022 执行静态代码分析。我们将为我们的软件生成指标，包括可维护性指数、循环复杂度、继承深度、类耦合、源代码单元和可执行代码行数。
 
 +   **生成和查看内存转储**：在本节中，我们将探讨在代码中遇到断点或应用程序遇到时如何生成和查看内存转储。
 
-+   **查看已加载模块**：在本节中，我们将展示Visual Studio中的**模块**窗口，以便我们可以查看由我们的应用程序加载到内存中的模块，并查看有关这些模块的信息。
++   **查看已加载模块**：在本节中，我们将展示 Visual Studio 中的**模块**窗口，以便我们可以查看由我们的应用程序加载到内存中的模块，并查看有关这些模块的信息。
 
 +   **调试你的应用程序**：本节突出了我们可用的各种调试选项。
 
-+   **使用跟踪和诊断工具**：在本节中，我们将介绍可以帮助我们在软件应用程序上执行跟踪和诊断的工具。具体来说，我们将考虑Visual Studio 2022、JetBrains dotMemory和JetBrains dotTrace。
++   **使用跟踪和诊断工具**：在本节中，我们将介绍可以帮助我们在软件应用程序上执行跟踪和诊断的工具。具体来说，我们将考虑 Visual Studio 2022、JetBrains dotMemory 和 JetBrains dotTrace。
 
-+   使用`dotnet-counters`并使用它们来列出可监控的.NET进程、列出我们可以使用的可用计数器以收集性能数据、监控.NET进程，并将该进程的数据收集到CSV文件中，以便在Excel中进行后续分析。
++   使用`dotnet-counters`并使用它们来列出可监控的.NET 进程、列出我们可以使用的可用计数器以收集性能数据、监控.NET 进程，并将该进程的数据收集到 CSV 文件中，以便在 Excel 中进行后续分析。
 
 +   **使用 dotMemory 跟踪和修复内存泄漏**：在本节中，我们将使用 dotMemory 来追踪 WPF 应用程序中的内存泄漏并修复它。
 
@@ -64,7 +64,7 @@
 
 +   JetBrains dotTrace
 
-+   源代码：[https://github.com/PacktPublishing/High-Performance-Programming-in-CSharp-and-.NET/tree/master/CH05](https://github.com/PacktPublishing/High-Performance-Programming-in-CSharp-and-.NET/tree/master/CH05)
++   源代码：[`github.com/PacktPublishing/High-Performance-Programming-in-CSharp-and-.NET/tree/master/CH05`](https://github.com/PacktPublishing/High-Performance-Programming-in-CSharp-and-.NET/tree/master/CH05)
 
 +   可选：Microsoft Excel 或其他 CSV 文件查看器
 
@@ -134,7 +134,7 @@
 
 ## 命名空间指标
 
-命名空间是任何专业质量API的重要组成部分。正确地将你的代码分区到相关命名的命名空间有助于程序员理解你的API，并更容易找到他们想要的东西。命名空间指标帮助你了解你是否存在依赖循环，以及你的程序集是高级、中级还是低级。
+命名空间是任何专业质量 API 的重要组成部分。正确地将你的代码分区到相关命名的命名空间有助于程序员理解你的 API，并更容易找到他们想要的东西。命名空间指标帮助你了解你是否存在依赖循环，以及你的程序集是高级、中级还是低级。
 
 关于命名空间代码质量的可用指标包括以下内容：
 
@@ -154,7 +154,7 @@
 
 类型代码质量指标包括以下内容：
 
-+   **类型排名**：基于对类型依赖图应用排名算法计算得出的值，类似于谷歌的PageRank算法。
++   **类型排名**：基于对类型依赖图应用排名算法计算得出的值，类似于谷歌的 PageRank 算法。
 
 +   **输入耦合**：依赖于当前类型的类型数量。
 
@@ -164,7 +164,7 @@
 
 +   **循环复杂度**：通过方法路径的数量。
 
-+   **IL循环复杂度**：通过IL代码的路径数量。
++   **IL 循环复杂度**：通过 IL 代码的路径数量。
 
 +   **实例大小**：指定类型的实例的大小，以字节为单位。
 
@@ -182,13 +182,13 @@
 
 通常，方法背后隐藏着大多数性能问题。是类中的方法执行指令，可能会给客户带来任何数量的问题。这些问题可能包括运行时错误、数据错误和性能问题。能够看到和理解方法如何与其他方法交互，对于解决包括性能问题在内的各种问题非常有帮助。可用于分析方法代码质量的指标包括以下内容：
 
-+   **方法排名**：基于对方法依赖图应用排名算法计算得出的值，类似于谷歌的PageRank算法。
++   **方法排名**：基于对方法依赖图应用排名算法计算得出的值，类似于谷歌的 PageRank 算法。
 
 +   **输入耦合**：直接依赖于当前方法的方法数量。
 
 +   **输出耦合**：当前方法直接依赖的方法数量。
 
-+   **IL嵌套深度**：从IL代码中计算出的方法体内封装的作用域的最大数量。
++   **IL 嵌套深度**：从 IL 代码中计算出的方法体内封装的作用域的最大数量。
 
 +   **参数**：在方法签名中使用的参数数量。
 
@@ -238,25 +238,19 @@
 
 在 Visual Studio 中，您可以通过**项目属性** | **代码分析**页面运行构建和实时分析的分析器。您可以启用 .NET 分析器并将分析级别设置为**预览**、**最新**、**5.0**和**无**。此外，您可以在构建上强制执行 CodeStyle。*图 5.1*显示了**代码分析**页面：
 
-![图 5.1 – 项目属性选项卡上的 Visual Studio Code 分析页面
-
-](img/Figure_5.01_B16617.jpg)
+![图 5.1 – 项目属性选项卡上的 Visual Studio Code 分析页面](img/Figure_5.01_B16617.jpg)
 
 图 5.1 – 项目属性选项卡上的 Visual Studio Code 分析页面
 
 **代码度量结果**窗口可通过**视图**菜单中的**视图** | **其他窗口 – 代码度量结果**访问。**代码度量结果**窗口如图 5.2 所示：
 
-![图 5.2 – 代码度量结果窗口
-
-](img/Figure_5.02_B16617.jpg)
+![图 5.2 – 代码度量结果窗口](img/Figure_5.02_B16617.jpg)
 
 图 5.2 – 代码度量结果窗口
 
 右键单击 `CH04_Finalization` 项目，并在上下文弹出菜单中选择**分析**和**代码清理** | **计算代码度量**。**代码度量结果**窗口将更新为分析结果：
 
-![图 5.3 – CH04_WeakReference 项目的 Visual Studio 2022 代码度量结果
-
-](img/Figure_5.03_B16617.jpg)
+![图 5.3 – CH04_WeakReference 项目的 Visual Studio 2022 代码度量结果](img/Figure_5.03_B16617.jpg)
 
 图 5.3 – CH04_WeakReference 项目的 Visual Studio 2022 代码度量结果
 
@@ -264,7 +258,7 @@
 
 详细了解度量信息
 
-如果你想了解更多关于指标（**可维护性指数**、**圈复杂度**、**继承深度**、**类耦合度**、**源代码行数**和**可执行代码行数**）的信息，那么你可以在我的另一本书中找到一个专门的章节（[*第 12 章*](B16617_12_Final_SB_Epub.xhtml#_idTextAnchor215)），这本书名为 *Clean Code in C#* ([https://www.packtpub.com/product/clean-code-in-c/9781838982973](https://www.packtpub.com/product/clean-code-in-c/9781838982973))），由 Packt 出版。
+如果你想了解更多关于指标（**可维护性指数**、**圈复杂度**、**继承深度**、**类耦合度**、**源代码行数**和**可执行代码行数**）的信息，那么你可以在我的另一本书中找到一个专门的章节（*第十二章*），这本书名为 *Clean Code in C#* ([`www.packtpub.com/product/clean-code-in-c/9781838982973`](https://www.packtpub.com/product/clean-code-in-c/9781838982973))），由 Packt 出版。
 
 从 **可维护性指数** 列的交通灯指示器中，你可以看到我们的项目一路绿灯。这意味着我们的项目是可维护的。
 
@@ -276,9 +270,7 @@
 
 打开 `CH06_Collections`：
 
-![图 5.4 – CH04_Finalization 项目的 Visual Studio 2022 代码分析结果
-
-](img/Figure_5.04_B16617.jpg)
+![图 5.4 – CH04_Finalization 项目的 Visual Studio 2022 代码分析结果](img/Figure_5.04_B16617.jpg)
 
 图 5.4 – CH04_Finalization 项目的 Visual Studio 2022 代码分析结果
 
@@ -286,43 +278,81 @@
 
 在 `CH04_Finalization.DisposableBase` 类中，我们实现了 `IDisposable` 接口。在这个类中，代码分析会为代码分析规则 CA1816 产生两个信息性消息。这个代码分析规则告诉我们，`Dispose` 方法应该调用 `SuppressFinalize`。尽管调用了 `GC.SuppressFinalize`，但我们仍然收到这个代码分析规则的信息性消息。因此，为了移除（抑制）警告，我们将代码包裹在 `#pragma` 编译器指令中。这可以手动完成，或者通过右键单击消息并选择以下方式选择 `DisposableBase` 源文件：
 
-[PRE0]
+```cs
+#pragma warning disable CA1816 
+```
 
-[PRE1]
+```cs
+// Dispose methods should call SuppressFinalize
+```
 
-[PRE2]
+```cs
+public void Dispose()
+```
 
-[PRE3]
+```cs
+#pragma warning restore CA1816 
+```
 
-[PRE4]
+```cs
+// Dispose methods should call SuppressFinalize
+```
 
-[PRE5]
+```cs
+{
+```
 
-[PRE6]
+```cs
+    Dispose(true);
+```
 
-[PRE7]
+```cs
+}
+```
 
-[PRE8]
+```cs
+private void Dispose(bool disposing)
+```
 
-[PRE9]
+```cs
+{
+```
 
-[PRE10]
+```cs
+    if (disposing)
+```
 
-[PRE11]
+```cs
+#pragma warning disable CA1816 
+```
 
-[PRE12]
+```cs
+// Dispose methods should call SuppressFinalize
+```
 
-[PRE13]
+```cs
+        GC.SuppressFinalize(this);
+```
 
-[PRE14]
+```cs
+#pragma warning restore CA1816 
+```
 
-[PRE15]
+```cs
+// Dispose methods should call SuppressFinalize
+```
 
-[PRE16]
+```cs
+ReleaseManagedResources();
+```
 
-[PRE17]
+```cs
+ReleaseUnmanagedResources();
+```
 
-[PRE18]
+```cs
+}
+```
 
 现在，`DisposableBase` 类已经通过这些 `#pragma` 警告禁用 CA1816 语句进行了更新，请注意，这些消息不再在错误列表中显示。
 
@@ -340,7 +370,9 @@
 
 1.  使用我们的 `CH04_WeakReferences` 项目，在 `program.cs` 文件中的以下行设置断点：
 
-    [PRE19]
+    ```cs
+    Console.WriteLine("Press any key to continue.");
+    ```
 
 1.  运行项目到断点。然后，当断点被触发时，选择 `CH04_WeakReference.dmp`。这是一个包含堆文件的 minidump 文件。
 
@@ -362,17 +394,13 @@
 
 当您在 Visual Studio 2022 中进行调试时，**调试** | **窗口** 菜单包含以下菜单，如图 *图 5.6* 所示：
 
-![图 5.6 – 调试会话期间的 Windows 菜单
-
-](img/Figure_5.06_B16617.jpg)
+![图 5.6 – 调试会话期间的 Windows 菜单](img/Figure_5.06_B16617.jpg)
 
 图 5.6 – 调试会话期间的 Windows 菜单
 
 如 *图 5.6* 所示的先前菜单中，您可以在调试会话期间选择 **模块**。这将加载 **模块** 窗口，如图 *图 5.7* 所示：
 
-![图 5.7 – 显示当前进程加载模块的模块窗口
-
-](img/Figure_5.07_B16617.jpg)
+![图 5.7 – 显示当前进程加载模块的模块窗口](img/Figure_5.07_B16617.jpg)
 
 图 5.7 – 显示当前进程加载模块的模块窗口
 
@@ -418,9 +446,7 @@
 
 假设您知道如何通过运行代码、单步执行和跳过代码、运行到光标处以及设置断点来调试您的代码。然而，当使用调试器时，还有其他有用的工具可用。以下是一些工具：
 
-![图 5.8 – 调试 | 窗口菜单
-
-](img/Figure_5.08_B16617.jpg)
+![图 5.8 – 调试 | 窗口菜单](img/Figure_5.08_B16617.jpg)
 
 图 5.8 – 调试 | 窗口菜单
 
@@ -438,9 +464,7 @@
 
 要访问 Visual Studio 2022 性能配置文件，请从 Visual Studio 2022 **调试**菜单中选择**性能分析器**。这将打开一个标签页，如图 *图 5.9* 所示：
 
-![图 5.9 – Visual Studio 2022 性能分析器
-
-![图片](img/Figure_5.09_B16617.jpg)
+![图 5.9 – Visual Studio 2022 性能分析器![图片](img/Figure_5.09_B16617.jpg)
 
 图 5.9 – Visual Studio 2022 性能分析器
 
@@ -448,9 +472,9 @@
 
 1.  选择你的启动项目。
 
-1.  然后，选择您想要使用的工具。在我们的例子中，我们选择了`CH04_Finalization`。我们选择的工具是用于跟踪.NET对象分配的工具。这使我们能够看到.NET对象在哪里分配以及何时被回收。
+1.  然后，选择您想要使用的工具。在我们的例子中，我们选择了`CH04_Finalization`。我们选择的工具是用于跟踪.NET 对象分配的工具。这使我们能够看到.NET 对象在哪里分配以及何时被回收。
 
-1.  点击**开始**按钮以开始分析应用程序。分析器将运行，并在代码停止时停止。您将看到一个类似于*图5.10*的报告：
+1.  点击**开始**按钮以开始分析应用程序。分析器将运行，并在代码停止时停止。您将看到一个类似于*图 5.10*的报告：
 
 ![Figure 5.10 – 完整的 Visual Studio 2022 性能分析器报告
 
@@ -458,45 +482,45 @@
 
 ![img/Figure_5.10_B16617.jpg]
 
-图5.10 – 显示活动对象随时间变化的完整 Visual Studio 2022 性能分析器报告
+图 5.10 – 显示活动对象随时间变化的完整 Visual Studio 2022 性能分析器报告
 
 主要图表区域显示了随着时间的推移活动对象的数量。此外，还有四个标签页，包含**分配**、**调用树**、**函数**和**收藏集**数据。
 
-1.  在**分配**标签页上，您可以看到使用的类型及其分配数量。点击一个类型将显示该类型的**回溯**。您可以看到该类型的分配数量以及在您的函数中分配的字节数，如图*图5.11*所示：
+1.  在**分配**标签页上，您可以看到使用的类型及其分配数量。点击一个类型将显示该类型的**回溯**。您可以看到该类型的分配数量以及在您的函数中分配的字节数，如图*图 5.11*所示：
 
-![Figure 5.11 – Visual Studio 2022 性能分析器中System.Sbyte[]的分配]
+![Figure 5.11 – Visual Studio 2022 性能分析器中 System.Sbyte[]的分配]
 
 ![img/Image87475.jpg]
 
-图5.11 – Visual Studio 2022 性能分析器中System.Sbyte[]的分配
+图 5.11 – Visual Studio 2022 性能分析器中 System.Sbyte[]的分配
 
-在*图5.11*中，我们可以看到在我们的`Main`方法中，有19次`System.Sbyte[]`类型的分配，分配大小为**952**字节。
+在*图 5.11*中，我们可以看到在我们的`Main`方法中，有 19 次`System.Sbyte[]`类型的分配，分配大小为**952**字节。
 
-1.  选择`DisplayGeneration(Product product)`方法，有一个大小为**24**字节的`System.Int32`分配，如图*图5.12*所示：
+1.  选择`DisplayGeneration(Product product)`方法，有一个大小为**24**字节的`System.Int32`分配，如图*图 5.12*所示：
 
 ![Figure 5.12 – Visual Studio 2022 性能分析器调用树标签页
 
 ![img/Figure_5.12_B16617.jpg]
 
-图5.12 – Visual Studio 2022 性能分析器调用树标签页
+图 5.12 – Visual Studio 2022 性能分析器调用树标签页
 
-1.  选择`Main`方法总共有**347**次分配，**27**次自我分配，总大小为**1,438**字节，如图*图5.13*所示：
+1.  选择`Main`方法总共有**347**次分配，**27**次自我分配，总大小为**1,438**字节，如图*图 5.13*所示：
 
 ![Figure 5.13 – Visual Studio 2022 性能分析器函数标签页显示各种方法的分配和大小
 
 ![img/Figure_5.13_B16617.jpg]
 
-图5.13 – Visual Studio 2022 性能分析器函数标签页显示各种方法的分配和大小
+图 5.13 – Visual Studio 2022 性能分析器函数标签页显示各种方法的分配和大小
 
-1.  点击**收藏集**标签页。然后，点击一行。您将看到两个饼图，分别显示**顶级收集类型**和**顶级存活类型**，如图*图5.14*所示：
+1.  点击**收藏集**标签页。然后，点击一行。您将看到两个饼图，分别显示**顶级收集类型**和**顶级存活类型**，如图*图 5.14*所示：
 
 ![Figure 5.14 – Visual Studio 2022 性能分析器显示垃圾回收的分解
 
 ![img/Figure_5.14_B16617.jpg]
 
-图5.14 – Visual Studio 2022 性能分析器显示垃圾回收的分解
+图 5.14 – Visual Studio 2022 性能分析器显示垃圾回收的分解
 
-在*图5.14*中，我们可以看到随着时间的推移，活动对象的数量以及对象变化量（百分比变化）。此外，我们还可以在两个饼图中看到顶级收集类型和顶级存活类型。
+在*图 5.14*中，我们可以看到随着时间的推移，活动对象的数量以及对象变化量（百分比变化）。此外，我们还可以在两个饼图中看到顶级收集类型和顶级存活类型。
 
 Visual Studio 2022 性能分析器是一个非常实用的工具，它使您能够查看分配、字节大小以及垃圾回收和存活的对象。您还可以看到随时间变化的存活对象数量。现在您已经了解了分析器及其功能，让我们将注意力转向 JetBrains 的工具 **dotMemory**。
 
@@ -520,19 +544,15 @@ Visual Studio 2022 性能分析器是一个非常实用的工具，它使您能�
 
 +   **自垃圾回收以来分配到 LOH**：垃圾回收发生后在 LOH 上使用的内存量。
 
-让我们看看 dotMemory 内存分析器的实际应用。如果您还没有这样做，请从 JetBrains 下载并安装 dotMemory，以及从 GitHub 页面获取 `第 4 章` 的代码。打开 dotMemory，您将看到一个类似于 *图 5.15* 所示的屏幕：
+让我们看看 dotMemory 内存分析器的实际应用。如果您还没有这样做，请从 JetBrains 下载并安装 dotMemory，以及从 GitHub 页面获取 `第四章` 的代码。打开 dotMemory，您将看到一个类似于 *图 5.15* 所示的屏幕：
 
-![Figure 5.15 – 准备分析 .NET Core 应用程序的 dotMemory 内存分析器
-
-](img/Figure_5.15_B16617.jpg)
+![Figure 5.15 – 准备分析 .NET Core 应用程序的 dotMemory 内存分析器](img/Figure_5.15_B16617.jpg)
 
 图 5.15 – 准备分析 .NET Core 应用程序的 dotMemory 内存分析器
 
 在 *图 5.15* 中，我们选择了分析 `CH04_PreventingMemoryLeaks.dll`。点击 **运行** 按钮。这将使分析器开始运行并分析您的应用程序。一旦应用程序被分析，将显示一个报告，以图形形式显示结果，如图 *图 5.16* 所示：
 
-![Figure 5.16 – CH04_PreventingMemoryLeaks.dll 的分析报告
-
-](img/Figure_5.16_B16617.jpg)
+![Figure 5.16 – CH04_PreventingMemoryLeaks.dll 的分析报告](img/Figure_5.16_B16617.jpg)
 
 图 5.16 – CH04_PreventingMemoryLeaks.dll 的分析报告
 
@@ -588,7 +608,9 @@ dotTrace 中可用的分析器选项包括以下内容：
 
 打开 Visual Studio 2022 的开发者命令提示符。然后，输入以下命令并按 *Enter* 键：
 
-[PRE20]
+```cs
+dotnet tool install --global dotnet-counters --version 3.1.141901
+```
 
 这将下载并安装 dotnet-tools。成功安装将显示，如图 *图 5.20* 所示：
 
@@ -612,9 +634,13 @@ dotTrace 中可用的分析器选项包括以下内容：
 
 要获取每个命令的可用选项列表，请附加 `-h` 或 `–help`。让我们使用这些命令中的每一个。在我们这样做之前，将以下行添加到 `CH04_WeakRefereces` `Main` 方法在 `Program` 类的末尾：
 
-[PRE21]
+```cs
+Console.WriteLine("Press any key to continue.");
+```
 
-[PRE22]
+```cs
+Console.ReadKey();
+```
 
 运行程序。程序将暂停并等待你按下一个键后继续。
 
@@ -626,7 +652,20 @@ dotTrace 中可用的分析器选项包括以下内容：
 
 1.  将 `Program` 类中的 `ProcessReferences()` 方法更新如下：
 
-    [PRE23]
+    ```cs
+    private static void ProcessReferences()
+    {
+    int x = 0;
+    while(x < 10000)
+    {
+        StrongReferences.ListObjects();
+        WeakReferences.ListObjects();
+        Thread.Sleep(2000);
+        GC.Collect();
+        x++;
+    }
+    }
+    ```
 
 1.  在 `Program` 类的 `while (x < 10000)` 循环中添加一个断点。
 
@@ -652,9 +691,7 @@ dotTrace 中可用的分析器选项包括以下内容：
 
 1.  在 **Excel** 中打开名为 `C:\Temp\counter.csv` 的文件。*Figure 5.22* 显示了电子表格中的数据摘录：
 
-![Figure 5.22 – counter.csv 的摘录
-
-![Figure_5.22_B16617.jpg](img/Figure_5.22_B16617.jpg)
+![Figure 5.22 – counter.csv 的摘录![Figure_5.22_B16617.jpg](img/Figure_5.22_B16617.jpg)
 
 Figure 5.22 – counter.csv 的摘录
 
@@ -664,9 +701,7 @@ Figure 5.22 – counter.csv 的摘录
 
 要列出可监控的 .NET 进程，请打开开发者命令提示符窗口并输入 `dotnet-counters ps` 命令。你应该会看到类似以下输出：
 
-![Figure 5.23 – 可监控的 .NET 进程列表
-
-![Figure_5.23_B16617.jpg](img/Figure_5.23_B16617.jpg)
+![Figure 5.23 – 可监控的 .NET 进程列表![Figure_5.23_B16617.jpg](img/Figure_5.23_B16617.jpg)
 
 Figure 5.23 – 可监控的 .NET 进程列表
 
@@ -676,7 +711,9 @@ Figure 5.23 – 可监控的 .NET 进程列表
 
 要列出可用的 .NET 计数器，请运行以下命令：
 
-[PRE24]
+```cs
+dotnet-counters list
+```
 
 你将在控制台看到计数器和它们的描述列表。对于 `Microsoft.AspNetCore.Hosting`，可用的计数器如下所示：
 
@@ -724,31 +761,31 @@ Figure 5.23 – 可监控的 .NET 进程列表
 
 我们将运行 `CH04_WeakReferences` 项目。一旦项目运行，请运行以下命令以获取进程 ID：
 
-[PRE25]
+```cs
+dotnet-counters ps
+```
 
-然后，一旦你有了.NET程序的进程ID，运行以下命令：
+然后，一旦你有了.NET 程序的进程 ID，运行以下命令：
 
-[PRE26]
+```cs
+dotnet-counters monitor –process-id 6719
+```
 
-对于我来说，该进程的ID为**6719**。将**6719**替换为你的进程ID。结果应该是你看到.NET计数器实时显示和更新，如图*图5.24*所示：
+对于我来说，该进程的 ID 为**6719**。将**6719**替换为你的进程 ID。结果应该是你看到.NET 计数器实时显示和更新，如图*图 5.24*所示：
 
-![图5.24 – dotnet-counters正在实时列出和更新我们的
+![图 5.24 – dotnet-counters 正在实时列出和更新我们的 CH04_WeakReferences 项目](img/Figure_5.24_B16617.jpg)
 
-CH04_WeakReferences项目
+图 5.24 – dotnet-counters 正在实时列出和更新我们的 CH04_WeakReferences 项目
 
-](img/Figure_5.24_B16617.jpg)
+按*q*键退出。如你所见，我们有**19.042%**的垃圾收集碎片。在 LOH 上有**19,640**字节，**80,864**字节分配给了第**2**代。我们已加载**9**个程序集，**24**字节分配给了第**0**代和第**1**代。我们观察到内存碎片发生在**19.042**%，因此可以进一步调查为什么有碎片，以及我们是否可以避免这种情况。
 
-图5.24 – dotnet-counters正在实时列出和更新我们的CH04_WeakReferences项目
+在下一节中，我们将查看一个示例，该示例追踪一个 WPF 应用程序中的内存泄漏。
 
-按*q*键退出。如你所见，我们有**19.042%**的垃圾收集碎片。在LOH上有**19,640**字节，**80,864**字节分配给了第**2**代。我们已加载**9**个程序集，**24**字节分配给了第**0**代和第**1**代。我们观察到内存碎片发生在**19.042**%，因此可以进一步调查为什么有碎片，以及我们是否可以避免这种情况。
-
-在下一节中，我们将查看一个示例，该示例追踪一个WPF应用程序中的内存泄漏。
-
-# 使用dotMemory追踪和修复内存泄漏
+# 使用 dotMemory 追踪和修复内存泄漏
 
 在本节中，我们将通过一个示例来演示如何追踪和修复内存泄漏。应用程序抛出的`OutOfMemoryException`异常。
 
-我们的示例将是一个名为`CH05_GameOfLife`的WPF应用程序。为了节省时间和空间，下载WPF应用程序的源代码。这将帮助你专注于当前的任务，即追踪内存泄漏并修复它。
+我们的示例将是一个名为`CH05_GameOfLife`的 WPF 应用程序。为了节省时间和空间，下载 WPF 应用程序的源代码。这将帮助你专注于当前的任务，即追踪内存泄漏并修复它。
 
 注意
 
@@ -760,27 +797,21 @@ CH04_WeakReferences项目
 
 1.  打开**dotMemory**。本例中使用的版本是**2020.3.4**
 
-1.  在**新会话**下，选择**本地**。然后，在**分析应用程序**下，选择**.NET Core应用程序**。在**.NET Core应用程序**下选择**CH05_GameOfLife.exe**文件，对于**分析器选项**，选择**从开始收集内存分配和流量数据**。*图5.25*显示了dotMemory准备分析我们的应用程序：
+1.  在**新会话**下，选择**本地**。然后，在**分析应用程序**下，选择**.NET Core 应用程序**。在**.NET Core 应用程序**下选择**CH05_GameOfLife.exe**文件，对于**分析器选项**，选择**从开始收集内存分配和流量数据**。*图 5.25*显示了 dotMemory 准备分析我们的应用程序：
 
-![图5.25 – dotMemory准备分析我们的.NET 6.0应用程序CH05_GameOfLife.exe
+![图 5.25 – dotMemory 准备分析我们的.NET 6.0 应用程序 CH05_GameOfLife.exe](img/Figure_5.25_B16617.jpg)
 
-](img/Figure_5.25_B16617.jpg)
+图 5.25 – dotMemory 准备分析我们的.NET 6.0 应用程序 CH05_GameOfLife.exe
 
-图5.25 – dotMemory准备分析我们的.NET 6.0应用程序CH05_GameOfLife.exe
+1.  点击**运行**以开始分析我们的应用程序。你将看到 dotMemory 中出现一个新的**分析**标签，如图*图 5.26*所示：
 
-1.  点击**运行**以开始分析我们的应用程序。你将看到dotMemory中出现一个新的**分析**标签，如图*图5.26*所示：
+![图 5.26 – dotMemory 在分析我们的应用程序时显示分析标签](img/Figure_5.26.jpg)
 
-![图5.26 – dotMemory在分析我们的应用程序时显示分析标签
+图 5.26 – dotMemory 在分析我们的应用程序时显示分析标签
 
-](img/Figure_5.26.jpg)
+1.  当分析器启动时，它也会启动我们的应用程序。点击应用程序的**开始**按钮，如图*图 5.27*所示：
 
-图5.26 – dotMemory在分析我们的应用程序时显示分析标签
-
-1.  当分析器启动时，它也会启动我们的应用程序。点击应用程序的**开始**按钮，如图*图5.27*所示：
-
-![图 5.27 – 运行 CH05_GameOfLife
-
-![图片](img/Image87625.jpg)
+![图 5.27 – 运行 CH05_GameOfLife![图片](img/Image87625.jpg)
 
 图 5.27 – 运行 CH05_GameOfLife
 
@@ -790,25 +821,19 @@ CH04_WeakReferences项目
 
 1.  再次拍摄一个快照，以便我们有两个快照。然后，关闭 *生命游戏* 应用程序以停止分析器。*图 5.28* 显示了已拍摄两个快照的 dotMemory **分析** 选项卡：
 
-![图 5.28 – 显示两个内存快照的 dotMemory 分析选项卡
-
-![图片](img/Figure_5.28.jpg)
+![图 5.28 – 显示两个内存快照的 dotMemory 分析选项卡![图片](img/Figure_5.28.jpg)
 
 图 5.28 – 显示两个内存快照的 dotMemory 分析选项卡
 
 1.  下一步是我们比较两个不同的快照。*图 5.29* 显示了两个快照并排的特写：
 
-![图 5.29 – dotMemory 快照 1 和 2
-
-![图片](img/Figure_5.29.jpg)
+![图 5.29 – dotMemory 快照 1 和 2![图片](img/Figure_5.29.jpg)
 
 图 5.29 – dotMemory 快照 1 和 2
 
 1.  点击 **比较** 打开两个快照的详细并排比较。您应该看到如图 *图 5.30* 所示的比较：
 
-![图 5.30 – 并排快照比较屏幕
-
-![图片](img/Figure_5.30_B16617.jpg)
+![图 5.30 – 并排快照比较屏幕![图片](img/Figure_5.30_B16617.jpg)
 
 图 5.30 – 并排快照比较屏幕
 
@@ -816,17 +841,13 @@ CH04_WeakReferences项目
 
 1.  点击 **命名空间** 列表。然后，展开 **CH05_GameOfLife** 命名空间并突出显示 **AdWindow** 条目，如图 *图 5.31* 所示：
 
-![图 5.31 – 使用 CH05_GameOfLife 高亮的命名空间分析
-
-![图片](img/Figure_5.31_B16617.jpg)
+![图 5.31 – 使用 CH05_GameOfLife 高亮的命名空间分析![图片](img/Figure_5.31_B16617.jpg)
 
 图 5.31 – 使用 CH05_GameOfLife 高亮的命名空间分析
 
 1.  在 **存活对象** 列表中，点击 **AdWindow** 行中的数字 **1**。这将弹出对话框，如图 *图 5.32* 所示：
 
-![图 5.32 – dotMemory 对话框提示打开快照
-
-![图片](img/Figure_5.32_B16617.jpg)
+![图 5.32 – dotMemory 对话框提示打开快照![图片](img/Figure_5.32_B16617.jpg)
 
 图 5.32 – dotMemory 对话框提示打开快照
 
@@ -834,9 +855,7 @@ CH04_WeakReferences项目
 
 1.  然后，点击 **关键保留路径** 选项卡。JetBrains dotMemory 视图将更改为类似于 *图 5.33* 的视图：
 
-![图 3.33 – 关键保留路径选项卡
-
-![图片](img/Figure_5.33_B16617.jpg)
+![图 3.33 – 关键保留路径选项卡![图片](img/Figure_5.33_B16617.jpg)
 
 图 3.33 – 关键保留路径选项卡
 
@@ -844,9 +863,7 @@ CH04_WeakReferences项目
 
 1.  点击 `DispatcherTimer` 框。这将带您到 `DispatcherTimer` 类，如图 *图 3.34* 所示：
 
-![图 3.34 – 显示 DispatcherTimeruse 详细信息的输出引用表
-
-![图片](img/Figure_5.34_B16617.jpg)
+![图 3.34 – 显示 DispatcherTimeruse 详细信息的输出引用表![图片](img/Figure_5.34_B16617.jpg)
 
 图 3.34 – 显示 DispatcherTimeruse 详细信息的输出引用表
 
@@ -862,25 +879,39 @@ CH04_WeakReferences项目
 
 1.  在 **CH05_GameOfLife** 项目的 `AdWindow` 类中定位 `AdWindow` 构造函数：
 
-    [PRE27]
+    ```cs
+    public AdWindow(Window owner)
+    {
+        ... 
+        _adTimer = new DispatcherTimer { 
+            Interval = TimeSpan.FromSeconds(3) 
+    };
+      _adTimer.Tick += ChangeAds;
+      _adTimer.Start();
+    }
+    ```
 
 如前述代码片段所示，我们正在订阅 `Tick` 事件，该事件由 `ChangeAds` 方法处理。但我们没有做的一件事是在我们不再需要它时取消订阅事件。这就是内存泄漏的原因。
 
 1.  为了纠正我们的内存泄漏，我们只需要在我们不再需要它时取消订阅事件。为此，我们更新 `OnClosed` 方法，如下面的代码所示：
 
-    [PRE28]
+    ```cs
+    protected override void OnClosed(EventArgs e)
+    {
+      _adTimer.Tick -= ChangeAds;
+      base.OnClosed(e);
+    }
+    ```
 
 我们现在通过在关闭 `AdWindow` 构造函数时取消订阅 `Tick` 事件来纠正我们的内存泄漏。重复这些步骤来分析这个内存泄漏，你会看到它现在已经被修复，如图 *图 5.36* 所示：
 
-![图 5.36 – dotMemory 显示内存泄漏已被修复
-
-](img/Figure_5.36.jpg)
+![图 5.36 – dotMemory 显示内存泄漏已被修复](img/Figure_5.36.jpg)
 
 图 5.36 – dotMemory 显示内存泄漏已被修复
 
 注意
 
-我们已经有效地追踪并修复了一个内存泄漏，这是由于我们没有取消订阅我们订阅的事件。这是 C# 中内存泄漏的非常常见的原因。要了解更多关于 dotMemory 以及如何在各种场景中使用它的信息，请访问 JetBrains 的官方 How-To 文档，网址为 [https://www.jetbrains.com/help/dotmemory/Examples.html](https://www.jetbrains.com/help/dotmemory/Examples.html)。
+我们已经有效地追踪并修复了一个内存泄漏，这是由于我们没有取消订阅我们订阅的事件。这是 C# 中内存泄漏的非常常见的原因。要了解更多关于 dotMemory 以及如何在各种场景中使用它的信息，请访问 JetBrains 的官方 How-To 文档，网址为 [`www.jetbrains.com/help/dotmemory/Examples.html`](https://www.jetbrains.com/help/dotmemory/Examples.html)。
 
 在下一节中，我们将探讨如何使用 dotTrace 追踪和修复 UI 冻结。
 
@@ -898,41 +929,31 @@ CH04_WeakReferences项目
 
 1.  选择**配置文件本地应用** | **.NET Core 应用程序** | **时间线**，并选择您刚刚编译的可执行文件。请确保勾选**从开始收集分析数据**。*图 5.37* 展示了在运行 dotTrace 之前对其进行配置的情况：
 
-![图 5.37 – 在我们运行时间线分析器之前 dotTrace
-
-![图 5.37_B16617.jpg](img/Figure_5.37_B16617.jpg)
+![图 5.37 – 在我们运行时间线分析器之前 dotTrace![图 5.37_B16617.jpg](img/Figure_5.37_B16617.jpg)
 
 图 5.37 – 在我们运行时间线分析器之前 dotTrace
 
 1.  点击**运行**按钮开始时间线分析。分析器将被打开，如图 *图 5.38* 所示：
 
-![图 5.38 – dotTrace 时间线分析器
-
-![图 5.38_B16617.jpg](img/Figure_5.38_B16617.jpg)
+![图 5.38 – dotTrace 时间线分析器![图 5.38_B16617.jpg](img/Figure_5.38_B16617.jpg)
 
 图 5.38 – dotTrace 时间线分析器
 
 分析器将启动 **CH05_BatchFileProcessor** 程序，如图 *图 5.39* 所示：
 
-![图 5.39 – 批处理文件处理器
-
-![图 5.39_B16617.jpg](img/Figure_5.39_B16617.jpg)
+![图 5.39 – 批处理文件处理器![图 5.39_B16617.jpg](img/Figure_5.39_B16617.jpg)
 
 图 5.39 – 批处理文件处理器
 
 当应用程序完成文件处理后，UI 将显示，如图 *图 5.40* 所示：
 
-![图 5.40 – CH05_BatchFileProcessor
-
-![图 5.40_B16617.jpg](img/Figure_5.40_B16617.jpg)
+![图 5.40 – CH05_BatchFileProcessor![图 5.40_B16617.jpg](img/Figure_5.40_B16617.jpg)
 
 图 5.40 – CH05_BatchFileProcessor
 
 1.  点击时间线分析器上的 **获取快照** 和 **等待** 按钮。这将保存快照并在 dotTrace **时间线查看器**应用程序中打开，如图 *图 5.41* 所示：
 
-![图 5.41 – 加载了时间线快照的 dotTrace 时间线查看器应用程序
-
-![图 5.41.jpg](img/Figure_5.41.jpg)
+![图 5.41 – 加载了时间线快照的 dotTrace 时间线查看器应用程序![图 5.41.jpg](img/Figure_5.41.jpg)
 
 图 5.41 – 加载了时间线快照的 dotTrace 时间线查看器应用程序
 
@@ -942,43 +963,31 @@ CH04_WeakReferences项目
 
 1.  我们的 **BackgroundWorker** 线程是具有 ID **12764** 的 **.NET ThreadPoolWorker** 线程，如图 *图 5.42* 所示：
 
-![图 5.42 – dotTrace 时间线查看器应用程序与我们的
-
-BackgroundWorker 线程突出显示
-
-![图 5.42.jpg](img/Figure_5.42.jpg)
+![图 5.42 – dotTrace 时间线查看器应用程序与我们的 BackgroundWorker 线程突出显示![图 5.42.jpg](img/Figure_5.42.jpg)
 
 图 5.42 – 带有突出显示的 BackgroundWorker 线程的 dotTrace 时间线查看器应用程序
 
 1.  将时间线放大到 **.NET ThreadPool Worker**。您可以看到时间线由三个状态组成。这些状态是**运行中**、**等待 CPU** 和 **等待**。您可以在 *图 5.43* 中看到我们的线程时间线：
 
-![图 5.43 – 我们线程在时间线跟踪中的活动
-
-![图 5.43_B16617.jpg](img/Figure_5.43_B16617.jpg)
+![图 5.43 – 我们线程在时间线跟踪中的活动![图 5.43_B16617.jpg](img/Figure_5.43_B16617.jpg)
 
 图 5.43 – 我们线程在时间线跟踪中的活动
 
 在屏幕的左侧，您将在 **过滤器** 面板中看到 **线程状态** 部分。依次选择每个状态，您将看到相应的时线被突出显示。尝试所有可用的不同过滤器。调查每个选项提供的内容。这是一种很好的学习方法。收起的 **过滤器** 面板在 *图 5.44* 中显示：
 
-![图 5.44 – 收起的 dotTrace 过滤器面板
-
-![图片](img/Figure_5.44_B16617.jpg)
+![图 5.44 – 收起的 dotTrace 过滤器面板![图片](img/Figure_5.44_B16617.jpg)
 
 图 5.44 – 收起的 dotTrace 过滤器面板
 
 1.  在屏幕的右侧，您将看到 **调用栈** 面板和 **源视图** 面板。如果您在线程的时间线上点击任何位置，您将看到该时间点的调用栈。对于该堆栈跟踪，将显示调用树。如果您在调用栈中点击一个条目，代码将被反编译并在 **源视图** 选项卡中显示。此功能使您能够看到在什么时间点运行什么代码。此外，此视图还显示了您正在查看的代码的完整程序集名称、命名空间和类名。*图 5.45* 显示了 **调用栈** 面板：
 
-![图 5.45 – 显示 Backtraces 选项卡的 dotTrace 调用栈面板
-
-![图片](img/Figure_5.45_B16617.jpg)
+![图 5.45 – 显示 Backtraces 选项卡的 dotTrace 调用栈面板![图片](img/Figure_5.45_B16617.jpg)
 
 图 5.45 – 显示 Backtraces 选项卡的 dotTrace 调用栈面板
 
 *图 5.46* 显示了 **源视图** 面板：
 
-![图 5.46 – 显示反编译的 C# 和 IL 源代码的 dotTrace 源视图屏幕
-
-![图片](img/Figure_5.46_B16617.jpg)
+![图 5.46 – 显示反编译的 C# 和 IL 源代码的 dotTrace 源视图屏幕![图片](img/Figure_5.46_B16617.jpg)
 
 图 5.46 – 显示反编译的 C# 和 IL 源代码的 dotTrace 源视图屏幕
 
@@ -988,9 +997,7 @@ BackgroundWorker 线程突出显示
 
 1.  现在我们准备调查为什么我们的 UI 会冻结。*图 5.47* 中的紫色线条代表我们的 UI 冻结的时刻：
 
-![图 5.47 – 显示我们的线程并突出显示 UI 冻结的 dotTrace 过滤视图
-
-![图片](img/Figure_5.47_B16617.jpg)
+![图 5.47 – 显示我们的线程并突出显示 UI 冻结的 dotTrace 过滤视图![图片](img/Figure_5.47_B16617.jpg)
 
 图 5.47 – 显示我们的线程并突出显示 UI 冻结的 dotTrace 过滤视图
 
@@ -1002,35 +1009,61 @@ BackgroundWorker 线程突出显示
 
 1.  选择 **子系统** | **用户代码**，并取消选择其他所有选项。您应该在 **方法和子系统** 下看到以下内容：
 
-![图 5.48 – 突出显示有问题的用户代码的 dotTrace 方法和子系统屏幕
-
-![图片](img/Figure_5.48_B16617.jpg)
+![图 5.48 – 突出显示有问题的用户代码的 dotTrace 方法和子系统屏幕![图片](img/Figure_5.48_B16617.jpg)
 
 图 5.48 – 突出显示有问题的用户代码的 dotTrace 方法和子系统屏幕
 
-查看前面高亮的方法`ProcessInProgress`，我们在UI冻结发生的时间段内100%地调用它。点击`ProcessInProgress`将显示`MainWindow.xaml.cs`文件的內容。我们的违规代码如下：
+查看前面高亮的方法`ProcessInProgress`，我们在 UI 冻结发生的时间段内 100%地调用它。点击`ProcessInProgress`将显示`MainWindow.xaml.cs`文件的內容。我们的违规代码如下：
 
-[PRE29]
+```cs
+private void ProcessInProgress(
+object sender, 
+ProgressChangedEventArgs e
+)
+{
+var upd = (ProgressUpdater)e.UserState;
+lblProgress.Content = $"File {upd.CurrentFileNmb} of {upd.
+    TotalFiles}: {e.ProgressPercentage}%";
+} 
+```
 
 我们的代码正在更新进度标签的值，该值是传递给方法的`ProgressChangedEventArgs`类型。那么，调用这个方法的是谁呢？它是`FileProcessor`类中的`ProcessFiles`方法：
 
-[PRE30]
+```cs
+...                
+for (var i = 0; i < FilePaths.Count; i++)
+{
+     ...
+for (var j = 0; j < _lines.Length; j++)
+{
+    var line = _lines[j];
+    var stringReverser = new StringReverser(line);
+    _lines[j] = stringReverser.Reverse();
+    if (j % 5 == 0)
+    {
+        var p = (float)(j + 1) / _lines.Length * 100;
+        Worker.ReportProgress((int)p, _updater);
+    }
+}
+File.WriteAllLines(path, _lines);
+}
+```
 
 此方法遍历用户选择的文件。每个文件逐行读取，一行一行地读取。每行文本都被反转。问题是，我们调用这个方法太频繁了。所以，解决方案是将`(j % 5 == 0)`改为`(j% 1000 == 0)`。
 
-1.  对代码进行更改后重新编译并重新运行分析器。这次，将不会有延迟。您将看到UI冻结已被修复。
+1.  对代码进行更改后重新编译并重新运行分析器。这次，将不会有延迟。您将看到 UI 冻结已被修复。
 
-现在您已经使用了dotTrace和Timeline配置文件来跟踪并修复了UI冻结。在最后一节中，我们将探讨如何使用dotTrace来优化应用程序性能和内存流量。
+现在您已经使用了 dotTrace 和 Timeline 配置文件来跟踪并修复了 UI 冻结。在最后一节中，我们将探讨如何使用 dotTrace 来优化应用程序性能和内存流量。
 
-# 使用dotTrace优化应用程序性能和内存流量
+# 使用 dotTrace 优化应用程序性能和内存流量
 
-在本节中，我们将继续跟踪我们的`CH05_BatchFileProcessing`项目。我们已经修复了UI冻结，并将运行另一个跟踪以查看是否可以识别任何其他问题。在分析跟踪时，我们将看到产生了大量影响应用程序性能的内存流量。因此，我们将解决这个问题并修复它：
+在本节中，我们将继续跟踪我们的`CH05_BatchFileProcessing`项目。我们已经修复了 UI 冻结，并将运行另一个跟踪以查看是否可以识别任何其他问题。在分析跟踪时，我们将看到产生了大量影响应用程序性能的内存流量。因此，我们将解决这个问题并修复它：
 
-1.  打开dotTrace。您的前一个会话应该已保存。选择它，然后点击**Run**按钮以开始跟踪。然后，将启动示例应用程序。
+1.  打开 dotTrace。您的前一个会话应该已保存。选择它，然后点击**Run**按钮以开始跟踪。然后，将启动示例应用程序。
 
 1.  选择文本文件，然后点击**Process Files**按钮。
 
-1.  一旦处理完文件，终止应用程序。这将刷新数据并将我们的跟踪加载到跟踪查看器中。然后，关闭dotTrace。
+1.  一旦处理完文件，终止应用程序。这将刷新数据并将我们的跟踪加载到跟踪查看器中。然后，关闭 dotTrace。
 
 1.  一旦将跟踪快照加载到**Timeline Viewer**中，点击按钮以**显示快照**。
 
@@ -1038,7 +1071,7 @@ BackgroundWorker 线程突出显示
 
 1.  隐藏除我们的**.NET ThreadPool Worker**线程之外的所有线程。
 
-1.  在`System.String`类中。这将是我们`CH05_BatchFileProcessing.StringReverse.Reverse()`调用的结果。*图5.49*显示了我们的跟踪结果，我们可以看到我们的方法和它们产生的内存流量百分比：
+1.  在`System.String`类中。这将是我们`CH05_BatchFileProcessing.StringReverse.Reverse()`调用的结果。*图 5.49*显示了我们的跟踪结果，我们可以看到我们的方法和它们产生的内存流量百分比：
 
 ![Figure 5.49 – The dotTrace Timeline Viewer Call Stack screen showing our methods and memory traffic percentage]
 
@@ -1046,27 +1079,43 @@ BackgroundWorker 线程突出显示
 
 ![Figure 5.49 – The dotTrace Timeline Viewer Call Stack screen showing our methods and memory traffic percentage]
 
-在这个方法中，两个不同的MB大小是我们自己的内存分配，不包括从该方法中调用的子方法中的内存分配/该方法或任何从该方法中调用的子方法分配的内存量。正如你所看到的，内存分配是`Reverse()`方法和`ProcessFiles()`方法。
+在这个方法中，两个不同的 MB 大小是我们自己的内存分配，不包括从该方法中调用的子方法中的内存分配/该方法或任何从该方法中调用的子方法分配的内存量。正如你所看到的，内存分配是`Reverse()`方法和`ProcessFiles()`方法。
 
-1.  在Visual Studio中打开这个类。`Reverse()`方法的代码如下：
+1.  在 Visual Studio 中打开这个类。`Reverse()`方法的代码如下：
 
-    [PRE31]
+    ```cs
+    public string Reverse()
+    {
+    char[] charArray = _original.ToCharArray();
+    string stringResult = null;
+    for (int i = charArray.Length; i > 0; i--)
+    {
+        stringResult += charArray[i - 1];
+    }
+    return stringResult;
+    }
+    ```
 
 如你所见，这种方法通过将字符串分配给数组来反转字符串。然后，数组以反向迭代，每个字符通过字符串连接分配给字符串。这正是我们应用程序性能的问题所在。
 
 有充分的文档记录表明，构建字符串的最高效方式是使用`StringBuilder`类。我们在这里也可以这样做。然而，还有另一种方法可以提高这个方法的表现。将现有的`Reverse()`字符串方法替换为以下版本：
 
-[PRE32]
+```cs
+public string Reverse()
+{
+     char[] charArray = _original.ToCharArray();
+     Array.Reverse(charArray);
+return new string(charArray);
+}
+```
 
 在我们修改后的代码中，我们反转数组，并从反转后的数组返回一个新的字符串。
 
-1.  在**发布**模式下构建你的项目，然后运行一个新的跟踪。*图5.50*显示了新跟踪的结果：
+1.  在**发布**模式下构建你的项目，然后运行一个新的跟踪。*图 5.50*显示了新跟踪的结果：
 
-![图5.50 – 显示我们改进性能的新跟踪
+![图 5.50 – 显示我们改进性能的新跟踪](img/Figure_5.50_B16617.jpg)
 
-](img/Figure_5.50_B16617.jpg)
-
-图5.50 – 显示我们改进性能的新跟踪
+图 5.50 – 显示我们改进性能的新跟踪
 
 从我们的跟踪中我们可以看到，`ProcessFiles`方法的内存分配从**2.9 MB**/**255 MB**，生成**1.2%**的内存流量，到**3.8 MB**/**37 MB**的内存分配，生成**10.1%**的内存流量。
 
@@ -1074,13 +1123,13 @@ BackgroundWorker 线程突出显示
 
 那是一个很好的性能提升！
 
-在本章中，我们介绍了各种代码测量和分析的方法。通过我们获得的数据，我们成功地修复了由于未取消订阅事件处理程序而导致的内存泄漏，修复了由于UI更新过于频繁而导致的UI冻结，并改进了由于我们批量处理字符串反转的方式而引起的应用程序性能和内存流量。现在，是时候总结我们所学的知识了。
+在本章中，我们介绍了各种代码测量和分析的方法。通过我们获得的数据，我们成功地修复了由于未取消订阅事件处理程序而导致的内存泄漏，修复了由于 UI 更新过于频繁而导致的 UI 冻结，并改进了由于我们批量处理字符串反转的方式而引起的应用程序性能和内存流量。现在，是时候总结我们所学的知识了。
 
 # 摘要
 
 我们从查看我们可用的各种代码指标开始，进行应用程序分析和跟踪。不同的工具有不同的指标可用。这些指标涵盖了应用程序、程序集、命名空间、类型、方法和字段。
 
-然后，我们继续研究我们如何执行静态代码分析。我们使用Visual Studio 2022内置的代码分析工具演示了静态代码分析。我们看到了如何生成以下指标：可维护性指数、循环复杂度、继承深度、类耦合、源代码行数和可执行代码行数。
+然后，我们继续研究我们如何执行静态代码分析。我们使用 Visual Studio 2022 内置的代码分析工具演示了静态代码分析。我们看到了如何生成以下指标：可维护性指数、循环复杂度、继承深度、类耦合、源代码行数和可执行代码行数。
 
 我们接下来探讨了内存转储的生成以及如何在 Visual Studio 2022 中查看它们。我们可以查看转储时间、转储位置、进程名称、处理器架构、任何异常信息、操作系统版本和 CLR 版本。此外，我们还可以查看已加载的模块名称及其版本和物理路径。
 
@@ -1090,7 +1139,7 @@ BackgroundWorker 线程突出显示
 
 接下来，我们探讨了 `dotnet-counters` 的使用方法。我们学习了如何列出可监控的 .NET 进程。然后，我们看到了如何列出可用的已知 .NET 计数器。在我们的结论部分，我们收集数据并将数据保存到文件中，以便进行后续分析。
 
-最后，我们通过三个示例来演示如何使用 JetBrains dotMemory 和 JetBrains dotTrace 修复内存泄漏和UI冻结问题，提高性能，并减少内存流量。
+最后，我们通过三个示例来演示如何使用 JetBrains dotMemory 和 JetBrains dotTrace 修复内存泄漏和 UI 冻结问题，提高性能，并减少内存流量。
 
 在下一章中，我们将详细探讨 **集合** 框架。然而，在此之前，请花时间进一步阅读并回答以下问题，以巩固您所学的内容。
 
@@ -1110,18 +1159,18 @@ BackgroundWorker 线程突出显示
 
 # 进一步阅读
 
-+   调试 Visual Studio 2019：[https://docs.microsoft.com/en-us/visualstudio/get-started/csharp/tutorial-debugger?view=vs-2019](https://docs.microsoft.com/en-us/visualstudio/get-started/csharp/tutorial-debugger?view=vs-2019).
++   调试 Visual Studio 2019：[`docs.microsoft.com/en-us/visualstudio/get-started/csharp/tutorial-debugger?view=vs-2019`](https://docs.microsoft.com/en-us/visualstudio/get-started/csharp/tutorial-debugger?view=vs-2019).
 
 +   Visual Studio 调试器中的转储文件：https://docs.microsoft.com/visualstudio/debugger/using-dump-files?view=vs-2019.
 
 +   `dotnet-counters`: https://docs.microsoft.com/en-us/dotnet/core/diagnostics/dotnet-counters.
 
-+   .NET Core计数器内部机制：如何在监控管道中集成计数器: [https://medium.com/criteo-engineering/net-core-counters-internals-how-to-integrate-counters-in-your-monitoring-pipeline-5354cd61b42e#:~:text=dotnet-counters%3A%20collect%20the%20metrics%20corresponding%20to%20some%20performance,how%20to%20fetch%20them%20via%20the%20EventPipe%20infrastructure](https://medium.com/criteo-engineering/net-core-counters-internals-how-to-integrate-counters-in-your-monitoring-pipeline-5354cd61b42e#:~:text=dotnet-counters%3A%20collect%20the%20metrics%20corresponding%20to%20some%20performance,how%20to%20fetch%20them%20v).
++   .NET Core 计数器内部机制：如何在监控管道中集成计数器: [`medium.com/criteo-engineering/net-core-counters-internals-how-to-integrate-counters-in-your-monitoring-pipeline-5354cd61b42e#:~:text=dotnet-counters%3A%20collect%20the%20metrics%20corresponding%20to%20some%20performance,how%20to%20fetch%20them%20via%20the%20EventPipe%20infrastructure`](https://medium.com/criteo-engineering/net-core-counters-internals-how-to-integrate-counters-in-your-monitoring-pipeline-5354cd61b42e#:~:text=dotnet-counters%3A%20collect%20the%20metrics%20corresponding%20to%20some%20performance,how%20to%20fetch%20them%20v).
 
 +   *JetBrains dotTrace*: https://www.jetbrains.com/profiler/.
 
-+   *JetBrains dotMemory*: [https://www.jetbrains.com/dotmemory/](https://www.jetbrains.com/dotmemory/).
++   *JetBrains dotMemory*: [`www.jetbrains.com/dotmemory/`](https://www.jetbrains.com/dotmemory/).
 
-+   *ndepend*: [https://www.ndepend.com/](https://www.ndepend.com/).
++   *ndepend*: [`www.ndepend.com/`](https://www.ndepend.com/).
 
-+   .NET源代码分析概述: [https://docs.microsoft.com/dotnet/fundamentals/code-analysis/overview](https://docs.microsoft.com/dotnet/fundamentals/code-analysis/overview).
++   .NET 源代码分析概述: [`docs.microsoft.com/dotnet/fundamentals/code-analysis/overview`](https://docs.microsoft.com/dotnet/fundamentals/code-analysis/overview).

@@ -1,28 +1,28 @@
-# 使用.NET Core应用SOA
+# 使用.NET Core 应用 SOA
 
-术语**面向服务的架构**（**SOA**）指的是一种模块化架构，其中系统组件之间的交互是通过通信实现的。SOA允许来自不同组织的应用程序自动交换数据和事务，并允许组织在互联网上提供服务。
+术语**面向服务的架构**（**SOA**）指的是一种模块化架构，其中系统组件之间的交互是通过通信实现的。SOA 允许来自不同组织的应用程序自动交换数据和事务，并允许组织在互联网上提供服务。
 
-此外，正如我们在第5章的*模块概念的演变 - 微服务*部分中讨论的，*将微服务架构应用于您的企业应用程序*，基于通信的交互解决了由共享相同地址空间的模块组成的复杂系统中不可避免出现的二进制兼容性和版本不匹配问题。此外，使用SOA，您不需要在所有使用该组件的系统/子系统上部署同一组件的不同副本 - 每个组件只需在一个地方部署即可。这可以是一个单独的服务器，位于单个数据中心的位置集群，或者地理上分布的集群。在这里，您的组件的每个版本都只部署一次，服务器/集群逻辑自动创建所有必要的副本，从而简化了整体的**持续集成/持续交付**（**CI/CD**）周期。
+此外，正如我们在第五章的*模块概念的演变 - 微服务*部分中讨论的，*将微服务架构应用于您的企业应用程序*，基于通信的交互解决了由共享相同地址空间的模块组成的复杂系统中不可避免出现的二进制兼容性和版本不匹配问题。此外，使用 SOA，您不需要在所有使用该组件的系统/子系统上部署同一组件的不同副本 - 每个组件只需在一个地方部署即可。这可以是一个单独的服务器，位于单个数据中心的位置集群，或者地理上分布的集群。在这里，您的组件的每个版本都只部署一次，服务器/集群逻辑自动创建所有必要的副本，从而简化了整体的**持续集成/持续交付**（**CI/CD**）周期。
 
-只要新版本符合向客户端声明的通信接口，就不会出现不兼容性。另一方面，当使用DLLs/packages时，如果保持相同的接口，由于库模块可能与其客户端共享的其他DLLs/packages的依赖项中可能出现的版本不匹配，可能会出现不兼容性。
+只要新版本符合向客户端声明的通信接口，就不会出现不兼容性。另一方面，当使用 DLLs/packages 时，如果保持相同的接口，由于库模块可能与其客户端共享的其他 DLLs/packages 的依赖项中可能出现的版本不匹配，可能会出现不兼容性。
 
-在第5章[将微服务架构应用于您的企业应用程序](49aed8bb-9a4a-4241-9efc-f53c3f53dd5a.xhtml)中讨论了组织协作服务的集群/网络。在本章中，我们将主要关注每个服务提供的通信接口。更具体地说，我们将讨论以下主题：
+在第五章将微服务架构应用于您的企业应用程序中讨论了组织协作服务的集群/网络。在本章中，我们将主要关注每个服务提供的通信接口。更具体地说，我们将讨论以下主题：
 
-+   理解SOA方法的原则
++   理解 SOA 方法的原则
 
-+   .NET Core如何处理SOA？
++   .NET Core 如何处理 SOA？
 
-+   用例 - 暴露WWTravelClub包
++   用例 - 暴露 WWTravelClub 包
 
-在本章结束时，您将了解如何通过ASP.NET Core服务公开暴露WWTravelClub书用例中的数据。
+在本章结束时，您将了解如何通过 ASP.NET Core 服务公开暴露 WWTravelClub 书用例中的数据。
 
 # 技术要求
 
-本章需要Visual Studio 2017或2019免费社区版或更高版本，并安装所有数据库工具。
+本章需要 Visual Studio 2017 或 2019 免费社区版或更高版本，并安装所有数据库工具。
 
-本章中的所有概念都将基于本书的WWTravelClub书用例的实践示例进行阐明。您可以在[https://github.com/PacktPublishing/Hands-On-Software-Architecture-with-CSharp-8](https://github.com/PacktPublishing/Hands-On-Software-Architecture-with-CSharp-8)找到本章的代码。
+本章中的所有概念都将基于本书的 WWTravelClub 书用例的实践示例进行阐明。您可以在[`github.com/PacktPublishing/Hands-On-Software-Architecture-with-CSharp-8`](https://github.com/PacktPublishing/Hands-On-Software-Architecture-with-CSharp-8)找到本章的代码。
 
-# 理解SOA方法的原则
+# 理解 SOA 方法的原则
 
 就像面向对象架构中的类一样，服务是实现接口的实例，而这些接口又来自系统功能规格。因此，*服务* 设计的第一步是定义其抽象接口。在这个阶段，你将所有服务操作定义为操作接口方法，这些方法作用于你喜欢的语言类型（C#、Java、C++、JavaScript 等），并决定哪些操作使用同步通信实现，哪些操作使用异步通信实现。
 
@@ -38,29 +38,29 @@
 
 一旦你确定了通信栈/架构，你需要将之前的接口适应架构的独特性（有关更多详细信息，请参阅本章的 *REST Web 服务* 子节）。然后，你必须将这些接口翻译成选定的通信语言。这意味着你必须将所有编程语言类型映射到所选通信语言中可用的类型。
 
-实际的数据转换通常由开发环境使用的SOA库自动执行。然而，可能需要一些配置，并且在任何情况下，我们必须意识到在每次通信之前我们的编程语言类型是如何转换的。例如，某些数值类型可能被转换为精度较低或值范围不同的类型。
+实际的数据转换通常由开发环境使用的 SOA 库自动执行。然而，可能需要一些配置，并且在任何情况下，我们必须意识到在每次通信之前我们的编程语言类型是如何转换的。例如，某些数值类型可能被转换为精度较低或值范围不同的类型。
 
 对于集群外不可访问的微服务，互操作性约束可以以较轻的形式解释，因为它们需要与其他属于同一集群的微服务进行通信。在这种情况下，这意味着通信栈可能是平台特定的，以便提高性能，但它必须是一个事实上的标准，以避免与其他可能随着应用程序的发展而添加到集群中的微服务兼容性问题。
 
-我们讨论的是*通信栈*而不是*通信协议*，因为SOA通信标准通常定义消息内容的格式，并为嵌入这些消息的特定协议提供不同的可能性。例如，SOAP协议仅定义了各种消息的基于XML的格式，但SOAP消息可以通过各种协议传递。通常，用于SOAP的最常见协议是HTTP，但你可能决定跳到HTTP级别，并通过TCP/IP直接发送SOAP消息以获得更好的性能。
+我们讨论的是*通信栈*而不是*通信协议*，因为 SOA 通信标准通常定义消息内容的格式，并为嵌入这些消息的特定协议提供不同的可能性。例如，SOAP 协议仅定义了各种消息的基于 XML 的格式，但 SOAP 消息可以通过各种协议传递。通常，用于 SOAP 的最常见协议是 HTTP，但你可能决定跳到 HTTP 级别，并通过 TCP/IP 直接发送 SOAP 消息以获得更好的性能。
 
 你应该采用的通信栈的选择取决于几个因素：
 
-+   **兼容性约束**：如果你的服务必须对互联网上的商业客户公开可用，那么你必须遵守最常见的选择，这意味着使用HTTP上的SOAP或JSON REST服务。如果您的客户端不是商业客户端而是**物联网**（**IoT**）客户端，那么最常见的选择可能会有所不同。在物联网中，不同应用领域使用的协议可能不同。例如，海洋车辆状态数据通常不与*Signal K*交换。
++   **兼容性约束**：如果你的服务必须对互联网上的商业客户公开可用，那么你必须遵守最常见的选择，这意味着使用 HTTP 上的 SOAP 或 JSON REST 服务。如果您的客户端不是商业客户端而是**物联网**（**IoT**）客户端，那么最常见的选择可能会有所不同。在物联网中，不同应用领域使用的协议可能不同。例如，海洋车辆状态数据通常不与*Signal K*交换。
 
-+   **开发/部署平台**：并非所有通信栈都适用于所有开发框架和所有部署平台。例如，我们在[第5章](49aed8bb-9a4a-4241-9efc-f53c3f53dd5a.xhtml)的代码示例中使用的.NET远程通信，专门针对.NET和Azure Service Fabric。幸运的是，所有在公共商业服务中使用的最常见通信栈，如基于SOAP和JSON的REST通信，都可在所有主要开发/部署平台上使用。
++   **开发/部署平台**：并非所有通信栈都适用于所有开发框架和所有部署平台。例如，我们在第五章的代码示例中使用的.NET 远程通信，专门针对.NET 和 Azure Service Fabric。幸运的是，所有在公共商业服务中使用的最常见通信栈，如基于 SOAP 和 JSON 的 REST 通信，都可在所有主要开发/部署平台上使用。
 
-+   **性能**：如果你的系统没有暴露给外界，而是你的微服务集群的私有部分，性能考虑的优先级更高。这就是为什么在[第5章](49aed8bb-9a4a-4241-9efc-f53c3f53dd5a.xhtml)的末尾的Service Fabric示例中，*将微服务架构应用于企业应用程序*，我们使用了.NET远程通信作为内部通信栈。值得注意的是，对于*私有*服务，你需要关注互操作性，并避免使用自定义通信栈。.NET远程通信不是一个官方标准，但它是可以接受的，因为它是在Azure Service Fabric内部通信的事实标准。
++   **性能**：如果你的系统没有暴露给外界，而是你的微服务集群的私有部分，性能考虑的优先级更高。这就是为什么在第五章的末尾的 Service Fabric 示例中，*将微服务架构应用于企业应用程序*，我们使用了.NET 远程通信作为内部通信栈。值得注意的是，对于*私有*服务，你需要关注互操作性，并避免使用自定义通信栈。.NET 远程通信不是一个官方标准，但它是可以接受的，因为它是在 Azure Service Fabric 内部通信的事实标准。
 
 +   **你团队中工具和知识的可用性**：在选择可接受的通信栈时，了解团队/组织中工具和知识的可用性具有重要意义。然而，这种限制通常比兼容性约束的优先级低，因为设想一个对团队来说易于实施但几乎无人能使用的系统是没有意义的。
 
-+   **灵活性与可用特性之间的权衡**：一些通信解决方案虽然不够完整，但提供了更高的灵活性，而其他解决方案虽然更完整，但提供的灵活性较低。对灵活性的需求在过去的几年中引发了一场从基于SOAP的服务转向更灵活的REST服务的运动。当我们在本节剩余部分描述SOAP和REST服务时，这一点将更详细地讨论。
++   **灵活性与可用特性之间的权衡**：一些通信解决方案虽然不够完整，但提供了更高的灵活性，而其他解决方案虽然更完整，但提供的灵活性较低。对灵活性的需求在过去的几年中引发了一场从基于 SOAP 的服务转向更灵活的 REST 服务的运动。当我们在本节剩余部分描述 SOAP 和 REST 服务时，这一点将更详细地讨论。
 
-+   **服务描述**：当服务必须在互联网上公开时，客户端应用程序需要一个公开可用的服务规范描述，以便设计它们的通信客户端。一些通信栈包括用于描述服务规范的语言和约定。以这种方式公开的形式化服务规范可以被处理，以便自动创建通信客户端。SOAP更进一步，通过一个包含有关每个Web服务可以执行的任务信息的公共XML目录，允许服务可发现性。
++   **服务描述**：当服务必须在互联网上公开时，客户端应用程序需要一个公开可用的服务规范描述，以便设计它们的通信客户端。一些通信栈包括用于描述服务规范的语言和约定。以这种方式公开的形式化服务规范可以被处理，以便自动创建通信客户端。SOAP 更进一步，通过一个包含有关每个 Web 服务可以执行的任务信息的公共 XML 目录，允许服务可发现性。
 
-一旦你选择了希望使用的通信栈，你必须使用你的开发环境中可用的工具以符合所选通信栈的方式实现服务。有时，通信栈的合规性可以通过开发工具自动保证，但有时可能需要一些开发工作。例如，在.NET世界中，如果你使用WCF，SOAP服务的合规性会自动由开发工具保证，而REST服务的合规性则落在开发者的责任之下。
+一旦你选择了希望使用的通信栈，你必须使用你的开发环境中可用的工具以符合所选通信栈的方式实现服务。有时，通信栈的合规性可以通过开发工具自动保证，但有时可能需要一些开发工作。例如，在.NET 世界中，如果你使用 WCF，SOAP 服务的合规性会自动由开发工具保证，而 REST 服务的合规性则落在开发者的责任之下。
 
-SOA解决方案的一些基本特性如下：
+SOA 解决方案的一些基本特性如下：
 
 +   **认证**：允许客户端认证以访问服务操作。
 
@@ -82,11 +82,11 @@ SOA解决方案的一些基本特性如下：
 
 +   **路由**：如果以及如何将消息通过服务网络进行路由
 
-本节的其余部分致力于描述 SOAP 和 REST 服务，因为它们是公开其集群/服务器之外的业务服务的既定标准。出于性能原因，微服务使用其他协议，如 .NET Remoting 和 AMQP 进行集群间通信。.NET Remoting 的使用在第 5 章[将微服务架构应用于您的企业应用程序](49aed8bb-9a4a-4241-9efc-f53c3f53dd5a.xhtml)中讨论，而 AMQP 的链接在*进一步阅读*部分给出。
+本节的其余部分致力于描述 SOAP 和 REST 服务，因为它们是公开其集群/服务器之外的业务服务的既定标准。出于性能原因，微服务使用其他协议，如 .NET Remoting 和 AMQP 进行集群间通信。.NET Remoting 的使用在第五章将微服务架构应用于您的企业应用程序中讨论，而 AMQP 的链接在*进一步阅读*部分给出。
 
 # SOAP 网络服务
 
-**简单对象访问协议**（**SOAP**）允许单向消息和响应/回答消息。通信可以是同步的，也可以是异步的，但如果底层协议是同步的，例如在 HTTP 的情况下，发送者会收到一个确认消息，表明消息已被接收（但不一定已处理）。当使用异步通信时，发送者必须监听传入的通信。通常，异步通信是通过我们第 9 章[设计模式和 .NET Core 实现](a2d50e08-6698-47f6-a9b5-188de08134c0.xhtml)中描述的订阅者/发布者模式实现的。
+**简单对象访问协议**（**SOAP**）允许单向消息和响应/回答消息。通信可以是同步的，也可以是异步的，但如果底层协议是同步的，例如在 HTTP 的情况下，发送者会收到一个确认消息，表明消息已被接收（但不一定已处理）。当使用异步通信时，发送者必须监听传入的通信。通常，异步通信是通过我们第九章设计模式和 .NET Core 实现中描述的订阅者/发布者模式实现的。
 
 消息表示为称为**封装**的 XML 文档。每个封装包含一个`header`（头部）、一个`body`（主体）和一个`fault`（错误）元素。`body`是放置实际消息内容的地方。`fault`元素包含可能的错误，因此它是通信发生时交换异常的方式。最后，`header`包含任何丰富协议但不包含域数据的辅助信息。例如，`header`可能包含一个身份验证令牌，以及/或如果消息已签名，则包含一个签名。
 
@@ -102,33 +102,55 @@ SOAP 规范包含消息交换的基本内容，而其他辅助功能则在单独
 
 服务的整个定义是一个可能包含对其他命名空间的引用的 XSD 规范，即对其他 XSD 文档的引用。简而言之，SOAP 通信的所有消息都必须在 XSD 规范中定义。然后，如果服务器和客户端引用相同的 XSD 规范，它们就可以进行通信。这意味着，例如，每次您向消息添加另一个字段时，您都需要创建一个新的 XSD 规范。之后，您需要通过创建新版本来更新所有引用旧消息定义的 XSD 文件到新消息定义。反过来，这些修改需要为其他 XSD 文件创建其他版本，依此类推。因此，保持与先前行为兼容的简单修改（客户端可以简单地忽略添加的字段）可能会导致版本变化的指数级链式反应。
 
-在过去几年中，处理修改的难度，处理所有`WS-*`规范配置的复杂性以及性能问题，导致逐渐转向我们将在下一节中描述的更简单的REST服务。这一转变始于从JavaScript调用的服务，因为实现能够在网页浏览器中高效运行的完整SOAP客户端很困难。此外，复杂的SOAP机制对于典型在浏览器中运行的客户端的简单需求来说过大，可能导致了开发时间的完全浪费。
+在过去几年中，处理修改的难度，处理所有`WS-*`规范配置的复杂性以及性能问题，导致逐渐转向我们将在下一节中描述的更简单的 REST 服务。这一转变始于从 JavaScript 调用的服务，因为实现能够在网页浏览器中高效运行的完整 SOAP 客户端很困难。此外，复杂的 SOAP 机制对于典型在浏览器中运行的客户端的简单需求来说过大，可能导致了开发时间的完全浪费。
 
-大约在2018年左右，针对非JavaScript客户端的服务开始大规模转向REST服务，如今首选的选择是REST服务，SOAP的使用要么是为了与遗留系统兼容，要么是在需要REST服务不支持的功能时。一个继续偏好SOAP系统的典型应用领域是支付/银行系统，因为这些系统需要由`WS-Transaction` SOAP规范提供的交易支持。在REST服务世界中没有等效的规范。
+大约在 2018 年左右，针对非 JavaScript 客户端的服务开始大规模转向 REST 服务，如今首选的选择是 REST 服务，SOAP 的使用要么是为了与遗留系统兼容，要么是在需要 REST 服务不支持的功能时。一个继续偏好 SOAP 系统的典型应用领域是支付/银行系统，因为这些系统需要由`WS-Transaction` SOAP 规范提供的交易支持。在 REST 服务世界中没有等效的规范。
 
-# REST网络服务
+# REST 网络服务
 
-REST服务最初是为了避免在简单情况下（例如从网页的JavaScript代码调用服务）使用SOAP的复杂机制而构思的。随后，它们逐渐成为复杂系统的首选选择。REST服务使用HTTP以JSON格式或较少情况下以XML格式交换数据。简而言之，它们用HTTP体替换了SOAP体，用HTTP头替换了SOAP头，HTTP响应代码取代了错误元素，并为执行的操作提供了进一步的辅助信息。
+REST 服务最初是为了避免在简单情况下（例如从网页的 JavaScript 代码调用服务）使用 SOAP 的复杂机制而构思的。随后，它们逐渐成为复杂系统的首选选择。REST 服务使用 HTTP 以 JSON 格式或较少情况下以 XML 格式交换数据。简而言之，它们用 HTTP 体替换了 SOAP 体，用 HTTP 头替换了 SOAP 头，HTTP 响应代码取代了错误元素，并为执行的操作提供了进一步的辅助信息。
 
-REST服务成功的主要原因在于HTTP已经提供了SOAP的大部分功能，这意味着我们可以避免在HTTP之上构建SOAP层。此外，整个HTTP机制比SOAP简单：编程更简单，配置更简单，实现效率更高。
+REST 服务成功的主要原因在于 HTTP 已经提供了 SOAP 的大部分功能，这意味着我们可以避免在 HTTP 之上构建 SOAP 层。此外，整个 HTTP 机制比 SOAP 简单：编程更简单，配置更简单，实现效率更高。
 
-此外，REST服务对客户端的约束更少。特别是，服务器和客户端之间的类型兼容性符合更灵活的JavaScript类型兼容性模型，因为JSON是JavaScript的一个子集。此外，当使用XML代替JSON时，它保持相同的JavaScript类型兼容性规则。不需要指定XML命名空间。
+此外，REST 服务对客户端的约束更少。特别是，服务器和客户端之间的类型兼容性符合更灵活的 JavaScript 类型兼容性模型，因为 JSON 是 JavaScript 的一个子集。此外，当使用 XML 代替 JSON 时，它保持相同的 JavaScript 类型兼容性规则。不需要指定 XML 命名空间。
 
-当使用JSON和XML时，如果服务器在保持所有其他字段与先前客户端兼容的相同语义的同时添加了一些额外的字段，它们可以简单地忽略这些新字段。因此，对REST服务定义所做的更改只有在发生破坏性变更并导致服务器实际不兼容行为的情况下才需要传播到先前客户端。
+当使用 JSON 和 XML 时，如果服务器在保持所有其他字段与先前客户端兼容的相同语义的同时添加了一些额外的字段，它们可以简单地忽略这些新字段。因此，对 REST 服务定义所做的更改只有在发生破坏性变更并导致服务器实际不兼容行为的情况下才需要传播到先前客户端。
 
 此外，变化可能是自我限制的，不会导致指数级的变化链，因为类型兼容性不需要在唯一共享的地方定义特定类型的引用，只需确保类型形状兼容即可。
 
 让我们通过一个例子来明确 REST 服务的类型兼容性规则。让我们设想有几个服务使用一个包含 `Name`、`Surname` 和 `Address` 字符串字段的 `Person` 对象：
 
-[PRE0]
+```cs
+{
+    Name: string,
+    Surname: string,
+    Address: string
+}
+```
 
 如果服务和客户端引用的是前面定义的不同副本，则类型兼容性得到保证。客户端使用具有较少字段的定义也是可以接受的，因为它可以简单地忽略所有其他字段：
 
-[PRE1]
+```cs
+{
+    Name: string,
+    Surname: string,
+}
+```
 
 现在，假设一个处理 `Persons` 数据库的服务，S1，将 `Address` 字符串替换为一个复杂对象：
 
-[PRE2]
+```cs
+{
+    Name: string,
+    Surname: string,
+    Address: 
+        {
+            Country: string,
+            Town: string
+            Location: string
+        }
+}
+```
 
 现在，假设一个服务，S2，从 S1 中获取 `Persons` 并将其添加到它返回的一些方法上的响应中。在 S1 的破坏性更改之后，它可以调整调用 S1 的通信客户端以适应新格式。然后，它可以在使用 `Persons` 作为响应之前将新的 `Person` 格式转换为旧格式。这样，S2 就避免了传播 S1 的破坏性更改。
 
@@ -136,17 +158,17 @@ REST服务成功的主要原因在于HTTP已经提供了SOAP的大部分功能�
 
 REST 服务宣言指出，REST 使用原生 HTTP 功能来实现所有必需的服务功能。例如，认证将通过 HTTP 的 `Authorization` 字段直接执行，加密将通过 HTTPS 实现，异常将通过 HTTP 错误状态码处理，路由和可靠消息将通过 HTTP 协议依赖的机制处理。通过使用 URL 来引用服务、它们的方法和其他资源来实现寻址。
 
-由于HTTP是同步协议，因此没有对异步通信的原生支持。也没有对发布者/订阅者模式的原生支持，但两个服务可以通过每个向对方公开一个端点来与发布者/订阅者模式交互。更具体地说，第一个服务公开一个订阅端点，而第二个服务公开一个接收其通知的端点，这些通知通过在订阅期间交换的公共密钥进行授权。这种模式相当常见。GitHub还允许我们将我们的REST服务发送到存储库事件。
+由于 HTTP 是同步协议，因此没有对异步通信的原生支持。也没有对发布者/订阅者模式的原生支持，但两个服务可以通过每个向对方公开一个端点来与发布者/订阅者模式交互。更具体地说，第一个服务公开一个订阅端点，而第二个服务公开一个接收其通知的端点，这些通知通过在订阅期间交换的公共密钥进行授权。这种模式相当常见。GitHub 还允许我们将我们的 REST 服务发送到存储库事件。
 
-REST服务在实现分布式事务方面没有提供简单选项，这也是为什么支付/银行系统仍然更喜欢SOAP。幸运的是，大多数应用领域不需要分布式事务确保的强一致性形式。对于它们，更轻量级的一致性形式，如*最终一致性*，就足够了，并且出于性能原因更受欢迎。请参阅[第7章](77cdecb5-cef4-4b02-80a1-052ad366b9f3.xhtml)，*如何在云中选择您的数据存储*，以了解各种类型的一致性讨论。
+REST 服务在实现分布式事务方面没有提供简单选项，这也是为什么支付/银行系统仍然更喜欢 SOAP。幸运的是，大多数应用领域不需要分布式事务确保的强一致性形式。对于它们，更轻量级的一致性形式，如*最终一致性*，就足够了，并且出于性能原因更受欢迎。请参阅第七章，*如何在云中选择您的数据存储*，以了解各种类型的一致性讨论。
 
-REST宣言不仅规定了使用HTTP中已预定义的解决方案，还规定了使用类似WEB的语义。更具体地说，所有服务操作都必须被视为对由URL（同一资源可能由多个URL标识）标识的资源进行的CRUD操作。实际上，REST是**表示状态传输**的缩写，意味着每个URL都是某种对象的表示。每种类型的服务请求都需要采用适当的HTTP动词，如下所示：
+REST 宣言不仅规定了使用 HTTP 中已预定义的解决方案，还规定了使用类似 WEB 的语义。更具体地说，所有服务操作都必须被视为对由 URL（同一资源可能由多个 URL 标识）标识的资源进行的 CRUD 操作。实际上，REST 是**表示状态传输**的缩写，意味着每个 URL 都是某种对象的表示。每种类型的服务请求都需要采用适当的 HTTP 动词，如下所示：
 
-+   `GET`（读取操作）：URL代表由读取操作返回的资源。因此，`GET`操作模拟指针解引用。在操作成功的情况下，返回一个200（ok）状态码。
++   `GET`（读取操作）：URL 代表由读取操作返回的资源。因此，`GET`操作模拟指针解引用。在操作成功的情况下，返回一个 200（ok）状态码。
 
-+   `POST`（创建操作）：请求体中包含的JSON/XML对象被添加为操作URL所表示的对象的新资源。如果新资源立即成功创建，则返回一个201（created）状态码，以及一个依赖于操作的响应对象。响应对象应包含标识创建资源的最具体URL。如果创建被延迟到以后的时间，则返回一个202（accepted）状态码。
++   `POST`（创建操作）：请求体中包含的 JSON/XML 对象被添加为操作 URL 所表示的对象的新资源。如果新资源立即成功创建，则返回一个 201（created）状态码，以及一个依赖于操作的响应对象。响应对象应包含标识创建资源的最具体 URL。如果创建被延迟到以后的时间，则返回一个 202（accepted）状态码。
 
-+   `PUT`：请求体中包含的JSON/XML对象替换由请求URL引用的对象。在操作成功的情况下，返回一个200（ok）状态码。此操作是幂等的，意味着重复相同的请求两次会产生相同的修改。
++   `PUT`：请求体中包含的 JSON/XML 对象替换由请求 URL 引用的对象。在操作成功的情况下，返回一个 200（ok）状态码。此操作是幂等的，意味着重复相同的请求两次会产生相同的修改。
 
 +   `PATCH`: 请求体中包含的 JSON/XML 对象包含了如何修改由请求 URL 引用的对象的说明。由于修改可能是一个数值字段的增量，此操作不是幂等的。在操作成功的情况下，返回 200 (ok) 状态码。
 
@@ -180,19 +202,23 @@ REST宣言不仅规定了使用HTTP中已预定义的解决方案，还规定了
 
 通常，将现有服务迁移到 REST 需要我们在请求 URL 和请求体之间分割各种输入。更具体地说，我们提取那些唯一定义方法执行中涉及的某个对象的输入字段，并使用它们创建一个唯一标识该对象的 URL。然后，我们根据对所选对象执行的操作来决定使用哪个 HTTP 动词。最后，我们将输入的其余部分放在请求体中。
 
-如果我们的服务是以面向对象架构设计的，该架构专注于业务域对象（例如，如第 10 章所述的 DDD，*理解软件解决方案中的不同域*），那么所有服务方法的 REST 转换应该相当直接，因为服务应该已经围绕域资源组织。否则，迁移到 REST 可能需要重新定义一些服务接口。
+如果我们的服务是以面向对象架构设计的，该架构专注于业务域对象（例如，如第十章所述的 DDD，*理解软件解决方案中的不同域*），那么所有服务方法的 REST 转换应该相当直接，因为服务应该已经围绕域资源组织。否则，迁移到 REST 可能需要重新定义一些服务接口。
 
 采用完整的 REST 语义的优点是，服务可以在不修改现有操作定义的情况下进行扩展，也可以在修改现有操作定义的情况下进行扩展。实际上，扩展应主要表现为某些对象的一些附加属性以及一些相关操作的附加资源 URL。因此，现有的客户端可以简单地忽略它们。
 
 现在，让我们通过一个银行内部资金转账的简单示例来学习如何在 REST 语言中表达方法。一个银行账户可以表示为一个 URL，如下所示：
 
-[PRE3]
+```cs
+https://mybank.com/bankaccounts/{bank account number}
+```
 
 转账可能表示为一个包含表示金额、转账时间、描述和接收资金的账户的对象的 PATCH 请求。该操作修改了 URL 中提到的账户，但也作为 *副作用* 修改了接收账户。如果账户资金不足，将返回 403（禁止）状态码，以及包含所有错误详情的对象（错误描述、可用资金等）。
 
 然而，由于所有银行操作都记录在账户报表中，因此为与银行账户关联的 *银行账户操作* 集合创建和添加一个新的转账对象是表示转账的更好方式。在这种情况下，URL 可能如下所示：
 
-[PRE4]
+```cs
+https://mybank.com/bankaccounts/{bank account number}/operations
+```
 
 在这里，HTTP 动词是 `POST`，因为我们正在创建一个新的对象。正文内容完全相同，如果资金不足，将返回 403 状态码。
 
@@ -200,35 +226,39 @@ REST宣言不仅规定了使用HTTP中已预定义的解决方案，还规定了
 
 然而，虚拟 *操作* 集合的引入使我们能够通过几个更多特定于操作集合的方法来扩展服务。值得注意的是，操作集合不需要与数据库表或任何物理对象连接：它存在于 URL 的世界中，为我们创建了一种方便的方式来模拟传输。
 
-REST服务的使用增加导致需要创建REST服务接口的描述，类似于为SOAP开发的那些。这个标准被称为**OpenAPI**。我们将在下一个子节中讨论这个问题。
+REST 服务的使用增加导致需要创建 REST 服务接口的描述，类似于为 SOAP 开发的那些。这个标准被称为**OpenAPI**。我们将在下一个子节中讨论这个问题。
 
-# OpenAPI标准
+# OpenAPI 标准
 
-OpenAPI是一个用于描述REST API的标准。它目前是第3版。整个服务由一个JSON端点描述，即一个用JSON对象描述服务的端点。这个JSON对象有一个通用部分，适用于整个服务，并包含服务的一般特性，如其版本和描述，以及共享定义。
+OpenAPI 是一个用于描述 REST API 的标准。它目前是第 3 版。整个服务由一个 JSON 端点描述，即一个用 JSON 对象描述服务的端点。这个 JSON 对象有一个通用部分，适用于整个服务，并包含服务的一般特性，如其版本和描述，以及共享定义。
 
-然后，每个服务端点都有一个特定的部分，描述端点URL或URL格式（如果某些输入包含在URL中），所有输入，所有可能的输出类型和状态码，以及所有授权协议。每个端点特定的部分可以引用通用部分中包含的定义。
+然后，每个服务端点都有一个特定的部分，描述端点 URL 或 URL 格式（如果某些输入包含在 URL 中），所有输入，所有可能的输出类型和状态码，以及所有授权协议。每个端点特定的部分可以引用通用部分中包含的定义。
 
-OpenAPI语法的描述超出了本书的范围，但在*进一步阅读*部分提供了参考。各种开发框架通过处理REST API代码和提供更多信息来自动生成OpenAPI文档，因此您的团队不需要深入了解OpenAPI语法。
+OpenAPI 语法的描述超出了本书的范围，但在*进一步阅读*部分提供了参考。各种开发框架通过处理 REST API 代码和提供更多信息来自动生成 OpenAPI 文档，因此您的团队不需要深入了解 OpenAPI 语法。
 
-*“.NET Core如何处理SOA？”*这一节解释了如何在ASP.NET Core REST API项目中自动生成OpenAPI文档，而本章末尾的使用案例提供了一个其实际应用的实例。
+*“.NET Core 如何处理 SOA？”*这一节解释了如何在 ASP.NET Core REST API 项目中自动生成 OpenAPI 文档，而本章末尾的使用案例提供了一个其实际应用的实例。
 
-我们将在这个子节的最后讨论如何在REST服务中处理认证和授权。
+我们将在这个子节的最后讨论如何在 REST 服务中处理认证和授权。
 
-# REST服务的授权和认证
+# REST 服务的授权和认证
 
-由于REST服务是无状态的，当需要认证时，客户端必须在每个请求中发送一个认证令牌。这个令牌通常放在HTTP认证头中，但这取决于你使用的认证协议类型。最简单的认证方式是通过显式传输共享密钥。这可以通过以下代码实现：
+由于 REST 服务是无状态的，当需要认证时，客户端必须在每个请求中发送一个认证令牌。这个令牌通常放在 HTTP 认证头中，但这取决于你使用的认证协议类型。最简单的认证方式是通过显式传输共享密钥。这可以通过以下代码实现：
 
-[PRE5]
+```cs
+Authorization: Api-Key <string known by both server and client>
+```
 
-共享密钥被称为API密钥。由于在撰写本文时，尚无关于如何发送它的标准，API密钥也可以在其他头中发送，如下面的代码所示：
+共享密钥被称为 API 密钥。由于在撰写本文时，尚无关于如何发送它的标准，API 密钥也可以在其他头中发送，如下面的代码所示：
 
-[PRE6]
+```cs
+X-API-Key: <string known by both server and client>
+```
 
-不言而喻，基于API密钥的认证需要HTTPS来防止共享密钥被盗。API密钥非常易于使用，但它们不传达有关用户授权的信息，因此可以在客户端允许的操作相当标准且没有复杂授权模式的情况下采用。此外，当在请求中交换时，API密钥容易在服务器或客户端端受到攻击。
+不言而喻，基于 API 密钥的认证需要 HTTPS 来防止共享密钥被盗。API 密钥非常易于使用，但它们不传达有关用户授权的信息，因此可以在客户端允许的操作相当标准且没有复杂授权模式的情况下采用。此外，当在请求中交换时，API 密钥容易在服务器或客户端端受到攻击。
 
 更安全的技巧使用有效的长期共享密钥，只需用户登录即可。然后，登录返回一个短期令牌，该令牌在所有后续请求中用作共享密钥。当短期密钥即将到期时，可以通过调用续订端点来更新它。
 
-整个登录逻辑与基于短期令牌的授权逻辑完全解耦。登录通常基于接收长期凭证并返回短期令牌的登录端点。登录凭证可以是作为登录方法输入的常规用户名-密码对，或者可以转换为由登录端点提供的短期令牌的其他类型的授权令牌。登录还可以通过基于X.509证书的各种身份验证协议实现。
+整个登录逻辑与基于短期令牌的授权逻辑完全解耦。登录通常基于接收长期凭证并返回短期令牌的登录端点。登录凭证可以是作为登录方法输入的常规用户名-密码对，或者可以转换为由登录端点提供的短期令牌的其他类型的授权令牌。登录还可以通过基于 X.509 证书的各种身份验证协议实现。
 
 最常见的短期令牌类型是所谓的载体令牌。每个载体令牌都编码了有关其持续时间的详细信息以及用于授权目的的声明列表，称为声明。载体令牌由登录操作或续订操作返回。它们的特征是它们与接收它们的客户端或任何其他特定客户端无关。
 
@@ -236,57 +266,80 @@ OpenAPI语法的描述超出了本书的范围，但在*进一步阅读*部分�
 
 因此，一旦客户端获得一个载体令牌，它可以通过将其载体令牌转移给第三方来委托一些操作。通常，当必须使用载体令牌进行委托时，在登录阶段，客户端会指定要包含的声明以限制令牌可以授权的操作。
 
-与API密钥身份验证相比，基于载体令牌的身份验证受到标准的约束。特别是，它们必须使用以下`Authorization`头部：
+与 API 密钥身份验证相比，基于载体令牌的身份验证受到标准的约束。特别是，它们必须使用以下`Authorization`头部：
 
-[PRE7]
+```cs
+Authorization: Bearer <bearer token string>
+```
 
-载体令牌可以以多种方式实现。REST服务通常使用JWT令牌，这些令牌是用JSON对象的Base64URL编码连接起来的。更具体地说，JWT的创建从JSON头部开始，以及一个JSON有效负载。JSON头部指定了令牌的类型及其签名方式，而有效负载由一个包含所有声明作为属性/值对的JSON对象组成。以下是一个示例头部：
+载体令牌可以以多种方式实现。REST 服务通常使用 JWT 令牌，这些令牌是用 JSON 对象的 Base64URL 编码连接起来的。更具体地说，JWT 的创建从 JSON 头部开始，以及一个 JSON 有效负载。JSON 头部指定了令牌的类型及其签名方式，而有效负载由一个包含所有声明作为属性/值对的 JSON 对象组成。以下是一个示例头部：
 
-[PRE8]
+```cs
+{
+  "alg": "RS256",
+  "typ": "JWT"
+}
+```
 
 以下是一个示例有效负载：
 
-[PRE9]
+```cs
+{
+  "iss": "issuerbomain.com"
+  "sub": "example",
+  "aud": ["S1", "S2"],
+  "roles": [
+    "ADMIN",
+    "USER"
+  ],
+  "exp": 1512975450,
+  "iat": 1512968250230
+}
+```
 
-然后，将头部和有效负载进行BASE64URL编码，并将相应的字符串连接，如下所示：
+然后，将头部和有效负载进行 BASE64URL 编码，并将相应的字符串连接，如下所示：
 
-[PRE10]
+```cs
+<header BASE64 string>.<payload base64 string>
+```
 
-然后使用头部中指定的算法对前面的字符串进行签名，在我们的例子中是RSA + SHA256，然后将签名字符串与原始字符串连接，如下所示：
+然后使用头部中指定的算法对前面的字符串进行签名，在我们的例子中是 RSA + SHA256，然后将签名字符串与原始字符串连接，如下所示：
 
-[PRE11]
+```cs
+<header BASE64 string>.<payload base64 string>.<signature string>
+```
 
-上述代码是最终的载体令牌字符串。可以使用对称签名代替RSA，但在此情况下，JWT发行者和所有使用它进行授权的服务必须共享一个共同的秘密，而使用RSA时，JWT发行者的私钥无需与任何人共享，因为可以使用发行者的公钥来验证签名。
+上述代码是最终的载体令牌字符串。可以使用对称签名代替 RSA，但在此情况下，JWT 发行者和所有使用它进行授权的服务必须共享一个共同的秘密，而使用 RSA 时，JWT 发行者的私钥无需与任何人共享，因为可以使用发行者的公钥来验证签名。
 
 一些有效载荷属性是标准的，例如以下内容：
 
-+   `iss`：JWT的发行者。
++   `iss`：JWT 的发行者。
 
 +   `aud`：受众，即可以使用令牌进行授权的服务和/或操作。如果服务没有看到其标识符在此列表中，则应拒绝该令牌。
 
-+   `sub`：一个字符串，用于标识JWT发行的*主体*（即用户）。
++   `sub`：一个字符串，用于标识 JWT 发行的*主体*（即用户）。
 
-+   `iat`、`exp`和`nbf`：这些分别表示JWT发行的时间、过期时间和，如果设置，令牌有效的起始时间。所有时间都以自1970年1月1日午夜UTC以来的秒数表示。在这里，所有天都被认为是包含86,400秒。
++   `iat`、`exp`和`nbf`：这些分别表示 JWT 发行的时间、过期时间和，如果设置，令牌有效的起始时间。所有时间都以自 1970 年 1 月 1 日午夜 UTC 以来的秒数表示。在这里，所有天都被认为是包含 86,400 秒。
 
-其他声明可能如果用唯一的URI表示，则可以定义为公共的；否则，它们被认为是发行者及其已知服务的私有。
+其他声明可能如果用唯一的 URI 表示，则可以定义为公共的；否则，它们被认为是发行者及其已知服务的私有。
 
-# .NET Core是如何处理SOA的？
+# .NET Core 是如何处理 SOA 的？
 
-.Net Core通过ASP.NET Core对REST服务有出色的支持。在SOAP服务方面，经典.NET使用WCF技术处理。在WCF中，服务规范通过.NET接口定义，实际服务代码由实现这些接口的类提供。
+.Net Core 通过 ASP.NET Core 对 REST 服务有出色的支持。在 SOAP 服务方面，经典.NET 使用 WCF 技术处理。在 WCF 中，服务规范通过.NET 接口定义，实际服务代码由实现这些接口的类提供。
 
-端点、底层协议（HTTP和TCP/IP）以及任何其他功能都在配置文件中定义。反过来，配置文件可以使用易于使用的配置工具进行编辑。因此，开发者只需提供标准.NET类中的服务行为，并以声明性方式配置所有服务功能。这样，服务配置与实际服务行为完全解耦，每个服务都可以重新配置，以便能够适应不同的环境，而无需修改其代码。
+端点、底层协议（HTTP 和 TCP/IP）以及任何其他功能都在配置文件中定义。反过来，配置文件可以使用易于使用的配置工具进行编辑。因此，开发者只需提供标准.NET 类中的服务行为，并以声明性方式配置所有服务功能。这样，服务配置与实际服务行为完全解耦，每个服务都可以重新配置，以便能够适应不同的环境，而无需修改其代码。
 
-WCF技术尚未移植到.NET Core，也没有计划进行完整的移植。相反，微软正在投资于gRPC，这是谷歌的开源技术。
+WCF 技术尚未移植到.NET Core，也没有计划进行完整的移植。相反，微软正在投资于 gRPC，这是谷歌的开源技术。
 
-放弃在.NET Core中使用WCF的主要原因是如下：
+放弃在.NET Core 中使用 WCF 的主要原因是如下：
 
-+   正如我们已经讨论过的，在大多数应用领域，SOAP技术已经被REST技术所取代。
++   正如我们已经讨论过的，在大多数应用领域，SOAP 技术已经被 REST 技术所取代。
 
-+   WCF技术与Windows紧密绑定，因此在.NET Core中从头开始重新实现所有功能将非常昂贵。由于对经典.NET的支持将继续，需要WCF的用户仍然可以依赖经典.NET。
++   WCF 技术与 Windows 紧密绑定，因此在.NET Core 中从头开始重新实现所有功能将非常昂贵。由于对经典.NET 的支持将继续，需要 WCF 的用户仍然可以依赖经典.NET。
 
 +   作为一种一般策略，使用 .NET Core，微软更倾向于投资可以与其他竞争对手共享的开源技术。这就是为什么，而不是投资于 WCF，微软从 .NET Core 3.0 开始提供了 gRPC 实现。
 
-虽然 .NET Core 不支持 SOAP 技术，但它支持 SOAP 客户端。更具体地说，从 2017 版本开始，在 Visual Studio 中创建现有 SOAP 服务的 SOAP 服务代理相当容易（请参阅 [第 9 章](a2d50e08-6698-47f6-a9b5-188de08134c0.xhtml)，*设计模式和 .NET Core 实现*，以讨论代理是什么以及代理模式）。在服务的情况下，代理是一个实现服务接口的类，其方法通过调用远程服务的类似方法来完成其工作。
+虽然 .NET Core 不支持 SOAP 技术，但它支持 SOAP 客户端。更具体地说，从 2017 版本开始，在 Visual Studio 中创建现有 SOAP 服务的 SOAP 服务代理相当容易（请参阅 第九章，*设计模式和 .NET Core 实现*，以讨论代理是什么以及代理模式）。在服务的情况下，代理是一个实现服务接口的类，其方法通过调用远程服务的类似方法来完成其工作。
 
 要创建一个服务代理，请在 Visual Studio 中右键单击 *已连接的服务* 节点，转到解决方案资源管理器，然后选择添加连接服务。然后，在出现的表单中，选择 Microsoft WCF 服务引用提供程序。在这里，您可以指定服务的 URL（其中包含 WSDL 服务描述），您希望添加代理类的命名空间，以及更多内容。在向导的末尾，Visual Studio 自动添加所有必要的 NuGet 包并生成代理类。这足以创建此类的一个实例并调用其方法，以便我们可以与远程 SOAP 服务进行交互。
 
@@ -294,7 +347,7 @@ WCF技术尚未移植到.NET Core，也没有计划进行完整的移植。相�
 
 从 .NET Core SDK 开始，Visual Studio 2019 支持 gRPC 项目模板，该模板生成 gRPC 服务器和 gRPC 客户端。在撰写本文时，gRPC 不是一个标准，而只是一个 Google 开源项目。然而，如果微软和谷歌继续投资其中，它可能会成为事实上的标准。gRPC 实现了一个远程过程调用模式，它提供了同步和异步调用。
 
-它的配置方式类似于 WCF 和 .NET 远程处理，正如我们在 [第 5 章](49aed8bb-9a4a-4241-9efc-f53c3f53dd5a.xhtml) 的结尾所描述的，*将微服务架构应用于您的企业应用程序*。也就是说，服务通过接口定义，其代码在实现这些接口的类中提供，而客户端通过实现相同服务接口的代理与这些服务进行交互。
+它的配置方式类似于 WCF 和 .NET 远程处理，正如我们在 第五章 的结尾所描述的，*将微服务架构应用于您的企业应用程序*。也就是说，服务通过接口定义，其代码在实现这些接口的类中提供，而客户端通过实现相同服务接口的代理与这些服务进行交互。
 
 gRPC 是微服务集群内部通信的良好选择，特别是如果集群不是完全基于 Service Fabric 技术且不能依赖 .NET 远程通信。由于所有主要语言和开发框架都有 gRPC 库，因此它可以在基于 Kubernetes 的集群中使用，也可以在托管其他框架实现的 Docker 镜像的 Service Fabric 集群中使用。
 
@@ -306,9 +359,24 @@ gRPC 是微服务集群内部通信的良好选择，特别是如果集群不是
 
 # ASP.NET Core 简介短文
 
-ASP.NET Core 应用程序是基于我们在第 5 章 *将微服务架构应用于您的企业应用程序* 的 *使用通用宿主* 子节中描述的 *Host* 概念的 .NET Core 应用程序。每个 ASP.NET 应用程序的 `program.cs` 文件创建一个宿主，构建它，并使用以下代码运行它：
+ASP.NET Core 应用程序是基于我们在第五章 *将微服务架构应用于您的企业应用程序* 的 *使用通用宿主* 子节中描述的 *Host* 概念的 .NET Core 应用程序。每个 ASP.NET 应用程序的 `program.cs` 文件创建一个宿主，构建它，并使用以下代码运行它：
 
-[PRE12]
+```cs
+public class Program
+{
+    public static void Main(string[] args)
+    {
+        CreateHostBuilder(args).Build().Run();
+    }
+
+    public static IHostBuilder CreateHostBuilder(string[] args) =>
+        Host.CreateDefaultBuilder(args)
+            .ConfigureWebHostDefaults(webBuilder =>
+            {
+                webBuilder.UseStartup<Startup>();
+            });
+}
+```
 
 `CreatesDefaultBuilder` 设置了一个标准的宿主，而 `ConfigureWebHostDefaults` 则配置它以处理 HTTP 管道。更具体地说，它执行以下操作：
 
@@ -318,9 +386,32 @@ ASP.NET Core 应用程序是基于我们在第 5 章 *将微服务架构应用�
 
 ![截图](img/e1030042-bb95-469a-9421-648443cea65e.png)
 
-在 `launchSettings.json` 文件中，您可以定义多个环境，这些环境可以通过Visual Studio运行按钮旁边的下拉菜单进行选择 ![图片](img/27ad6b8b-7341-4dcd-a1bb-20ce544816c4.png)。默认情况下，IIS Express 设置将 `ASPNETCORE_ENVIRONMENT` 设置为 `Development`。以下是一个典型的 `launchSettings.json` 文件：
+在 `launchSettings.json` 文件中，您可以定义多个环境，这些环境可以通过 Visual Studio 运行按钮旁边的下拉菜单进行选择 ![图片](img/27ad6b8b-7341-4dcd-a1bb-20ce544816c4.png)。默认情况下，IIS Express 设置将 `ASPNETCORE_ENVIRONMENT` 设置为 `Development`。以下是一个典型的 `launchSettings.json` 文件：
 
-[PRE13]
+```cs
+{
+  "iisSettings": {
+    "windowsAuthentication": false, 
+    "anonymousAuthentication": true, 
+    "iisExpress": {
+      "applicationUrl": "http://localhost:2575",
+      "sslPort": 44393
+    }
+  },
+  "profiles": {
+    "IIS Express": {
+      "commandName": "IISExpress",
+      "launchBrowser": true,
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    },
+    ...
+    ...
+    }
+  }
+}
+```
 
 当应用程序发布时，用于 `ASPNETCORE_ENVIRONMENT` 的值可以在 Visual Studio 创建后添加到已创建的发布 XML 文件中。此值为 `<EnvironmentName>Staging</EnvironmentName>`。它也可以在您的 Visual Studio ASP.NET Core 项目文件（`.csproj`）中指定：
 
@@ -332,15 +423,40 @@ ASP.NET Core 应用程序是基于我们在第 5 章 *将微服务架构应用�
 
 当应用程序在 Linux 上运行时，ASP.NET Core 管道连接到 .NET Core Kestrel 网络服务器。由于 Kestrel 是一个最小化的网络服务器，您需要负责从具有 Kestrel 所不具备的功能的完整网络服务器（如 Apache 或 Nginx）反向代理请求到它。当应用程序在 Windows 上运行时，默认情况下，`ConfigureWebHostDefaults` 将 ASP.NET Core 管道直接连接到 **互联网信息服务**（**IIS**）。但是，您也可以在 Windows 上使用 Kestrel，并且可以通过更改 Visual Studio 项目文件的 `AspNetCoreHostingModel` 设置来反向代理 IIS 请求到 Kestrel，如下所示：
 
-[PRE14]
+```cs
+<PropertyGroup>
+    ...
+    <AspNetCoreHostingModel>OutOfProcess</AspNetCoreHostingModel>
+</PropertyGroup>
+```
 
-`UseStartup<Startup>()` 允许从项目的 `Startup.cs` 类的方法中获取 Host 服务（参见第 5 章 [49aed8bb-9a4a-4241-9efc-f53c3f53dd5a.xhtml] 中的 *使用通用主机* 子节，*将微服务架构应用于您的企业应用程序*）和 ASP.NET Core 管道的定义。更具体地说，服务在它的 `ConfigureServices(IServiceCollection services)` 方法中定义，而 ASP.NET Core 管道在 `Configure` 方法中定义。以下代码显示了使用 API REST 项目生成的标准 `Configure` 方法框架：
+`UseStartup<Startup>()` 允许从项目的 `Startup.cs` 类的方法中获取 Host 服务（参见第五章 [49aed8bb-9a4a-4241-9efc-f53c3f53dd5a.xhtml] 中的 *使用通用主机* 子节，*将微服务架构应用于您的企业应用程序*）和 ASP.NET Core 管道的定义。更具体地说，服务在它的 `ConfigureServices(IServiceCollection services)` 方法中定义，而 ASP.NET Core 管道在 `Configure` 方法中定义。以下代码显示了使用 API REST 项目生成的标准 `Configure` 方法框架：
 
-[PRE15]
+```cs
+public void Configure(IApplicationBuilder app, 
+    IWebHostEnvironment env)
+{
+    if (env.IsDevelopment())
+    {
+        app.UseDeveloperExceptionPage();
+    }
+
+    app.UseHttpsRedirection();
+
+    app.UseRouting();
+
+    app.UseAuthorization();
+
+    app.UseEndpoints(endpoints =>
+    {
+        endpoints.MapControllers();
+    });
+}
+```
 
 管道中的每个模块都由一个 `app.Use<something>` 方法定义，该方法通常接受一些选项。每个模块处理请求，然后将修改后的请求转发到管道中的下一个模块，或者返回一个 HTTP 响应。当返回 HTTP 响应时，它将按相反的顺序由所有之前的模块处理。
 
-模块按照 `app.Use<something>` 方法调用中定义的顺序插入到管道中。前面的代码在 `ASPNETCORE_ENVIRONMENT` 为 `Development` 时添加错误页面；否则，`UseHsts` 与客户端协商一个安全协议。最后，`UseEndpoints` 添加创建实际 HTTP 响应的 MVC 控制器。关于 ASP.NET Core 管道的完整描述将在第 13 章 *理解 Web 应用程序的表示层* 节中给出，*展示 ASP.NET Core MVC*。
+模块按照 `app.Use<something>` 方法调用中定义的顺序插入到管道中。前面的代码在 `ASPNETCORE_ENVIRONMENT` 为 `Development` 时添加错误页面；否则，`UseHsts` 与客户端协商一个安全协议。最后，`UseEndpoints` 添加创建实际 HTTP 响应的 MVC 控制器。关于 ASP.NET Core 管道的完整描述将在第十三章 *理解 Web 应用程序的表示层* 节中给出，*展示 ASP.NET Core MVC*。
 
 在下一小节中，我们将解释 MVC 框架如何让您实现 REST 服务。
 
@@ -350,11 +466,21 @@ ASP.NET Core 应用程序是基于我们在第 5 章 *将微服务架构应用�
 
 处理 HTTP 请求的控制器方法被称为操作方法。当选择控制器和操作方法时，MVC 框架会创建一个控制器实例来处理请求。控制器构造函数的所有参数都通过依赖注入与在 `Startup.cs` 类的 `ConfigureServices` 方法中定义的类型进行解析。
 
-请参阅第 5 章 *将微服务架构应用于您的企业应用程序* 的 *使用通用宿主* 小节 [49aed8bb-9a4a-4241-9efc-f53c3f53dd5a.xhtml]，了解如何使用 .NET Core 宿主进行依赖注入，以及第 10 章 *理解软件解决方案的不同领域* 的 *依赖注入模式* 小节 [2a42483c-2193-4bd4-91b4-0fdce94f6ed1.xhtml]，了解依赖注入的一般讨论。
+请参阅第五章 *将微服务架构应用于您的企业应用程序* 的 *使用通用宿主* 小节 [49aed8bb-9a4a-4241-9efc-f53c3f53dd5a.xhtml]，了解如何使用 .NET Core 宿主进行依赖注入，以及第十章 *理解软件解决方案的不同领域* 的 *依赖注入模式* 小节 [2a42483c-2193-4bd4-91b4-0fdce94f6ed1.xhtml]，了解依赖注入的一般讨论。
 
 以下是一个典型的 REST API 控制器和其控制器方法定义：
 
-[PRE16]
+```cs
+    [Route("api/[controller]")]
+    [ApiController]
+    public class ValuesController : ControllerBase
+    {
+        // GET api/values/5
+        [HttpGet("{id}")]
+        public ActionResult<string> Get(int id)
+        {
+            ...
+```
 
 `[ApiController]` 属性声明控制器是一个 REST API 控制器。`[Route("api/[controller]")]` 声明控制器必须在以 `api/<controller name>` 开头的路径上选择。控制器名称是控制器类名称，不带 `Controller` 后缀。因此，在这种情况下，我们有 `api/values`。
 
@@ -362,41 +488,52 @@ ASP.NET Core 应用程序是基于我们在第 5 章 *将微服务架构应用�
 
 我们也可能定义另一个类似的方法：
 
-[PRE17]
+```cs
+[HttpGet]
+public ... Get()
+```
 
 此方法在 `api/values` 类型的 GET 请求上调用，即在没有 `id` 的控制器名称之后的 GET 请求上。
 
 几个操作方法可以具有相同的名称，但每个请求路径只能有一个与之兼容；否则，将抛出异常。换句话说，路由规则和`Http<verb>`属性必须唯一地定义每个请求应选择哪个控制器及其哪个操作方法。
 
-默认情况下，参数根据以下规则传递到API控制器的操作方法中：
+默认情况下，参数根据以下规则传递到 API 控制器的操作方法中：
 
-+   简单类型（`整数`、`浮点数`和`DateTimes`）如果路由规则指定它们为参数，则从请求路径中获取，例如上一个示例中的`[HttpGet("{id}")]`属性。如果它们在路由规则中未找到，MVC框架将查找具有相同名称的查询字符串参数。因此，例如，如果我们用`[HttpGet]`替换`[HttpGet("{id}")]`，MVC框架将查找类似`api/values?id=<一个整数>`的内容。
++   简单类型（`整数`、`浮点数`和`DateTimes`）如果路由规则指定它们为参数，则从请求路径中获取，例如上一个示例中的`[HttpGet("{id}")]`属性。如果它们在路由规则中未找到，MVC 框架将查找具有相同名称的查询字符串参数。因此，例如，如果我们用`[HttpGet]`替换`[HttpGet("{id}")]`，MVC 框架将查找类似`api/values?id=<一个整数>`的内容。
 
-+   复杂类型是通过格式化程序从请求体中提取的。根据请求的`Content-Type`头部的值选择正确的格式化程序。如果没有指定`Content-Type`头部，则使用JSON格式化程序。JSON格式化程序尝试将请求体解析为JSON对象，然后尝试将此JSON对象转换为.NET Core复杂类型的实例。如果JSON提取或后续转换失败，将抛出异常。默认情况下，仅支持JSON输入格式化程序，但您也可以添加一个XML格式化程序，当`Content-Type`指定XML内容时可以使用。只需添加`Microsoft.AspNetCore.Mvc.Formatters.Xml` NuGet包，并在`Startup.cs`的`ConfigureServices`方法中将`services.AddMvc()`替换为`services.AddMvc().AddXmlSerializerFormatters()`即可。
++   复杂类型是通过格式化程序从请求体中提取的。根据请求的`Content-Type`头部的值选择正确的格式化程序。如果没有指定`Content-Type`头部，则使用 JSON 格式化程序。JSON 格式化程序尝试将请求体解析为 JSON 对象，然后尝试将此 JSON 对象转换为.NET Core 复杂类型的实例。如果 JSON 提取或后续转换失败，将抛出异常。默认情况下，仅支持 JSON 输入格式化程序，但您也可以添加一个 XML 格式化程序，当`Content-Type`指定 XML 内容时可以使用。只需添加`Microsoft.AspNetCore.Mvc.Formatters.Xml` NuGet 包，并在`Startup.cs`的`ConfigureServices`方法中将`services.AddMvc()`替换为`services.AddMvc().AddXmlSerializerFormatters()`即可。
 
 您可以通过在参数前添加适当的属性来自定义用于填充操作方法参数的源。以下代码显示了此示例的一些示例：
 
-[PRE18]
+```cs
+...MyAcrionMethod(....[FromHeader] string myHeader....) 
+// x is taken from a request header named myHeader
+
+...MyAcrionMethod(....[FromServices] MyType x....) 
+// x is filled with an istance of MyType through dependency injection
+```
 
 `Action`方法的返回类型必须是`IAsyncResult`接口或实现该接口的类型。反过来，`IAsyncResult`只有一个以下方法：
 
-[PRE19]
+```cs
+public Task ExecuteResultAsync (ActionContext context)
+```
 
-此方法由MVC框架在正确的时间调用以创建实际响应和响应头。当将`ActionContext`对象传递到方法中时，它包含整个HTTP请求的上下文，包括包含有关原始HTTP请求（头、正文和Cookie）的所有必要信息的请求对象，以及收集正在构建的响应的所有部分的响应对象。
+此方法由 MVC 框架在正确的时间调用以创建实际响应和响应头。当将`ActionContext`对象传递到方法中时，它包含整个 HTTP 请求的上下文，包括包含有关原始 HTTP 请求（头、正文和 Cookie）的所有必要信息的请求对象，以及收集正在构建的响应的所有部分的响应对象。
 
-您无需手动创建`IAsyncResult`的实现，因为`ControllerBase`已经具有创建`IAsyncResult`实现的方法，以便生成所有必要的HTTP响应。以下是一些这些方法：
+您无需手动创建`IAsyncResult`的实现，因为`ControllerBase`已经具有创建`IAsyncResult`实现的方法，以便生成所有必要的 HTTP 响应。以下是一些这些方法：
 
-+   `OK`: 这将返回一个200状态码，以及一个可选的结果对象。它可以用作`return OK()`或`return OK(myResult)`。
++   `OK`: 这将返回一个 200 状态码，以及一个可选的结果对象。它可以用作`return OK()`或`return OK(myResult)`。
 
-+   `BadRequest`: 这将返回一个400状态码，以及一个可选的请求对象。
++   `BadRequest`: 这将返回一个 400 状态码，以及一个可选的请求对象。
 
-+   `Created(string uri, object o)`: 这将返回一个201状态码，以及一个结果对象和创建资源的URI。
++   `Created(string uri, object o)`: 这将返回一个 201 状态码，以及一个结果对象和创建资源的 URI。
 
-+   `Accepted`: 这将返回一个202状态结果，以及一个可选的结果对象和资源URI。
++   `Accepted`: 这将返回一个 202 状态结果，以及一个可选的结果对象和资源 URI。
 
-+   `Unauthorized`: 这将返回一个401状态结果，以及一个可选的结果对象。
++   `Unauthorized`: 这将返回一个 401 状态结果，以及一个可选的结果对象。
 
-+   `Forbid`: 这将返回一个403状态结果，以及一个可选的失败权限列表。
++   `Forbid`: 这将返回一个 403 状态结果，以及一个可选的失败权限列表。
 
 +   `StatusCode(int statusCode, object o = null)`: 这将返回一个自定义状态码，以及一个可选的结果对象。
 
@@ -404,43 +541,111 @@ ASP.NET Core 应用程序是基于我们在第 5 章 *将微服务架构应用�
 
 当所有结果路径都返回相同类型的结果对象，例如`MyType`时，操作方法可以声明为返回`ActionResult<MyType>`以获得更好的类型检查。
 
-默认情况下，结果对象在响应体中以JSON格式序列化。然而，如果已向MVC框架处理管道中添加了XML格式化程序，如前所述，结果的序列化方式取决于HTTP请求的`Accept`头。更具体地说，如果客户端明确要求使用`Accept`头以XML格式，对象将以XML格式序列化；否则，将以JSON格式序列化。
+默认情况下，结果对象在响应体中以 JSON 格式序列化。然而，如果已向 MVC 框架处理管道中添加了 XML 格式化程序，如前所述，结果的序列化方式取决于 HTTP 请求的`Accept`头。更具体地说，如果客户端明确要求使用`Accept`头以 XML 格式，对象将以 XML 格式序列化；否则，将以 JSON 格式序列化。
 
 作为操作方法的输入传递的复杂对象可以使用验证属性进行验证，如下所示：
 
-[PRE20]
+```cs
+public class MyType
+{
+    [Required]
+    public string Name{get; set;}
+    ...
+    [MaxLength(64)]
+    public string Description{get; set;}
+}
+```
 
-如果控制器已用`[ApiController]`属性装饰，并且验证失败，MVC框架将自动创建一个包含所有检测到的验证错误的BadRequest响应，而不执行操作方法。因此，您不需要添加额外的代码来处理验证错误。
+如果控制器已用`[ApiController]`属性装饰，并且验证失败，MVC 框架将自动创建一个包含所有检测到的验证错误的 BadRequest 响应，而不执行操作方法。因此，您不需要添加额外的代码来处理验证错误。
 
 操作方法也可以声明为异步方法，如下所示：
 
-[PRE21]
+```cs
+public async Task<IActionResult> MyMethod(......)
+{
+    await MyBusinessObject.MyBusinessMethod();
+    ...
+}
 
-本章的使用案例部分将展示控制器/操作方法的实际示例。在下一小节中，我们将解释如何使用JWT令牌处理授权和身份验证。
+public async Task<ActionResult<MyType>> MyMethod(......)
+{
+    ...
+```
 
-# ASP.NET Core服务授权
+本章的使用案例部分将展示控制器/操作方法的实际示例。在下一小节中，我们将解释如何使用 JWT 令牌处理授权和身份验证。
 
-当使用JWT令牌时，授权基于JWT令牌中包含的声明。任何操作方法中的所有令牌声明都可以通过`User.Claims`控制器属性访问。由于`User.Claims`是一个`IEnumerable<Claim>`，它可以与`LinQ`一起处理以验证声明的复杂条件。如果授权基于*角色*声明，您可以使用`User.IsInRole`函数，如下面的代码所示：
+# ASP.NET Core 服务授权
 
-[PRE22]
+当使用 JWT 令牌时，授权基于 JWT 令牌中包含的声明。任何操作方法中的所有令牌声明都可以通过`User.Claims`控制器属性访问。由于`User.Claims`是一个`IEnumerable<Claim>`，它可以与`LinQ`一起处理以验证声明的复杂条件。如果授权基于*角色*声明，您可以使用`User.IsInRole`函数，如下面的代码所示：
+
+```cs
+If(User.IsInRole("Administrators") || User.IsInRole("SuperUsers"))
+{
+    ...
+}
+else return Forbid();
+```
 
 然而，通常不会在动作方法内部检查权限，而是由 MVC 框架根据装饰整个控制器或单个动作方法的授权属性自动检查。如果一个动作方法或整个控制器被 `[Authorize]` 装饰，那么只有当请求包含有效的身份验证令牌时，才能访问动作方法，这意味着我们不需要对令牌声明进行检查。还可以使用以下代码检查令牌是否包含一组角色：
 
-[PRE23]
+```cs
+[Authorize(Roles = "Administrators,SuperUsers")]
+```
 
 对于更复杂的声明条件，需要在 `Startup.cs` 的 `ConfigureServices` 方法中定义授权策略，如下所示代码所示：
 
-[PRE24]
+```cs
+public void ConfigureServices(IServiceCollection services)
+{
+    services.AddMvc();
+    ...
+    services.AddAuthorization(options =>
+    {
+        options.AddPolicy("Father", policy => 
+            policy.RequireAssertion(context =>
+                context.User
+                    .HasClaim(c =>c.Type == "Married") &&
+                context.User
+                    .HasClaim(c => c.Type == "HasSon")));
+
+    });
+}
+```
 
 之后，你可以使用 `[Authorize(Policy = "Father")]` 装饰动作方法或控制器。
 
 在使用基于 JWT 的授权之前，必须在 `Startup.cs` 中进行配置。首先，必须将处理身份验证令牌的中间件添加到在 `Configure` 方法中定义的 ASP.NET Core 处理管道中，如下所示：
 
-[PRE25]
+```cs
+public void Configure(IApplicationBuilder app, IHostingEnvironment env)
+{
+    ...
+    app.UseAuthentication();//authentication middleware
+    app.UseMvc();
+
+}
+```
 
 然后，必须在 `ConfigureServices` 部分配置身份验证服务。在这里，你定义将通过依赖注入注入到身份验证中间件的身份验证选项：
 
-[PRE26]
+```cs
+services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options => {
+        options.TokenValidationParameters =
+            new TokenValidationParameters
+            {
+                ValidateIssuer = true,
+                ValidateAudience = true,
+                ValidateLifetime = true,
+                ValidateIssuerSigningKey = true,
+
+                ValidIssuer = "My.Issuer",
+                ValidAudience = "This.Website.Audience",
+                IssuerSigningKey = 
+                new SymmetricSecurityKey(Encoding.ASCII.GetBytes("MySecret"))
+    };
+});
+```
 
 上述代码为身份验证方案提供了一个名称，即默认名称。然后，它指定 JWT 身份验证选项。通常，我们要求身份验证中间件验证 JWT 令牌未过期（`ValidateLifetime = true`），它具有正确的发行者和受众（参见本章的 *REST 服务授权和身份验证* 部分），并且其签名有效。
 
@@ -448,11 +653,33 @@ ASP.NET Core 应用程序是基于我们在第 5 章 *将微服务架构应用�
 
 在这里，我们应该使用非对称密钥（通常是 RsaSecurityKey），因此 JWT 验证只需要知道与实际私有签名密钥关联的公钥。Identity Server 4 可以快速创建一个作为身份验证服务器工作的网站。它使用常规的用户名/密码凭据发出 JWT 令牌或转换其他身份验证令牌。如果你使用身份验证服务器，如 Identity Server 4，则不需要指定 `IssuerSigningKey` 选项，因为授权中间件能够自动从授权服务器检索所需的公钥。只需提供身份验证服务器 URL 即可，如下所示：
 
-[PRE27]
+```cs
+.AddJwtBearer(options => {
+        options.Authority = "https://www.MyAuthorizationserver.com";
+        options.TokenValidationParameters =...
+        ...
+```
 
 另一方面，如果您决定在您的 Web API 网站上发出 JWT，您可以定义一个接受具有用户名和密码的对象的 `Login` 操作方法，并且该操作方法在依赖数据库信息的同时，使用类似于以下代码的代码构建 JWT 令牌：
 
-[PRE28]
+```cs
+var claims = new List<Claim> 
+{ 
+   new Claim(...), 
+   new Claim(...) ,
+   ...
+};
+
+var token = new JwtSecurityToken( 
+          issuer: "MyIssuer", 
+          audience: ..., 
+          claims: claims, 
+          expires: DateTime.UtcNow.AddMinutes(expiryInMinutes), 
+          signingCredentials: 
+                new SymmetricSecurityKey(Encoding.ASCII.GetBytes("MySecret")); 
+
+       return OK(new JwtSecurityTokenHandler().WriteToken(token)); 
+```
 
 在这里，`JwtSecurityTokenHandler().WriteToken(token)` 从 `JwtSecurityToken` 实例中包含的令牌属性生成实际的令牌字符串。
 
@@ -462,21 +689,55 @@ ASP.NET Core 应用程序是基于我们在第 5 章 *将微服务架构应用�
 
 大多数需要填充 OpenAPI JSON 文档的信息都可以通过反射从 Web API 控制器中提取，即输入类型和来源（路径、请求体和头部）以及端点路径（这些可以从路由规则中提取）。返回的输出类型和状态码通常不容易计算，因为它们可以动态生成。因此，MVC 框架提供了 `ProducesResponseType` 属性，以便我们可以声明可能的返回类型——状态码对。只需在每个操作方法上装饰尽可能多的 `ProducesResponseType` 属性，即可能的类型，也就是可能的状态码对，如下面的代码所示：
 
-[PRE29]
+```cs
+[HttpGet("{id}")] 
+[ProducesResponseType(typeof(MyReturnType), StatusCodes.Status200OK)] 
+[ProducesResponseType(typeof(MyErrorReturnType), StatusCodes.Status404NotFound)]
+public IActionResult GetById(int id)...
+
+```
 
 如果路径上没有返回对象，我们只需声明状态码，如下所示：
 
-[PRE30]
+```cs
+ [ProducesResponseType(StatusCodes.Status403Forbidden)]
+```
 
 当所有路径都返回相同类型，并且该类型在操作方法返回类型中指定为 `ActionResult<CommonReturnType>` 时，我们也可以仅指定状态码。
 
 一旦所有操作方法都已记录，为了生成针对 JSON 端点的任何实际文档，我们必须安装 `Swashbuckle.AspNetCore` NuGet 包，并在 `Startup.cs` 文件中放置一些代码。更具体地说，我们必须在 `Configure` 方法中添加一些中间件，如下所示：
 
-[PRE31]
+```cs
+app.UseSwagger(); //open api middleware
+app.UseAuthentication();
+app.UseMvc();
+```
 
 然后，我们必须在 `ConfigureServices` 方法中添加一些配置选项，如下所示：
 
-[PRE32]
+```cs
+services.AddSwaggerGen(c =>
+{        
+    c.SwaggerDoc("MyServiceName", new Info
+    {
+        Version = "v1",
+        Title = "ToDo API",
+        Description = "My service description",
+        TermsOfService = "My terms of service",
+        Contact = new Contact
+        {
+            Name = "My Contact Name",
+            Email = string.Empty,
+            Url = "https://MyContatcUrl.com"
+        },
+        License = new License
+        {
+            Name = "My License name",
+            Url = "https://MyLicensecUrl.com"
+        }
+    });
+});
+```
 
 `SwaggerDoc` 方法的第一个参数是文档端点名称。默认情况下，文档端点可以通过 `<webroot>//swagger/<endpoint name>/swagger.json` 路径访问，但可以通过多种方式更改。`Info` 类中包含的其他信息都是自解释的。
 
@@ -484,43 +745,105 @@ ASP.NET Core 应用程序是基于我们在第 5 章 *将微服务架构应用�
 
 `DocInclusionPredicate` 必须传递一个函数，该函数接收一个 JSON 文档名称和一个操作方法描述，并且如果操作必须在那个 JSON 文档中包含文档，则必须返回 `true`。
 
-为了声明你的 REST API 需要JWT令牌，你必须在 `services.AddSwaggerGen(c => {...})` 内部添加以下代码：
+为了声明你的 REST API 需要 JWT 令牌，你必须在 `services.AddSwaggerGen(c => {...})` 内部添加以下代码：
 
-[PRE33]
+```cs
+var security = new Dictionary<string, IEnumerable<string>>
+{
+    {"Bearer", new string[] { }},
+};
+
+c.AddSecurityDefinition("Bearer", new ApiKeyScheme
+{
+    Description = "JWT Authorization header using the Bearer scheme. 
+    Example: \"Authorization: Bearer {token}\"",
+    Name = "Authorization",
+    In = "header",
+    Type = "apiKey"
+});
+c.AddSecurityRequirement(security);
+```
 
 你可以通过从三斜杠注释中提取信息来丰富 JSON 文档端点，这些注释通常用于生成自动代码文档。以下代码展示了这一过程的几个示例。以下片段展示了如何添加方法描述和参数信息：
 
-[PRE34]
+```cs
+//adds a description to the REST method
+
+/// <summary>
+/// Deletes a specific TodoItem.
+/// </summary>
+/// <param name="id"></param> 
+[HttpDelete("{id}")]
+public IActionResult Delete(long id)
+```
 
 以下片段展示了如何添加使用示例：
 
-[PRE35]
+```cs
+//adds an example of usage
+
+/// <summary>
+/// Creates an item.
+/// </summary>
+/// <remarks>
+/// Sample request:
+///
+/// POST /MyItem
+/// {
+/// "id": 1,
+/// "name": "Item1"
+/// }
+///
+/// </remarks>
+```
 
 以下片段展示了如何为每个 HTTP 状态码添加参数描述和返回类型描述：
 
-[PRE36]
+```cs
+//Add input parameters and return object descriptions
+
+/// <param name="item">item to be created</param>
+/// <returns>A newly created TodoItem</returns>
+/// <response code="201">Returns the newly created item</response>
+/// <response code="400">If the item is null</response> 
+```
 
 要启用从三斜杠注释的提取，我们必须通过在项目文件（`.csproj`）中添加以下代码来启用代码文档创建：
 
-[PRE37]
+```cs
+<PropertyGroup>
+  <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  <NoWarn>$(NoWarn);1591</NoWarn>
+</PropertyGroup>
+```
 
 然后，我们必须在 `services.AddSwaggerGen(c => {...})` 内部启用代码文档处理，通过添加以下代码：
 
-[PRE38]
+```cs
+var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
+var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+c.IncludeXmlComments(xmlPath);
+```
 
 一旦我们的文档端点准备就绪，我们可以在同一 `Swashbuckle.AspNetCore` NuGet 包中添加一些中间件来生成一个友好的用户界面，我们可以在该界面上测试我们的 REST API：
 
-[PRE39]
+```cs
+app.UseSwaggerUI(c =>
+{
+    c.SwaggerEndpoint("/swagger/<documentation name>/swagger.json", "
+    <api name that appears in dropdown>");
+});
+```
 
 如果你拥有多个文档端点，你需要为每个端点添加一个 `SwaggerEndpoint` 调用。我们将使用此接口来测试本章用例中定义的 REST API。
 
 一旦你有一个工作的 JSON 文档端点，你可以使用以下方法之一自动生成代理类的 C# 或 TypeScript 代码：
 
-+   可在 [https://github.com/RicoSuter/NSwag/wiki/NSwagStudio](https://github.com/RicoSuter/NSwag/wiki/NSwagStudio) 找到的 NSwagStudio Windows 程序。
++   可在 [`github.com/RicoSuter/NSwag/wiki/NSwagStudio`](https://github.com/RicoSuter/NSwag/wiki/NSwagStudio) 找到的 NSwagStudio Windows 程序。
 
 +   如果你想要自定义代码生成，可以使用 `NSwag.CodeGeneration.CSharp` 或 `NSwag.CodeGeneration.TypeScript` NuGet 包。
 
-+   如果你想要将代码生成与 Visual Studio 构建操作关联起来，可以使用 `NSwag.MSBuild` NuGet 包。有关此包的文档可以在 [https://github.com/RicoSuter/NSwag/wiki/MSBuild](https://github.com/RicoSuter/NSwag/wiki/MSBuild) 找到。
++   如果你想要将代码生成与 Visual Studio 构建操作关联起来，可以使用 `NSwag.MSBuild` NuGet 包。有关此包的文档可以在 [`github.com/RicoSuter/NSwag/wiki/MSBuild`](https://github.com/RicoSuter/NSwag/wiki/MSBuild) 找到。
 
 在下一个子节中，你将学习如何从一个 REST API 或从 .NET Core 客户端调用 REST API。
 
@@ -532,79 +855,169 @@ ASP.NET Core 应用程序是基于我们在第 5 章 *将微服务架构应用�
 
 +   例如，当 `HttpClient` 被释放时，在 `using` 语句中，底层连接不会立即关闭，而是在第一次垃圾回收会话时关闭，这是一个重复创建的过程。释放操作会迅速耗尽操作系统可以处理的连接最大数量。
 
-因此，可以重用单个`HttpClient`实例，例如单例，或者以某种方式池化`HttpClient`实例。从.NET Core 2.1版本开始，引入了`HttpClientFactory`类来池化HTTP客户端。更具体地说，每当需要为`HttpClientFactory`对象创建新的`HttpClient`实例时，都会创建一个新的`HttpClient`。然而，底层的`HttpClientMessageHandler`实例，创建成本较高，会池化直到其最大生命周期到期。
+因此，可以重用单个`HttpClient`实例，例如单例，或者以某种方式池化`HttpClient`实例。从.NET Core 2.1 版本开始，引入了`HttpClientFactory`类来池化 HTTP 客户端。更具体地说，每当需要为`HttpClientFactory`对象创建新的`HttpClient`实例时，都会创建一个新的`HttpClient`。然而，底层的`HttpClientMessageHandler`实例，创建成本较高，会池化直到其最大生命周期到期。
 
-`HttpClientMessageHandler`实例必须具有有限的生命周期，因为它们缓存可能随时间变化的DNS解析信息。`HttpClientMessageHandler`的默认生命周期为2分钟，但可以被开发者重新定义。
+`HttpClientMessageHandler`实例必须具有有限的生命周期，因为它们缓存可能随时间变化的 DNS 解析信息。`HttpClientMessageHandler`的默认生命周期为 2 分钟，但可以被开发者重新定义。
 
-使用`HttpClientFactory`允许我们自动将所有HTTP操作与其他操作一起管道化。例如，我们可以添加Polly重试策略来自动处理所有HTTP操作的失败。有关Polly的介绍，请参阅[第5章](49aed8bb-9a4a-4241-9efc-f53c3f53dd5a.xhtml)的*弹性任务执行*小节，*将微服务架构应用于您的企业应用*。
+使用`HttpClientFactory`允许我们自动将所有 HTTP 操作与其他操作一起管道化。例如，我们可以添加 Polly 重试策略来自动处理所有 HTTP 操作的失败。有关 Polly 的介绍，请参阅第五章的*弹性任务执行*小节，*将微服务架构应用于您的企业应用*。
 
-利用`HttpClientFactory`类提供的优势的最简单方法是添加`Microsoft.Extensions.Http` NuGet包，然后按照以下步骤操作：
+利用`HttpClientFactory`类提供的优势的最简单方法是添加`Microsoft.Extensions.Http` NuGet 包，然后按照以下步骤操作：
 
-1.  定义一个代理类，例如`MyProxy`，以与所需的REST服务交互。
+1.  定义一个代理类，例如`MyProxy`，以与所需的 REST 服务交互。
 
 1.  让`MyProxy`在其构造函数中接受一个`HttpClient`实例。
 
 1.  使用构造函数中注入的`HttpClient`来实现所有必要的操作。
 
-1.  在您的宿主服务的配置方法中声明您的代理，对于ASP.NET Core应用程序，这是`Startup.cs`类中的`ConfigureServices`方法，而对于客户端应用程序，这是`HostBuilder`实例的`ConfigureServices`方法。在最简单的情况下，声明类似于`services.AddHttpClient<MyProxy>()`。这将自动将`MyProxy`添加到可用于依赖注入的服务中，因此您可以轻松地在控制器构造函数中注入它。此外，每次创建`MyProxy`实例时，`HttpClientFactory`都会返回一个`HttpClient`实例，并将其自动注入其构造函数中。
+1.  在您的宿主服务的配置方法中声明您的代理，对于 ASP.NET Core 应用程序，这是`Startup.cs`类中的`ConfigureServices`方法，而对于客户端应用程序，这是`HostBuilder`实例的`ConfigureServices`方法。在最简单的情况下，声明类似于`services.AddHttpClient<MyProxy>()`。这将自动将`MyProxy`添加到可用于依赖注入的服务中，因此您可以轻松地在控制器构造函数中注入它。此外，每次创建`MyProxy`实例时，`HttpClientFactory`都会返回一个`HttpClient`实例，并将其自动注入其构造函数中。
 
-在需要与REST服务交互的类的构造函数中，我们可能也需要一个接口，而不是具有特定代理实现的声明：
+在需要与 REST 服务交互的类的构造函数中，我们可能也需要一个接口，而不是具有特定代理实现的声明：
 
-[PRE40]
+```cs
+services.AddHttpClient<IMyProxy, MyProxy>()
+```
 
-Polly弹性策略（参见[第5章](49aed8bb-9a4a-4241-9efc-f53c3f53dd5a.xhtml)的*弹性任务执行*小节，*将微服务架构应用于您的企业应用*）可以应用于我们代理类发出的所有HTTP调用，如下所示：
+Polly 弹性策略（参见第五章的*弹性任务执行*小节，*将微服务架构应用于您的企业应用*）可以应用于我们代理类发出的所有 HTTP 调用，如下所示：
 
-[PRE41]
+```cs
+var myRetryPolicy = Policy.Handle<HttpRequestException>()
+    ...//policy definition
+    ...;
+services.AddHttpClient<IMyProxy, MyProxy>()
+    .AddPolicyHandler(myRetryPolicy );
+```
 
 最后，我们可以预先配置传递给我们的代理的所有`HttpClient`实例的一些属性，如下所示：
 
-[PRE42]
+```cs
+services.AddHttpClient<IMyProxy, MyProxy>(clientFactory =>
+{
+  clientFactory.DefaultRequestHeaders.Add("Accept", "application/json");
+  clientFactory.BaseAddress = new Uri("https://www.myService.com/");
+})
+ .AddPolicyHandler(myRetryPolicy );
+```
 
 这样，每个传递给代理的客户端都预先配置好，它们需要 JSON 响应，并且必须与特定服务一起工作。一旦定义了基本地址，每个 HTTP 请求都需要指定要调用的服务方法的相对路径。
 
 以下代码显示了如何向服务执行 `POST` 操作。在这里，我们声明注入到代理构造函数中的 `HttpClient` 已被存储在 `webClient` 私有字段中：
 
-[PRE43]
+```cs
+//Add a bearer token to authenticate the call
+webClient.DefaultRequestHeaders.Add("Authorization", "Bearer " + token);
+...
+//Call service method with a POST verb and get response
+var response = await webClient.PostAsJsonAsync<MyPostModel>("my/method/relative/path",
+    new MyPostModel
+    {
+        //fill model here
+        ...
+    });
+//extract response status code
+var status = response.StatusCode;
+...
+//extract body content from response
+string stringResult = await response.Content.ReadAsStringAsync();
+```
 
 如果你使用 Polly，你不需要拦截和处理通信错误，因为这个任务由 Polly 完成。首先，你需要验证状态码以决定下一步要做什么。然后，你可以解析响应体中包含的 JSON 字符串，以获取一个 .NET 实例的类型，这通常取决于状态码。执行解析的代码基于 `Newtonsoft.Json` NuGet 包的 `JsonConvert` 类，如下所示：
 
-[PRE44]
+```cs
+var result=JsonConvert.DeserializeObject<MyResultClass>(stringResult);
+```
 
 执行 GET 请求类似，但你需要调用 `GetAsync` 而不是 `PostAsJsonAsync`，如下所示：
 
-[PRE45]
+```cs
+var response = await webClient.GetAsync("my/getmethod/relative/path");
+```
 
 其他 HTTP 动词的使用完全类似。
 
 # 用例 - 暴露 WWTravelClub 包
 
-在本节中，我们将实现一个 ASP.NET REST 服务，该服务列出给定假期的开始和结束日期可用的所有包。为了教学目的，我们不会根据第 10 章[2a42483c-2193-4bd4-91b4-0fdce94f6ed1.xhtml]中描述的最佳实践来构建应用程序；相反，我们将简单地使用 LINQ 查询生成结果，该查询将直接放置在控制器操作方法中。一个结构良好的 ASP.NET Core 应用程序将在第 13 章[003ee8cb-5995-4364-8772-73d73df29cf8.xhtml]中介绍，*展示 ASP.NET Core MVC*，该章节专门介绍 MVC 框架。
+在本节中，我们将实现一个 ASP.NET REST 服务，该服务列出给定假期的开始和结束日期可用的所有包。为了教学目的，我们不会根据第十章[2a42483c-2193-4bd4-91b4-0fdce94f6ed1.xhtml]中描述的最佳实践来构建应用程序；相反，我们将简单地使用 LINQ 查询生成结果，该查询将直接放置在控制器操作方法中。一个结构良好的 ASP.NET Core 应用程序将在第十三章[003ee8cb-5995-4364-8772-73d73df29cf8.xhtml]中介绍，*展示 ASP.NET Core MVC*，该章节专门介绍 MVC 框架。
 
-让我们复制 `WWTravelClubDB` 解决方案文件夹，并将新文件夹重命名为 `WWTravelClubREST`。WWTravelClubDB 项目是在第 6 章[8c8a9dbc-3bfc-4291-866f-fdd1a62c16ef.xhtml]的各个部分中逐步构建的，*在 C# 中与数据交互 - Entity Framework Core*。让我们打开新的解决方案，并向其中添加一个名为 WWTravelClubREST 的新 ASP.NET Core API 项目（与新的解决方案文件夹同名）。为了简单起见，选择不进行身份验证。右键单击新创建的项目，并选择设置为启动项目，以便在运行解决方案时将其作为默认项目启动。
+让我们复制 `WWTravelClubDB` 解决方案文件夹，并将新文件夹重命名为 `WWTravelClubREST`。WWTravelClubDB 项目是在第六章[8c8a9dbc-3bfc-4291-866f-fdd1a62c16ef.xhtml]的各个部分中逐步构建的，*在 C# 中与数据交互 - Entity Framework Core*。让我们打开新的解决方案，并向其中添加一个名为 WWTravelClubREST 的新 ASP.NET Core API 项目（与新的解决方案文件夹同名）。为了简单起见，选择不进行身份验证。右键单击新创建的项目，并选择设置为启动项目，以便在运行解决方案时将其作为默认项目启动。
 
 最后，我们需要将 WWTravelClubDB 项目添加为引用。
 
 ASP.NET Core 项目将配置常量存储在 `appsettings.json` 文件中。让我们打开这个文件，并将我们为在 WWTravelClubDB 项目中创建的数据库添加到其中，如下所示：
 
-[PRE46]
+```cs
+{
+    "ConnectionStrings": {
+        "DefaultConnection": "Server=
+        (localdb)\\mssqllocaldb;Database=wwtravelclub;
+        Trusted_Connection=True;MultipleActiveResultSets=true"
+    },
+    ...
+    ...
+}
+```
 
 现在，我们必须将 WWTravelClubDB 实体框架数据库上下文添加到 `Startup.cs` 中的 `ConfigureServices` 方法中，如下所示：
 
-[PRE47]
+```cs
+services.AddDbContext<WWTravelClubDB.MainDBContext>(options =>
+     options.UseSqlServer(
+            Configuration.GetConnectionString("DefaultConnection"),
+            b => b.MigrationsAssembly("WWTravelClubDB")));
+```
 
-将传递给 `AddDbContext` 的选项对象设置指定了使用 SQL Server，其连接字符串通过 `Configuration.GetConnectionString("DefaultConnection")` 方法从 `appsettings.json` 配置文件的 `ConnectionStrings` 部分提取。`b => b.MigrationsAssembly("WWTravelClubDB")` 的 lambda 函数声明了包含数据库迁移的程序的名称（参见 [第 6 章](8c8a9dbc-3bfc-4291-866f-fdd1a62c16ef.xhtml)，*在 C# 中与数据交互 - Entity Framework Core*），在我们的例子中，这是由 WWTravelClubDB 项目生成的 DLL。为了使前面的代码能够编译，你应该添加 `using Microsoft.EntityFrameworkCore;`。
+将传递给 `AddDbContext` 的选项对象设置指定了使用 SQL Server，其连接字符串通过 `Configuration.GetConnectionString("DefaultConnection")` 方法从 `appsettings.json` 配置文件的 `ConnectionStrings` 部分提取。`b => b.MigrationsAssembly("WWTravelClubDB")` 的 lambda 函数声明了包含数据库迁移的程序的名称（参见 第六章，*在 C# 中与数据交互 - Entity Framework Core*），在我们的例子中，这是由 WWTravelClubDB 项目生成的 DLL。为了使前面的代码能够编译，你应该添加 `using Microsoft.EntityFrameworkCore;`。
 
 由于我们想要用 OpenAPI 文档丰富我们的 REST 服务，因此让我们添加对 `Swashbuckle.AspNetCore` NuGet 包的引用。对于 .NET 3.0，你必须选择至少版本 5.0 RC-4，所以，如果你在搜索结果中看不到 5.0 版本，请启用 Include prerelease 复选框。现在，我们可以在 `ConfigureServices` 方法中添加以下非常基本的配置：
 
-[PRE48]
+```cs
+services.AddSwaggerGen(c =>
+{
+    c.SwaggerDoc("WWWTravelClub", new OpenAPIInfo
+    {
+        Version = "WWWTravelClub 1.0.0",
+        Title = "WWWTravelClub",
+        Description = "WWWTravelClub Api",
+        TermsOfService = null
+    });
+});
+```
 
 然后，我们可以添加 OpenAPI 端点的中间件以及为我们的 API 文档添加用户界面的功能，如下所示：
 
-[PRE49]
+```cs
+app.UseSwagger();
+app.UseSwaggerUI(c =>
+{
+ c.SwaggerEndpoint(
+ "/swagger/WWWTravelClub/swagger.json", 
+ "WWWTravelClub Api");
+});
+
+app.UseEndpoints(endpoints => //preexisting code//
+{
+     endpoints.MapControllers();
+});
+```
 
 现在，我们准备编码我们的服务。让我们删除由 Visual Studio 自动生成的 `ValueController`。然后，右键单击 `Controller` 文件夹并选择 Add | Controller。现在，选择一个名为 `PackagesController` 的空 API 控制器。首先，让我们按照以下方式修改代码：
 
-[PRE50]
+```cs
+[Route("api/packages")]
+[ApiController]
+public class PackagesController : ControllerBase
+{
+    [HttpGet("bydate/{start}/{stop}")]
+    [ProducesResponseType(typeof(IEnumerable<PackagesListDTO>), 200)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(500)]
+    public async Task<IActionResult> GetPackagesByDate(
+        [FromServices] WWTravelClubDB.MainDBContext ctx, 
+        DateTime start, DateTime stop)
+    {
+
+    }
+}
+```
 
 `Route` 属性声明我们的服务的基本路径将是 `api/packages`。我们实现的唯一操作方法是 `GetPackagesByDate`，它在 `HttpGet` 请求的 `bydate/{start}/{stop}` 类型的路径上被调用，其中 `start` 和 `stop` 是作为输入传递给 `GetPackagesByDate` 的 `DateTime` 参数。`ProduceResponseType` 属性声明以下内容：
 
@@ -616,17 +1029,59 @@ ASP.NET Core 项目将配置常量存储在 `appsettings.json` 文件中。让�
 
 现在，让我们在新的 DTOs 文件夹中定义 `PackagesListDTO` 类：
 
-[PRE51]
+```cs
+namespace WWTravelClubREST.DTOs
+{
+    public class PackagesListDTO
+    {
+        public int Id { get; set; }
+        public string Name { get; set; }
+        public decimal Price { get; set; }
+        public int DuratioInDays { get; set; }
+        public DateTime? StartValidityDate { get; set; }
+        public DateTime? EndValidityDate { get; set; }
+        public string DestinationName { get; set; }
+        public int DestinationId { get; set; }
+    }
+}
+```
 
 最后，让我们在我们的控制器代码中添加以下 `using` 语句，以便我们可以轻松地引用我们的 DTO 和 Entity Framework LINQ 方法：
 
-[PRE52]
+```cs
+using Microsoft.EntityFrameworkCore;
+using WWTravelClubREST.DTOs;
+```
 
 现在，我们准备用以下代码填充 `GetPackagesByDate` 方法的主体：
 
-[PRE53]
+```cs
+try
+{
+    var res = await ctx.Packages
+        .Where(m => start >= m.StartValidityDate
+        && stop <= m.EndValidityDate)
+        .Select(m => new PackagesListDTO
+        {
+            StartValidityDate = m.StartValidityDate,
+            EndValidityDate = m.EndValidityDate,
+            Name = m.Name,
+            DuratioInDays = m.DuratioInDays,
+            Id = m.Id,
+            Price = m.Price,
+            DestinationName = m.MyDestination.Name,
+            DestinationId = m.DestinationId
+        })
+        .ToListAsync();
+    return Ok(res);
+}
+catch
+{
+    return StatusCode(500);
+}
+```
 
-LINQ 查询类似于我们在第 6 章 [8c8a9dbc-3bfc-4291-866f-fdd1a62c16ef.xhtml] “使用 C# 与数据交互 - Entity Framework Core” 中测试的 WWTravelClubDBTest 项目中的查询。一旦计算结果，它将通过 `OK` 调用返回。方法代码通过捕获异常并返回 500 状态码来处理内部服务器错误，因为 Bad Requests 在由 `ApiController` 属性调用控制器方法之前自动处理。
+LINQ 查询类似于我们在第六章 [8c8a9dbc-3bfc-4291-866f-fdd1a62c16ef.xhtml] “使用 C# 与数据交互 - Entity Framework Core” 中测试的 WWTravelClubDBTest 项目中的查询。一旦计算结果，它将通过 `OK` 调用返回。方法代码通过捕获异常并返回 500 状态码来处理内部服务器错误，因为 Bad Requests 在由 `ApiController` 属性调用控制器方法之前自动处理。
 
 让我们运行解决方案。当浏览器打开时，它无法从我们的 ASP.NET Core 网站接收任何结果。让我们修改浏览器 URL，使其为 `https://localhost:<previous port>/swagger`。OpenAPI 文档的用户界面将如下所示：
 
@@ -640,7 +1095,18 @@ LINQ 查询类似于我们在第 6 章 [8c8a9dbc-3bfc-4291-866f-fdd1a62c16ef.xht
 
 日期必须以正确的 JSON 格式输入；否则，将返回 400 错误请求错误，如下面的代码所示：
 
-[PRE54]
+```cs
+{
+  "errors": {
+    "start": [
+      "The value '2019' is not valid."
+    ]
+  },
+  "title": "One or more validation errors occurred.",
+  "status": 400,
+  "traceId": "80000008-0000-f900-b63f-84710c7967bb"
+}
+```
 
 如果你输入正确的输入参数，Swagger UI 将以 JSON 格式返回满足查询的包。
 
@@ -660,34 +1126,34 @@ LINQ 查询类似于我们在第 6 章 [8c8a9dbc-3bfc-4291-866f-fdd1a62c16ef.xht
 
 # 问题
 
-1.  服务可以使用基于cookie的会话吗？
+1.  服务可以使用基于 cookie 的会话吗？
 
 1.  实现服务时使用自定义通信协议是好的做法吗？为什么或为什么不？
 
-1.  向REST服务发送`POST`请求会导致删除吗？
+1.  向 REST 服务发送`POST`请求会导致删除吗？
 
-1.  JWT载体令牌中包含多少个点分隔的部分？
+1.  JWT 载体令牌中包含多少个点分隔的部分？
 
-1.  默认情况下，REST服务操作方法的复杂类型参数是从哪里获取的？
+1.  默认情况下，REST 服务操作方法的复杂类型参数是从哪里获取的？
 
-1.  如何声明控制器为REST服务？
+1.  如何声明控制器为 REST 服务？
 
-1.  ASP.NET Core服务的哪些主要文档属性？
+1.  ASP.NET Core 服务的哪些主要文档属性？
 
-1.  ASP.NET Core REST服务路由规则是如何声明的？
+1.  ASP.NET Core REST 服务路由规则是如何声明的？
 
-1.  应如何声明代理，以便我们可以利用.NET Core的`HttpClientFactory`类功能？
+1.  应如何声明代理，以便我们可以利用.NET Core 的`HttpClientFactory`类功能？
 
 # 进一步阅读
 
-本章主要关注更常用的REST服务。如果您对SOAP服务感兴趣，可以从有关SOAP规范的维基百科页面开始：[https://en.wikipedia.org/wiki/List_of_web_service_specifications](https://en.wikipedia.org/wiki/List_of_web_service_specifications). 另一方面，如果您对实现SOAP服务的Microsoft .NET WCF技术感兴趣，可以参考WCF的官方文档：[https://docs.microsoft.com/en-us/dotnet/framework/wcf/](https://docs.microsoft.com/en-us/dotnet/framework/wcf/).
+本章主要关注更常用的 REST 服务。如果您对 SOAP 服务感兴趣，可以从有关 SOAP 规范的维基百科页面开始：[`en.wikipedia.org/wiki/List_of_web_service_specifications`](https://en.wikipedia.org/wiki/List_of_web_service_specifications). 另一方面，如果您对实现 SOAP 服务的 Microsoft .NET WCF 技术感兴趣，可以参考 WCF 的官方文档：[`docs.microsoft.com/en-us/dotnet/framework/wcf/`](https://docs.microsoft.com/en-us/dotnet/framework/wcf/).
 
-本章提到了AMQP协议作为集群内部通信的选项，但没有对其进行描述。关于此协议的详细信息可在AMQP的官方网站上找到：[https://www.amqp.org/](https://www.amqp.org/).
+本章提到了 AMQP 协议作为集群内部通信的选项，但没有对其进行描述。关于此协议的详细信息可在 AMQP 的官方网站上找到：[`www.amqp.org/`](https://www.amqp.org/).
 
-关于gRPC的更多信息可在Google gRPC的官方网站上找到：[https://grpc.io/](https://grpc.io/). 关于Visual Studio gRPC项目模板的更多信息可在此处找到：[https://docs.microsoft.com/en-US/aspnet/core/grpc/?view=aspnetcore-3.0](https://docs.microsoft.com/en-US/aspnet/core/grpc/?view=aspnetcore-3.0.).
+关于 gRPC 的更多信息可在 Google gRPC 的官方网站上找到：[`grpc.io/`](https://grpc.io/). 关于 Visual Studio gRPC 项目模板的更多信息可在此处找到：[`docs.microsoft.com/en-US/aspnet/core/grpc/?view=aspnetcore-3.0`](https://docs.microsoft.com/en-US/aspnet/core/grpc/?view=aspnetcore-3.0.).
 
-更多关于ASP.NET Core服务的详细信息可在官方文档中找到：[https://docs.microsoft.com/en-US/aspnet/core/web-api/?view=aspnetcore-3.0](https://docs.microsoft.com/en-US/aspnet/core/web-api/?view=aspnetcore-3.0). 更多关于.NET Core HTTP客户端的信息可在此处找到：[https://docs.microsoft.com/en-US/aspnet/core/fundamentals/http-requests?view=aspnetcore-3.0](https://docs.microsoft.com/en-US/aspnet/core/fundamentals/http-requests?view=aspnetcore-3.0).
+更多关于 ASP.NET Core 服务的详细信息可在官方文档中找到：[`docs.microsoft.com/en-US/aspnet/core/web-api/?view=aspnetcore-3.0`](https://docs.microsoft.com/en-US/aspnet/core/web-api/?view=aspnetcore-3.0). 更多关于.NET Core HTTP 客户端的信息可在此处找到：[`docs.microsoft.com/en-US/aspnet/core/fundamentals/http-requests?view=aspnetcore-3.0`](https://docs.microsoft.com/en-US/aspnet/core/fundamentals/http-requests?view=aspnetcore-3.0).
 
-关于JWT令牌认证的更多信息可在此处找到：[https://jwt.io/](https://jwt.io/). 如果您想使用Identity Serve 4生成JWT令牌，您可以参考其官方文档页面：[http://docs.identityserver.io/en/latest/](http://docs.identityserver.io/en/latest/).
+关于 JWT 令牌认证的更多信息可在此处找到：[`jwt.io/`](https://jwt.io/). 如果您想使用 Identity Serve 4 生成 JWT 令牌，您可以参考其官方文档页面：[`docs.identityserver.io/en/latest/`](http://docs.identityserver.io/en/latest/).
 
-更多关于OpenAPI的信息可在[https://swagger.io/docs/specification/about/](https://swagger.io/docs/specification/about/)找到，而关于Swashbuckle的更多信息可在其GitHub存储库页面上找到：[https://github.com/domaindrivendev/Swashbuckle](https://github.com/domaindrivendev/Swashbuckle).
+更多关于 OpenAPI 的信息可在[`swagger.io/docs/specification/about/`](https://swagger.io/docs/specification/about/)找到，而关于 Swashbuckle 的更多信息可在其 GitHub 存储库页面上找到：[`github.com/domaindrivendev/Swashbuckle`](https://github.com/domaindrivendev/Swashbuckle).

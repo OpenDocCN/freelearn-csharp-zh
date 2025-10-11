@@ -26,9 +26,9 @@
 
 **为什么这是错误的？** 认为已经知道一切的想法比任何东西都更能阻碍你学习。这种危险的心态使你对自己的不足视而不见，使你无法处理反馈。结果，你将永远无法进步，你将最终成为职业生涯中一个平庸的程序员，即使你拥有高级或技术总监等头衔。
 
-**根本原因是什么？** 这种过早的失望的主要原因在于，像Unity引擎这样的工具简化了制作游戏的过程，以至于几乎任何人都可以做到。但这意味着很少有人理解他们所使用的工具或编程语言在引擎底层的运作方式。
+**根本原因是什么？** 这种过早的失望的主要原因在于，像 Unity 引擎这样的工具简化了制作游戏的过程，以至于几乎任何人都可以做到。但这意味着很少有人理解他们所使用的工具或编程语言在引擎底层的运作方式。
 
-以为例子，仅仅因为你能够用C#编写程序，并不意味着你就是C#专家，但了解语言库的复杂性将使你成为专家。
+以为例子，仅仅因为你能够用 C#编写程序，并不意味着你就是 C#专家，但了解语言库的复杂性将使你成为专家。
 
 **如何避免这种情况？**
 
@@ -36,7 +36,7 @@
 
 +   学习，学习，永远不要停止学习。
 
-+   避免追求像高级、技术领导或CTO这样的头衔，而应专注于真正掌握你的技艺。
++   避免追求像高级、技术领导或 CTO 这样的头衔，而应专注于真正掌握你的技艺。
 
 +   每次你使用一个新的工具、库和语言时，尽可能多地研究其起源以及其复杂性。
 
@@ -44,7 +44,7 @@
 
 +   教学相长，写博客，并在论坛上回答技术问题。换句话说，将你所知的知识传授出去，同时吸收新的信息。这种方法将帮助你验证和构建你的学习。
 
-创业公司给出的职位名称与大公司给出的职位名称并不等价。所以，当你从一个小型独立工作室过渡到AAA工作室时，你最终又回到了一个更初级的位置，这并不奇怪。原因是简单的：在大团队中晋升到高级职位更难，因为你需要与更多的程序员竞争更好的职位。
+创业公司给出的职位名称与大公司给出的职位名称并不等价。所以，当你从一个小型独立工作室过渡到 AAA 工作室时，你最终又回到了一个更初级的位置，这并不奇怪。原因是简单的：在大团队中晋升到高级职位更难，因为你需要与更多的程序员竞争更好的职位。
 
 # 对复杂性的恐惧
 
@@ -92,9 +92,32 @@
 
 如果每个类都是一个管理者，最终会导致管理者之间相互依赖。换句话说，管理者变成了其他管理者的子系统，直到你发现自己处于你试图避免的相同境地，一个依赖性的混乱。另一个负面点是，管理者通常被实现为单例，这意味着你在代码库中散布了全局依赖。
 
-以下是一个代码示例，展示了可能过于依赖Manager类的软件架构。如果你在你的源代码中看到类似的情况，你可能需要重构你的架构：
+以下是一个代码示例，展示了可能过于依赖 Manager 类的软件架构。如果你在你的源代码中看到类似的情况，你可能需要重构你的架构：
 
-[PRE0]
+```cs
+using UnityEngine;
+
+public class GameManager : MonoBehaviour
+{
+    private Player m_Player;
+
+    void Start()
+    {
+        // Get the player ID
+        m_Player = PlayerManager.Instance.GetPlayer();
+
+        // Sign-in to online services
+        OnlineManager.Instance.LoginPlayer(m_Player);
+
+        // Load save game data of the player
+        SaveManager.Instance.LoadSaveGame(m_Player);
+
+        // Load player preferred controller configuration
+        IInputConfiguration inputConfig = SaveManager.Instance.GetInputConfig(m_Player);
+        InputManager.Instance.LoadControllerConfig(inputConfig);
+    }
+}
+```
 
 **根本原因是什么？**
 
@@ -106,7 +129,7 @@
 
 +   每次你即将使用一个特定的模式时，总是考虑使用一个可能更适合的替代方案。换句话说，避免默认选择最简单的解决方案。
 
-+   跟踪你的架构和你正在使用的模式。如果你看到标题中包含Manager的类太多，就提出一个警告。
++   跟踪你的架构和你正在使用的模式。如果你看到标题中包含 Manager 的类太多，就提出一个警告。
 
 +   如果你正在为你的核心系统实现单元测试时遇到问题，这是一个很好的迹象，表明你的架构中可能存在问题，这可能与有太多的单例或类似全局管理者的类有关。
 
@@ -156,7 +179,7 @@
 
 **为什么这是错误的？**
 
-你必须维护的代码密度通常与你每次进行更改时可能需要修复的bug频率有关。另一个副作用是，鬼魂类在你的代码库中徘徊可能会引起对做出更改的恐惧，因为可能会在错误的时间出现未知对象。
+你必须维护的代码密度通常与你每次进行更改时可能需要修复的 bug 频率有关。另一个副作用是，鬼魂类在你的代码库中徘徊可能会引起对做出更改的恐惧，因为可能会在错误的时间出现未知对象。
 
 **根本原因是什么？**
 
@@ -218,17 +241,17 @@
 
 **如何避免这种情况？** 在购买他们的产品并将它们集成到代码库之前，你应该研究供应商。例如，如果他们没有更新他们的支持论坛，这可能表明他们没有计划在不久的将来发布更新，这可能会限制你在需要时获得即时支持的能力。
 
-作为一名Unity开发者，你在编写任何东西之前应该始终检查Unity资产商店，因为可能已经有其他人已经以更好的方式完成了你想要做的事情。
+作为一名 Unity 开发者，你在编写任何东西之前应该始终检查 Unity 资产商店，因为可能已经有其他人已经以更好的方式完成了你想要做的事情。
 
 # 按数字管理
 
 **这是什么？**
 
-**按数字管理**是指基于由工具（如Excel电子表格或报告）生成的统计数据来做出管理决策，而不是基于对项目实际情况的准确分析。
+**按数字管理**是指基于由工具（如 Excel 电子表格或报告）生成的统计数据来做出管理决策，而不是基于对项目实际情况的准确分析。
 
 **为什么这是错误的？**
 
-在生产力报告中表达的数据往往不能反映团队的质量或潜力。它们可能隐藏由动态人际互动引起的问题，而不是揭示它们。这种对数字的关注可能会在关键决策过程中使项目经理失明。换句话说，你能通过程序员一周内修复的bug数量来定义程序员的效率吗？答案是*不*，因为特定bug的复杂性不是恒定的。你不能用同样的方式评估一周内修复五个简单bug的程序员和在同一时期内解决一个但非常复杂的bug的程序员。
+在生产力报告中表达的数据往往不能反映团队的质量或潜力。它们可能隐藏由动态人际互动引起的问题，而不是揭示它们。这种对数字的关注可能会在关键决策过程中使项目经理失明。换句话说，你能通过程序员一周内修复的 bug 数量来定义程序员的效率吗？答案是*不*，因为特定 bug 的复杂性不是恒定的。你不能用同样的方式评估一周内修复五个简单 bug 的程序员和在同一时期内解决一个但非常复杂的 bug 的程序员。
 
 **根本原因是什么？**
 
@@ -240,9 +263,9 @@
 
 +   服务更新与停机时间
 
-+   随时间发现的和修复的bug数量
++   随时间发现的和修复的 bug 数量
 
-在你40岁之后，为了确保自己在科技行业有一个长期的职业生涯，最关键的事情之一是回到学校，获得管理学的文凭或证书。这种教育将使你能够过渡到长期领导角色，公司可能会在你积累了数十年经验后鼓励你考虑这一角色。
+在你 40 岁之后，为了确保自己在科技行业有一个长期的职业生涯，最关键的事情之一是回到学校，获得管理学的文凭或证书。这种教育将使你能够过渡到长期领导角色，公司可能会在你积累了数十年经验后鼓励你考虑这一角色。
 
 # 技术面试
 
@@ -276,7 +299,7 @@
 
 +   不要寻找弱点。相反，尝试理解候选人的优势，并看看它们是否与他们的潜在弱点相平衡。
 
-+   总是考虑到程序员在行业中的技能可能有很多，这取决于他们的专业。例如，平均的网页开发者可能不如3D程序员擅长数学，但他们可能在数据库规范化或客户端-服务器应用程序设计方面更出色。
++   总是考虑到程序员在行业中的技能可能有很多，这取决于他们的专业。例如，平均的网页开发者可能不如 3D 程序员擅长数学，但他们可能在数据库规范化或客户端-服务器应用程序设计方面更出色。
 
 +   当候选人未能回答一个技术问题时，问问自己这是否是因为他们不理解它，可能没有足够的技能去做，或者可能因为考试过程而过于紧张。换句话说，在评估申请人的实际技能水平时，面试的背景很重要，而不仅仅是最终分数。
 
@@ -298,25 +321,25 @@
 
 +   通过参加练习面试编程考试来定期检查你的技能。
 
-+   每年获得一项新的技术认证，如PMP、CCNA和CEH。
++   每年获得一项新的技术认证，如 PMP、CCNA 和 CEH。
 
 +   列出你作为程序员的全部弱点，并每天努力克服它们。
 
 +   尝试每周至少参加一次与技术相关的聚会活动或会议。
 
-+   加入技术专业组织，如ACM和IEEE，并使用提供的资源。
++   加入技术专业组织，如 ACM 和 IEEE，并使用提供的资源。
 
 +   通过每天阅读技术和游戏行业新闻来保持对发生的事情的了解。
 
-+   学习其他领域可能与你的领域相关的课程，包括管理、UI设计和动画。
++   学习其他领域可能与你的领域相关的课程，包括管理、UI 设计和动画。
 
-+   为自己列一个与技术和编程相关的博客和YouTube频道的清单。每天至少阅读一篇博客文章和观看一个视频。
++   为自己列一个与技术和编程相关的博客和 YouTube 频道的清单。每天至少阅读一篇博客文章和观看一个视频。
 
 +   每月参加一次编码训练营或订阅至少一个培训课程。别忘了完成它们。
 
 +   每年至少阅读两本关于编程或相关领域的书籍。
 
-+   开一个GitHub账户，并至少为一个开源项目做出贡献，即使只是几行代码。习惯这个过程和社区。
++   开一个 GitHub 账户，并至少为一个开源项目做出贡献，即使只是几行代码。习惯这个过程和社区。
 
 +   学习冥想；这是一份压力很大的工作；知道如何在压力下保持冷静将有助于你保持心理健康并避免过度劳累。
 
@@ -328,84 +351,84 @@
 
 +   *ACM*
 
-    [https://www.acm.org](https://www.acm.org)
+    [`www.acm.org`](https://www.acm.org)
 
 +   *IEEE*
 
-    [https://www.ieee.org](https://www.ieee.org)
+    [`www.ieee.org`](https://www.ieee.org)
 
 **博客**:
 
 +   *编码恐怖*
 
-    [https://blog.codinghorror.com](https://blog.codinghorror.com)
+    [`blog.codinghorror.com`](https://blog.codinghorror.com)
 
 +   *乔尔·汉斯勒姆博客*
 
-    [https://www.joelonsoftware.com](https://www.joelonsoftware.com)
+    [`www.joelonsoftware.com`](https://www.joelonsoftware.com)
 
 +   *斯科特·汉斯勒姆博客*
 
-    [https://www.hanselman.com/blog/](https://www.hanselman.com/blog/)
+    [`www.hanselman.com/blog/`](https://www.hanselman.com/blog/)
 
 +   *疯狂程序员*
 
-    [https://www.thecrazyprogrammer.com](https://www.thecrazyprogrammer.com)
+    [`www.thecrazyprogrammer.com`](https://www.thecrazyprogrammer.com)
 
 **YouTube**:
 
 +   *计算机爱好者*
 
-    [https://www.youtube.com/user/Computerphile](https://www.youtube.com/user/Computerphile)
+    [`www.youtube.com/user/Computerphile`](https://www.youtube.com/user/Computerphile)
 
 +   *技术成功*
 
-    [https://www.youtube.com/channel/UC-vYrOAmtrx9sBzJAf3x_xw](https://www.youtube.com/channel/UC-vYrOAmtrx9sBzJAf3x_xw)
+    [`www.youtube.com/channel/UC-vYrOAmtrx9sBzJAf3x_xw`](https://www.youtube.com/channel/UC-vYrOAmtrx9sBzJAf3x_xw)
 
 +   *TED*
 
-    [https://www.youtube.com/user/TEDtalksDirector](https://www.youtube.com/user/TEDtalksDirector)
+    [`www.youtube.com/user/TEDtalksDirector`](https://www.youtube.com/user/TEDtalksDirector)
 
 +   *TechLead*
 
-    [https://www.youtube.com/channel/UC4xKdmAXFh4ACyhpiQ_3qBw](https://www.youtube.com/channel/UC4xKdmAXFh4ACyhpiQ_3qBw)
+    [`www.youtube.com/channel/UC4xKdmAXFh4ACyhpiQ_3qBw`](https://www.youtube.com/channel/UC4xKdmAXFh4ACyhpiQ_3qBw)
 
 **科技新闻**:
 
 +   *Slashdot*
 
-    [https://slashdot.org](https://slashdot.org)
+    [`slashdot.org`](https://slashdot.org)
 
 +   *Wired*
 
-    [https://www.wired.com](https://www.wired.com)
+    [`www.wired.com`](https://www.wired.com)
 
 +   *Gamasutra*
 
-    [http://www.gamasutra.com](http://www.gamasutra.com)
+    [`www.gamasutra.com`](http://www.gamasutra.com)
 
 +   GamesIndustry.biz
 
-    [https://www.gamesindustry.biz](https://www.gamesindustry.biz)
+    [`www.gamesindustry.biz`](https://www.gamesindustry.biz)
 
 **在线课程**:
 
 +   *Udemy*
 
-    [https://www.udemy.com](https://www.udemy.com)
+    [`www.udemy.com`](https://www.udemy.com)
 
 +   *Lynda*
 
-    [https://www.lynda.com](https://www.lynda.com)
+    [`www.lynda.com`](https://www.lynda.com)
 
 +   *Pluralsight*
 
-    [https://www.pluralsight.com](https://www.pluralsight.com)
+    [`www.pluralsight.com`](https://www.pluralsight.com)
 
 +   MasterClass
 
-    [https://www.masterclass.com](https://www.masterclass.com)
+    [`www.masterclass.com`](https://www.masterclass.com)
 
 **书籍**:
 
-+   *Anti-patterns: Managing Software Organizations and People*, by Colin J. Neill, Philip A. Laplante, and Joanna F. DeFranco [https://www.crcpress.com/Antipatterns-Managing-Software-Organizations-and-People-Second-Edition/Neill-Laplante-DeFranco/p/book/9781439861868](https://www.crcpress.com/Antipatterns-Managing-Software-Organizations-and-People-Second-Edition/Neill-Laplante-DeFranco/p/book/9781439861868)
++   *Anti-patterns: Managing Software Organizations and People*, by Colin J. Neill, Philip A. Laplante, and Joanna F. DeFranco [`www.crcpress.com/Antipatterns-Managing-Software-Organizations-and-People-Second-Edition/Neill-Laplante-DeFranco/p/book/9781439861868`](https://www.crcpress.com/Antipatterns-Managing-Software-Organizations-and-People-Second-Edition/Neill-Laplante-DeFranco/p/book/9781439861868)

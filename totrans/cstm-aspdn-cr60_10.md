@@ -1,4 +1,4 @@
-# *第10章*: 自定义 ASP.NET Core Identity
+# *第十章*: 自定义 ASP.NET Core Identity
 
 在本章中，我们将学习如何自定义 ASP.NET Core Identity。安全性是应用程序最重要的方面之一。Microsoft 将 ASP.NET Core Identity 作为 ASP.NET Core 框架的一部分提供，以向 ASP.NET Core 应用程序添加身份验证和用户管理。
 
@@ -12,21 +12,26 @@
 
 本章的主题与 ASP.NET Core 架构的 MVC 层相关：
 
-![图10.1 – ASP.NET Core 架构](img/Figure_10.1_B17996.jpg)
+![图 10.1 – ASP.NET Core 架构](img/Figure_10.1_B17996.jpg)
 
-图10.1 – ASP.NET Core 架构
+图 10.1 – ASP.NET Core 架构
 
 # 技术要求
 
 要跟随本章的练习，您需要创建一个 ASP.NET Core MVC 应用程序。打开您的控制台、shell 或 Bash 终端，切换到您的工作目录。使用以下命令创建一个新的 MVC 应用程序：
 
-[PRE0]
+```cs
+dotnet new mvc -n AuthSample -o AuthSample --auth Individual
+```
 
 现在，通过双击项目文件在 Visual Studio 中打开项目，或者通过在已打开的控制台中输入以下命令在 Visual Studio Code 中打开它：
 
-[PRE1]
+```cs
+cd AuthSample
+code .
+```
 
-本章的所有代码示例都可以在本书的 GitHub 仓库中找到：[https://github.com/PacktPublishing/Customizing-ASP.NET-Core-6.0-Second-Edition/tree/main/Chapter10](https://github.com/PacktPublishing/Customizing-ASP.NET-Core-6.0-Second-Edition/tree/main/Chapter10)。
+本章的所有代码示例都可以在本书的 GitHub 仓库中找到：[`github.com/PacktPublishing/Customizing-ASP.NET-Core-6.0-Second-Edition/tree/main/Chapter10`](https://github.com/PacktPublishing/Customizing-ASP.NET-Core-6.0-Second-Edition/tree/main/Chapter10)。
 
 # 介绍 ASP.NET Core Identity
 
@@ -38,7 +43,7 @@ ASP.NET Core Identity 提供了多种方式来验证您的用户：
 
 +   **个人**: 应用程序自行管理身份。它有一个数据库，其中存储用户信息，并自行管理登录、注销、注册等。
 
-+   **个人B2C**: 自行管理用户数据，但从中获取 Azure B2C 的数据。
++   **个人 B2C**: 自行管理用户数据，但从中获取 Azure B2C 的数据。
 
 +   **单组织**: 身份由 Azure **活动目录**（**AD**）管理；登录、注销等由 Azure AD 完成。应用程序只需从网络服务器获取一个现成的身份。
 
@@ -66,31 +71,33 @@ AUTHSAMPLE 包含一个 `Data` 文件夹，其中包含一个 Entity Framework C
 
 在启动应用程序之前，在终端中调用以下命令：
 
-[PRE2]
+```cs
+dotnet ef database update
+```
 
 这将创建和更新数据库。
 
 如果不起作用，你可能需要首先在 .NET CLI 中安装 Entity Framework 工具：
 
-[PRE3]
+```cs
+dotnet tool install -g dotnet-ef
+```
 
 然后，调用以下命令：
 
-[PRE4]
+```cs
+dotnet watch
+```
 
 应用程序现在将以监视模式启动，并启用热重载。它还会打开一个浏览器窗口并调用应用程序：
 
-![图 10.3 – AuthSample 主页
-
-](img/Figure_10.3_B17996.jpg)
+![图 10.3 – AuthSample 主页](img/Figure_10.3_B17996.jpg)
 
 图 10.3 – AuthSample 主页
 
 如您所见，在右上角有一个菜单，其中包含此应用程序的 **注册** 和 **登录** 选项。点击 **登录** 链接将带您到以下登录界面：
 
-![图 10.4 – 登录界面
-
-](img/Figure_10.4_B17996.jpg)
+![图 10.4 – 登录界面](img/Figure_10.4_B17996.jpg)
 
 图 10.4 – 登录界面
 
@@ -100,15 +107,28 @@ AUTHSAMPLE 包含一个 `Data` 文件夹，其中包含一个 Entity Framework C
 
 在服务注册的上部区域，有注册 `DbContext` 以及数据库异常页面的代码行：
 
-[PRE5]
+```cs
+var connectionString = builder.Configuration
+    .GetConnectionString("DefaultConnection");
+builder.Services.AddDbContext<ApplicationDbContext>(
+    options => options.UseSqlite(connectionString));
+builder.Services.AddDatabaseDeveloperPageExceptionFilter();
+builder.Services.AddDefaultIdentity<IdentityUser>(
+    options => options.SignIn.RequireConfirmedAccount = 
+        true)
+    .AddEntityFrameworkStores<ApplicationDbContext>();
+```
 
 还有一个用于默认身份的注册，它添加了 `EntityFramework` 存储。它还配置为仅允许已确认的账户，这意味着您作为用户需要在登录之前确认您的电子邮件地址。
 
 在使用中间件的较低部分，我们看到身份验证和授权被使用：
 
-[PRE6]
+```cs
+app.UseAuthentication();
+app.UseAuthorization();
+```
 
-这两个中间件启用身份验证和授权。第一个通过读取身份验证cookie来尝试识别用户。它还将所有相关信息添加到 Identity 对象中。
+这两个中间件启用身份验证和授权。第一个通过读取身份验证 cookie 来尝试识别用户。它还将所有相关信息添加到 Identity 对象中。
 
 你可能需要通过向用户添加更多属性来扩展用户配置文件。让我们看看如何在下一节中这样做。
 
@@ -120,23 +140,41 @@ AUTHSAMPLE 包含一个 `Data` 文件夹，其中包含一个 Entity Framework C
 
 要做到这一点，需要在 `Data` 文件夹中添加一个名为 `WebAppUser.cs` 的文件，其中包含以下行：
 
-[PRE7]
+```cs
+using Microsoft.AspNetCore.Identity;
+namespace AuthSample.Data;
+public class WebAppUser : IdentityUser
+{
+    [PersonalData]
+    public string? Name { get; set; }
+    [PersonalData]
+    public DateTime DOB { get; set; }
+}
+```
 
 如此所示，`WebAppUser` 从 `IdentityUser` 继承并扩展了前面提到的两个属性。
 
 在 `Program.cs` 中，我们需要修改服务注册以使用新的 `WebAppUser`：
 
-[PRE8]
+```cs
+builder.Services.AddDefaultIdentity<WebAppUser>
+```
 
 我们还需要以更改基类的方式更改 `DbContext` 以使用此 `WebAppUser`。
 
-[PRE9]
+```cs
+public class ApplicationDbContext : 
+     IdentityDbContext<WebAppUser, IdentityRole, string>
+```
 
 你可能需要向 `Microsoft.AspNetCore.Identity` 添加一个 `using` 语句。
 
 第一步就到这里。我们现在需要更新数据库：
 
-[PRE10]
+```cs
+dotnet ef migrations add CustomUserData
+dotnet ef database update
+```
 
 一旦你将 `IdentityUser` 扩展了自定义属性，你就可以开始在用户配置文件中使用它。这需要在 ASP.NET Core Identity UI 中进行一些自定义。
 
@@ -148,7 +186,12 @@ AUTHSAMPLE 包含一个 `Data` 文件夹，其中包含一个 Entity Framework C
 
 如果已经完成，请在这个文件夹内放置一个新的 Razor 页面，命名为 `Register.cshtml`，并将以下内容放入其中，以查看视图覆盖是否生效：
 
-[PRE11]
+```cs
+@page
+@{
+}
+<h1>Hello Register Form</h1> 
+```
 
 如果你现在运行应用程序并点击左上角的 **Register**，你会看到以下页面：
 
@@ -162,79 +205,143 @@ AUTHSAMPLE 包含一个 `Data` 文件夹，其中包含一个 Entity Framework C
 
 通过调用以下命令安装代码生成器：
 
-[PRE12]
+```cs
+dotnet tool install -g dotnet-aspnet-codegenerator
+```
 
 如果还没有完成，你还需要在你的项目中安装以下包：
 
-[PRE13]
+```cs
+dotnet add package Microsoft.VisualStudio.Web.CodeGeneration.Design
+dotnet add package Microsoft.EntityFrameworkCore.Design
+dotnet add package Microsoft.AspNetCore.Identity.EntityFrameworkCore
+dotnet add package Microsoft.AspNetCore.Identity.UI
+dotnet add package Microsoft.EntityFrameworkCore.SqlServer
+dotnet add package Microsoft.EntityFrameworkCore.Tools
+```
 
 要了解代码生成器能做什么，请运行以下命令：
 
-[PRE14]
+```cs
+dotnet aspnet-codegenerator identity -h
+```
 
 你可以构建整个身份 UI 以及特定的页面。如果你没有指定默认 UI 的页面，所有页面都将生成到你的项目中。要查看你可以生成的页面，请输入以下命令：
 
-[PRE15]
+```cs
+dotnet aspnet-codegenerator identity -lf
+```
 
 第一次更改的想法是让用户在注册页面上填写名称属性。
 
 因此，让我们生成**注册**页面：
 
-[PRE16]
+```cs
+dotnet aspnet-codegenerator identity -dc AuthSample.Data.ApplicationDbContext --files "Account.Register" -sqlite
+```
 
-此命令告诉代码生成器使用已存在的`ApplicationDbContext`和`Sqlite`。如果你没有指定，它将创建一个新的`DbContext`或注册现有的`DbContext`以使用SQL Server而不是SQLite。
+此命令告诉代码生成器使用已存在的`ApplicationDbContext`和`Sqlite`。如果你没有指定，它将创建一个新的`DbContext`或注册现有的`DbContext`以使用 SQL Server 而不是 SQLite。
 
 如果一切设置正确，代码生成器应该只添加`Register.cshtml`页面以及一些基础设施文件：
 
-![图10.6 – 代码生成器添加的文件](img/Figure_10.6_B17996.jpg)
+![图 10.6 – 代码生成器添加的文件](img/Figure_10.6_B17996.jpg)
 
-图10.6 – 代码生成器添加的文件
+图 10.6 – 代码生成器添加的文件
 
 代码生成器也知道项目正在使用自定义的`WebAppUser`而不是`IdentityUser`，这意味着`WebAppUser`在生成的代码中使用。
 
-现在，你应该将`Register.cshtml`更改为添加显示名称到表单中。在15行电子邮件字段之前的表单元素中添加以下行：
+现在，你应该将`Register.cshtml`更改为添加显示名称到表单中。在 15 行电子邮件字段之前的表单元素中添加以下行：
 
-[PRE17]
+```cs
+<div class="form-floating">
+    <input asp-for="Input.Name" class="form-control" 
+        autocomplete="name" aria-required="true" />
+    <label asp-for="Input.Name"></label>
+    <span asp-validation-for="Input.Name"
+        class="text-danger"></span>
+</div>
+```
 
 此外，`Regiser.cshtml.cs`也需要更改。`ImportModel`类需要`Name`属性：
 
-[PRE18]
+```cs
+public class InputModel
+{
+    [Required]
+    [Display(Name = "Display name")]
+    public string Name { get; set; }
+```
 
 在`PostAsync`方法中，将`Name`属性分配给新创建的用户：
 
-[PRE19]
+```cs
+var user = CreateUser();
+user.Name = Input.Name;
+```
 
 就这样。
 
 启动应用程序后，你会看到以下注册表单：
 
-![图10.7 – 注册表单
+![图 10.7 – 注册表单![](img/Figure_10.7_B17996.jpg)
 
-![](img/Figure_10.7_B17996.jpg)
-
-图10.7 – 注册表单
+图 10.7 – 注册表单
 
 尝试一下，你就会看到它正在工作。
 
 由于用户可能需要更新名称，我们还需要更改个人资料页面的视图。在这里，还需要添加出生日期：
 
-[PRE20]
+```cs
+dotnet aspnet-codegenerator identity -dc AuthSample.Data.ApplicationDbContext --files "Account.Manage.Index" -sqlite
+```
 
 打开位于`/Areas/Identity/Pages/Account/Manage/`文件夹中的新创建的`Index.cshtml.cs`，并在`InputModel`类中放置以下属性：
 
-[PRE21]
+```cs
+public class InputModel
+{
+    [Required]
+    [Display(Name = "Display name")]
+    public string Name { get; set; }
+    [Display(Name = "Date of birth")]
+    public DateTime DOB { get; set; }
+```
 
 你现在可以在相应的`Index.cshtml`中使用这些属性。下一个代码片段需要放置在验证摘要和用户名之间：
 
-[PRE22]
+```cs
+<div class="form-floating">
+    <input asp-for="Input.Name" class="form-control" 
+        autocomplete="name" aria-required="true" />
+    <label asp-for="Input.Name"></label>
+    <span asp-validation-for="Input.Name" 
+        class="text-danger"></span>
+</div>
+<div class="form-floating">
+    <input asp-for="Input.DOB" class="form-control" 
+         type="date"/>
+    <label asp-for="Input.DOB" class="form-label"></label>
+</div>
+```
 
 这足以显示字段，但还需要进行一些更改来填充保存的数据。在`LoadAsync`方法中，`InputModel`的实例化需要扩展到新属性：
 
-[PRE23]
+```cs
+Input = new InputModel
+{
+    PhoneNumber = phoneNumber,
+    Name = user.Name,
+    DOB = user.DOB
+};
+```
 
 当用户保存表单时，更改的值也需要保存。在`OnPostAsync`方法的倒数第三行之前放置以下代码片段：
 
-[PRE24]
+```cs
+user.Name = Input.Name;
+user.DOB = Input.DOB;
+await _userManager.UpdateAsync(user);
+```
 
 这将`InputModel`的值设置为`WebAppUser`属性，并在数据库中保存更改。
 
@@ -242,11 +349,9 @@ AUTHSAMPLE 包含一个 `Data` 文件夹，其中包含一个 Entity Framework C
 
 现在个人资料页面将看起来类似于这个：
 
-![图10.8 – 管理账户页面
+![图 10.8 – 管理账户页面![](img/Figure_10.8_B17996.jpg)
 
-![](img/Figure_10.8_B17996.jpg)
-
-图10.8 – 管理账户页面
+图 10.8 – 管理账户页面
 
 你现在可以更改显示名称并添加你的出生日期。
 
@@ -254,19 +359,27 @@ AUTHSAMPLE 包含一个 `Data` 文件夹，其中包含一个 Entity Framework C
 
 打开位于`Views/Shared`文件夹中的`_LoginPartial.cshtml`，并将前四行替换为以下代码片段：
 
-[PRE25]
+```cs
+@using Microsoft.AspNetCore.Identity
+@using AuthSample.Data
+@inject SignInManager<WebAppUser> SignInManager
+@inject UserManager<WebAppUser> UserManager
+@{
+ var user = await @UserManager.GetUserAsync(User);
+}
+```
 
 这将 `SignInManager` 和 `UserManager` 的泛型类型参数从 `IdentityUser` 类型更改为 `WebAppUser` 类型。在代码块内部，通过传递当前用户，使用 `UserManager` 加载当前的 `WebAppUser`。
 
 现在，需要将第 12 行上用户名的输出更改为写入显示名称：
 
-[PRE26]
+```cs
+Hello @user?.Name!
+```
 
 当 `dotnet watch` 仍在运行时，浏览器中运行的应用程序应该已经更新。可能你需要重新登录。现在你应该在右上角看到显示名称：
 
-![图 10.9 – 显示名称
-
-![Figure 10.9_B17996.jpg](img/Figure_10.9_B17996.jpg)
+![图 10.9 – 显示名称![Figure 10.9_B17996.jpg](img/Figure_10.9_B17996.jpg)
 
 图 10.9 – 显示名称
 

@@ -1,4 +1,4 @@
-# *第 6 章*: .NET 集合
+# *第六章*: .NET 集合
 
 集合是 .NET 的一个重要组成部分。使用这些集合的方式有很多种。Microsoft .NET 在处理数据集、数组、列表、字典、栈和队列等事物时，大量使用了数组和集合。您很难编写一个不使用集合框架的 C# 程序。使用集合和数组的不同方式在性能下降和性能提升方面有所不同。因此，了解何时使用数组以及何时使用集合将成为您 C# 和 .NET 编程技能的一个重要方面。
 
@@ -26,7 +26,7 @@
 
 +   **学习 Equals() 和 == 之间的区别**: 在本节中，您将了解不同相等运算符之间的区别，并学习何时使用一种而非另一种。
 
-+   **研究LINQ性能**：LINQ是一种C#查询语言，在处理集合时被广泛使用，但它的速度可能快或慢，这取决于你编写查询的方式。在本节中，你将学习如何基准测试执行相同类型查询的不同方式。通过这样做，你将看到不同方式编写相同查询的性能差异。
++   **研究 LINQ 性能**：LINQ 是一种 C#查询语言，在处理集合时被广泛使用，但它的速度可能快或慢，这取决于你编写查询的方式。在本节中，你将学习如何基准测试执行相同类型查询的不同方式。通过这样做，你将看到不同方式编写相同查询的性能差异。
 
 到本章结束时，你将能够做到以下几点：
 
@@ -44,7 +44,7 @@
 
 +   了解用于不同类型相等性检查的相等运算符
 
-+   提高LINQ查询性能
++   提高 LINQ 查询性能
 
 # 技术要求
 
@@ -52,11 +52,11 @@
 
 +   Visual Studio 2022
 
-+   SQL Server（任何版本）Express或更高版本
++   SQL Server（任何版本）Express 或更高版本
 
 +   SQL Server Management Studio
 
-+   本书源代码：[https://github.com/PacktPublishing/High-Performance-Programming-in-CSharp-and-.NET/tree/master/CH06](https://github.com/PacktPublishing/High-Performance-Programming-in-CSharp-and-.NET/tree/master/CH06)
++   本书源代码：[`github.com/PacktPublishing/High-Performance-Programming-in-CSharp-and-.NET/tree/master/CH06`](https://github.com/PacktPublishing/High-Performance-Programming-in-CSharp-and-.NET/tree/master/CH06)
 
 # 理解不同的集合提供
 
@@ -70,7 +70,7 @@
 
 +   **优先级**集合，例如栈或队列。优先级集合允许你以特定顺序存储和提取记录。队列使用**先进先出**（**FIFO**）顺序，而栈使用**后进先出**（**LIFO**）顺序。
 
-+   `CollectionsUtil`类，它创建忽略字符串大小写的集合，以及`ListDictionary`类，它适用于包含少于10个项目的集合。它使用单链表实现`IDictionary`。
++   `CollectionsUtil`类，它创建忽略字符串大小写的集合，以及`ListDictionary`类，它适用于包含少于 10 个项目的集合。它使用单链表实现`IDictionary`。
 
 .NET 集合框架由传统的 `System.Collections` 命名空间以及较新的 `System.Collections.Generic`、`System.Collections.Concurrent` 和 `System.Collections.Specialized` 命名空间组成。在我们深入研究集合的性能之前，重新熟悉上述每个命名空间中可用的不同集合是个好主意。
 
@@ -154,7 +154,7 @@
 
 `Partitioner` 类提供了数组、列表和可枚举分区策略。`Partitioner<Tsource>` 类提供了一种将数据源分割成多个分区的方式，而 `OrderablePartioner<Tsource>` 则将可排序的数据源分割成多个分区。
 
-`Concurrent<T>`类包含一个线程安全的对象无序列表。线程安全的FIFO集合使用`ConcurrentQueue<T>`类，而线程安全的LIFO集合使用`ConcurrentStack<T>`类。要线程安全地访问键/值对，请使用`ConcurrentDictionary<Tkey, Tvalue>`类。
+`Concurrent<T>`类包含一个线程安全的对象无序列表。线程安全的 FIFO 集合使用`ConcurrentQueue<T>`类，而线程安全的 LIFO 集合使用`ConcurrentStack<T>`类。要线程安全地访问键/值对，请使用`ConcurrentDictionary<Tkey, Tvalue>`类。
 
 有了这些，我们已经涵盖了`System.Collections.Concurrent`命名空间。现在，让我们看看`System.Collections.Specialized`命名空间。
 
@@ -168,7 +168,7 @@
 
 当集合较小时，`HybrdDictionary`类会改变其行为；当集合增长并变得较大时，它也会改变行为。它是通过在集合较小时使用`ListDictionary`实现`IDictionary`，在集合增长并变得较大时使用`Hashtable`来实现的。
 
-对于少于10个项的情况，您可以使用`ListDictionary`，它通过使用单链表实现`IDictionary`。
+对于少于 10 个项的情况，您可以使用`ListDictionary`，它通过使用单链表实现`IDictionary`。
 
 要保存集合的字符串键集合，请使用`NameObjectCollectionBase.KeysCollection`。
 
@@ -180,7 +180,7 @@
 
 要获取键和强类型字符串值的哈希表，请使用`StringDictionary`类。
 
-要在32位内存中存储布尔值或小整数，您可以使用`BitVector32`结构。您可以使用向量的`BitVector32.Section`存储整数。
+要在 32 位内存中存储布尔值或小整数，您可以使用`BitVector32`结构。您可以使用向量的`BitVector32.Section`存储整数。
 
 键/值对的索引集合由`IOrderedDictionary`接口表示。`INotifyCollectionChanged`接口用于通知监听器集合的动态更改，例如当项目被添加、修改或删除时。`NotifyCollectionChangedAction`枚举描述了导致`CollectionChanged`事件被触发的行为。
 
@@ -194,31 +194,51 @@
 
 1.  将 `Add(object item)` 方法添加到类中：
 
-    [PRE0]
+    ```cs
+    public void Add(object item)
+    {
+          InnerList.Add(item);
+    }
+    ```
 
 此方法将一个项目添加到 `InnerList` 中，这是从 `CollectionBase` 类继承而来的。
 
 1.  将 `Remove(object item)` 方法添加到类中：
 
-    [PRE1]
+    ```cs
+    public void Remove(object item)
+    {
+          InnerList.Remove(item);
+    }
+    ```
 
 此方法从继承的 `InnerList` 中移除一个项目。
 
 1.  添加 `Clear()` 方法：
 
-    [PRE2]
+    ```cs
+    public new void Clear()
+    {
+    InnerList.Clear();
+    }
+    ```
 
 此方法清除 `InnerList` 中的所有项目。
 
 1.  添加 `Count()` 方法：
 
-    [PRE3]
+    ```cs
+    public new int Count()
+    {
+          return InnerList.Count;
+    }
+    ```
 
 此方法返回 `InnerList` 中项目数量的计数。
 
 如你所见，创建自定义集合并不一定困难。我们的实现非常简单和基础。然而，这样的类可以被设计为只持有特定类型，而不是泛型对象类型。你也可以使你的类成为泛型，以便它接受实现特定接口的类。
 
-以下是由微软撰写的关于通过实现 `ICollection` 来实现自定义集合的详细文章：[https://docs.microsoft.com/troubleshoot/dotnet/csharp/implement-custom-collection.](https://docs.microsoft.com/troubleshoot/dotnet/csharp/implement-custom-collection.)
+以下是由微软撰写的关于通过实现 `ICollection` 来实现自定义集合的详细文章：[`docs.microsoft.com/troubleshoot/dotnet/csharp/implement-custom-collection.`](https://docs.microsoft.com/troubleshoot/dotnet/csharp/implement-custom-collection.)
 
 随着你阅读本章内容，你将看到集合的不同方面。你还将测量它们的性能。这样，当你创建自定义集合时，你可以为当前任务选择最有效的操作方式。
 
@@ -228,41 +248,41 @@
 
 Big O 表示法用于确定算法效率。它决定了与输入相关的时间尺度。常数时间等于 Big O 表示法值 O(1)。随时间线性扩展的数据操作，根据操作的大小，具有 Big O 表示法值 (*N*)，其中 *N* 等于正在处理的数据量。
 
-例如，如果你正在遍历数组或集合中的几个元素，你会使用O(*N*)，这是一个线性时间，其中*N*是数组或集合的大小。如果一个迭代包含如*x*和*y*这样的成对元素，其中你在迭代中遍历*x*，然后是*y*，那么你的大O表示法将是O(*N*2)。另一个场景是确定收获一块正方形土地所需的时间。这可以写成O(*a*)，其中*a*是土地面积。或者，你也可以将大O表示法写成O(*s*2)，其中*s*是一个尺寸的长度。
+例如，如果你正在遍历数组或集合中的几个元素，你会使用 O(*N*)，这是一个线性时间，其中*N*是数组或集合的大小。如果一个迭代包含如*x*和*y*这样的成对元素，其中你在迭代中遍历*x*，然后是*y*，那么你的大 O 表示法将是 O(*N*2)。另一个场景是确定收获一块正方形土地所需的时间。这可以写成 O(*a*)，其中*a*是土地面积。或者，你也可以将大 O 表示法写成 O(*s*2)，其中*s*是一个尺寸的长度。
 
-使用大O表示法时需要考虑一些规则：
+使用大 O 表示法时需要考虑一些规则：
 
-+   你的算法中的不同步骤被相加。因此，如果步骤1需要O(*a*)时间，步骤2需要O(*b*)时间，那么你的算法的大O表示法将是O(*a+b*)。
++   你的算法中的不同步骤被相加。因此，如果步骤 1 需要 O(*a*)时间，步骤 2 需要 O(*b*)时间，那么你的算法的大 O 表示法将是 O(*a+b*)。
 
-+   丢弃常数。例如，如果你算法中有两个都是常数的操作，你不需要写O(*2N*)。表示法仍然是O(*N*)。
++   丢弃常数。例如，如果你算法中有两个都是常数的操作，你不需要写 O(*2N*)。表示法仍然是 O(*N*)。
 
-+   如果你有不同的输入，这些输入是不同的变量，例如集合a和集合b，那么你的大O表示法将是O(*a*b*)。
++   如果你有不同的输入，这些输入是不同的变量，例如集合 a 和集合 b，那么你的大 O 表示法将是 O(*a*b*)。
 
-+   丢弃非主导项。所以，O(*n*2)等同于O(*n + n*2*)，等同于(*n*2*+n*2)。
++   丢弃非主导项。所以，O(*n*2)等同于 O(*n + n*2*)，等同于(*n*2*+n*2)。
 
-现在我们已经了解了大O表示法是什么以及我们可用的各种集合，让我们看看如何为我们的工作项选择正确的集合。
+现在我们已经了解了大 O 表示法是什么以及我们可用的各种集合，让我们看看如何为我们的工作项选择正确的集合。
 
 ## 选择正确的集合
 
 在内存中处理多个数据项时，性能的关键是选择正确的存储机制，以提供满足你要求的最快处理时间。以下是一系列不同类型的集合及其优势，以帮助你为正确的任务选择正确的集合：
 
-+   `Dictionary`是一个无序的集合，具有连续的存储，并且可以通过键直接访问。字典使用键的查找效率为O(1)，其操作效率也为O(1)。字典最适合用于高性能查找。
++   `Dictionary`是一个无序的集合，具有连续的存储，并且可以通过键直接访问。字典使用键的查找效率为 O(1)，其操作效率也为 O(1)。字典最适合用于高性能查找。
 
-+   `HashSet`是无序的，具有连续的存储，并且可以通过键直接访问。使用键的查找效率为O(1)，操作效率为O(1)。`HashSet`是一个独特的无序集合，称为`Dictionary`，除了键和值是同一个对象。
++   `HashSet`是无序的，具有连续的存储，并且可以通过键直接访问。使用键的查找效率为 O(1)，操作效率为 O(1)。`HashSet`是一个独特的无序集合，称为`Dictionary`，除了键和值是同一个对象。
 
-+   `LinkedList`允许用户完全控制其顺序，没有连续的存储，并且不能直接访问。它的查找效率值为O(*n*)，操作效率为O(1)。当你需要插入或删除项目且不需要直接访问时，最好使用列表。
++   `LinkedList`允许用户完全控制其顺序，没有连续的存储，并且不能直接访问。它的查找效率值为 O(*n*)，操作效率为 O(1)。当你需要插入或删除项目且不需要直接访问时，最好使用列表。
 
-+   `List`允许用户完全控制其顺序，具有连续的存储，并且可以通过索引直接访问。使用索引的查找效率为O(1)，使用值的查找效率为O(*n*)。其操作效率为O(*n*)。当需要直接访问、列表较小且不需要排序时，最好使用此列表。
++   `List`允许用户完全控制其顺序，具有连续的存储，并且可以通过索引直接访问。使用索引的查找效率为 O(1)，使用值的查找效率为 O(*n*)。其操作效率为 O(*n*)。当需要直接访问、列表较小且不需要排序时，最好使用此列表。
 
-+   `Queue`根据FIFO排序，具有连续存储，并且只能从队列的前端直接访问。它在队列前端具有O(1)的查找效率，操作索引为O(1)。它基本上与`List<T>`相同，只是它只使用FIFO进行处理。
++   `Queue`根据 FIFO 排序，具有连续存储，并且只能从队列的前端直接访问。它在队列前端具有 O(1)的查找效率，操作索引为 O(1)。它基本上与`List<T>`相同，只是它只使用 FIFO 进行处理。
 
-+   `SortedDictionary`是有序的，没有连续存储，并且可以使用键直接访问。它使用键的查找效率为O(*log n*)，操作效率为O(*log n*)。这个集合在速度和排序之间做出了权衡，并使用二叉搜索树。
++   `SortedDictionary`是有序的，没有连续存储，并且可以使用键直接访问。它使用键的查找效率为 O(*log n*)，操作效率为 O(*log n*)。这个集合在速度和排序之间做出了权衡，并使用二叉搜索树。
 
-+   `SortedList`是有序的，具有连续存储，并且可以通过键直接访问。它使用键的查找效率为O(*log n*)，操作效率为O(*n*)。树作为数组实现，这使得在预加载数据上的查找更快，但在加载时较慢。
++   `SortedList`是有序的，具有连续存储，并且可以通过键直接访问。它使用键的查找效率为 O(*log n*)，操作效率为 O(*n*)。树作为数组实现，这使得在预加载数据上的查找更快，但在加载时较慢。
 
-+   `SortedSet`是有序的，没有连续存储，并且可以通过键直接访问。它使用键的查找效率为O(*log n*)，操作效率为O(*log n*)。它是一个独特的有序集合，类似于`SortedDictionary`，但键和值是相同的对象。
++   `SortedSet`是有序的，没有连续存储，并且可以通过键直接访问。它使用键的查找效率为 O(*log n*)，操作效率为 O(*log n*)。它是一个独特的有序集合，类似于`SortedDictionary`，但键和值是相同的对象。
 
-+   `Stack`根据LIFO排序，具有连续存储，并且只能从堆栈的顶部直接访问。它具有O(1)的顶部项查找效率，操作效率为O(1)*。它基本上与`List<T>`相同，只是它只使用LIFO进行处理。
++   `Stack`根据 LIFO 排序，具有连续存储，并且只能从堆栈的顶部直接访问。它具有 O(1)的顶部项查找效率，操作效率为 O(1)*。它基本上与`List<T>`相同，只是它只使用 LIFO 进行处理。
 
     注意
 
@@ -272,7 +292,7 @@ Big O 表示法用于确定算法效率。它决定了与输入相关的时间�
 
 # 设置我们的示例数据库
 
-在本章中，我们将演示不同的集合接口如何处理数据之间的差异。为了我们的演示，我们需要访问数据库数据。为此，我们将创建一个数据库，向其中添加一个表，并用数据填充它。我们将使用SQL Server作为我们的数据库引擎，并使用SQL Server Management Studio来开发我们的示例数据库。
+在本章中，我们将演示不同的集合接口如何处理数据之间的差异。为了我们的演示，我们需要访问数据库数据。为此，我们将创建一个数据库，向其中添加一个表，并用数据填充它。我们将使用 SQL Server 作为我们的数据库引擎，并使用 SQL Server Management Studio 来开发我们的示例数据库。
 
 要添加我们的数据库，请按照以下步骤操作：
 
@@ -280,15 +300,13 @@ Big O 表示法用于确定算法效率。它决定了与输入相关的时间�
 
 1.  在**对象资源管理器**中的**数据库**文件夹上右键单击，如下面的截图所示：
 
-![图6.1 – SQL Server Management Studio – 对象资源管理器
+![图 6.1 – SQL Server Management Studio – 对象资源管理器](img/B16617_Figure_6.1.jpg)
 
-](img/B16617_Figure_6.1.jpg)
-
-图6.1 – SQL Server Management Studio – 对象资源管理器
+图 6.1 – SQL Server Management Studio – 对象资源管理器
 
 1.  从上下文菜单中选择**新建数据库**。这将显示**新建数据库**对话框，如下面的截图所示：
 
-![图6.2 – SQL Server Management Studio – 新建数据库对话框
+![图 6.2 – SQL Server Management Studio – 新建数据库对话框
 
 ![img/B16617_Figure_6.2.jpg]
 
@@ -324,61 +342,153 @@ Big O 表示法用于确定算法效率。它决定了与输入相关的时间�
 
 1.  在 `ConcreteVsInterface` 文件夹中，添加 `ITax` 接口：
 
-    [PRE4]
+    ```cs
+    internal interface ITax
+    {
+          int Id { get; set; }
+          TaxType TaxType { get; set; }
+          TaxRate TaxRate { get; set; }
+          decimal LowerLimit { get; set; }
+          decimal UpperLimit { get; set; }
+          decimal Percentage { get; set; }
+          decimal Calculate(decimal amount);
+    }
+    ```
 
 此接口定义了一个合同，各种具体税类都必须遵守。它强制执行影响分析，因为此接口的更改将影响所有实现它的类。
 
 1.  接下来，添加 `BaseTax` 类：
 
-    [PRE5]
+    ```cs
+    internal abstract class BaseTax : ITax
+    {
+        public int Id { get; set; }
+        public TaxType TaxType { get; set; }
+        public TaxRate TaxRate { get; set; }
+        public decimal LowerLimit { get; set; }
+        public decimal UpperLimit { get; set; }
+        public decimal Percentage { get; set; }
+        public abstract decimal Calculate(decimal amount);
+    }
+    ```
 
 这个抽象类实现了 `ITax` 接口，但将 `Calculate(decimal amount)` 标记为抽象，因此其实现留给子类。
 
 1.  现在，添加 `TaxRate` 枚举：
 
-    [PRE6]
+    ```cs
+    using System;
+    [Flags]
+    internal enum TaxRate
+    {
+        TaxFreePersonalAllowance,
+        StarterRate,
+        BasicRate,
+        IntermediateRate,
+        HigherRate,
+        AdditionalRate
+    }
+    ```
 
 `TaxRate` 枚举提供了英国所得税的不同税率类型。
 
 1.  添加 `TaxType` 枚举：
 
-    [PRE7]
+    ```cs
+    [Flags]
+    internal enum TaxType
+    {
+        CorporationTax,
+        ValueAddedTax,
+        IncomeTax,
+        NationInsuranceContributions,
+        ExciseDuties,
+        RoadTax,
+        StampDuty
+    }
+    ```
 
 `TaxType` 接口提供了不同种类的英国税收。添加 `BaseRate` 类。这个类将继承自 `BaseTax` 类。
 
 1.  然后，添加以下构造函数：
 
-    [PRE8]
+    ```cs
+    public BasicRate()
+    {
+        this.LowerLimit = 14550M;
+        this.UpperLimit = 24944M;
+        this.TaxType = TaxType.IncomeTax;
+        this.TaxRate = TaxRate.BasicRate;
+        this.Percentage = 0.2M;
+    }
+    ```
 
 此构造函数将 `BaseClass` 中包含的属性设置为适用于基本税率所得税的值。
 
 1.  现在，实现 `Calculate(decimal amount)` 方法：
 
-    [PRE9]
+    ```cs
+    public override decimal Calculate(decimal amount)
+    {
+          if (Percentage > 1)
+                throw new Exception("Invalid percentage. 
+                    Percentage must be between 0 and 1.");
+    if (amount < LowerLimit & amount > UpperLimit)
+        return 0;
+    return Percentage * amount;
+    }
+    ```
 
 此方法检查百分比是否小于一，如果不小于一则抛出异常。检查个人应税收入的下限和上限。如果金额超出此范围，则返回零。然后返回应税收入的税额，并退出方法。
 
 1.  添加一个名为 `TaxMan` 的新类：
 
-    [PRE10]
+    ```cs
+    using BenchmarkDotNet.Attributes;
+    using BenchmarkDotNet.Engines;
+    using BenchmarkDotNet.Order;
+    using CH06_Collections.Linq;
+    using System.Collections.Generic;
+    using System.Threading;
+    [MemoryDiagnoser]
+    [Orderer(SummaryOrderPolicy.FastestToSlowest)]
+    [RankColumn]
+    public class TaxMan { }
+    ```
 
 我们班级现在已配置为使用 `BenchmarkDotNet` 进行基准测试。
 
 1.  添加以下方法：
 
-    [PRE11]
+    ```cs
+    [Benchmark]
+    public void BasicRateInterface()
+    {
+          IList<BasicRate> basicRate = new 
+              List<BasicRate>();
+    }
+    ```
 
 `BasicRateInterface()` 方法使用 `IList` 接口声明了一个 `BasicRate` 对象的列表。
 
 1.  添加 `BasicRateConcrete()` 方法：
 
-    [PRE12]
+    ```cs
+    [Benchmark]
+    public void BasicRateConcrete()
+    {
+          List<BasicRate> basicRate = new 
+              List<BasicRate>();
+    }
+    ```
 
 `BasicRateConcrete()` 方法使用具体的 `List` 类声明了一个 `BasicRate` 对象的列表。
 
 1.  在 `Program` 类中，注释掉 `Main` 方法中的代码，并添加以下代码行：
 
-    [PRE13]
+    ```cs
+    BenchmarkRunner.Run<TaxMan>();
+    ```
 
 这行代码将运行我们的基准测试。进行发布构建，然后从命令行运行可执行文件。您应该看到以下输出或类似内容：
 
@@ -438,75 +548,151 @@ Big O 表示法用于确定算法效率。它决定了与输入相关的时间�
 
 1.  在项目根目录下添加一个名为 `ArraysVsCollections` 的新类，并包含以下 `using` 语句：
 
-    [PRE14]
+    ```cs
+    using BenchmarkDotNet.Attributes;
+    using BenchmarkDotNet.Order;
+    using System;
+    using System.Collections;
+    using System.Collections.Generic;
+    using System.Linq;
+    ```
 
 这些 `using` 语句为我们提供了与数组和集合一起工作以及基准测试它们所需的内容。
 
 1.  添加以下成员变量：
 
-    [PRE15]
+    ```cs
+    private int[] array;
+    private List<int> collection;
+    ```
 
 `int` 数组和 `int` 列表将被用来基准测试添加、获取和迭代数组和集合。
 
 1.  接下来，添加 `GlobalSetup()` 方法：
 
-    [PRE16]
+    ```cs
+    [GlobalSetup]
+    public void GlobalSetup()
+    {
+    array = new int[1000];
+    collection = new List<int>(1000);
+    for (int i = 0; i < 1000; i++)
+    {
+        array[i] = i;
+        collection.Add(i);
+    }
+    }
+    ```
 
 `GlobalSetup()` 方法被 `[GlobalSetup]` 属性标记。这通知 `BenchmarkDotNet` 在所有其他基准方法之前运行此方法。它使用大小为 `1000` 的数组集合初始化，并将当前迭代中的 `i` 值添加到数组和集合中。
 
 1.  虽然我们不会使用 `GlobalCleanup()` 方法，但我们添加它以保持完整性，这样您就知道如何在基准测试时执行清理操作：
 
-    [PRE17]
+    ```cs
+    [GlobalCleanup]
+    public void GlobalCleanup()
+    {
+    // Disposing logic
+    }
+    ```
 
 `GlobalCleanup()` 方法是您提供清理逻辑的地方，如果需要的话。
 
 1.  现在，添加 `ArrayAdd1000Logic()` 方法：
 
-    [PRE18]
+    ```cs
+    [Benchmark]
+    public void ArrayAdd1000Logic1()
+    {
+    int[] list = new int[1000];
+    for (int i = 0; i < 1000; i++)
+    {
+        list[i] = i;
+    }
+    }
+    ```
 
 `ArrayAdd1000Logic()` 方法声明了一个包含 1000 个 `int` 值的数组，随后对数组中的每个元素添加整数值。
 
 1.  添加 `CollectionAdd1000Logic()` 方法：
 
-    [PRE19]
+    ```cs
+    [Benchmark]
+    public void CollectionAdd1000Logic()
+    {
+    Ilist<int> list = new new List<int>();
+    for (int i = 0; i < 1000; i++)
+          list.Add(i)
+    }
+    ```
 
 `CollectionAdd1000Logic()` 方法声明了一个 `int` 元素列表。然后，它使用 `for` 循环循环 1,000 次，并将当前值添加到集合中。
 
 1.  添加 `ArrayIterationLogic()` 方法：
 
-    [PRE20]
+    ```cs
+    [Benchmark]
+    public int ArrayIterationLogic()
+    {
+    int res = 0;
+    for (int i = 0; i < 1000; i++)
+        res += array[i];
+    return res;
+    }
+    ```
 
 `ArrayIterationLogic()` 方法声明了一个 `int` 变量，并将其赋值为 `0`。使用 `for` 循环迭代 1,000 次，并将数组在索引位置上的值添加到 `res` 值中。一旦迭代完成，返回 `res` 变量。
 
 1.  现在，添加 `CollectionIterationLogic()` 方法：
 
-    [PRE21]
+    ```cs
+    [Benchmark]
+    public int CollectionIterationLogic()
+    {
+    int res = 0;
+    for (int i = 0; i < 1000; i++)
+        res += collection[i];
+    return res;
+    }
+    ```
 
 `CollectionIterationLogic()` 声明了一个 `int` 变量，并将其赋值为 `0`。使用 `for` 循环迭代 1,000 次，并将数组在索引位置上的值添加到 `res` 值中。一旦迭代完成，返回 `res` 变量。
 
 1.  添加 `ArrayGetElement500Logic()` 方法：
 
-    [PRE22]
+    ```cs
+    [Benchmark]
+    public int ArrayGetElement500Logic()
+    {
+    return array[500];
+    }
+    ```
 
 `ArrayGetElement500Logic()` 方法返回数组在位置 `500` 的值。
 
 1.  现在，添加 `CollectionGetElement500Logic()` 方法：
 
-    [PRE23]
+    ```cs
+    [Benchmark]
+    public int CollectionGetElement500Logic()
+    {
+    return collection[500];
+    }
+    ```
 
 `CollectionGetElement500Logic()`方法返回集合在位置`500`的值。
 
 1.  将`Main`方法中的代码替换为以下代码行：
 
-    [PRE24]
+    ```cs
+    BenchmarkRunner.Run<ArraysVsCollections>();
+    ```
 
 这个调用将运行我们的基准测试。发布构建您的代码，并在控制台运行它。您应该会看到一个与以下截图相似的报告：
 
-![图6.4 – BenchmarkDotNet对数组和集合操作的总结报告
+![图 6.4 – BenchmarkDotNet 对数组和集合操作的总结报告](img/B16617_Figure_6.4.jpg)
 
-](img/B16617_Figure_6.4.jpg)
-
-图6.4 – BenchmarkDotNet对数组和集合操作的总结报告
+图 6.4 – BenchmarkDotNet 对数组和集合操作的总结报告
 
 从时间性能的角度来看，向数组中添加项目比向集合中添加项目更快。遍历集合比遍历数组更快，并且通过索引从数组中获取项目比通过索引从集合中获取集合更快。基于这些发现，您需要决定您的需求是什么，然后根据这些需求选择最佳类型。
 
@@ -520,41 +706,92 @@ Big O 表示法用于确定算法效率。它决定了与输入相关的时间�
 
 1.  添加一个名为`Indexers`的新类，并将`using`语句添加到`System`命名空间。然后，在类的顶部添加以下数组和构造函数：
 
-    [PRE25]
+    ```cs
+    private string[] _items;
+    public Indexers(int size)
+    {
+          _items = new string[size];
+    }
+    ```
 
 `_items`数组将包含几个字符串。数组的大小由传递给构造函数并初始化数组的值设置。
 
 1.  添加索引器以通过索引获取字符串：
 
-    [PRE26]
+    ```cs
+    public string this[int index]
+    {
+      get
+    {
+        if (IsValidIndex(index))
+            return _items[index];
+        else
+            return string.Empty;
+    }
+      set
+    {
+        if (IsValidIndex(index))
+            _items[index] = value;
+    }
+    } 
+    ```
 
 此索引器使用一个`int`值从数组中获取一个项目并设置给定索引处的数组值。只有当索引有效时，才会设置和检索项目。
 
 1.  我们可以通过将其传递到`IsValidIndex(int index)`方法中来检查索引，该方法返回一个`bool`。让我们添加`IsValidIndex(int index)`方法：
 
-    [PRE27]
+    ```cs
+    private bool IsValidIndex(int index)
+    {
+        return index > -1 && index < _items.Length;
+    }
+    ```
 
-此方法如果索引大于-1且小于数组的长度，则返回`true`。否则，返回`false`。
+此方法如果索引大于-1 且小于数组的长度，则返回`true`。否则，返回`false`。
 
 1.  现在，添加一个接受`string`并返回字符串索引的索引：
 
-    [PRE28]
+    ```cs
+    public int this[string item]
+    {
+      get
+    {
+        return Array.IndexOf(_items, item);
+    }
+    }
+    ```
 
 此索引器接受一个`string`。然后，它查找字符串的索引并返回索引。此索引没有设置器。
 
 1.  在`Program`类中添加`IndexerExample()`方法：
 
-    [PRE29]
+    ```cs
+    public static void IndexerExample()
+    {
+          Indexers indexers = new Indexers(1000);
+          for (int i = 0; i < 1000; i++)
+                indexers[i] = $"Item {i}";
+    Console.WriteLine($"The item at position 500 is 
+         \"{indexers[500]}\".");
+    Console.WriteLine($"The index of \"Item 500\" is 
+         {indexers["Item 500"]}.");
+    }
+    ```
 
-此方法创建一个新的`Indexer`对象，其内部数组大小为`1000`。然后，它循环1,000次并设置数组中每个元素的值。之后，它打印出数组位置500的值，并打印出`Item 500`的值。
+此方法创建一个新的`Indexer`对象，其内部数组大小为`1000`。然后，它循环 1,000 次并设置数组中每个元素的值。之后，它打印出数组位置 500 的值，并打印出`Item 500`的值。
 
 1.  在`Main`方法中注释掉代码，然后添加以下行：
 
-    [PRE30]
+    ```cs
+    IndexerExample();
+    ```
 
 这个语句调用了执行我们的`Indexer`方法的函数。你应该看到以下输出：
 
-[PRE31]
+```cs
+The item at position 500 is "Item 500".
+The index of "Item 500" is 500.
+```
 
 这就结束了我们对索引器的探讨。正如你所见，它们相当简单。你可以为索引器使用任何你喜欢的数据项。然而，如何评估这些索引器的性能将取决于你。现在，让我们看看`IEnumerable`和`IEnumerator`接口之间的区别。
 
@@ -570,37 +807,80 @@ Big O 表示法用于确定算法效率。它决定了与输入相关的时间�
 
 1.  添加一个名为`IEnumerableVsIEnumerable`的新类，并包含以下`using`语句：
 
-    [PRE32]
+    ```cs
+        using BenchmarkDotNet.Attributes;
+        using BenchmarkDotNet.Running;
+        using System;
+        using System.Collections;
+        using System.Collections.Generic;
+        using System.Diagnostics;
+    ```
 
 这些`using`语句提供了我们将需要构建和测试`IEnumerable`和`IEnumerator`性能的元素。
 
 1.  将以下代码添加到类中：
 
-    [PRE33]
+    ```cs
+    private List<int> _years;
+    public IEnumerableVsIEnumerator()
+    {
+      _years = new List<int> { 1970, 1971, 1972, 1973, 1974, 
+          1975, 1976, 1977, 1978, 1979 };
+    }
+    ```
 
 在这里，我们声明了一个`int`值的列表，它将包含几个年份值。然后我们的构造函数初始化数组，包含年份`1970`到`1979`。
 
 1.  添加`IterateEnumerator1970to1975()`方法：
 
-    [PRE34]
+    ```cs
+    public void IterateEnumerator1970To1975()
+    {
+      var years = _years.GetEnumerator();
+      while (years.MoveNext())
+    {
+        Debug.WriteLine(years.Current);
+        if (years.Current > 1975)
+            IterateEnumberator1976To1979(years);
+    }
+    }
+    ```
 
 此方法遍历值`1970`到`1975`并将值打印到调试窗口。
 
 1.  如果当前年份大于`1975`，则枚举器将被传递到`IterateEnumerator1976To1979(IEnumerator<int> years)`方法中，我们将在下面添加它：
 
-    [PRE35]
+    ```cs
+    public void IterateEnumberator1976To1979
+        (IEnumerator<int> years)
+    {
+    while (years.MoveNext())
+    {
+        Debug.WriteLine(years.Current);
+    }
+    }
+    ```
 
 此方法接受一个枚举器并遍历它。在每次迭代中，它将当前年份打印到调试窗口。
 
 1.  在`Program`类的`Main`方法末尾添加以下行：
 
-    [PRE36]
+    ```cs
+    IEnumerableVsIEnumeratorExample();
+    ```
 
 这行代码调用一个方法，该方法将运行我们的示例并展示枚举器如何记住迭代中的位置。
 
 1.  将`IEnumerableVsIEnumeratorExample()`方法添加到`Program`类中：
 
-    [PRE37]
+    ```cs
+    private static void IEnumerableVsIEnumeratorExample()
+    {
+      IEnumerableVsIEnumerator eve = new 
+        IEnumerableVsIEnumerator();
+      eve.IterateEnumerator1970To1975();
+    }
+    ```
 
 此方法运行我们的代码。如果你进行调试构建并运行代码，那么你应该看到年份*1970*到*1979*被打印到输出窗口。
 
@@ -608,31 +888,49 @@ Big O 表示法用于确定算法效率。它决定了与输入相关的时间�
 
 1.  添加`BenchmarkIEnumerabled()`方法：
 
-    [PRE38]
+    ```cs
+    [Benchmark]
+    public void BenchmarkIEnumerable()
+    {
+      IEnumerable<int> enumerable = IEnumerable<int>)_years;
+      foreach (int i in enumerable)
+          Debug.WriteLine(i);
+    }
+    ```
 
 此方法使用可枚举和`foreach`循环遍历年份并将它们写入调试窗口。
 
 1.  添加`BenchmarkIEnumerator()`方法：
 
-    [PRE39]
+    ```cs
+    [Benchmark]
+    public void BenchmarkIEnumerator()
+    {
+      IEnumerator<int> enumerator = _years.GetEnumerator();
+      while (enumerator.MoveNext())
+          Debug.WriteLine(enumerator.Current);
+    }
+    ```
 
 此方法使用枚举器和`while`循环遍历年份并将它们写入调试窗口。
 
 1.  在`Program`类的`Main`方法中注释掉代码，然后添加以下行：
 
-    [PRE40]
+    ```cs
+    BenchmarkRunner.Run<IEnumerableVsIEnumerator>();
+    ```
 
 这行代码检测我们的基准测试并运行它们，以生成性能总结报告。进行发布构建并从命令提示符运行程序。你应该看到以下输出：
 
-![图6.5 – BenchmarkDotNet总结报告显示IEnumerator比IEnumerable快](img/B16617_Figure_6.5.jpg)
+![图 6.5 – BenchmarkDotNet 总结报告显示 IEnumerator 比 IEnumerable 快](img/B16617_Figure_6.5.jpg)
 
 is faster than IEnumerable
 
 ](img/B16617_Figure_6.5.jpg)
 
-图6.5 – BenchmarkDotNet总结报告显示IEnumerator比IEnumerable快
+图 6.5 – BenchmarkDotNet 总结报告显示 IEnumerator 比 IEnumerable 快
 
-如我们所见，尽管`IEnumerable`和`IEnumerator`都在相同的集合上执行迭代，但它们以不同的方式执行。通过查看基准测试总结报告，我们可以看到在性能方面，`IEnumerator`接口是明显的赢家。现在，让我们看看`IEnumerable`、`IEnumerator`和`IQueryable`之间的区别，以及这些差异在执行数据库上的LINQ查询时的性能影响。
+如我们所见，尽管`IEnumerable`和`IEnumerator`都在相同的集合上执行迭代，但它们以不同的方式执行。通过查看基准测试总结报告，我们可以看到在性能方面，`IEnumerator`接口是明显的赢家。现在，让我们看看`IEnumerable`、`IEnumerator`和`IQueryable`之间的区别，以及这些差异在执行数据库上的 LINQ 查询时的性能影响。
 
 # 数据库查询性能
 
@@ -672,25 +970,59 @@ is faster than IEnumerable
 
 1.  更新你的 `secrets.json` 文件，包含我们在这章开头创建的数据库的连接字符串：
 
-    [PRE41]
+    ```cs
+    {
+      "DatabaseSettings": {
+        "ConnectionString": "YOUR_CONNECTION_STRING"
+      }
+    }
+    ```
 
 这个连接字符串将用于连接到我们的数据库，执行返回一些数据的查询，并允许我们遍历这些数据并对它进行操作。
 
 1.  添加一个名为 `Configuration` 的文件夹。在该文件夹中，添加一个名为 `SecretsManager` 的类，它有一个空的静态构造函数和以下 `using` 语句：
 
-    [PRE42]
+    ```cs
+    using Microsoft.Extensions.Configuration;
+    using System;
+    using System.IO;
+    ```
 
 我们需要这些 `using` 语句来进行文件 I/O 和系统配置，例如从 `secrets.json` 文件中获取密钥。
 
 1.  在 `SecretsManager` 类的顶部添加以下行：
 
-    [PRE43]
+    ```cs
+    public static IConfigurationRoot Configuration { get; 
+        set; }
+    ```
 
 这行代码声明了我们的静态配置属性，它用于在我们的应用程序中获取配置数据。
 
 1.  现在，添加以下代码：
 
-    [PRE44]
+    ```cs
+    public static T GetSecrets<T>(string sectionName) 
+        where T : class
+    {
+    var devEnvironmentVariable = Environment
+        .GetEnvironmentVariable("NETCORE_ENVIRONMENT");
+    var isDevelopment = string.IsNullOrEmpty
+        (devEnvironmentVariable) || devEnvironmentVariable
+            .ToLower() == "development";
+    var builder = new ConfigurationBuilder()    
+        .SetBasePath(Directory.GetCurrentDirectory())
+    .AddJsonFile("appsettings.json", optional: true, 
+        reloadOnChange: true)
+    .AddEnvironmentVariables();
+    if (isDevelopment) //only add secrets in development
+    {
+        builder.AddUserSecrets<T>();
+    }
+    Configuration = builder.Build();
+    return Configuration.GetSection(sectionName).Get<T>();
+    }
+    ```
 
 这段代码获取 .NET Core 环境的环境变量。然后，它获取代码以查看它是否在软件开发环境中运行。配置是为它将要运行的环境构建的。如果我们处于开发状态，那么我们必须添加由 `T` 变量定义的 `secrets` 类。切换到 `Models` 文件夹中的 `Product` 类。
 
@@ -698,75 +1030,182 @@ is faster than IEnumerable
 
 1.  将 `DatabaseSettings` 类添加到 `Configuration` 文件夹：
 
-    [PRE45]
+    ```cs
+    public class DatabaseSettings
+    {
+        public string ConnectionString { get; set; }
+    }
+    ```
 
 这个类有一个名为 `ConnectionString` 的单个属性，它将保存我们到 `SampleData` 数据库的连接字符串。注意，类的名称和属性的名称与 JSON 部分的名称和属性名称相匹配！
 
 1.  现在，将 `appsettings.json` 添加到项目的根目录，并包含以下内容：
 
-    [PRE46]
+    ```cs
+    {
+      "DatabaseSettings": {
+        "ConnectionString": "Set in Azure. For 
+            development, set in User Secrets"
+      }
+    }
+    ```
 
-此文件包含与`secrets.json`文件和`DatabaseSettings`类相同的布局。此文件用于存储我们的连接字符串。在开发中，它设置在我们的`secrets`文件中，而在生产中，它设置在Azure中。现在我们已经设置了数据库配置，我们可以添加我们的基准测试代码。
+此文件包含与`secrets.json`文件和`DatabaseSettings`类相同的布局。此文件用于存储我们的连接字符串。在开发中，它设置在我们的`secrets`文件中，而在生产中，它设置在 Azure 中。现在我们已经设置了数据库配置，我们可以添加我们的基准测试代码。
 
 1.  在项目的根目录中添加一个名为`DatabaseQueryAndIteration`的新类，该类实现`IDisposable`，代码如下：
 
-    [PRE47]
+    ```cs
+    using BenchmarkDotNet.Attributes;
+    using BenchmarkDotNet.Order;
+    using CH06_Collections.Configuration;
+    using CH06_Collections.Data;
+    using CH06_Collections.Models;
+    using Microsoft.Extensions.Options;
+    using System;
+    using System.Collections.Generic;
+    using System.Diagnostics;
+    using System.Linq;
+    [MemoryDiagnoser]
+    [Orderer(SummaryOrderPolicy.Declared)]
+    [RankColumn]
+    public class DatabaseQueryAndIteration : IDisposable 
+    {
+    }
+    ```
 
 此代码声明我们的类并定义了它实现`IDisposable`的事实。它也被配置为可进行基准测试。
 
 1.  在我们的类中实现`IDisposable`接口：
 
-    [PRE48]
+    ```cs
+    private bool disposedValue;
+    protected virtual void Dispose(bool disposing)
+    {
+        if (!disposedValue) {
+            if (disposing)
+                _context.Dispose();
+            disposedValue = true;
+        }
+    }
+    public void Dispose(){
+        Dispose(disposing: true);
+        GC.SuppressFinalize(this);
+    }
+    ```
 
 此代码释放我们的托管资源并抑制对类终结器方法的调用。
 
 1.  我们已经准备好对类中的方法进行基准测试，访问数据库资源，并在自己之后进行清理。将以下代码添加到类中：
 
-    [PRE49]
+    ```cs
+    private DatabaseContext _context;
+    [GlobalSetup]
+    public void GlobalSetup()
+    {
+        var connectionString = SecretsManager.
+            GetSecrets<DatabaseSettings>(nameof
+              (DatabaseSettings)).ConnectionString;
+    _context = new DatabaseContext(connectionString);
+    }
+    [GlobalCleanup]
+    public void GlobalCleanup()
+    {
+            Dispose(true);
+    }
+    ```
 
 `_`变量`context`为我们提供了数据库访问。`GlobalSetup()`方法从我们的秘密文件中获取连接字符串，并使用安全存储的连接字符串创建一个新的`DatabaseContext`。`GlobalSetup()`方法将在基准测试之前运行。`GlobalCleanup()`方法在基准测试完成后调用`Dispose(disposing)`方法来清理我们的托管资源。
 
 1.  接下来，添加`QueryDb()`方法：
 
-    [PRE50]
+    ```cs
+    [Benchmark]
+    public void QueryDb()
+    {
+        var products = (from p in _context.Products
+                        where p.Id > 1 select p);
+    foreach (var product in products)
+        Debug.WriteLine(product.Name);
+    }
+    ```
 
-`QueryDb()`方法通过选择ID大于`1`的产品对数据库执行简单的LINQ查询。然后，它迭代`lQueryable<Product>`列表中的每个产品，并将产品名称写入调试窗口。
+`QueryDb()`方法通过选择 ID 大于`1`的产品对数据库执行简单的 LINQ 查询。然后，它迭代`lQueryable<Product>`列表中的每个产品，并将产品名称写入调试窗口。
 
 1.  现在，添加`QueryDbAsList()`方法：
 
-    [PRE51]
+    ```cs
+    [Benchmark]
+    public void QueryDbAsList()
+    {
+    List<Product> products = (from p in _context.Products
+    where p.Id > 1
+    select p).ToList<Product>();
+    foreach (var product in products)
+    Debug.WriteLine(product.Name);
+    }
+    ```
 
 `QueryDbAsList()`执行与`QueryDb()`相同的查询，但处理类型为`List<Product>`类型。
 
 1.  添加`QueryDbAsIEnumerable()`方法：
 
-    [PRE52]
+    ```cs
+    [Benchmark]
+    public void QueryDbAsIEnumerable()
+    {
+    var products = (from p in _context.Products
+                    where p.Id > 1
+                    select p).AsEnumerable<Product>();
+    foreach (var product in products)
+        Debug.WriteLine(product.Name);
+    }
+    ```
 
 `QueryDbAsIEnumerable()`方法执行与`QueryDbAsList`相同的查询，但处理类型为`Ienumerable<Product>`类型。
 
 1.  添加`QueryDbAsIEnumerator()`方法：
 
-    [PRE53]
+    ```cs
+    [Benchmark]
+    public void QueryDbAsIEnumerator()
+    {
+          var products = (from p in _context.Products
+                    where p.Id > 1
+                    select p).GetEnumerator();
+    while (products.MoveNext())
+        Debug.WriteLine(products.Current.Name);
+    }
+    ```
 
 `QueryDbAsIEnumerator()`与前面的方法执行相同，但操作`IEnumerator<Product>`类型，并使用`while`循环而不是`foreach`循环进行迭代。
 
 1.  本类中的最后一个方法是`QueryDbAsIQueryable()`方法：
 
-    [PRE54]
+    ```cs
+    [Benchmark]
+    public void QueryDbAsIQueryable()
+    {
+    var products = (from p in _context.Products
+                    where p.Id > 1
+                    select p).AsQueryable<Product>();
+    foreach (var product in products)
+        Debug.WriteLine(product.Name);
+    }
+    ```
 
 此方法与`QueryDb`相同，但明确操作`IQueryable<Product>`类型。
 
 1.  将`Program`类中的`Main`方法中的代码替换为以下代码：
 
-    [PRE55]
+    ```cs
+    BenchmarkRunner.Run<DatabaseQueryAndIteration>();
+    ```
 
 此代码运行我们的基准测试。进行代码的发布构建并从命令行运行可执行文件。你应该看到类似于以下摘要报告：
 
-![图6.7 – 使用LINQ的各种数据库查询类型的不同时间和内存分配
+![图 6.7 – 使用 LINQ 的各种数据库查询类型的不同时间和内存分配![img/B16617_Figure_6.7.jpg](img/B16617_Figure_6.7.jpg)
 
-![img/B16617_Figure_6.7.jpg](img/B16617_Figure_6.7.jpg)
-
-图6.7 – 使用LINQ的各种数据库查询类型的不同时间和内存分配
+图 6.7 – 使用 LINQ 的各种数据库查询类型的不同时间和内存分配
 
 在内存使用方面，表现最差的是 `QueryDb()` 方法，其次是 `QueryDbAsList()` 方法。`QueryDbAsIEnumerable()` 和 `QueryDbAsIQueryable()` 都比前两种略好。然而，在所有五种方法中，就内存分配而言，表现最好的方法是 `QueryDbAsIEnumerator()` 方法。
 
@@ -800,101 +1239,227 @@ is faster than IEnumerable
 
 1.  将一个名为 `Yield` 的新类添加到项目的根目录：
 
-    [PRE56]
+    ```cs
+    using BenchmarkDotNet.Attributes;
+    using BenchmarkDotNet.Order;
+    using System;
+    using System.Collections.Generic;
+    [MemoryDiagnoser]
+    [Orderer(SummaryOrderPolicy.Declared)]
+    [RankColumn]
+    public class Yield { }
+    ```
 
 这个类将基准测试 `yield` 关键字的用法。
 
 1.  现在，添加 `YieldSample()` 方法：
 
-    [PRE57]
+    ```cs
+    public void YieldSample()
+    {
+    DoCountdown();
+    PrintMonthsOfYear();
+    DoBreakIteration();
+    }
+    ```
 
 `YieldSample()` 方法将从我们的 `Program` 类中调用。它将运行所有三个方法。
 
 1.  添加 `Countdown()` 方法：
 
-    [PRE58]
+    ```cs
+    private IEnumerable<int> Countdown()
+    {
+          for (int x = 10; x >= 0; x--)
+          yield return x;
+    }
+    ```
 
 这个方法从 `10` 循环到 `0`。每次迭代都使用 `yield` 关键字返回。
 
 1.  添加 `DoCountdown()` 方法：
 
-    [PRE59]
+    ```cs
+    private void DoCountdown()
+    {
+    foreach (int x in Countdown())
+        Console.WriteLine(x);
+    }
+    ```
 
 `DoCountdown()` 方法将 `10` 到 `0` 的倒计时打印到控制台窗口。
 
 1.  添加一个名为 `Month` 的类：
 
-    [PRE60]
+    ```cs
+    internal class Month
+    {
+          public string Name { get; set; }
+          public int MonthOfYear { get; set; }
+    }
+    ```
 
 这个类包含一年中月份的名称及其编号。
 
 1.  现在，添加 `Months` 类：
 
-    [PRE61]
+    ```cs
+    internal class Months
+    {
+       public IEnumerable<Month> MonthsOfYear
+       {
+        get
+       {
+        yield return new Month { Name = "January", 
+            MonthOfYear = 1 };
+        yield return new Month { Name = "February", 
+            MonthOfYear = 2 };
+        yield return new Month { Name = "March", 
+            MonthOfYear = 3 };
+        yield return new Month { Name = "April", 
+            MonthOfYear = 4 };
+        yield return new Month { Name = "May", 
+            MonthOfYear = 5 };
+        yield return new Month { Name = "June", 
+            MonthOfYear = 6 };
+        yield return new Month { Name = "July", 
+            MonthOfYear = 7 };
+        yield return new Month { Name = "August", 
+            MonthOfYear = 8 };
+        yield return new Month { Name = "September", 
+            MonthOfYear = 9 };
+        yield return new Month { Name = "October", 
+            MonthOfYear = 10 };
+        yield return new Month { Name = "November", 
+            MonthOfYear = 11 };
+        yield return new Month { Name = "December", 
+            MonthOfYear = 12 };
+        }
+    }
+    }
+    ```
 
 这个类使用 `yield` 关键字返回 `Month` 对象的集合。切换回 `Yield` 类。
 
 1.  添加 `PrintMonthsOfYear()` 方法：
 
-    [PRE62]
+    ```cs
+    private void PrintMonthsOfYear()
+    {
+    foreach (Month month in new Months().MonthsOfYear)
+        Console.WriteLine($"{month.Name} is month 
+            {month.MonthOfYear} of the year.");
+    }
+    ```
 
 这个方法遍历年份中的月份并将它们打印到控制台窗口。
 
 1.  添加 `BreakIteration()` 方法：
 
-    [PRE63]
+    ```cs
+    private IEnumerable<int> BreakIteration()
+    {
+    int x = 0;
+    while (x < 20)
+    {
+        if (x < 15)
+            yield return x;
+        else
+            yield break;
+        x++;
+    }
+    }
+    ```
 
 这个方法迭代 `20` 次。每次迭代都会进行检查。如果值小于 `15`，则产生结果并增加变量。否则，退出迭代。
 
 1.  添加 `DoBreakIteration()` 方法：
 
-    [PRE64]
+    ```cs
+    private void DoBreakIteration()
+    {
+            foreach (int x in BreakIteration())
+                Console.WriteLine($"Line {x}:");
+    }
+    ```
 
 `DoBeakIteration()` 方法遍历 `BreakIteraton()` 并将值写入控制台窗口。
 
 1.  在`Program`类中，添加一个名为`Yield()`的方法，并在你的`Main`方法中调用它：
 
-    [PRE65]
+    ```cs
+    private static void Yield()
+    {
+            var yieldToMe = new Yield();
+            yieldToMe.YieldSample();
+    }
+    ```
 
 此方法运行我们的`yield`关键字示例。进行调试构建并逐步执行代码，以便你可以看到它的行为。你会看到每次遇到`yield`关键字时，它都会返回到调用方法。然后，它从上次离开的地方继续迭代。
 
 1.  现在，让我们添加基准测试来测试`yield`关键字的性能。添加`GetValues()`方法：
 
-    [PRE66]
+    ```cs
+    public IEnumerable<long> GetValues()
+    {
+          List<long> list = new List<long>();
+          for (long i = 0; i < 1000000; i++)
+                list.Add(i);
+    return list;
+    }
+    ```
 
-此方法使用泛型`List`创建一个`long`值的集合。它迭代1百万个项并将它们添加到集合中。一旦完成，集合作为`IEnumerable<long>`集合返回给调用者。
+此方法使用泛型`List`创建一个`long`值的集合。它迭代 1 百万个项并将它们添加到集合中。一旦完成，集合作为`IEnumerable<long>`集合返回给调用者。
 
 1.  添加`GetValuesYield()`方法：
 
-    [PRE67]
+    ```cs
+    public IEnumerable<long> GetValuesYield()
+    {
+          for (long i = 0; i < 1000000; i++)
+              yield return i;
+    }
+    ```
 
-此方法遍历1百万个项，并返回一个`IEnumerable<long>`集合。迭代使用`yield`关键字，因此每次迭代都会返回给调用者。
+此方法遍历 1 百万个项，并返回一个`IEnumerable<long>`集合。迭代使用`yield`关键字，因此每次迭代都会返回给调用者。
 
 1.  添加`GetValuesBenchmark()`方法：
 
-    [PRE68]
+    ```cs
+    [Benchmark]
+    public void GetValuesBenchmark()
+    {
+          var data = GetValues();
+    }
+    ```
 
 此方法对`GetValues()`方法进行基准测试。
 
 1.  添加`GetValuesYieldBenchmark()`方法：
 
-    [PRE69]
+    ```cs
+    [Benchmark]
+    public void GetValuesYieldBenchmark()
+    {
+          var data = GetValuesYield();
+    }
+    ```
 
 此方法对`GetValuesYield()`方法进行基准测试。
 
 1.  将`Program`类中的`Main`方法中的代码替换为以下行代码：
 
-    [PRE70]
+    ```cs
+    BenchmarkRunner.Run<Yield>();
+    ```
 
 这行代码运行我们的基准测试。进行发布构建，然后从命令行运行可执行文件。你应该会看到以下摘要报告：
 
-![图6.8 – BenchmarkDotNet摘要报告显示了使用`yield`关键字的性能优势
+![图 6.8 – BenchmarkDotNet 摘要报告显示了使用`yield`关键字的性能优势![图片](img/B16617_Figure_6.8.jpg)
 
-![图片](img/B16617_Figure_6.8.jpg)
+图 6.8 – BenchmarkDotNet 摘要报告显示了使用`yield`关键字的性能优势
 
-图6.8 – BenchmarkDotNet摘要报告显示了使用`yield`关键字的性能优势
-
-如报告所示，构建包含1百万个`long`值的列表比使用`yield`关键字慢得多。`yield`关键字显著提高了集合的处理速度。这相当于性能提高了13,102,611.27 ns / 14.50 ns = 903,628.26倍！所以，你可以看到使用`yield`关键字对你的计算机程序的性能是非常有益的。
+如报告所示，构建包含 1 百万个`long`值的列表比使用`yield`关键字慢得多。`yield`关键字显著提高了集合的处理速度。这相当于性能提高了 13,102,611.27 ns / 14.50 ns = 903,628.26 倍！所以，你可以看到使用`yield`关键字对你的计算机程序的性能是非常有益的。
 
 在下一节中，我们将探讨并发和并行之间的区别以及它们对性能的影响。
 
@@ -910,7 +1475,7 @@ is faster than IEnumerable
 
 并行化的主要目标是性能。换句话说，使用并行的目的是在最短的时间内完成操作。并行化使用的一个例子是对报告生成进行数据密集型数值计算。
 
-你永远不应该将并发与性能混合使用。如果你这样做，你的设计要么是糟糕的，要么是过度设计的。所以，如果你想用户界面非阻塞，使用并发。然而，如果你想非UI任务尽可能快地完成，使用并行化。在本书的后续章节中，我们将专门讨论并发、并行化和异步处理。但就目前而言，让我们将注意力转向`Equals()`和`==`之间的区别。
+你永远不应该将并发与性能混合使用。如果你这样做，你的设计要么是糟糕的，要么是过度设计的。所以，如果你想用户界面非阻塞，使用并发。然而，如果你想非 UI 任务尽可能快地完成，使用并行化。在本书的后续章节中，我们将专门讨论并发、并行化和异步处理。但就目前而言，让我们将注意力转向`Equals()`和`==`之间的区别。
 
 # 学习`Equals()`和`==`之间的区别
 
@@ -938,69 +1503,136 @@ is faster than IEnumerable
 
 1.  添加`Equality`类，如下所示：
 
-    [PRE71]
+    ```cs
+    using BenchmarkDotNet.Attributes;
+    using BenchmarkDotNet.Order;
+    using System;
+    using System.Collections;
+    using System.Collections.Generic;
+    using System.Diagnostics;
+    using System.Linq;
+    [MemoryDiagnoser]
+    [Orderer(SummaryOrderPolicy.Declared)]
+    [RankColumn]
+    public class Equality { }
+    ```
 
 这样，我们的类已经配置好以执行基准测试。
 
 1.  将以下代码添加到类的顶部：
 
-    [PRE72]
+    ```cs
+    private List<string> _listOne;
+    private List<string> _listTwo;
+    private int _value1;
+    private int _value2;
+    private string _string1;
+    private string _string2;
+    ```
 
 在这里，我们已经准备好了我们的值类型、引用类型和字符串类型，它们将进行相等性测试。
 
 1.  现在，添加 `GlobalSetup()` 方法：
 
-    [PRE73]
+    ```cs
+    [GlobalSetup]
+    public void GlobalSetup()
+    {
+          _listOne = new List<string>
+    {
+        "Alpha", "Beta", "Gamma", "Delta", "Eta", "Theta"
+    };
+      _listTwo = _listOne;
+      _value1 = 123;
+      _value2 = _value1;
+      _string1 = "Hello, world!";
+      _string2 = _string1;
+    }
+    ```
 
 此方法分配我们的变量，为我们的相等性基准测试做准备。
 
 1.  添加 `ValueOperatorValue()` 方法：
 
-    [PRE74]
+    ```cs
+    [Benchmark]
+    public void ValueOperatorValue()
+    {
+          bool value = _value1 == _value2;
+    }
+    ```
 
 `ValueOperatorValue()` 方法使用 `equality` 运算符对两个值进行相等性检查的基准测试。
 
 1.  添加 `ValueEqualsValue()` 方法：
 
-    [PRE75]
+    ```cs
+    [Benchmark]
+    public void ValueEqualsValue()
+    {
+          bool value = _value1.Equals(_value2);
+    }
+    ```
 
 `ValueEqualsValue()` 方法使用 `Equals(value)` 方法对两个值进行相等性检查的基准测试。
 
 1.  添加 `ReferenceOperatorReference()` 方法：
 
-    [PRE76]
+    ```cs
+    [Benchmark]
+    public void ReferenceOperatorReference()
+    {
+          bool value = _listOne == _listTwo;
+    }
+    ```
 
 `ReferenceOperatorReference()` 方法使用相等运算符对两个引用值进行相等性检查的基准测试。
 
 1.  添加 `ReferenceEqualsReference()` 方法：
 
-    [PRE77]
+    ```cs
+    [Benchmark]
+    public void ReferenceEqualsReference()
+    {
+          bool value = _listOne.Equals(_listTwo);
+    }
+    ```
 
 `ReferenceEqualsReference()` 方法使用 `Equals(reference)` 方法对两个值进行相等性检查的基准测试。
 
 1.  添加 `StringOperatorString()` 方法：
 
-    [PRE78]
+    ```cs
+    [Benchmark]
+    public void StringOpertatorString()
+    {
+          bool value = _string1 == _string2;
+    }
+    ```
 
 `StringOperatorString()` 方法使用 `==` 运算符对两个字符串进行相等性测试的基准测试。
 
 1.  接下来，添加 `StringEqualsString()` 方法：
 
-    [PRE79]
+    ```cs
+    [Benchmark]
+    public void StringEqualsString()
+    {
+          bool value = _string1.Equals(_string2);
+    }
+    ```
 
 `StringEqualsString()` 方法使用 `Equals()` 方法对两个字符串进行相等性测试的基准测试。
 
 1.  将 `BenchmarkRunner.Run<Equality>();` 添加到 `Program` 类的 `Main` 方法中，进行 `Release` 构建并从命令行运行您的可执行文件。你应该会得到以下基准测试报告：
 
-![图 6.9 – BenchmarkDotNet 对各种相等性检查的总结报告
-
-](img/B16617_Figure_6.9.jpg)
+![图 6.9 – BenchmarkDotNet 对各种相等性检查的总结报告](img/B16617_Figure_6.9.jpg)
 
 图 6.9 – BenchmarkDotNet 对各种相等性检查的总结报告
 
 如我们所见，使用 `==` 运算符测试值类型相等性更快，使用 `==` 运算符测试引用类型相等性更快，而在比较字符串时使用 `Equals(string)` 更快。
 
-这样，我们就完成了这一章。但在我们继续进入 [*第 7 章*](B16617_07_Final_SB_Epub.xhtml#_idTextAnchor139)，*LINQ 性能* 之前，让我们总结一下本章学到的内容。
+这样，我们就完成了这一章。但在我们继续进入 *第七章*，*LINQ 性能* 之前，让我们总结一下本章学到的内容。
 
 # 摘要
 
@@ -1010,7 +1642,7 @@ is faster than IEnumerable
 
 我们接下来探讨的是使用`yield`关键字。我们讨论了并发和并行之间的差异，并提到这些将在后面的章节中更深入地探讨。最后，我们探讨了在性能方面`==`运算符和`Equals()`方法之间的差异。
 
-在下一章中，我们将探讨LINQ的性能。但到目前为止，尝试回答以下问题，并查看“进一步阅读”部分以巩固本章所学内容。
+在下一章中，我们将探讨 LINQ 的性能。但到目前为止，尝试回答以下问题，并查看“进一步阅读”部分以巩固本章所学内容。
 
 # 问题
 
@@ -1018,7 +1650,7 @@ is faster than IEnumerable
 
 1.  列出不同的命名空间集合。
 
-1.  大O表示法用于什么？
+1.  大 O 表示法用于什么？
 
 1.  算法效率衡量的是什么？
 
@@ -1038,20 +1670,20 @@ is faster than IEnumerable
 
 要了解更多关于本章所涉及主题的信息，请查看以下资源：
 
-+   *索引器*: [https://docs.microsoft.com/dotnet/csharp/programming-guide/indexers/](https://docs.microsoft.com/dotnet/csharp/programming-guide/indexers/).
++   *索引器*: [`docs.microsoft.com/dotnet/csharp/programming-guide/indexers/`](https://docs.microsoft.com/dotnet/csharp/programming-guide/indexers/).
 
-+   *ConsoleSecrets*: [https://github.com/jasonshave/ConsoleSecrets](https://github.com/jasonshave/ConsoleSecrets).
++   *ConsoleSecrets*: [`github.com/jasonshave/ConsoleSecrets`](https://github.com/jasonshave/ConsoleSecrets).
 
-+   *等式运算符*: [https://docs.microsoft.com/dotnet/standard/design-guidelines/equality-operators](https://docs.microsoft.com/dotnet/standard/design-guidelines/equality-operators).
++   *等式运算符*: [`docs.microsoft.com/dotnet/standard/design-guidelines/equality-operators`](https://docs.microsoft.com/dotnet/standard/design-guidelines/equality-operators).
 
-+   *C# 9记录等性检查的有趣性能影响*: [https://gmanvel.medium.com/interesting-performance-implications-of-c-9-records-equality-check-f0d0a3612919](https://gmanvel.medium.com/interesting-performance-implications-of-c-9-records-equality-check-f0d0a3612919).
++   *C# 9 记录等性检查的有趣性能影响*: [`gmanvel.medium.com/interesting-performance-implications-of-c-9-records-equality-check-f0d0a3612919`](https://gmanvel.medium.com/interesting-performance-implications-of-c-9-records-equality-check-f0d0a3612919).
 
-+   *改进C#中结构体等性性能*: [http://dontcodetired.com/blog/post/Improving-Struct-Equality-Performance-in-C](http://dontcodetired.com/blog/post/Improving-Struct-Equality-Performance-in-C).
++   *改进 C#中结构体等性性能*: [`dontcodetired.com/blog/post/Improving-Struct-Equality-Performance-in-C`](http://dontcodetired.com/blog/post/Improving-Struct-Equality-Performance-in-C).
 
-+   *C#中的字符串等性和性能*: [https://rhale78.wordpress.com/2011/05/16/string-equality-and-performance-in-c/](https://rhale78.wordpress.com/2011/05/16/string-equality-and-performance-in-c/).
++   *C#中的字符串等性和性能*: [`rhale78.wordpress.com/2011/05/16/string-equality-and-performance-in-c/`](https://rhale78.wordpress.com/2011/05/16/string-equality-and-performance-in-c/).
 
-+   *C#中默认结构体等性的性能影响*: [https://devblogs.microsoft.com/premier-developer/performance-implications-of-default-struct-equality-in-c/](https://devblogs.microsoft.com/premier-developer/performance-implications-of-default-struct-equality-in-c/).
++   *C#中默认结构体等性的性能影响*: [`devblogs.microsoft.com/premier-developer/performance-implications-of-default-struct-equality-in-c/`](https://devblogs.microsoft.com/premier-developer/performance-implications-of-default-struct-equality-in-c/).
 
-+   *C#中的性能最佳实践*: [https://kevingosse.medium.com/performance-best-practices-in-c-b85a47bdd93a](https://kevingosse.medium.com/performance-best-practices-in-c-b85a47bdd93a).
++   *C#中的性能最佳实践*: [`kevingosse.medium.com/performance-best-practices-in-c-b85a47bdd93a`](https://kevingosse.medium.com/performance-best-practices-in-c-b85a47bdd93a).
 
-+   *8 技巧避免 C# .NET 中的 GC 压力并提高性能*: [https://michaelscodingspot.com/avoid-gc-pressure/](https://michaelscodingspot.com/avoid-gc-pressure/).
++   *8 技巧避免 C# .NET 中的 GC 压力并提高性能*: [`michaelscodingspot.com/avoid-gc-pressure/`](https://michaelscodingspot.com/avoid-gc-pressure/).

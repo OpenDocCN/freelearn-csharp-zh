@@ -16,19 +16,19 @@
 
 # 技术要求
 
-以下章节是实践性的，因此您需要对Unity和C#有基本的了解。
+以下章节是实践性的，因此您需要对 Unity 和 C#有基本的了解。
 
-我们将使用以下Unity特定的引擎和C#语言概念：
+我们将使用以下 Unity 特定的引擎和 C#语言概念：
 
 +   静态
 
 +   泛型
 
-如果不熟悉这些概念，请查阅[第3章](c71c8dd0-2787-43e0-a140-d9cc4ab41ff9.xhtml)，《Unity编程简明指南》。
+如果不熟悉这些概念，请查阅第三章，《Unity 编程简明指南》。
 
-本章的代码文件可以在GitHub上找到，地址为[https://github.com/PacktPublishing/Game-Development-Patterns-with-Unity-2021-Second-Edition/tree/main/Assets/Chapters/Chapter16](https://github.com/PacktPublishing/Game-Development-Patterns-with-Unity-2021-Second-Edition/tree/main/Assets/Chapters/Chapter16)。
+本章的代码文件可以在 GitHub 上找到，地址为[`github.com/PacktPublishing/Game-Development-Patterns-with-Unity-2021-Second-Edition/tree/main/Assets/Chapters/Chapter16`](https://github.com/PacktPublishing/Game-Development-Patterns-with-Unity-2021-Second-Edition/tree/main/Assets/Chapters/Chapter16)。
 
-查看以下视频以查看代码的实际运行情况：[https://bit.ly/36AKWli](https://bit.ly/36AKWli)
+查看以下视频以查看代码的实际运行情况：[`bit.ly/36AKWli`](https://bit.ly/36AKWli)
 
 静态是一个关键字修饰符。在类中声明为静态的方法可以在不实例化对象的情况下调用。
 
@@ -40,7 +40,7 @@
 
 ![](img/0d532f91-cc29-465f-ac92-14affd8ebd4f.png)
 
-图16.1 – 服务定位器模式的示意图
+图 16.1 – 服务定位器模式的示意图
 
 如我们所见，我们很容易说服务定位器模式充当了客户端（请求者）和服务提供者之间的代理，这种方法在一定程度上将它们解耦。客户端只有在需要解决依赖并需要访问服务时才需要调用服务定位器模式。我们可以说，服务定位器模式的作用类似于餐厅中的服务员，从客户端接收订单，并在餐厅提供的各种服务与其客户之间充当中间人。
 
@@ -60,9 +60,9 @@
 
 +   **全局依赖**：如果过度使用且意图不正确，服务定位器模式本身可能会成为一个难以管理的全局依赖。你的代码将过度依赖它，最终，将其从其他核心组件中解耦将变得困难。
 
-服务定位器模式在Java开发者中很受欢迎；它在2004年马丁·福勒（Martin Fowler）发表的一篇博客文章中被部分定义，你可以在这里阅读：
+服务定位器模式在 Java 开发者中很受欢迎；它在 2004 年马丁·福勒（Martin Fowler）发表的一篇博客文章中被部分定义，你可以在这里阅读：
 
-[https://martinfowler.com/articles/injection.html](https://martinfowler.com/articles/injection.html)
+[`martinfowler.com/articles/injection.html`](https://martinfowler.com/articles/injection.html)
 
 ## 何时使用服务定位器模式
 
@@ -70,7 +70,7 @@
 
 但在考虑使用服务定位器模式时，我们还应该考虑不使用它的情况。因为服务定位器模式通常全局可访问，正如其名称所暗示的，它应该定位并提供对服务的访问。那么，我们只应该用它来暴露具有全局范围的服务。
 
-例如，我们需要访问**抬头显示**（**HUD**）来更新其**用户界面**（**UI**）组件之一。我们应该考虑将HUD视为一个全局服务，通过服务定位器模式来访问吗？答案应该是否定的，因为HUD只在游戏的某些部分出现，并且应该仅在特定上下文中由特定的组件访问。但是，如果我们设计一个自定义的日志系统，我们可以通过服务定位器模式来证明其暴露的合理性，因为我们可能需要在代码的任何地方独立于上下文和范围来记录信息。
+例如，我们需要访问**抬头显示**（**HUD**）来更新其**用户界面**（**UI**）组件之一。我们应该考虑将 HUD 视为一个全局服务，通过服务定位器模式来访问吗？答案应该是否定的，因为 HUD 只在游戏的某些部分出现，并且应该仅在特定上下文中由特定的组件访问。但是，如果我们设计一个自定义的日志系统，我们可以通过服务定位器模式来证明其暴露的合理性，因为我们可能需要在代码的任何地方独立于上下文和范围来记录信息。
 
 既然我们已经了解了理论，让我们动手编写一个服务定位器模式，以提供对日志记录器、分析系统和**广告网络**（**ad network**）提供者的访问。
 
@@ -96,7 +96,48 @@
 
 1.  让我们从实现最重要的成分——`ServiceLocator`类开始，如下所示：
 
-[PRE0]
+```cs
+using System;
+using System.Collections.Generic;
+
+namespace Chapter.ServiceLocator
+{
+    public static class ServiceLocator
+    {
+        private static readonly 
+            IDictionary<Type, object> Services = 
+                new Dictionary<Type, Object>();
+
+        public static void RegisterService<T>(T service)
+        {
+            if (!Services.ContainsKey(typeof(T)))
+            {
+                Services[typeof(T)] = service;
+            }
+            else
+            {
+                throw new 
+                    ApplicationException
+                    ("Service already registered");
+            }
+        }
+
+        public static T GetService<T>()
+        {
+            try
+            {
+                return (T) Services[typeof(T)];
+            }
+            catch
+            {
+                throw new 
+                    ApplicationException
+                    ("Requested service not found.");
+            }
+        }
+    }
+}
+```
 
 这种服务定位器模式有三个主要职责，如下所述：
 
@@ -108,49 +149,161 @@
 
 它必须考虑到`RegisterService()`和`GetService()`都是静态函数，因此它们可以直接访问，无需初始化`ServiceLocator`类。
 
-`Services`字典包含可用的服务列表，我们将其标记为`readonly`和`private`；因此，我们保护它不被覆盖或直接访问。相反，客户端必须通过Service Locator模式公开的方法来添加或获取服务。
+`Services`字典包含可用的服务列表，我们将其标记为`readonly`和`private`；因此，我们保护它不被覆盖或直接访问。相反，客户端必须通过 Service Locator 模式公开的方法来添加或获取服务。
 
-现在我们有了准备好的Service Locator类，我们现在可以开始以接口的形式实现一些服务合同。
+现在我们有了准备好的 Service Locator 类，我们现在可以开始以接口的形式实现一些服务合同。
 
 1.  我们的第一个接口是为`Logger`服务，如下面的代码片段所示：
 
-[PRE1]
+```cs
+namespace Chapter.ServiceLocator
+{
+    public interface ILoggerService
+    {
+        void Log(string message);
+    }
+}
+```
 
 1.  下一个接口是为`Analytics`服务，正如我们在这里看到的：
 
-[PRE2]
+```cs
+namespace Chapter.ServiceLocator
+{
+    public interface IAnalyticsService
+    {
+        void SendEvent(string eventName);
+    }
+}
+```
 
 1.  最后，我们实现了我们的`Advertisement`服务接口的代码，如下所示：
 
-[PRE3]
+```cs
+namespace Chapter.ServiceLocator
+{
+    public interface IAdvertisement
+    {
+        void DisplayAd();
+    }
+}
+```
 
 1.  现在，我们将实现具体的服务类，从`Logger`类开始。完成此任务的代码如下所示：
 
-[PRE4]
+```cs
+using UnityEngine;
+
+namespace Chapter.ServiceLocator
+{
+    public class Logger: ILoggerService
+    {
+        public void Log(string message)
+        {
+            Debug.Log("Logged: " + message);
+        }
+    }
+}
+```
 
 1.  接下来是`Analytics`类。以下是实现此功能所需的代码：
 
-[PRE5]
+```cs
+using UnityEngine;
+
+namespace Chapter.ServiceLocator
+{
+    public class Analytics : IAnalyticsService
+    {
+        public void SendEvent(string eventName)
+        {
+            Debug.Log("Sent: " + eventName);
+        }
+    }
+}
+```
 
 1.  最后，我们实现了我们的具体`Advertisement`服务类，如下所示：
 
-[PRE6]
+```cs
+using UnityEngine;
 
-现在，我们有一个可以注册和从任何地方访问服务的Service Locator模式。
+namespace Chapter.ServiceLocator
+{
+    public class Advertisement : IAdvertisement
+    {
+        public void DisplayAd()
+        {
+            Debug.Log("Displaying video advertisement");
+        }
+    }
+}
+```
 
-## 测试Service Locator模式
+现在，我们有一个可以注册和从任何地方访问服务的 Service Locator 模式。
 
-为了测试我们实现的Service Locator模式，让我们编写一个客户端类，我们将将其作为组件附加到一个空Unity场景中的GameObject上，如下所示：
+## 测试 Service Locator 模式
 
-[PRE7]
+为了测试我们实现的 Service Locator 模式，让我们编写一个客户端类，我们将将其作为组件附加到一个空 Unity 场景中的 GameObject 上，如下所示：
 
-需要注意的是，在实际的Unity项目中实现服务定位器模式时，我们应该尽可能早地在游戏的生命周期中注册我们的服务，以确保它们始终可用——例如，这个任务可以分配给我们在项目第一个场景中初始化的`GameManager`对象。如果我们知道当玩家开始游戏时场景和游戏管理器对象总是会被加载，我们就确信服务定位器模式的注册会在客户端开始请求访问服务之前更新。
+```cs
+using UnityEngine;
+
+namespace Chapter.ServiceLocator
+{
+    public class ClientServiceLocator : MonoBehaviour
+    {
+        void Start() {
+            RegisterServices();
+        }
+
+        private void RegisterServices() {
+            ILoggerService logger = new Logger();
+            ServiceLocator.RegisterService(logger);
+
+            IAnalyticsService analytics = new Analytics();
+            ServiceLocator.RegisterService(analytics);
+
+            IAdvertisement advertisement = new Advertisement();
+            ServiceLocator.RegisterService(advertisement);
+        }
+
+        void OnGUI()
+        {
+            GUILayout.Label("Review output in the console:");
+
+            if (GUILayout.Button("Log Event")) {
+                ILoggerService logger = 
+                    ServiceLocator.GetService<ILoggerService>();
+
+                logger.Log("Hello World!");
+            }
+
+            if (GUILayout.Button("Send Analytics")) {
+                IAnalyticsService analytics = 
+                    ServiceLocator.GetService<IAnalyticsService>();
+
+                analytics.SendEvent("Hello World!");
+            }
+
+            if (GUILayout.Button("Display Advertisement")) {
+                IAdvertisement advertisement = 
+                    ServiceLocator.GetService<IAdvertisement>();
+
+                advertisement.DisplayAd();
+            }
+        }
+    }
+}
+```
+
+需要注意的是，在实际的 Unity 项目中实现服务定位器模式时，我们应该尽可能早地在游戏的生命周期中注册我们的服务，以确保它们始终可用——例如，这个任务可以分配给我们在项目第一个场景中初始化的`GameManager`对象。如果我们知道当玩家开始游戏时场景和游戏管理器对象总是会被加载，我们就确信服务定位器模式的注册会在客户端开始请求访问服务之前更新。
 
 我们方法的一个关键好处是我们通过引用它们的接口来注册服务，这意味着在我们注册服务的那一刻，我们可以选择使用哪个具体实现。因此，我们可以在调试构建中轻松地运行每个服务的模拟版本。此外，这种方法将避免在**质量保证**（**QA**）阶段向日志和数据分析中添加噪音。
 
 因此，这是该模式的一个酷特性；你可以根据运行时环境动态注入各种服务版本。
 
-使用Unity作为你的引擎的主要好处之一是它提供了一系列集成服务，包括广告和数据分析服务，因此大多数时候，你不需要手动实现它们。你可以在以下链接中了解可用的Unity服务范围：[https://docs.unity3d.com/Manual/UnityServices.html.](https://docs.unity3d.com/Manual/UnityServices.html)
+使用 Unity 作为你的引擎的主要好处之一是它提供了一系列集成服务，包括广告和数据分析服务，因此大多数时候，你不需要手动实现它们。你可以在以下链接中了解可用的 Unity 服务范围：[`docs.unity3d.com/Manual/UnityServices.html.`](https://docs.unity3d.com/Manual/UnityServices.html)
 
 # 审查替代方案
 
@@ -160,10 +313,10 @@
 
 **Extenject** 是一个免费的 Unity DI 框架，可以从 Asset Store 下载：
 
-[https://assetstore.unity.com/packages/tools/utilities/extenject-dependency-injection-ioc-157735](https://assetstore.unity.com/packages/tools/utilities/extenject-dependency-injection-ioc-157735)
+[`assetstore.unity.com/packages/tools/utilities/extenject-dependency-injection-ioc-157735`](https://assetstore.unity.com/packages/tools/utilities/extenject-dependency-injection-ioc-157735)
 
 # 摘要
 
 在本章中，我们回顾了服务定位器模式。这个模式是解决对象之间依赖服务（功能）管理重复挑战的一个简单解决方案。在其最简单的形式中，服务定位器模式解耦了客户端（请求者）与服务提供者之间的关系。
 
-我们的旅程已经到达终点，因为这是本书的最后一章。我们希望您喜欢每一章的内容。请记住，本书中提出的概念只是入门，不是关于主题的最终结论。关于设计模式、Unity和游戏开发还有很多东西要学习——多到我们无法在一本书中定义清楚。因此，我们鼓励您继续学习，将每一章中我们一起回顾的内容做得更好，因为总有改进的空间。
+我们的旅程已经到达终点，因为这是本书的最后一章。我们希望您喜欢每一章的内容。请记住，本书中提出的概念只是入门，不是关于主题的最终结论。关于设计模式、Unity 和游戏开发还有很多东西要学习——多到我们无法在一本书中定义清楚。因此，我们鼓励您继续学习，将每一章中我们一起回顾的内容做得更好，因为总有改进的空间。

@@ -4,6 +4,6 @@
 
 本节包括以下章节：
 
-+   [*第一章*](B17146_01_Final_ASB_ePub.xhtml#_idTextAnchor010), *Hello Unity*
++   *第一章*, *Hello Unity*
 
-+   [*第二章*](B17146_02_Final_ASB_ePub.xhtml#_idTextAnchor025), *Unity 中的脚本概念*
++   *第二章*, *Unity 中的脚本概念*

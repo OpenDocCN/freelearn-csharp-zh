@@ -24,35 +24,35 @@
 
 C# 是微软开发的一种编程语言。本书撰写时的当前版本是 C# 7.0。该语言于 2002 年出现。这是一种面向对象和面向组件的语言。当前版本具有各种新功能，如 ValueTuple、析构函数、模式匹配、switch 语句局部函数等。
 
-我们不会深入探讨这些功能，因为它们超出了本书的范围。更多详细信息，请参考：[https://docs.microsoft.com/en-us/dotnet/csharp/whats-new/](https://docs.microsoft.com/en-us/dotnet/csharp/whats-new/)。
+我们不会深入探讨这些功能，因为它们超出了本书的范围。更多详细信息，请参考：[`docs.microsoft.com/en-us/dotnet/csharp/whats-new/`](https://docs.microsoft.com/en-us/dotnet/csharp/whats-new/)。
 
 # Entity Framework Core
 
 **Entity Framework Core**（**EF Core**）是微软 Entity Framework 的跨平台版本，它是最受欢迎的 **对象关系映射器**（**ORM**）之一。
 
-ORM 是一种帮助您根据所需业务输出查询和操作数据的技术。有关更多详细信息，请参阅[https://stackoverflow.com/questions/1279613/what-is-an-orm-and-where-can-i-learn-more-about-it](https://stackoverflow.com/questions/1279613/what-is-an-orm-and-where-can-i-learn-more-about-it)。
+ORM 是一种帮助您根据所需业务输出查询和操作数据的技术。有关更多详细信息，请参阅[`stackoverflow.com/questions/1279613/what-is-an-orm-and-where-can-i-learn-more-about-it`](https://stackoverflow.com/questions/1279613/what-is-an-orm-and-where-can-i-learn-more-about-it)。
 
-EF Core 支持多种数据库。数据库的完整列表可在以下链接找到：[https://docs.microsoft.com/en-us/ef/core/providers/index](https://docs.microsoft.com/en-us/ef/core/providers/index)。当前 EF Core 的版本是 2.0。为了熟悉 EF Core，我建议您详细阅读以下内容：[https://docs.microsoft.com/en-us/ef/core/get-started/index](https://docs.microsoft.com/en-us/ef/core/get-started/index)。
+EF Core 支持多种数据库。数据库的完整列表可在以下链接找到：[`docs.microsoft.com/en-us/ef/core/providers/index`](https://docs.microsoft.com/en-us/ef/core/providers/index)。当前 EF Core 的版本是 2.0。为了熟悉 EF Core，我建议您详细阅读以下内容：[`docs.microsoft.com/en-us/ef/core/get-started/index`](https://docs.microsoft.com/en-us/ef/core/get-started/index)。
 
 # Visual Studio 2017
 
 Visual Studio 是微软创建的最好的 **集成开发环境**（**IDE**）之一。它使开发者能够使用著名的语言（例如，C#、VB.NET、F# 等）以各种方式工作。Visual Studio 2017 的当前发布版本是更新 3（VS15.3）。
 
-集成开发环境（IDE）是一种软件应用程序，它为程序员提供了一个使用编程语言编写程序的平台。更多信息，请访问：[https://en.wikipedia.org/wiki/Integrated_development_environment](https://en.wikipedia.org/wiki/Integrated_development_environment)。
+集成开发环境（IDE）是一种软件应用程序，它为程序员提供了一个使用编程语言编写程序的平台。更多信息，请访问：[`en.wikipedia.org/wiki/Integrated_development_environment`](https://en.wikipedia.org/wiki/Integrated_development_environment)。
 
-微软还发布了适用于macOS的Visual Studio，Visual Studio的新版本拥有许多惊人的功能。更多信息请参阅[https://www.visualstudio.com/vs/whatsnew/](https://www.visualstudio.com/vs/whatsnew/)。本书中的所有示例都是使用Visual Studio 2017更新3编写的。您还可以下载免费的社区版：[https://www.visualstudio.com/](https://www.visualstudio.com/)。
+微软还发布了适用于 macOS 的 Visual Studio，Visual Studio 的新版本拥有许多惊人的功能。更多信息请参阅[`www.visualstudio.com/vs/whatsnew/`](https://www.visualstudio.com/vs/whatsnew/)。本书中的所有示例都是使用 Visual Studio 2017 更新 3 编写的。您还可以下载免费的社区版：[`www.visualstudio.com/`](https://www.visualstudio.com/)。
 
 # Microsoft SQLServer
 
-**Microsoft SQLServer**（**MSSQL**）是一个关系型数据库管理系统软件应用。它主要用于作为数据库软件来存储和检索数据。这是建立在SQL之上的，即结构化查询语言：[http://searchsqlserver.techtarget.com/definition/SQL](http://searchsqlserver.techtarget.com/definition/SQL)。
+**Microsoft SQLServer**（**MSSQL**）是一个关系型数据库管理系统软件应用。它主要用于作为数据库软件来存储和检索数据。这是建立在 SQL 之上的，即结构化查询语言：[`searchsqlserver.techtarget.com/definition/SQL`](http://searchsqlserver.techtarget.com/definition/SQL)。
 
-当前版本，即SQL Server 2017，更加健壮，可以在Windows和Linux上使用。您可以从这里获取SQL Server 2017：[https://www.microsoft.com/en-IN/sql-server/sql-server-2017](https://www.microsoft.com/en-IN/sql-server/sql-server-2017)。请注意，本书中将使用SQL Server 2008 R2或更高版本。
+当前版本，即 SQL Server 2017，更加健壮，可以在 Windows 和 Linux 上使用。您可以从这里获取 SQL Server 2017：[`www.microsoft.com/en-IN/sql-server/sql-server-2017`](https://www.microsoft.com/en-IN/sql-server/sql-server-2017)。请注意，本书中将使用 SQL Server 2008 R2 或更高版本。
 
 # 微服务的大小
 
 在我们开始构建微服务之前，我们应该清楚它们的一些基本方面，例如在确定微服务大小时要考虑哪些因素，以及如何确保它们与系统其他部分的隔离。
 
-如其名所示，微服务应该是微型的。一个问题随之而来：什么是微型？微服务全部关乎大小和粒度。为了更好地理解这一点，让我们考虑在[第1章](274437a4-3708-4913-96b3-539e376c71fb.xhtml)中讨论的应用，*微服务简介*。
+如其名所示，微服务应该是微型的。一个问题随之而来：什么是微型？微服务全部关乎大小和粒度。为了更好地理解这一点，让我们考虑在第一章中讨论的应用，*微服务简介*。
 
 我们希望参与此项目的团队始终保持其代码的一致性。在发布完整项目时，保持一致性尤为重要。我们需要首先将我们的应用/特定部分分解成更小的功能/主服务段的片段。让我们讨论需要考虑的因素，以确保微服务的高级隔离：
 
@@ -74,19 +74,19 @@ Visual Studio 是微软创建的最好的 **集成开发环境**（**IDE**）之
 
 为了使服务能够被开发者和用户轻松使用和维护，该服务必须具备以下特性（我们也可以将这些视为良好服务的特征）：
 
-+   标准数据格式：良好的服务在与其他组件交换服务或系统时应遵循标准数据格式。在.NET堆栈中最常用的数据格式是XML和JSON。
++   标准数据格式：良好的服务在与其他组件交换服务或系统时应遵循标准数据格式。在.NET 堆栈中最常用的数据格式是 XML 和 JSON。
 
-+   标准通信协议：良好的服务应遵守标准通信格式，如SOAP和REST。
++   标准通信协议：良好的服务应遵守标准通信格式，如 SOAP 和 REST。
 
 +   松散耦合：良好服务的一个重要特征是它遵循松散耦合。当服务松散耦合时，我们不必担心变化。一个服务的变更不会影响其他服务。
 
-# DDD及其对微服务的重要性
+# DDD 及其对微服务的重要性
 
-**领域驱动设计**（**DDD**）是一种设计和复杂系统的方法论和过程。在这些部分中，我们将简要讨论DDD及其在微服务环境中的重要性。
+**领域驱动设计**（**DDD**）是一种设计和复杂系统的方法论和过程。在这些部分中，我们将简要讨论 DDD 及其在微服务环境中的重要性。
 
 # 领域模型设计
 
-领域设计的首要目标是理解确切的领域问题，然后制定一个可以用任何语言或技术集编写的模型。例如，在我们的Flix One书店应用程序中，我们需要理解*订单管理*和*库存管理*。
+领域设计的首要目标是理解确切的领域问题，然后制定一个可以用任何语言或技术集编写的模型。例如，在我们的 Flix One 书店应用程序中，我们需要理解*订单管理*和*库存管理*。
 
 这里是领域驱动模型的一些特征：
 
@@ -132,7 +132,7 @@ DDD 是蓝图，可以通过微服务实现。换句话说，一旦完成 DDD，
 
 这里需要采取双管齐下的方法。首先，你必须确定应用基础框架中正在利用的不同功能。这种区分可以基于对某些数据结构的重依赖、执行进程间通信或报告生成活动。这是比较容易的部分。
 
-然而，作为第二步，我建议你变得更加自信，并挑选出使用与当前使用的技术类型不同的部分。例如，可能有一段代码依赖于简单的数据结构或基于XML的持久化。识别系统中的这种负担并将其标记为过渡。在这种双管齐下的方法中需要非常谨慎。选择过于雄心勃勃可能会让你走上我们试图完全避免的道路。
+然而，作为第二步，我建议你变得更加自信，并挑选出使用与当前使用的技术类型不同的部分。例如，可能有一段代码依赖于简单的数据结构或基于 XML 的持久化。识别系统中的这种负担并将其标记为过渡。在这种双管齐下的方法中需要非常谨慎。选择过于雄心勃勃可能会让你走上我们试图完全避免的道路。
 
 其中一些部分可能看起来并不是最终微服务风格架构应用的很有希望的候选者。但它们现在仍然需要处理。最终，它们将使你能够轻松地进行过渡。
 
@@ -208,43 +208,43 @@ DDD 是蓝图，可以通过微服务实现。换句话说，一旦完成 DDD，
 
 # 微服务之间的通信
 
-在前面的章节中，我们将我们的**Order模块**分离成**Order服务**，并讨论了如何分解**ORDER**和**PRODUCT**表之间的外键关系。
+在前面的章节中，我们将我们的**Order 模块**分离成**Order 服务**，并讨论了如何分解**ORDER**和**PRODUCT**表之间的外键关系。
 
-在单体应用中，我们有一个单一的仓库，它查询数据库以从**ORDER**和**PRODUCT**表中获取记录。然而，在我们的即将推出的微服务应用中，我们将**Order服务**和**Product服务**之间的仓库进行分离。每个服务都有自己的数据库，每个服务只会访问自己的数据库。**Order服务**只能访问订单**数据库**，而**Product服务**只能访问产品**数据库**。**Order服务**不应被允许访问产品**数据库**，反之亦然。
+在单体应用中，我们有一个单一的仓库，它查询数据库以从**ORDER**和**PRODUCT**表中获取记录。然而，在我们的即将推出的微服务应用中，我们将**Order 服务**和**Product 服务**之间的仓库进行分离。每个服务都有自己的数据库，每个服务只会访问自己的数据库。**Order 服务**只能访问订单**数据库**，而**Product 服务**只能访问产品**数据库**。**Order 服务**不应被允许访问产品**数据库**，反之亦然。
 
-我们将在第3章“集成技术和微服务”中详细讨论微服务之间的通信。
+我们将在第三章“集成技术和微服务”中详细讨论微服务之间的通信。
 
 请参考以下图表：
 
 ![图片](img/357146ab-c997-4a2c-8a36-26bae14d8155.png)
 
-在前面的图表中，我们可以看到我们的UI通过**API网关**与**Order服务**和**Product服务**进行交互。这两个服务在物理上是分离的，并且这些服务之间没有直接交互。以这种方式进行的通信也被称为基于**API网关模式**的通信。
+在前面的图表中，我们可以看到我们的 UI 通过**API 网关**与**Order 服务**和**Product 服务**进行交互。这两个服务在物理上是分离的，并且这些服务之间没有直接交互。以这种方式进行的通信也被称为基于**API 网关模式**的通信。
 
-API网关实际上是一个中间层，通过它UI可以与微服务进行交互。它还提供了一个更简单的接口，简化了消费这些服务的流程。它根据需要为不同的客户端提供不同级别的粒度（浏览器和桌面）。
+API 网关实际上是一个中间层，通过它 UI 可以与微服务进行交互。它还提供了一个更简单的接口，简化了消费这些服务的流程。它根据需要为不同的客户端提供不同级别的粒度（浏览器和桌面）。
 
-我们可以说，它为移动客户端提供粗粒度API，为桌面客户端提供细粒度API，并且它可以在其内部使用高性能网络来提供一些严重的吞吐量。
+我们可以说，它为移动客户端提供粗粒度 API，为桌面客户端提供细粒度 API，并且它可以在其内部使用高性能网络来提供一些严重的吞吐量。
 
-维基百科对粒度的定义如下([https://en.wikipedia.org/wiki/Granularity](https://en.wikipedia.org/wiki/Granularity))：
+维基百科对粒度的定义如下([`en.wikipedia.org/wiki/Granularity`](https://en.wikipedia.org/wiki/Granularity))：
 
 “**粒度**是指系统分解成小部分的程度，无论是系统本身、其描述还是观察。它是更大实体细分到何种程度。例如，将码分成英寸的粒度比将码分成英尺的粒度更细。”
 
 粗粒度系统由比细粒度系统更少、更大的组件组成；一个系统的粗粒度描述关注大子组件，而细粒度描述关注由较大组件组成的较小组件。
 
-# API网关对微服务的益处
+# API 网关对微服务的益处
 
-毫无疑问，API网关对微服务是有益的。使用它，你可以做以下事情：
+毫无疑问，API 网关对微服务是有益的。使用它，你可以做以下事情：
 
-+   通过API网关调用服务
++   通过 API 网关调用服务
 
 +   减少客户端与应用程序之间的往返次数
 
-+   客户端能够在一个地方访问不同的API，这些API由网关进行隔离
++   客户端能够在一个地方访问不同的 API，这些 API 由网关进行隔离
 
-它以这种方式为客户端提供灵活性，使他们能够根据需要与不同的服务进行交互。这样，就无需完全或全部公开服务。API网关是完整API管理的一个组件。在我们的解决方案中，我们将使用Azure API管理，并在第3章“集成技术和微服务”中进一步解释。
+它以这种方式为客户端提供灵活性，使他们能够根据需要与不同的服务进行交互。这样，就无需完全或全部公开服务。API 网关是完整 API 管理的一个组件。在我们的解决方案中，我们将使用 Azure API 管理，并在第三章“集成技术和微服务”中进一步解释。
 
-# API网关与API管理的比较
+# API 网关与 API 管理的比较
 
-在上一节中，我们讨论了API网关如何隐藏实际API以防止其客户端直接访问，然后仅将这些客户端的调用重定向到实际API。API管理解决方案提供了一个完整的系统来管理其外部消费者的所有API。所有API管理解决方案，例如Azure API管理([https://docs.microsoft.com/en-us/azure/api-management/](https://docs.microsoft.com/en-us/azure/api-management/))，都提供了各种功能和能力，例如：
+在上一节中，我们讨论了 API 网关如何隐藏实际 API 以防止其客户端直接访问，然后仅将这些客户端的调用重定向到实际 API。API 管理解决方案提供了一个完整的系统来管理其外部消费者的所有 API。所有 API 管理解决方案，例如 Azure API 管理([`docs.microsoft.com/en-us/azure/api-management/`](https://docs.microsoft.com/en-us/azure/api-management/))，都提供了各种功能和能力，例如：
 
 +   设计
 
@@ -262,9 +262,9 @@ API网关实际上是一个中间层，通过它UI可以与微服务进行交互
 
 +   赚钱
 
-# 回顾Flix One案例研究
+# 回顾 Flix One 案例研究
 
-在上一章中，我们查看了一个虚构公司Flix One Inc.的例子，该公司在电子商务领域运营，并拥有自己的.NET单体应用：Flix One书店。我们已经讨论了以下内容：
+在上一章中，我们查看了一个虚构公司 Flix One Inc.的例子，该公司在电子商务领域运营，并拥有自己的.NET 单体应用：Flix One 书店。我们已经讨论了以下内容：
 
 +   如何隔离代码
 
@@ -276,13 +276,13 @@ API网关实际上是一个中间层，通过它UI可以与微服务进行交互
 
 +   可用的重构方法
 
-在下一节中，我们将开始编写/过渡.NET单体应用到一个微服务应用。
+在下一节中，我们将开始编写/过渡.NET 单体应用到一个微服务应用。
 
 # 前提条件
 
 在将我们的单体应用过渡到微服务架构风格时，我们将使用以下工具和技术：
 
-+   Visual Studio 2017更新3或更高版本
++   Visual Studio 2017 更新 3 或更高版本
 
 +   C# 7.0
 
@@ -294,11 +294,11 @@ API网关实际上是一个中间层，通过它UI可以与微服务进行交互
 
 # 转向我们的产品服务
 
-我们已经建立了我们的产品模块。我们现在将撤回这个模块，并开始一个新的 ASP.NET Core MVC 项目。为此，请遵循我们在前几节和[第1章](6126f4b5-7098-4bb4-891d-02065b4b5930.xhtml)，*微服务简介*中讨论的所有步骤，让我们来检查我们将使用的技术和数据库：
+我们已经建立了我们的产品模块。我们现在将撤回这个模块，并开始一个新的 ASP.NET Core MVC 项目。为此，请遵循我们在前几节和第一章，*微服务简介*中讨论的所有步骤，让我们来检查我们将使用的技术和数据库：
 
 +   技术栈：我们已经为我们的产品服务选择了这项技术；我们将使用 ASP.NET Core、C#、**Entity framework **(**EF**) 等技术。微服务可以使用不同的技术栈编写，并且可以被由不同技术创建的客户端消费。对于我们的产品服务，我们将选择 ASP.NET Core。
 
-+   数据库：我们在[第1章](6126f4b5-7098-4bb4-891d-02065b4b5930.xhtml)，*微服务简介*中讨论单体应用程序及其数据库隔离时已经讨论过这个问题。在这里，我们将使用 SQL Server，数据库模式将是 `Product` 而不是 `dbo`。
++   数据库：我们在第一章，*微服务简介*中讨论单体应用程序及其数据库隔离时已经讨论过这个问题。在这里，我们将使用 SQL Server，数据库模式将是 `Product` 而不是 `dbo`。
 
 我们的产品数据库是隔离的。我们将在产品服务中使用这个数据库，如下截图所示：
 
@@ -376,11 +376,39 @@ API网关实际上是一个中间层，通过它UI可以与微服务进行交互
 
 以下代码片段描述了我们的 `Product.cs` 模型类将看起来像什么：
 
-[PRE0]
+```cs
+ namespace FlixOne.BookStore.ProductService.Models
+ {
+   public class Product
+   {
+     public Guid Id { get; set; }
+     public string Name { get; set; }
+     public string Description { get; set; }
+     public string Image { get; set; }
+     public decimal Price { get; set; }
+     public Guid CategoryId { get; set; }
+   }
+ }
+```
 
 以下代码片段显示了我们的 `Category.cs` 模型类将看起来像什么：
 
-[PRE1]
+```cs
+ namespace FlixOne.BookStore.ProductService.Models
+ {
+   public class Category
+   {
+     public Category()
+     {
+       Products = new List<Product>();
+     }
+     public Guid Id { get; set; }
+     public string Name { get; set; }
+     public string Description { get; set; }
+     public IEnumerable<Product> Products { get; set; }
+   }
+ }
+```
 
 # 添加仓库
 
@@ -398,11 +426,50 @@ API网关实际上是一个中间层，通过它UI可以与微服务进行交互
 
 以下代码片段提供了 `IProductRepository` 接口的一个概述：
 
-[PRE2]
+```cs
+namespace FlixOne.BookStore.ProductService.Persistence
+{
+  public interface IProductRepository
+  {
+    void Add(Product product);
+    IEnumerable<Product> GetAll();
+    Product GetBy(Guid id);
+    void Remove(Guid id);
+    void Update(Product product);
+  }
+}
+```
 
 以下代码片段提供了 `ProductRepository` 类的一个概述（它还没有任何实现，并且还没有与数据库进行任何交互）：
 
-[PRE3]
+```cs
+ namespace FlixOne.BookStore.ProductService.Persistence
+ {
+   public class ProductRepository : IProductRepository
+   {
+     public void Add(Product Product)
+     {
+       throw new NotImplementedException();
+     }
+     public IEnumerable<Product> GetAll()
+     {
+       throw new NotImplementedException();
+     }
+     public Product GetBy(Guid id)
+     {
+       throw new NotImplementedException();
+     }
+     public bool Remove(Guid id)
+     {
+       throw new NotImplementedException();
+     }
+     public void Update(Product Product)
+     {
+       throw new NotImplementedException();
+     }
+   }
+ }
+```
 
 # 注册仓库
 
@@ -412,7 +479,15 @@ API网关实际上是一个中间层，通过它UI可以与微服务进行交互
 
 1.  将仓库添加到 `ConfigureServices` 方法中。它应该看起来像这样：
 
-[PRE4]
+```cs
+public void ConfigureServices(IServiceCollection services)
+{
+  // Add framework services.
+  services.AddMvc();
+  services.AddSingleton<IProductRepository, 
+  ProductRepository>();
+}
+```
 
 # 添加产品控制器
 
@@ -424,7 +499,22 @@ API网关实际上是一个中间层，通过它UI可以与微服务进行交互
 
 在我们对 `ProductController` 进行了必要的修改后，它应该看起来类似于以下内容：
 
-[PRE5]
+```cs
+ using Microsoft.AspNetCore.Mvc;
+ using FlixOne.BookStore.ProductService.Persistence;
+ namespace FlixOne.BookStore.ProductService.Controllers
+ {
+   [Route("api/[controller]")]
+   public class ProductController : Controller
+   {
+     private readonly IProductRepository _ProductRepository;
+     public ProductController(IProductRepositoryProductRepository)
+     {
+       _ProductRepository = ProductRepository;
+     }
+   }
+ }
+```
 
 # ProductService API
 
@@ -452,7 +542,7 @@ API网关实际上是一个中间层，通过它UI可以与微服务进行交互
 
 在继续之前，我们需要添加 EF 以便我们的服务可以与实际的产品数据库交互。到目前为止，我们没有向我们的存储库添加任何可以与数据库交互的方法。
 
-要添加 EF core 支持，我们需要添加 EF 的核心 `sqlserver` 包（我们添加 `sqlserver` 包是因为我们正在使用 SQL Server 作为我们的数据库服务器）。打开 NuGet 包管理器（工具 | NuGet 包管理器 | 管理NuGet包）。
+要添加 EF core 支持，我们需要添加 EF 的核心 `sqlserver` 包（我们添加 `sqlserver` 包是因为我们正在使用 SQL Server 作为我们的数据库服务器）。打开 NuGet 包管理器（工具 | NuGet 包管理器 | 管理 NuGet 包）。
 
 打开 NuGet 包管理器并搜索 `Microsoft.EntityFrameworkCore.SqlServer`：
 
@@ -470,73 +560,185 @@ API网关实际上是一个中间层，通过它UI可以与微服务进行交互
 
 1.  进行更改，我们的 `ProductContext` 类将看起来像这样：
 
-[PRE6]
+```cs
+ using FlixOne.BookStore.ProductService.Models;
+ using Microsoft.EntityFrameworkCore;
+ namespace FlixOne.BookStore.ProductService.Contexts
+ {
+   public class ProductContext : DbContext
+   {
+     public ProductContext(DbContextOptions<
+     ProductContext>options): base(options)
+     { }
+     public ProductContext()
+     { }
+     public DbSet<Product> Products { get; set; }
+     public DbSet<Category> Categories { get; set; }
+   }
+ }
+```
 
 我们已经创建了上下文，但这个上下文与产品数据库是独立的。我们需要添加一个提供者和连接字符串，以便 `ProductContext` 可以与我们的数据库通信。
 
 1.  再次打开 `Startup.cs` 文件，并在 `ConfigureServices` 方法下添加 `SQL Server db` 提供器以支持我们的 EF Core。一旦添加了提供器的 `ConfigureServices` 方法，我们的 `Startup.cs` 文件将看起来像这样：
 
-[PRE7]
+```cs
+ public void ConfigureServices(IServiceCollection services)
+ {
+   // Add framework services.
+   services.AddMvc();
+   services.AddSingleton<IProductRepository, ProductRepository>();
+   services.AddDbContext<ProductContext>(o =>o.UseSqlServer
+   (Configuration.GetConnectionString("ProductsConnection" )));
+ }
+```
 
 1.  打开`appsettings.json`文件并添加所需的数据库连接字符串。在我们的提供者中，我们已经将连接密钥设置为`ProductsConnection`。因此，现在添加以下行以使用相同的密钥设置连接字符串（将数据源更改为您的数据源）：
 
-[PRE8]
+```cs
+ {
+   "ConnectionStrings": 
+   {
+     "ProductConnection":
+     "Data Source=.SQLEXPRESS;Initial Catalog=ProductsDB;
+     IntegratedSecurity=True;MultipleActiveResultSets=True"
+   }
+ }
+```
 
-# EF Core迁移
+# EF Core 迁移
 
-尽管我们已经创建了产品数据库，但不应低估EF Core迁移的力量。EF Core迁移将帮助我们执行对数据库的任何未来修改。这种修改可能是简单字段添加或对数据库结构的任何其他更新。我们可以简单地依赖这些EF Core迁移命令来为我们进行必要的更改。为了利用这一功能，请按照以下简单步骤操作：
+尽管我们已经创建了产品数据库，但不应低估 EF Core 迁移的力量。EF Core 迁移将帮助我们执行对数据库的任何未来修改。这种修改可能是简单字段添加或对数据库结构的任何其他更新。我们可以简单地依赖这些 EF Core 迁移命令来为我们进行必要的更改。为了利用这一功能，请按照以下简单步骤操作：
 
-1.  前往工具 | NuGet包管理器 | 包管理器控制台。
+1.  前往工具 | NuGet 包管理器 | 包管理器控制台。
 
 1.  从包管理器控制台运行以下命令：
 
-[PRE9]
+```cs
+Install--Package Microsoft.EntityFrameworkCore.Tools --pre
+Install--Package Microsoft.EntityFrameworkCore.Design 
+```
 
 1.  要启动迁移，运行以下命令：
 
-[PRE10]
+```cs
+ Add-Migration ProductDB
+```
 
 重要的一点是，这应该只在进行一次（当我们还没有通过此命令创建数据库时）。
 
 1.  现在，每当您的模型有任何更改时，只需执行以下命令：
 
-[PRE11]
+```cs
+Update-Database
+```
 
 # 数据库迁移
 
-在这个阶段，我们已经完成了`ProductDatabase`的创建。现在，是时候迁移我们现有的数据库了。有许许多多的方法可以做到这一点。我们目前拥有一个庞大的数据库的单体应用程序，其中包含大量的记录。仅使用数据库SQL脚本是无法迁移它们的。
+在这个阶段，我们已经完成了`ProductDatabase`的创建。现在，是时候迁移我们现有的数据库了。有许许多多的方法可以做到这一点。我们目前拥有一个庞大的数据库的单体应用程序，其中包含大量的记录。仅使用数据库 SQL 脚本是无法迁移它们的。
 
-我们需要显式地创建一个脚本以迁移包含所有数据的数据库。另一个选择是继续创建所需的DB包。根据您数据复杂性和记录的数量，您可能需要创建多个数据包以确保数据正确迁移到我们新创建的数据库`ProductDB`。
+我们需要显式地创建一个脚本以迁移包含所有数据的数据库。另一个选择是继续创建所需的 DB 包。根据您数据复杂性和记录的数量，您可能需要创建多个数据包以确保数据正确迁移到我们新创建的数据库`ProductDB`。
 
 # 重新审视仓储和控制器
 
 我们现在准备好通过我们新创建的仓储来促进模型和数据库之间的交互。在适当修改`ProductRepository`后，它将如下所示：
 
-[PRE12]
+```cs
+ using System.Collections.Generic;
+ using System.Linq;
+ using FlixOne.BookStore.ProductService.Contexts;
+ using FlixOne.BookStore.ProductService.Models;
+ namespace FlixOne.BookStore.ProductService.Persistence
+ {
+   public class ProductRepository : IProductRepository
+   {
+     private readonly ProductContext _context;
+     public ProductRepository(ProductContext context)
+     {
+       _context = context;
+     }
+     public void Add(Product Product)
+     {
+       _context.Add(Product);
+       _context.SaveChanges();
+     }
+     public IEnumerable<Product> GetAll() =>
+     _context.Products.Include(c => c.Category).ToList();
+     //Rest of the code has been deleted
+   }
+ }
+```
 
-# 介绍ViewModel
+# 介绍 ViewModel
 
 在`models`文件夹中添加一个新的类，命名为`ProductViewModel`。我们这样做是因为，在我们的单体应用程序中，每次我们搜索产品时，它应该显示在其产品类别中。为了支持这一点，我们需要将必要的字段纳入我们的视图模型。我们的`ProductViewModel`类将如下所示：
 
-[PRE13]
+```cs
+ using System;
+ namespace FlixOne.BookStore.ProductService.Models
+ {
+   public class ProductViewModel
+   {
+     public Guid ProductId { get; set; }
+     public string ProductName { get; set; }
+     public string ProductDescription { get; set; }
+     public string ProductImage { get; set; }
+     public decimal ProductPrice { get; set; }
+     public Guid CategoryId { get; set; }
+     public string CategoryName { get; set; }
+     public string CategoryDescription { get; set; }
+   }
+ }
+```
 
 # 重新审视产品控制器
 
-最后，我们准备好为`ProductService`创建REST API。在做出更改后，`ProductController`将如下所示：
+最后，我们准备好为`ProductService`创建 REST API。在做出更改后，`ProductController`将如下所示：
 
-[PRE14]
+```cs
+ using System.Linq;
+ using FlixOne.BookStore.ProductService.Models;
+ using FlixOne.BookStore.ProductService.Persistence;
+ using Microsoft.AspNetCore.Mvc;
+ namespace FlixOne.BookStore.ProductService.Controllers
+ {
+   [Route("api/[controller]")]
+   public class ProductController : Controller
+   {
+     private readonly IProductRepository _productRepository;
+     public ProductController(IProductRepository 
+     productRepository) => _productRepository = productRepository;
 
-我们已经完成了创建Web API所需的所有任务。现在，我们需要调整一些设置，以便客户端可以获取有关我们的Web API的信息。因此，在接下来的章节中，我们将向Web API文档中添加Swagger。
+    [HttpGet]
+    [Route("productlist")]
+    public IActionResult GetList() => new
+    OkObjectResult(_productRepository.GetAll().
+    Select(ToProductvm).ToList());
 
-# 添加Swagger支持
+    [HttpGet]
+    [Route("product/{productid}")]
+    public IActionResult Get(string productId)
+    {
+      var productModel = _productRepository.GetBy(new Guid(productId));
+      return new OkObjectResult(ToProductvm(productModel));
+    }
 
-我们在我们的API文档中使用Swagger。在这里，我们不会深入Swagger的细节（更多信息，请参阅[https://docs.microsoft.com/en-us/aspnet/core/tutorials/web-api-help-pages-using-swagger](https://docs.microsoft.com/en-us/aspnet/core/tutorials/web-api-help-pages-using-swagger))。
+     //Rest of code has been removed
+   }
+ }
+```
 
-Swagger是一个开源且著名的库，为Web API提供文档。有关更多信息，请参阅官方链接，[https://swagger.io/](https://swagger.io/)。
+我们已经完成了创建 Web API 所需的所有任务。现在，我们需要调整一些设置，以便客户端可以获取有关我们的 Web API 的信息。因此，在接下来的章节中，我们将向 Web API 文档中添加 Swagger。
 
-使用Swagger添加文档非常简单。按照以下步骤操作：
+# 添加 Swagger 支持
 
-1.  打开NuGet包管理器。
+我们在我们的 API 文档中使用 Swagger。在这里，我们不会深入 Swagger 的细节（更多信息，请参阅[`docs.microsoft.com/en-us/aspnet/core/tutorials/web-api-help-pages-using-swagger`](https://docs.microsoft.com/en-us/aspnet/core/tutorials/web-api-help-pages-using-swagger))。
+
+Swagger 是一个开源且著名的库，为 Web API 提供文档。有关更多信息，请参阅官方链接，[`swagger.io/`](https://swagger.io/)。
+
+使用 Swagger 添加文档非常简单。按照以下步骤操作：
+
+1.  打开 NuGet 包管理器。
 
 1.  搜索`Swashbuckle.AspNetCore`包。
 
@@ -558,33 +760,47 @@ Swagger是一个开源且著名的库，为Web API提供文档。有关更多信
 
 ![](img/20ceaa41-dd98-46f8-ace6-39f8a46fc3c5.png)
 
-1.  打开`Startup.cs`文件，移动到`ConfigureServices`方法，并添加以下行以注册Swagger生成器：
+1.  打开`Startup.cs`文件，移动到`ConfigureServices`方法，并添加以下行以注册 Swagger 生成器：
 
-[PRE15]
+```cs
+services.AddSwaggerGen(swagger =>
+{
+  swagger.SwaggerDoc("v1", new Info 
+  { Title = "Product APIs", Version = "v1" });
+});
+```
 
 1.  接下来，在`Configure`方法中添加以下代码：
 
-[PRE16]
+```cs
+app.UseSwagger();
+app.UseSwaggerUI(c =>
+{
+  c.SwaggerEndpoint("/swagger/v1/swagger.json", 
+  "My API V1");
+});
+
+```
 
 1.  按*F5*运行应用程序；您将获得一个默认页面。
 
-1.  通过在URL中添加swagger来打开Swagger文档。因此，URL将是`http://localhost:43552/swagger/`：
+1.  通过在 URL 中添加 swagger 来打开 Swagger 文档。因此，URL 将是`http://localhost:43552/swagger/`：
 
 ![](img/64e5272f-fc8a-4a65-be37-8a765d25ae75.png)
 
-上一张图像显示了产品API资源，您可以在Swagger文档页面中尝试这些API。
+上一张图像显示了产品 API 资源，您可以在 Swagger 文档页面中尝试这些 API。
 
-最后，我们已经完成了我们的单体.NET应用程序向微服务的过渡，并讨论了`ProductService`的逐步过渡。对于此应用程序还有更多步骤要来：
+最后，我们已经完成了我们的单体.NET 应用程序向微服务的过渡，并讨论了`ProductService`的逐步过渡。对于此应用程序还有更多步骤要来：
 
-+   微服务如何通信：这将在*第3章，集成技术和微服务*中讨论。
++   微服务如何通信：这将在*第三章，集成技术和微服务*中讨论。
 
-+   如何测试微服务：这将在**第4章，测试微服务**中讨论。
++   如何测试微服务：这将在**第四章，测试微服务**中讨论。
 
-+   部署微服务：这将在*[第5章](6843b0a1-0287-4d15-9e72-fdf228e52604.xhtml)，部署微服务*中讨论。
++   部署微服务：这将在*第五章，部署微服务*中讨论。
 
-+   如何确保我们的微服务安全，以及监控微服务：这将在*第6章，确保微服务安全*和*第7章，监控微服务*中讨论。
++   如何确保我们的微服务安全，以及监控微服务：这将在*第六章，确保微服务安全*和*第七章，监控微服务*中讨论。
 
-+   微服务如何扩展：这将在*第8章，扩展微服务*中讨论。
++   微服务如何扩展：这将在*第八章，扩展微服务*中讨论。
 
 # 摘要
 

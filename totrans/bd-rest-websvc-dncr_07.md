@@ -1,18 +1,18 @@
 # 持续集成和持续部署
 
-大多数项目都是团队合作的结果。团队可能位于不同的地方，也可能位于同一个地方，来自不同地点的成员必须同步工作，以确保他们的更改不会与其他团队成员发生冲突。一个系统只有在各种场景中使用后才会成熟；这些场景可能基于领域专家的经验，也可能来自生产环境。即使系统被视为完美的系统，也有可能在生产环境中崩溃。对于Web应用来说，由于性能问题、用户体验不佳等因素，条件更为关键。系统应该经过一个过程，在这个过程中，如果团队成员进行更改，代码在单元测试后进行集成，然后部署到相关环境中。
+大多数项目都是团队合作的结果。团队可能位于不同的地方，也可能位于同一个地方，来自不同地点的成员必须同步工作，以确保他们的更改不会与其他团队成员发生冲突。一个系统只有在各种场景中使用后才会成熟；这些场景可能基于领域专家的经验，也可能来自生产环境。即使系统被视为完美的系统，也有可能在生产环境中崩溃。对于 Web 应用来说，由于性能问题、用户体验不佳等因素，条件更为关键。系统应该经过一个过程，在这个过程中，如果团队成员进行更改，代码在单元测试后进行集成，然后部署到相关环境中。
 
-当我们提到部署时，Xcopy部署立刻浮现在我们的脑海中。在这种部署类型中，你只需构建并复制相关文件，然后部署/粘贴到相关环境中。
+当我们提到部署时，Xcopy 部署立刻浮现在我们的脑海中。在这种部署类型中，你只需构建并复制相关文件，然后部署/粘贴到相关环境中。
 
 在本章中，我们将讨论部署的基础知识以及新兴实践（如**持续集成**（**CI**）和**持续部署**（**CD**））的影响。我们将重点关注以下主题：
 
-+   Azure环境
++   Azure 环境
 
 +   发布/托管
 
-+   使用TFS online进行CI和CD
++   使用 TFS online 进行 CI 和 CD
 
-+   CI和CD的区别
++   CI 和 CD 的区别
 
 # 简介——部署术语
 
@@ -24,11 +24,11 @@
 
 # 持续集成
 
-每当开发者提交任何更改时，CI都会强制整个应用程序重新构建——应用程序代码被编译，并对其运行一系列全面的自动化测试。这种做法源于大型团队中频繁集成代码的问题。基本思想是保持软件更改的增量或变化尽可能小。这提供了软件处于可工作状态的信心。即使开发者的提交破坏了系统，使用此过程也容易修复。
+每当开发者提交任何更改时，CI 都会强制整个应用程序重新构建——应用程序代码被编译，并对其运行一系列全面的自动化测试。这种做法源于大型团队中频繁集成代码的问题。基本思想是保持软件更改的增量或变化尽可能小。这提供了软件处于可工作状态的信心。即使开发者的提交破坏了系统，使用此过程也容易修复。
 
 # 部署
 
-硬件配置、安装基础操作系统和正确的.NET框架版本是部署的先决条件。接下来，通过各个阶段将构建工件推进到生产环境中。这两部分的组合被称为部署阶段。在大多数应用程序中，部署阶段和发布阶段之间没有区别。
+硬件配置、安装基础操作系统和正确的.NET 框架版本是部署的先决条件。接下来，通过各个阶段将构建工件推进到生产环境中。这两部分的组合被称为部署阶段。在大多数应用程序中，部署阶段和发布阶段之间没有区别。
 
 # 持续部署
 
@@ -66,23 +66,23 @@
 
 +   **自给自足的团队**：作为 SOA 和微服务架构的先驱，亚马逊遵循“两个披萨团队”模式。这意味着一个微服务团队通常不会超过 7-10 名成员。这些团队成员将拥有所有必要的技能和角色；例如，开发、运维和业务分析师。这样的服务团队负责微服务的开发、运维和管理。
 
-+   **持续集成和持续部署**：CI和CD是实现基于微服务架构风格的系统中的RESTful服务的先决条件。能够频繁集成其工作的较小、自给自足的团队是微服务成功的前提。这种架构并不像单体架构那样简单。然而，自动化和定期推送代码升级的能力使团队能够处理复杂性。Team Foundation Online Services（**TFS**）、TeamCity和Jenkins等工具在这个领域非常受欢迎。
++   **持续集成和持续部署**：CI 和 CD 是实现基于微服务架构风格的系统中的 RESTful 服务的先决条件。能够频繁集成其工作的较小、自给自足的团队是微服务成功的前提。这种架构并不像单体架构那样简单。然而，自动化和定期推送代码升级的能力使团队能够处理复杂性。Team Foundation Online Services（**TFS**）、TeamCity 和 Jenkins 等工具在这个领域非常受欢迎。
 
-+   **基础设施即代码**：用代码表示硬件和基础设施组件，例如网络，这一想法是新的。它可以帮助你使部署环境，如集成、测试和生产，看起来完全相同。这意味着开发人员和测试工程师将能够在较低的环境中轻松地重现生产缺陷。使用CFEngine、Chef、Puppet、Ansible和PowerShell DSC等工具，你可以将整个基础设施写成代码。随着这一范式转变，你还可以将基础设施置于版本控制系统之下，并以部署工件的形式进行分发。
++   **基础设施即代码**：用代码表示硬件和基础设施组件，例如网络，这一想法是新的。它可以帮助你使部署环境，如集成、测试和生产，看起来完全相同。这意味着开发人员和测试工程师将能够在较低的环境中轻松地重现生产缺陷。使用 CFEngine、Chef、Puppet、Ansible 和 PowerShell DSC 等工具，你可以将整个基础设施写成代码。随着这一范式转变，你还可以将基础设施置于版本控制系统之下，并以部署工件的形式进行分发。
 
-+   **云计算的利用**：云计算是采用微服务的一个大催化剂。尽管如此，微服务部署并不强制使用云计算。云计算具有近乎无限的扩展性、弹性和快速部署能力。云是微服务的天然盟友，这是不言而喻的。因此，了解和使用Azure云将有助于你采用微服务。
++   **云计算的利用**：云计算是采用微服务的一个大催化剂。尽管如此，微服务部署并不强制使用云计算。云计算具有近乎无限的扩展性、弹性和快速部署能力。云是微服务的天然盟友，这是不言而喻的。因此，了解和使用 Azure 云将有助于你采用微服务。
 
-# Azure环境
+# Azure 环境
 
-Azure是微软提供各种云计算服务的一项服务。Azure是一个云平台，可以帮助你全球范围内构建、部署和管理应用程序。
+Azure 是微软提供各种云计算服务的一项服务。Azure 是一个云平台，可以帮助你全球范围内构建、部署和管理应用程序。
 
-在我们讨论Azure环境之前，我们应该了解云计算。
+在我们讨论 Azure 环境之前，我们应该了解云计算。
 
 # 云计算
 
 简而言之，云计算是一个提供各种基于计算机服务的存储/场所，包括存储、数据库、服务器和软件，通过互联网（在这里，互联网被称为云）。
 
-与云计算相关的术语有很多，你可以参考以下链接了解这些术语：[https://azure.microsoft.com/en-in/overview/cloud-computing-dictionary/](https://azure.microsoft.com/en-in/overview/cloud-computing-dictionary/)。
+与云计算相关的术语有很多，你可以参考以下链接了解这些术语：[`azure.microsoft.com/en-in/overview/cloud-computing-dictionary/`](https://azure.microsoft.com/en-in/overview/cloud-computing-dictionary/)。
 
 这些服务可以由任何人销售，提供这些云计算服务的供应商/公司被称为云服务提供商。
 
@@ -98,7 +98,7 @@ Azure是微软提供各种云计算服务的一项服务。Azure是一个云平�
 
 # 云的优势
 
-现在，云计算在IT资源相关业务增长中扮演着重要角色。如今，每个人都在从传统系统出发思考不同；正如这里所讨论的，云具有其优势，对所有用户都有益处：
+现在，云计算在 IT 资源相关业务增长中扮演着重要角色。如今，每个人都在从传统系统出发思考不同；正如这里所讨论的，云具有其优势，对所有用户都有益处：
 
 +   **选择并开始**：如果你有任何类型的云计算订阅，你无需思考，只需选择你的服务并从任何地方开始。你只需要互联网即可开始。
 
@@ -108,33 +108,33 @@ Azure是微软提供各种云计算服务的一项服务。Azure是一个云平�
 
 +   **可用性**：云计算最重要的好处之一是你无需担心服务的可用性，因为这些服务是全球可用的。例如，如果你从印度租用了虚拟机，那么即使你身处世界的另一端，你也不必担心使用这台机器。
 
-要决定哪个云提供商适合你，请参考 [https://azure.microsoft.com/en-in/overview/choosing-a-cloud-service-provider/](https://azure.microsoft.com/en-in/overview/choosing-a-cloud-service-provider/)。
+要决定哪个云提供商适合你，请参考 [`azure.microsoft.com/en-in/overview/choosing-a-cloud-service-provider/`](https://azure.microsoft.com/en-in/overview/choosing-a-cloud-service-provider/)。
 
 # 云计算服务模型
 
 云计算服务种类繁多，但最佳类型的云计算服务被定义为以下几种（其他类型仅基于这些服务类型）：
 
-+   **基础设施即服务**（**IaaS**）：这提供基础设施，即存储、虚拟机等。更多信息，请访问 [https://azure.microsoft.com/en-in/overview/what-is-iaas/](https://azure.microsoft.com/en-in/overview/what-is-iaas/)。
++   **基础设施即服务**（**IaaS**）：这提供基础设施，即存储、虚拟机等。更多信息，请访问 [`azure.microsoft.com/en-in/overview/what-is-iaas/`](https://azure.microsoft.com/en-in/overview/what-is-iaas/)。
 
-+   **平台即服务**（**PaaS**）：这提供了一种按需环境，用于开发、测试或管理应用程序等活动。更多信息，请访问 [https://azure.microsoft.com/en-in/overview/what-is-paas/](https://azure.microsoft.com/en-in/overview/what-is-paas/)。
++   **平台即服务**（**PaaS**）：这提供了一种按需环境，用于开发、测试或管理应用程序等活动。更多信息，请访问 [`azure.microsoft.com/en-in/overview/what-is-paas/`](https://azure.microsoft.com/en-in/overview/what-is-paas/)。
 
-+   **软件即服务**（**SaaS**）：这提供按需的软件应用程序。云计算提供商可能提供各种订阅模式，你可以在这些模式下订阅特定的软件应用程序。更多信息，请访问 [https://azure.microsoft.com/en-in/overview/what-is-saas/](https://azure.microsoft.com/en-in/overview/what-is-saas/)。
++   **软件即服务**（**SaaS**）：这提供按需的软件应用程序。云计算提供商可能提供各种订阅模式，你可以在这些模式下订阅特定的软件应用程序。更多信息，请访问 [`azure.microsoft.com/en-in/overview/what-is-saas/`](https://azure.microsoft.com/en-in/overview/what-is-saas/)。
 
-# 讨论Azure环境
+# 讨论 Azure 环境
 
-Azure环境提供了一种通过互联网获取其各种服务的方式。以下截图代表所有云计算服务模型的典型概述：
+Azure 环境提供了一种通过互联网获取其各种服务的方式。以下截图代表所有云计算服务模型的典型概述：
 
 ![图片](img/2378a57b-cbdd-4a88-a71a-b6757aa35708.png)
 
-它显示了IaaS作为一个非常基础的模型，提供服务器和存储，以及SaaS作为一个高级模型，几乎提供所有云计算服务。
+它显示了 IaaS 作为一个非常基础的模型，提供服务器和存储，以及 SaaS 作为一个高级模型，几乎提供所有云计算服务。
 
-# 从Azure开始
+# 从 Azure 开始
 
 要开始使用 Azure，您需要访问 Azure 门户。按照以下步骤操作：
 
-1.  使用此链接登录 Azure 门户：[https://portal.azure.com](https://portal.azure.com)。
+1.  使用此链接登录 Azure 门户：[`portal.azure.com`](https://portal.azure.com)。
 
-如果您没有 Azure 账户，可以在此免费创建一个：[https://azure.microsoft.com/en-in/free/](https://azure.microsoft.com/en-in/free/)。
+如果您没有 Azure 账户，可以在此免费创建一个：[`azure.microsoft.com/en-in/free/`](https://azure.microsoft.com/en-in/free/)。
 
 1.  登录后，您将看到如下截图所示的仪表板：
 
@@ -150,13 +150,13 @@ Azure 门户仪表板
 
 发布/托管是一个使您的应用程序公开可用的服务。应用程序可以存储在托管提供商提供的服务器上。在本节中，我们将使用 TFS（现在为 VSTS）：请参阅[ https://www.visualstudio.com/tfs/](https://www.visualstudio.com/tfs/)。
 
-如果您的现有项目托管在 TFS 上，您需要将其迁移。有关更多详细信息，请参阅此链接：[https://www.visualstudio.com/team-services/migrate-tfs-vsts/](https://www.visualstudio.com/team-services/migrate-tfs-vsts/)。
+如果您的现有项目托管在 TFS 上，您需要将其迁移。有关更多详细信息，请参阅此链接：[`www.visualstudio.com/team-services/migrate-tfs-vsts/`](https://www.visualstudio.com/team-services/migrate-tfs-vsts/)。
 
 # 项目托管
 
 您需要访问 Visual Studio Online/TFS Online（现在为 VSTS）以托管项目。为此，您需要按照以下步骤操作：
 
-1.  使用您首选的浏览器访问 [https://www.visualstudio.com/vso/](https://www.visualstudio.com/vso/)。
+1.  使用您首选的浏览器访问 [`www.visualstudio.com/vso/`](https://www.visualstudio.com/vso/)。
 
 1.  点击登录，如下所示：
 
@@ -186,13 +186,13 @@ VSTS 我的个人资料页面
 
 1.  选择您的版本控制 – 您将可以选择 Git 或 团队基础版版本控制（TFVC）。
 
-如果您对选项感到困惑，请参考此链接以比较 Git 和 TFVC：[https://docs.microsoft.com/en-us/vsts/tfvc/comparison-git-tfvc?view=vsts](https://docs.microsoft.com/en-us/vsts/tfvc/comparison-git-tfvc?view=vsts)。
+如果您对选项感到困惑，请参考此链接以比较 Git 和 TFVC：[`docs.microsoft.com/en-us/vsts/tfvc/comparison-git-tfvc?view=vsts`](https://docs.microsoft.com/en-us/vsts/tfvc/comparison-git-tfvc?view=vsts)。
 
 在我们的情况下，选择团队基础版版本控制：
 
 ![图片](img/4cefeeaf-ef05-4b2d-be5f-51c15d4a57f4.png)
 
-1.  现在，选择工作项流程，参考[https://docs.microsoft.com/en-us/vsts/work/work-items/guidance/choose-process?view=vsts](https://docs.microsoft.com/en-us/vsts/work/work-items/guidance/choose-process?view=vsts)了解可用的各种选项。在我们的情况下，选择Scrum：
+1.  现在，选择工作项流程，参考[`docs.microsoft.com/en-us/vsts/work/work-items/guidance/choose-process?view=vsts`](https://docs.microsoft.com/en-us/vsts/work/work-items/guidance/choose-process?view=vsts)了解可用的各种选项。在我们的情况下，选择 Scrum：
 
 ![图片](img/ad3723c6-bb5f-40eb-aafe-ffa61016c796.png)
 
@@ -202,7 +202,7 @@ VSTS 我的个人资料页面
 
 ![图片](img/879ea8b9-c37d-4c9b-989a-e753eb8a77a8.png)
 
-FlixOneProductServices项目主屏幕
+FlixOneProductServices 项目主屏幕
 
 1.  项目主屏幕是一个快速显示页面，您可以快速查看所有活动。
 
@@ -214,7 +214,7 @@ FlixOneProductServices项目主屏幕
 
 ![图片](img/fb5d2973-15aa-42ed-a65d-e7ffd7d9cf73.png)
 
-FlixOneProductServices项目仪表板
+FlixOneProductServices 项目仪表板
 
 从项目仪表板，您可以通过添加新控件或删除现有控件来编辑您的控件。前面的截图显示了我们的项目的默认视图。
 
@@ -224,7 +224,7 @@ FlixOneProductServices项目仪表板
 
 ![图片](img/d8dbdafd-ac7d-4828-aec7-bf95ecc33865.png)
 
-FlixOneProductServices项目的代码屏幕
+FlixOneProductServices 项目的代码屏幕
 
 您可以查看以下内容：
 
@@ -334,7 +334,7 @@ FlixOneProductServices项目的代码屏幕
 
 # 测试
 
-VSTS 的这个屏幕可以帮助您创建各种测试计划，以便您可以跟踪冲刺的手动测试。它有助于监控当前冲刺的手动测试何时完成。我们在第 6 章[测试 RESTful Web 服务](17c8ef83-d95b-41af-9b61-54f69981bc3a.xhtml)中讨论了测试的各个术语。
+VSTS 的这个屏幕可以帮助您创建各种测试计划，以便您可以跟踪冲刺的手动测试。它有助于监控当前冲刺的手动测试何时完成。我们在第六章测试 RESTful Web 服务中讨论了测试的各个术语。
 
 在以下部分，我们将看到通过创建测试计划和测试用例，这是如何帮助我们测试冲刺的。
 
@@ -396,7 +396,7 @@ Wiki 页面帮助团队成员共同工作。这些页面可以包括项目文档
 
 创建 Wiki
 
-您可以从“创建 Wiki 页面模板”中添加任意数量的页面。Wiki 页面支持 Markdown：[https://docs.microsoft.com/en-us/vsts/collaborate/markdown-guidance?view=vsts](https://docs.microsoft.com/en-us/vsts/collaborate/markdown-guidance?view=vsts)。
+您可以从“创建 Wiki 页面模板”中添加任意数量的页面。Wiki 页面支持 Markdown：[`docs.microsoft.com/en-us/vsts/collaborate/markdown-guidance?view=vsts`](https://docs.microsoft.com/en-us/vsts/collaborate/markdown-guidance?view=vsts)。
 
 # “构建和发布”选项卡
 
@@ -460,9 +460,9 @@ Wiki 页面帮助团队成员共同工作。这些页面可以包括项目文档
 
 构建步骤
 
-# 启动CD发布流程
+# 启动 CD 发布流程
 
-你已经设置了CI流程，现在是时候进行CD了。转到“发布”选项卡，然后点击“新建定义”按钮：
+你已经设置了 CI 流程，现在是时候进行 CD 了。转到“发布”选项卡，然后点击“新建定义”按钮：
 
 ![图片](img/03ef9076-cfe3-4e4d-96d5-ea839fdc771f.png)
 
@@ -472,7 +472,7 @@ Wiki 页面帮助团队成员共同工作。这些页面可以包括项目文档
 
 ![图片](img/8c5ab7bd-6577-4e86-b2a6-4edf0d971451.png)
 
-选择Azure App Service部署
+选择 Azure App Service 部署
 
 通过选择你的仓库或构建来将工件添加到发布定义中，参考以下截图：
 
@@ -480,7 +480,7 @@ Wiki 页面帮助团队成员共同工作。这些页面可以包括项目文档
 
 添加工件
 
-为你的部署环境设置值，你将使用什么Azure服务或应用类型，等等。参考以下截图：
+为你的部署环境设置值，你将使用什么 Azure 服务或应用类型，等等。参考以下截图：
 
 ![图片](img/272a86d1-ccc5-4347-b6db-dcefc5fe6956.png)
 
@@ -492,10 +492,10 @@ Wiki 页面帮助团队成员共同工作。这些页面可以包括项目文档
 
 发布部署状态
 
-我们尚未部署我们的发布，所以其状态为“未部署”。你可以手动触发部署。这个发布是为了开发环境——你可以设置你想要的任何数量的环境。在本节中，我们介绍了如何使用VSTS启动CI和CD。
+我们尚未部署我们的发布，所以其状态为“未部署”。你可以手动触发部署。这个发布是为了开发环境——你可以设置你想要的任何数量的环境。在本节中，我们介绍了如何使用 VSTS 启动 CI 和 CD。
 
 # 摘要
 
-部署术语使团队在其工作中保持一致，即使团队在不同的地理区域工作。借助CI/CD，当项目中的任何团队在提交后立即收到更改时，CI/CD团队保持同步。
+部署术语使团队在其工作中保持一致，即使团队在不同的地理区域工作。借助 CI/CD，当项目中的任何团队在提交后立即收到更改时，CI/CD 团队保持同步。
 
 在下一章中，我们将讨论开发日常活动中的一种测试范式。我们将讨论与测试范式相关的重要术语，包括这些术语的理论，然后我们将讨论具有对存根、模拟和了解集成、安全性和性能测试的了解的代码示例。

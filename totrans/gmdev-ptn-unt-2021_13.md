@@ -16,9 +16,9 @@
 
 本章是实践性的，因此你需要对 Unity 和 C# 有基本的了解。
 
-本章的代码文件可以在 GitHub 上找到，地址为 [https://github.com/PacktPublishing/Game-Development-Patterns-with-Unity-2021-Second-Edition/tree/main/Assets/Chapters/Chapter11](https://github.com/PacktPublishing/Game-Development-Patterns-with-Unity-2021-Second-Edition/tree/main/Assets/Chapters/Chapter11)。
+本章的代码文件可以在 GitHub 上找到，地址为 [`github.com/PacktPublishing/Game-Development-Patterns-with-Unity-2021-Second-Edition/tree/main/Assets/Chapters/Chapter11`](https://github.com/PacktPublishing/Game-Development-Patterns-with-Unity-2021-Second-Edition/tree/main/Assets/Chapters/Chapter11)。
 
-查看以下视频以查看代码的实际效果：[https://bit.ly/2TdeoL4](https://bit.ly/2TdeoL4)[.](https://bit.ly/2TdeoL4)
+查看以下视频以查看代码的实际效果：[`bit.ly/2TdeoL4`](https://bit.ly/2TdeoL4)[.](https://bit.ly/2TdeoL4)
 
 # 理解策略模式
 
@@ -78,7 +78,7 @@
 
 # 设计敌方无人机
 
-我们游戏中的敌方无人机并不非常聪明；背后没有运行人工智能。这些是具有机器人行为的机器人，在视频游戏中，敌人具有可预测的自动化行为并在循环中运行是很常见的。例如，在原始《超级马里奥兄弟》中的Goombas只是朝一个方向走；他们没有意识到马里奥的存在，也不会对他做出反应。他们只是在运行一个算法，使他们沿着路径徘徊，直到撞到障碍物。单独来看，他们并不构成威胁，但如果将它们编队或定位在地图上导航困难的位置，它们就会变得难以躲避。
+我们游戏中的敌方无人机并不非常聪明；背后没有运行人工智能。这些是具有机器人行为的机器人，在视频游戏中，敌人具有可预测的自动化行为并在循环中运行是很常见的。例如，在原始《超级马里奥兄弟》中的 Goombas 只是朝一个方向走；他们没有意识到马里奥的存在，也不会对他做出反应。他们只是在运行一个算法，使他们沿着路径徘徊，直到撞到障碍物。单独来看，他们并不构成威胁，但如果将它们编队或定位在地图上导航困难的位置，它们就会变得难以躲避。
 
 我们将使用相同的方法来设计我们的敌方无人机。单独来看，它们很容易被打败，因为它们不能根据玩家的动作改变行为，但在编队中，它们可能很难躲避。
 
@@ -96,13 +96,13 @@
 
 ![图片](img/a2c7f88d-444e-47d8-880b-a01102961ed3.png)
 
-图11.2 – 无人机攻击机动的示意图
+图 11.2 – 无人机攻击机动的示意图
 
-敌人无人机有一件武器：一个向前发射的45度角激光束。以下图示展示了无人机的激光武器：
+敌人无人机有一件武器：一个向前发射的 45 度角激光束。以下图示展示了无人机的激光武器：
 
 ![图片](img/d26c7ff3-661e-4fa1-8faf-a428685bd87e.png)
 
-图11.3 – 无人机武器攻击的示意图
+图 11.3 – 无人机武器攻击的示意图
 
 如我们所见，玩家必须通过高速绕过无人机来避免攻击。如果被光束击中，自行车的正面护盾将损失一定量的能量。如果护盾耗尽，车辆将在下一次被击中时爆炸，游戏结束。
 
@@ -118,17 +118,79 @@
 
 1.  我们的第一个元素是策略接口；我们所有的具体策略都将使用它：
 
-[PRE0]
+```cs
+namespace Chapter.Strategy
+{
+    public interface IManeuverBehaviour
+    {
+        void Maneuver(Drone drone);
+    }
+}
+```
 
 注意，我们正在将`Drone`类型的参数传递给`Maneuver()`方法。这是一个我们稍后会回顾的重要细节。
 
 1.  接下来是我们的`Drone`类；它将使用我们的具体策略，因此在策略模式的整体结构中，我们将将其视为我们的`Context`类：
 
-[PRE1]
+```cs
+using UnityEngine;
+
+namespace Chapter.Strategy {
+    public class Drone : MonoBehaviour {
+
+        // Ray parameters
+        private RaycastHit _hit;
+        private Vector3 _rayDirection;
+        private float _rayAngle = -45.0f;
+        private float _rayDistance = 15.0f;
+
+        // Movement parameters
+        public float speed = 1.0f;
+        public float maxHeight = 5.0f;
+        public float weavingDistance = 1.5f;
+        public float fallbackDistance = 20.0f;
+
+        void Start() {
+            _rayDirection = 
+                transform.TransformDirection(Vector3.back) 
+                * _rayDistance;
+
+            _rayDirection = 
+                Quaternion.Euler(_rayAngle, 0.0f, 0f) 
+                * _rayDirection;
+        }
+
+        public void ApplyStrategy(IManeuverBehaviour strategy) {
+            strategy.Maneuver(this);
+        }
+
+        void Update() {
+            Debug.DrawRay(transform.position, 
+                _rayDirection, Color.blue);
+
+            if (Physics.Raycast(
+                transform.position,
+                _rayDirection, out _hit, _rayDistance)) {
+
+                if (_hit.collider) {
+                    Debug.DrawRay(
+                        transform.position, 
+                        _rayDirection, Color.green);
+                }
+            }
+        }
+    }
+}
+```
 
 这个类中的大多数代码行都是用于射线投射调试信息；我们可以安全地忽略它们。然而，以下部分是理解的关键：
 
-[PRE2]
+```cs
+public void ApplyStrategy(IManeuverBehaviour strategy)
+{
+    strategy.Maneuver(this);
+}
+```
 
 `ApplyStrategy()`方法包含了策略模式的核心机制。如果我们仔细观察，我们可以看到，相关的方法接受一个`IManeuverBehaviour`类型的具体策略作为参数。这里事情变得非常有趣。一个`Drone`对象可以通过`IManeuverBehaviour`接口与其接收到的具体策略进行通信。因此，它只需要调用`Maneuver()`在运行时执行策略。因此，一个`Drone`对象不需要知道策略的行为/算法是如何执行的——它只需要了解其接口。
 
@@ -136,31 +198,191 @@
 
 1.  以下类实现了弹跳机动：
 
-[PRE3]
+```cs
+using UnityEngine;
+using System.Collections;
+
+namespace Chapter.Strategy {
+    public class BoppingManeuver : 
+        MonoBehaviour, IManeuverBehaviour { 
+
+        public void Maneuver(Drone drone) {
+            StartCoroutine(Bopple(drone));
+        }
+
+        IEnumerator Bopple(Drone drone)
+        {
+            float time;
+            bool isReverse = false;
+            float speed = drone.speed;
+            Vector3 startPosition = drone.transform.position;
+            Vector3 endPosition = startPosition;
+            endPosition.y = drone.maxHeight;
+
+            while (true) {
+                time = 0;
+                Vector3 start = drone.transform.position;
+                Vector3 end = 
+                    (isReverse) ? startPosition : endPosition;
+
+                while (time < speed) {
+                    drone.transform.position = 
+                        Vector3.Lerp(start, end, time / speed);
+                    time += Time.deltaTime;
+                    yield return null;
+                }
+
+                yield return new WaitForSeconds(1);
+                isReverse = !isReverse;
+            }
+        }
+    }
+}
+```
 
 1.  以下类实现了编织机动：
 
-[PRE4]
+```cs
+using UnityEngine;
+using System.Collections;
+
+namespace Chapter.Strategy {
+    public class WeavingManeuver : 
+        MonoBehaviour, IManeuverBehaviour {
+
+        public void Maneuver(Drone drone) {
+            StartCoroutine(Weave(drone));
+        }
+
+        IEnumerator Weave(Drone drone) {
+            float time;
+            bool isReverse = false;
+            float speed = drone.speed;
+            Vector3 startPosition = drone.transform.position;
+            Vector3 endPosition = startPosition;
+            endPosition.x = drone.weavingDistance;
+
+            while (true) {
+                time = 0;
+                Vector3 start = drone.transform.position;
+                Vector3 end = 
+                    (isReverse) ? startPosition : endPosition;
+
+                while (time < speed) {
+                    drone.transform.position = 
+                        Vector3.Lerp(start, end, time / speed);
+
+                    time += Time.deltaTime;
+
+                    yield return null;
+                }
+
+                yield return new WaitForSeconds(1);
+                isReverse = !isReverse;
+            }
+        }
+    }
+}
+```
 
 1.  最后，让我们实现回退机动：
 
-[PRE5]
+```cs
+using UnityEngine;
+using System.Collections;
+
+namespace Chapter.Strategy
+{
+    public class FallbackManeuver : 
+        MonoBehaviour, IManeuverBehaviour {
+
+        public void Maneuver(Drone drone) {
+            StartCoroutine(Fallback(drone));
+        }
+
+        IEnumerator Fallback(Drone drone)
+        {
+            float time = 0;
+            float speed = drone.speed;
+            Vector3 startPosition = drone.transform.position;
+            Vector3 endPosition = startPosition;
+            endPosition.z = drone.fallbackDistance;
+
+            while (time < speed)
+            {
+                drone.transform.position = 
+                    Vector3.Lerp(
+                        startPosition, endPosition, time / speed);
+
+                time += Time.deltaTime;
+
+                yield return null;
+            }
+        }
+    }
+}
+```
 
 你可能已经注意到，每个类的代码相当相似，甚至在某些部分重复。这就是我们使用策略模式的原因之一——我们希望封装类似行为的变体，以便更容易单独维护。但同样，想象一下，如果我们试图在一个类中实现跳跃、穿梭和回退行为，我们的`Drone`类会多么混乱。我们可能会发现自己在一个充满条件语句的膨胀的`Drone`类中。
 
-我不建议使用协程来动画化非人类实体。相反，我建议使用如DOTween之类的Tween引擎，因为你可以用更少的代码来动画化对象，并获得更好的效果。我们在这章中使用协程是为了避免外部依赖，并使我们的代码易于移植。要了解更多关于DOTween的信息，请访问 [http://dotween.demigiant.com](http://dotween.demigiant.com/)。
+我不建议使用协程来动画化非人类实体。相反，我建议使用如 DOTween 之类的 Tween 引擎，因为你可以用更少的代码来动画化对象，并获得更好的效果。我们在这章中使用协程是为了避免外部依赖，并使我们的代码易于移植。要了解更多关于 DOTween 的信息，请访问 [`dotween.demigiant.com`](http://dotween.demigiant.com/)。
 
 ## 测试敌方无人机实现
 
-现在是时候进行有趣的部分了——测试我们的实现。这将会很容易，因为我们需要做的只是将以下客户端类附加到Unity场景中的一个空`GameObject`上：
+现在是时候进行有趣的部分了——测试我们的实现。这将会很容易，因为我们需要做的只是将以下客户端类附加到 Unity 场景中的一个空`GameObject`上：
 
-[PRE6]
+```cs
+using UnityEngine;
+using System.Collections.Generic;
 
-在你的Unity实例中，如果你在项目中包含了前面几节中编写的所有脚本，当你启动它时，你应该在屏幕上看到一个名为“Spawn Drone”的单个按钮，如下面的截图所示：
+namespace Chapter.Strategy {
+    public class ClientStrategy : MonoBehaviour {
+
+        private GameObject _drone;
+
+        private List<IManeuverBehaviour> 
+            _components = new List<IManeuverBehaviour>();
+
+        private void SpawnDrone() {
+            _drone = 
+                GameObject.CreatePrimitive(PrimitiveType.Cube);
+
+            _drone.AddComponent<Drone>();
+
+            _drone.transform.position = 
+                Random.insideUnitSphere * 10;
+
+            ApplyRandomStrategies();
+        }
+
+        private void ApplyRandomStrategies() {
+            _components.Add(
+                _drone.AddComponent<WeavingManeuver>());
+            _components.Add(
+                _drone.AddComponent<BoppingManeuver>());
+            _components.Add(
+                _drone.AddComponent<FallbackManeuver>());
+
+            int index = Random.Range(0, _components.Count);
+
+            _drone.GetComponent<Drone>().
+                ApplyStrategy(_components[index]);
+        }
+
+        void OnGUI() {
+            if (GUILayout.Button("Spawn Drone")) {
+                SpawnDrone();
+            }
+        }
+    }
+}
+```
+
+在你的 Unity 实例中，如果你在项目中包含了前面几节中编写的所有脚本，当你启动它时，你应该在屏幕上看到一个名为“Spawn Drone”的单个按钮，如下面的截图所示：
 
 ![](img/75f67a2a-f8c9-4b8b-a0c3-0f07bd89a6b2.png)
 
-图11.4 – 在Unity中运行的代码示例
+图 11.4 – 在 Unity 中运行的代码示例
 
 如果你点击场景的主按钮，一个代表无人机实体的新立方体应该出现在一个随机位置，同时执行一个随机选择的攻击机动。
 
@@ -170,13 +392,13 @@
 
 # 审查替代解决方案
 
-本章中展示的代码示例有一个明显的问题。我们将攻击机动行为封装到不同的策略类中，但每个机动不过是一个在循环中运行的单一动画。因此，在一个由包括动画师在内的制作团队构建的实际游戏项目中，我不会通过使用协程或甚至一个Tween动画引擎在代码中动画化敌方无人机。相反，我会要求一个动画师在一个外部创作工具中创作一些详细的攻击机动动画，然后将它们作为动画剪辑导入Unity。然后我会使用Unity的本地动画系统和其状态机功能来动态地将攻击机动动画分配给无人机。
+本章中展示的代码示例有一个明显的问题。我们将攻击机动行为封装到不同的策略类中，但每个机动不过是一个在循环中运行的单一动画。因此，在一个由包括动画师在内的制作团队构建的实际游戏项目中，我不会通过使用协程或甚至一个 Tween 动画引擎在代码中动画化敌方无人机。相反，我会要求一个动画师在一个外部创作工具中创作一些详细的攻击机动动画，然后将它们作为动画剪辑导入 Unity。然后我会使用 Unity 的本地动画系统和其状态机功能来动态地将攻击机动动画分配给无人机。
 
 如果我决定无人机可以在内部状态改变时切换攻击，那么使用这种方法，我将在动画质量和从一种攻击行为平滑过渡到另一种攻击行为之间的灵活性方面获得提升。因此，我会放弃将每个攻击行为封装到策略类中的想法，而是将它们定义为有限状态。这种切换不会在设计中引起重大变化，因为驱动有限状态机（FSM）、状态和策略模式的概念是紧密相关的。
 
-尽管本章中展示的策略模式实现是有效的，但在管理实体的动画集时，首先考虑使用Unity的动画系统原生的功能是明智的。但想象另一种用例，其中我们需要实现运动检测算法的变体，并在运行时将它们分配给无人机。在这种情况下，策略模式将是构建该系统的绝佳选择。
+尽管本章中展示的策略模式实现是有效的，但在管理实体的动画集时，首先考虑使用 Unity 的动画系统原生的功能是明智的。但想象另一种用例，其中我们需要实现运动检测算法的变体，并在运行时将它们分配给无人机。在这种情况下，策略模式将是构建该系统的绝佳选择。
 
-您可以在[https://docs.unity3d.com/2021.2/Documentation/Manual/AnimationOverview.html](https://docs.unity3d.com/2021.2/Documentation/Manual/AnimationOverview.html)上阅读Unity原生动画系统的官方文档。
+您可以在[`docs.unity3d.com/2021.2/Documentation/Manual/AnimationOverview.html`](https://docs.unity3d.com/2021.2/Documentation/Manual/AnimationOverview.html)上阅读 Unity 原生动画系统的官方文档。
 
 # 摘要
 

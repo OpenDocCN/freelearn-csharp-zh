@@ -1,58 +1,58 @@
-# 原始数据类型、集合、LINQ以及更多
+# 原始数据类型、集合、LINQ 以及更多
 
 在本章中，我们将介绍以下内容：
 
-+   构建一个使用原始数据类型的.NET Standard 2.0库
++   构建一个使用原始数据类型的.NET Standard 2.0 库
 
-+   构建一个用于使用库的.NET控制台应用程序
++   构建一个用于使用库的.NET 控制台应用程序
 
 +   创建集合
 
-+   构建一个用于使用库的WPF应用程序
++   构建一个用于使用库的 WPF 应用程序
 
 +   使用反射描述我们的库
 
-+   构建一个用于使用库的.NET Core控制台应用程序
++   构建一个用于使用库的.NET Core 控制台应用程序
 
-+   构建一个使用LINQ的.NET Standard 2.0库
++   构建一个使用 LINQ 的.NET Standard 2.0 库
 
-+   构建一个用于使用库的ASP.NET MVC应用程序
++   构建一个用于使用库的 ASP.NET MVC 应用程序
 
 # 技术要求
 
-读者应该具备基本的C#知识。他们还应该了解如何使用Visual Studio，使用NuGet安装包，以及在其他项目中引用项目中的库。
+读者应该具备基本的 C#知识。他们还应该了解如何使用 Visual Studio，使用 NuGet 安装包，以及在其他项目中引用项目中的库。
 
-本章的代码文件可以在GitHub上找到：
+本章的代码文件可以在 GitHub 上找到：
 
-[https://github.com/PacktPublishing/DotNET-Standard-2-Cookbook/tree/master/Chapter02](https://github.com/PacktPublishing/DotNET-Standard-2-Cookbook/tree/master/Chapter02)
+[`github.com/PacktPublishing/DotNET-Standard-2-Cookbook/tree/master/Chapter02`](https://github.com/PacktPublishing/DotNET-Standard-2-Cookbook/tree/master/Chapter02)
 
 查看以下视频以查看代码的实际操作：
 
-[https://goo.gl/BiXiAM](https://goo.gl/BiXiAM)
+[`goo.gl/BiXiAM`](https://goo.gl/BiXiAM)
 
 # 简介
 
-当您将C#视为一种语言时，有一些事情我们需要首先考虑：C#能做什么，它如何支持我们的日常编程需求，以及它如何帮助我们解决问题。在本章中，我们将主要探讨C#支持的原始数据类型、集合和LINQ功能。在完整的.NET Framework中，使用这些功能没有问题，但当涉及到跨平台和.NET Framework不同版本之间的代码共享时，它确实成为一个问题。
+当您将 C#视为一种语言时，有一些事情我们需要首先考虑：C#能做什么，它如何支持我们的日常编程需求，以及它如何帮助我们解决问题。在本章中，我们将主要探讨 C#支持的原始数据类型、集合和 LINQ 功能。在完整的.NET Framework 中，使用这些功能没有问题，但当涉及到跨平台和.NET Framework 不同版本之间的代码共享时，它确实成为一个问题。
 
-每个菜谱都将通过构建.NET Standard 2.0库以及如何使用它来介绍如何与使用.NET Framework版本的程序一起使用。
+每个菜谱都将通过构建.NET Standard 2.0 库以及如何使用它来介绍如何与使用.NET Framework 版本的程序一起使用。
 
-# 构建一个使用原始数据类型的.NET Standard 2.0库
+# 构建一个使用原始数据类型的.NET Standard 2.0 库
 
-在这个菜谱中，我们将探讨C#原始数据类型及其在.NET Standard 2.0库中的使用。原始数据类型是框架的核心部分之一。这些类型是在.NET Framework本身中定义的，而不是在C#语言规范中定义的。
+在这个菜谱中，我们将探讨 C#原始数据类型及其在.NET Standard 2.0 库中的使用。原始数据类型是框架的核心部分之一。这些类型是在.NET Framework 本身中定义的，而不是在 C#语言规范中定义的。
 
-我们将构建一个使用.NET Framework中的原始数据类型的.NET Standard 2.0库，并在下一个菜谱中使用它。
+我们将构建一个使用.NET Framework 中的原始数据类型的.NET Standard 2.0 库，并在下一个菜谱中使用它。
 
 # 准备工作
 
-如前所述，原始数据类型是在.NET Framework本身中定义的，并且不是特定于语言的。这意味着您可以在.NET Framework支持的所有语言中使用这些数据类型。这并不意味着您可以在不同版本的.NET Framework中使用这些原始数据类型。例如，如果一个数据类型是在.NET Framework版本4.6.1中定义的，而在.NET Core 2.0中没有定义，那么您的代码将在.NET Core 2.0中失败。
+如前所述，原始数据类型是在.NET Framework 本身中定义的，并且不是特定于语言的。这意味着您可以在.NET Framework 支持的所有语言中使用这些数据类型。这并不意味着您可以在不同版本的.NET Framework 中使用这些原始数据类型。例如，如果一个数据类型是在.NET Framework 版本 4.6.1 中定义的，而在.NET Core 2.0 中没有定义，那么您的代码将在.NET Core 2.0 中失败。
 
-此外，请确保您拥有最新的Visual Studio版本，即写作时的2017版本。
+此外，请确保您拥有最新的 Visual Studio 版本，即写作时的 2017 版本。
 
 # 如何操作...
 
-1.  打开Visual Studio 2017。
+1.  打开 Visual Studio 2017。
 
-1.  点击“文件”|“新建”|“项目”，然后在“新建项目模板”对话框中，在左侧窗格的“其他项目类型”节点下选择“Visual Studio解决方案”，然后在右侧窗格中选择“空白解决方案”。
+1.  点击“文件”|“新建”|“项目”，然后在“新建项目模板”对话框中，在左侧窗格的“其他项目类型”节点下选择“Visual Studio 解决方案”，然后在右侧窗格中选择“空白解决方案”。
 
 1.  在“名称”文本框中，输入`Chapter2.Primitives`作为解决方案的名称。在“位置”下拉列表中选择一个首选位置，或点击“浏览...”按钮选择一个位置。保留默认设置。
 
@@ -60,7 +60,7 @@
 
 1.  点击“确定”。
 
-1.  现在，在解决方案资源管理器中（或按*Ctrl* + *Alt* + *L*），选择Chapter2.Primitives。右键单击，选择“添加”|“新建项目**”。**
+1.  现在，在解决方案资源管理器中（或按*Ctrl* + *Alt* + *L*），选择 Chapter2.Primitives。右键单击，选择“添加”|“新建项目**”。**
 
 1.  在“添加新项目”对话框中，展开“Visual C#”节点，在左侧窗格中选择.NET Standard。
 
@@ -86,13 +86,35 @@
 
 1.  在`Helpers`类的花括号之间输入以下代码：
 
-[PRE0]
+```cs
+      public char WhatIsMyGrade(int yourMarks)
+      {
+          var grade = 'F';
+          if (yourMarks >= 85)
+              grade = 'A';
+          else if (yourMarks >= 65)
+               grade = 'B';
+          else if (yourMarks >= 55)
+               grade = 'C';
+          else if (yourMarks >= 35)
+               grade = 'S';
+
+          return grade;
+      }
+```
 
 1.  按*Ctrl* + *Shift* + *B*构建您的代码。
 
-1.  再次，在步骤14的结束花括号旁边输入以下代码：
+1.  再次，在步骤 14 的结束花括号旁边输入以下代码：
 
-[PRE1]
+```cs
+      public double CmToInches(double cm)
+      {
+          var oneCmToInches = 0.393700787;
+
+          return oneCmToInches * cm; 
+      }
+```
 
 1.  让我们构建代码以检查一切是否正常。点击“生成”|“生成解决方案”或按*Ctrl* + *Shift* + *B*，解决方案应该能够成功构建。让我们在下一个菜谱中测试我们的类库。
 
@@ -100,13 +122,13 @@
 
 # 它是如何工作的...
 
-让我们看看到目前为止我们取得了什么成果。从步骤1到4，我们打开了Visual Studio 2017并创建了一个空白解决方案。空白解决方案是具有多个项目的项目的良好基础。在步骤5到10中，我们在空白解决方案中添加了一个新项目。在第7步中，我们使用了一个现有的基础.NET Standard 2.0项目模板，并在第8步中给它起了适当的名字。
+让我们看看到目前为止我们取得了什么成果。从步骤 1 到 4，我们打开了 Visual Studio 2017 并创建了一个空白解决方案。空白解决方案是具有多个项目的项目的良好基础。在步骤 5 到 10 中，我们在空白解决方案中添加了一个新项目。在第 7 步中，我们使用了一个现有的基础.NET Standard 2.0 项目模板，并在第 8 步中给它起了适当的名字。
 
-在第11步和第12步中，我们将默认的`Class1.cs`更改为有意义的名称。这些名称非常重要，它有助于开发者理解文件内部的代码用途。在这种情况下，我们选择了`Chapter2.Primitives.PrimitiveLib`作为项目名称。前两部分提供了解决方案名称，最后是实际的项目名称。
+在第 11 步和第 12 步中，我们将默认的`Class1.cs`更改为有意义的名称。这些名称非常重要，它有助于开发者理解文件内部的代码用途。在这种情况下，我们选择了`Chapter2.Primitives.PrimitiveLib`作为项目名称。前两部分提供了解决方案名称，最后是实际的项目名称。
 
-在第14步中，我们创建了包含公共方法的代码。该方法接受一个`int`类型的变量作为参数。`int`是框架本身支持的原始数据类型，因此我们在.NET Standard库中使用它。这意味着代码可以在.NET Framework、.NET Core和Mono运行的应用程序之间共享。
+在第 14 步中，我们创建了包含公共方法的代码。该方法接受一个`int`类型的变量作为参数。`int`是框架本身支持的原始数据类型，因此我们在.NET Standard 库中使用它。这意味着代码可以在.NET Framework、.NET Core 和 Mono 运行的应用程序之间共享。
 
-数据类型`int`是`System.Int32`的别名，这些是在.NET下支持的原始类型，可以在.NET Standard 2.0库中使用和共享：
+数据类型`int`是`System.Int32`的别名，这些是在.NET 下支持的原始类型，可以在.NET Standard 2.0 库中使用和共享：
 
 +   `Boolean`
 
@@ -184,11 +206,19 @@
 
 1.  向上滚动并添加以下 `using` 指令：
 
-[PRE2]
+```cs
+      using Chapter2.Primitives.PrimitiveLib;
+```
 
 1.  现在，向下滚动，在 `Main()` 方法的花括号之间，输入以下代码：
 
-[PRE3]
+```cs
+      var myHelper = new Helpers();
+      var myGrade = myHelper.WhatIsMyGrade(65);
+      Console.WriteLine($"You are current grade is {myGrade}");
+
+      Console.ReadLine();
+```
 
 1.  现在，按 *F5* 键进行代码调试。
 
@@ -200,7 +230,11 @@
 
 1.  让我们现在输入以下代码：
 
-[PRE4]
+```cs
+      var cm = 15;
+      var inches = myHelper.CmToInches(cm);
+      Console.WriteLine($"{cm} centimeters in inches are {inches}");
+```
 
 1.  按 *F5* 键查看输出，你应该会看到以下内容：
 
@@ -210,19 +244,23 @@
 
 # 它是如何工作的...
 
-在第1步到第7步中，我们打开了一个现有的 Visual Studio 解决方案，并向其中添加了一个新项目。新添加的项目是基于 .NET 的控制台应用程序。在第9步到第11步中，我们添加了对 .NET Standard 2.0 库项目的引用。这是一个重要的步骤。为了使用库中的功能，你必须将项目作为引用添加。
+在第 1 步到第 7 步中，我们打开了一个现有的 Visual Studio 解决方案，并向其中添加了一个新项目。新添加的项目是基于 .NET 的控制台应用程序。在第 9 步到第 11 步中，我们添加了对 .NET Standard 2.0 库项目的引用。这是一个重要的步骤。为了使用库中的功能，你必须将项目作为引用添加。
 
-在第13步，我们添加了代码来使用库的第一个方法。代码的第一行将定义一个变量来持有 `Helpers()` 类的实例。`var` 关键字帮助你创建一个局部变量，而不需要给出显式的类型。它只是告诉编译器从初始化语句右侧的表达式中获取变量的类型。例如，请看以下内容：
+在第 13 步，我们添加了代码来使用库的第一个方法。代码的第一行将定义一个变量来持有 `Helpers()` 类的实例。`var` 关键字帮助你创建一个局部变量，而不需要给出显式的类型。它只是告诉编译器从初始化语句右侧的表达式中获取变量的类型。例如，请看以下内容：
 
-[PRE5]
+```cs
+var myInteger = 10;
+```
 
 这与以下内容相同：
 
-[PRE6]
+```cs
+int myInteger = 10; 
+```
 
-代码的第二行保存了 `WhatIsMyGrade()` 方法的返回值。下一行将输出显示到控制台窗口。最后一行将告诉控制台等待按键。在第14步和第15步中，我们看到了我们编写的代码的输出。
+代码的第二行保存了 `WhatIsMyGrade()` 方法的返回值。下一行将输出显示到控制台窗口。最后一行将告诉控制台等待按键。在第 14 步和第 15 步中，我们看到了我们编写的代码的输出。
 
-在第17步，我们正在测试我们创建的 .NET Standard 2.0 库中 `Helpers()` 类内的第二个方法。在第一行，我们创建了一个变量来存储需要转换的默认值。在第二行，它将转换后的输出存储在一个变量中。同样，我们使用了 `var` 关键字来存储变量，这将自动存储从方法返回的类型值，在本例中是 `System.Double` 类型。第三行将在控制台窗口中显示输出。在第18步和第19步中，我们执行了控制台应用程序。
+在第 17 步，我们正在测试我们创建的 .NET Standard 2.0 库中 `Helpers()` 类内的第二个方法。在第一行，我们创建了一个变量来存储需要转换的默认值。在第二行，它将转换后的输出存储在一个变量中。同样，我们使用了 `var` 关键字来存储变量，这将自动存储从方法返回的类型值，在本例中是 `System.Double` 类型。第三行将在控制台窗口中显示输出。在第 18 步和第 19 步中，我们执行了控制台应用程序。
 
 # 创建集合
 
@@ -278,21 +316,48 @@
 
 1.  在代码窗口顶部，将光标（或点击鼠标）移动到 using 指令的最后一行并添加以下 using 指令：
 
-[PRE7]
+```cs
+      using System.Collections.Generic;
+```
 
 1.  在 LittleShop 类的花括号之间输入以下代码：
 
-[PRE8]
+```cs
+      public List<string> GetFruitsList()
+      {
+          var fruitsList = new List<string>();
+
+          fruitsList.Add("Apples");
+          fruitsList.Add("Grapes");
+          fruitsList.Add("Mangoes");
+          fruitsList.Add("Oranges");
+          fruitsList.Add("Pineapples");
+
+          return fruitsList;
+       }
+```
 
 1.  按下 *Ctrl* + *Shift* + *B* 进行快速构建并检查任何语法错误。
 
 1.  现在在代码窗口顶部的 using 指令末尾输入以下代码：
 
-[PRE9]
+```cs
+      using System.Collections;
+```
 
 1.  在 GetFruitsList() 方法的末尾添加以下代码：
 
-[PRE10]
+```cs
+      public ArrayList GetShopItems()
+      {
+          var shopItems = new ArrayList();
+          shopItems.Add("Fruits");
+          shopItems.Add("Vegetables");
+          shopItems.Add("Chocolates");
+
+          return shopItems;
+       }
+```
 
 1.  快速按一下 *Ctrl* + B 进行调试并检查语法错误。
 
@@ -300,7 +365,7 @@
 
 # 工作原理...
 
-让我们看看幕后发生了什么。从步骤1到4，我们创建了项目的基。这个基将帮助您创建 .NET Standard 2.0 库以及将使用该库的项目。空白解决方案始终是任何类型项目的良好起点。在步骤5到10中，我们将 .NET Standard 2.0 库项目添加到空白解决方案，并给它一个有意义的名称。在步骤11到13中，我们将默认类模板名称更改为有意义的名称。
+让我们看看幕后发生了什么。从步骤 1 到 4，我们创建了项目的基。这个基将帮助您创建 .NET Standard 2.0 库以及将使用该库的项目。空白解决方案始终是任何类型项目的良好起点。在步骤 5 到 10 中，我们将 .NET Standard 2.0 库项目添加到空白解决方案，并给它一个有意义的名称。在步骤 11 到 13 中，我们将默认类模板名称更改为有意义的名称。
 
 在第 14 步中，我们创建了对 `System.Collections.Generics` 命名空间的引用。这将使您能够访问此命名空间下所有可用的集合。在第 15 步中，我们使用了一个名为 `List<T>` 的泛型集合对象。在接下来的几行中，我们将一些字符串对象添加到创建的变量中。最后，我们返回了列表集合，它与 `GetFruitsList()` 方法的返回类型相同。然后，在第 16 步中，我们进行了快速构建，这将帮助我们检查代码的语法。进行快速构建以检查语法是一个好的做法。
 
@@ -383,11 +448,25 @@
 
 1.  向上滚动代码窗口，并在所有`using`指令的末尾添加以下`using`指令：
 
-[PRE11]
+```cs
+      using Chapter2.Collections.CollectionsLib;
+```
 
 1.  再次向下滚动，并在`FruitsButton_Click()`方法中编写以下代码：
 
-[PRE12]
+```cs
+      var littleShop = new LittleShop();
+      var fruits = littleShop.GetFruitsList();
+
+      foreach (var fruit in fruits)
+      {
+          FruitsList.Items.Add(fruit);
+      }
+
+      FruitsList.Items.Add("--------");
+      FruitsList.Items.Add($"Item Count: {fruits.Count}");
+      FruitsList.Items.Add($"Capacity: {fruits.Capacity}");
+```
 
 1.  通过点击其标签或直接在解决方案资源管理器中双击`MainWindow.xaml`标签来切换回`MainWindow.xaml`的设计视图。
 
@@ -395,7 +474,19 @@
 
 1.  现在，在`ItemsButton_Click()`事件方法中输入以下代码：
 
-[PRE13]
+```cs
+      var littleShop = new LittleShop();
+      var items = littleShop.GetShopItems();
+
+      for (int i=0; i<items.Count; i++)
+      {
+          ItemsList.Items.Add(items[i]);
+      }
+
+      ItemsList.Items.Add("--------");
+      ItemsList.Items.Add($"Item Count: {items.Count}");
+      ItemsList.Items.Add($"Capacity: {items.Capacity}");
+```
 
 1.  让我们按*F5*来调试代码。
 
@@ -407,21 +498,30 @@
 
 # 它是如何工作的...
 
-现在，我们有一个使用.NET Standard 2.0库作为其源的工作WPF应用程序。让我们看看我们遵循的步骤。在步骤1到7中，我们打开了之前构建的.NET Standard 2.0库项目和解题方案。之后，我们将一个Windows Presentation Foundation项目添加到解决方案中。正如你所知，WPF是一个在.NET Framework之上运行的UI框架。
+现在，我们有一个使用.NET Standard 2.0 库作为其源的工作 WPF 应用程序。让我们看看我们遵循的步骤。在步骤 1 到 7 中，我们打开了之前构建的.NET Standard 2.0 库项目和解题方案。之后，我们将一个 Windows Presentation Foundation 项目添加到解决方案中。正如你所知，WPF 是一个在.NET Framework 之上运行的 UI 框架。
 
-从步骤9到13，我们只是创建了应用程序的用户界面。然后在步骤12中，我们更改了我们添加的控件的一些默认属性。赋予有意义的名称是一个非常好的做法，因为它有助于你构建可读的代码。在步骤20中，我们只是双击了一个控件，在这个例子中是按钮，以打开代码窗口。默认情况下，Visual Studio为我们选择了一个事件。主要选择一个常用事件，在这个例子中是按钮的点击事件。
+从步骤 9 到 13，我们只是创建了应用程序的用户界面。然后在步骤 12 中，我们更改了我们添加的控件的一些默认属性。赋予有意义的名称是一个非常好的做法，因为它有助于你构建可读的代码。在步骤 20 中，我们只是双击了一个控件，在这个例子中是按钮，以打开代码窗口。默认情况下，Visual Studio 为我们选择了一个事件。主要选择一个常用事件，在这个例子中是按钮的点击事件。
 
-在步骤22中，我们将.NET Standard 2.0库引用到代码中。这将允许你在WPF应用程序中访问其可用方法。在步骤23中，我们有按钮点击事件的实际运行代码。在第一行，我们创建了一个`LittleShop()`实例并将其存储在一个变量中。然后我们使用`GetFruitsList()`方法获取水果列表并将其存储在一个变量中。然后我们遍历`fruits`变量中所有可用的项目。
+在步骤 22 中，我们将.NET Standard 2.0 库引用到代码中。这将允许你在 WPF 应用程序中访问其可用方法。在步骤 23 中，我们有按钮点击事件的实际运行代码。在第一行，我们创建了一个`LittleShop()`实例并将其存储在一个变量中。然后我们使用`GetFruitsList()`方法获取水果列表并将其存储在一个变量中。然后我们遍历`fruits`变量中所有可用的项目。
 
-[PRE14]
+```cs
+foreach (var fruit in fruits)
+{
+    FruitsList.Items.Add(fruit);
+}
+```
 
 在之前为`fruits`变量编写的代码中，有一个`List`集合。`foreach`循环将遍历存储在`fruits`变量中的`List`集合内的每个项目。在循环内部，一个`FruitsList`列表框控件将添加存储在`fruit`变量中的`fruits`集合中的每个项目。
 
-[PRE15]
+```cs
+FruitsList.Items.Add("--------");
+FruitsList.Items.Add($"Item Count: {fruits.Count}");
+FruitsList.Items.Add($"Capacity: {fruits.Capacity}");
+```
 
 在我们将每个项目添加到列表框（`FruitsList`）之后，我们添加了一个显示`List`集合中项目数量的字符串。我们使用了`List`集合中的`Count`属性来获取该信息。在代码的最后一行，我们选择了`List`集合的`Capacity`属性。容量属性获取或设置内部数据结构可以不进行大小调整而容纳的总元素数。
 
-在步骤26中，我们创建了一个`LittleShop()`类的实例，并使用`GetShopItems()`方法获取作为`ArrayList()`返回的项目。然后我们使用`for`循环获取第二个列表框中的项目。其余部分与我们对`List`集合所做的一样。
+在步骤 26 中，我们创建了一个`LittleShop()`类的实例，并使用`GetShopItems()`方法获取作为`ArrayList()`返回的项目。然后我们使用`for`循环获取第二个列表框中的项目。其余部分与我们对`List`集合所做的一样。
 
 # 使用反射描述我们的库
 
@@ -429,13 +529,13 @@
 
 # 准备工作
 
-确保已安装Visual Studio 2017及其所有更新。我们将从一个空白解决方案开始。空白解决方案是任何规模项目的非常好的起点。让我们构建我们的.NET Standard 2.0库。
+确保已安装 Visual Studio 2017 及其所有更新。我们将从一个空白解决方案开始。空白解决方案是任何规模项目的非常好的起点。让我们构建我们的.NET Standard 2.0 库。
 
 # 如何操作...
 
-1.  打开Visual Studio 2017。
+1.  打开 Visual Studio 2017。
 
-1.  点击“文件”|“新建”|“项目”，然后在“新建项目模板”对话框中，在左侧窗格的“其他项目类型”节点下选择“Visual Studio解决方案”，然后在右侧窗格中选择“空白解决方案”。
+1.  点击“文件”|“新建”|“项目”，然后在“新建项目模板”对话框中，在左侧窗格的“其他项目类型”节点下选择“Visual Studio 解决方案”，然后在右侧窗格中选择“空白解决方案”。
 
 1.  在“名称：”文本框中，将`Chapter2.Reflections`作为解决方案的名称输入。在“位置：”下拉列表中选择一个首选位置或点击“浏览...”按钮选择一个位置。保留默认设置：
 
@@ -443,7 +543,7 @@
 
 1.  点击“确定”。
 
-1.  现在，在解决方案资源管理器（或按*Ctrl* + *Alt* + *L*），选择Chapter2.Reflections。右键单击并选择“添加”|“新项目”。
+1.  现在，在解决方案资源管理器（或按*Ctrl* + *Alt* + *L*），选择 Chapter2.Reflections。右键单击并选择“添加”|“新项目”。
 
 1.  在“添加新项目”对话框中，展开“Visual C#”节点，并在左侧窗格中选择“.NET Standard”。
 
@@ -465,7 +565,16 @@
 
 1.  将 `Class1.cs` 重命名为 `Calculator.cs`，同时确保你也将类名本身进行了相同的更改：
 
-[PRE16]
+```cs
+      using System;
+
+      namespace Chapter2.Reflections.CalculatorLib
+      {
+          public class Calculator
+          {
+          }
+      }
+```
 
 1.  现在，解决方案资源管理器应该看起来像这样：
 
@@ -473,15 +582,25 @@
 
 1.  在代码窗口中，在 `Calculator` 类的大括号之间，编写以下代码：
 
-[PRE17]
+```cs
+      public int Add(int number1, int number2)
+      {
+          return number1 + number2; 
+      }
+
+      public int Subtract(int number1, int number2)
+      {
+          return number1 - number2;
+      }
+```
 
 1.  通过按 *Ctrl* + *Shift* + *B* 进行快速构建。
 
 # 工作原理...
 
-从步骤1到4，我们创建了一个空白解决方案。然后，从步骤5到9，我们在空白解决方案中添加了一个 .NET Standard 2.0 库。在步骤12中，我们将模板中提供的现有 `Class1.cs` 重命名为更有意义的东西。我们还重命名了类名以匹配文件名。这是一个好习惯，也是 Visual Studio 在创建全新的类时的默认行为。我们将名称更改为 `Calculator.cs` 并将类名更改为 `Calculator`。
+从步骤 1 到 4，我们创建了一个空白解决方案。然后，从步骤 5 到 9，我们在空白解决方案中添加了一个 .NET Standard 2.0 库。在步骤 12 中，我们将模板中提供的现有 `Class1.cs` 重命名为更有意义的东西。我们还重命名了类名以匹配文件名。这是一个好习惯，也是 Visual Studio 在创建全新的类时的默认行为。我们将名称更改为 `Calculator.cs` 并将类名更改为 `Calculator`。
 
-在步骤14中，我们向 `Calculator` 类添加了两个简单的方法。第一个方法用于将给定的整数相加，第二个方法用于从一个整数中减去另一个整数。最后，我们快速构建以检查语法错误。
+在步骤 14 中，我们向 `Calculator` 类添加了两个简单的方法。第一个方法用于将给定的整数相加，第二个方法用于从一个整数中减去另一个整数。最后，我们快速构建以检查语法错误。
 
 # 一个用于使用库的 .NET Core 控制台应用程序
 
@@ -533,11 +652,31 @@
 
 1.  在`using`指令的最后一行旁边，添加以下`using`指令：
 
-[PRE18]
+```cs
+      using System.Reflection;
+      using Chapter2.Reflections.CalculatorLib;
+```
 
 1.  再次，向下滚动直到到达`Main()`方法，并在`Main()`方法的括号之间写入以下代码：
 
-[PRE19]
+```cs
+      MemberInfo info = typeof(Calculator);
+      Console.WriteLine($"Assembly Name: {info.Name}");
+      Console.WriteLine($"Module Name: {info.Module.Name}");
+      Console.WriteLine();
+
+      var calculator = new Calculator();
+      var typeObject = calculator.GetType();
+      var methods = typeObject.GetRuntimeMethods();
+
+      foreach (var method in methods)
+      {
+          Console.WriteLine($"Method name : {method.Name}, 
+          ---> Return type : {method.ReturnType}");
+      }
+
+      Console.ReadLine();
+```
 
 1.  让我们按*F5*并查看输出：
 
@@ -547,39 +686,56 @@
 
 # 它是如何工作的...
 
-让我们看看步骤并尝试理解。在步骤1到3中，我们打开了一个包含.NET Standard 2.0库的现有解决方案。我们快速构建以检查所有语法是否正确，并且项目没有问题地编译。在步骤4到8中，我们将一个基于.NET Core的控制台应用程序添加到项目中，并给它一个合适的名称。
+让我们看看步骤并尝试理解。在步骤 1 到 3 中，我们打开了一个包含.NET Standard 2.0 库的现有解决方案。我们快速构建以检查所有语法是否正确，并且项目没有问题地编译。在步骤 4 到 8 中，我们将一个基于.NET Core 的控制台应用程序添加到项目中，并给它一个合适的名称。
 
-在步骤10到14中，我们从.NET Core控制台应用程序中添加了对.NET Standard 2.0库项目的引用。在步骤17中，我们将两个命名空间添加到了`Program.cs`代码中。一个是用于访问反射类，这些类包含在`System.Reflection`命名空间中。另一个是.NET Standard 2.0库本身。
+在步骤 10 到 14 中，我们从.NET Core 控制台应用程序中添加了对.NET Standard 2.0 库项目的引用。在步骤 17 中，我们将两个命名空间添加到了`Program.cs`代码中。一个是用于访问反射类，这些类包含在`System.Reflection`命名空间中。另一个是.NET Standard 2.0 库本身。
 
-在步骤18中，我们在`Program.cs`的`Main()`方法中添加了代码：
+在步骤 18 中，我们在`Program.cs`的`Main()`方法中添加了代码：
 
-[PRE20]
+```cs
+MemberInfo info = typeof(Calculator);
+Console.WriteLine($"Assembly Name: {info.Name}");
+Console.WriteLine($"Module Name: {info.Module.Name}");
+Console.WriteLine();
+```
 
 在第一行代码中，我们将一个名为`info`的变量存储了一个`Calculator`类类型，该变量是`System.Reflections.MemberInfo()`类型。在第二行代码中，我们使用`Name`属性访问了程序集类的名称，而再次使用`Module.Name`属性访问了模块名称。`Member Info()`类允许您获取成员的属性信息，并提供对成员元数据的访问：
 
-[PRE21]
+```cs
+var calculator = new Calculator();
+var typeObject = calculator.GetType();
+var methods = typeObject.GetRuntimeMethods();
 
-在前面的几行代码中，我们在.NET Standard 2.0库内部创建了一个`Calculator()`类的实例。在第二行中，我们存储了类的类型。在第三行中，我们有一个名为`methods`的变量，用于存储该类内部所有可用的运行时方法。由于`GetRuntimeMethods()`是一个集合，我们可以轻松地使用`foreach`语句遍历集合。最后，在`foreach()`语句内部，我们输出了`Calculator()`类内部每个方法的名称和返回类型。
+foreach (var method in methods)
+{
+    Console.WriteLine($"Method name : {method.Name}, 
+    ---> Return type : {method.ReturnType}");
+}
+
+Console.ReadLine();
+```
+
+在前面的几行代码中，我们在.NET Standard 2.0 库内部创建了一个`Calculator()`类的实例。在第二行中，我们存储了类的类型。在第三行中，我们有一个名为`methods`的变量，用于存储该类内部所有可用的运行时方法。由于`GetRuntimeMethods()`是一个集合，我们可以轻松地使用`foreach`语句遍历集合。最后，在`foreach()`语句内部，我们输出了`Calculator()`类内部每个方法的名称和返回类型。
 
 最后，我们等待用户按任意键退出控制台应用程序。
 
 在步骤*19*中，在输出中，您可能会注意到除了我们创建的两个公共方法之外，还有更多方法。这些方法来自基`Object`类本身。
 
-# 构建.NET Standard 2.0库，使用LINQ
+# 构建.NET Standard 2.0 库，使用 LINQ
 
-在这个示例中，我们将在我们的.NET Standard 2.0库中使用LINQ。LINQ代表.NET语言集成查询。LINQ定义了一组通用标准查询操作符：列表、选择、排序和投影操作符，这些操作符可以在任何.NET编程语言中使用。标准查询操作符允许查询应用于任何基于`IEnumerable<T>`的信息源。
+在这个示例中，我们将在我们的.NET Standard 2.0 库中使用 LINQ。LINQ 代表.NET 语言集成查询。LINQ 定义了一组通用标准查询操作符：列表、选择、排序和投影操作符，这些操作符可以在任何.NET 编程语言中使用。标准查询操作符允许查询应用于任何基于`IEnumerable<T>`的信息源。
 
-我们将构建一个利用LINQ的.NET Standard 2.0库，并在下一个示例中使用这个库。
+我们将构建一个利用 LINQ 的.NET Standard 2.0 库，并在下一个示例中使用这个库。
 
 # 准备工作
 
-让我们通过打开Visual Studio 2017并创建一个基于.NET Standard 2.0库的项目来做好准备。我们可以从一个空白解决方案开始，稍后添加库项目。
+让我们通过打开 Visual Studio 2017 并创建一个基于.NET Standard 2.0 库的项目来做好准备。我们可以从一个空白解决方案开始，稍后添加库项目。
 
 # 如何操作...
 
-1.  打开Visual Studio 2017。
+1.  打开 Visual Studio 2017。
 
-1.  点击“文件”|“新建”|“项目”，然后在左侧窗格的“其他项目类型”节点下选择“Visual Studio解决方案”，然后在右侧窗格中选择“空白解决方案”。
+1.  点击“文件”|“新建”|“项目”，然后在左侧窗格的“其他项目类型”节点下选择“Visual Studio 解决方案”，然后在右侧窗格中选择“空白解决方案”。
 
 1.  在“名称”文本框中，输入`Chapter2.Linq`作为解决方案的名称。在“位置”下拉列表中选择一个首选位置，或点击“浏览...”按钮选择一个位置。保留默认设置：
 
@@ -587,7 +743,7 @@
 
 1.  点击“确定”。
 
-1.  现在，在解决方案资源管理器（或按*Ctrl* + *Alt* + *L*），选择Chapter2.Linq。右键单击并选择“添加”|“新建项目”。
+1.  现在，在解决方案资源管理器（或按*Ctrl* + *Alt* + *L*），选择 Chapter2.Linq。右键单击并选择“添加”|“新建项目”。
 
 1.  在“添加新项目”对话框中，展开“Visual C#”节点，并在左侧窗格中选择.NET Standard。
 
@@ -605,7 +761,7 @@
 
 ![图片](img/4446b8fd-d524-4b9c-8d92-2dfedb849cbe.png)
 
-1.  在项目树中选择Class1.cs并按*F2*。
+1.  在项目树中选择 Class1.cs 并按*F2*。
 
 1.  将`Class1.cs`重命名为`TelephoneBook.cs`，同时确保你也将类名本身进行了相同的更改。
 
@@ -615,73 +771,124 @@
 
 ![图片](img/93a2abd6-f0bd-4ca6-b21b-c5b4e582a334.png)
 
-1.  双击TelephoneBook.cs文件以打开代码窗口。
+1.  双击 TelephoneBook.cs 文件以打开代码窗口。
 
 1.  现在，将代码窗口滚动到顶部，并在`using`指令的最后一行旁边添加以下代码：
 
-[PRE22]
+```cs
+      using System.Collections.Generic;
+      using System.Linq;
+```
 
 1.  再次，滚动到`TelephoneBook`类的开括号处，并添加以下代码：
 
-[PRE23]
+```cs
+      private List<string> _contactList;
+```
 
 1.  现在，在下一行，将以下代码作为`constructor`方法添加：
 
-[PRE24]
+```cs
+      public TelephoneBook()
+      {
+
+          _contactList = new List<string>();
+
+          _contactList.Add("Lenna Paprocki");
+          _contactList.Add("Donette Foller");
+          _contactList.Add("Simona Morasca");
+          _contactList.Add("Mitsue Tollner");
+          _contactList.Add("Leota Dilliard");
+          _contactList.Add("Sage Wieser");
+          _contactList.Add("Kris Marrier");
+          _contactList.Add("Minna Amigon");
+          _contactList.Add("Abel Maclead");
+          _contactList.Add("Kiley Caldarera");
+          _contactList.Add("Graciela Ruta");
+}
+```
 
 1.  在构造函数旁边添加以下代码：
 
-[PRE25]
+```cs
+      public List<string> GetContacts() 
+      {
+          return _contactList;
+      }
+```
 
 1.  再次，在`GetContacts()`方法的末尾添加此代码块：
 
-[PRE26]
+```cs
+      public List<string> GetContactsByLastName(string lastName)
+      {
+          var contacts = _contactList.Where(
+          c => c.Contains(lastName)).ToList();
+          return contacts;
+      }
+```
 
 1.  最后，在`GetContactsByLastName()`方法的末尾添加以下代码块：
 
-[PRE27]
+```cs
+      public List<string> GetSortedContacts(bool ascending = true)
+      {
+          var sorted = _contactList.OrderBy(c => c).ToList();
 
-1.  现在我们已经将代码添加到.NET Standard 2.0库中，让我们按*Ctrl* + *Shift* + *B*进行快速构建并检查语法错误。
+          if (!ascending)
+          {
+              sorted = _contactList.OrderByDescending(c => c).ToList();
+          }
+
+          return sorted;
+      }
+```
+
+1.  现在我们已经将代码添加到.NET Standard 2.0 库中，让我们按*Ctrl* + *Shift* + *B*进行快速构建并检查语法错误。
 
 # 它是如何工作的...
 
-从步骤1到4，我们使用Visual Studio 2017创建了一个空白解决方案，并给它指定了一个位置和有意义的名称。然后，从步骤5到9，我们在空白解决方案中添加了一个新的.NET Standard 2.0库。像往常一样，我们给它起了一个恰当且有意义的名字。
+从步骤 1 到 4，我们使用 Visual Studio 2017 创建了一个空白解决方案，并给它指定了一个位置和有意义的名称。然后，从步骤 5 到 9，我们在空白解决方案中添加了一个新的.NET Standard 2.0 库。像往常一样，我们给它起了一个恰当且有意义的名字。
 
-在步骤12和13中，我们将默认的 `Class1.cs` 模板重命名为 `TelephoneBook.cs`。保持类和文件名相同是一个好习惯。当你回到代码时，这会使代码更易读、更易理解。在步骤16中，我们向代码中添加了两个命名空间。`System.Collections.Generic` 将为你提供代码中使用的 `List<T>` 类，而 `System.Linq` 通过允许使用LINQ功能，为你提供了对那些泛型集合的更多控制。
+在步骤 12 和 13 中，我们将默认的 `Class1.cs` 模板重命名为 `TelephoneBook.cs`。保持类和文件名相同是一个好习惯。当你回到代码时，这会使代码更易读、更易理解。在步骤 16 中，我们向代码中添加了两个命名空间。`System.Collections.Generic` 将为你提供代码中使用的 `List<T>` 类，而 `System.Linq` 通过允许使用 LINQ 功能，为你提供了对那些泛型集合的更多控制。
 
-在步骤17中，我们引入了一个类型为 `List<string>` 的私有变量。在步骤18中，我们初始化了这个变量并向列表中添加了一些数据。  所有这些都是在 `TelephoneBook()` 类的构造函数中完成的。在步骤19中，我们创建了一个返回联系人列表的方法。它只有一行代码，返回了填充后的列表。
+在步骤 17 中，我们引入了一个类型为 `List<string>` 的私有变量。在步骤 18 中，我们初始化了这个变量并向列表中添加了一些数据。  所有这些都是在 `TelephoneBook()` 类的构造函数中完成的。在步骤 19 中，我们创建了一个返回联系人列表的方法。它只有一行代码，返回了填充后的列表。
 
-再次，在步骤20中，我们创建了一个接受字符串作为参数的方法。该参数是姓氏，我们在这行代码中使用了LINQ查询：
+再次，在步骤 20 中，我们创建了一个接受字符串作为参数的方法。该参数是姓氏，我们在这行代码中使用了 LINQ 查询：
 
-[PRE28]
+```cs
+var contacts = _contactList.Where(c => c.Contains(lastName)).ToList();
+```
 
 我们使用了一个 `Where` 子句来过滤列表，并使用内联函数将 `lastName` 参数传递给操作。最后，我们将结果作为列表输出，并在方法末尾返回结果。
 
-在步骤21中，我们创建了一个使用LINQ对列表进行排序的方法。`GetSortedContacts()` 方法接受一个布尔参数，它是可选的。C#自C# 4.0以来就支持可选参数。
+在步骤 21 中，我们创建了一个使用 LINQ 对列表进行排序的方法。`GetSortedContacts()` 方法接受一个布尔参数，它是可选的。C#自 C# 4.0 以来就支持可选参数。
 
-[PRE29]
+```cs
+var sorted = _contactList.OrderBy(c => c).ToList();
+```
 
 上一行代码使用了列表中的 `OrderBy()` 方法来按升序排序列表，并将其作为列表传递。如果我们需要降序排序，只需将方法参数传递为 `false`。
 
-# 使用库的ASP.NET MVC应用程序
+# 使用库的 ASP.NET MVC 应用程序
 
-在这个菜谱中，我们将创建一个ASP.NET MVC应用程序来使用.NET Standard 2.0库。这个库是在上一个菜谱中创建的。ASP.NET MVC应用程序在基于Windows的系统下运行于IIS，并使用完整的.NET Framework。我们将从一个空的ASP.NET MVC项目开始，然后转向其组件和库的使用。
+在这个菜谱中，我们将创建一个 ASP.NET MVC 应用程序来使用.NET Standard 2.0 库。这个库是在上一个菜谱中创建的。ASP.NET MVC 应用程序在基于 Windows 的系统下运行于 IIS，并使用完整的.NET Framework。我们将从一个空的 ASP.NET MVC 项目开始，然后转向其组件和库的使用。
 
 # 准备工作
 
-定位之前构建的.NET Standard 2.0库，并确保它构建时没有错误。还假设你具备基于MVC的ASP.NET应用程序的基本知识，并且熟悉术语模型（Models）、视图（Views）和控制器（Controllers）。
+定位之前构建的.NET Standard 2.0 库，并确保它构建时没有错误。还假设你具备基于 MVC 的 ASP.NET 应用程序的基本知识，并且熟悉术语模型（Models）、视图（Views）和控制器（Controllers）。
 
 # 如何操作...
 
-1.  打开Visual Studio 2017。
+1.  打开 Visual Studio 2017。
 
-1.  现在，打开上一个菜谱中的解决方案。点击 文件 | 打开 | **打开项目/解决方案**，或者按 *Ctrl* + *Shift* + *O*，然后选择Chapter2.Linq解决方案。
+1.  现在，打开上一个菜谱中的解决方案。点击 文件 | 打开 | **打开项目/解决方案**，或者按 *Ctrl* + *Shift* + *O*，然后选择 Chapter2.Linq 解决方案。
 
 1.  按 *Ctrl* + *Shift* + *B* 进行快速构建以检查一切是否正常。
 
-1.  现在，点击Chapter2.Linq解决方案标签。点击 文件 | 添加 | 新项目。
+1.  现在，点击 Chapter2.Linq 解决方案标签。点击 文件 | 添加 | 新项目。
 
-1.  在 添加新项目 模板对话框中，展开左侧窗格中的Visual C#节点。
+1.  在 添加新项目 模板对话框中，展开左侧窗格中的 Visual C#节点。
 
 1.  在右侧窗格中选择 Web，然后选择 ASP.NET Web 应用程序 (.NET Framework)：
 
@@ -693,7 +900,7 @@
 
 1.  在新 ASP.NET Web 应用程序对话框中，从模板列表中选择空：
 
-1.  选择MVC作为“为以下添加文件夹和核心引用”的选项：
+1.  选择 MVC 作为“为以下添加文件夹和核心引用”的选项：
 
 ![](img/8cddcabf-0bb7-45e7-b831-8569d4a9dc36.png)
 
@@ -707,7 +914,7 @@
 
 1.  选择添加 | 控制器。
 
-1.  在添加脚手架对话框中，选择MVC 5 控制器 - 空的：
+1.  在添加脚手架对话框中，选择 MVC 5 控制器 - 空的：
 
 ![](img/844d157d-f6a6-4d5a-9ce4-67c67e954f4b.png)
 
@@ -725,7 +932,7 @@
 
 1.  现在，右键单击“引用”标签并选择添加引用。
 
-1.  在参考管理器中，选择项目并从列表中检查Chapter2.Linq.QueriesLib：
+1.  在参考管理器中，选择项目并从列表中检查 Chapter2.Linq.QueriesLib：
 
 ![](img/d012a394-ca29-4efa-bada-2018e2ca7894.png)
 
@@ -735,11 +942,17 @@
 
 1.  在`HomeController.cs`代码窗口中，向上滚动并在`using`指令的最后一行添加以下代码：
 
-[PRE30]
+```cs
+      using Chapter2.Linq.QueriesLib;
+```
 
 1.  在`Index()`动作中，在`return`关键字之前添加以下代码：
 
-[PRE31]
+```cs
+      var telephoneBook = new TelephoneBook();
+
+      ViewBag.Contacts = telephoneBook.GetContacts();
+```
 
 1.  右键单击`Index()`方法的名称并选择添加视图：
 
@@ -753,11 +966,20 @@
 
 1.  将代码`<h2>Index</h2>`更改为以下内容：
 
-[PRE32]
+```cs
+      <h2>Contacts</h2>
+```
 
 1.  现在，将光标移至代码窗口的底部并添加此代码：
 
-[PRE33]
+```cs
+      <ul>
+          @foreach(var contact in ViewBag.Contacts as List<string>)
+          {
+              <li>@contact</li>
+          }
+      </ul>
+```
 
 1.  让我们按 *F5* 测试代码。
 
@@ -769,7 +991,25 @@
 
 1.  在`Index()`动作方法的结束花括号之后，添加以下代码：
 
-[PRE34]
+```cs
+      public ActionResult Search(string ln)
+      {
+
+          var telephoneBook = new TelephoneBook();
+
+          if (string.IsNullOrEmpty(ln))
+          {
+              ViewBag.Contacts = telephoneBook.GetContacts();
+          }
+          else
+          {
+              ViewBag.Contacts =
+              telephoneBook.GetContactsByLastName(ln);
+          }
+
+          return View();
+      }
+```
 
 1.  右键单击`Search()`动作的方法名称并选择添加视图。
 
@@ -777,11 +1017,20 @@
 
 1.  在`Search.chtml`代码窗口中，将代码`<h2>Search</h2>`更改为以下内容：
 
-[PRE35]
+```cs
+      <h2>Search Results - Contacts</h2>
+```
 
 1.  在`<h2>`标签之后将以下代码添加到`Search.chtml`中：
 
-[PRE36]
+```cs
+      <ul>
+          @foreach (var contact in ViewBag.Contacts as List<string>)
+          {
+              <li>@contact</li>
+          }
+      </ul>
+```
 
 1.  让我们按 *F5* 调试当前代码。
 
@@ -797,7 +1046,16 @@
 
 1.  在`Search()`动作方法之后添加以下代码：
 
-[PRE37]
+```cs
+      public ActionResult SortedContacts(bool asc = true)
+      {
+          var telephoneBook = new TelephoneBook();
+
+          ViewBag.Contacts = telephoneBook.GetSortedContacts(asc);
+
+          return View();
+      }
+```
 
 1.  右键单击`SortedContacts()`动作的方法名称，然后选择添加视图。
 
@@ -807,7 +1065,14 @@
 
 1.  在`<h2>`标签的末尾添加以下代码。
 
-[PRE38]
+```cs
+      <ul>
+          @foreach (var contact in ViewBag.Contacts as List<string>)
+          {
+              <li>@contact</li>
+          }
+      </ul>
+```
 
 1.  按*F5*键以调试当前代码。
 
@@ -823,12 +1088,12 @@
 
 # 它是如何工作的...
 
-让我们看看完成后的步骤。从步骤1到3，我们打开了一个现有的解决方案，这是在之前的菜谱中完成的。然后我们快速构建以进行语法检查。从步骤4到6，我们在现有解决方案中添加了一个ASP.NET Web应用程序项目。在第7步，我们给它起了个合适的名字。
+让我们看看完成后的步骤。从步骤 1 到 3，我们打开了一个现有的解决方案，这是在之前的菜谱中完成的。然后我们快速构建以进行语法检查。从步骤 4 到 6，我们在现有解决方案中添加了一个 ASP.NET Web 应用程序项目。在第 7 步，我们给它起了个合适的名字。
 
-之后，在步骤8和9中，我们决定它应该是什么样的ASP.NET Web应用程序。在这种情况下，我们选择了MVC空模板。在步骤13到15中，我们向MVC应用程序添加了一个控制器。我们选择了一个空的MVC 5控制器。
+之后，在步骤 8 和 9 中，我们决定它应该是什么样的 ASP.NET Web 应用程序。在这种情况下，我们选择了 MVC 空模板。在步骤 13 到 15 中，我们向 MVC 应用程序添加了一个控制器。我们选择了一个空的 MVC 5 控制器。
 
-在步骤19到21中，我们从.NET Standard 2.0库中添加了引用。在第23步，我们在代码级别引用了它。在第24步，代码的第一行中，我们创建了一个`TelephoneBook()`类的实例。在第二行中，我们调用了`GetContacts()`方法并将其存储在`ViewBag.Contacts`中。`ViewBag`用于从控制器向视图发送数据。
+在步骤 19 到 21 中，我们从.NET Standard 2.0 库中添加了引用。在第 23 步，我们在代码级别引用了它。在第 24 步，代码的第一行中，我们创建了一个`TelephoneBook()`类的实例。在第二行中，我们调用了`GetContacts()`方法并将其存储在`ViewBag.Contacts`中。`ViewBag`用于从控制器向视图发送数据。
 
-从步骤25到27，我们向控制器动作方法中添加了一个视图。在第28步，我们更改了Visual Studio为我们创建的`View`模板中的现有代码。然后，我们使用Razor语法遍历联系人。在步骤30和31中，我们在浏览器中测试了代码。
+从步骤 25 到 27，我们向控制器动作方法中添加了一个视图。在第 28 步，我们更改了 Visual Studio 为我们创建的`View`模板中的现有代码。然后，我们使用 Razor 语法遍历联系人。在步骤 30 和 31 中，我们在浏览器中测试了代码。
 
-从步骤31到50，我们创建了视图并测试了`TelephoneBook()`类中找到的其他方法。
+从步骤 31 到 50，我们创建了视图并测试了`TelephoneBook()`类中找到的其他方法。

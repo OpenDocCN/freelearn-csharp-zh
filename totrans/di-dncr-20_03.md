@@ -1,62 +1,62 @@
-# .NET Core 2.0中的依赖注入介绍
+# .NET Core 2.0 中的依赖注入介绍
 
-本章是.NET Core依赖注入技术在.NET Core最新版本（2.0）中的首次尝试实现。它的主要功能、功能以及包含支持这些功能的类集的命名空间。
+本章是.NET Core 依赖注入技术在.NET Core 最新版本（2.0）中的首次尝试实现。它的主要功能、功能以及包含支持这些功能的类集的命名空间。
 
 在本章中，我们将讨论以下内容：
 
-+   总的来说，我们将讨论.NET Core如何包括对SOLID原则的支持，特别是与依赖注入相关的原则
++   总的来说，我们将讨论.NET Core 如何包括对 SOLID 原则的支持，特别是与依赖注入相关的原则
 
-+   我们将从.NET Core的主要特性及其在Visual Studio中的安装和使用开始，特别是关注最新版本Visual Studio 2017，以及这个版本允许的不同类型的部署
++   我们将从.NET Core 的主要特性及其在 Visual Studio 中的安装和使用开始，特别是关注最新版本 Visual Studio 2017，以及这个版本允许的不同类型的部署
 
-+   然后，我们将深入了解.NET Core中的依赖注入，`ActivatorUtilities`类，以及`Microsoft.Extensions.DependencyInjection`容器
++   然后，我们将深入了解.NET Core 中的依赖注入，`ActivatorUtilities`类，以及`Microsoft.Extensions.DependencyInjection`容器
 
 +   之后，我们将看到一些与对象生命周期实现相关的演示，以及如何将接口映射到实例类，以及当应用于服务时对作用域的一些更多方面的简要回顾
 
-+   最后，我们将看到这种依赖注入功能是如何在.NET Core服务中实现的，特别是与日志记录相关的服务，以及大量演示如何在使用纯.NET Core时使用它。
++   最后，我们将看到这种依赖注入功能是如何在.NET Core 服务中实现的，特别是与日志记录相关的服务，以及大量演示如何在使用纯.NET Core 时使用它。
 
-# .NET Core的主要特性
+# .NET Core 的主要特性
 
-我们已经在[第1章](d6bd2d11-4eec-499b-826c-b4ad849945a8.xhtml)《软件设计的SOLID原则》中解释了.NET Core架构提案的基础，以及它如何试图成为一个变革者，因为它提供了在相同语言（C#或VB.NET）中创建代码的可能性，能够在任何设备或平台上执行。
+我们已经在第一章《软件设计的 SOLID 原则》中解释了.NET Core 架构提案的基础，以及它如何试图成为一个变革者，因为它提供了在相同语言（C#或 VB.NET）中创建代码的可能性，能够在任何设备或平台上执行。
 
-请注意，VB.NET对新特性的支持总是落后于C#语言中的新进展，因此，如果你尝试使用此语言使用某些新特性，请确保它已经实现了我们在这本书中使用的版本。
+请注意，VB.NET 对新特性的支持总是落后于 C#语言中的新进展，因此，如果你尝试使用此语言使用某些新特性，请确保它已经实现了我们在这本书中使用的版本。
 
-这种能力也扩展到了移动应用程序，这得益于将Xamarin环境（和IDE）纳入到与.NET Core开发相关的工具集。
+这种能力也扩展到了移动应用程序，这得益于将 Xamarin 环境（和 IDE）纳入到与.NET Core 开发相关的工具集。
 
-# .NET Core的主要优势
+# .NET Core 的主要优势
 
-如果我们从更开发者的角度来审视这个框架，我们可以说，使.NET Core与其他选择不同的因素可以总结如下：
+如果我们从更开发者的角度来审视这个框架，我们可以说，使.NET Core 与其他选择不同的因素可以总结如下：
 
-+   **跨平台：** 这意味着在Windows、macOS和Linux上执行，以及将其移植到其他操作系统。您可以在各种网站上查看支持的操作系统列表，例如[https://github.com/dotnet/core/blob/master/roadmap.md](https://github.com/dotnet/core/blob/master/roadmap.md)，并且您应该记住，无论是微软还是其他公司提供的，CPU和应用场景都将持续增长。
++   **跨平台：** 这意味着在 Windows、macOS 和 Linux 上执行，以及将其移植到其他操作系统。您可以在各种网站上查看支持的操作系统列表，例如[`github.com/dotnet/core/blob/master/roadmap.md`](https://github.com/dotnet/core/blob/master/roadmap.md)，并且您应该记住，无论是微软还是其他公司提供的，CPU 和应用场景都将持续增长。
 
-+   **兼容性**：.NET Core不仅与.NET Framework兼容，还与Xamarin和Mono兼容，这得益于.NET Standard库。正如官方文档所述，.NET Standard库是，
++   **兼容性**：.NET Core 不仅与.NET Framework 兼容，还与 Xamarin 和 Mono 兼容，这得益于.NET Standard 库。正如官方文档所述，.NET Standard 库是，
 
-“.NET API的正式规范，旨在在所有.NET运行时中可用。标准库背后的动机是在.NET生态系统中建立更大的统一性。ECMA 335继续为.NET运行时行为建立统一性，但对于.NET库实现没有类似的规范。”
+“.NET API 的正式规范，旨在在所有.NET 运行时中可用。标准库背后的动机是在.NET 生态系统中建立更大的统一性。ECMA 335 继续为.NET 运行时行为建立统一性，但对于.NET 库实现没有类似的规范。”
 
 +   **部署**：关于运行时最有趣的特点可能是它可以在应用程序内部部署或以并排方式安装，适用于用户或机器范围
 
 +   **独特的命令行选项**：所有独特的场景都可以在命令行工具中使用（并且这可以扩展到其他平台）
 
-+   **开源**：.NET Core平台自诞生以来就是开源的。它使用MIT和Apache 2许可证，文档在Creative Commons 4.0（CC-BY）许可下发布（见[https://creativecommons.org/licenses/by/4.0/](https://creativecommons.org/licenses/by/4.0/)）。除此之外，.NET Core是.NET Foundation（[http://www.dotnetfoundation.org/](http://www.dotnetfoundation.org/)）的项目
++   **开源**：.NET Core 平台自诞生以来就是开源的。它使用 MIT 和 Apache 2 许可证，文档在 Creative Commons 4.0（CC-BY）许可下发布（见[`creativecommons.org/licenses/by/4.0/`](https://creativecommons.org/licenses/by/4.0/)）。除此之外，.NET Core 是.NET Foundation（[`www.dotnetfoundation.org/`](http://www.dotnetfoundation.org/)）的项目
 
-+   **Microsoft的支持**：.NET Core完全由Microsoft支持，您将在公司的推广网站上找到大量文档、视频、论坛等内容，这些内容通常在.NET Core支持（[https://www.microsoft.com/net/core/support/](https://www.microsoft.com/net/core/support/)）中提及
++   **Microsoft 的支持**：.NET Core 完全由 Microsoft 支持，您将在公司的推广网站上找到大量文档、视频、论坛等内容，这些内容通常在.NET Core 支持（[`www.microsoft.com/net/core/support/`](https://www.microsoft.com/net/core/support/)）中提及
 
-# 在IDE中安装.NET Core
+# 在 IDE 中安装.NET Core
 
-在[第1章](d6bd2d11-4eec-499b-826c-b4ad849945a8.xhtml)《软件设计的SOLID原则》中，我们提到您可以使用.NET Core（和ASP.NET Core）与您选择的任何IDE一起使用。然而，在这本书中，我使用Visual Studio 2017，因为它集成了工具和设施，并且对.NET Core项目的优化程度很高。
+在第一章《软件设计的 SOLID 原则》中，我们提到您可以使用.NET Core（和 ASP.NET Core）与您选择的任何 IDE 一起使用。然而，在这本书中，我使用 Visual Studio 2017，因为它集成了工具和设施，并且对.NET Core 项目的优化程度很高。
 
-尽管如此，由于其年轻，Visual Studio的所有版本都没有一个共同的安装路径，并且根据您使用的版本，您会发现两种不同的方法。
+尽管如此，由于其年轻，Visual Studio 的所有版本都没有一个共同的安装路径，并且根据您使用的版本，您会发现两种不同的方法。
 
-# Visual Studio 2015中.NET Core的安装路径
+# Visual Studio 2015 中.NET Core 的安装路径
 
-如果您想使用Visual Studio 2015，您应该安装更新3.3。它可以从以下链接获取：[https://www.visualstudio.com/en-us/news/releasenotes/vs2015-update3-vs](https://www.visualstudio.com/en-us/news/releasenotes/vs2015-update3-vs)。在这个网站上，您将看到更新如何与.NET Core 1.0.0和.NET Core 1.0.0 SDK Preview 2相关。
+如果您想使用 Visual Studio 2015，您应该安装更新 3.3。它可以从以下链接获取：[`www.visualstudio.com/en-us/news/releasenotes/vs2015-update3-vs`](https://www.visualstudio.com/en-us/news/releasenotes/vs2015-update3-vs)。在这个网站上，您将看到更新如何与.NET Core 1.0.0 和.NET Core 1.0.0 SDK Preview 2 相关。
 
-如果您对此版本不确定，请转到帮助菜单中的“关于 Microsoft Visual Studio”，并确保版本号是14.0.25424.00或更高版本，并且包含更新3。
+如果您对此版本不确定，请转到帮助菜单中的“关于 Microsoft Visual Studio”，并确保版本号是 14.0.25424.00 或更高版本，并且包含更新 3。
 
 您还需要：
 
 +   Visual Studio 的 **NuGet 管理器** 扩展（你知道，NuGet 是微软开发的官方包管理器，我们可以确信它包含所有版本的 .NET Core）。你需要 NuGet 3.5.0-beta 或更高版本来构建 .NET Core 应用程序。
 
-+   .**NET Core 工具预览版 2+**，负责 Visual Studio 2015 的项目模板和其他工具，你可以在 [https://go.microsoft.com/fwlink/?LinkID=827546](https://go.microsoft.com/fwlink/?LinkID=827546) 找到它。
++   .**NET Core 工具预览版 2+**，负责 Visual Studio 2015 的项目模板和其他工具，你可以在 [`go.microsoft.com/fwlink/?LinkID=827546`](https://go.microsoft.com/fwlink/?LinkID=827546) 找到它。
 
 # Visual Studio 2017 中的 .NET Core
 
@@ -80,13 +80,13 @@
 
 +   因此，你正在将 .NET Core 的具体版本作为可执行文件与你的应用程序一起部署，它将始终以 DLL 的形式存在，并在由可执行文件创建的上下文中运行。
 
-如您所见，这是一个非常不同的方法，也许是我们第一次能够使用.NET生成完全独立的可执行应用程序。
+如您所见，这是一个非常不同的方法，也许是我们第一次能够使用.NET 生成完全独立的可执行应用程序。
 
-# 在.NET Core中检查其他依赖项
+# 在.NET Core 中检查其他依赖项
 
-在我们继续了解.NET Core功能之前，明智的做法是记住，依赖项不仅涉及类之间的关系，还涉及构建应用程序所使用的组件，IDE在定义和可视化分析这些依赖项时可能会帮助我们，即使应用程序已经编译完成。
+在我们继续了解.NET Core 功能之前，明智的做法是记住，依赖项不仅涉及类之间的关系，还涉及构建应用程序所使用的组件，IDE 在定义和可视化分析这些依赖项时可能会帮助我们，即使应用程序已经编译完成。
 
-在这样一个框架中，这些组件总是从NuGet（或任何其他有效存储库）下载，并在Visual Studio 2017项目中以动态方式更新，这一点尤为重要。
+在这样一个框架中，这些组件总是从 NuGet（或任何其他有效存储库）下载，并在 Visual Studio 2017 项目中以动态方式更新，这一点尤为重要。
 
 不注意这些方面可能会导致许多问题。其中，我想强调以下问题：
 
@@ -98,7 +98,7 @@
 
 +   不需要的依赖项
 
-为了帮助开发者防止依赖项问题，从Visual Studio 2010版本开始，IDE提供了创建层图的能力，自那个版本以来，这些图一直在持续发展。
+为了帮助开发者防止依赖项问题，从 Visual Studio 2010 版本开始，IDE 提供了创建层图的能力，自那个版本以来，这些图一直在持续发展。
 
 使用这些图，您可以表达层之间的依赖关系，这些依赖关系不仅通过图例显示，从最新版本（2017）开始，还在代码本身中显示。
 
@@ -106,17 +106,17 @@
 
 ![图片](img/2a19ce2c-cefb-4ede-b3ed-6e210595a7a9.png)
 
-此图是通过IDE中与架构菜单相关的新菜单选项创建的，它还展示了与代码分析相关的某些功能，例如代码图生成、创建外部文件（包括文件）的图，以及其他功能。总的来说，该选项提供了以下选项：
+此图是通过 IDE 中与架构菜单相关的新菜单选项创建的，它还展示了与代码分析相关的某些功能，例如代码图生成、创建外部文件（包括文件）的图，以及其他功能。总的来说，该选项提供了以下选项：
 
 ![图片](img/331d0368-7f23-41b6-918c-c77efcda6d18.png)
 
-请记住，此架构菜单仅在V.Studio 2017 Enterprise中可用。
+请记住，此架构菜单仅在 V.Studio 2017 Enterprise 中可用。
 
-这份菜单中的一个新选项是依赖项验证图，它将打开一个新的编辑窗口，在这里我们可以从解决方案中拖放元素，包括文件夹、文件（C# 和 VB.NET）甚至程序集。我们可以将这些功能视为IDE提供的其他实现，用于研究任何应用程序的依赖项。
+这份菜单中的一个新选项是依赖项验证图，它将打开一个新的编辑窗口，在这里我们可以从解决方案中拖放元素，包括文件夹、文件（C# 和 VB.NET）甚至程序集。我们可以将这些功能视为 IDE 提供的其他实现，用于研究任何应用程序的依赖项。
 
-这种技术是从头开始使用Roslyn重建的（参考Pack的《精通C#和.NET Framework》一书，了解更多关于此功能的信息和演示），它允许编码者以完全定制的方式配置编辑器的行为，编程IDE在遇到代码（甚至在其他程序集，因为该工具接受拖放已编译的组件）中的任何这些功能时应如何响应。
+这种技术是从头开始使用 Roslyn 重建的（参考 Pack 的《精通 C#和.NET Framework》一书，了解更多关于此功能的信息和演示），它允许编码者以完全定制的方式配置编辑器的行为，编程 IDE 在遇到代码（甚至在其他程序集，因为该工具接受拖放已编译的组件）中的任何这些功能时应如何响应。
 
-一旦你在图中建立了关系和依赖，这个新的Intellisense将能够验证现有代码，向程序员建议不同应用域内的冲突区域。
+一旦你在图中建立了关系和依赖，这个新的 Intellisense 将能够验证现有代码，向程序员建议不同应用域内的冲突区域。
 
 实际上，你可以在配置中激活这些功能，这样一旦发现问题，你将看到一个波浪线突出显示你的违规代码，同时还有一个问题根源的指示。
 
@@ -126,27 +126,27 @@
 
 当然，这种行为也是可配置的，这些功能与其他选项无关，我们在分析菜单中找到的选项，如代码度量、性能分析器等。
 
-# .NET Core中的依赖注入
+# .NET Core 中的依赖注入
 
-当处理与.NET Core相关的依赖注入的正确功能时，有许多先前的方法需要考虑。其中之一是`new`是粘合剂的格言，这是我们经常作为建议听到的。
+当处理与.NET Core 相关的依赖注入的正确功能时，有许多先前的方法需要考虑。其中之一是`new`是粘合剂的格言，这是我们经常作为建议听到的。
 
 这意味着每次你创建一个类的新的实例（你使用`new`关键字），在幕后都有一些代码的凝聚力。你是在建立这样一个事实，即定义该实例的类将依赖于实例化的类。
 
-我们已经看到了如何通过工厂或使用专注于DI问题的第三方库来解决这个问题，但在这个章节中，我们将依靠框架本身提供的这些功能来实现相同的结果。
+我们已经看到了如何通过工厂或使用专注于 DI 问题的第三方库来解决这个问题，但在这个章节中，我们将依靠框架本身提供的这些功能来实现相同的结果。
 
 理想情况下，这是我们能够定义的，一旦定义注册，每次我们需要任何预定义类的实例时，其他东西应该负责提供这个实例。
 
-换句话说，我们看到的与其他DI容器相关的行为（或多或少）也应该在这里存在，并涵盖那些资深容器提供的重要功能，包括对象的生命周期、注册和泛型类和接口的定义等。
+换句话说，我们看到的与其他 DI 容器相关的行为（或多或少）也应该在这里存在，并涵盖那些资深容器提供的重要功能，包括对象的生命周期、注册和泛型类和接口的定义等。
 
-# DI架构和对象的生命周期
+# DI 架构和对象的生命周期
 
-考虑到前面提到的点，即使我们知道我们正在处理框架的初始版本，.NET Core团队设计了基于两个想法的依赖注入功能：
+考虑到前面提到的点，即使我们知道我们正在处理框架的初始版本，.NET Core 团队设计了基于两个想法的依赖注入功能：
 
-+   在一方面，已经存在的一些功能，可以完美地扩展到.NET Core内部工作
++   在一方面，已经存在的一些功能，可以完美地扩展到.NET Core 内部工作
 
-+   在另一方面，他们认为将其他倡议中最常用的功能包含在内是明智的，无论是微软的还是外部的，比如那些在Prism Patterns & Practices或第三方DI容器中存在的功能（记得我们在前几章中看到的四个容器）
++   在另一方面，他们认为将其他倡议中最常用的功能包含在内是明智的，无论是微软的还是外部的，比如那些在 Prism Patterns & Practices 或第三方 DI 容器中存在的功能（记得我们在前几章中看到的四个容器）
 
-因此（遵循这些想法），在处理对象的生存周期时，.NET Core提供了三种类型，这取决于实例的配置和使用方式--单例（Singleton）、作用域（Scoped）和瞬态（Transient）。
+因此（遵循这些想法），在处理对象的生存周期时，.NET Core 提供了三种类型，这取决于实例的配置和使用方式--单例（Singleton）、作用域（Scoped）和瞬态（Transient）。
 
 +   这些选项不仅影响我们定义它们的方式，还影响我们使用它们的方式，在某些情况下，还需要考虑线程安全预防措施和其他方面。
 
@@ -156,25 +156,25 @@
 
 +   最后，每次请求时，瞬态选项都会创建该类的新实例。
 
-虽然包含在ASP.NET Core文档中，但Microsoft提供了以下图表，与这些选项相关：
+虽然包含在 ASP.NET Core 文档中，但 Microsoft 提供了以下图表，与这些选项相关：
 
 ![图片](img/f55299db-672f-4987-ac1d-d401ea3d01b2.png)
 
-由于在现实世界中，此功能主要与ASP.NET Core应用程序、服务和中间件相关联，因此它们会显示有助于任务的函数（这就是为什么那些引用是针对*请求*的）。但实际上，它同样适用于纯.NET Core应用程序。
+由于在现实世界中，此功能主要与 ASP.NET Core 应用程序、服务和中间件相关联，因此它们会显示有助于任务的函数（这就是为什么那些引用是针对*请求*的）。但实际上，它同样适用于纯.NET Core 应用程序。
 
-正如我们最初提到的，这部分功能与`Microsoft.Extensions.DependencyInjection`命名空间相关，该命名空间包含同名的DLL，它可以与另一个辅助DLL（如`Microsoft.Extensions.DependencyInjection.Abstractions`）和其他DLL一起工作。
+正如我们最初提到的，这部分功能与`Microsoft.Extensions.DependencyInjection`命名空间相关，该命名空间包含同名的 DLL，它可以与另一个辅助 DLL（如`Microsoft.Extensions.DependencyInjection.Abstractions`）和其他 DLL 一起工作。
 
-具体来说，`IServiceCollection`接口是一组提供方法的类的基类，这些方法可以通过DI使用这三种选项来实例化对象（在这个上下文中通常称为服务）。我们将在下一节中看到这一点，但也会在[第4章](06d5c629-d866-4319-b2d3-1a5120d1f6d2.xhtml)，*ASP.NET Core中的依赖注入*中看到，该章节专门介绍ASP.NET Core。
+具体来说，`IServiceCollection`接口是一组提供方法的类的基类，这些方法可以通过 DI 使用这三种选项来实例化对象（在这个上下文中通常称为服务）。我们将在下一节中看到这一点，但也会在第四章，*ASP.NET Core 中的依赖注入*中看到，该章节专门介绍 ASP.NET Core。
 
 # `ActivatorUtilities`类和其他辅助类
 
 在我们进入演示之前，请记住，这个命名空间中包含的类数量相当大，因为它试图提供广泛的覆盖范围，同时仍然是多平台的。
 
-其中一个例子是`ActivatorUtilities`类，它也包含在`Microsoft.Extensions.DependencyInjection`库中，该库包含静态方法，有助于配置和实现服务、实例和工厂，从而简化DI管理和控制。
+其中一个例子是`ActivatorUtilities`类，它也包含在`Microsoft.Extensions.DependencyInjection`库中，该库包含静态方法，有助于配置和实现服务、实例和工厂，从而简化 DI 管理和控制。
 
-因此，如果你发现自己缺少某些功能或功能，请查看[http://docs.microsoft.com](http://docs.microsoft.com)上的文档，但请注意，你会发现它与ASP.NET Core相关。
+因此，如果你发现自己缺少某些功能或功能，请查看[`docs.microsoft.com`](http://docs.microsoft.com)上的文档，但请注意，你会发现它与 ASP.NET Core 相关。
 
-这意味着你将在互联网和其他来源看到的大多数实现都不会链接到.NET Core应用程序，而是链接到ASP.NET Core应用程序，在这些应用程序中，许多此类功能默认为不同场景实现。
+这意味着你将在互联网和其他来源看到的大多数实现都不会链接到.NET Core 应用程序，而是链接到 ASP.NET Core 应用程序，在这些应用程序中，许多此类功能默认为不同场景实现。
 
 显然，这些类中还有更多内容，我们无法在一个章节中全部涵盖。
 
@@ -224,13 +224,50 @@ Visual Studio 2017 将列出所有正在更新的库，如果你向下滚动一�
 
 因此，我最终得到了以下代码（在默认由模板创建的 `Program` 类之外）：
 
-[PRE0]
+```cs
+    public class DependencyClass1 : IDisposable 
+    { 
+      private readonly DependencyClass2 _DC2; 
+      public DependencyClass1(DependencyClass2 DC2instance) 
+      { 
+        _DC2 = DC2instance; 
+        Console.WriteLine("Constructor of DependencyClass1 finished"); 
+      } 
+      public void CurrentTime() 
+      { 
+        string time = DateTime.Now.Hour.ToString() + ":" + 
+           DateTime.Now.Minute.ToString() + ":" + 
+           DateTime.Now.Second.ToString(); 
+        Console.WriteLine($"Current time: {time}"); 
+      } 
+      public void Dispose() 
+      { 
+        _DC2.Dispose(); 
+        Console.WriteLine("DependencyClass1 disposed"); 
+      } 
+    } 
+    public class DependencyClass2 : IDisposable 
+    { 
+      public DependencyClass2() 
+      { 
+        Console.WriteLine("Constructor of DependencyClass2 finished"); 
+      } 
+
+      public void Dispose() 
+      { 
+        Console.WriteLine("DependencyClass2 Disposed"); 
+      } 
+    } 
+```
 
 注意，`DependencyClass1` 会负责在完成使用后销毁 `DependencyClass2`。
 
 现在是当需要 `DependencyInjection` 类的时候。首先，我们在代码顶部引用相应的命名空间（对于这个简单的演示只需要两个命名空间）：
 
-[PRE1]
+```cs
+    using Microsoft.Extensions.DependencyInjection; 
+    using System; 
+```
 
 然后，在 `Program` 类中，我们需要注册和使用这些类。第一步是使用 `ServiceCollection` 类的新实例来执行。
 
@@ -250,7 +287,30 @@ Visual Studio 2017 将列出所有正在更新的库，如果你向下滚动一�
 
 以下代码在 `Program` 类中被修改以配置此架构：
 
-[PRE2]
+```cs
+    static void Main(string[] args) 
+    { 
+      Console.WriteLine("Dependency Injection Demo"); 
+      Console.WriteLine("Basic use of the Microsoft.Extensions.
+          DependencyInjection Library"); 
+      Console.WriteLine("--------------------------------------
+          ---------------------------"); 
+      var services = new ServiceCollection(); 
+      services.AddTransient<DependencyClass2>(); 
+      services.AddTransient<DependencyClass1>(); 
+      var provider = services.BuildServiceProvider(); 
+      using (var DC1Instance = provider.GetService<DependencyClass1>()) 
+      { 
+        // Merely by declaring DC1Instance 
+        // everything gets launched, but we also call 
+        // CurrentTime() just to check functionality 
+        DC1Instance.CurrentTime(); 
+        // Notice also how classes are properly disposed 
+        // after used. 
+      } 
+      Console.ReadLine(); 
+    } 
+```
 
 如您在以下输出中看到的，一切按预期工作：
 
@@ -268,7 +328,20 @@ Visual Studio 2017 将列出所有正在更新的库，如果你向下滚动一�
 
 如果我们为第一个类创建另一个实例会发生什么？正如预期的那样，当我们将代码中的 `using` 块改为包含 `DependencyClass1` 的另一个实例时，例如以下代码：
 
-[PRE3]
+```cs
+    using (var DC1Instance = provider.
+         GetService<DependencyClass1>()) 
+    { 
+      // Merely by declaring DependencyClass1  
+      // everything gets launched, but we also call 
+      // CurrentTime() just to check functionality 
+      DC1Instance.CurrentTime(); 
+      // Notice also how classes are properly disposed 
+      // after used. 
+      var DC1Instance2 = provider.GetService<DependencyClass1>(); 
+      DC1Instance2.CurrentTime(); 
+    } 
+```
 
 输出发生了明显的变化，因为我们迫使引擎创建一个新的实例，而不是重用之前的实例：
 
@@ -280,7 +353,10 @@ Visual Studio 2017 将列出所有正在更新的库，如果你向下滚动一�
 
 例如，只需以这种方式更改这两行代码：
 
-[PRE4]
+```cs
+    services.AddScoped<DependencyClass2>(); 
+    services.AddScoped<DependencyClass1>(); 
+```
 
 我们可以通过简单地查看相应的输出来检查不同的创建行为：
 
@@ -304,9 +380,32 @@ Visual Studio 2017 将列出所有正在更新的库，如果你向下滚动一�
 
 与先前的演示一样，我们使用一个非常简单的方法来展示这一点。我创建了两个接口和两个实现它们的类，每个类都有一个将基本消息写入`Console`的方法。这是初始代码：
 
-[PRE5]
+```cs
+    public interface IXMLWriter 
+    { 
+      void WriteXML(); 
+    } 
+    public interface IJSONWriter 
+    { 
+      void WriteJSON(); 
+    } 
+    public class XMLWriter : IXMLWriter 
+    { 
+      public void WriteXML() 
+      { 
+        Console.WriteLine("<message>Writing in XML Format</message>"); 
+      } 
+    } 
+    public class JSONWriter : IJSONWriter 
+    { 
+      public void WriteJSON() 
+      { 
+        Console.WriteLine("{'message': 'Writing in JSON Format'}"); 
+      } 
+    } 
+```
 
-类和接口之间存在对应关系，因此我们现在可以引用接口，让DI引擎决定返回给我们哪个类实例。这与我们在上一章使用第三方DI容器时看到的演示非常相似。
+类和接口之间存在对应关系，因此我们现在可以引用接口，让 DI 引擎决定返回给我们哪个类实例。这与我们在上一章使用第三方 DI 容器时看到的演示非常相似。
 
 为了达到这个目的，`ServiceCollection`类支持一种定义引用的替代方式，在调用`GetService<Interface>()`时，你可以传递（泛型签名）一个接口名称和映射该接口的类。
 
@@ -316,7 +415,32 @@ Visual Studio 2017 将列出所有正在更新的库，如果你向下滚动一�
 
 假设这个变更，演示的实现相当简单：
 
-[PRE6]
+```cs
+    static void Main(string[] args) 
+    { 
+      var services = new ServiceCollection(); 
+      services.AddTransient<IXMLWriter, XMLWriter>(); 
+      services.AddTransient<IJSONWriter, JSONWriter>(); 
+      var provider = services.BuildServiceProvider(); 
+      Console.WriteLine("Dependency Injection Demo (2)"); 
+      Console.WriteLine("Mapping Interfaces to instance classes"); 
+      Console.WriteLine("--------------------------------------"); 
+      Console.WriteLine("Please, select message format 
+          (1):XML // (2):JSON"); 
+       var res = Console.ReadLine(); 
+      if (res == "1") 
+      { 
+        var XMLInstance = provider.GetService<IXMLWriter>(); 
+        XMLInstance.WriteXML(); 
+      } 
+      else 
+      { 
+         var JSONInstance = provider.GetService<IJSONWriter>(); 
+         JSONInstance.WriteJSON(); 
+      } 
+      Console.ReadLine(); 
+    } 
+```
 
 与前一种情况不同，我们不请求一个特定的类，而是请求实现所需接口的类。
 
@@ -324,17 +448,44 @@ Visual Studio 2017 将列出所有正在更新的库，如果你向下滚动一�
 
 ![图片](img/8eb2f516-7118-402d-a140-fc036cdb5850.png)
 
-注意，注册的方式与我们之前在其他DI容器中看到的方式类似。也就是说，如果我们使用这种语法，最新注册的映射就是返回的映射，尽管这可以动态地改变。
+注意，注册的方式与我们之前在其他 DI 容器中看到的方式类似。也就是说，如果我们使用这种语法，最新注册的映射就是返回的映射，尽管这可以动态地改变。
 
 另一个非常有用的功能是`GetServices<Interface>`方法，因为它允许我们恢复所有已注册的服务并随意调用它们。
 
 我们可以通过添加几个实现相同接口的新类并将它们与之前的类一起注册来证明这一点：
 
-[PRE7]
+```cs
+    public class XMLWriter2 : IXMLWriter 
+    { 
+      public void WriteXML() 
+      { 
+        Console.WriteLine("<message>Writing in XML Format (2)</message>"); 
+      } 
+    } 
+    public class JSONWriter2 : IJSONWriter 
+    { 
+      public void WriteJSON() 
+      { 
+        Console.WriteLine("{'message': 'Writing in JSON Format (2)'}"); 
+      } 
+   } 
+```
 
 在这些定义之后，我们在相同的接口合约下注册这两个类，因此它们可以一起访问：
 
-[PRE8]
+```cs
+    services.AddTransient<IXMLWriter, XMLWriter>(); 
+    services.AddTransient<IXMLWriter, XMLWriter2>(); 
+    services.AddTransient<IJSONWriter, JSONWriter>(); 
+    services.AddTransient<IJSONWriter, JSONWriter2>(); 
+    Now we can use a whole collection by asking for it by means of the 
+       GetServices<Interface>() method that I mentioned above: 
+    var registeredXMLServices = provider.GetServices<IXMLWriter>(); 
+    foreach (var svc in registeredXMLServices) 
+    { 
+      svc.WriteXML(); 
+    } 
+```
 
 由于我们使用的是定义的接口功能，我们知道它们都将实现`WriteXML()`函数，即使它们实现的方式不同。
 
@@ -346,7 +497,18 @@ Visual Studio 2017 将列出所有正在更新的库，如果你向下滚动一�
 
 在这种情况下，过程是创建一个包含我们 `ServiceCollection` 类中所有服务信息的 `ServiceDescriptor` 集合。我们使用枚举器和 `CopyTo()` 方法（它期望 `ServiceCollection` 作为第一个参数）来创建这样一个集合：
 
-[PRE9]
+```cs
+    var myServiceArray = new ServiceDescriptor[services.Count]; 
+    // Copy the services into an array. 
+    services.CopyTo(myServiceArray, 0); 
+    IEnumerator myEnumerator = myServiceArray.GetEnumerator(); 
+    Console.WriteLine("The Implementation Types in the array are"); 
+    while (myEnumerator.MoveNext()) 
+    { 
+      var myService1 = (ServiceDescriptor)myEnumerator.Current; 
+      Console.WriteLine(myService1.ImplementationType); 
+    } 
+```
 
 当集合被复制到 `ServiceDescriptor` 集合时，我们可以看到至少五个可能后来用于确定在特定场景中所需服务的有趣属性：
 
@@ -360,7 +522,15 @@ Visual Studio 2017 将列出所有正在更新的库，如果你向下滚动一�
 
 要获取我们服务容器中当前注册的组件的信息，另一个简单的方法是直接遍历它，使用一个简单的 `foreach` 循环：
 
-[PRE10]
+```cs
+    //Description of properties in the service collection  
+    foreach (var svc in services) 
+    { 
+      Console.WriteLine($"Type: {svc.ImplementationType} \n" + 
+         $"Lifetime: {svc.Lifetime} \n" + 
+         $"Service Type: {svc.ServiceType}"); 
+    } 
+```
 
 注意，根据服务注册的方式和其他编程功能，并非所有属性都将有值（在这种情况下，只请求接口（`ServiceType`）、实现（`Types`）及其生命周期是有意义的）。
 
@@ -376,7 +546,25 @@ Visual Studio 2017 将列出所有正在更新的库，如果你向下滚动一�
 
 考虑以下代码（前一个演示的变体）：
 
-[PRE11]
+```cs
+    static void Main(string[] args) 
+    { 
+      var services = new ServiceCollection(); 
+      services.AddSingleton<IXMLWriter, XMLWriter>(); 
+      var provider = services.BuildServiceProvider(); 
+      Console.WriteLine("Dependency Injection Demo (3)"); 
+      Console.WriteLine("Choice between implementations"); 
+      Console.WriteLine("------------------------------"); 
+      // Instance via services class 
+      var XMLInstance = provider.GetService<IXMLWriter>(); 
+      XMLInstance.WriteXML(); 
+      // Instance via ServiceProviderServiceExtensions 
+      var XMLInstance2 = ServiceProviderServiceExtensions. 
+                       GetService<IXMLWriter>(provider); 
+      XMLInstance2.WriteXML();     
+      Console.ReadLine(); 
+    } 
+```
 
 如您所见，我们正在使用两种不同的方法来获取相同的实例（通过其 `GUID` 标识）。我们可以通过比较两个输出（见以下截图）来测试它：
 
@@ -392,7 +580,15 @@ Visual Studio 2017 将列出所有正在更新的库，如果你向下滚动一�
 
 以下代码是通过`DefaultServiceProvider`类创建的提供者：
 
-[PRE12]
+```cs
+    var services = new ServiceCollection(); 
+    services.AddSingleton<IXMLWriter, XMLWriter>(); 
+    // Provider via DefaultServiceProviderFactory 
+    var factory = new DefaultServiceProviderFactory(); 
+    IServiceProvider prov = factory.CreateServiceProvider(services); 
+    var XMLInstance = prov.GetService<IXMLWriter>(); 
+    XMLInstance.WriteXML(); 
+```
 
 我在这里省略了输出，因为它与之前的演示完全相同，你可以在本章伴随的代码中自行检查。
 
@@ -400,31 +596,41 @@ Visual Studio 2017 将列出所有正在更新的库，如果你向下滚动一�
 
 在这种情况下，编程甚至更简单，因为我们不需要类的任何实例，代码简化为以下代码：
 
-[PRE13]
+```cs
+    var services = new ServiceCollection(); 
+    services.AddSingleton<IXMLWriter, XMLWriter>(); 
+    // Provider via ServiceCollectionContainerBuilderExtensions 
+    IServiceProvider prov = ServiceCollectionContainerBuilderExtensions. 
+        BuildServiceProvider(services); 
+    var XMLInstance = prov.GetService<IXMLWriter>(); 
+    XMLInstance.WriteXML(); 
+```
 
 只是为了得到与我们之前相同的结果（再次，我省略了输出）。
 
 # 将作用域概念应用于服务
 
-在处理服务和与DI相关的其他功能时，一个重要的问题是定义其范围。DI文档将服务的范围与其生命周期紧密相关联，因此，与垃圾收集器应该销毁该服务的时刻相关联。
+在处理服务和与 DI 相关的其他功能时，一个重要的问题是定义其范围。DI 文档将服务的范围与其生命周期紧密相关联，因此，与垃圾收集器应该销毁该服务的时刻相关联。
 
-我们之前已经讨论过Transitory和Singleton的生命周期，但Scope生命周期确实有点令人困惑。
+我们之前已经讨论过 Transitory 和 Singleton 的生命周期，但 Scope 生命周期确实有点令人困惑。
 
 具体来说，实现了`IDisposable`接口的`IServiceDispose`接口包含了一个`Disposed of()`方法，该方法在调用时结束作用域生命周期。它包含在`Microsoft.Extensions.DependencyInjection.Abstractions.dll`中。
 
-更详细地说，文档中声明：“*一旦此对象被销毁，从* *M**icrosoft.Extensions.DependencyInjection.IServiceScope.ServiceProvider解析出的任何作用域服务也将被销毁*”。
+更详细地说，文档中声明：“*一旦此对象被销毁，从* *M**icrosoft.Extensions.DependencyInjection.IServiceScope.ServiceProvider 解析出的任何作用域服务也将被销毁*”。
 
 它的声明如下：
 
-[PRE14]
+```cs
+    public interface IServiceScope : IDisposable 
+```
 
 如果你记得本章的第一个演示，我们的`DependencyClass1`和`DependencyClass2`类实现了`IDisposable`接口，因此我们可以在类的主要操作完成后调用这些方法。
 
-正如我们在[第4章](06d5c629-d866-4319-b2d3-1a5120d1f6d2.xhtml)，“ASP.NET Core中的依赖注入”中将会看到的，这个概念特别适合某些互联网应用的场景，在这些场景中，对某些服务的生命周期进行特定控制非常有意义，并且始终可以通过实例类访问执行上下文。
+正如我们在第四章，“ASP.NET Core 中的依赖注入”中将会看到的，这个概念特别适合某些互联网应用的场景，在这些场景中，对某些服务的生命周期进行特定控制非常有意义，并且始终可以通过实例类访问执行上下文。
 
-在[第4章](06d5c629-d866-4319-b2d3-1a5120d1f6d2.xhtml)，“ASP.NET Core中的依赖注入”中，你会看到这个特性在面对性能问题、服务器资源、可伸缩性问题等时可能非常重要。
+在第四章，“ASP.NET Core 中的依赖注入”中，你会看到这个特性在面对性能问题、服务器资源、可伸缩性问题等时可能非常重要。
 
-# 其他具有DI功能的扩展
+# 其他具有 DI 功能的扩展
 
 与 `Microsoft.Extensions` 全局命名空间相关联，我们发现了一些在开发者中越来越受欢迎的相关命名空间，因为它们有助于应用程序生命周期的不同领域。
 
@@ -462,11 +668,25 @@ Mark Michaelis 在他的 MSDN 文章 *Essential .NET - Dependency Injection with
 
 考虑到我们也可以连接调用来配置我们的服务集合，让我们看看我们的新 `Main()` 方法的第一部分，包括那个调用：
 
-[PRE15]
+```cs
+    // Enabling logging with the ServiceCollection 
+    var services = new ServiceCollection() 
+      .AddSingleton<IXMLWriter, XMLWriter>() 
+      .AddLogging(); 
+   var serviceProvider = services.BuildServiceProvider(); 
+```
 
 因此，我们通过 `AddLogging()` 在 `ServiceCollection` 中启用日志记录。那么，发生了什么？让我们通过迭代结果服务对象来检查我们的集合现在具有的新成员，就像在之前的演示中那样：
 
-[PRE16]
+```cs
+    // Test the register of AddLoggin() 
+    foreach (var svc in services) 
+   { 
+      Console.WriteLine($"Type: {svc.ImplementationType} \n" + 
+        $"Lifetime: {svc.Lifetime} \n" + 
+        $"Service Type: {svc.ServiceType}"); 
+   } 
+```
 
 我们将获得一个包含三个服务的集合（见下面的输出），因为 `AddLogging()` 方法确实已将 `LoggingFactory` 类注册为 `ILoggingFactory` 接口，以及另一个泛型类，`ILogger<>`。该 `ILogger<>` 类将被配置为提供将日志消息发送到控制台的能力，为任何其他类：
 
@@ -474,7 +694,11 @@ Mark Michaelis 在他的 MSDN 文章 *Essential .NET - Dependency Injection with
 
 因此，下一步是获取一个 `ILoggerFactory` 对象，并将其与 `Console` 相关联，我们通过以这种方式调用 `AddConsole()` 来执行此操作：
 
-[PRE17]
+```cs
+    //Obtain service and configure logging 
+    serviceProvider.GetService<ILoggerFactory>() 
+      .AddConsole(LogLevel.Debug); 
+```
 
 正如你所见，`AddConsole` 预期一些额外的配置，形式为 `LogLevel` 类型的 `enum` 值，它决定了运行时在向控制台发送消息时将过滤的最小严重程度级别——每当日志系统接收到条目时，如果它低于该级别，它将忽略它。
 
@@ -486,17 +710,17 @@ Mark Michaelis 在他的 MSDN 文章 *Essential .NET - Dependency Injection with
 
 +   **跟踪 = 0**：对于只有开发人员在调试问题时才有价值的信息。这些消息可能包含敏感的应用程序数据，因此不应在生产环境中启用。默认情况下禁用。例如，凭证：`{"User":"someuser", "Password":"P@ssword"}`
 
-+   **调试 = 1**：对于在开发和调试期间具有短期有用性的信息。例如，使用fl the g设置为true进入`Configure`方法。
++   **调试 = 1**：对于在开发和调试期间具有短期有用性的信息。例如，使用 fl the g 设置为 true 进入`Configure`方法。
 
 +   **信息 = 2**：用于跟踪应用程序的一般流程。这些日志通常具有一些长期价值。例如，接收到的路径`/api/todo`的请求。
 
 +   **警告 = 3**：对于应用程序流程中的异常或意外事件。这些可能包括不会导致应用程序停止的错误或其他条件，但可能需要调查。处理异常是使用警告日志级别的常见地方。例如，对于文件`quotes.txt`的`FileNotFoundException`。
 
-+   **错误 = 4**：对于无法处理的错误和异常。这些消息表明当前活动或操作（如当前HTTP请求）失败，而不是应用程序级别的失败。例如，日志消息：`由于重复键违反无法插入记录`。
++   **错误 = 4**：对于无法处理的错误和异常。这些消息表明当前活动或操作（如当前 HTTP 请求）失败，而不是应用程序级别的失败。例如，日志消息：`由于重复键违反无法插入记录`。
 
 +   **关键 = 5**：对于需要立即注意的失败。例如，数据丢失场景，磁盘空间不足。
 
-IDE还通过IntelliSense服务显示这些级别，以及每个目的和功能的说明：
+IDE 还通过 IntelliSense 服务显示这些级别，以及每个目的和功能的说明：
 
 ![](img/3f7d1638-39ba-41ce-9149-55c0adae1e7f.png)
 
@@ -506,11 +730,23 @@ IDE还通过IntelliSense服务显示这些级别，以及每个目的和功能�
 
 现在，如果我们想让这两个类（`XMLWriter`和`Program`）都使用这些日志服务，我们需要为每个类提供一个`ILogger`实例。我们将开始为`Program`创建一个实例，并在控制台中展示一组初始消息：
 
-[PRE18]
+```cs
+    // Create a logger class from ILoggerFactory 
+    // and print an initial set of messages. 
+    var ILoggerService = serviceProvider.GetService<ILoggerFactory>(); 
+    var logger = ILoggerService.CreateLogger<Program>(); 
+```
 
 注意到创建日志类意味着调用`CreateLogger<Program>()`泛型方法。一旦实例化，日志器就有方法来声明不同的作用域（标记每个作用域的开始和结束）以及向控制台发送六种不同类型的消息，每种消息代表不同的严重级别：
 
-[PRE19]
+```cs
+    logger.LogCritical("Critical format message from Program"); 
+    logger.LogDebug("Debug format message from Program"); 
+    logger.LogError("Error format message from Program"); 
+    logger.LogInformation("Information format message from Program"); 
+    logger.LogTrace("Trace format message from Program"); 
+    logger.LogWarning("Warning format message from Program");  
+```
 
 如果我们查看输出，我们可以欣赏到这些消息格式之间的差异：
 
@@ -518,13 +754,27 @@ IDE还通过IntelliSense服务显示这些级别，以及每个目的和功能�
 
 如您所见，不同的消息严重级别在输出中生成不同的格式，使用不同的颜色和前缀来表示其`LogLevel`类别。但是，等等！有一个缺失的（`Trace`消息）。
 
-嗯，还不完全是。发生的事情是，`Trace` `LogLevel`不会输出到控制台，它主要准备用于启用跟踪开关的Web应用程序（我们将在[第4章](06d5c629-d866-4319-b2d3-1a5120d1f6d2.xhtml)，*ASP.NET Core中的依赖注入*）中。
+嗯，还不完全是。发生的事情是，`Trace` `LogLevel`不会输出到控制台，它主要准备用于启用跟踪开关的 Web 应用程序（我们将在第四章，*ASP.NET Core 中的依赖注入*）中。
 
-所以，所有这些都说完了，我们如何使用这个架构和从我们的`XMLWriter`类中使用的日志服务呢？让我们改变实现方式，以便我们使用我们在上一章中看到的一个DI模式——构造函数依赖模型。
+所以，所有这些都说完了，我们如何使用这个架构和从我们的`XMLWriter`类中使用的日志服务呢？让我们改变实现方式，以便我们使用我们在上一章中看到的一个 DI 模式——构造函数依赖模型。
 
 要使用该模型，我们必须稍微改变我们的`XMLWriter`类，以包括一个只读属性，它持有`ILogger<>`实例，并在类的构造函数中分配其值。因此，这次我们独特的`XMLWriter`类的最终格式将是（接口定义尚未受到影响，所以它和之前的演示相同）：
 
-[PRE20]
+```cs
+    public class XMLWriter : IXMLWriter 
+    { 
+      private readonly ILogger<XMLWriter> logger; 
+      public XMLWriter(ILoggerFactory loggerFactory) 
+      { 
+        logger = loggerFactory.CreateLogger<XMLWriter>(); 
+      } 
+      public void WriteXML() 
+      { 
+        logger.LogInformation("<message>Writing in XML Format
+          (via Logger)</message>"); 
+      } 
+    } 
+```
 
 剩下的唯一事情就是使用`logger`代替之前的`Console`调用，并调用一个`Log*`方法来生成预期的输出。就是这样。
 
@@ -532,9 +782,40 @@ IDE还通过IntelliSense服务显示这些级别，以及每个目的和功能�
 
 所以，考虑到所有这些，我们最终得到了这个实现版本的`Main`方法：
 
-[PRE21]
+```cs
+    static void Main(string[] args) 
+    { 
+      // Enabling logging in the ServiceCollection 
+      // via AddLogging() 
+      var services = new ServiceCollection() 
+        .AddSingleton<IXMLWriter, XMLWriter>() 
+        .AddLogging(); 
+      var serviceProvider = services.BuildServiceProvider(); 
+      //Obtain service and configure logging 
+      serviceProvider.GetService<ILoggerFactory>() 
+        .AddConsole(LogLevel.Debug); 
 
-正如我们在最终输出中可以看到的（请参阅以下截图），所有消息都按照它们被调用的顺序在控制台中呈现，使用.NET Core配置的预定义格式，包括我们的`XMLWriter`消息：
+      // Create a logger class from ILoggerFactory 
+      // and print all types of messages. 
+      var ILoggerService = serviceProvider.GetService<ILoggerFactory>(); 
+      var logger = ILoggerService.CreateLogger<Program>(); 
+      logger.LogCritical("Critical format message from Program"); 
+      logger.LogDebug("Debug format message from Program"); 
+      logger.LogError("Error format message from Program"); 
+      logger.LogInformation("Information format message from Program"); 
+      logger.LogTrace("Trace format message from Program"); 
+      logger.LogWarning("Warning format message from Program"); 
+
+      //Instantiation of XMLInstance 
+      var XMLInstance = serviceProvider.GetService<IXMLWriter>(); 
+      XMLInstance.WriteXML(); 
+
+      logger.LogDebug("Process finished!"); 
+      Console.Read(); 
+    } 
+```
+
+正如我们在最终输出中可以看到的（请参阅以下截图），所有消息都按照它们被调用的顺序在控制台中呈现，使用.NET Core 配置的预定义格式，包括我们的`XMLWriter`消息：
 
 ![](img/1d65f85e-fa1c-4fc9-8e55-3a85320b9fdf.png)
 
@@ -544,38 +825,75 @@ IDE还通过IntelliSense服务显示这些级别，以及每个目的和功能�
 
 为了测试这个功能，我们将在`IXMLWriter`接口的定义中做一些更改，并相应地更新实现。我们的新接口将有一个额外的方法，该方法也会将消息发送到预定义的输出（在这种情况下，将在运行时出现在几个地方）：
 
-[PRE22]
+```cs
+    public interface IXMLWriter 
+    { 
+        void WriteXML(); 
+        void WriteXMLWithSeverityLevel(); 
+    } 
+```
 
-因此，XMLWriter的更新代码将是：
+因此，XMLWriter 的更新代码将是：
 
-[PRE23]
+```cs
+    public class XMLWriter : IXMLWriter 
+    { 
+      private readonly ILogger<XMLWriter> logger; 
+      public XMLWriter(ILoggerFactory loggerFactory) 
+      { 
+        loggerFactory.AddDebug().AddConsole(LogLevel.Information); 
+        logger = loggerFactory.CreateLogger<XMLWriter>(); 
+      } 
+      public void WriteXML() 
+      { 
+        logger.LogDebug( 
+            "<msg>First Message (LogDebug/SeverityLevel: 
+                 Information)</msg>"); 
+      } 
+      public void WriteXMLWithSeverityLevel() 
+      { 
+        logger.LogDebug( 
+            "<msg>Second Message (LogDebug/SeverityLevel: 
+                 Information</msg>"); 
+      } 
+    } 
+```
 
 因此，现在我们有两种不同的方法来写入消息。为了测试这个功能，我们可以在`Main()`方法中配置`ILoggerService`对象（记住，它是`ILoggerFactory`类型）。一旦新的命名空间被加载并可用，我们可以写入：
 
-[PRE24]
+```cs
+    var ILoggerService = serviceProvider.GetService<
+          ILoggerFactory>(); 
+    ILoggerService.AddDebug(); 
+```
 
-以这种方式，我们允许将消息发送到`Debug`或`Output`窗口，无论是控制台还是Web应用程序。
+以这种方式，我们允许将消息发送到`Debug`或`Output`窗口，无论是控制台还是 Web 应用程序。
 
 测试不同的选项很容易，只需更改调用此方法时使用的严重性级别类型，以及现有的那些。例如，我们可以调用`WriteXMLWithSeverityLevel()`并观察在执行过程中生成的两个输出（现在我们有两个）：
 
-[PRE25]
+```cs
+    //Instantiation of XMLInstance 
+    var XMLInstance = serviceProvider.GetService<IXMLWriter>(); 
+    XMLInstance.WriteXML(); 
+    XMLInstance.WriteXMLWithSeverityLevel(); 
+```
 
 一方面，输出现在显示了新的消息（没有意外）：
 
 ![](img/324caea3-87c7-41a9-9eb7-285ad3cf41e7.png)
 
-但是，现在我们有了更多的消息。如果我们查看`输出`窗口，我们会看到根据我们配置的`LogLevel`出现的新条目——其中一些将被展示，而其他一些则会被忽略（正如你所见，在这个版本中，只有前四条消息被复制到输出窗口中，所有XMLWriter消息都被忽略）：
+但是，现在我们有了更多的消息。如果我们查看`输出`窗口，我们会看到根据我们配置的`LogLevel`出现的新条目——其中一些将被展示，而其他一些则会被忽略（正如你所见，在这个版本中，只有前四条消息被复制到输出窗口中，所有 XMLWriter 消息都被忽略）：
 
 ![](img/d33a0f69-0e87-4e06-ae02-edc6de0e2883.png)
 
-这只是对采用DI架构的一些服务以及.NET Core内部可用的服务的初步了解。当我们处理ASP.NET Core编码时，在[第4章](06d5c629-d866-4319-b2d3-1a5120d1f6d2.xhtml)，“ASP.NET Core中的依赖注入”中，我们将看到更多关于这些实现的细节。
+这只是对采用 DI 架构的一些服务以及.NET Core 内部可用的服务的初步了解。当我们处理 ASP.NET Core 编码时，在第四章，“ASP.NET Core 中的依赖注入”中，我们将看到更多关于这些实现的细节。
 
 # 摘要
 
-在本章中，我们初步探讨了如何在当前版本的.NET Core（2.0）中支持和使用依赖注入技术，以及我们如何在ASP.NET项目之外使用它们。
+在本章中，我们初步探讨了如何在当前版本的.NET Core（2.0）中支持和使用依赖注入技术，以及我们如何在 ASP.NET 项目之外使用它们。
 
-总结来说，我们已经看到了.NET Core的主要特性和从Visual Studio安装和使用的步骤，特别是关注最新版本，Visual Studio 2017，以及与这个框架版本相关的不同类型的部署，以及包含在DI和相关命名空间中的主要功能和功能。
+总结来说，我们已经看到了.NET Core 的主要特性和从 Visual Studio 安装和使用的步骤，特别是关注最新版本，Visual Studio 2017，以及与这个框架版本相关的不同类型的部署，以及包含在 DI 和相关命名空间中的主要功能和功能。
 
-我们还分析了与此架构相关的类和接口，以及通过一系列示例实现它的方法，最后是一些真实实现，它们已经是.NET Core 2.0的一部分，例如日志服务，以及如何从任何类中使用它们。
+我们还分析了与此架构相关的类和接口，以及通过一系列示例实现它的方法，最后是一些真实实现，它们已经是.NET Core 2.0 的一部分，例如日志服务，以及如何从任何类中使用它们。
 
-在[第4章](06d5c629-d866-4319-b2d3-1a5120d1f6d2.xhtml)，“ASP.NET Core中的依赖注入”，我们的方法将更加真实，因为它涉及到Web应用程序以及网站的新架构和配置如何管理这些新概念，例如中间件和服务配置，其中DI从一开始就扮演着重要角色。
+在第四章，“ASP.NET Core 中的依赖注入”，我们的方法将更加真实，因为它涉及到 Web 应用程序以及网站的新架构和配置如何管理这些新概念，例如中间件和服务配置，其中 DI 从一开始就扮演着重要角色。

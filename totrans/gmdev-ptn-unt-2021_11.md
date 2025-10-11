@@ -1,10 +1,10 @@
 使用观察者模式解耦组件
 
-在Unity开发中，一个常见的挑战是找到优雅的方法来解耦组件。在引擎中编写代码时，这是一个重大的障碍，因为它为我们提供了通过API和直接在检查器中引用组件的多种方式。但这种灵活性可能会带来代价，并且可能会使你的代码变得脆弱，因为在某些情况下，一个缺失的引用就足以破坏你的游戏。
+在 Unity 开发中，一个常见的挑战是找到优雅的方法来解耦组件。在引擎中编写代码时，这是一个重大的障碍，因为它为我们提供了通过 API 和直接在检查器中引用组件的多种方式。但这种灵活性可能会带来代价，并且可能会使你的代码变得脆弱，因为在某些情况下，一个缺失的引用就足以破坏你的游戏。
 
 因此，在本章中，我们将使用观察者模式来设置与核心组件的关系。这些关系将通过分配对象作为主题或观察者的角色来映射。这种方法不会完全消除我们组件之间的耦合，但会将其放松并逻辑化组织。它还将建立一个具有一对一结构的处理系统，这正是本章用例中需要实现的内容。
 
-如果你正在寻找一种使用事件在多对多关系中解耦对象的方法，请查看第6章，*使用事件总线管理游戏事件*。
+如果你正在寻找一种使用事件在多对多关系中解耦对象的方法，请查看第六章，*使用事件总线管理游戏事件*。
 
 本章将涵盖以下主题：
 
@@ -18,9 +18,9 @@
 
 # 技术要求
 
-本章的代码文件可以在GitHub上找到：[https://github.com/PacktPublishing/Game-Development-Patterns-with-Unity-2021-Second-Edition/tree/main/Assets/Chapters/Chapter09](https://github.com/PacktPublishing/Game-Development-Patterns-with-Unity-2021-Second-Edition/tree/main/Assets/Chapters/Chapter09)。
+本章的代码文件可以在 GitHub 上找到：[`github.com/PacktPublishing/Game-Development-Patterns-with-Unity-2021-Second-Edition/tree/main/Assets/Chapters/Chapter09`](https://github.com/PacktPublishing/Game-Development-Patterns-with-Unity-2021-Second-Edition/tree/main/Assets/Chapters/Chapter09)。
 
-查看以下视频以查看代码的实际操作：[https://bit.ly/3xDlBDa](https://bit.ly/3xDlBDa)。
+查看以下视频以查看代码的实际操作：[`bit.ly/3xDlBDa`](https://bit.ly/3xDlBDa)。
 
 # 理解观察者模式
 
@@ -28,11 +28,11 @@
 
 它与发布者和订阅者关系有些相似，其中对象订阅并监听特定事件通知。核心区别在于观察者模式中，主题和观察者彼此知晓对方，因此它们仍然轻度耦合在一起。
 
-让我们回顾一个典型观察者模式实现的UML图，看看它在代码中实现时可能如何工作：
+让我们回顾一个典型观察者模式实现的 UML 图，看看它在代码中实现时可能如何工作：
 
 ![](img/03b549cd-caed-4ef5-a6f2-951802a723de.png)
 
-图9.1 – 观察者模式的UML图
+图 9.1 – 观察者模式的 UML 图
 
 如您所见，主题和观察者都有自己的接口实现，但最重要的一个是`ISubject`，它包括以下方法：
 
@@ -58,7 +58,7 @@
 
 +   **泄漏**: 观察者可能导致内存泄漏，因为主题对其观察者持有强引用。如果实现不当，并且观察者对象在不再需要时没有正确地分离和释放，它可能会引起垃圾收集问题，并且某些资源将不会被释放。
 
-要了解此处指出的潜在内存泄漏缺陷，我建议阅读以下关于该主题的维基百科文章：[https://en.wikipedia.org/wiki/Lapsed_listener_problem](https://en.wikipedia.org/wiki/Lapsed_listener_problem)。
+要了解此处指出的潜在内存泄漏缺陷，我建议阅读以下关于该主题的维基百科文章：[`en.wikipedia.org/wiki/Lapsed_listener_problem`](https://en.wikipedia.org/wiki/Lapsed_listener_problem)。
 
 但请注意，与任何与优化相关的内容一样，它是上下文相关的，因此你应该在优化潜在的性能问题之前对代码进行性能分析。
 
@@ -84,7 +84,7 @@ HUD 和相机控制器将作为 `BikeController` 的观察者。它们的核心�
 
 ![图片](img/da2d43e3-3686-46c3-aafa-57d46f4aaa09.png)
 
-图9.2 – 控制器观察主题的示意图
+图 9.2 – 控制器观察主题的示意图
 
 如我们所见，我们可以有任意数量的控制器观察自行车（主题）。在下一节中，我们将把这些概念转化为代码。
 
@@ -94,39 +94,256 @@ HUD 和相机控制器将作为 `BikeController` 的观察者。它们的核心�
 
 1.  我们将从这个代码示例开始，实现模式的两个元素。让我们从 `Subject` 类开始：
 
-[PRE0]
+```cs
+using UnityEngine;
+using System.Collections;
+
+namespace Chapter.Observer
+{
+    public abstract class Subject : MonoBehaviour
+    {
+        private readonly 
+            ArrayList _observers = new ArrayList();
+
+        public void Attach(Observer observer)
+        {
+            _observers.Add(observer);
+        }
+
+        public void Detach(Observer observer)
+        {
+            _observers.Remove(observer);
+        }
+
+        public void NotifyObservers()
+        {
+            foreach (Observer observer in _observers)
+            {
+                observer.Notify(this);
+            }
+        }
+    }
+}
+```
 
 `Subject` 抽象类有三个方法。前两个方法，`Attach()` 和 `Detach()`，分别负责将观察者对象添加到观察者列表或从列表中移除。第三个方法 `NotifyObservers()` 负责遍历观察者对象列表，并调用它们的公共方法，即 `Notify()`。在接下来的步骤中实现具体的观察者类时，这一点将变得有意义。
 
 1.  接下来是 `Observer` 抽象类：
 
-[PRE1]
+```cs
+using UnityEngine;
+
+namespace Chapter.Observer
+{
+    public abstract class Observer : MonoBehaviour
+    {
+        public abstract void Notify(Subject subject);
+    }
+}
+```
 
 希望成为观察者的类必须继承这个 `Observer` 类并实现名为 `Notify()` 的抽象方法，该方法接收主题作为参数。
 
 1.  现在我们已经有了核心成分，让我们编写一个作为主题的 `BikeController` 类的骨架。然而，因为它太长了，我们将将其分成三个部分。第一部分只是初始化代码：
 
-[PRE2]
+```cs
+using UnityEngine;
+
+namespace Chapter.Observer
+{
+    public class BikeController : Subject
+    {
+        public bool IsTurboOn
+        {
+            get; private set;
+        }
+
+        public float CurrentHealth
+        {
+            get { return health; }
+        } 
+
+        private bool _isEngineOn;
+        private HUDController _hudController;
+        private CameraController _cameraController;
+
+        [SerializeField]
+        private float health = 100.0f;
+
+        void Awake()
+        {
+            _hudController = 
+                gameObject.AddComponent<HUDController>();
+
+            _cameraController = 
+                (CameraController) 
+                FindObjectOfType(typeof(CameraController));
+        }
+
+        private void Start()
+        {
+            StartEngine();
+        }
+
+```
 
 下面的部分很重要，因为我们是在 `BikeController` 启用时附加我们的观察者，并在它禁用时解除它们；这避免了我们保留不再需要的引用：
 
-[PRE3]
+```cs
+void OnEnable()
+{
+    if (_hudController) 
+        Attach(_hudController);
+
+    if (_cameraController) 
+        Attach(_cameraController);
+}
+
+void OnDisable()
+{
+    if (_hudController) 
+        Detach(_hudController);
+
+    if (_cameraController) 
+        Detach(_cameraController);
+}
+```
 
 对于最后一部分，我们有一些核心行为的初步实现。请注意，我们只在自行车参数更新时通知观察者，例如它受到伤害或涡轮增压器激活时：
 
-[PRE4]
+```cs
+        private void StartEngine()
+        {
+            _isEngineOn = true;
+
+            NotifyObservers();
+        }
+
+        public void ToggleTurbo()
+        {
+            if (_isEngineOn) 
+                IsTurboOn = !IsTurboOn;
+
+            NotifyObservers();
+        }
+
+        public void TakeDamage(float amount)
+        {
+            health -= amount;
+            IsTurboOn = false;
+
+            NotifyObservers();
+
+            if (health < 0)
+                Destroy(gameObject);
+        }
+    }
+}
+```
 
 `BikeController` 从不直接调用 `HUDController` 或 `CameraController`；它只通知它们有变化——它从不告诉它们该做什么。这很重要，因为观察者可以独立选择在收到通知时的行为。因此，它们在一定程度上与主题解耦。
 
 1.  现在，让我们实现一些观察者并观察它们在主题发出信号时的行为。我们将从 `HUDController` 开始，它负责显示用户界面：
 
-[PRE5]
+```cs
+using UnityEngine;
+
+namespace Chapter.Observer {
+    public class HUDController : Observer {
+
+        private bool _isTurboOn;
+        private float _currentHealth;
+        private BikeController _bikeController;
+
+        void OnGUI() {
+            GUILayout.BeginArea (
+                new Rect (50,50,100,200));
+            GUILayout.BeginHorizontal ("box");
+            GUILayout.Label ("Health: " + _currentHealth);
+            GUILayout.EndHorizontal ();
+
+            if (_isTurboOn) {
+                GUILayout.BeginHorizontal("box");
+                GUILayout.Label("Turbo Activated!");
+                GUILayout.EndHorizontal();
+            }
+
+            if (_currentHealth <= 50.0f) {
+                GUILayout.BeginHorizontal("box");
+                GUILayout.Label("WARNING: Low Health");
+                GUILayout.EndHorizontal();
+            }
+
+            GUILayout.EndArea ();
+        }
+
+        public override void Notify(Subject subject) {
+            if (!_bikeController)
+                _bikeController = 
+                    subject.GetComponent<BikeController>();
+
+            if (_bikeController) {
+                _isTurboOn = 
+                    _bikeController.IsTurboOn;
+
+                _currentHealth = 
+                    _bikeController.CurrentHealth;
+            }
+        }
+    }
+}
+```
 
 `HUDController` 的 `Notify()` 方法接收一个指向通知它的主题的引用。因此，它可以访问其属性并选择在界面中显示哪一个。
 
 1.  最后，我们将实现 `CameraController`。相机的预期行为是在自行车涡轮增压器激活时开始晃动：
 
-[PRE6]
+```cs
+using UnityEngine;
+
+namespace Chapter.Observer
+{
+    public class CameraController : Observer
+    {
+        private bool _isTurboOn;
+        private Vector3 _initialPosition;
+        private float _shakeMagnitude = 0.1f;
+        private BikeController _bikeController;
+
+        void OnEnable()
+        {
+            _initialPosition = 
+                gameObject.transform.localPosition;
+        }
+
+        void Update()
+        {
+            if (_isTurboOn)
+            {
+                gameObject.transform.localPosition =
+                    _initialPosition + 
+                    (Random.insideUnitSphere * _shakeMagnitude);
+            }
+            else
+            {
+                gameObject.transform.
+                    localPosition = _initialPosition;
+            }
+        }
+
+        public override void Notify(Subject subject)
+        {
+            if (!_bikeController)
+                _bikeController =
+                    subject.GetComponent<BikeController>();
+
+            if (_bikeController)
+                _isTurboOn = _bikeController.IsTurboOn;
+        }
+    }
+}
+
+```
 
 `CameraController` 检查刚刚通知它的主题的公共布尔属性，如果为真，则开始晃动相机，直到再次被 `BikeController` 通知并确认涡轮增压开关关闭。
 
@@ -148,7 +365,35 @@ HUD 和相机控制器将作为 `BikeController` 的观察者。它们的核心�
 
 1.  创建一个空的 GameObject，将其添加以下 `ClientObserver` 脚本，然后开始场景：
 
-[PRE7]
+```cs
+using UnityEngine;
+
+namespace Chapter.Observer
+{
+    public class ClientObserver : MonoBehaviour
+    {
+        private BikeController _bikeController;
+
+        void Start()
+        {
+            _bikeController = 
+                (BikeController) 
+                FindObjectOfType(typeof(BikeController));
+        }
+
+        void OnGUI()
+        {
+            if (GUILayout.Button("Damage Bike"))
+                if (_bikeController) 
+                    _bikeController.TakeDamage(15.0f);
+
+            if (GUILayout.Button("Toggle Turbo"))
+                if (_bikeController) 
+                    _bikeController.ToggleTurbo();
+        }
+    }
+}
+```
 
 我们应该在屏幕上看到类似于以下内容的 GUI 按钮和标签：
 
@@ -166,7 +411,7 @@ HUD 和相机控制器将作为 `BikeController` 的观察者。它们的核心�
 
 如果您需要组件通过事件进行交互，尤其是如果您不需要在它们之间建立特定关系时，应始终考虑使用本地事件系统。
 
-Unity 有自己的本地事件系统；它与 C# 版本非常相似，但增加了引擎功能，例如通过检查器连接事件和动作的能力。要了解更多信息，请访问 [https://docs.unity3d.com/2021.2/Documentation/Manual/UnityEvents.html](https://docs.unity3d.com/2021.2/Documentation/Manual/UnityEvents.html)。
+Unity 有自己的本地事件系统；它与 C# 版本非常相似，但增加了引擎功能，例如通过检查器连接事件和动作的能力。要了解更多信息，请访问 [`docs.unity3d.com/2021.2/Documentation/Manual/UnityEvents.html`](https://docs.unity3d.com/2021.2/Documentation/Manual/UnityEvents.html)。
 
 # 摘要
 

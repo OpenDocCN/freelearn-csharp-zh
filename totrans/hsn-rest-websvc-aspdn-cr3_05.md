@@ -38,13 +38,37 @@
 
 # 实际中的中间件管道
 
-我们已经探讨了中间件管道背后的理论以及它在短路和单一责任原则方面的有用性。现在让我们在ASP.NET Core中具体化这一点。在前一章中，我们研究了.NET Core提供的默认Web API模板。让我们通过用以下代码片段替换`Startup`类的内容来继续：
+我们已经探讨了中间件管道背后的理论以及它在短路和单一责任原则方面的有用性。现在让我们在 ASP.NET Core 中具体化这一点。在前一章中，我们研究了.NET Core 提供的默认 Web API 模板。让我们通过用以下代码片段替换`Startup`类的内容来继续：
 
-[PRE0]
+```cs
+    public class Startup
+    {
+        public Startup(IConfiguration configuration)
+        {
+            Configuration = configuration;
+        }
 
-我们可以通过在`SampleAPI`文件夹中执行以下CLI命令来运行此项目：
+        public IConfiguration Configuration { get; }
 
-[PRE1]
+        public void ConfigureServices(IServiceCollection services)
+        {
+        }
+        public void Configure(IApplicationBuilder app, IWebHostEnvironment 
+        env)
+        {
+            app.Run(async context =>
+ {
+ await context.Response.WriteAsync("Hello, World!");
+ });
+        }
+    }
+```
+
+我们可以通过在`SampleAPI`文件夹中执行以下 CLI 命令来运行此项目：
+
+```cs
+dotnet run
+```
 
 上述命令使用`http://localhost:5000`地址启动我们的应用程序。我们可以使用浏览器调用它：
 
@@ -52,15 +76,51 @@
 
 正如你所见，使用中间件策略运行“Hello, World!”很简单。它需要实现`Configure`方法，这是中间件通常被定义的方法。`app.Run`执行一个委托方法，这是我们的中间件的表示。在我们的例子中，它接受请求的`HttpContext`并在上下文的响应中写入内容。
 
-理解ASP.NET Core框架如何实现`Run`方法至关重要。让我们通过检查`Microsoft.AspNetCore.Builder`命名空间中的代码来更仔细地看看`Run`方法的实现：
+理解 ASP.NET Core 框架如何实现`Run`方法至关重要。让我们通过检查`Microsoft.AspNetCore.Builder`命名空间中的代码来更仔细地看看`Run`方法的实现：
 
-[PRE2]
+```cs
+using System;
+using Microsoft.AspNetCore.Http;
+
+namespace Microsoft.AspNetCore.Builder
+{
+    /// <summary>
+    /// Extension methods for adding terminal middleware.
+    /// </summary>
+    public static class RunExtensions
+    {
+        /// <summary>
+        /// Adds a terminal middleware delegate to the application's 
+            request pipeline.
+        /// </summary>
+        /// <param name="app">The <see cref="IApplicationBuilder"/> 
+            instance.</param>
+        /// <param name="handler">A delegate that handles the 
+            request.</param>
+        public static void Run(this IApplicationBuilder app, 
+        RequestDelegate handler)
+        {
+            if (app == null)
+            {
+                throw new ArgumentNullException(nameof(app));
+            }
+
+            if (handler == null)
+            {
+                throw new ArgumentNullException(nameof(handler));
+            }
+
+            app.Use(_ => handler);
+        }
+    }
+}
+```
 
 上述代码提供了我们正在执行操作的更多细节。我们注意到`RequestDelegate`处理器不能为`null`，如果我们深入到调用栈中，我们可以看到我们的委托将通过`app.Use`扩展方法被添加到**管道的末尾**。
 
-理解中间件顺序的重要性。中间件管道的顺序在`Startup`类的`Configure`方法中隐式定义。此外，**MVC中间件**通常是被请求击中的最后一个；另一方面，**授权中间件**通常被放置在其他中间件之前，以确保正确的安全级别（将授权**中间件**放在**MVC中间件**之后可能会损害我们的服务并使其不安全）*.*
+理解中间件顺序的重要性。中间件管道的顺序在`Startup`类的`Configure`方法中隐式定义。此外，**MVC 中间件**通常是被请求击中的最后一个；另一方面，**授权中间件**通常被放置在其他中间件之前，以确保正确的安全级别（将授权**中间件**放在**MVC 中间件**之后可能会损害我们的服务并使其不安全）*.*
 
-# ASP.NET Core中的HttpContext
+# ASP.NET Core 中的 HttpContext
 
 在上一个示例中，我们看到了如何使用 `app.Run` 扩展方法创建中间件。该实现中涉及的一个关键概念是 `HttpContext` 类型，它是获取所有 HTTP 属性信息的唯一入口点；它通常与传入的请求相关。`HttpContext` 属性公开了从请求中获取信息和在响应中更新信息的方法和属性。响应和请求信息由以下属性表示：`HttpContext.Response` 和 `HttpContext.Request`。例如，在上一个案例中，我们使用了 `WriteAsync` 方法，该方法将 `Hello World!` 字符串写入到当前的 `HttpContext` 响应中。
 
@@ -70,7 +130,32 @@
 
 中间件也可以通过使用 *基于类的* 方法来实现。这种方法增加了中间件的 *可重用性*、*可测试性* 和 *可维护性*。基于类的方法涉及定义一个新的类型，例如。让我们看看基于类的中间件：
 
-[PRE3]
+```cs
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Http;
+
+namespace Demo.WebAPI
+{
+    public class SampleMiddleware
+    {
+        private readonly RequestDelegate _next;
+
+        public RequestCultureMiddleware(RequestDelegate next)
+        {
+            _next = next;
+        }
+
+        public async Task InvokeAsync(HttpContext context)
+        {
+            //DO STUFF
+
+            // Call the next delegate/middleware in the pipeline
+            await _next(context);
+        }
+    }
+}
+
+```
 
 让我们考察这个类的一些关键点：
 
@@ -80,52 +165,106 @@
 
 在定义我们的中间件类之后，我们需要将其添加到我们的管道中。一种很好的方法是创建一个新的扩展方法，如下所示：
 
-[PRE4]
+```cs
+public static class SampleMiddlewareExtensions
+{
+    public static IApplicationBuilder UseSampleMiddleware(
+        this IApplicationBuilder builder)
+    {
+        return builder.UseMiddleware<SampleMiddleware>();
+    }
+}
+```
 
 在此之后，我们可以在 `Startup` 类中通过执行之前定义的扩展方法将我们的中间件添加到管道中：
 
-[PRE5]
+```cs
 
-上述实现提供了一种将中间件的逻辑封装在`SampleMiddleware`类中的方法。出于各种原因，这种方法是首选的。首先，中间件类和逻辑可以通过单元测试进行验证和测试。其次，在企业环境中，创建包含由Web服务使用的常见中间件的专用库项目，并通过公司的NuGet仓库进行分发可能很有用。最后，基于类的方法提供了使用构造函数注入突出显示中间件依赖关系的一种清晰方式。我们将在[第4章](54bd7784-d757-4cbc-91d4-5362ca3a60de.xhtml)，*依赖注入*中更深入地探讨这个主题。现在我们已经看到了如何在ASP.NET Core管道中声明和添加中间件，有必要更深入地讨论中间件的条件初始化。
+    public class Startup
+    {
+
+        //  ...
+
+        public void Configure(IApplicationBuilder app, 
+        IHostingEnvironment env)
+        {
+            app.UseSampleMiddleware();
+
+            app.Run(async context =>
+            {
+                await context.Response.WriteAsync("Hello, World!");
+            });
+        } 
+     }
+```
+
+上述实现提供了一种将中间件的逻辑封装在`SampleMiddleware`类中的方法。出于各种原因，这种方法是首选的。首先，中间件类和逻辑可以通过单元测试进行验证和测试。其次，在企业环境中，创建包含由 Web 服务使用的常见中间件的专用库项目，并通过公司的 NuGet 仓库进行分发可能很有用。最后，基于类的方法提供了使用构造函数注入突出显示中间件依赖关系的一种清晰方式。我们将在第四章，*依赖注入*中更深入地探讨这个主题。现在我们已经看到了如何在 ASP.NET Core 管道中声明和添加中间件，有必要更深入地讨论中间件的条件初始化。
 
 # 条件管道
 
-ASP.NET Core提供了一些有用的操作符，允许我们将条件初始化逻辑放入中间件管道中。这些类型的操作符可能有助于为我们的服务和应用程序提供额外的性能优势。让我们看看这些操作符的一些例子。
+ASP.NET Core 提供了一些有用的操作符，允许我们将条件初始化逻辑放入中间件管道中。这些类型的操作符可能有助于为我们的服务和应用程序提供额外的性能优势。让我们看看这些操作符的一些例子。
 
-`IApplicationBuilder Map (this IApplicationBuilder app, PathString pathMatch, Action<IApplicationBuilder> configuration)`扩展方法帮助我们通过映射URI路径来初始化我们的中间件；例如：
+`IApplicationBuilder Map (this IApplicationBuilder app, PathString pathMatch, Action<IApplicationBuilder> configuration)`扩展方法帮助我们通过映射 URI 路径来初始化我们的中间件；例如：
 
-[PRE6]
+```cs
+public static class SampleMiddlewareExtensions
+{
+    public static IApplicationBuilder UseSampleMiddleware(
+        this IApplicationBuilder builder)
+    {
+       return builder.Map("/test/path", _ => 
+       _.UseMiddleware<SampleMiddleware>());
+    }
+}
+```
 
-在这种情况下，只有当`SampleMiddleware`作为一个具有指定路径的URI被调用时，它才会被添加到我们的管道中。请注意，`Map`操作符也可以嵌套在其他操作符内部：这种方法提供了一种更高级的初始化条件的方法。
+在这种情况下，只有当`SampleMiddleware`作为一个具有指定路径的 URI 被调用时，它才会被添加到我们的管道中。请注意，`Map`操作符也可以嵌套在其他操作符内部：这种方法提供了一种更高级的初始化条件的方法。
 
 另一个有用的操作符是`MapWhen`，它只有在*谓词*函数返回`true`时才会初始化提供的中间件；例如：
 
-[PRE7]
+```cs
+public static class SampleMiddlewareExtensions
+{
+    public static IApplicationBuilder UseSampleMiddleware(
+        this IApplicationBuilder builder)
+    {
+      return  builder.MapWhen(context => context.Request.IsHttps, 
+      _ => _.UseMiddleware<SampleMiddleware>());
+    }
+}
+```
 
-在这种情况下，如果请求是HTTPS，我们将初始化`SampleMiddleware`类。当需要针对特定类型的请求采取行动时，条件中间件初始化可能非常有用。通常，当需要在HTTP请求类型上强制执行某些逻辑时，例如请求中存在特定头或使用特定协议时，这通常成为必要。
+在这种情况下，如果请求是 HTTPS，我们将初始化`SampleMiddleware`类。当需要针对特定类型的请求采取行动时，条件中间件初始化可能非常有用。通常，当需要在 HTTP 请求类型上强制执行某些逻辑时，例如请求中存在特定头或使用特定协议时，这通常成为必要。
 
-总之，*基于类的*中间件在需要在中间件管道中实现自定义逻辑时非常有用，条件初始化提供了一种更干净的方式来初始化我们的中间件集合。在ASP.NET Core中，中间件是框架基本逻辑的一等公民；因此，下一节将涵盖一些用例和一些与ASP.NET Core一起提供的中间件。
+总之，*基于类的*中间件在需要在中间件管道中实现自定义逻辑时非常有用，条件初始化提供了一种更干净的方式来初始化我们的中间件集合。在 ASP.NET Core 中，中间件是框架基本逻辑的一等公民；因此，下一节将涵盖一些用例和一些与 ASP.NET Core 一起提供的中间件。
 
 # 理解内置中间件
 
-那么，中间件有哪些用例呢？如前所述，它们通常与跨切面关注点相关，例如*日志记录*、*身份验证*和*异常处理*。ASP.NET Core本身提供了一些*内置中间件*，它们代表了解决问题的标准方式：*
+那么，中间件有哪些用例呢？如前所述，它们通常与跨切面关注点相关，例如*日志记录*、*身份验证*和*异常处理*。ASP.NET Core 本身提供了一些*内置中间件*，它们代表了解决问题的标准方式：*
 
 +   `UseStaticFiles()`: 提供了一种处理应用程序内部静态文件和资源的方法。当客户端请求静态资源时，此中间件会过滤请求并返回请求的文件，而无需触及管道的其余部分。
 
-+   `AddResponseCaching()`: 帮助开发者配置应用程序的缓存系统。此中间件还添加了所有与缓存相关的HTTP兼容信息。
++   `AddResponseCaching()`: 帮助开发者配置应用程序的缓存系统。此中间件还添加了所有与缓存相关的 HTTP 兼容信息。
 
-+   `UseHttpsRedirection()`: 这个新的内置ASP.NET Core 2.1中间件提供了一种强制HTTPS重定向的方法。
++   `UseHttpsRedirection()`: 这个新的内置 ASP.NET Core 2.1 中间件提供了一种强制 HTTPS 重定向的方法。
 
-+   `UseDeveloperExceptionPage()`: 在发生异常的情况下，此功能会显示详细的错误页面（新的YSOD）。这通常根据环境条件进行初始化。
++   `UseDeveloperExceptionPage()`: 在发生异常的情况下，此功能会显示详细的错误页面（新的 YSOD）。这通常根据环境条件进行初始化。
 
-这些是ASP.NET Core提供的内置中间件的一部分。正如你所见，所有中间件都为你的应用程序提供了跨切面功能。这里重要的是中间件初始化的顺序反映了我们的管道顺序；例如：
+这些是 ASP.NET Core 提供的内置中间件的一部分。正如你所见，所有中间件都为你的应用程序提供了跨切面功能。这里重要的是中间件初始化的顺序反映了我们的管道顺序；例如：
 
-[PRE8]
+```cs
+     public void Configure(IApplicationBuilder app, IHostingEnvironment env)
+        {
+            // ...
+            app.UseHttpsRedirection();
+            app.UseStaticFiles();
+        }
+```
 
-在这种情况下，`UseStaticFiles`中间件将不会收到静态文件的请求，因为MVC中间件首先处理它们。一个一般规则是将`UseHttpsRedirection()`作为管道中的最后一个中间件；否则，其他中间件将不会拦截请求。
+在这种情况下，`UseStaticFiles`中间件将不会收到静态文件的请求，因为 MVC 中间件首先处理它们。一个一般规则是将`UseHttpsRedirection()`作为管道中的最后一个中间件；否则，其他中间件将不会拦截请求。
 
 # 摘要
 
-中间件是处理跨切面问题的开发者有用的工具。这是因为它拦截并增强每个*进入请求*和*输出响应*，并且可以通过早期返回请求来提高性能。从日志记录到身份验证的概念都应通过使用中间件来处理。本章涵盖的主题为你理解ASP.NET Core框架采用的中间件优先方法提供了必要的知识。此外，本章还概述了ASP.NET Core的内置中间件，并描述了如何创建自定义中间件。
+中间件是处理跨切面问题的开发者有用的工具。这是因为它拦截并增强每个*进入请求*和*输出响应*，并且可以通过早期返回请求来提高性能。从日志记录到身份验证的概念都应通过使用中间件来处理。本章涵盖的主题为你理解 ASP.NET Core 框架采用的中间件优先方法提供了必要的知识。此外，本章还概述了 ASP.NET Core 的内置中间件，并描述了如何创建自定义中间件。
 
-在下一章中，我们将探讨另一个核心主题，即提高我们代码的可维护性和可测试性：*依赖注入*。ASP.NET Core提供了开箱即用的依赖注入，我们还将探讨如何解决依赖关系以及如何处理不同生命周期类型。
+在下一章中，我们将探讨另一个核心主题，即提高我们代码的可维护性和可测试性：*依赖注入*。ASP.NET Core 提供了开箱即用的依赖注入，我们还将探讨如何解决依赖关系以及如何处理不同生命周期类型。

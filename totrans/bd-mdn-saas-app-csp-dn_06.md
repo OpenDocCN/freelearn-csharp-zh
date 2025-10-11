@@ -1,6 +1,6 @@
 # 6
 
-# SaaS应用程序的微服务
+# SaaS 应用程序的微服务
 
 微服务是一种强大的架构模式，在现代软件开发中越来越受欢迎。微服务是将大型应用程序组织成更小、更易于管理和独立的子服务的方式，这些子服务可以使用定义良好的接口相互通信。随着公司寻求构建更具可扩展性和健壮性的软件系统，这种方法在近年来越来越受欢迎。随着现代应用程序复杂性的增加，传统的单体软件构建方法已不再足够。微服务提供了一种将复杂应用程序分解为更小、更易于管理、可独立开发、部署和维护的组件的方法。
 
@@ -14,7 +14,7 @@
 
 +   构建高性能和安全的微服务的最佳实践
 
-+   如何使用我们学到的技能来处理微服务的RESTful API
++   如何使用我们学到的技能来处理微服务的 RESTful API
 
 +   构建微服务时的常见陷阱以及如何避免它们
 
@@ -22,13 +22,13 @@
 
 # 技术要求
 
-本章中所有代码均可在[https://github.com/PacktPublishing/Building-Modern-SaaS-Applications-with-C-and-.NET/tree/main/Chapter-6](https://github.com/PacktPublishing/Building-Modern-SaaS-Applications-with-C-and-.NET/tree/main/Chapter-6)找到。
+本章中所有代码均可在[`github.com/PacktPublishing/Building-Modern-SaaS-Applications-with-C-and-.NET/tree/main/Chapter-6`](https://github.com/PacktPublishing/Building-Modern-SaaS-Applications-with-C-and-.NET/tree/main/Chapter-6)找到。
 
 # 什么是微服务以及为什么使用它们？
 
 微服务是一种软件架构风格，它将应用程序结构化为一系列松散耦合的服务。与所有功能都打包在单个代码库中的传统单体架构不同，微服务将功能分解为更小、更独立的子服务，这些子服务可以独立开发、部署和扩展。
 
-微服务架构最早在2000年代初被引入，近年来由于对更快开发周期、灵活扩展和改进应用程序弹性的需求增加而受到欢迎。微服务被视为快速向客户提供价值并具有更高敏捷性的方式，这使得它们非常适合寻求快速迭代和创新的组织。
+微服务架构最早在 2000 年代初被引入，近年来由于对更快开发周期、灵活扩展和改进应用程序弹性的需求增加而受到欢迎。微服务被视为快速向客户提供价值并具有更高敏捷性的方式，这使得它们非常适合寻求快速迭代和创新的组织。
 
 微服务也为组织带来了多项好处。通过将应用程序分解为更小、更专注的服务，组织可以提升其开发流程的速度和效率。团队可以并行工作在更小、独立的服务上，减少延迟的风险，并确保每个服务都能以高质量交付。此外，微服务可以独立部署和扩展，使组织能够更快地响应需求变化并优化其应用程序的性能。
 
@@ -42,25 +42,25 @@
 
 微服务架构基于松散耦合的原则，即应用程序被分解为更小、更专注的服务，这些服务可以独立开发、部署和扩展。这使组织能够更快地响应需求变化，优化其应用程序的性能，并提高其开发流程的速度和效率。
 
-SaaS应用程序通常相当复杂。项目上通常会有一支相当大的团队在合作，每个团队都有自己的专业领域。通过将应用程序分解成更小、更专注的服务，团队可以并行工作，降低延迟风险并提高交付速度。这有助于组织更快地响应需求变化并向客户更快地交付价值。
+SaaS 应用程序通常相当复杂。项目上通常会有一支相当大的团队在合作，每个团队都有自己的专业领域。通过将应用程序分解成更小、更专注的服务，团队可以并行工作，降低延迟风险并提高交付速度。这有助于组织更快地响应需求变化并向客户更快地交付价值。
 
-微服务的另一个优点是更好的可伸缩性。依赖基于云的基础设施，每个服务都可以独立部署和扩展，使组织能够更快地响应需求变化并优化其应用程序的性能。这对于经常经历使用模式波动的SaaS应用程序尤为重要。当使用量高时，可以通过提供更多资源来提高应用程序的性能。当使用量低时，可以关闭一些资源，帮助组织管理其云计算成本并优化资源的使用。
+微服务的另一个优点是更好的可伸缩性。依赖基于云的基础设施，每个服务都可以独立部署和扩展，使组织能够更快地响应需求变化并优化其应用程序的性能。这对于经常经历使用模式波动的 SaaS 应用程序尤为重要。当使用量高时，可以通过提供更多资源来提高应用程序的性能。当使用量低时，可以关闭一些资源，帮助组织管理其云计算成本并优化资源的使用。
 
-微服务还应设计为具有高度弹性，这意味着即使一个服务失败，对整个系统的影响也最小。这使得微服务非常适合SaaS应用程序，因为停机时间可能会对客户满意度产生重大影响，并相应地影响提供应用程序的公司的收入。通过将应用程序分解成更小、更专注的服务，组织可以降低在系统更改时意外后果的风险，使维护和修改更容易，并降低停机风险。
+微服务还应设计为具有高度弹性，这意味着即使一个服务失败，对整个系统的影响也最小。这使得微服务非常适合 SaaS 应用程序，因为停机时间可能会对客户满意度产生重大影响，并相应地影响提供应用程序的公司的收入。通过将应用程序分解成更小、更专注的服务，组织可以降低在系统更改时意外后果的风险，使维护和修改更容易，并降低停机风险。
 
-微服务是有志于开发SaaS应用程序的组织的一个有价值的工具。它们提供了更高的敏捷性、更好的可伸缩性、改进的弹性、更简单的维护和更好的成本管理，使它们成为寻求快速迭代和创新的组织的理想选择。
+微服务是有志于开发 SaaS 应用程序的组织的一个有价值的工具。它们提供了更高的敏捷性、更好的可伸缩性、改进的弹性、更简单的维护和更好的成本管理，使它们成为寻求快速迭代和创新的组织的理想选择。
 
 ## Docker
 
-使用`GoodHabits`服务，我们一直在使用Docker运行一个包含开发环境和SQL服务器数据库的`devcontainer`。这只是Docker可以使用的多种方式之一。在其核心，Docker是一个可以在容器中运行进程的工具。你可以将容器想象成一个非常轻量级的虚拟机，通常运行Linux发行版。
+使用`GoodHabits`服务，我们一直在使用 Docker 运行一个包含开发环境和 SQL 服务器数据库的`devcontainer`。这只是 Docker 可以使用的多种方式之一。在其核心，Docker 是一个可以在容器中运行进程的工具。你可以将容器想象成一个非常轻量级的虚拟机，通常运行 Linux 发行版。
 
-Docker经常成为构建微服务时非常重要的工具。一个微服务应用程序通常会有许多不同的组件，这些组件必须运行才能使整个系统运行。这可能包括使用不同的编程语言运行代码，以及针对多个不同的数据库平台运行。试图在开发机器上可靠地运行所有内容，并在多个云环境中运行，很快就会变成一场噩梦！
+Docker 经常成为构建微服务时非常重要的工具。一个微服务应用程序通常会有许多不同的组件，这些组件必须运行才能使整个系统运行。这可能包括使用不同的编程语言运行代码，以及针对多个不同的数据库平台运行。试图在开发机器上可靠地运行所有内容，并在多个云环境中运行，很快就会变成一场噩梦！
 
-Docker提供了一种高效且可靠的方式来在一系列网络容器中运行您的微服务。通过容器化您的微服务，您可以隔离它们，使它们更容易构建和运行。
+Docker 提供了一种高效且可靠的方式来在一系列网络容器中运行您的微服务。通过容器化您的微服务，您可以隔离它们，使它们更容易构建和运行。
 
-此外，Docker允许您轻松打包您的微服务和它们的依赖项，使您能够将服务部署到不同的环境中，包括在开发环境中运行。这有助于确保您的微服务能够在不同的系统上保持一致的工作，这对于微服务构建来说是至关重要的，尽管具有挑战性。
+此外，Docker 允许您轻松打包您的微服务和它们的依赖项，使您能够将服务部署到不同的环境中，包括在开发环境中运行。这有助于确保您的微服务能够在不同的系统上保持一致的工作，这对于微服务构建来说是至关重要的，尽管具有挑战性。
 
-虽然Docker对于构建微服务并非绝对必要，但它作为最佳实践被高度推荐，以提高微服务部署的效率和可靠性。我们将在下一节中详细讨论一些更多最佳实践。
+虽然 Docker 对于构建微服务并非绝对必要，但它作为最佳实践被高度推荐，以提高微服务部署的效率和可靠性。我们将在下一节中详细讨论一些更多最佳实践。
 
 # 构建微服务的最佳实践
 
@@ -74,7 +74,7 @@ Docker提供了一种高效且可靠的方式来在一系列网络容器中运�
 
 *断路器*在设计失败时也是另一个有用的工具。这些可以用来自动检测和隔离失败的服务，防止它们影响系统的其余部分。这使得即使一个服务失败，整体系统也有更大的可能性继续运行。
 
-在接受“失败设计”原则时，*幂等性*也是至关重要的。这涉及到确保每个服务都是幂等的，意味着它可以多次执行并得到相同的结果。这允许您在服务失败时重试请求，从而降低数据丢失或不一致结果的风险。您会记得，我们在上一章学习某些HTTP动词时遇到了这个话题。这里的原理是相同的。
+在接受“失败设计”原则时，*幂等性*也是至关重要的。这涉及到确保每个服务都是幂等的，意味着它可以多次执行并得到相同的结果。这允许您在服务失败时重试请求，从而降低数据丢失或不一致结果的风险。您会记得，我们在上一章学习某些 HTTP 动词时遇到了这个话题。这里的原理是相同的。
 
 应该使用*健康检查*定期测试每个服务并确定其是否正常运行。然后，可以使用这些信息在原始实例失败时自动将请求重定向到该服务的其他实例（依赖于冗余原则）。这些健康检查应该自动运行或在定义的计划上运行，并在出现任何问题时立即通知团队。
 
@@ -92,27 +92,27 @@ Docker提供了一种高效且可靠的方式来在一系列网络容器中运�
 
 *使用事件驱动架构*是解耦服务的重要部分。事件可以在其他服务中触发动作，减少直接通信的需求。这允许每个服务独立运行，减少服务之间的相互依赖。这在基于事件的消息队列促进系统内各种服务之间的通信时经常看到。
 
-最后，*服务发现*是解耦服务的有用工具。如果你考虑一个系统，该系统可能包含20个不同的松散耦合服务，这些服务以Docker容器的星系形式托管在云中，并且可能有一些服务的多个版本，跟踪它们所有运行的地点可能会变得非常具有挑战性。使用某种形式的服务发现允许系统自动检测并连接到其他服务，减少硬编码连接的需求。
+最后，*服务发现*是解耦服务的有用工具。如果你考虑一个系统，该系统可能包含 20 个不同的松散耦合服务，这些服务以 Docker 容器的星系形式托管在云中，并且可能有一些服务的多个版本，跟踪它们所有运行的地点可能会变得非常具有挑战性。使用某种形式的服务发现允许系统自动检测并连接到其他服务，减少硬编码连接的需求。
 
 接受“关注解耦”原则有助于构建一个健壮的基于微服务的系统。通过定义清晰的服务边界，使用异步通信，实现版本控制，使用事件驱动架构，以及考虑服务发现，你可以确保你的系统是可扩展的、灵活的并且具有弹性。
 
 ## 接受自动化
 
-自动化对于微服务的有效运行至关重要，因为它有助于确保服务之间的一致性和可靠性。应尽可能使用自动化来提高测试（使用自动化测试套件）、部署（CI/CD）和扩展（可能使用Terraform）。
+自动化对于微服务的有效运行至关重要，因为它有助于确保服务之间的一致性和可靠性。应尽可能使用自动化来提高测试（使用自动化测试套件）、部署（CI/CD）和扩展（可能使用 Terraform）。
 
-自动化是所有类型软件开发中的一个非常重要的原则，但在构建利用微服务架构的SaaS应用程序时，这一点尤为重要。自动化部署和测试流程有助于减少人工工作量并加快将新功能交付给用户的速度。自动化的部署和测试流程确保服务的一致部署，并在开发周期早期发现任何问题。这有助于减少停机时间并提高系统的整体效率。
+自动化是所有类型软件开发中的一个非常重要的原则，但在构建利用微服务架构的 SaaS 应用程序时，这一点尤为重要。自动化部署和测试流程有助于减少人工工作量并加快将新功能交付给用户的速度。自动化的部署和测试流程确保服务的一致部署，并在开发周期早期发现任何问题。这有助于减少停机时间并提高系统的整体效率。
 
-*实施CI/CD*有助于确保代码更改自动构建、测试和部署。这有助于减少测试新功能所涉及的人工工作量，并尽可能快地将它们交付给用户。CI/CD还有助于确保代码更改的一致部署，并在开发周期早期发现任何问题。使用管道自动构建、测试和部署微服务将使项目管理在项目开始增长时变得更加容易！
+*实施 CI/CD*有助于确保代码更改自动构建、测试和部署。这有助于减少测试新功能所涉及的人工工作量，并尽可能快地将它们交付给用户。CI/CD 还有助于确保代码更改的一致部署，并在开发周期早期发现任何问题。使用管道自动构建、测试和部署微服务将使项目管理在项目开始增长时变得更加容易！
 
 自动化监控和日志记录也是有用的。自动化监控和日志记录有助于早期发现问题并减少停机时间。自动化的监控和日志记录流程确保系统持续被监控，并且任何问题都能被早期发现，减少人工工作量并提高系统的整体效率。
 
-在生产环境中，SaaS应用程序可能会经历系统各部分需求量的快速波动。自动化可以促进自动扩展，以确保系统在无需人工干预的情况下处理增加的流量。自动扩展流程确保系统可以根据流量进行扩展或缩减，减少人工工作量并提高系统的整体效率。
+在生产环境中，SaaS 应用程序可能会经历系统各部分需求量的快速波动。自动化可以促进自动扩展，以确保系统在无需人工干预的情况下处理增加的流量。自动扩展流程确保系统可以根据流量进行扩展或缩减，减少人工工作量并提高系统的整体效率。
 
-接受“拥抱自动化”原则有助于构建一个健壮且高效的基于微服务的系统。自动化部署和测试流程、实施CI/CD、自动化监控和日志记录以及自动化扩展流程有助于简化流程、减少人工工作量并提高系统的效率。
+接受“拥抱自动化”原则有助于构建一个健壮且高效的基于微服务的系统。自动化部署和测试流程、实施 CI/CD、自动化监控和日志记录以及自动化扩展流程有助于简化流程、减少人工工作量并提高系统的效率。
 
 ## 使用基于合同的开发
 
-微服务应该有定义良好的合同，这些合同定义了服务之间的接口。这允许服务独立演进，同时仍确保兼容性。在这个背景下，“合同”指的是一个协议，它指定了服务之间的交互，包括每个服务的输入和输出细节、通信协议和数据格式。这个合同可以用各种形式表示，如API规范、消息格式或文档，并且应由所有参与构建和维护服务的团队达成一致。
+微服务应该有定义良好的合同，这些合同定义了服务之间的接口。这允许服务独立演进，同时仍确保兼容性。在这个背景下，“合同”指的是一个协议，它指定了服务之间的交互，包括每个服务的输入和输出细节、通信协议和数据格式。这个合同可以用各种形式表示，如 API 规范、消息格式或文档，并且应由所有参与构建和维护服务的团队达成一致。
 
 基于合同的开发要求在服务之间定义清晰的合同。这些合同应定义每个服务的输入和输出，并确保服务按预期运行。这有助于降低破坏性变更的风险，并提高系统的整体稳定性。
 
@@ -146,15 +146,15 @@ Docker提供了一种高效且可靠的方式来在一系列网络容器中运�
 
 *加密敏感数据*是接受“实施安全”原则的关键方面。加密有助于保护敏感信息，降低安全漏洞的风险，并确保数据的机密性和完整性。加密应应用于所有敏感数据，包括静态数据和传输中的数据。
 
-由于SaaS/微服务系统中有许多动态部分，因此应在网络层面实施安全措施，以涵盖系统的每个部分。网络层面的安全措施应包括防火墙、入侵检测和预防系统以及网络分段。
+由于 SaaS/微服务系统中有许多动态部分，因此应在网络层面实施安全措施，以涵盖系统的每个部分。网络层面的安全措施应包括防火墙、入侵检测和预防系统以及网络分段。
 
-在任何应用程序中，安全都极其重要。SaaS应用程序通常具有复杂的安全需求。从项目一开始就接受“实施安全”原则有助于构建一个安全可靠的基于微服务的SaaS应用程序。实施身份验证和授权、加密敏感数据以及在网络层面实施安全措施有助于降低安全漏洞的风险并确保数据的机密性和完整性。
+在任何应用程序中，安全都极其重要。SaaS 应用程序通常具有复杂的安全需求。从项目一开始就接受“实施安全”原则有助于构建一个安全可靠的基于微服务的 SaaS 应用程序。实施身份验证和授权、加密敏感数据以及在网络层面实施安全措施有助于降低安全漏洞的风险并确保数据的机密性和完整性。
 
 ## 关注可扩展性
 
 微服务应该设计成可扩展的，无论是水平扩展（通过添加更多实例）还是垂直扩展（通过向现有实例添加更多资源）。这将使您能够快速响应需求的变化，并确保系统在重负载下仍能良好运行。
 
-拥抱“关注可扩展性”原则是构建基于微服务的SaaS应用程序的另一个重要方面。可扩展性有助于确保系统可以处理增加的流量，减少停机时间，并提高系统的整体性能。
+拥抱“关注可扩展性”原则是构建基于微服务的 SaaS 应用程序的另一个重要方面。可扩展性有助于确保系统可以处理增加的流量，减少停机时间，并提高系统的整体性能。
 
 设计可扩展性是拥抱“关注可扩展性”原则的第一步。可扩展的设计有助于确保系统可以处理增加的流量，减少停机时间，并提高系统的整体性能。设计应考虑预期的流量和资源利用率，并应包括在需要时增加资源的措施。
 
@@ -192,35 +192,35 @@ Docker提供了一种高效且可靠的方式来在一系列网络容器中运�
 
 设计微服务应用程序是困难的。有很多事情需要考虑，以确保你能实现这种方法的益处！这些最佳实践将帮助你构建可扩展、可维护和有弹性的微服务。通过遵循它们，你可以确保你的基于微服务的系统在性能、效率和可靠性方面得到优化！
 
-# 混合微服务和RESTful API
+# 混合微服务和 RESTful API
 
-当构建基于微服务的架构时，REST通常用作不同服务之间的通信协议。**REST**，或**表征状态转移**，是一种常用且广泛采用的Web服务架构，为客户端和服务器之间提供了标准化的通信方式。微服务和REST是自然匹配的，因为REST为微服务之间的通信和数据交换提供了必要的通信基础设施。我们之前讨论了基于契约的开发；REST API的表面可以看作是服务之间通信的契约。
+当构建基于微服务的架构时，REST 通常用作不同服务之间的通信协议。**REST**，或**表征状态转移**，是一种常用且广泛采用的 Web 服务架构，为客户端和服务器之间提供了标准化的通信方式。微服务和 REST 是自然匹配的，因为 REST 为微服务之间的通信和数据交换提供了必要的通信基础设施。我们之前讨论了基于契约的开发；REST API 的表面可以看作是服务之间通信的契约。
 
-在基于微服务的系统中使用REST的一个关键优点是，它为服务之间提供了清晰和标准的通信方式。REST定义了一套规则，用于服务如何交换数据，包括使用HTTP方法（如GET、POST和DELETE）以及使用HTTP状态码来指示成功或失败。这使得开发者更容易构建和维护微服务，因为他们知道在与其他服务通信时可以期待什么。
+在基于微服务的系统中使用 REST 的一个关键优点是，它为服务之间提供了清晰和标准的通信方式。REST 定义了一套规则，用于服务如何交换数据，包括使用 HTTP 方法（如 GET、POST 和 DELETE）以及使用 HTTP 状态码来指示成功或失败。这使得开发者更容易构建和维护微服务，因为他们知道在与其他服务通信时可以期待什么。
 
-在基于微服务的系统中使用REST的另一个优点是，它为服务之间提供了一种可扩展且灵活的通信方式。REST是平台无关的，通常通过HTTP进行通信，这意味着它可以与各种编程语言和技术一起使用，使其成为构建微服务的理想选择。
+在基于微服务的系统中使用 REST 的另一个优点是，它为服务之间提供了一种可扩展且灵活的通信方式。REST 是平台无关的，通常通过 HTTP 进行通信，这意味着它可以与各种编程语言和技术一起使用，使其成为构建微服务的理想选择。
 
-最后，在基于微服务的系统中使用REST提供了一种安全的服务间通信方式。REST使用标准的Web安全措施，如SSL/TLS加密，这有助于保护传输中的数据，以及HTTP身份验证，这有助于确保只有授权客户端可以访问数据。
+最后，在基于微服务的系统中使用 REST 提供了一种安全的服务间通信方式。REST 使用标准的 Web 安全措施，如 SSL/TLS 加密，这有助于保护传输中的数据，以及 HTTP 身份验证，这有助于确保只有授权客户端可以访问数据。
 
-微服务和REST是天生匹配的，使用REST作为微服务之间的通信协议提供了一种清晰、可扩展且安全的服务间通信和交换数据的方式。通过使用REST，开发者可以自信地构建和维护基于微服务的系统，因为他们知道他们有一个可靠且广泛采用的通信基础设施。
+微服务和 REST 是天生匹配的，使用 REST 作为微服务之间的通信协议提供了一种清晰、可扩展且安全的服务间通信和交换数据的方式。通过使用 REST，开发者可以自信地构建和维护基于微服务的系统，因为他们知道他们有一个可靠且广泛采用的通信基础设施。
 
-## 将单个REST API拆分为微服务
+## 将单个 REST API 拆分为微服务
 
-当你想到一个“典型”的RESTful API时，你可能会想到一个包含多个控制器、每个控制器包含几个相关方法或端点的系统。一个企业系统拥有单个**单体**API并拥有数十个控制器和数百个端点并不罕见。将它们拆分为基于契约的微服务系统并不容易。没有一种正确的方法来处理这个问题，这更像是一门艺术而不是科学。
+当你想到一个“典型”的 RESTful API 时，你可能会想到一个包含多个控制器、每个控制器包含几个相关方法或端点的系统。一个企业系统拥有单个**单体**API 并拥有数十个控制器和数百个端点并不罕见。将它们拆分为基于契约的微服务系统并不容易。没有一种正确的方法来处理这个问题，这更像是一门艺术而不是科学。
 
-这里有一些可以将单体REST API拆分为微服务的方法：
+这里有一些可以将单体 REST API 拆分为微服务的方法：
 
-+   **功能驱动**: 这种方法涉及根据它们提供的功能将单体API分解为更小的服务。例如，可以创建一个服务来处理用户身份验证，另一个服务来处理产品管理。这种方法使得管理和维护服务变得更加容易，因为每个服务都专注于特定的任务。
++   **功能驱动**: 这种方法涉及根据它们提供的功能将单体 API 分解为更小的服务。例如，可以创建一个服务来处理用户身份验证，另一个服务来处理产品管理。这种方法使得管理和维护服务变得更加容易，因为每个服务都专注于特定的任务。
 
-+   **数据驱动**: 在这种方法中，单体API被分解为基于它们管理的数据的服务。例如，可以创建一个服务来管理客户信息，另一个服务来管理订单信息。当不同数据集有不同的数据访问模式、安全要求或性能要求时，这种方法很有用。
++   **数据驱动**: 在这种方法中，单体 API 被分解为基于它们管理的数据的服务。例如，可以创建一个服务来管理客户信息，另一个服务来管理订单信息。当不同数据集有不同的数据访问模式、安全要求或性能要求时，这种方法很有用。
 
-+   **领域驱动**: 这种方法涉及根据它所代表的领域将单体API分解为服务。例如，可以创建一个服务来管理客户信息，另一个服务来管理产品信息。当存在可以分解为更小、更易管理的部分的复杂业务领域时，这种方法很有用。
++   **领域驱动**: 这种方法涉及根据它所代表的领域将单体 API 分解为服务。例如，可以创建一个服务来管理客户信息，另一个服务来管理产品信息。当存在可以分解为更小、更易管理的部分的复杂业务领域时，这种方法很有用。
 
-+   **微前端**: 这种方法涉及将单体API分解为微服务，并使用微前端架构将服务组合成一个单一的用户界面。这种方法提供了一种独立扩展前端和后端的方式，同时仍然提供无缝的用户体验。
++   **微前端**: 这种方法涉及将单体 API 分解为微服务，并使用微前端架构将服务组合成一个单一的用户界面。这种方法提供了一种独立扩展前端和后端的方式，同时仍然提供无缝的用户体验。
 
-无论使用哪种方法，在确定将单体API拆分为微服务的最佳方式时，考虑API的复杂性、API不同部分之间的依赖关系以及开发团队的技能和资源都是非常重要的。此外，根据需要持续评估和重构微服务，以确保它们继续满足应用程序和业务的需求。
+无论使用哪种方法，在确定将单体 API 拆分为微服务的最佳方式时，考虑 API 的复杂性、API 不同部分之间的依赖关系以及开发团队的技能和资源都是非常重要的。此外，根据需要持续评估和重构微服务，以确保它们继续满足应用程序和业务的需求。
 
-讨论REST和微服务时，经常被问到的问题是，“*API中的每个控制器是否应该是自己的微服务？*”
+讨论 REST 和微服务时，经常被问到的问题是，“*API 中的每个控制器是否应该是自己的微服务？*”
 
 答案并不直接，取决于您系统的具体要求以及每个控制器的规模和复杂性。一般来说，每个微服务应代表一个单一、自包含的业务能力，如果多个控制器共同提供单一业务功能，它们可以是一个微服务的一部分。
 
@@ -228,27 +228,27 @@ Docker提供了一种高效且可靠的方式来在一系列网络容器中运�
 
 关键在于确定需要执行的业务功能，并将系统分解成一系列自包含的微服务，这些微服务可以独立开发、部署和扩展。当不确定时，最好从较小的微服务开始，如果需要的话再进行整合。这有助于简化测试和调试，以及更快的开发和部署周期。
 
-API中的每个控制器不一定是自己的微服务，但决策应基于您系统的具体要求以及每个控制器的规模和复杂性。
+API 中的每个控制器不一定是自己的微服务，但决策应基于您系统的具体要求以及每个控制器的规模和复杂性。
 
-当结合微服务和REST时，有几个重要主题需要涵盖，以构建一个健壮且可扩展的系统，这在构建基于微服务的系统中起着至关重要的作用：
+当结合微服务和 REST 时，有几个重要主题需要涵盖，以构建一个健壮且可扩展的系统，这在构建基于微服务的系统中起着至关重要的作用：
 
-+   **设计RESTful API**：RESTful API应设计为可扩展、灵活且易于消费。
++   **设计 RESTful API**：RESTful API 应设计为可扩展、灵活且易于消费。
 
-+   **API文档**：API文档应清晰、简洁且易于理解，并提供如何消费API的明确说明。
++   **API 文档**：API 文档应清晰、简洁且易于理解，并提供如何消费 API 的明确说明。
 
-+   **API版本控制**：API版本控制有助于确保系统可以进化，而不会破坏现有的集成。
++   **API 版本控制**：API 版本控制有助于确保系统可以进化，而不会破坏现有的集成。
 
-+   **API安全**：应实施API安全以防止未经授权的访问、数据盗窃和其他安全风险。
++   **API 安全**：应实施 API 安全以防止未经授权的访问、数据盗窃和其他安全风险。
 
 +   **错误处理**：应实施错误处理以确保系统能够一致和可预测地处理和响应错误。
 
 +   **数据一致性**：数据一致性是构建基于微服务系统的关键方面。应在微服务之间保持数据一致性，以确保系统按预期运行。
 
-当结合微服务和REST时，重要的是要专注于设计RESTful API，提供清晰的API文档，实现API版本控制，确保API的安全性，处理错误，并维护数据一致性。这些主题有助于构建一个健壮且可扩展的系统，能够处理增加的流量并提供更好的用户体验。
+当结合微服务和 REST 时，重要的是要专注于设计 RESTful API，提供清晰的 API 文档，实现 API 版本控制，确保 API 的安全性，处理错误，并维护数据一致性。这些主题有助于构建一个健壮且可扩展的系统，能够处理增加的流量并提供更好的用户体验。
 
 # 常见陷阱及其避免方法
 
-构建SaaS应用很难。构建微服务应用很难。将两者结合起来真的很难，而且有几个常见的陷阱你应该避免！
+构建 SaaS 应用很难。构建微服务应用很难。将两者结合起来真的很难，而且有几个常见的陷阱你应该避免！
 
 避免的第一个、最常见且最重要的陷阱是过早地构建微服务。通常情况下，从单体开始，并在需要时逐渐将应用的小部分拆分为小型、自包含的服务，而不是提前这样做，会更容易。
 
@@ -300,27 +300,27 @@ API中的每个控制器不一定是自己的微服务，但决策应基于您�
 
 虽然有可能让用户界面应用程序直接与微服务进行通信，但管理这一点可能会变得极其复杂。图中只显示了三个微服务，但实际上可能有 20 个或更多。考虑一下在 20 个或更多的微服务以及三种或更多类型的客户端 UI 之间协调通信的附加复杂性——这种情况在视觉上变得更加困难，在实践中也更难以管理！
 
-在微服务架构中使用API网关提供了几个好处。首先，API网关充当客户端的单一点入口，使得请求管理、身份验证和授权更加容易。它还允许将不同的微服务组合成一个统一的API，这可以简化客户端与系统的交互。API网关还可以提供负载均衡和故障转移功能，这对于高可用性系统非常重要。另一个重要好处是能够强制执行安全性和流量策略，以及监控和记录请求。通过使用API网关，开发者可以更容易地管理和演进微服务架构，同时保持高水平的安全性和性能。
+在微服务架构中使用 API 网关提供了几个好处。首先，API 网关充当客户端的单一点入口，使得请求管理、身份验证和授权更加容易。它还允许将不同的微服务组合成一个统一的 API，这可以简化客户端与系统的交互。API 网关还可以提供负载均衡和故障转移功能，这对于高可用性系统非常重要。另一个重要好处是能够强制执行安全性和流量策略，以及监控和记录请求。通过使用 API 网关，开发者可以更容易地管理和演进微服务架构，同时保持高水平的安全性和性能。
 
 ### 消息代理
 
-消息代理用于促进各种后端微服务之间的通信。这在后端执行的功能与API网关在前端执行的功能非常相似。它解开了服务之间的所有通信。虽然我们图中只有三个服务，但我们应记住，现实世界的系统可能拥有更多服务，并且服务间的通信可能会迅速变得极其复杂和低效。
+消息代理用于促进各种后端微服务之间的通信。这在后端执行的功能与 API 网关在前端执行的功能非常相似。它解开了服务之间的所有通信。虽然我们图中只有三个服务，但我们应记住，现实世界的系统可能拥有更多服务，并且服务间的通信可能会迅速变得极其复杂和低效。
 
 在微服务架构中使用消息代理提供了许多好处。其中一个主要优势是它允许服务以异步方式相互通信，解耦发送者与接收者。这可以提高可靠性和可伸缩性，因为服务可以以自己的速度处理消息，不会被其他服务的性能所阻塞。消息代理还可以作为服务之间的缓冲区，这在某个服务暂时不可用时尤其有用。它可以通过持久化消息直到它们可以被交付到适当的服务来帮助避免消息丢失。消息代理还可以提供一种集中式的方式来监控和管理服务之间的消息流，这使得跟踪和调试问题更加容易。最后，通过将通信关注点从业务逻辑中分离出来，服务可以更容易地进行测试和独立部署。
 
-使用消息代理（以及API网关）遵循了我们之前在本章中讨论的许多微服务良好设计原则。
+使用消息代理（以及 API 网关）遵循了我们之前在本章中讨论的许多微服务良好设计原则。
 
-在.NET微服务应用程序中，常用的几个消息代理包括以下：
+在.NET 微服务应用程序中，常用的几个消息代理包括以下：
 
-+   **RabbitMQ**：一个支持多种消息协议的开源消息代理，包括AMQP、MQTT和STOMP
++   **RabbitMQ**：一个支持多种消息协议的开源消息代理，包括 AMQP、MQTT 和 STOMP
 
 +   **Apache Kafka**：一个优化的分布式流平台，适用于处理高容量和高速度的数据流
 
-+   **Azure Service Bus**：由Microsoft Azure提供的一个完全托管的 messaging 服务，支持传统消息模式和 pub/sub 场景
++   **Azure Service Bus**：由 Microsoft Azure 提供的一个完全托管的 messaging 服务，支持传统消息模式和 pub/sub 场景
 
 +   **AWS Simple Queue Service (SQS)**: 亚马逊网络服务提供的一项完全托管的消息队列服务，用于解耦和扩展微服务、分布式系统和无服务器应用程序
 
-+   **NServiceBus**: 一个.NET消息框架，提供了一种统一的编程模型，用于使用各种消息模式构建分布式系统
++   **NServiceBus**: 一个.NET 消息框架，提供了一种统一的编程模型，用于使用各种消息模式构建分布式系统
 
 所有这些工具都提供可靠的消息传递、可扩展性和容错性，并且可以帮助简化分布式系统中微服务之间的通信。
 
@@ -332,7 +332,7 @@ API中的每个控制器不一定是自己的微服务，但决策应基于您�
 
 +   一个习惯服务，处理与用户试图跟踪的习惯相关的一切。
 
-+   一个内容服务。在这个更高级的Good Habits应用版本中，我假设将能够以社交媒体风格的内容流查看你朋友的进度。
++   一个内容服务。在这个更高级的 Good Habits 应用版本中，我假设将能够以社交媒体风格的内容流查看你朋友的进度。
 
 请注意，我选择将数据存储也分开到单独的数据库中。这使我们能够对每个数据存储进行稍微不同的处理。我还决定为用户和习惯服务使用关系型数据库，而为内容服务使用文档（NoSQL）数据库。这是微服务的一个超级功能——可以根据单个微服务的用例使用不同类型的数据存储。
 
@@ -346,21 +346,21 @@ API中的每个控制器不一定是自己的微服务，但决策应基于您�
 
 ### 习惯服务
 
-在Good Habits应用程序中，预计习惯服务将在应用程序中承担大部分繁重的工作，因此将分配额外的资源给它。这个服务还应设计得易于扩展，以便可以将更多的时间投入到性能上，也许对用户服务的关注会少于对安全性的关注。（当然，安全性仍然很重要！！）
+在 Good Habits 应用程序中，预计习惯服务将在应用程序中承担大部分繁重的工作，因此将分配额外的资源给它。这个服务还应设计得易于扩展，以便可以将更多的时间投入到性能上，也许对用户服务的关注会少于对安全性的关注。（当然，安全性仍然很重要！！）
 
 该服务中的数据类型将高度相关，因此关系型存储是最合适的。
 
 ### 内容服务
 
-如果我们设想一个更高级的Good Habits应用程序版本，我们可能已经扩展到拥有类似社交网络的功能集，这允许用户看到他们朋友的成绩并与他们一起庆祝他们的成功。
+如果我们设想一个更高级的 Good Habits 应用程序版本，我们可能已经扩展到拥有类似社交网络的功能集，这允许用户看到他们朋友的成绩并与他们一起庆祝他们的成功。
 
-这种类型的服务通常使用文档存储或类似GraphQL的东西来建模。关系型存储不合适。使用微服务架构允许我们选择最合适的数据存储类型！
+这种类型的服务通常使用文档存储或类似 GraphQL 的东西来建模。关系型存储不合适。使用微服务架构允许我们选择最合适的数据存储类型！
 
 播放器中的所有信息都将由用户选择以供公开，因此在此服务中数据安全不太重要。我们可以确信在此服务中没有私有数据，因为用户数据存储对此服务不可访问。
 
 ### 总体架构
 
-**图6**.1中的架构展示了我们可以使用微服务来拆分应用程序的一种方式。但做这件事有许多可能的方法，这更多的是艺术而非科学。
+**图 6**.1 中的架构展示了我们可以使用微服务来拆分应用程序的一种方式。但做这件事有许多可能的方法，这更多的是艺术而非科学。
 
 最重要的是要遵循用户的需求，并考虑到你在拆分单体应用时所做的选择将如何影响用户。
 
@@ -372,45 +372,210 @@ API中的每个控制器不一定是自己的微服务，但决策应基于您�
 
 1.  添加一个非常基础的`UserService`，以展示我们如何与多个微服务交互。
 
-1.  添加一个API网关，作为所有客户端与系统交互时的单一入口点。
+1.  添加一个 API 网关，作为所有客户端与系统交互时的单一入口点。
 
 ## UserService
 
 运行以下脚本以添加用户服务的项目和文件：
 
-[PRE0]
+```cs
+dotnet new webapi -n GoodHabits.UserService; \
+cd GoodHabits.UserService; \
+rm ./WeatherForecast.cs; \
+rm ./Controllers/WeatherForecastController.cs; \
+touch Controllers/UsersController.cs; \
+dotnet add package Microsoft.AspNetCore.Mvc.Versioning; \
+dotnet add reference ../GoodHabits.Database/GoodHabits.Database.csproj; \
+cd ..; \
+dotnet sln add ./GoodHabits.UserService/GoodHabits.UserService.csproj;
+```
 
 接下来，我们将配置如何启动用户微服务。设置`launchSettings.json`文件，使其看起来像这样：
 
-[PRE1]
+```cs
+{
+  "$schema": "https://json.schemastore.org/launchsettings.json",
+  "profiles": {
+    "UserService": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": false,
+      "applicationUrl": "http://localhost:5200",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    }
+  }
+}
+```
 
 最后，将以下代码添加到控制器中：
 
-[PRE2]
+```cs
+using GoodHabits.Database.Entities;
+using Microsoft.AspNetCore.Mvc;
+namespace GoodHabits.UserService.Controllers;
+[Route("api/[controller]")]
+public class UsersController : ControllerBase
+{
+    private readonly Ilogger<UsersController> _logger;
+    public UsersController(
+        Ilogger<UsersController> logger
+        )
+    {
+        _logger = logger;
+    }
+    [HttpGet()]
+    public async Task<IactionResult> GetAsync()
+    {
+        return Ok(new List<User>()
+        {
+            new User() { Id = 111, FirstName = "Roger",
+              LastName = "Waters", Email = "rw@pf.com"},
+            new User() { Id = 222, FirstName = "Dave",
+              LastName = "Gilmore", Email = "dg@pf.com"},
+            new User() { Id = 333, FirstName = "Nick",
+              LastName = "Mason", Email = "nm@pf.com"}
+        });
+    }
+}
+```
 
-这就是设置一个非常简单的用户服务所需的所有内容。你可以独立启动它，并查看它与Swagger如何协同工作。提供的功能非常基础，尝试构建这个服务更多一些将是一项极好的练习。
+这就是设置一个非常简单的用户服务所需的所有内容。你可以独立启动它，并查看它与 Swagger 如何协同工作。提供的功能非常基础，尝试构建这个服务更多一些将是一项极好的练习。
 
-## API网关
+## API 网关
 
-如前所述，API网关为使用应用程序的客户端提供了一个进入应用程序的单一点。他们需要做的只是与网关通信，从而隐藏了微服务实现的复杂性。
+如前所述，API 网关为使用应用程序的客户端提供了一个进入应用程序的单一点。他们需要做的只是与网关通信，从而隐藏了微服务实现的复杂性。
 
-我们将使用一个名为Ocelot的包，它提供了我们需要的绝大多数功能。要开始，执行以下脚本以设置`ApiGateway`项目：
+我们将使用一个名为 Ocelot 的包，它提供了我们需要的绝大多数功能。要开始，执行以下脚本以设置`ApiGateway`项目：
 
-[PRE3]
+```cs
+dotnet new webapi -n GoodHabits.ApiGateway; \
+cd GoodHabits.ApiGateway; \
+rm ./WeatherForecast.cs; \
+rm ./Controllers/WeatherForecastController.cs; \
+dotnet add package Ocelot; \
+dotnet add package Ocelot.Cache.CacheManager; \
+dotnet sln add ./GoodHabits.ApiGateway/GoodHabits.ApiGateway.csproj; \
+touch ocelot.json;
+```
 
-正如我们对`UserService`所做的那样，我们需要修改`launchsettings.json`文件来配置API网关的启动方式。设置文件如下：
+正如我们对`UserService`所做的那样，我们需要修改`launchsettings.json`文件来配置 API 网关的启动方式。设置文件如下：
 
-[PRE4]
+```cs
+{
+  "$schema": "https://json.schemastore.org/launchsettings.json",
+  "profiles": {
+    "ApiGateway": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "launchUrl": "swagger",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "applicationUrl": "http://localhost:5300",
+      "dotnetRunMessages": true
+    }
+  }
+}
+```
 
 接下来，使`Program.cs`文件看起来像这样：
 
-[PRE5]
+```cs
+using Ocelot.Cache.CacheManager;
+using Ocelot.DependencyInjection;
+using Ocelot.Middleware;
+var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddControllers();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+builder.Configuration.AddJsonFile("ocelot.json", optional: false, reloadOnChange: true);
+builder.Services.AddOcelot(builder.Configuration)
+    .AddCacheManager(x =>
+    {
+        x.WithDictionaryHandle();
+    });
+var app = builder.Build();
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+    app.UseCors(policy =>
+        policy.AllowAnyOrigin()
+                .AllowAnyHeader()
+                .AllowAnyMethod()
+                );
+}
+app.UseHttpsRedirection();
+app.UseAuthorization();
+app.MapControllers();
+await app.UseOcelot();
+app.Run();
+```
 
 在这里，你可以看到`Ocelot`包的关键行。
 
 最后，通过向`Ocelot.json`添加以下配置来配置`Ocelot`：
 
-[PRE6]
+```cs
+{
+    "GlobalConfiguration": {
+      "BaseUrl": "http://localhost:5900"
+    },
+    "Routes": [
+      {
+        "UpstreamPathTemplate": "/gateway/habits",
+        "UpstreamHttpMethod": [ "Get", "Post" ],
+        "DownstreamPathTemplate": "/api/habits",
+        "DownstreamScheme": "http",
+        "DownstreamHostAndPorts": [
+          {
+            "Host": "localhost",
+            "Port": 5100
+          }
+        ],
+        "RateLimitOptions": {
+          "EnableRateLimiting": true,
+          "Period": "10s",
+          "PeriodTimespan": 10,
+          "Limit": 3
+        }
+      },
+      {
+        "UpstreamPathTemplate": "/gateway/habits/{id}",
+        "UpstreamHttpMethod": [ "Get", "Delete", "Put",
+          "Patch" ],
+        "DownstreamPathTemplate": "/api/habits/{id}",
+        "DownstreamScheme": "http",
+        "DownstreamHostAndPorts": [
+          {
+            "Host": "localhost",
+            "Port": 5100
+          }
+        ],
+        "RateLimitOptions": {
+          "EnableRateLimiting": true,
+          "Period": "10s",
+          "PeriodTimespan": 10,
+          "Limit": 1
+        }
+      },
+      {
+        "UpstreamPathTemplate": "/gateway/users",
+        "UpstreamHttpMethod": [ "Get" ],
+        "DownstreamPathTemplate": "/api/users",
+        "DownstreamScheme": "http",
+        "DownstreamHostAndPorts": [
+          {
+            "Host": "localhost",
+            "Port": 5200
+          }
+        ]
+      }
+    ]
+  }
+```
 
 如果你查看配置文件，你会看到我们只是在网关中的一个 URL 和我们创建的两个微服务（`HabitService` 和 `UserService`）中的另一个 URL 之间进行映射。这看起来可能是一个不必要的复杂性，但如果你考虑到可能还会添加更多微服务到整个应用程序中，那么提供一个单一的入口点是有意义的。
 
@@ -420,15 +585,93 @@ API中的每个控制器不一定是自己的微服务，但决策应基于您�
 
 在 `.vscode` 文件夹中，将以下代码添加到 `tasks.json`：
 
-[PRE7]
+```cs
+        {
+            "label": "build-user-service",
+            "type": "shell",
+            "command": "dotnet",
+            "args": [
+                "build",
+                "${workspaceFolder}/GoodHabits.UserService/
+                  GoodHabits.UserService.csproj"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "build-api-gateway",
+            "type": "shell",
+            "command": "dotnet",
+            "args": [
+                "build",
+                "${workspaceFolder}/GoodHabits.ApiGateway/
+                  GoodHabits.ApiGateway.csproj"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        }
+```
 
 在同一文件夹中，将以下代码添加到 `launch.json`：
 
-[PRE8]
+```cs
+        {
+            "name": "RunUserService",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build-user-service",
+            "program": "${workspaceFolder}/
+              GoodHabits.UserService/bin/Debug/net7.0/
+              GoodHabits.UserService.dll",
+            "args": [],
+            "cwd": "${workspaceFolder}/
+              GoodHabits.UserService",
+            "stopAtEntry": false,
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "RunApiGateway",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build-api-gateway",
+            "program": "${workspaceFolder}/
+              GoodHabits.ApiGateway/bin/Debug/net7.0/
+              GoodHabits.ApiGateway.dll",
+            "args": [],
+            "cwd": "${workspaceFolder}/
+              GoodHabits.ApiGateway",
+            "stopAtEntry": false,
+            "console": "integratedTerminal"
+        }
+```
 
 还在 `launch.json` 中添加以下复合任务：
 
-[PRE9]
+```cs
+    "compounds": [
+        {
+            "name": "Run Server",
+            "configurations": [
+                "RunHabitService",
+                "RunUserService",
+                "RunApiGateway"
+            ]
+        },
+        {
+            "name": "Run All",
+            "configurations": [
+                "RunHabitService",
+                "RunClient",
+                "RunUserService",
+                "RunApiGateway"
+            ]
+        }
+    ]
+```
 
 上述配置将允许通过按 *F5* 键或使用构建和运行菜单来启动 VSCode 的所有四个项目。
 
@@ -454,15 +697,15 @@ API中的每个控制器不一定是自己的微服务，但决策应基于您�
 
 要了解更多关于本章所涵盖的主题，请查看以下资源：
 
-+   如何构建 .NET Core 微服务：[https://www.altkomsoftware.com/blog/microservices-service-discovery-eureka/](https://www.altkomsoftware.com/blog/microservices-service-discovery-eureka/)
++   如何构建 .NET Core 微服务：[`www.altkomsoftware.com/blog/microservices-service-discovery-eureka/`](https://www.altkomsoftware.com/blog/microservices-service-discovery-eureka/)
 
-+   创建一个简单的数据驱动 CRUD 微服务：[https://learn.microsoft.com/en-us/dotnet/architecture/microservices/multi-container-microservice-net-applications/data-driven-crud-microservice](https://learn.microsoft.com/en-us/dotnet/architecture/microservices/multi-container-microservice-net-applications/data-driven-crud-microservice)
++   创建一个简单的数据驱动 CRUD 微服务：[`learn.microsoft.com/en-us/dotnet/architecture/microservices/multi-container-microservice-net-applications/data-driven-crud-microservice`](https://learn.microsoft.com/en-us/dotnet/architecture/microservices/multi-container-microservice-net-applications/data-driven-crud-microservice)
 
-+   8 种保护微服务架构安全的方法：[https://www.okta.com/resources/whitepaper/8-ways-to-secure-your-microservices-architecture/](https://www.okta.com/resources/whitepaper/8-ways-to-secure-your-microservices-architecture/)
++   8 种保护微服务架构安全的方法：[`www.okta.com/resources/whitepaper/8-ways-to-secure-your-microservices-architecture/`](https://www.okta.com/resources/whitepaper/8-ways-to-secure-your-microservices-architecture/)
 
-+   按照以下 6 个关键步骤在生产环境中部署微服务：[https://www.techtarget.com/searchitoperations/tip/Follow-these-6-steps-to-deploy-microservices-in-production](https://www.techtarget.com/searchitoperations/tip/Follow-these-6-steps-to-deploy-microservices-in-production)
++   按照以下 6 个关键步骤在生产环境中部署微服务：[`www.techtarget.com/searchitoperations/tip/Follow-these-6-steps-to-deploy-microservices-in-production`](https://www.techtarget.com/searchitoperations/tip/Follow-these-6-steps-to-deploy-microservices-in-production)
 
-+   使用 .NET 的微服务：[https://dotnet.microsoft.com/en-us/apps/aspnet/microservices](https://dotnet.microsoft.com/en-us/apps/aspnet/microservices)
++   使用 .NET 的微服务：[`dotnet.microsoft.com/en-us/apps/aspnet/microservices`](https://dotnet.microsoft.com/en-us/apps/aspnet/microservices)
 
 # 问题
 
@@ -484,6 +727,6 @@ API中的每个控制器不一定是自己的微服务，但决策应基于您�
 
 本节包含以下章节：
 
-+   [*第7章*](B19343_07.xhtml#_idTextAnchor169), *构建用户界面*
++   *第七章*, *构建用户界面*
 
-+   [*第8章*](B19343_08.xhtml#_idTextAnchor200), *身份验证和授权*
++   *第八章*, *身份验证和授权*

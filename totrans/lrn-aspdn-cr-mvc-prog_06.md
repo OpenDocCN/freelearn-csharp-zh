@@ -1,4 +1,4 @@
-# 第6章 验证
+# 第六章 验证
 
 我们永远不能依赖用户输入的数据。有时他们可能对应用程序一无所知，因此他们可能无意中输入了错误的数据。在其他时候，一些恶意用户可能希望通过在应用程序中输入不适当的数据来破坏应用程序。在任何情况下，我们都需要在存储数据以供进一步处理之前验证输入数据。
 
@@ -36,7 +36,7 @@
 
 ![客户端和服务器端验证](img/Image00102.jpg)
 
-在我们构建的现有应用程序中，即使用户在所有字段中都没有输入任何信息并提交，我们也不会向用户显示任何消息。相反，我们静默地存储字段的默认值（字符串类型的空值和十进制类型的0.00），如下面的截图所示：
+在我们构建的现有应用程序中，即使用户在所有字段中都没有输入任何信息并提交，我们也不会向用户显示任何消息。相反，我们静默地存储字段的默认值（字符串类型的空值和十进制类型的 0.00），如下面的截图所示：
 
 ![客户端和服务器端验证](img/Image00103.jpg)
 
@@ -70,7 +70,33 @@
 
 由于数据注释属性位于`System.ComponentModel.DataAnnotations`命名空间中，我们需要包含此命名空间。以下是更新后的视图模型代码：
 
-[PRE0]
+```cs
+using System; 
+using System.Collections.Generic; 
+using System.ComponentModel.DataAnnotations; 
+using System.Linq; 
+using System.Threading.Tasks; 
+using Validation.Models;
+
+namespace Validation.ViewModels 
+{ 
+    public class EmployeeAddViewModel 
+    { 
+        public List<Employee> EmployeesList { get; set; } 
+        [Required(ErrorMessage ="Employee Name is required")] 
+        public string Name { get; set; } 
+
+        [Required(ErrorMessage ="Employee Designation is required")] 
+        [MinLength(5, ErrorMessage = "Minimum length of designation should be 5 characters")] 
+        public string Designation { get; set; } 
+
+        [Required] 
+        [Range(1000,9999.99)] 
+        public decimal Salary { get; set; } 
+    } 
+} 
+
+```
 
 我们为所有三个属性——`Name`、`Designation`和`Salary`——添加了数据注释属性。
 
@@ -78,15 +104,66 @@
 
 ## 更新视图模型以显示验证错误消息
 
-对于每个字段，我们添加了一个`span`标签，当验证失败时，错误消息将以红色显示。当验证成功时，将不会显示错误消息。`asp-validation-for`属性的值表示需要显示验证错误消息的字段名称。例如，我们使用了带有`asp-validation-for`属性和值`Name`的`span`标签，这告诉ASP.NET MVC显示`Name`字段的验证错误消息：
+对于每个字段，我们添加了一个`span`标签，当验证失败时，错误消息将以红色显示。当验证成功时，将不会显示错误消息。`asp-validation-for`属性的值表示需要显示验证错误消息的字段名称。例如，我们使用了带有`asp-validation-for`属性和值`Name`的`span`标签，这告诉 ASP.NET MVC 显示`Name`字段的验证错误消息：
 
-[PRE1]
+```cs
+<form asp-controller="Employee" asp-action="Index"> 
+        <table> 
+            <tr> 
+                <td><label asp-for="Name"></label></td> 
+                <td><input asp-for="Name" /></td> 
+                <td><span asp-validation-for="Name" style="color:red"></span></td> 
+            </tr> 
+            <tr> 
+                <td><label asp-for="Designation"></label> </td> 
+                <td><input asp-for="Designation" /></td> 
+                <td><span asp-validation-for="Designation" style="color:red"></span> </td> 
+            </tr> 
+            <tr> 
+                <td><label asp-for="Salary"></label></td> 
+                <td><input asp-for="Salary"></td> 
+                <td> <span asp-validation-for="Salary" style="color:red"></span> </td> 
+            </tr> 
+            <tr> 
+                <td colspan="2"><input type="submit" id="submitbutton" value="Submit" /></td> 
+            </tr> 
+        </table> 
+    </form> 
+
+```
 
 ## 更新控制器操作方法以验证模型状态
 
 模型状态会根据我们在视图模型上指定的数据注释属性和输入数据自动更新。我们在以下`Index`方法中验证模型状态是否有效，这是一个`POST`操作方法。如果模型状态有效（验证成功），我们将保存输入的数据到数据库。如果验证失败，则`ModelState`会自动设置为`invalid`。然后，我们会用输入的数据填充`ViewModel`并再次渲染`View`方法，以便用户可以纠正输入数据并重新提交数据：
 
-[PRE2]
+```cs
+[HttpPost] 
+    public IActionResult Index(EmployeeAddViewModel employeeAddViewModel) 
+{ 
+        if (ModelState.IsValid) 
+        { 
+            using (var db = new EmployeeDbContext()) 
+            { 
+                Employee newEmployee = new Employee 
+                { 
+                    Name = employeeAddViewModel.Name, 
+                    Designation = employeeAddViewModel.Designation, 
+                    Salary = employeeAddViewModel.Salary 
+                }; 
+                db.Employees.Add(newEmployee); 
+                db.SaveChanges(); 
+                //Redirect to get Index GET method 
+                return RedirectToAction("Index"); 
+            } 
+        } 
+        using (var db = new EmployeeDbContext()) 
+        { 
+            employeeAddViewModel.EmployeesList = db.Employees.ToList(); 
+        } 
+        return View(employeeAddViewModel); 
+} 
+
+```
 
 在对应用程序进行上述更改后运行应用程序并提交表单而不输入值时，将显示与字段旁边的错误消息，如下面的截图所示。请注意，即使在验证错误的情况下，我们也会在以下表格中显示员工数据，这是通过使用前一个代码片段中的代码块实现的。
 
@@ -98,7 +175,7 @@
 
 +   如果一个字段有多个验证，它将一次显示一个错误消息。例如，我们对`Designation`字段有几个验证——`Required`和`MinLength`属性。如果没有为该字段输入数据，则只会显示必填字段错误消息。只有当必填字段错误得到解决（在字段中输入一些字符）时，第二个验证错误消息才会显示。
 
-+   如果没有错误消息可用且验证失败，将显示默认错误消息。我们没有为**薪资**字段提供任何错误消息。因此，当该字段的验证失败时，ASP.NET MVC将根据字段名称和验证失败类型显示基于字段的默认错误消息。![更新控制器操作方法以验证模型状态](img/Image00105.jpg)
++   如果没有错误消息可用且验证失败，将显示默认错误消息。我们没有为**薪资**字段提供任何错误消息。因此，当该字段的验证失败时，ASP.NET MVC 将根据字段名称和验证失败类型显示基于字段的默认错误消息。![更新控制器操作方法以验证模型状态](img/Image00105.jpg)
 
 前面的图示展示了服务器端验证的高级事件序列，具体描述如下：
 
@@ -116,25 +193,84 @@
 
 有一些场景中我们不需要去服务器验证输入数据。在前面的服务器端验证示例中，我们不需要去服务器验证用户是否为**姓名**字段输入了数据。我们可以在客户端本身进行验证。这防止了往返服务器，并减少了服务器负载。
 
-我们将使用JavaScript从客户端验证数据。JavaScript是一种高级、解释型语言，主要用于客户端编程。
+我们将使用 JavaScript 从客户端验证数据。JavaScript 是一种高级、解释型语言，主要用于客户端编程。
 
 ### 注意
 
-这些天，JavaScript也被用作Node.js的一部分在服务器端。
+这些天，JavaScript 也被用作 Node.js 的一部分在服务器端。
 
 我们将在我们的视图模型（`Index.cshtml`文件）中进行一些更改，以在客户端验证表单：
 
-1.  表单中的更改：将`id`属性添加到所有`span`标签中，以便我们可以访问此HTML元素来显示HTML错误消息。在表单提交时，调用一个JavaScript函数来验证输入数据。
+1.  表单中的更改：将`id`属性添加到所有`span`标签中，以便我们可以访问此 HTML 元素来显示 HTML 错误消息。在表单提交时，调用一个 JavaScript 函数来验证输入数据。
 
-1.  添加脚本HTML元素并创建一个JavaScript函数来验证输入数据。
+1.  添加脚本 HTML 元素并创建一个 JavaScript 函数来验证输入数据。
 
-在以下代码中，我们在表单提交时调用`validateForm` JavaScript函数。如果`validateForm`函数返回`true`，则数据将被发送到服务器。否则，数据将不会发送。我们已为所有`span`标签添加了`id`属性，以便我们可以识别`span`标签并在那里显示验证错误消息：
+在以下代码中，我们在表单提交时调用`validateForm` JavaScript 函数。如果`validateForm`函数返回`true`，则数据将被发送到服务器。否则，数据将不会发送。我们已为所有`span`标签添加了`id`属性，以便我们可以识别`span`标签并在那里显示验证错误消息：
 
-[PRE3]
+```cs
+<form asp-controller="Employee" asp-action="Index" onsubmit="return validateForm()"> 
+        <table> 
+            <tr> 
+                <td><label asp-for="Name"></label></td> 
+                <td><input asp-for="Name" /></td> 
+                <td><span id="validationName" asp-validation-for="Name" style="color:red"></span></td> 
+            </tr> 
+            <tr> 
+                <td><label asp-for="Designation"></label> </td> 
+                <td><input asp-for="Designation" /></td> 
+                <td><span id="validationDesignation" asp-validation-for="Designation" style="color:red"></span> </td> 
+            </tr> 
+            <tr> 
+                <td><label asp-for="Salary"></label></td> 
+                <td><input asp-for="Salary"></td> 
+                <td> <span id="validationSalary" asp-validation-for="Salary" style="color:red"></span> </td> 
+            </tr> 
+            <tr> 
+                <td colspan="2"><input type="submit" id="submitbutton" value="Submit" /></td> 
+            </tr> 
+        </table> 
+</form> 
 
-我们已添加JavaScript函数来验证所有三个字段。我们获取所有三个字段的值并将它们存储在单独的变量中。然后我们验证每个变量的值是否为null或空。如果值为空，我们获取相应字段的`span`元素并设置文本上下文为验证错误消息：
+```
 
-[PRE4]
+我们已添加 JavaScript 函数来验证所有三个字段。我们获取所有三个字段的值并将它们存储在单独的变量中。然后我们验证每个变量的值是否为 null 或空。如果值为空，我们获取相应字段的`span`元素并设置文本上下文为验证错误消息：
+
+```cs
+<script type="text/javascript"> 
+        function validateForm() { 
+            var isValidForm = true; 
+            var nameValue = document.getElementById("Name").value; 
+            var designationValue = document.getElementById("Designation").value; 
+            var salaryValue = document.getElementById("Salary").value; 
+
+            //Validate the name field 
+            if (nameValue == null || nameValue == "") { 
+                document.getElementById("validationName").textContent = "Employee Name is required - from client side"; 
+                isValidForm = false; 
+            } 
+
+            //validate the designation field 
+            if (designationValue == null || designationValue == "") { 
+                document.getElementById("validationDesignation").textContent = "Employee Designation is required - from client side"; 
+                isValidForm = false; 
+            } 
+
+            //validate the salary field - if it is empty 
+            if (salaryValue == null || salaryValue == "") { 
+                document.getElementById("validationSalary").textContent = "Employee Salary is required - from client side"; 
+                isValidForm = false; 
+            }else if (Number(salaryValue) == NaN || Number(salaryValue)<=0.0) { 
+                document.getElementById("validationSalary").textContent = "Please enter valid number for salary field - from client side"; 
+                isValidForm = false; 
+            } 
+
+            return isValidForm; 
+
+        } 
+
+</script> 
+
+```
 
 当你运行应用程序并提交表单而没有输入数据时，你会收到客户端本身生成的错误消息，而无需访问服务器。
 
@@ -154,11 +290,85 @@
 
 将有一个布局文件 (`_Layout.cshtml` ) 来定义你的 Web 应用程序的布局结构。由于所有页面都将使用 JavaScript 库，这是添加诸如无侵入验证等常见功能的好地方。只需将 JavaScript 库（粗体显示）添加到布局文件 (`_Layout.cshtml` ) 中，这样它们就会对所有 `View` 文件可用：
 
-[PRE5]
+```cs
+<!DOCTYPE html> 
+<html> 
+<head> 
+    <meta name="viewport" content="width=device-width" /> 
+    <title>@ViewBag.Title</title> 
+</head> 
+<body> 
+    <div> 
+        @RenderBody() 
+    </div> 
+
+<script src="img/jquery-2.2.3.js"></script> 
+    <script src="img/jquery.validate.min.js"></script> 
+    <script src="img/jquery.validate.unobtrusive.min.js"></script>
+
+</body> 
+</html> 
+
+```
 
 除了移除我们之前编写的用于验证字段的 JavaScript 函数外，视图模型没有发生变化。视图的完整代码如下：
 
-[PRE6]
+```cs
+@model Validation.ViewModels.EmployeeAddViewModel 
+
+<div> 
+
+    <form asp-controller="Employee" asp-action="Index" method="post" role="form"> 
+        <table> 
+            <tr> 
+                <td><label asp-for="Name"></label></td> 
+                <td><input asp-for="Name" /></td> 
+                <td><span id="validationName" asp-validation-for="Name" style="color:red"></span></td> 
+            </tr> 
+            <tr> 
+                <td><label asp-for="Designation"></label> </td> 
+                <td><input asp-for="Designation" /></td> 
+                <td><span id="validationDesignation" asp-validation-for="Designation" style="color:red"></span> </td> 
+            </tr> 
+            <tr> 
+                <td><label asp-for="Salary"></label></td> 
+                <td><input asp-for="Salary"></td> 
+                <td> <span id="validationSalary" asp-validation-for="Salary" style="color:red"></span> </td> 
+            </tr> 
+            <tr> 
+                <td colspan="2"><input type="submit" id="submitbutton" value="Submit" /></td> 
+            </tr> 
+
+        </table> 
+    </form> 
+
+</div> 
+
+<br /><br /> <br /> 
+
+<b> List of employees:</b> <br /> 
+<div> 
+    <table border="1"> 
+        <tr> 
+            <th> ID </th> 
+            <th> Name </th> 
+            <th> Designation </th> 
+            <th> Salary </th> 
+        </tr> 
+        @foreach (var employee in Model.EmployeesList) 
+        { 
+            <tr> 
+                <td>@employee.EmployeeId</td> 
+                <td>@employee.Name</td> 
+                <td>@employee.Designation</td> 
+                <td>@employee.Salary</td> 
+            </tr> 
+        } 
+    </table> 
+
+</div> 
+
+```
 
 ![实现](img/Image00108.jpg)
 
@@ -176,13 +386,13 @@
 
     +   对于范围数据注释，`data-val-range` 属性设置为错误消息的值。`data-val-range-max` 表示范围的最大值，而 `data-val-range-min` 属性表示范围的最小值。
 
-1.  jQuery无障碍验证库通过`data-*`属性读取这些元素并执行客户端验证。这允许开发者不必使用JavaScript编写分离的验证代码，因为所有内容都由配置本身解决。
+1.  jQuery 无障碍验证库通过`data-*`属性读取这些元素并执行客户端验证。这允许开发者不必使用 JavaScript 编写分离的验证代码，因为所有内容都由配置本身解决。
 
 # 摘要
 
-在本章中，我们学习了验证的需求以及可用的不同类型的验证。我们还讨论了客户端和服务器端验证的工作原理，以及每种类型验证的优缺点。随后，我们对代码进行了更改，以在服务器端验证输入数据。然后我们使用JavaScript在客户端本身验证输入数据。最后，我们使用jQuery无障碍库在客户端进行验证，而无需编写任何用于在客户端验证输入数据的JavaScript代码。
+在本章中，我们学习了验证的需求以及可用的不同类型的验证。我们还讨论了客户端和服务器端验证的工作原理，以及每种类型验证的优缺点。随后，我们对代码进行了更改，以在服务器端验证输入数据。然后我们使用 JavaScript 在客户端本身验证输入数据。最后，我们使用 jQuery 无障碍库在客户端进行验证，而无需编写任何用于在客户端验证输入数据的 JavaScript 代码。
 
-在下一章中，我们将讨论路由原理以及如何自定义它。在早期章节中，我们看到了ASP.NET 5应用程序中路由的基础。现在我们将深入探讨这个主题。
+在下一章中，我们将讨论路由原理以及如何自定义它。在早期章节中，我们看到了 ASP.NET 5 应用程序中路由的基础。现在我们将深入探讨这个主题。
 
 # 看累了记得休息一会哦~
 

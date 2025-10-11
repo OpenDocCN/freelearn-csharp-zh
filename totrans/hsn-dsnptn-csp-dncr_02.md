@@ -1,14 +1,14 @@
-# .NET Core和C#中OOP概述
+# .NET Core 和 C#中 OOP 概述
 
-20多年来，最受欢迎的编程语言都是基于**面向对象编程**（**OOP**）的原则。OOP语言受欢迎的上升很大程度上归功于能够将复杂逻辑抽象成一个结构，即对象，这使得解释更加容易，更重要的是，可以在应用程序中重用。本质上，OOP是一种软件开发方法，即使用包含数据和功能的概念来开发软件的模式。随着软件行业的成熟，OOP中出现了针对常见问题的模式，因为它们在不同环境和行业中有效解决了相同的问题。随着软件从主机迁移到客户端服务器，再到云计算，出现了更多的模式来帮助降低开发成本和提高可靠性。本书将探讨设计模式，从OOP的基础到基于云软件的架构设计模式。
+20 多年来，最受欢迎的编程语言都是基于**面向对象编程**（**OOP**）的原则。OOP 语言受欢迎的上升很大程度上归功于能够将复杂逻辑抽象成一个结构，即对象，这使得解释更加容易，更重要的是，可以在应用程序中重用。本质上，OOP 是一种软件开发方法，即使用包含数据和功能的概念来开发软件的模式。随着软件行业的成熟，OOP 中出现了针对常见问题的模式，因为它们在不同环境和行业中有效解决了相同的问题。随着软件从主机迁移到客户端服务器，再到云计算，出现了更多的模式来帮助降低开发成本和提高可靠性。本书将探讨设计模式，从 OOP 的基础到基于云软件的架构设计模式。
 
-OOP基于对象的概念。这个对象通常包含数据，称为属性和字段，以及称为方法的代码或行为。
+OOP 基于对象的概念。这个对象通常包含数据，称为属性和字段，以及称为方法的代码或行为。
 
 **设计模式**是软件开发人员在开发过程中遇到的一般问题的解决方案，并基于成功和失败的经验构建。这些解决方案经过众多开发者在各种情况下的试验和测试。基于先前活动的模式使用的好处确保了相同的努力不会反复进行。此外，使用模式增加了问题将在不引入缺陷或问题的前提下得到解决的可靠性。
 
-本章回顾OOP及其在C#中的应用。请注意，这只是一个简短的介绍，并不旨在成为OOP或C#的完整入门指南；相反，本章将详细涵盖这两个方面，以便您了解后续章节中将要介绍的设计模式。本章将涵盖以下主题：
+本章回顾 OOP 及其在 C#中的应用。请注意，这只是一个简短的介绍，并不旨在成为 OOP 或 C#的完整入门指南；相反，本章将详细涵盖这两个方面，以便您了解后续章节中将要介绍的设计模式。本章将涵盖以下主题：
 
-+   关于OOP以及类和对象如何工作的讨论
++   关于 OOP 以及类和对象如何工作的讨论
 
 +   继承
 
@@ -18,37 +18,37 @@ OOP基于对象的概念。这个对象通常包含数据，称为属性和字�
 
 # 技术要求
 
-本章包含各种代码示例来解释这些概念。代码保持简单，仅用于演示目的。大多数示例涉及用C#编写的.NET Core控制台应用程序。
+本章包含各种代码示例来解释这些概念。代码保持简单，仅用于演示目的。大多数示例涉及用 C#编写的.NET Core 控制台应用程序。
 
 要运行和执行代码，您需要以下内容：
 
-+   Visual Studio 2019（您也可以使用Visual Studio 2017版本3或更高版本运行应用程序）
++   Visual Studio 2019（您也可以使用 Visual Studio 2017 版本 3 或更高版本运行应用程序）
 
 +   .NET Core
 
-+   SQL Server（本章使用的是Express版）
++   SQL Server（本章使用的是 Express 版）
 
-# 安装Visual Studio
+# 安装 Visual Studio
 
-为了运行这些代码示例，您需要安装Visual Studio或更高版本（您也可以使用您偏好的IDE）。为此，请按照以下说明操作：
+为了运行这些代码示例，您需要安装 Visual Studio 或更高版本（您也可以使用您偏好的 IDE）。为此，请按照以下说明操作：
 
-1.  从以下链接下载Visual Studio：[https://docs.microsoft.com/en-us/visualstudio/install/install-visual-studio](https://docs.microsoft.com/en-us/visualstudio/install/install-visual-studio)。
+1.  从以下链接下载 Visual Studio：[`docs.microsoft.com/en-us/visualstudio/install/install-visual-studio`](https://docs.microsoft.com/en-us/visualstudio/install/install-visual-studio)。
 
-1.  遵循链接中包含的安装说明。有多种版本的Visual Studio可用；在本章中，我们使用Windows版本的Visual Studio。
+1.  遵循链接中包含的安装说明。有多种版本的 Visual Studio 可用；在本章中，我们使用 Windows 版本的 Visual Studio。
 
 # 设置.NET Core
 
 如果您尚未安装.NET Core，您需要遵循以下说明：
 
-1.  从以下链接下载.NET Core：[https://www.microsoft.com/net/download/windows](https://www.microsoft.com/net/download/windows)。
+1.  从以下链接下载.NET Core：[`www.microsoft.com/net/download/windows`](https://www.microsoft.com/net/download/windows)。
 
-1.  请遵循相关库中的安装说明：[https://dotnet.microsoft.com/download/dotnet-core/2.2](https://dotnet.microsoft.com/download/dotnet-core/2.2)。
+1.  请遵循相关库中的安装说明：[`dotnet.microsoft.com/download/dotnet-core/2.2`](https://dotnet.microsoft.com/download/dotnet-core/2.2)。
 
-完整的源代码可在GitHub上获得。章节中显示的源代码可能不完整，因此建议您检索源代码以运行示例（[https://github.com/PacktPublishing/Hands-On-Design-Patterns-with-C-and-.NET-Core/tree/master/Chapter1](https://github.com/PacktPublishing/Hands-On-Design-Patterns-with-C-and-.NET-Core/tree/master/Chapter1)）。
+完整的源代码可在 GitHub 上获得。章节中显示的源代码可能不完整，因此建议您检索源代码以运行示例（[`github.com/PacktPublishing/Hands-On-Design-Patterns-with-C-and-.NET-Core/tree/master/Chapter1`](https://github.com/PacktPublishing/Hands-On-Design-Patterns-with-C-and-.NET-Core/tree/master/Chapter1)）。
 
 # 本书所使用的模型
 
-作为学习辅助，本书将包含许多C#代码示例，以及图表和图像，以帮助描述尽可能具体的概念。这不是一本**统一建模语言**（**UML**）的书籍；然而，对于那些了解UML的人来说，许多图表应该看起来很熟悉。本节提供了将在这本书中使用的类图的描述。
+作为学习辅助，本书将包含许多 C#代码示例，以及图表和图像，以帮助描述尽可能具体的概念。这不是一本**统一建模语言**（**UML**）的书籍；然而，对于那些了解 UML 的人来说，许多图表应该看起来很熟悉。本节提供了将在这本书中使用的类图的描述。
 
 在这里，一个类将被定义为包括字段和方法，字段和方法之间用虚线分隔。如果对讨论很重要，则可访问性将表示为`-`表示私有，`+`表示公共，`#`表示受保护，`~`表示内部。以下屏幕截图通过显示一个具有私有`_name`变量和公共`GetName()`方法的`Car`类来说明这一点：
 
@@ -70,9 +70,9 @@ OOP基于对象的概念。这个对象通常包含数据，称为属性和字�
 
 # 面向对象编程以及类和对象的工作原理
 
-面向对象编程（OOP）是指使用定义为类的对象进行软件编程的方法。这些定义包括字段，有时称为属性，用于存储数据，以及方法以提供功能。第一种面向对象编程语言是名为Simula的模拟真实系统的语言（[https://en.wikipedia.org/wiki/Simula](https://en.wikipedia.org/wiki/Simula)），于1960年在挪威计算中心开发。第一种纯面向对象编程语言是在1970年作为Smalltalk语言出现的。这种语言被设计用来编程Dynabook（[http://history-computer.com/ModernComputer/Personal/Dynabook.html](http://history-computer.com/ModernComputer/Personal/Dynabook.html)），这是由艾伦·凯创建的个人计算机。从那时起，发展出了几种面向对象编程语言，其中最流行的是Java、C++、Python和C#。
+面向对象编程（OOP）是指使用定义为类的对象进行软件编程的方法。这些定义包括字段，有时称为属性，用于存储数据，以及方法以提供功能。第一种面向对象编程语言是名为 Simula 的模拟真实系统的语言（[`en.wikipedia.org/wiki/Simula`](https://en.wikipedia.org/wiki/Simula)），于 1960 年在挪威计算中心开发。第一种纯面向对象编程语言是在 1970 年作为 Smalltalk 语言出现的。这种语言被设计用来编程 Dynabook（[`history-computer.com/ModernComputer/Personal/Dynabook.html`](http://history-computer.com/ModernComputer/Personal/Dynabook.html)），这是由艾伦·凯创建的个人计算机。从那时起，发展出了几种面向对象编程语言，其中最流行的是 Java、C++、Python 和 C#。
 
-面向对象编程（OOP）基于包含数据的对象。OOP范式允许开发者将代码组织/安排成一个称为对象的抽象或逻辑结构。一个对象可以包含数据和行为。
+面向对象编程（OOP）基于包含数据的对象。OOP 范式允许开发者将代码组织/安排成一个称为对象的抽象或逻辑结构。一个对象可以包含数据和行为。
 
 使用面向对象的方法，我们正在做以下事情：
 
@@ -92,17 +92,17 @@ OOP基于对象的概念。这个对象通常包含数据，称为属性和字�
 
 正如你所见，对象是以逻辑方式组织指令列表的一种方式。回到房子的例子，建筑师的设计指导帮助我们建造房子，但它们本身不是房子。相反，建筑师的设计指导是房子的抽象表示。类类似，它定义了对象的特征。然后，根据类的定义创建对象。这通常被称为**实例化对象**。
 
-为了更深入地理解OOP，我们应该提及两种其他重要的编程方法：
+为了更深入地理解 OOP，我们应该提及两种其他重要的编程方法：
 
-+   **结构化编程**：这是一个由Edsger W. Dijkstra在1966年提出的术语。结构化编程是一种编程范式，它通过将问题分解成小部分来解决处理1,000行代码的问题。这些小部分通常被称为**子程序**、**块结构**、**for**和**while**循环等。使用结构化编程技术的语言包括ALGOL、Pascal、PL/I等。
++   **结构化编程**：这是一个由 Edsger W. Dijkstra 在 1966 年提出的术语。结构化编程是一种编程范式，它通过将问题分解成小部分来解决处理 1,000 行代码的问题。这些小部分通常被称为**子程序**、**块结构**、**for**和**while**循环等。使用结构化编程技术的语言包括 ALGOL、Pascal、PL/I 等。
 
-+   **过程式编程**：这是一种从结构化编程衍生出来的范式，它简单地基于我们如何进行调用（也称为**过程调用**）。使用过程式编程技术的语言包括COBOL、Pascal和C。Go编程语言的一个近期例子是在2009年发布的。
++   **过程式编程**：这是一种从结构化编程衍生出来的范式，它简单地基于我们如何进行调用（也称为**过程调用**）。使用过程式编程技术的语言包括 COBOL、Pascal 和 C。Go 编程语言的一个近期例子是在 2009 年发布的。
 
 过程调用
 
 过程调用是指激活一组称为**过程**的语句。这有时也被称为被**调用**的过程。
 
-这两种方法的主要问题是，一旦程序变得庞大，程序就难以管理。更复杂和更大的代码库的程序会拉伸这两种方法，导致难以理解和维护的应用程序。为了克服这些问题，OOP提供了以下特性：
+这两种方法的主要问题是，一旦程序变得庞大，程序就难以管理。更复杂和更大的代码库的程序会拉伸这两种方法，导致难以理解和维护的应用程序。为了克服这些问题，OOP 提供了以下特性：
 
 +   继承
 
@@ -112,7 +112,7 @@ OOP基于对象的概念。这个对象通常包含数据，称为属性和字�
 
 在接下来的章节中，我们将更详细地讨论这些特性。
 
-继承、封装和多态有时被称为OOP的三大支柱。
+继承、封装和多态有时被称为 OOP 的三大支柱。
 
 在我们开始之前，让我们讨论一些在面向对象编程（OOP）中常见的结构。
 
@@ -122,25 +122,56 @@ OOP基于对象的概念。这个对象通常包含数据，称为属性和字�
 
 让我们看一下以下代码示例：
 
-[PRE0]
+```cs
+public class PetAnimal
+{
+    private readonly string PetName;
+    private readonly PetColor PetColor;
+
+    public PetAnimal(string petName, PetColor petColor)
+    {
+        PetName = petName;
+        PetColor = petColor;
+    }
+
+    public string MyPet() => $"My pet is {PetName} and its color is {PetColor}.";
+}
+```
 
 在前面的代码中，我们有一个名为`PetAnimal`的类，它有两个私有字段，分别称为`PetName`和`PetColor`，以及一个名为`MyPet()`的方法。
 
 # 对象
 
-在现实世界中，对象有两个共同的特征，即状态和行为。换句话说，我们可以这样说，每个对象都有一个名称、颜色等；这些特征仅仅是对象的状态。让我们以任何类型的宠物为例：狗和猫都会有一个名字，人们会叫它。所以，以这种方式，我的狗名叫Ace，我的猫名叫Clementine。同样，狗和猫都有特定的行为，例如，狗会吠叫，猫会喵喵叫。
+在现实世界中，对象有两个共同的特征，即状态和行为。换句话说，我们可以这样说，每个对象都有一个名称、颜色等；这些特征仅仅是对象的状态。让我们以任何类型的宠物为例：狗和猫都会有一个名字，人们会叫它。所以，以这种方式，我的狗名叫 Ace，我的猫名叫 Clementine。同样，狗和猫都有特定的行为，例如，狗会吠叫，猫会喵喵叫。
 
-在*解释OOP*部分，我们讨论了OOP是一种旨在结合状态或结构（数据）和行为（方法）以提供软件功能的编程模型。在先前的例子中，宠物的不同状态构成了实际的数据，而宠物的行为则是方法。
+在*解释 OOP*部分，我们讨论了 OOP 是一种旨在结合状态或结构（数据）和行为（方法）以提供软件功能的编程模型。在先前的例子中，宠物的不同状态构成了实际的数据，而宠物的行为则是方法。
 
 对象将信息（即数据）存储在属性中，并通过方法展示其行为。
 
-在面向对象的语言，如C#中，对象是类的实例。在我们之前的例子中，现实世界的对象`Dog`将是`PetAnimal`类的一个对象。
+在面向对象的语言，如 C#中，对象是类的实例。在我们之前的例子中，现实世界的对象`Dog`将是`PetAnimal`类的一个对象。
 
 对象可以是具体的（即现实世界的对象，如狗或猫，或任何类型的文件，如物理文件或计算机文件），也可以是概念性的，如数据库模式或代码蓝图。
 
 以下代码片段展示了对象如何包含数据和方法，以及如何使用它：
 
-[PRE1]
+```cs
+namespace OOPExample
+{
+    class Program
+    {
+        static void Main(string[] args)
+        {
+            Console.WriteLine("OOP example");
+            PetAnimal dog = new PetAnimal("Ace", PetColor.Black);
+            Console.WriteLine(dog.MyPet());
+            Console.ReadLine();
+            PetAnimal cat = new PetAnimal("Clementine", PetColor.Brown);
+            Console.WriteLine(cat.MyPet());
+            Console.ReadLine();
+        }
+    }
+}
+```
 
 在之前的代码片段中，我们创建了两个对象：`dog`和`cat`。这些对象是`PetAnimal`类的两个不同实例。您可以看到，包含有关动物数据的字段或属性是通过构造函数方法赋予值的。构造函数方法是一个特殊的方法，用于创建类的实例。
 
@@ -162,21 +193,21 @@ OOP基于对象的概念。这个对象通常包含数据，称为属性和字�
 
 +   **组合**：组合指的是死亡关系；它表示两个对象之间的关系，其中一个对象（子对象）依赖于另一个对象（父对象）。如果父对象被删除，所有子对象将自动被删除。让我们以房屋和房间为例。一个房屋可以有多个房间，但一个房间不能属于多个房屋。如果我们拆除了房屋，房间将自动被删除。
 
-让我们通过扩展之前的宠物示例并引入一个`PetOwner`类来在C#中说明这些概念。`PetOwner`类可以关联一个或多个`PetAnimal`实例。由于`PetAnimal`类可以有无所有者而存在，这种关系是聚合关系。`PetAnimal`与`PetColor`相关联，在这个系统中，只有当它与`PetAnimal`相关联时，`PetColor`才存在，这使得关联成为组合。
+让我们通过扩展之前的宠物示例并引入一个`PetOwner`类来在 C#中说明这些概念。`PetOwner`类可以关联一个或多个`PetAnimal`实例。由于`PetAnimal`类可以有无所有者而存在，这种关系是聚合关系。`PetAnimal`与`PetColor`相关联，在这个系统中，只有当它与`PetAnimal`相关联时，`PetColor`才存在，这使得关联成为组合。
 
 以下图示说明了聚合和组合：
 
 ![图片](img/d132053d-f041-4a26-a000-436ad74ddaa6.png)
 
-上述模型基于UML，可能对您来说并不熟悉；因此，让我们指出关于该图的一些重要事项。类由一个包含类名以及其属性和方法的框表示（通过虚线分隔）。现在，忽略名称前的符号，例如`+`或`-`，因为我们将在讨论封装时介绍访问修饰符。关联通过连接类的线条表示。在组合的情况下，父类的一侧使用实心菱形，而父类的一侧使用开放菱形来表示聚合。此外，请注意，该图支持表示可能子数目的多值。在图中，`PetOwner`类可以有`0`个或更多`PetAnimal`类（注意，*****表示没有强制限制关联的数量）。
+上述模型基于 UML，可能对您来说并不熟悉；因此，让我们指出关于该图的一些重要事项。类由一个包含类名以及其属性和方法的框表示（通过虚线分隔）。现在，忽略名称前的符号，例如`+`或`-`，因为我们将在讨论封装时介绍访问修饰符。关联通过连接类的线条表示。在组合的情况下，父类的一侧使用实心菱形，而父类的一侧使用开放菱形来表示聚合。此外，请注意，该图支持表示可能子数目的多值。在图中，`PetOwner`类可以有`0`个或更多`PetAnimal`类（注意，*****表示没有强制限制关联的数量）。
 
 UML
 
-UML是一种专门为软件工程开发的建模语言。它经过20多年的发展，由**对象管理组**（**OMG**）管理。您可以参考[http://www.uml.org/](http://www.uml.org/)获取更多详细信息。
+UML 是一种专门为软件工程开发的建模语言。它经过 20 多年的发展，由**对象管理组**（**OMG**）管理。您可以参考[`www.uml.org/`](http://www.uml.org/)获取更多详细信息。
 
 # 接口
 
-在C#中，**接口**定义了一个对象包含的内容，或其合同；特别是对象的方法、属性、事件或索引。然而，接口不提供实现。接口不能包含属性。这与基类形成对比，基类既提供合同也提供实现。实现接口的类必须实现接口中指定的所有内容。
+在 C#中，**接口**定义了一个对象包含的内容，或其合同；特别是对象的方法、属性、事件或索引。然而，接口不提供实现。接口不能包含属性。这与基类形成对比，基类既提供合同也提供实现。实现接口的类必须实现接口中指定的所有内容。
 
 抽象类
 
@@ -214,7 +245,7 @@ C# 只支持单继承。
 
 您可以参考以下帖子以获取有关 C# 和多重继承的更多信息：
 
-[https://blogs.msdn.microsoft.com/csharpfaq/2004/03/07/why-doesnt-c-supportmultiple-inheritance/](https://blogs.msdn.microsoft.com/csharpfaq/2004/03/07/why-doesnt-c-supportmultiple-inheritance/).
+[`blogs.msdn.microsoft.com/csharpfaq/2004/03/07/why-doesnt-c-supportmultiple-inheritance/`](https://blogs.msdn.microsoft.com/csharpfaq/2004/03/07/why-doesnt-c-supportmultiple-inheritance/).
 
 +   **层次继承**：当多个类从另一个类继承时，发生层次继承。
 
@@ -224,11 +255,11 @@ C# 只支持单继承。
 
 C# 不支持混合继承。
 
-+   **隐式继承**：.NET Core中的所有类型都隐式继承自`System.Object`类及其派生类。
++   **隐式继承**：.NET Core 中的所有类型都隐式继承自`System.Object`类及其派生类。
 
 # 封装
 
-封装是面向对象编程中的另一个基本概念，其中类的细节，即属性和方法，可以在对象外部可见或不可见。通过封装，开发者提供了关于如何使用类的指导，同时帮助防止类被错误处理。例如，假设我们只想通过使用`AddPet(PetAnimal)`方法来添加`PetAnimal`对象。我们会通过使`PetOwner`类的`AddPet(PetAnimal)`方法可用，同时将`Pets`属性限制为`PetAnimal`类之外的所有内容来实现这一点。在C#中，这是通过将`Pets`属性设置为私有来实现的。这样做的一个原因可能是，每当添加`PetAnimal`类时，都需要额外的逻辑，例如记录或验证`PetOwner`类是否可以有宠物。
+封装是面向对象编程中的另一个基本概念，其中类的细节，即属性和方法，可以在对象外部可见或不可见。通过封装，开发者提供了关于如何使用类的指导，同时帮助防止类被错误处理。例如，假设我们只想通过使用`AddPet(PetAnimal)`方法来添加`PetAnimal`对象。我们会通过使`PetOwner`类的`AddPet(PetAnimal)`方法可用，同时将`Pets`属性限制为`PetAnimal`类之外的所有内容来实现这一点。在 C#中，这是通过将`Pets`属性设置为私有来实现的。这样做的一个原因可能是，每当添加`PetAnimal`类时，都需要额外的逻辑，例如记录或验证`PetOwner`类是否可以有宠物。
 
 C#支持可以在项目上设置的不同的访问级别。项目可以是类、类的属性或方法，或枚举：
 
@@ -260,31 +291,64 @@ C#支持可以在项目上设置的不同的访问级别。项目可以是类、
 
 静态或早期绑定多态发生在编译时，它主要是由方法重载组成，即一个类有多个具有相同名称但参数不同的方法。这通常有助于传达方法的含义或简化代码。例如，在计算器中，有多个方法用于添加不同类型的数字比每个场景都有不同的方法名称更易于阅读；让我们比较以下代码：
 
-[PRE2]
+```cs
+int Add(int a, int b) => a + b;
+float Add(float a, float b) => a + b;
+decimal Add(decimal a, decimal b) => a + b;
+```
 
 在以下代码中，代码再次展示了相同的功能，但没有重载`Add()`方法：
 
-[PRE3]
+```cs
+int AddTwoIntegers(int a, int b) => a + b;
+float AddTwoFloats(float a, float b) => a + b;
+decimal AddTwoDecimals(decimal a, decimal b) => a + b;
+```
 
 在宠物示例中，主人会使用不同的食物来喂养`cat`和`dog`类的对象。我们可以定义一个`PetOwner`类，其中包含两个`Feed()`方法，如下所示：
 
-[PRE4]
+```cs
+public void Feed(PetDog dog)
+{
+    PetFeeder.FeedPet(dog, new Kibble());
+}
+
+public void Feed(PetCat cat)
+{
+    PetFeeder.FeedPet(cat, new Fish());
+}
+```
 
 两种方法都使用一个`PetFeeder`类来喂养宠物，而`dog`类被赋予`Kibble`，`cat`实例则被赋予`Fish`。`PetFeeder`类在*泛型*部分有所描述。
 
 # 动态多态
 
-动态或晚期绑定多态发生在应用程序运行时。有多个情况可以发生，我们将涵盖C#中的三种常见形式：接口、继承和泛型。
+动态或晚期绑定多态发生在应用程序运行时。有多个情况可以发生，我们将涵盖 C#中的三种常见形式：接口、继承和泛型。
 
 # 接口多态
 
 接口定义了一个类必须实现的签名。在`PetAnimal`示例中，想象我们定义宠物食品提供能量量，如下所示：
 
-[PRE5]
+```cs
+public interface IPetFood
+{
+    int Energy { get; }
+}
+```
 
 界面本身不能被实例化，但它描述了`IPetFood`实例必须实现的内容。例如，`Kibble`和`Fish`可能提供不同水平的能量，如下面的代码所示：
 
-[PRE6]
+```cs
+public class Kibble : IPetFood
+{
+    public int Energy => 7;
+}
+
+public class Fish : IPetFood
+{
+    int IPetFood.Energy => 8;
+}
+```
 
 在前面的代码片段中，`Kibble`提供的能量比`Fish`少。
 
@@ -292,7 +356,17 @@ C#支持可以在项目上设置的不同的访问级别。项目可以是类、
 
 继承多态允许在运行时以类似于接口的方式确定功能，但应用于类继承。在我们的例子中，宠物可以被喂养，因此我们可以定义一个新的`Feed(IPetFood)`方法，它使用之前定义的接口：
 
-[PRE7]
+```cs
+public virtual void Feed(IPetFood food)
+{
+    Eat(food);
+}
+
+protected void Eat(IPetFood food)
+{
+    _hunger -= food.Energy;
+}
+```
 
 上述代码表明，所有`PetAnimal`的实现都将有一个`Feed(IPetFood)`方法，并且子类可以提供不同的实现。`Eat(IPetFood food)`没有被标记为虚拟，因为预期所有`PetAnimal`对象都将使用该方法，而不需要覆盖其行为。它也被标记为受保护的，以防止从对象外部访问。
 
@@ -300,7 +374,19 @@ C#支持可以在项目上设置的不同的访问级别。项目可以是类、
 
 `PetDog`不会覆盖基类的行为，因为狗会吃`Kibble`和`Fish`。猫则更为挑剔，如下面的代码所示：
 
-[PRE8]
+```cs
+public override void Feed(IPetFood food)
+{
+    if (food is Fish)
+    {
+        Eat(food);
+    }
+    else
+    {
+        Meow();
+    }
+}
+```
 
 使用`override`关键字，`PetCat`将改变基类的行为，使得猫只能吃鱼。
 
@@ -310,7 +396,16 @@ C#支持可以在项目上设置的不同的访问级别。项目可以是类、
 
 回到宠物的话题，我们可以定义一个用于喂养宠物的泛型类。这个类简单地根据提供的宠物和食物来喂养宠物，如下面的代码所示：
 
-[PRE9]
+```cs
+public static class PetFeeder
+{
+    public static void FeedPet<TP, TF>(TP pet, TF food) where TP : PetAnimal
+                                                    where TF : IPetFood 
+    {
+        pet.Feed(food); 
+    }
+}
+```
 
 在这里有一些有趣的事情需要指出。首先，由于类和方法都被标记为静态，因此不需要实例化这个类。泛型方法使用方法签名`FeedPet<TP, TF>`进行描述。`where`关键字用于指示对`TP`和`TF`的额外要求。在这个例子中，`where`关键字定义`TP`必须是一个`PetAnimal`类型的类型，而`TF`必须实现`IPetFood`接口。
 
@@ -328,7 +423,7 @@ C#支持可以在项目上设置的不同的访问级别。项目可以是类、
 
 1.  C#支持多重继承吗？
 
-1.  在C#中，可以使用什么级别的封装来防止从库外部访问类？
+1.  在 C#中，可以使用什么级别的封装来防止从库外部访问类？
 
 1.  聚合和组合之间的区别是什么？
 

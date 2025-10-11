@@ -20,7 +20,7 @@
 
 # 响应性
 
-不久前，业务赞助商在需求收集会议中讨论的一个关键要求是保证几秒钟的响应时间。例如，一个T恤定制打印网店，你可以上传图片，然后将其渲染到所选的服装上。向前推进几年——我可以为此作证——如果任何网页加载时间超过几秒钟，我们将关闭浏览器窗口。
+不久前，业务赞助商在需求收集会议中讨论的一个关键要求是保证几秒钟的响应时间。例如，一个 T 恤定制打印网店，你可以上传图片，然后将其渲染到所选的服装上。向前推进几年——我可以为此作证——如果任何网页加载时间超过几秒钟，我们将关闭浏览器窗口。
 
 用户今天期望几乎瞬间的响应。但除非你编写的代码遵循某些标准以提供预期的性能，否则这是不可能的。总会有许多不同的组件协同合作和协调以解决某些业务问题。因此，每个组件预期返回结果的时间已经减少到现在的毫秒级。此外，当涉及到响应时间时，系统必须表现出一致性和性能。如果你有一个在定义时间段内表现出可变响应时间的服务，那么这是你系统中即将出现问题的迹象。你迟早必须处理这个负担。毫无疑问，在大多数情况下，你将设法解决这个问题。
 
@@ -80,7 +80,7 @@
 
 # 消息级安全
 
-消息级安全是保护你单个请求消息的最基本方法。在初始认证执行后，根据实现方式，请求消息本身可能包含OAuth承载令牌或JWT。这样，每个请求都会被认证，并且与用户相关的信息可以嵌入到这些令牌中。这些信息可能很简单，比如一个用户名，以及一个表示令牌有效期的过期时间戳。毕竟，我们不想允许令牌在某个时间框架之外被使用。
+消息级安全是保护你单个请求消息的最基本方法。在初始认证执行后，根据实现方式，请求消息本身可能包含 OAuth 承载令牌或 JWT。这样，每个请求都会被认证，并且与用户相关的信息可以嵌入到这些令牌中。这些信息可能很简单，比如一个用户名，以及一个表示令牌有效期的过期时间戳。毕竟，我们不想允许令牌在某个时间框架之外被使用。
 
 然而，这里重要的是要注意，你可以自由地以这种方式实现它，以便可以嵌入和利用更多信息用于不同的用途。
 
@@ -94,7 +94,7 @@
 
 如果包含所有用户认证数据和授权数据的认证服务变得不可用，会发生什么？这是否意味着整个微服务生态系统都会崩溃，因为所有动作——或者大部分动作——都需要对尝试执行动作的用户进行授权？这不符合微服务架构的领域。让我们看看我们如何处理这种情况。
 
-一种方法是在每个需要它的服务中复制用户授权数据。当授权数据已经与相应服务可用时，将减少通过JWT（JSON Web Tokens）传输的数据量。这将实现的是，如果我们的Auth服务变得不可用，已经认证并访问系统的用户将不会受到影响。由于所有授权数据已经存在于需要验证的各个服务中，业务可以继续进行，没有任何阻碍。
+一种方法是在每个需要它的服务中复制用户授权数据。当授权数据已经与相应服务可用时，将减少通过 JWT（JSON Web Tokens）传输的数据量。这将实现的是，如果我们的 Auth 服务变得不可用，已经认证并访问系统的用户将不会受到影响。由于所有授权数据已经存在于需要验证的各个服务中，业务可以继续进行，没有任何阻碍。
 
 然而，这种方法也有其自身的代价。由于数据需要随时更新以适应所有服务，维护这些数据将变得具有挑战性。为每个服务所需的复制本身就是一个挑战。尽管如此，也有解决这个特定挑战的方法。
 
@@ -104,7 +104,7 @@
 
 跟踪单个订单的下单过程是容易的。然而，将这个数字乘以每小时数百万个订单的下单和取消，在反应式微服务领域可能会迅速成为一个挑战。挑战在于如何在多个服务之间执行事务。不仅跟踪此类事务很困难，而且它还带来了其他挑战，例如持久化跨越数据库和消息代理的事务。如果在中间某个服务失败导致事务中断的情况下，这种操作的撤销任务可能会更加艰巨。
 
-在这种情况下，我们可以利用事件溯源模式。这是一个强有力的候选方案，尤其是因为我们不寻求通常称为2PC（两阶段提交）的两阶段提交。我们不是存储事务，而是持久化我们实体的所有状态改变事件。换句话说，我们以实体的形式存储所有改变它们状态的事件，例如订单和产品。当客户端下单时，在正常情况下，我们会将订单持久化到订单表作为一行。然而，在这里我们将持久化整个事件序列，直到订单被接受或拒绝的最终阶段。
+在这种情况下，我们可以利用事件溯源模式。这是一个强有力的候选方案，尤其是因为我们不寻求通常称为 2PC（两阶段提交）的两阶段提交。我们不是存储事务，而是持久化我们实体的所有状态改变事件。换句话说，我们以实体的形式存储所有改变它们状态的事件，例如订单和产品。当客户端下单时，在正常情况下，我们会将订单持久化到订单表作为一行。然而，在这里我们将持久化整个事件序列，直到订单被接受或拒绝的最终阶段。
 
 参考前图，我们分析了创建订单时生成的事件序列。看看这些事件将如何在这个模式中存储，以及如何从这些事件集中推导出事务。首先，让我们看看数据将如何存储。如以下图所示，单个记录作为行保存。数据一致性在事务后得到确认：
 
@@ -124,7 +124,7 @@
 
 ![图片](img/8cc3dc4a-12d7-43fe-9d19-86f35c3706be.png)
 
-除了所有的好处之外，还有一些缺点。其中最重要的一点是如何查询事件存储。要重建给定业务实体在特定时间点的状态，需要一些复杂的查询。除此之外，还需要一个学习曲线来掌握事件存储替代数据库并推导实体状态的概念。查询复杂性可以通过CQRS模式轻松处理。然而，这超出了本章的范围。值得注意的是，事件源模式和CQRS在响应式微服务之后值得有单独的章节。
+除了所有的好处之外，还有一些缺点。其中最重要的一点是如何查询事件存储。要重建给定业务实体在特定时间点的状态，需要一些复杂的查询。除此之外，还需要一个学习曲线来掌握事件存储替代数据库并推导实体状态的概念。查询复杂性可以通过 CQRS 模式轻松处理。然而，这超出了本章的范围。值得注意的是，事件源模式和 CQRS 在响应式微服务之后值得有单独的章节。
 
 # 微服务生态系统
 
@@ -132,109 +132,242 @@
 
 # 编码响应式微服务
 
-现在，让我们尝试总结一下，看看它在代码中实际上看起来如何。我们将使用Visual Studio 2017来完成此操作。第一步是创建一个反应式微服务，然后我们将继续创建一个客户端来消费我们创建的服务。
+现在，让我们尝试总结一下，看看它在代码中实际上看起来如何。我们将使用 Visual Studio 2017 来完成此操作。第一步是创建一个反应式微服务，然后我们将继续创建一个客户端来消费我们创建的服务。
 
 # 创建项目
 
-现在，我们将继续创建我们的反应式微服务示例。为了做到这一点，我们需要创建一个ASP.NET Web应用程序类型的项目。只需按照以下步骤操作，你应该能够看到你的第一个反应式微服务在行动：
+现在，我们将继续创建我们的反应式微服务示例。为了做到这一点，我们需要创建一个 ASP.NET Web 应用程序类型的项目。只需按照以下步骤操作，你应该能够看到你的第一个反应式微服务在行动：
 
-1.  启动Visual Studio。
+1.  启动 Visual Studio。
 
 1.  通过导航到文件 | 新建 | 项目创建一个新的项目。
 
-1.  从已安装的模板中，选择.NET Core | ASP.NET Core Web应用程序。
+1.  从已安装的模板中，选择.NET Core | ASP.NET Core Web 应用程序。
 
 1.  将其命名为`FlixOne.BookStore.ProductService`并点击确定：
 
 ![图片](img/b057fc3c-85ba-40a0-b9f7-51641480ac89.png)
 
-1.  在“新建ASP.NET Core Web应用程序”窗口中，选择.NET Core和ASP.NET Core 2.0，然后选择Web应用程序（模型-视图-控制器），然后单击确定：
+1.  在“新建 ASP.NET Core Web 应用程序”窗口中，选择.NET Core 和 ASP.NET Core 2.0，然后选择 Web 应用程序（模型-视图-控制器），然后单击确定：
 
 ![图片](img/8cf49cfa-2873-4e9f-b57f-01422029d466.png)
 
-如果你启用了容器，你可以为Windows启用Docker支持。
+如果你启用了容器，你可以为 Windows 启用 Docker 支持。
 
-1.  确保已选择C#7.1；为此，在解决方案资源管理器中右键单击项目，然后单击属性。在项目属性窗口中，单击生成选项卡，然后滚动到高级。单击高级，然后选择C# 7.1：
+1.  确保已选择 C#7.1；为此，在解决方案资源管理器中右键单击项目，然后单击属性。在项目属性窗口中，单击生成选项卡，然后滚动到高级。单击高级，然后选择 C# 7.1：
 
 ![图片](img/fbc7aaf8-5dc7-4167-965c-ebf0b885a8b7.png)
 
-1.  打开NuGet管理器，并将System.Reactive.Core NuGet包添加到项目中。确保在屏幕上选择包含预发布版本：
+1.  打开 NuGet 管理器，并将 System.Reactive.Core NuGet 包添加到项目中。确保在屏幕上选择包含预发布版本：
 
 ![图片](img/fad91898-4d26-4241-bd49-8e5f128706c0.png)
 
-你还必须添加一个EF core包；要这样做，请参阅第2章“实现微服务”中的*EF Core迁移*部分。
+你还必须添加一个 EF core 包；要这样做，请参阅第二章“实现微服务”中的*EF Core 迁移*部分。
 
 1.  将`Product.cs`模型代码添加到`Models`文件夹中，如下所示：
 
-[PRE0]
+```cs
+namespace FlixOne.BookStore.ProductService.Models
+{
+  public class Product
+  {
+    public Guid Id { get; set; }
+    public string Name { get; set; }
+    public string Description { get; set; }
+    public string Image { get; set; }
+    public decimal Price { get; set; }
+    public Guid CategoryId { get; set; }
+    public virtual Category Category { get; set; }
+  }
+}
+```
 
 1.  将`Category.cs`模型代码添加到`Models`文件夹中，如下所示：
 
-[PRE1]
+```cs
+namespace FlixOne.BookStore.ProductService.Models
+{
+  public class Category
+  {
+    public Category() => Products = new List<Product>();
+    public Guid Id { get; set; }
+    public string Name { get; set; }
+    public string Description { get; set; }
+    public IEnumerable<Product> Products { get; set; }
+  }
+}
+```
 
 1.  将`context`和`persistence`文件夹添加到项目中。将`ProductContext`添加到`context`文件夹中，并将`IProductRepository`接口和`ProductRepository`类添加到`persistence`文件夹中。
 
 考虑以下代码片段，展示了我们的上下文和持久化类：
 
-[PRE2]
+```cs
+namespace FlixOne.BookStore.ProductService.Contexts
+{
+  public class ProductContext : DbContext
+  {
+    public ProductContext(DbContextOptions<ProductContext> options)
+    : base(options)
+    { }
+    public ProductContext()
+    { }
+    public DbSet<Product> Products { get; set; }
+    public DbSet<Category> Categories { get; set; }
+  }
+}
+//Persistence or repositories, following is the interface
+namespace FlixOne.BookStore.ProductService.Persistence
+{
+  public interface IProductRepository
+  {
+    IObservable<IEnumerable<Product>> GetAll();
+    IObservable<IEnumerable<Product>> GetAll(IScheduler scheduler);
+    IObservable<Unit> Remove(Guid productId);
+    IObservable<Unit> Remove(Guid productId, IScheduler scheduler);
+  }
+}
+//ProductRepository class that implements the IProductRepository interface
+namespace FlixOne.BookStore.ProductService.Persistence
+{
+  public class ProductRepository : IProductRepository
+  {
+    private readonly ProductContext _context;
+    public ProductRepository(ProductContext context)
+    => _context = context;
+    public IObservable<IEnumerable<Product>> 
+    GetAll() => Observable.Return(GetProducts());
+    public IObservable<IEnumerable<Product>>
+    GetAll(IScheduler scheduler) => 
+    Observable.Return(GetProducts(), scheduler);
+    public IObservable<Unit> Remove(Guid productId) =>
+    Remove(productId, null);
+    public IObservable<Unit> Remove(Guid productId,
+    IScheduler scheduler)
+    {
+      DeleteProduct(productId);
+      return scheduler != null
+      ? Observable.Return(new Unit(), scheduler)
+      : Observable.Return(new Unit());
+    }
+    private IEnumerable<Product> GetProducts()
+    {
+      var products = (from p in _context.Products.
+      Include(p => p.Category)
+      orderby p.Name
+      select p).ToList();
+      return products;
+    }
+    private Product GetBy(Guid id) => GetProducts().
+    FirstOrDefault(x => x.Id == id);
+    private void DeleteProduct(Guid productId)
+    {
+      var product = GetBy(productId);
+      _context.Entry(product).State = EntityState.Deleted;
+      _context.SaveChanges();
+    }
+  }
+}
+```
 
 我们已经创建了我们的模型。我们的下一步是添加与数据库交互的代码。这些模型帮助我们将数据源中的数据投影到我们的模型中。
 
 对于数据库交互，我们已创建了一个上下文，即`ProductContext`，它从`DbContext`派生而来。在之前的某个步骤中，我们创建了一个名为`Context`的文件夹。
 
-Entity Framework Core上下文有助于查询数据库。它还帮助我们汇总我们在数据上执行的所有更改，并一次性在数据库上执行它们。在这里，我们不会详细介绍Entity Framework Core或上下文，因为它们不属于本章的范围。
+Entity Framework Core 上下文有助于查询数据库。它还帮助我们汇总我们在数据上执行的所有更改，并一次性在数据库上执行它们。在这里，我们不会详细介绍 Entity Framework Core 或上下文，因为它们不属于本章的范围。
 
 上下文从`appsettings.json`文件中的`connectionStrings`部分选择连接字符串——键名为`ProductConnectionString`。
 
-您需要更新`startup.cs`文件以确保您使用的是正确的数据库。我们已经在[第2章](047f5d0b-a008-48e2-9c7f-c57c16e671f9.xhtml)，*实现微服务*中讨论了修改`appsettings.json`和`Startup.cs`文件。在更新`Startup.cs`类时，您需要为项目添加`Swashbuckle.AspNetCore` NuGet包以支持Swagger。
+您需要更新`startup.cs`文件以确保您使用的是正确的数据库。我们已经在第二章，*实现微服务*中讨论了修改`appsettings.json`和`Startup.cs`文件。在更新`Startup.cs`类时，您需要为项目添加`Swashbuckle.AspNetCore` NuGet 包以支持 Swagger。
 
 您可以将其命名为以下代码片段中显示的任何名称：
 
-[PRE3]
+```cs
+ "ConnectionStrings": 
+ {
+   "ProductConnection": "Data Source=.;Initial
+   Catalog=ProductsDB;Integrated  
+   Security=True;MultipleActiveResultSets=True"
+ }
+```
 
 # 应用程序与数据库之间的通信
 
-在我们设置好上下文，并处理应用程序与数据库之间的通信后，让我们继续添加一个仓库以促进我们的数据模型与数据库之间的交互。请参考我们在*创建项目*部分的第10步中讨论的仓库代码。
+在我们设置好上下文，并处理应用程序与数据库之间的通信后，让我们继续添加一个仓库以促进我们的数据模型与数据库之间的交互。请参考我们在*创建项目*部分的第 10 步中讨论的仓库代码。
 
 将`GetAll`的结果标记为`IObservable`添加了我们寻找的响应式功能。同时，请注意返回语句。
 
 使用这个可观察模型，我们可以像处理其他更简单的集合一样轻松地处理异步事件的流：
 
-[PRE4]
+```cs
+ return Observable.Return(GetProducts());
+```
 
-我们现在准备好通过我们的控制器公开功能。在控制器文件夹上右键单击，点击添加新项，然后选择ASP.NET Core，Web API控制器类。将其命名为`ProductController`：
+我们现在准备好通过我们的控制器公开功能。在控制器文件夹上右键单击，点击添加新项，然后选择 ASP.NET Core，Web API 控制器类。将其命名为`ProductController`：
 
 ![](img/247eb9fe-30fa-454b-9f67-d32fb4b55410.png)
 
 我们的控制器将看起来如下：
 
-[PRE5]
+```cs
+namespace FlixOne.BookStore.ProductService.Controllers
+{
+  [Route("api/[controller]")]
+  public class ProductController : Controller
+  {
+    private readonly IProductRepository _productRepository;
+    public ProductController() => _productRepository =
+    new ProductRepository(new ProductContext());
+    public ProductController(IProductRepository 
+    productRepository) => _productRepository = 
+    productRepository;
+    [HttpGet]
+    public async Task<IEnumerable<Product>> Get() =>
+    await _productRepository.GetAll().SelectMany(p => p).ToArray();
+  }
+}
+```
 
 最终的结构看起来与以下解决方案资源管理器截图相似：
 
 ![](img/96684d1a-efe5-41b0-96b2-e6c1984d3245.png)
 
-要创建数据库，您可以参考[第2章](Implementing%20Microservices)，*实现微服务*中的*EF Core迁移*部分，或者简单地调用我们新部署的服务中的Get API。当服务发现数据库不存在时，在这种情况下，Entity Framework Core代码优先的方法将确保数据库被创建。
+要创建数据库，您可以参考第二章，*实现微服务*中的*EF Core 迁移*部分，或者简单地调用我们新部署的服务中的 Get API。当服务发现数据库不存在时，在这种情况下，Entity Framework Core 代码优先的方法将确保数据库被创建。
 
 我们现在可以继续部署这项服务到我们的客户那里。随着我们的反应式微服务部署完成，我们现在需要一个客户来调用它。
 
 # 客户端 – 编码实现
 
-我们将使用AutoRest的帮助创建一个用于消费我们新部署的反应式微服务的Web客户端。让我们为它创建一个控制台应用程序，并添加以下NuGet包：`Reactive.Core`、`WebApi.Client`、`Microsoft.Rest.ClientRuntime`和`Newtonsoft.Json`：
+我们将使用 AutoRest 的帮助创建一个用于消费我们新部署的反应式微服务的 Web 客户端。让我们为它创建一个控制台应用程序，并添加以下 NuGet 包：`Reactive.Core`、`WebApi.Client`、`Microsoft.Rest.ClientRuntime`和`Newtonsoft.Json`：
 
-1.  AutoRest将为主项目添加一个名为`Models`的文件夹，并创建模型的产品和类别的副本，就像我们刚刚创建的服务一样。它将内置必要的反序列化支持。
+1.  AutoRest 将为主项目添加一个名为`Models`的文件夹，并创建模型的产品和类别的副本，就像我们刚刚创建的服务一样。它将内置必要的反序列化支持。
 
 1.  `ProductOperations.cs`和`ProductServiceClient.cs`包含了所有调用所需的主要管道。
 
 1.  在`Program.cs`文件的`Main`函数中，按照以下方式更改`Main`函数：
 
-[PRE6]
+```cs
+ static void Main(string[] args)
+ {
+   var client = new ProductServiceClient {BaseUri = 
+   new Uri("http://localhost:22651/")};
+   var products = client.Product.Get();
+   Console.WriteLine($"Total count {products.Count}");
+   foreach (var product in products)
+   {
+     Console.WriteLine($"ProductId:{product.Id},Name:
+     {product.Name}");
+   }
+   Console.Write("Press any key to continue ....");
+   Console.ReadLine();
+ }  
+```
 
-在这一点上，如果数据库尚未创建，那么它将根据Entity Framework的要求自动创建。
+在这一点上，如果数据库尚未创建，那么它将根据 Entity Framework 的要求自动创建。
 
 我们需要了解从我们的微服务返回的这个列表与常规列表有何不同。答案是，如果这是一个非响应式场景，并且你对列表进行了任何更改，这些更改将不会反映在服务器上。在响应式微服务的情况下，对这样一个列表所做的更改将自动持久化到服务器，而无需手动跟踪和更新更改的过程。
 
-你可以使用任何其他客户端来执行Web API调用（例如，RestSharp或HttpClient）。
+你可以使用任何其他客户端来执行 Web API 调用（例如，RestSharp 或 HttpClient）。
 
 你可能已经注意到，在处理混乱的回调时，我们几乎不需要做任何工作，或者根本不需要做。这有助于保持我们的代码干净且易于维护。在使用可观察者时，当值可用时，是生产者推动这些值。此外，还有一个客户不意识到的区别：你的实现是阻塞的还是非阻塞的。对于客户来说，这一切似乎都是异步的。
 
@@ -242,6 +375,6 @@ Entity Framework Core上下文有助于查询数据库。它还帮助我们汇�
 
 # 摘要
 
-在本章中，我们将响应式编程的方面添加到了我们的基于微服务的架构中。这种微服务之间通信的消息驱动方法有其权衡。然而，同时，这种方法在进一步推进我们的微服务架构时，往往能解决一些基本问题。事件溯源模式出现并帮助我们克服了ACID事务或两阶段提交选项的限制。这个主题需要一本书来专门讨论，将其限制在一个章节中是不公正的。我们使用我们的示例应用程序来了解如何以响应式的方式重构我们的初始微服务。
+在本章中，我们将响应式编程的方面添加到了我们的基于微服务的架构中。这种微服务之间通信的消息驱动方法有其权衡。然而，同时，这种方法在进一步推进我们的微服务架构时，往往能解决一些基本问题。事件溯源模式出现并帮助我们克服了 ACID 事务或两阶段提交选项的限制。这个主题需要一本书来专门讨论，将其限制在一个章节中是不公正的。我们使用我们的示例应用程序来了解如何以响应式的方式重构我们的初始微服务。
 
 在下一章中，我们将有一个完整的应用程序供我们探索，并将我们在本书中迄今为止讨论的所有内容整合在一起。

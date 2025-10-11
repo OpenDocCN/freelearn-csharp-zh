@@ -12,9 +12,9 @@
 
 # 技术要求
 
-本章是实践性的；你需要对Unity和C#有基本的了解。
+本章是实践性的；你需要对 Unity 和 C#有基本的了解。
 
-我们将使用以下特定的Unity引擎和C#语言概念：
+我们将使用以下特定的 Unity 引擎和 C#语言概念：
 
 +   预制体
 
@@ -24,13 +24,13 @@
 
 如果你对这些概念不熟悉，请在开始本章之前复习它们。
 
-本章的代码文件可以在GitHub上找到：
+本章的代码文件可以在 GitHub 上找到：
 
-[https://github.com/PacktPublishing/Hands-On-Game-Development-Patterns-with-Unity-2018](https://github.com/PacktPublishing/Hands-On-Game-Development-Patterns-with-Unity-2018)
+[`github.com/PacktPublishing/Hands-On-Game-Development-Patterns-with-Unity-2018`](https://github.com/PacktPublishing/Hands-On-Game-Development-Patterns-with-Unity-2018)
 
 观看以下视频，看看代码的实际应用：
 
-[http://bit.ly/2WutcB2](http://bit.ly/2WutcB2)
+[`bit.ly/2WutcB2`](http://bit.ly/2WutcB2)
 
 # 对象池模式的概述
 
@@ -46,7 +46,7 @@
 
 # 优点和缺点
 
-对象池模式在Unity开发者中相当受欢迎，但在更广泛的软件开发社区中也有其批评者：
+对象池模式在 Unity 开发者中相当受欢迎，但在更广泛的软件开发社区中也有其批评者：
 
 **优点**：
 
@@ -56,11 +56,11 @@
 
 **缺点**:
 
-+   **在已管理的内存上分层**：有些人批评对象池模式在大多数情况下是不必要的，因为现代托管编程语言如C#已经最优地控制内存分配。
++   **在已管理的内存上分层**：有些人批评对象池模式在大多数情况下是不必要的，因为现代托管编程语言如 C#已经最优地控制内存分配。
 
 +   **不可预测的对象状态**：对象池模式的主要缺陷在于，如果管理不当，对象将不会返回到其默认状态，而是返回到当前状态。这可能导致在下次从池中取出对象时出现不可预测的行为，因为对象可能处于意外的状态。
 
-对比于普通的PC或游戏机，对象池对于移动游戏来说具有很多附加价值，因为手机内存和资源有限。
+对比于普通的 PC 或游戏机，对象池对于移动游戏来说具有很多附加价值，因为手机内存和资源有限。
 
 # 用例示例
 
@@ -74,15 +74,15 @@
 
 但是，重要的是要考虑的是，每次我们的玩家杀死其中一个僵尸时，我们不必在内存中销毁被击败僵尸的实例，而是可以将其送回对象池，以便之后再次使用。采用这种方法，我们正在回收僵尸类型的实体，而不是初始化新的实体。
 
-在下一节中，我们将实现此用例并对其进行调整，以便它与Unity的GameObject一起工作。
+在下一节中，我们将实现此用例并对其进行调整，以便它与 Unity 的 GameObject 一起工作。
 
 # 代码示例
 
-仅通过阅读代码可能难以理解本章内容，因为我们正在场景内部管理预制体。因此，我们建议您在我们的Git仓库[https://github.com/PacktPublishing/Hands-On-Game-Development-Patterns-with-Unity-2018](https://github.com/PacktPublishing/Hands-On-Game-Development-Patterns-with-Unity-2018)上下载与本书相关的Unity项目。
+仅通过阅读代码可能难以理解本章内容，因为我们正在场景内部管理预制体。因此，我们建议您在我们的 Git 仓库[`github.com/PacktPublishing/Hands-On-Game-Development-Patterns-with-Unity-2018`](https://github.com/PacktPublishing/Hands-On-Game-Development-Patterns-with-Unity-2018)上下载与本书相关的 Unity 项目。
 
-在Unity项目中，应该有一个名为Object Pool的文件夹，其中包含一个场景，该场景将包含运行此示例所需的全部依赖项。
+在 Unity 项目中，应该有一个名为 Object Pool 的文件夹，其中包含一个场景，该场景将包含运行此示例所需的全部依赖项。
 
-但是，如果GitHub地址不可用，以下是一个快速步骤列表，用于在Unity场景中执行以下代码示例：
+但是，如果 GitHub 地址不可用，以下是一个快速步骤列表，用于在 Unity 场景中执行以下代码示例：
 
 1.  打开一个新的场景，添加一个空的`GameObject`，并将其命名为`Object Pool`。
 
@@ -90,15 +90,54 @@
 
 +   `Runner`:
 
-[PRE0]
+```cs
+using UnityEngine;
+
+namespace Zombie
+{
+    public class Runner : MonoBehaviour
+    {
+        public void Run()
+        {
+            // Zombie runs!
+        }
+    }
+}
+```
 
 +   `Walker`:
 
-[PRE1]
+```cs
+using UnityEngine;
+
+namespace Zombie
+{
+    public class Walk: MonoBehaviour
+    {
+        public void Walk()
+        {
+            // Zombie walks!
+        }
+    }
+}
+```
 
 +   `Screamer`:
 
-[PRE2]
+```cs
+using UnityEngine;
+
+namespace Zombie
+{
+    public class Screamer : MonoBehaviour
+    {
+        public void Scream()
+        {
+            // Zombie screams!
+        }
+    }
+}
+```
 
 1.  将`ObjectPool`脚本附加到`GameObject`对象池。
 
@@ -108,7 +147,109 @@
 
 现在，是我们编写`ObjectPool`类的时候了。正如你将看到的，它相当长，因此我们阅读它并随后审查其核心功能是至关重要的：
 
-[PRE3]
+```cs
+using UnityEngine;
+using System.Collections.Generic;
+
+public class ObjectPool : Singleton<ObjectPool>
+{
+        // The objects to pool.
+        public GameObject[] objects;
+
+        // The list of pooled objects.
+        public List<GameObject>[] pooledObjects;
+
+        // The amount of objects to buffer.
+        public int[] amountToBuffer;
+
+        public int defaultBufferAmount = 3;
+
+        // The container of pooled objects.
+        protected GameObject containerObject;
+
+        void Start()
+        {
+            containerObject = new GameObject("ObjectPool");
+            pooledObjects = new List<GameObject>[objects.Length];
+
+            int i = 0;
+            foreach (GameObject obj in objects)
+            {
+                pooledObjects[i] = new List<GameObject>();
+
+                int bufferAmount;
+
+                if (i < amountToBuffer.Length)
+                {
+                    bufferAmount = amountToBuffer[i];
+                }
+                else
+                {
+                    bufferAmount = defaultBufferAmount;
+                }
+
+                for (int n = 0; n < bufferAmount; n++)
+                {
+                    GameObject newObj = Instantiate(obj) as GameObject;
+                    newObj.name = obj.name;
+                    PoolObject(newObj);
+                }
+
+                i++;
+            }
+        }
+
+        // Pull an object of a specific type from the pool.
+        public GameObject PullObject(string objectType)
+        {
+            bool onlyPooled = false;
+            for (int i = 0; i < objects.Length; i++)
+            {
+                GameObject prefab = objects[i];
+
+                if (prefab.name == objectType)
+                {
+                    if (pooledObjects[i].Count > 0)
+                    {
+                        GameObject pooledObject = pooledObjects[i][0];
+                        pooledObject.SetActive(true);
+                        pooledObject.transform.parent = null;
+
+                        pooledObjects[i].Remove(pooledObject);
+
+                        return pooledObject;
+                    }
+                    else if (!onlyPooled)
+                    {
+                        return Instantiate(objects[i]) as GameObject;
+                    }
+
+                    break;
+                }
+            }
+
+            // Null if there's a hit miss.
+            return null;
+        }
+
+        // Add object of a specific type to the pool.
+        public void PoolObject(GameObject obj)
+        {
+            for (int i = 0; i < objects.Length; i++)
+            {
+                if (objects[i].name == obj.name)
+                {
+                    obj.SetActive(false);
+                    obj.transform.parent = containerObject.transform;
+                    pooledObjects[i].Add(obj);
+                    return;
+                }
+            }
+
+            Destroy(obj);
+        }
+    }
+```
 
 因此，以下是对`ObjectPool`类中每个函数所发生情况的快速概述：
 
@@ -118,23 +259,52 @@
 
 +   `PoolObject()`: 客户端可以使用此函数将对象实例返回到池中。`ObjectPool`将使返回的对象失效，并将其作为子对象附加回自身，以便将其包含在内。
 
-我们还可以看到，我们的`ObjectPool`类是一个单例；这是一种常见的做法，因为我们通常需要全局访问对象池，并且始终可用。要了解如何实现单例，请参阅第6章，*单例*。
+我们还可以看到，我们的`ObjectPool`类是一个单例；这是一种常见的做法，因为我们通常需要全局访问对象池，并且始终可用。要了解如何实现单例，请参阅第六章，*单例*。
 
 下一步是使用`Client`类测试我们的`ObjectPool`：
 
-[PRE4]
+```cs
+using UnityEngine;
+
+public class Client : MonoBehaviour
+{
+    void Update()
+    {
+            if (Input.GetKeyDown(KeyCode.G))
+            {
+                GameObject walker = ObjectPool.Instance.PullObject("Walker");
+                walker.transform.Translate(Vector3.forward * Random.Range(-5.0f, 5.0f));
+                walker.transform.Translate(Vector3.right * Random.Range(-5.0f, 5.0f));
+            }
+
+            if (Input.GetKeyDown(KeyCode.P))
+            {
+                object[] objs = GameObject.FindObjectsOfType(typeof(GameObject));
+
+                foreach (object o in objs)
+                {
+                    GameObject obj = (GameObject)o;
+
+                    if (obj.gameObject.GetComponent<Zombie.Walker>() != null)
+                    {
+                        ObjectPool.Instance.PoolObject(obj);
+                    }
+                }
+            }
+        }
+```
 
 我们的`Client`类相当简单：
 
-+   如果玩家按下*G*键，我们从`ObjectPool`请求一个Walker僵尸的实例。然后，我们将它随机放置在场景中。
++   如果玩家按下*G*键，我们从`ObjectPool`请求一个 Walker 僵尸的实例。然后，我们将它随机放置在场景中。
 
-+   如果玩家按下*P*键，我们将场景中当前的所有Walker对象送回池中。
++   如果玩家按下*P*键，我们将场景中当前的所有 Walker 对象送回池中。
 
 就这样；通过一个类，我们可以实现一个简单、可配置和可扩展的对象池。
 
 # 摘要
 
-我们刚刚将对象池模式添加到我们的工具箱中；这是Unity开发者最有用的模式之一，因为我们从代码示例中看到，我们可以轻松地回收场景中已经存在的GameObject，而无需初始化新的GameObject。当处理包含大量数据和组件的巨大预制体时，此模式可以帮助你避免不稳定的帧率。
+我们刚刚将对象池模式添加到我们的工具箱中；这是 Unity 开发者最有用的模式之一，因为我们从代码示例中看到，我们可以轻松地回收场景中已经存在的 GameObject，而无需初始化新的 GameObject。当处理包含大量数据和组件的巨大预制体时，此模式可以帮助你避免不稳定的帧率。
 
 在下一章中，我们将探讨空间分区模式——这是构建开放世界游戏时理解的一个重要主题。
 
@@ -144,4 +314,4 @@
 
 # 进一步阅读
 
-+   《*游戏编程模式*》由罗伯特·尼斯特罗姆[http://gameprogrammingpatterns.com](http://gameprogrammingpatterns.com/)
++   《*游戏编程模式*》由罗伯特·尼斯特罗姆[`gameprogrammingpatterns.com`](http://gameprogrammingpatterns.com/)

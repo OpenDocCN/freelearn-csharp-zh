@@ -1,10 +1,10 @@
 使用访问者模式实现升级
 
-在本章中，我们将为我们的游戏实现一个升级机制。自游戏早期开始，升级一直是视频游戏的核心成分之一。第一个实现升级的游戏之一是1980年的*吃豆人*。在游戏中，你可以吃掉能量豆，使Pac-Man获得暂时的无敌状态。另一个经典例子是*马里奥兄弟*中的蘑菇，它使马里奥变得更高大更强壮。
+在本章中，我们将为我们的游戏实现一个升级机制。自游戏早期开始，升级一直是视频游戏的核心成分之一。第一个实现升级的游戏之一是 1980 年的*吃豆人*。在游戏中，你可以吃掉能量豆，使 Pac-Man 获得暂时的无敌状态。另一个经典例子是*马里奥兄弟*中的蘑菇，它使马里奥变得更高大更强壮。
 
 我们将要构建的升级成分将与经典类似，但具有更多的粒度。我们不仅可以使一个实体的单一能力得到升级，还可以创建组合，一次提供多个好处。例如，我们可以有一个名为“**保护者**”的升级，它增加了面向前方的护盾的耐久性，并增加了主要武器的强度。
 
-因此，在本章中，我们将实现一个可扩展和可配置的升级机制，不仅对我们程序员来说如此，而且对于可能被分配创建和调整独特升级成分的设计师来说也是如此。我们将通过结合访问者模式和独特的Unity API功能ScriptableObjects来实现这一点。
+因此，在本章中，我们将实现一个可扩展和可配置的升级机制，不仅对我们程序员来说如此，而且对于可能被分配创建和调整独特升级成分的设计师来说也是如此。我们将通过结合访问者模式和独特的 Unity API 功能 ScriptableObjects 来实现这一点。
 
 本章将涵盖以下主题：
 
@@ -12,21 +12,21 @@
 
 +   为赛车游戏实现一个升级机制
 
-为了简化代码示例并提高可读性，本节包含了一些简化的代码示例。如果你希望在真实游戏项目的上下文中查看完整的实现，请打开GitHub项目中的`FPP`文件夹，该链接可以在*技术要求*部分找到。
+为了简化代码示例并提高可读性，本节包含了一些简化的代码示例。如果你希望在真实游戏项目的上下文中查看完整的实现，请打开 GitHub 项目中的`FPP`文件夹，该链接可以在*技术要求*部分找到。
 
 # 技术要求
 
-本章是实践性的。你需要对Unity和C#有一个基本的了解。我们将使用以下Unity引擎和C#语言概念：
+本章是实践性的。你需要对 Unity 和 C#有一个基本的了解。我们将使用以下 Unity 引擎和 C#语言概念：
 
 +   接口
 
 +   ScriptableObjects
 
-如果你对这些概念不熟悉，请在开始本章之前复习它们。本章的代码文件可以在[https://github.com/PacktPublishing/Game-Development-Patterns-with-Unity-2021-Second-Edition/tree/main/Assets/Chapters/Chapter10](https://github.com/PacktPublishing/Game-Development-Patterns-with-Unity-2021-Second-Edition/tree/main/Assets/Chapters/Chapter10)找到[.](https://github.com/PacktPublishing/Game-Development-Patterns-with-Unity-2021-Second-Edition/tree/main/Assets/Chapters/Chapter10)
+如果你对这些概念不熟悉，请在开始本章之前复习它们。本章的代码文件可以在[`github.com/PacktPublishing/Game-Development-Patterns-with-Unity-2021-Second-Edition/tree/main/Assets/Chapters/Chapter10`](https://github.com/PacktPublishing/Game-Development-Patterns-with-Unity-2021-Second-Edition/tree/main/Assets/Chapters/Chapter10)找到[.](https://github.com/PacktPublishing/Game-Development-Patterns-with-Unity-2021-Second-Edition/tree/main/Assets/Chapters/Chapter10)
 
-查看以下视频以查看代码的实际效果：[https://bit.ly/3eeknGC](https://bit.ly/3eeknGC)[.](https://bit.ly/3eeknGC)
+查看以下视频以查看代码的实际效果：[`bit.ly/3eeknGC`](https://bit.ly/3eeknGC)[.](https://bit.ly/3eeknGC)
 
-我们在这本书的代码示例中经常使用ScriptableObjects，因为在构建游戏系统和机制时，使非程序员能够轻松配置它们是至关重要的。平衡系统和编写新成分的过程通常属于游戏和关卡设计师的责任。因此，我们使用ScriptableObjects，因为它提供了一种一致的方式来建立创作管道，以创建和配置游戏中的资产。
+我们在这本书的代码示例中经常使用 ScriptableObjects，因为在构建游戏系统和机制时，使非程序员能够轻松配置它们是至关重要的。平衡系统和编写新成分的过程通常属于游戏和关卡设计师的责任。因此，我们使用 ScriptableObjects，因为它提供了一种一致的方式来建立创作管道，以创建和配置游戏中的资产。
 
 # 理解访问者模式
 
@@ -38,7 +38,7 @@
 
 ![图片](img/84326d4d-0653-464b-9d6c-eb5f5d361c0f.png)
 
-图10.1 - 访问者模式的UML图
+图 10.1 - 访问者模式的 UML 图
 
 在这个模式中，我们需要熟悉两个关键参与者：
 
@@ -80,7 +80,7 @@
 
 注意，这些规范仅限于以下代码示例，但并非最终版本。我们可以轻松地将增强效果的益处设置为临时性的，或者通过修改下一节中展示的代码示例的微小变化来改变整个机制的整体设计。
 
-我们的水平设计师将在赛道上的战略点上定位增强效果；它们将具有在高速下易于识别的3D形状。玩家必须与增强效果发生碰撞以激活其包含的能力和益处。
+我们的水平设计师将在赛道上的战略点上定位增强效果；它们将具有在高速下易于识别的 3D 形状。玩家必须与增强效果发生碰撞以激活其包含的能力和益处。
 
 我们将结合使用访问者模式和 ScriptableObjects 来实现这个游戏机制，以便设计师可以编写新的提升变体，而无需编写任何代码。
 
@@ -96,19 +96,107 @@
 
 1.  我们将首先编写模式的核心元素，即 `Visitor` 接口：
 
-[PRE0]
+```cs
+namespace Pattern.Visitor
+{
+    public interface IVisitor
+    { 
+        void Visit(BikeShield bikeShield);
+        void Visit(BikeEngine bikeEngine);
+        void Visit(BikeWeapon bikeWeapon);
+    }
+}
+```
 
 1.  接下来，我们将编写一个接口，每个可访问元素都必须实现：
 
-[PRE1]
+```cs
+namespace Pattern.Visitor
+{
+    public interface IBikeElement
+    { 
+        void Accept(IVisitor visitor);
+    }
+}
+```
 
 1.  现在我们已经有了主要接口，让我们实现使提升机制工作的主要类；由于其长度，我们将分两部分进行回顾：
 
-[PRE2]
+```cs
+using UnityEngine;
+
+namespace Pattern.Visitor
+{
+    [CreateAssetMenu(fileName = "PowerUp", menuName = "PowerUp")]
+    public class PowerUp : ScriptableObject, IVisitor
+    {
+        public string powerupName;
+        public GameObject powerupPrefab;
+        public string powerupDescription;
+
+        [Tooltip("Fully heal shield")]
+        public bool healShield;
+
+        [Range(0.0f, 50f)]
+        [Tooltip(
+            "Boost turbo settings up to increments of 50/mph")]
+        public float turboBoost;
+
+        [Range(0.0f, 25)]
+        [Tooltip(
+            "Boost weapon range in increments of up to 25 units")]
+        public int weaponRange;
+
+        [Range(0.0f, 50f)]
+        [Tooltip(
+            "Boost weapon strength in increments of up to 50%")]
+        public float weaponStrength;
+
+```
 
 首先要注意的是，这个类是一个带有 `CreateAssetMenu` 属性的 `ScriptableObject` 类。因此，我们将能够从资产菜单中创建新的提升资产。然后，我们可以在引擎的检查器中配置每个新提升的参数。但另一个重要的细节是，这个类实现了 `IVisitor` 接口，我们将在下一部分进行回顾：
 
-[PRE3]
+```cs
+        public void Visit(BikeShield bikeShield) 
+        {
+            if (healShield) 
+                bikeShield.health = 100.0f;
+        } 
+
+        public void Visit(BikeWeapon bikeWeapon) 
+        {
+            int range = bikeWeapon.range += weaponRange;
+
+            if (range >= bikeWeapon.maxRange)
+                bikeWeapon.range = bikeWeapon.maxRange;
+            else
+                bikeWeapon.range = range;
+
+            float strength = 
+                bikeWeapon.strength += 
+                    Mathf.Round(
+                        bikeWeapon.strength 
+                        * weaponStrength / 100);
+
+            if (strength >= bikeWeapon.maxStrength)
+                bikeWeapon.strength = bikeWeapon.maxStrength;
+            else
+                bikeWeapon.strength = strength;
+        }
+
+        public void Visit(BikeEngine bikeEngine)
+        {
+            float boost = bikeEngine.turboBoost += turboBoost;
+
+            if (boost < 0.0f)
+                bikeEngine.turboBoost = 0.0f;
+
+            if (boost >= bikeEngine.maxTurboBoost)
+                bikeEngine.turboBoost = bikeEngine.maxTurboBoost;
+        }
+    }
+}
+```
 
 如我们所见，对于每个可访问元素，我们都有一个与之关联的独特方法；在它们内部，我们实现了在访问特定元素时要执行的操作。
 
@@ -118,7 +206,39 @@
 
 1.  接下来是 `BikeController` 类，它负责控制构成自行车结构的自行车关键组件：
 
-[PRE4]
+```cs
+using UnityEngine;
+using System.Collections.Generic;
+
+namespace Pattern.Visitor
+{
+    public class BikeController : MonoBehaviour, IBikeElement
+    {
+        private List<IBikeElement> _bikeElements = 
+            new List<IBikeElement>();
+
+        void Start()
+        {
+            _bikeElements.Add(
+                gameObject.AddComponent<BikeShield>());
+
+            _bikeElements.Add(
+                gameObject.AddComponent<BikeWeapon>());
+
+            _bikeElements.Add(
+                gameObject.AddComponent<BikeEngine>());
+        }
+
+        public void Accept(IVisitor visitor)
+        {
+            foreach (IBikeElement element in _bikeElements)
+            {
+                element.Accept(visitor);
+            }
+        }
+    }
+}
+```
 
 注意，该类正在实现 `IBikeElement` 接口的 `Accept()` 方法。当自行车与位于赛道上的提升物品相撞时，将自动调用此方法。通过此方法，提升实体将能够将访客对象传递给 `BikeController`。
 
@@ -126,31 +246,176 @@
 
 1.  现在是时候实现我们各自的访问元素了，从我们的骨骼 `BikeWeapon` 类开始：
 
-[PRE5]
+```cs
+using UnityEngine;
+
+namespace Pattern.Visitor
+{
+    public class BikeWeapon : MonoBehaviour, IBikeElement
+    {
+        [Header("Range")]
+        public int range = 5; 
+        public int maxRange = 25;
+
+        [Header("Strength")]
+        public float strength = 25.0f;
+        public float maxStrength = 50.0f;
+
+        public void Fire()
+        {
+            Debug.Log("Weapon fired!");
+        }
+
+        public void Accept(IVisitor visitor)
+        {
+            visitor.Visit(this);
+        }
+
+        void OnGUI() 
+        {
+            GUI.color = Color.green;
+
+            GUI.Label(
+                new Rect(125, 40, 200, 20), 
+                "Weapon Range: " + range);
+
+            GUI.Label(
+                new Rect(125, 60, 200, 20), 
+                "Weapon Strength: " + strength);
+        }
+    }
+}
+```
 
 1.  以下是`BikeEngine`类；请注意，在完整的实现中，这个类将负责模拟一些引擎的行为，包括激活涡轮增压，管理冷却系统，以及控制速度：
 
-[PRE6]
+```cs
+using UnityEngine;
+
+namespace Pattern.Visitor
+{
+    public class BikeEngine : MonoBehaviour, IBikeElement
+    {
+        public float turboBoost = 25.0f; // mph
+        public float maxTurboBoost = 200.0f;
+
+        private bool _isTurboOn;
+        private float _defaultSpeed = 300.0f; // mph
+
+        public float CurrentSpeed
+        {
+            get
+            {
+                if (_isTurboOn) 
+                    return _defaultSpeed + turboBoost;
+                return _defaultSpeed;
+            }
+        }
+
+        public void ToggleTurbo()
+        {
+            _isTurboOn = !_isTurboOn;
+        }
+
+        public void Accept(IVisitor visitor)
+        {
+            visitor.Visit(this);
+        }
+
+        void OnGUI() 
+        {
+            GUI.color = Color.green;
+
+            GUI.Label(
+                new Rect(125, 20, 200, 20), 
+                "Turbo Boost: " + turboBoost);
+        }
+    }
+}
+```
 
 1.  最后，`BikeShield`的名称暗示了其主要功能，其实现如下：
 
-[PRE7]
+```cs
+using UnityEngine;
+
+namespace Pattern.Visitor
+{
+    public class BikeShield : MonoBehaviour, IBikeElement
+    { 
+        public float health = 50.0f; // Percentage
+
+        public float Damage(float damage)
+        {
+            health -= damage;
+            return health;
+        }
+
+        public void Accept(IVisitor visitor)
+        {
+            visitor.Visit(this);
+        }
+
+        void OnGUI() 
+        {
+            GUI.color = Color.green;
+
+            GUI.Label(
+                new Rect(125, 0, 200, 20), 
+                "Shield Health: " + health);
+        }
+    }
+}
+```
 
 如我们所见，每个单独的可访问自行车元素类都实现了`Accept()`方法，从而使自己变得可访问。
 
 ## 测试`PowerUp`系统实现
 
-要快速测试您自己的Unity实例中的实现，您需要遵循以下步骤：
+要快速测试您自己的 Unity 实例中的实现，您需要遵循以下步骤：
 
-1.  将我们刚刚审查的所有脚本复制到您的Unity项目中。
+1.  将我们刚刚审查的所有脚本复制到您的 Unity 项目中。
 
 1.  创建一个新的场景。
 
-1.  将一个GameObject添加到场景中。
+1.  将一个 GameObject 添加到场景中。
 
-1.  将以下`ClientVisitor`脚本附加到新的GameObject上：
+1.  将以下`ClientVisitor`脚本附加到新的 GameObject 上：
 
-[PRE8]
+```cs
+using UnityEngine;
+
+namespace Pattern.Visitor
+{
+    public class ClientVisitor : MonoBehaviour
+    {
+        public PowerUp enginePowerUp;
+        public PowerUp shieldPowerUp;
+        public PowerUp weaponPowerUp;
+
+        private BikeController _bikeController;
+
+        void Start()
+        {
+            _bikeController = 
+                gameObject.
+                    AddComponent<BikeController>();
+        }
+
+        void OnGUI()
+        {
+            if (GUILayout.Button("PowerUp Shield"))
+                _bikeController.Accept(shieldPowerUp);
+
+            if (GUILayout.Button("PowerUp Engine"))
+                _bikeController.Accept(enginePowerUp);
+
+            if (GUILayout.Button("PowerUp Weapon"))
+                _bikeController.Accept(weaponPowerUp);
+        }
+    }
+}
+```
 
 1.  转到**资产/创建**菜单选项并创建三个`PowerUp`资产。
 
@@ -160,27 +425,44 @@
 
 1.  将新的`PowerUp`资产添加到`ClientVisitor`组件的公共属性中。
 
-一旦开始场景，您应该在屏幕上看到以下GUI按钮和调试输出：
+一旦开始场景，您应该在屏幕上看到以下 GUI 按钮和调试输出：
 
 ![图片](img/c84cf0c5-925b-4d5f-af9f-4cd806b5e0ee.png)
 
-图10.2 - 代码示例运行时的截图
+图 10.2 - 代码示例运行时的截图
 
 但你可能想知道，我该如何创建一个实际的拾取实体，我可以在赛道上生成它？
 
 做这件事的一个快速方法是简单地创建一个类似于以下的`Pickup`类：
 
-[PRE9]
+```cs
+using System;
+using UnityEngine;
 
-通过将此脚本附加到一个配置为触发器的碰撞器组件的GameObject上，我们可以检测具有`BikeController`组件的实体何时进入触发器。然后我们只需调用它的`Accept()`方法并传递`PowerUp`实例。设置触发器超出了本章的范围，但我建议查看Git仓库中的FPP项目，以了解我们如何在游戏的可玩原型中设置它。
+public class Pickup : MonoBehaviour
+{
+    public PowerUp powerup;
+
+    private void OnTriggerEnter(Collider other)
+    {
+        if (other.GetComponent<BikeController>())
+        {
+            other.GetComponent<BikeController>().Accept(powerup);
+            Destroy(gameObject);
+        }
+    }
+}
+```
+
+通过将此脚本附加到一个配置为触发器的碰撞器组件的 GameObject 上，我们可以检测具有`BikeController`组件的实体何时进入触发器。然后我们只需调用它的`Accept()`方法并传递`PowerUp`实例。设置触发器超出了本章的范围，但我建议查看 Git 仓库中的 FPP 项目，以了解我们如何在游戏的可玩原型中设置它。
 
 ## 检查`PowerUp`系统实现
 
-我们能够结合访问者模式的结构和ScriptableObjects的API功能，创建一个允许我们项目中的任何人为其编写和配置新的`PowerUp`而无需编写任何代码的机制。
+我们能够结合访问者模式的结构和 ScriptableObjects 的 API 功能，创建一个允许我们项目中的任何人为其编写和配置新的`PowerUp`而无需编写任何代码的机制。
 
 如果我们需要调整`PowerUp`对我们车辆各个组件的影响，我们可以通过修改单个类来实现。因此，总的来说，我们在保持代码易于维护的同时，实现了一定程度的可扩展性。
 
-本书中对标准软件设计模式的实现是实验性的，并且以创新的方式进行了调整。我们将它们调整为利用Unity API功能，并调整以适应游戏开发用例。因此，我们不应将示例视为学术或标准化的参考，而应将其视为解释。
+本书中对标准软件设计模式的实现是实验性的，并且以创新的方式进行了调整。我们将它们调整为利用 Unity API 功能，并调整以适应游戏开发用例。因此，我们不应将示例视为学术或标准化的参考，而应将其视为解释。
 
 # 摘要
 

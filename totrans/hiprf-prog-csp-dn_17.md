@@ -1,4 +1,4 @@
-# *第 14 章*：多线程编程
+# *第十四章*：多线程编程
 
 在本章中，你将学习关于 **多线程编程** 的内容。你将了解线程是什么，以及后台和前台线程。然后，你将学习在运行线程之前如何将数据传递给线程。你还将学习如何暂停、中断、销毁、调度和取消线程。
 
@@ -34,15 +34,13 @@
 
 +   Visual Studio 2022
 
-+   从以下链接获取本书的源代码：[https://github.com/PacktPublishing/High-Performance-Programming-in-CSharp-and-.NET/tree/master/CH14](https://github.com/PacktPublishing/High-Performance-Programming-in-CSharp-and-.NET/tree/master/CH14)。
++   从以下链接获取本书的源代码：[`github.com/PacktPublishing/High-Performance-Programming-in-CSharp-and-.NET/tree/master/CH14`](https://github.com/PacktPublishing/High-Performance-Programming-in-CSharp-and-.NET/tree/master/CH14)。
 
 # 理解线程和线程化
 
 在本节中，我们将了解线程的生命周期。C# 中的线程具有以下生命周期：
 
-![图 14.1 – 线程生命周期
-
-](img/B16617_Figure_14.1.jpg)
+![图 14.1 – 线程生命周期](img/B16617_Figure_14.1.jpg)
 
 图 14.1 – 线程生命周期
 
@@ -68,45 +66,81 @@
 
 以下代码展示了如何创建和运行一个前台线程：
 
-[PRE0]
+```cs
+var foregroundThread = new Thread(methodName);
+```
 
-[PRE1]
+```cs
+foregroundThread.Start();
+```
 
 要创建并运行一个后台线程，你可以运行以下代码：
 
-[PRE2]
+```cs
+var backgroundThread = new Thread(methodName);
+```
 
-[PRE3]
+```cs
+backgroundThread.IsBackground = true;
+```
 
-[PRE4]
+```cs
+backgroundThread.Start();
+```
 
 你刚才看到的生成前台和后台线程的两种代码版本都没有使用参数来创建线程。以下代码展示了如何使用参数创建线程：
 
-[PRE5]
+```cs
+static void ThreadCreationWithParameters()
+```
 
-[PRE6]
+```cs
+{
+```
 
-[PRE7]
+```cs
+    int result = 0;
+```
 
-[PRE8]
+```cs
+    Thread thread = new Thread(() => { result = Add(1, 2); );
+```
 
-[PRE9]
+```cs
+    thread.Start();
+```
 
-[PRE10]
+```cs
+    thread.Join();
+```
 
-[PRE11]
+```cs
+    Console.WriteLine($"The addition of 1 plus 2 is 
+```
 
-[PRE12]
+```cs
+        {result}." + $"");
+```
 
-[PRE13]
+```cs
+}
+```
 
-[PRE14]
+```cs
+static int Add(int a, int b)
+```
 
-[PRE15]
+```cs
+{
+```
 
-[PRE16]
+```cs
+    return a + b;
+```
 
-[PRE17]
+```cs
+}
+```
 
 如前述代码所示，线程用于计算两个数字的和并返回结果。线程调用`Add`方法并将要相加的两个整数传递给它。方法调用和结果都放置在传递给线程构造函数的匿名函数中。
 
@@ -116,41 +150,63 @@
 
 你可以按照以下方式在线程池中创建线程：
 
-[PRE18]
+```cs
+ThreadPool
+```
 
-[PRE19]
+```cs
+     .QueueUserWorkItem(
+```
 
-[PRE20]
+```cs
+         new WaitCallback(ThreadPoolWorkerMethod)
+```
 
-[PRE21]
+```cs
+     );
+```
 
-使用线程池时要注意的是，首次使用时，它们没有历史记录，但随时间推移，它们会调整自己以提高线程池性能。对于使用大量线程并对CPU造成重负载的应用程序，它们可能会遇到高昂的启动成本。线程必须被创建并可供线程池使用。这可能导致线程池必须等待直到那些线程可用。在启动时可以进行的一种性能调整是设置最小线程数。以下代码展示了如何设置最小线程数：
+使用线程池时要注意的是，首次使用时，它们没有历史记录，但随时间推移，它们会调整自己以提高线程池性能。对于使用大量线程并对 CPU 造成重负载的应用程序，它们可能会遇到高昂的启动成本。线程必须被创建并可供线程池使用。这可能导致线程池必须等待直到那些线程可用。在启动时可以进行的一种性能调整是设置最小线程数。以下代码展示了如何设置最小线程数：
 
-[PRE22]
+```cs
+const int WorkerThreads = 12;
+```
 
-[PRE23]
+```cs
+const int CompletionPortThreads = 12;
+```
 
-[PRE24]
+```cs
+ThreadPool.SetMinThreads(WorkerThreads, 
+```
 
-[PRE25]
+```cs
+    CompletionPortThreads);
+```
 
-`WorkerThreads`值是`ThreadPool`按需创建的最小工作线程数。`CompletionPortThreads`值是`ThreadPool`按需创建的异步I/O线程数。
+`WorkerThreads`值是`ThreadPool`按需创建的最小工作线程数。`CompletionPortThreads`值是`ThreadPool`按需创建的异步 I/O 线程数。
 
 除了设置最小线程数之外，你还可以设置最大线程数，如下所示：
 
-[PRE26]
+```cs
+const int WorkerThreads = 12;
+```
 
-[PRE27]
+```cs
+const int CompletionPortThreads = 12;
+```
 
-[PRE28]
+```cs
+ThreadPool.SetMaxThreads(WorkerThreads, CompletionPortThreads);
+```
 
-为了让这些设置有助于应用程序性能，您需要正确设置它们。否则，您可能会创建过多的线程并过度调度任务。这将通过增加上下文切换来降低性能，这将增加CPU的负载。`ThreadPool`足够智能，一旦收集到历史数据，就会切换到一种算法，以减少CPU需要完成的工作量。
+为了让这些设置有助于应用程序性能，您需要正确设置它们。否则，您可能会创建过多的线程并过度调度任务。这将通过增加上下文切换来降低性能，这将增加 CPU 的负载。`ThreadPool`足够智能，一旦收集到历史数据，就会切换到一种算法，以减少 CPU 需要完成的工作量。
 
 在设置这些值之前，使用性能监控来监控应用程序的线程使用和上下文切换是一个好主意。您可以使用上下文可视化器进行性能计数器跟踪，这将在下一章中讨论。您还可以使用`ThreadPool.GetMaxThreads`和`ThreadPool.GetMinThreads`方法来帮助您分析设置最小和最大工作线程以及完成端口线程的最佳值。
 
 您还可以设置线程的优先级。然而，您必须非常小心地设置线程优先级，因为它可能对其他线程和其他应用程序产生负面影响。将线程设置为更高的优先级可能会导致低优先级线程饥饿，从而使其很少运行。
 
-只有在需要快速响应事件时，例如异常，您才应考虑将线程优先级更改为高值。当遇到竞态条件时，您可以合法地降低线程的优先级。由于优先级较低而一段时间没有运行的线程最终会运行。这是因为线程的动态优先级会随着Windows在没有运行的情况下时间的增加而提高。
+只有在需要快速响应事件时，例如异常，您才应考虑将线程优先级更改为高值。当遇到竞态条件时，您可以合法地降低线程的优先级。由于优先级较低而一段时间没有运行的线程最终会运行。这是因为线程的动态优先级会随着 Windows 在没有运行的情况下时间的增加而提高。
 
 如果您确实更改了线程的优先级，那么在返回到池中时，其优先级将被重置。然而，一个线程可能用于多个任务。在这种情况下，线程将不会返回到池中，直到这些任务完成。如果优先级设置不正确，这可能会降低应用程序性能和系统性能。
 
@@ -166,35 +222,65 @@
 
 以下代码显示了如何延迟线程：
 
-[PRE29]
+```cs
+static void Main(string[] args)
+```
 
-[PRE30]
+```cs
+{
+```
 
-[PRE31]
+```cs
+     Console.WriteLine($"Current Time: {DateTime.Now}");
+```
 
-[PRE32]
+```cs
+     var delay = Task.Delay(TimeSpan.FromSeconds(5));
+```
 
-[PRE33]
+```cs
+     var duration = 0;
+```
 
-[PRE34]
+```cs
+     while (!delay.IsCompleted)
+```
 
-[PRE35]
+```cs
+     {
+```
 
-[PRE36]
+```cs
+         duration++;
+```
 
-[PRE37]
+```cs
+         Thread.Sleep(TimeSpan.FromSeconds(5));
+```
 
-[PRE38]
+```cs
+         Console.WriteLine($"Slept for {seconds} seconds");
+```
 
-[PRE39]
+```cs
+     }
+```
 
-[PRE40]
+```cs
+     Console.WriteLine($"Delay End:{DateTime.Now} after 
+```
 
-[PRE41]
+```cs
+         {duration} seconds");
+```
 
-[PRE42]
+```cs
+  }
+```
 
-[PRE43]
+```cs
+}
+```
 
 我们创建了一个具有五秒延迟的任务。循环会一直运行，直到延迟完成。
 
@@ -202,27 +288,77 @@
 
 # 销毁和取消线程
 
-终止线程不是一个好主意，因为您并不总是知道线程的状态。如果线程是静态构造函数的一部分，情况可能会变得更糟。使用`Thread.Abort`来终止线程是导致应用程序崩溃的主要原因之一。`Thread.Abort` API现在已过时。因此，建议您使用协作取消模式，定期使用`CancellationToken`检查取消操作。
+终止线程不是一个好主意，因为您并不总是知道线程的状态。如果线程是静态构造函数的一部分，情况可能会变得更糟。使用`Thread.Abort`来终止线程是导致应用程序崩溃的主要原因之一。`Thread.Abort` API 现在已过时。因此，建议您使用协作取消模式，定期使用`CancellationToken`检查取消操作。
 
 在正常情况下，当一个线程被终止时，它将被销毁。线程的取消也会销毁线程。让我们编写一些示例代码，演示如何使用`CancellationToken`在超时时取消同步操作，如下所示：
 
-1.  启动一个新的.NET 6控制台应用程序，并将其命名为CH14_Multithreading。
+1.  启动一个新的.NET 6 控制台应用程序，并将其命名为 CH14_Multithreading。
 
 1.  在`CH14_Multithreading`项目的`Program.cs`文件中，添加以下方法：
 
-    [PRE44]
+    ```cs
+    static bool TryCallWithTimeout<TResult>(
+          Func<CancellationToken, TResult> function,
+          TimeSpan timeout,
+          out TResult result
+    )
+    {
+         var cancellationTokentSource = 
+             new CancellationTokenSource(timeout);
+         try
+         {
+             result = 
+             function(cancellationTokentSource.Token);
+             return true;
+         }
+         catch (TaskCanceledException)
+         {
+         }
+         finally
+         {
+             cancellationTokentSource.Dispose();
+         }
+         result = default;
+         return false;
+    }
+    ```
 
 此方法接收一个在指定超时期间执行的方法，并返回一个结果。`SleepyMethod`被执行，但如果它超过了超时值，则引发`TaskCanceledException`异常，然后`CancellationTokenSource`被释放。
 
 1.  按如下方式添加`SleepyMethod`代码：
 
-    [PRE45]
+    ```cs
+    static int SleepyMethod(CancellationToken ct)
+    {
+        for (var i = 0; i < 10; i++)
+        {
+            Thread.Sleep(TimeSpan.FromMilliseconds(500));
+            if (ct.IsCancellationRequested) { throw new 
+                TaskCanceledException(); }
+        }
+        return 1234567890;
+    }
+    ```
 
 `SleepMethod`接受`CancellationToken`作为参数。然后它循环十次。在每次迭代中，它睡眠半秒钟。然后，它检查是否已请求取消。如果已请求取消，则引发`TaskCanceledException`异常。否则，返回方法的值。
 
 1.  按如下方式添加`SynchronousThreadCancelation`方法：
 
-    [PRE46]
+    ```cs
+    static void SyncrhonousThreadCancelation()
+    {
+         TimeSpan timeoutTimeSpan = TimeSpan
+             .FromMilliseconds(750);
+         bool callResult = TryCallWithTimeout(
+             SleepyMethod,
+             timeoutTimeSpan,
+             out int result
+         );
+         Console.WriteLine($"SleepyMethod() {
+             (callResult ? "Executed" : "Cancelled" )
+         }");
+    }
+    ```
 
 此方法创建了一个持续时间为三分之四秒的超时值。然后调用`TryCallWithTimeout`方法，该方法返回一个布尔值。传递给`TryCallWithTimeout`方法的参数如下：
 
@@ -236,17 +372,19 @@
 
 1.  在班级顶部，更新代码如下：
 
-    [PRE47]
+    ```cs
+    SyncrhonousThreadCancelation();
+    ```
 
 前面的代码调用我们的方法，是取消同步操作的一个示例。
 
 1.  运行前面的代码，结果应该类似于以下内容：
 
-![图14.2 – 程序的输出控制台，显示线程被取消]
+![图 14.2 – 程序的输出控制台，显示线程被取消]
 
-![图14.2 – 显示线程被取消的程序的输出控制台](img/B16617_Figure_14.2.jpg)
+![图 14.2 – 显示线程被取消的程序的输出控制台](img/B16617_Figure_14.2.jpg)
 
-图14.2 – 程序的输出控制台，显示线程被取消
+图 14.2 – 程序的输出控制台，显示线程被取消
 
 这就结束了取消和销毁线程的主题。现在让我们看看线程的调度。
 
@@ -258,27 +396,63 @@
 
 1.  添加一个名为`Job`的类，如下所示：
 
-    [PRE48]
+    ```cs
+    internal class Job
+    {
+         public void Execute()
+         {
+             Console.WriteLine(
+                 "Execute() method execute.");
+         }
+         public void PrintMessage(object message)
+         {
+             Console.WriteLine($"Message: {message}");
+         }
+    }
+    ```
 
 这个类提供了两个方法，这些方法将在我们的`Thread`调度示例中使用。`Execute`方法与无参数的`Thread.Start`方法一起使用，而`PrintMessage`函数与接受参数的`Thread.Start`方法一起使用。
 
 1.  在`Program.cs`类中，添加`SheduleThreadWithoutParameters`方法如下：
 
-    [PRE49]
+    ```cs
+    static void ScheduleThreadWithoutParameters()
+    {
+         Job job = new();
+         Thread thread = 
+             new Thread(new ThreadStart(job.Execute));
+         thread.Start();
+    }
+    ```
 
 在前面的代码中，我们创建了一个新的`Job`类实例。然后，我们创建了一个新的`Thread`，通过将其构造函数中的`new ThreadStart`实例传递给构造函数。在`ThreadStart`构造函数中，我们传递`object.method`，这是我们希望执行的，然后我们启动线程。
 
 1.  添加`ScheduleThreadWithParameters`方法如下：
 
-    [PRE50]
+    ```cs
+    static void ScheduleThreadWithParameters()
+    {
+         Job job = new();
+         var thread1 = new Thread(
+             new ParameterizedThreadStart(
+                 job.PrintMessage
+             )
+         );
+         var thread2 = new Thread(
+             new ParameterizedThreadStart(
+                 job.PrintMessage
+             )
+         );
+        thread1.Start("Hello, world!");
+        thread2.Start("Goodbye, world!");
+    }
+    ```
 
 在前面的代码中，我们通过调用每个线程的`ParameterizedThreadStart`类来创建一个新的`Job`实例和两个线程，以便在每个线程上执行一个参数化方法。然后我们启动每个线程。
 
 1.  在类的顶部添加对每个方法的调用，然后运行前面的代码。你的控制台应该看起来像以下这样：
 
-![14.3 – 我们的参数化线程输出
-
-![B16617_Figure_14.3.jpg](img/B16617_Figure_14.3.jpg)
+![14.3 – 我们的参数化线程输出![B16617_Figure_14.3.jpg](img/B16617_Figure_14.3.jpg)
 
 14.3 – 我们的参数化线程输出
 
@@ -288,77 +462,139 @@
 
 注意
 
-在《C#中的整洁代码》一书的[*第8章*](B16617_08_Final_SB_Epub.xhtml#_idTextAnchor152)《线程和并发》中，我们详细讨论了线程，包括使用线程、线程安全、使用信号量进行并行线程、线程同步和防止死锁，以及竞态条件。
+在《C#中的整洁代码》一书的*第八章*《线程和并发》中，我们详细讨论了线程，包括使用线程、线程安全、使用信号量进行并行线程、线程同步和防止死锁，以及竞态条件。
 
 为了同步你的代码，你可以使用一个锁对象，如下所示：
 
-[PRE51]
+```cs
+internal class LockMutexExample
+```
 
-[PRE52]
+```cs
+{
+```
 
-[PRE53]
+```cs
+public object _lockObject = new();
+```
 
-[PRE54]
+```cs
+public void UsingLockObject()
+```
 
-[PRE55]
+```cs
+{
+```
 
-[PRE56]
+```cs
+lock(_lockObject)
+```
 
-[PRE57]
+```cs
+{
+```
 
-[PRE58]
+```cs
+// Perform your unsafe code here.
+```
 
-[PRE59]
+```cs
+}
+```
 
-[PRE60]
+```cs
+}
+```
 
-[PRE61]
+```cs
+}
+```
 
 当进入被锁定的代码时，其他所有线程都被禁止访问被锁定的代码。这种方法的唯一缺点是可能会导致死锁。可以通过使用互斥锁来克服这个问题，如下所示：
 
-[PRE62]
+```cs
+internal class LockMutextExample
+```
 
-[PRE63]
+```cs
+{
+```
 
-[PRE64]
+```cs
+    private static readonly Mutex _mutex = new();
+```
 
-[PRE65]
+```cs
+    public void UsingMutext()
+```
 
-[PRE66]
+```cs
+    {
+```
 
-[PRE67]
+```cs
+      try
+```
 
-[PRE68]
+```cs
+      {
+```
 
-[PRE69]
+```cs
+          _mutex.WaitOne();
+```
 
-[PRE70]
+```cs
+          // ... Do work here ...
+```
 
-[PRE71]
+```cs
+       }
+```
 
-[PRE72]
+```cs
+       finally
+```
 
-[PRE73]
+```cs
+       {
+```
 
-[PRE74]
+```cs
+           _mutex.ReleaseMutex();
+```
 
-[PRE75]
+```cs
+       }
+```
 
-[PRE76]
+```cs
+    }
+```
 
-[PRE77]
+```cs
+}
+```
 
 上述代码声明了一个 `Mutex` 类级变量。需要保护的代码随后被包裹在 `try/catch` 块中。当前线程通过 `WaitOne()` 方法被阻塞，直到等待句柄收到信号。当 `Mutex` 被信号时，`WaitOne()` 方法返回 `True`。然后，`Mutex` 由调用线程拥有，可以访问受保护的资源。一旦受保护的资源完成，通过调用 `ReleaseMutex()` 释放 `Mutex`。始终在最终块中调用 `ReleaseMutex()` 方法，以防止在遇到异常时资源保持锁定。
 
 当多个线程访问同一资源并基于它们的时序产生不同结果时，会发生竞态条件。可以通过使用如下代码来避免竞态条件：
 
-[PRE78]
+```cs
+Task
+```
 
-[PRE79]
+```cs
+    .Run(() => Method1())
+```
 
-[PRE80]
+```cs
+    .ContinueWith(task => Method2())
+```
 
-[PRE81]
+```cs
+    .Wait();
+```
 
 `Task` 在运行 `Method1()` 后继续执行 `Method2()`。然后我们使用 `Wait()` 等待 `Task` 完成 `Method1()` 和 `Method2()` 的执行，再继续。
 
@@ -390,26 +626,26 @@
 
 # 进一步阅读
 
-+   管理和实现多线程：[https://subscription.packtpub.com/book/programming/9781789536577/6/ch06lvl1sec52/understanding-threads-and-the-threading-process](https://subscription.packtpub.com/book/programming/9781789536577/6/ch06lvl1sec52/understanding-threads-and-the-threading-process)
++   管理和实现多线程：[`subscription.packtpub.com/book/programming/9781789536577/6/ch06lvl1sec52/understanding-threads-and-the-threading-process`](https://subscription.packtpub.com/book/programming/9781789536577/6/ch06lvl1sec52/understanding-threads-and-the-threading-process)
 
 )
 
-+   暂停和中断线程：[https://docs.microsoft.com/en-us/dotnet/standard/threading/pausing-and-resuming-threads](https://docs.microsoft.com/en-us/dotnet/standard/threading/pausing-and-resuming-threads)
++   暂停和中断线程：[`docs.microsoft.com/en-us/dotnet/standard/threading/pausing-and-resuming-threads`](https://docs.microsoft.com/en-us/dotnet/standard/threading/pausing-and-resuming-threads)
 
 )
 
-+   如何在C#中终止线程：[https://www.geeksforgeeks.org/how-to-terminate-a-thread-in-c-sharp/](https://www.geeksforgeeks.org/how-to-terminate-a-thread-in-c-sharp/)
++   如何在 C#中终止线程：[`www.geeksforgeeks.org/how-to-terminate-a-thread-in-c-sharp/`](https://www.geeksforgeeks.org/how-to-terminate-a-thread-in-c-sharp/)
 
 )
 
-+   如何在C#中销毁线程：[https://www.tutorialspoint.com/How-to-destroy-threads-in-Chash](https://www.tutorialspoint.com/How-to-destroy-threads-in-Chash)
++   如何在 C#中销毁线程：[`www.tutorialspoint.com/How-to-destroy-threads-in-Chash`](https://www.tutorialspoint.com/How-to-destroy-threads-in-Chash)
 
-+   如何在C#中安排线程的执行：[https://www.geeksforgeeks.org/how-to-schedule-a-thread-for-execution-in-c-sharp/#:~:text=%20How%20to%20schedule%20a%20thread%20for%20execution,1%20Start%20%28%29%202%20Start%20%28Object%29%20More%20](https://www.geeksforgeeks.org/how-to-schedule-a-thread-for-execution-in-c-sharp/#:~:text=%20How%20to%20schedule%20a%20thread%20for%20execution,1%20Start%20%28%29%202%20Start%20%28Object%29%20More%20)
++   如何在 C#中安排线程的执行：[`www.geeksforgeeks.org/how-to-schedule-a-thread-for-execution-in-c-sharp/#:~:text=%20How%20to%20schedule%20a%20thread%20for%20execution,1%20Start%20%28%29%202%20Start%20%28Object%29%20More%20`](https://www.geeksforgeeks.org/how-to-schedule-a-thread-for-execution-in-c-sharp/#:~:text=%20How%20to%20schedule%20a%20thread%20for%20execution,1%20Start%20%28%29%202%20Start%20%28Object%29%20More%20)
 
-+   理解线程和线程过程：[https://subscription.packtpub.com/book/programming/9781789536577/6/ch06lvl1sec52/understanding-threads-and-the-threading-process](https://subscription.packtpub.com/book/programming/9781789536577/6/ch06lvl1sec52/understanding-threads-and-the-threading-process)
++   理解线程和线程过程：[`subscription.packtpub.com/book/programming/9781789536577/6/ch06lvl1sec52/understanding-threads-and-the-threading-process`](https://subscription.packtpub.com/book/programming/9781789536577/6/ch06lvl1sec52/understanding-threads-and-the-threading-process)
 
 )
 
-+   如何在C#中暂停代码执行：[https://csharpsage.com/c-delay/](https://csharpsage.com/c-delay/)
++   如何在 C#中暂停代码执行：[`csharpsage.com/c-delay/`](https://csharpsage.com/c-delay/)
 
-+   暂停和中断线程：[https://docs.microsoft.com/en-us/dotnet/standard/threading/pausing-and-resuming-threads](https://docs.microsoft.com/en-us/dotnet/standard/threading/pausing-and-resuming-threads)
++   暂停和中断线程：[`docs.microsoft.com/en-us/dotnet/standard/threading/pausing-and-resuming-threads`](https://docs.microsoft.com/en-us/dotnet/standard/threading/pausing-and-resuming-threads)

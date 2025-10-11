@@ -1,6 +1,6 @@
 # 模式 - 依赖注入
 
-在[第7章](d36b8d07-937a-4f06-ba4c-3cd040798052.xhtml)中，*拦截*，我们完成了探索**依赖注入**（**DI**）支柱的旅程。现在，是时候学习依赖注入背后的原则，并探索如何应用不同的技术来实现这些原则，以获得松散耦合的架构。有各种技术可以实现DI，但如果你在编码时没有选择合适的技术，你将成为项目的麻烦制造者。
+在第七章中，*拦截*，我们完成了探索**依赖注入**（**DI**）支柱的旅程。现在，是时候学习依赖注入背后的原则，并探索如何应用不同的技术来实现这些原则，以获得松散耦合的架构。有各种技术可以实现 DI，但如果你在编码时没有选择合适的技术，你将成为项目的麻烦制造者。
 
 在本章中，我们将讨论不同的技术，也称为**依赖注入模式**，并附上适当的说明。我将阐明用例、优点和缺点，以便您能够轻松地可视化您当前在应用程序中看到的问题。这将最终说服您在应用程序中采用这些模式，从而实现更好的架构。
 
@@ -14,37 +14,105 @@
 
 +   控制反转
 
-+   DI模式
++   DI 模式
 
 +   实现模式的正确方式
 
 +   每个模式的优缺点
 
-+   .NET Core 2.0中的采用和示例
++   .NET Core 2.0 中的采用和示例
 
 # 依赖倒置原则
 
-SOLID原则中有一个D，称为**依赖倒置原则**（**DIP**）。以下是对DIP的描述，由Robert C. Martin提供：
+SOLID 原则中有一个 D，称为**依赖倒置原则**（**DIP**）。以下是对 DIP 的描述，由 Robert C. Martin 提供：
 
 “高级模块不应依赖于低级模块。两者都应依赖于抽象。”
 
 你可以将高级模块视为一个应用程序的业务模块，它包含应用程序的复杂逻辑，而低级模块则是实际执行基本或主要功能的类，例如将数据写入磁盘、与数据库交互等，这些操作由业务模块接收的命令执行。
 
-当高级模块的对象与低级模块的对象交互时，它们会产生耦合。这是因为你必须引用低级模块的类才能访问它们以进行实例化。然而，DIP并不推荐这样做。该原则鼓励我们减少耦合，使模块能够独立生活。它还解释了如何通过抽象来实现这一点。两者都应该致力于抽象，而不是直接相互依赖。让我们用一个例子来理解这个观点。
+当高级模块的对象与低级模块的对象交互时，它们会产生耦合。这是因为你必须引用低级模块的类才能访问它们以进行实例化。然而，DIP 并不推荐这样做。该原则鼓励我们减少耦合，使模块能够独立生活。它还解释了如何通过抽象来实现这一点。两者都应该致力于抽象，而不是直接相互依赖。让我们用一个例子来理解这个观点。
 
 考虑一个名为`FeedbackService`的类，它将一个`Feedback`详情保存到数据库中：
 
-[PRE0]
+```cs
+    public class FeedbackService : IFeedbackService
+    {
+      private INotifier notifier;
+ public void SaveFeedback(Feedback feedback, NotifyType notify)
+ {
+ SaveFeedbackToDb(feedback);
+ SendNotification(feedback, notify);
+ }
+      private void SendNotification(Feedback feedback, NotifyType notify)
+      {
+        if (notify == NotifyType.Email)
+        {
+            notifier = new EmailNotifier();
+        }
+        else if (notify == NotifyType.Sms)
+        {
+            notifier = new SmsNotifier();
+        }
+        else if (notify == NotifyType.Voice)
+        {
+            notifier = new VoiceNotifier();
+        }
+        else
+        {
+            throw new ArgumentException("No matched notify type 
+              found.", notify.ToString());
+        }
+        notifier.SendNotification(feedback);
+      }
+      private int SaveFeedbackToDb(Feedback feedback)
+      {
+        // Save details in db.
+        Console.WriteLine("Db Saving Started.");
+        return 1;
+      }
+    }
+```
 
 这里的主要方法是 `SaveFeedback`，它不仅保存反馈，还发送通知。它接受 `Feedback` 对象和通知类型作为参数。当保存反馈时，通常向客户和管理员发送一条通知。
 
 `FeedbackService` 实现了一个接口，其代码可以如下编写：
 
-[PRE1]
+```cs
+    public interface IFeedbackService
+    {
+      void SaveFeedback(Feedback feedback, NotifyType notify);
+    }
+```
 
 `INotifier` 是一个接口，所有通知类型都实现了这个接口。看看下面的代码：
 
-[PRE2]
+```cs
+    public interface INotifier
+    {
+      void SendNotification(Feedback feedback);
+    }
+    public class EmailNotifier : INotifier
+    {
+      public void SendNotification(Feedback feedback)
+      {
+        Console.WriteLine("Email Notification starts!");
+      }
+    }
+    public class SmsNotifier : INotifier
+    {
+      public void SendNotification(Feedback feedback)
+      {
+        Console.WriteLine("Sms Notification starts!");
+      }
+    }
+    public class VoiceNotifier : INotifier
+    {
+      public void SendNotification(Feedback feedback)
+      {
+        Console.WriteLine("Voice Notification starts!");
+      }
+    }
+```
 
 注意，我没有定义方法的主体，因为它们在这里是为了说明。你可以编写逻辑并实现自己的代码。
 
@@ -58,7 +126,14 @@ SOLID原则中有一个D，称为**依赖倒置原则**（**DIP**）。以下是
 
 我们最常用的 `new` 关键字在 `FeedbackService` 类的 `SendNotification` 方法中使用，根据输入的 `notify` 类型的 `enum` 来决定创建哪个 `Notifier` 实例，它可以定义如下：
 
-[PRE3]
+```cs
+    public enum NotifyType
+    {
+      Email = 1,
+      Sms = 2,
+      Voice = 3
+    }
+```
 
 # 解决方案
 
@@ -70,11 +145,34 @@ SOLID原则中有一个D，称为**依赖倒置原则**（**DIP**）。以下是
 
 `FeedbackService` 可以重写如下：
 
-[PRE4]
+```cs
+    public class FeedbackService : IFeedbackService
+    {
+      private readonly INotifier _notifier;
+      public FeedbackService(INotifier notifier)
+      {
+        _notifier = notifier;
+      }
+
+      public void SaveFeedback(IFeedback feedback)
+      {
+        SaveFeedbackToDb(feedback);
+
+        _notifier.SendNotification(feedback);
+      }
+      private int SaveFeedbackToDb(IFeedback feedback)
+      {
+        throw new NotImplementedException();
+      }
+    }
+```
 
 现在 `Service` 不依赖于具体的实现，并且我们从类中消除了决定发送哪种通知的 `if...else...if` 繁琐代码。通知类型的决定现在由 `Service` 类实例的创建者来决定。这可以在组合根（Composition Root）内部完成，如下所示：
 
-[PRE5]
+```cs
+    var feedbackService = new FeedbackService(new SmsNotifier());
+    feedbackService.SaveFeedback(new Feedback());
+```
 
 # 控制反转（IoC）
 
@@ -90,7 +188,12 @@ DIP 是一种原则或规则集合的理论。另一方面，控制反转是一�
 
 1.  将依赖项提供给构造函数并存储在 `private readonly` 成员中：
 
-[PRE6]
+```cs
+        public FeedbackService(INotifier notifier)
+        {
+          _notifier = notifier;
+        }
+```
 
 1.  通过私有成员，我们可以直接调用依赖类的方法：`_notifier.SendNotification(feedback);`
 
@@ -102,7 +205,7 @@ DIP 是一种原则或规则集合的理论。另一方面，控制反转是一�
 
 最后一步是将依赖对象注入到 `Service` 的构造函数中，这种模式被称为 **构造函数注入模式**。让我们在下一节中探讨这个模式以及其他重要模式。
 
-下图表示了依赖倒置原则（DIP）和非依赖倒置原则（non-DIP）的实现。注意箭头。在非DIP中，依赖项由类本身管理，因此箭头指向具体类对象，而在DIP中，箭头指向类，因为依赖对象是由其他人发送的：
+下图表示了依赖倒置原则（DIP）和非依赖倒置原则（non-DIP）的实现。注意箭头。在非 DIP 中，依赖项由类本身管理，因此箭头指向具体类对象，而在 DIP 中，箭头指向类，因为依赖对象是由其他人发送的：
 
 ![](img/c6784d17-712d-41e5-a556-ff8a8142d1a6.png)
 
@@ -132,11 +235,32 @@ DIP 是一种原则或规则集合的理论。另一方面，控制反转是一�
 
 例如，一家公司最初只设立了一个名为工程部的部门。让我们为这家公司设计以下 `Employee` 类：
 
-[PRE7]
+```cs
+    public class Employee
+    {
+        public int EmployeeId;
+        public string EmployeeName;
+        public Department EmployeeDept;
+
+        public Employee(int id, string name)
+        {
+           EmployeeId = id;
+           EmployeeName = name;
+           EmployeeDept = new Engineering();
+        }
+    }
+```
 
 我们有一个构造函数，它接受 `id` 和 `name` 作为参数，并初始化一个 `Employee` 对象。正如我之前所说的，公司最初只有工程部门，所以很明显，我们将 `EmployeeDept` 赋值为 `Engineering` 类的新对象。`Engineering` 和 `Department` 类可能看起来如下所示：
 
-[PRE8]
+```cs
+    public class Department
+    {
+      public int DeptId { get; set; }
+      public string DeptName { get; set; }
+    }
+    public class Engineering : Department {  }
+```
 
 # 问题
 
@@ -152,19 +276,75 @@ DIP 是一种原则或规则集合的理论。另一方面，控制反转是一�
 
 1.  首先，设计一个接口 `IDepartment`，该接口可以被 `Department` 类实现：
 
-[PRE9]
+```cs
+        public interface IDepartment
+        {
+          int DeptId { get; set; }
+          string DeptName { get; set; }
+        }
+        public class Department : IDepartment
+        {
+          public int DeptId { get; set; }
+          public string DeptName { get; set; }
+        }
+```
 
 1.  我们不再拥有 `Department` 类型的属性，现在我们将拥有 `IDepartment` 类型的属性。基本上，我们可以通过这种技术允许不同的部门类型。我们很快就会看到这个技术的实际应用。同时，您也可以看到这个属性是如何在构造函数中使用 `IDepartment` 类型的 `dept` 参数进行初始化的。
 
-[PRE10]
+```cs
+        public class Employee
+        {
+          public int EmployeeId;
+          public string EmployeeName;
+          public IDepartment EmployeeDept;
+
+          public Employee(int id, string name, IDepartment dept)
+          {
+            EmployeeId = id;
+            EmployeeName = name;
+            EmployeeDept = dept;
+          }
+        }
+```
 
 1.  现在让我们看看不同部门的类。它们从 `Department` 继承，从而实现了 `IDepartment`：
 
-[PRE11]
+```cs
+       public class Engineering : Department
+       {
+         public Engineering()
+         {
+           DeptName = "Engineering";
+         }
+       }
+       public class Marketing: Department
+       {
+         public Marketing()
+         {
+            DeptName = "Marketing";
+         }
+       }
+```
 
 1.  现在创建不同部门的员工变得容易了。如果我们将在 `main` 方法内部创建这样的对象，我们可以做以下操作：
 
-[PRE12]
+```cs
+        static void Main(string[] args)
+        {
+          var engineering = new Engineering();
+          Employee emp = new Employee(1, "Sasmita Tripathy",
+            new Engineering());
+          var marketing = new Marketing();
+          Employee emp1 = new Employee(2, "Ganeswar Tripathy",
+            new Marketing());
+          Console.WriteLine("Emp Name: " + emp.EmployeeName + ",
+            Department: " + emp.EmployeeDept.DeptName);
+          Console.WriteLine();
+          Console.WriteLine("Emp Name: " + emp1.EmployeeName + ",
+            Department: " + emp1.EmployeeDept.DeptName);
+          Console.ReadLine();
+        }
+```
 
 您可以看到一个特定的 `Department` 对象是如何传递给 `Employee` 构造函数以创建属于不同部门的员工。这就是我们进行的注入。我们将 `IDepartment` 类型的对象（`Engineering` 和 `Marketing`）注入到 `Employee` 构造函数中。
 
@@ -176,23 +356,42 @@ DIP 是一种原则或规则集合的理论。另一方面，控制反转是一�
 
 您可能认为前面的内容都是完美的。但事实并非如此。让我们来分析一下：
 
-[PRE13]
+```cs
+     var engineering = new Engineering();
+     Employee emp = new Employee(1, "Sasmita Tripathy", 
+       new Engineering());
+     emp.EmployeeDept = new Marketing();
+```
 
 您可以看到我创建了一个部门为 `Engineering` 的对象。然后在下一行，我们可以轻松地通过将 `Marketing` 对象赋值给它来更改部门。这应该完全避免。
 
 为了做到这一点，该字段必须被标记为 `private` 和 `readonly`。
 
-[PRE14]
+```cs
+    private readonly IDepartment EmployeeDept;
+```
 
 虽然这并不是严格推荐的，但我们确实应该遵循这一点，以便开发者不能无端地篡改实际值。
 
 其次，构造函数没有处理依赖实例作为 `null` 接收的情况。构造函数可以被修改如下：
 
-[PRE15]
+```cs
+    public Employee(int id, string name, IDepartment dept)
+    {   
+        EmployeeDept = dept ?? throw new ArgumentNullException();
+        EmployeeId = id;
+        EmployeeName = name;
+   }
+```
 
 现在重要的是，构造函数不仅负责将依赖实例推送到一个 `private` 属性，还向其他成员变量（如 `EmployeeId` 和 `EmployeeName`）插入值。这违反了单一职责原则。因此，我们应该让构造函数只处理依赖项，而无需做其他事情：
 
-[PRE16]
+```cs
+    public Employee(IDepartment dept)
+    {   
+        EmployeeDept = dept ?? throw new ArgumentNullException();
+    }
+```
 
 此外，以这种方式编写可以保证当创建一个对象时，它将包含其中的依赖项。同时，这只有在类从此以后完全依赖于依赖项的情况下才有价值。
 
@@ -210,7 +409,31 @@ DIP 是一种原则或规则集合的理论。另一方面，控制反转是一�
 
 我们之前看到了每个示例，都是使用 `new` 关键字进行初始化。然而，我们应该使用 .NET Core 2.0 的方式来解决依赖项：
 
-[PRE17]
+```cs
+    static void Main(string[] args)
+    {
+       var serviceProvider = new ServiceCollection()
+       .AddTransient<IDepartment, Engineering>()
+       .AddTransient<Employee>()
+       .BuildServiceProvider();
+
+       var emp = serviceProvider.GetService<Employee>();
+       emp.EmployeeId = 1;
+       emp.EmployeeName = "Sasmita Tripathy";
+
+       var emp1 = serviceProvider.GetService<Employee>();
+       emp1.EmployeeId = 2;
+       emp1.EmployeeName = "Ganeswar Tripathy";
+
+       Console.WriteLine("Emp Name: " + emp.EmployeeName + ",
+          Department: " + emp.GetEmployeeDepartment());
+       Console.WriteLine();
+       Console.WriteLine("Emp Name: " + emp1.EmployeeName + ",
+          Department: " + emp1.GetEmployeeDepartment());
+
+        Console.ReadLine();
+}
+```
 
 我们使用 `ServiceCollection` 对象来注册在解析时我们期望的类型接口。当我们执行 `serviceProvider.GetService();` 时，它返回一个部门为 `Engineering` 的员工对象，因为我们已在集合中将 `IDepartment` 注册为 `Engineering`。
 
@@ -232,13 +455,13 @@ DIP 是一种原则或规则集合的理论。另一方面，控制反转是一�
 
 # 构造函数注入模式的重要性
 
-由于注入与构造函数相关联，这意味着每次尝试实例化特定类时，我们都能100%确信依赖项被包含或与创建的对象绑定。通过 Guard Clause 确保依赖项不是 `null` 并将其分配给 `private readonly` 数据成员，从而确保了拥有依赖项的保证。否则，类的构造函数将抛出异常。
+由于注入与构造函数相关联，这意味着每次尝试实例化特定类时，我们都能 100%确信依赖项被包含或与创建的对象绑定。通过 Guard Clause 确保依赖项不是 `null` 并将其分配给 `private readonly` 数据成员，从而确保了拥有依赖项的保证。否则，类的构造函数将抛出异常。
 
 没有可能不注入依赖就拥有此类的一个对象。因此，对象的状态始终有效，没有差异。使用模拟进行单元测试变得容易。让我们也看看其优缺点。
 
 # 构造函数注入模式的优势
 
-这是尊重DI概念的最受欢迎的方式。大多数DI容器都针对构造函数。它也是DI最常见和更广泛使用的模式。注入的组件可以在类的任何地方使用，因为当你创建对象时，注入的依赖项会自动进入类并保存在某个变量中。
+这是尊重 DI 概念的最受欢迎的方式。大多数 DI 容器都针对构造函数。它也是 DI 最常见和更广泛使用的模式。注入的组件可以在类的任何地方使用，因为当你创建对象时，注入的依赖项会自动进入类并保存在某个变量中。
 
 当类需要一些外部依赖来启动所有其他操作时，开发者更喜欢这种技术。由于构造函数涉及其中，一旦实例化，对象就准备好了依赖对象。
 
@@ -258,11 +481,51 @@ DIP 是一种原则或规则集合的理论。另一方面，控制反转是一�
 
 没有构造函数参数`IDepartment`和新的设置属性`Employee`类看起来如下所示：
 
-[PRE18]
+```cs
+    public class Employee
+    {
+      public int EmployeeId;
+      public string EmployeeName;
+
+      private IDepartment _employeeDept;
+      public IDepartment EmployeeDept
+      {
+        set
+        {
+          this._employeeDept = value;
+        }
+      }
+
+      public Employee(int id, string name)
+      {
+         EmployeeId = id;
+         EmployeeName = name;
+      }
+    }
+```
 
 我们刚刚从构造函数中移除了`IDepartment`参数，因为我们打算直接将一个`IDepartment`类型的对象分配给属性`EmployeeDept`。这可以在创建`Employee`对象时完成，如下所示：
 
-[PRE19]
+```cs
+    static void Main(string[] args)
+    {
+      Employee emp = new Employee(1, "Sasmita Tripathy")
+      {
+ EmployeeDept = new Engineering()
+      };
+
+      Employee emp1 = new Employee(2, "Ganeswar Tripathy")
+      {
+ EmployeeDept = new Marketing()
+      };
+      Console.WriteLine("Emp Name: " + emp.EmployeeName + ",
+         Department: " + emp.EmployeeDept.DeptName);
+      Console.WriteLine();
+      Console.WriteLine("Emp Name: " + emp1.EmployeeName + ",
+         Department: " + emp1.EmployeeDept.DeptName);
+      Console.ReadLine();
+    }
+```
 
 因此，通过执行`emp.EmployeeDept = new Engineering();`，我们直接将`Engineering`对象推入属性`EmployeeDept`。对于`emp1`也执行了同样的操作。
 
@@ -272,7 +535,19 @@ DIP 是一种原则或规则集合的理论。另一方面，控制反转是一�
 
 错误完全自解释。我们忘记包含获取器块，因为我们想打印部门名称。考虑以下代码片段：
 
-[PRE20]
+```cs
+    private IDepartment _employeeDept;
+    public IDepartment EmployeeDept
+    {
+      get {
+            return this._employeeDept;
+      }
+      set
+      {
+            this._employeeDept = value;
+      }
+    }
+```
 
 现在，我们做得很好。当你运行它时，你会看到与构造函数注入案例中相同的输出。
 
@@ -292,11 +567,31 @@ DIP 是一种原则或规则集合的理论。另一方面，控制反转是一�
 
 为了处理所有这些情况，我们应该为属性引入更多的保护。让我们这样做：
 
-[PRE21]
+```cs
+    private IDepartment _employeeDept;
+    public IDepartment EmployeeDept
+    {
+      get
+      {
+          if (this._employeeDept == null)
+          this.EmployeeDept = new Engineering();
+             return this._employeeDept;
+      }
+      set
+      {
+        if (value == null)
+           throw new ArgumentNullException("value");
+        if (this._employeeDept != null)
+           throw new InvalidOperationException();
+
+         this._employeeDept = value;
+       }
+     }
+```
 
 在设置器内部，我们检查`null`并抛出异常。然后，我们再次调查它是否已经存在，并抛出`InvalidOperationException`。同样，在获取器中，当传入`null`时，我们将其分配为默认值作为工程。因此，我们保护了我们的属性以应对所有这些困难的情况，如前所述。
 
-属性注入不是.NET Core内置的DI或IoC容器默认支持的。目前也没有计划将其引入默认容器。您必须使用外部容器，例如Autofac，来支持此功能。
+属性注入不是.NET Core 内置的 DI 或 IoC 容器默认支持的。目前也没有计划将其引入默认容器。您必须使用外部容器，例如 Autofac，来支持此功能。
 
 # 属性注入模式的优势
 
@@ -324,11 +619,40 @@ DIP 是一种原则或规则集合的理论。另一方面，控制反转是一�
 
 让我们看看如何编码 `Employee` 类：
 
-[PRE22]
+```cs
+    public class Employee
+    {
+        public int EmployeeId;
+        public string EmployeeName;
+        public IDepartment EmployeeDept;
+
+        // Default Constructor added for .NET Core 2.0 DI.
+        // So that it can automatically create the instance.
+        public Employee() { }
+
+        public Employee(int id, string name)
+        {
+          EmployeeId = id;
+          EmployeeName = name;
+        }
+
+        public void AssignDepartment(IDepartment dept)
+        {
+           EmployeeDept = dept;
+           // Other business logic if required.
+        }
+     }
+```
 
 在这个特定场景中，有一个 `AssignDepartment` 方法，它接受一个 `IDepartment` 类型的参数，并将其分配给属性。可以相应地创建一个 `Employee` 对象。考虑以下代码片段：
 
-[PRE23]
+```cs
+    Employee emp = new Employee(1, "Sasmita Tripathy");
+    emp.AssignDepartment(new Engineering());
+
+    Employee emp1 = new Employee(2, "Ganeswar Tripathy");
+    emp1.AssignDepartment(new Marketing());
+```
 
 它也产生了我们之前已经看到的相同输出。
 
@@ -338,13 +662,29 @@ DIP 是一种原则或规则集合的理论。另一方面，控制反转是一�
 
 在方法注入的情况下，按照惯例，我们也应该注意空值检查，以确保在使用之前依赖项可用：
 
-[PRE24]
+```cs
+    public void AssignDepartment(IDepartment dept)
+    {
+      EmployeeDept = dept ?? throw new ArgumentNullException("value");
+      // Other business logic if required.
+    }
+```
 
 # 使用 .NET Core 2.0 注入
 
 如我们在之前的模式中所做的那样，我们将使用 `GetService` 方法获取实例，然后通过注入依赖项调用所需的方法：
 
-[PRE25]
+```cs
+    Employee emp = serviceProvider.GetService<Employee>();
+    emp.EmployeeId = 1;
+    emp.EmployeeName = "Sasmita Tripathy";
+    emp.AssignDepartment(serviceProvider.GetService<IDepartment>());
+
+    Employee emp1 = serviceProvider.GetService<Employee>();
+    emp1.AssignDepartment(serviceProvider.GetService<IDepartment>());
+    emp1.EmployeeId = 2;
+    emp1.EmployeeName = "Ganeswar Tripathy";
+```
 
 你接下来会看到以下输出：
 
@@ -352,7 +692,9 @@ DIP 是一种原则或规则集合的理论。另一方面，控制反转是一�
 
 这是因为我们有一个接受 `integer` 和 `string` 参数的构造函数。提供者不知道如何解析它们的过程，因此抛出异常。解决方案是提供一个默认构造函数，因为服务提供者正在寻找它。
 
-[PRE26]
+```cs
+    public Employee() {  }
+```
 
 # .NET Core 2.0 中的实现
 
@@ -384,17 +726,73 @@ Ambient 是一个形容词，意为完全围绕或包含。这意味着当我们
 
 让我们通过一个例子来更好地理解实现方式。可以设计一个抽象类 `DepartmentProvider`，以提供名为 `Current` 的静态访问器：
 
-[PRE27]
+```cs
+    abstract class DepartmentProvider
+    {
+      private static DepartmentProvider current;
+      public static DepartmentProvider Current
+      {
+        get
+        {
+           return current;
+        }
+        set
+        {
+           current = value;
+        }
+      }
+      public virtual Department Department { get; }
+    }
+```
 
 我们将类标记为 `abstract`，并且有一个名为 `Department` 的 `virtual` 属性，它将被任何需要它的类访问。
 
 让我们看看如何使用 `Current` 属性。以下代码使用了 `MarketingProvider` 类的实例，它是 `DepartmentProvider` 的派生类：
 
-[PRE28]
+```cs
+    static void Main(string[] args)
+    {
+      var serviceProvider = new ServiceCollection()
+      .AddTransient<IDepartment, Engineering>()
+      .AddTransient<Employee>()
+ .AddTransient<MarketingProvider>()
+      .BuildServiceProvider();
+
+       // Set the Current value by resolving with 
+          MarketingProvider.
+       DepartmentProvider.Current = serviceProvider.GetService
+          <MarketingProvider>();
+
+       Employee emp = serviceProvider.GetService<Employee>();
+       emp.EmployeeId = 1;
+       emp.EmployeeName = "Sasmita Tripathy";
+       emp.EmployeeDept = DepartmentProvider.Current.Department;
+
+       Employee emp1 = serviceProvider.GetService<Employee>();
+       emp1.EmployeeId = 2;
+       emp1.EmployeeName = "Ganeswar Tripathy";
+       emp1.EmployeeDept = DepartmentProvider.Current.Department;
+
+       Console.WriteLine("Emp Name: " + emp.EmployeeName + ", 
+         Department: " + emp.EmployeeDept.DeptName); // Marketing
+       Console.WriteLine();
+       Console.WriteLine("Emp Name: " + emp1.EmployeeName + ",
+         Department: " + emp1.EmployeeDept.DeptName); // Marketing
+       Console.ReadLine();
+    }
+```
 
 看看我们如何使用内置的 DI 容器注册 `MarketingProvider`。然后我们将它分配给 `Current` 属性，通过这个属性，我们能够在读取 `DepartmentProvider.Current.Department` 时获取到营销值。`MarketingProvider` 是 `DepartmentProvider` 的子类，它返回一个 `Marketing` 对象。请参考以下代码：
 
-[PRE29]
+```cs
+    class MarketingProvider : DepartmentProvider
+    {
+      public override Department Department
+      {
+         get { return new Marketing(); }
+      }
+    }
+```
 
 因此，我们得出结论。我们可以在应用程序内部需要的地方使用 `static` 属性，除非你在其中设置了不同的值，否则值将是相同的。
 
@@ -404,7 +802,7 @@ Ambient 是一个形容词，意为完全围绕或包含。这意味着当我们
 
 +   这应该只在真正必要时使用。在决定使用 Ambient Context 之前，构造函数注入或属性注入应该是首选。如果你无法决定，就选择其他 DI 模式。
 
-+   服务定位器反模式在提供依赖的方式上与这个模式非常相似。然而，有一个区别，那就是环境上下文提供单个依赖项，而服务定位器负责提供所有请求的依赖项。我们将在第 9 章 [Anti-Patterns and Misconceptions on Dependency Injection](58f9e2e8-6e57-473a-9ccf-89a9a90f1858.xhtml) 中进一步讨论服务定位器。
++   服务定位器反模式在提供依赖的方式上与这个模式非常相似。然而，有一个区别，那就是环境上下文提供单个依赖项，而服务定位器负责提供所有请求的依赖项。我们将在第九章 Anti-Patterns and Misconceptions on Dependency Injection 中进一步讨论服务定位器。
 
 +   如果你没有正确实现环境上下文，它将会有副作用。假设你开始使用一个上下文或提供者，在过程中由于某些原因更改了它。现在，当你读取值时，由于静态特性，它将提供更改后的值而不是第一个值。这意味着你在实现时需要非常小心。
 
@@ -412,7 +810,26 @@ Ambient 是一个形容词，意为完全围绕或包含。这意味着当我们
 
 以下代码表示在获取器和设置器块中的简单守卫子句：
 
-[PRE30]
+```cs
+    abstract class DepartmentProvider
+    {
+      private static DepartmentProvider current;
+      public static DepartmentProvider Current
+      {
+        get
+        {
+ if (current == null)
+          current = new DefaultDepartmentProvider();
+          return current;
+        }
+        set
+        {
+ current = value ?? new DefaultDepartmentProvider();
+        }
+      }
+      public virtual Department Department { get; }
+    }
+```
 
 我们在获取器和设置器中都进行了空检查，并使用了一个名为 `DefaultDepartmentProvider` 的备用提供者来克服处理上下文不当的情况。
 
@@ -420,7 +837,19 @@ Ambient 是一个形容词，意为完全围绕或包含。这意味着当我们
 
 `corefx` 库在 `System.Threading` 命名空间下的部分类 `Thread` 中有一个 `CurrentPrincipal` `static` 属性。
 
-[PRE31]
+```cs
+    public static IPrincipal CurrentPrincipal
+    {
+      get
+      {
+         return CurrentThread._principal;
+      }
+      set
+      {
+         CurrentThread._principal = value;
+      }
+    }
+```
 
 使用示例可以在命名空间 `System.Security.Permissions` 下的类 `PrincipalPermission` 的方法 `Demand()` 中看到：
 
@@ -446,4 +875,4 @@ Ambient 是一个形容词，意为完全围绕或包含。这意味着当我们
 
 属性注入是一种允许你注入可选依赖项的技术。这意味着它肯定依赖于本地默认值，否则在请求它时我们可能会遇到异常。
 
-在[第9章](58f9e2e8-6e57-473a-9ccf-89a9a90f1858.xhtml)《依赖注入中的反模式和误解》中，我们将探讨在实现依赖注入时的一些不良做法，这些做法被称为反模式。
+在第九章《依赖注入中的反模式和误解》中，我们将探讨在实现依赖注入时的一些不良做法，这些做法被称为反模式。

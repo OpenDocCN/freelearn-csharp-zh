@@ -24,11 +24,11 @@
 
 本章的代码文件可以在 GitHub 上找到：
 
-[https://github.com/PacktPublishing/Hands-On-Game-Development-Patterns-with-Unity-2018](https://github.com/PacktPublishing/Hands-On-Game-Development-Patterns-with-Unity-2018)
+[`github.com/PacktPublishing/Hands-On-Game-Development-Patterns-with-Unity-2018`](https://github.com/PacktPublishing/Hands-On-Game-Development-Patterns-with-Unity-2018)
 
 查看以下视频，看看代码的实际运行情况：
 
-[http://bit.ly/2Fy4HvP](http://bit.ly/2Fy4HvP)
+[`bit.ly/2Fy4HvP`](http://bit.ly/2Fy4HvP)
 
 # 观察者模式的预览
 
@@ -50,13 +50,13 @@
 
 +   `Notify()`: 这将通知所有已附加到主题观察者列表中的观察者。
 
-尽管这不是一个非常复杂的设计来实现，但每次你需要观察其他对象时，编写它都可能变得非常繁琐。现代语言，如C#，已经以事件系统的形式原生实现了观察者模式，因此程序员不需要手动编写它。
+尽管这不是一个非常复杂的设计来实现，但每次你需要观察其他对象时，编写它都可能变得非常繁琐。现代语言，如 C#，已经以事件系统的形式原生实现了观察者模式，因此程序员不需要手动编写它。
 
 与通常只根据用户交互改变当前运行状态的电子表格应用程序不同，我们必须注意，游戏不是事件驱动的；相反，是主游戏循环推动游戏向前发展。
 
 # C#事件系统
 
-作为一名Unity开发者，你可能永远不需要手动实现完整的观察者模式，因为C#已经以事件系统的形式提供了原生的观察者实现。但在我们开始编写代码之前，让我们回顾一下C#事件系统的核心组件：
+作为一名 Unity 开发者，你可能永远不需要手动实现完整的观察者模式，因为 C#已经以事件系统的形式提供了原生的观察者实现。但在我们开始编写代码之前，让我们回顾一下 C#事件系统的核心组件：
 
 +   **事件**：当一个对象（发布者）引发事件时，它会发送一个信号，其他对象（订阅者）可以捕获这个信号。这个概念可能听起来非常熟悉，就像抛出和处理异常一样，当异常被抛出时，它会沿着调用栈向上传递，直到被处理。但在事件系统的案例中，实际上并没有调用链，因为一旦一个对象广播了一个事件，只有订阅了它的对象才会被通知，并且可以选择被它触发或只是忽略它。所以，我们基本上可以想象它就像一个突然爆发的无线电信号，只有那些有天线的人才能听到。
 
@@ -100,7 +100,7 @@
 
 +   在屏幕上显示一条消息
 
-但这里的挑战是：我们如何通知管理照明、声音和UI的各个系统或组件计时器的状态？当我们遇到这类问题时，观察者模式就变得非常有用，以事件系统的形式：我们将能够让所有这些个别系统在计时器广播特定时间事件时进行监听。
+但这里的挑战是：我们如何通知管理照明、声音和 UI 的各个系统或组件计时器的状态？当我们遇到这类问题时，观察者模式就变得非常有用，以事件系统的形式：我们将能够让所有这些个别系统在计时器广播特定时间事件时进行监听。
 
 # 代码示例
 
@@ -108,50 +108,190 @@
 
 1.  在我们的代码示例中，`Timer`类将是我们主题：
 
-[PRE0]
+```cs
+using UnityEngine;
+using System.Collections;
 
-如您所见，代码并不多；使用C#事件系统实现一个主题相当简单。最重要的是`委托`和`事件`类型之间的关系。一个`事件`是对象发送的消息，但在通信过程中，它并不知道哪些对象会接收其消息，因此需要一个类似指针的机制，可以在发送者和接收者之间充当中间人，这就是委托所需的地方。只需想象一下，委托就是将事件消息指向正确的`观察者`。
+public class Timer : MonoBehaviour
+{
+    private float m_Duration = 10.0f;
+    private float m_HalfTime;
 
-还有另一个重要的细节需要注意。请注意，每次我们调用像`OnTimerEnded()`这样的事件时，它都会在其相关的事件类型引用上检查null，然后再引发事件：
+    public delegate void TimerStarted();
+    public static event TimerStarted OnTimerStarted;
 
-[PRE1]
+    public delegate void HalfTime();
+    public static event HalfTime OnHalfTime;
+
+    public delegate void TimerEnded();
+    public static event TimerEnded OnTimerEnded;
+
+    private IEnumerator m_Coroutine;
+
+    IEnumerator Start()
+    {
+        m_HalfTime = m_Duration / 2;
+
+        if (OnTimerStarted != null)
+        {
+            OnTimerStarted();
+        }
+
+        yield return StartCoroutine(WaitAndPrint(1.0F));
+
+        if (OnTimerEnded != null)
+        {
+            OnTimerEnded();
+        }
+    }
+
+    private IEnumerator WaitAndPrint(float waitTime)
+    {
+        while (Time.time < m_Duration)
+        {
+            yield return new WaitForSeconds(waitTime);
+
+            Debug.Log("Seconds: " + Mathf.Round(Time.time));
+
+            if (Mathf.Round(Time.time) == Mathf.Round(m_HalfTime))
+            {
+                if (OnHalfTime != null)
+                {
+                    OnHalfTime();
+                }
+            }
+        }
+    }
+}
+```
+
+如您所见，代码并不多；使用 C#事件系统实现一个主题相当简单。最重要的是`委托`和`事件`类型之间的关系。一个`事件`是对象发送的消息，但在通信过程中，它并不知道哪些对象会接收其消息，因此需要一个类似指针的机制，可以在发送者和接收者之间充当中间人，这就是委托所需的地方。只需想象一下，委托就是将事件消息指向正确的`观察者`。
+
+还有另一个重要的细节需要注意。请注意，每次我们调用像`OnTimerEnded()`这样的事件时，它都会在其相关的事件类型引用上检查 null，然后再引发事件：
+
+```cs
+....        
+if (OnTimerEnded != null)
+{
+    OnTimerEnded();
+}
+```
 
 我们这样做是因为如果没有人在听，就无法广播事件。我们需要至少一个处理事件接收的观察者。这就是事件系统实现和管理其引用的方式。
 
 1.  现在我们已经准备好了主题，是时候实现那些将注册自己以接收来自我们的`Timer`事件消息的系统了。换句话说，我们将实现我们的观察者。第一个是`Buzzer`，它将通过发出蜂鸣声来通知玩家计时器已经开始或结束：
 
-[PRE2]
+```cs
+using UnityEngine;
+
+public class Buzzer : MonoBehaviour
+{
+    void OnEnable()
+    {
+        Timer.OnTimerStarted += PlayStartBuzzer;
+        Timer.OnTimerEnded += PlayEndBuzzer;
+    }
+
+    void OnDisable()
+    {
+        Timer.OnTimerStarted -= PlayStartBuzzer;
+        Timer.OnTimerEnded -= PlayEndBuzzer;
+    }
+
+    void PlayStartBuzzer()
+    {
+        Debug.Log("[BUZZER] : Play start buzzer!");
+    }
+
+    void PlayEndBuzzer()
+    {
+        Debug.Log("[BUZZER] : Play end buzzer!");
+    }
+}
+```
 
 1.  我们列表中的下一个是`WarningLight`，当计时器达到半场时将闪烁：
 
-[PRE3]
+```cs
+using UnityEngine;
+
+public class WarningLight : MonoBehaviour
+{
+    void OnEnable()
+    {
+        Timer.OnHalfTime += BlinkLight;
+    }
+
+    void OnDisable()
+    {
+        Timer.OnHalfTime -= BlinkLight;
+    }
+
+    void BlinkLight()
+    {
+        Debug.Log("[WARNING LIGHT] : It's half-time, blinking the warning light!");
+    }
+}
+```
 
 1.  作为我们的最终观察者，我们将实现`Notifier`，它负责在时间到游戏结束时弹出消息：
 
-[PRE4]
+```cs
+using UnityEngine;
+
+public class Notifier : MonoBehaviour
+{
+    void OnEnable()
+    {
+        Timer.OnTimerEnded += ShowGameOverPopUp;
+    }
+
+    void OnDisable()
+    {
+        Timer.OnTimerEnded -= ShowGameOverPopUp;
+    }
+
+    void ShowGameOverPopUp()
+    {
+        Debug.Log("[NOTIFIER] : Show game over pop up!");
+    }
+}
+```
 
 我们应该注意到我们所有的观察者有一个共同点：它们都通过指向一个特定的本地函数来注册自己以接收来自`Timer`的事件。这种实现方式意味着当`Timer`广播一个事件时，所有观察它的对象将自动调用它们的一个本地方法。因此，远程事件可以触发对象的本地函数调用：
 
-[PRE5]
+```cs
+// Adding the object as a observer of the OnTimerEnded event once it //get's enabled.
+void OnEnable() 
+{
+    Timer.OnTimerEnded += ShowGameOverPopUp;
+}
+
+// In case the object is disabled, removing it as an observer of //OnTimerEnded.
+void OnDisable()
+{
+    Timer.OnTimerEnded -= ShowGameOverPopUp;
+}
+```
 
 另一个需要记住的点是一个事件不能指向`null`引用，因此确保一个对象在禁用时作为观察者移除是一个好的实践。
 
-通过C#事件系统表达的观察者模式提供了一种简单但强大的方法来实现对象之间的观察者-主题关系，无需显式耦合，并且只需要几行代码。
+通过 C#事件系统表达的观察者模式提供了一种简单但强大的方法来实现对象之间的观察者-主题关系，无需显式耦合，并且只需要几行代码。
 
 # 摘要
 
-在本章中，我们学习了如何通过构建一个计时器来实现观察者模式，该计时器可以通过组件监听特定的定时事件来触发场景中的行为。从这个模式中，我们得到的一个重要启示是，观察者模式在Unity中以C#事件系统的形式原生化实现。
+在本章中，我们学习了如何通过构建一个计时器来实现观察者模式，该计时器可以通过组件监听特定的定时事件来触发场景中的行为。从这个模式中，我们得到的一个重要启示是，观察者模式在 Unity 中以 C#事件系统的形式原生化实现。
 
 在下一章中，我们将探讨状态模式。这是游戏编程中另一个有用的模式，它与观察者模式有些相关。
 
 # 练习
 
-正如我们在本章中学到的，观察者模式是C#事件系统的灵感来源。但当然，它并不是这个模式的精确实现。所以，作为一个练习，我会鼓励你重新编写我们刚刚实现的计时器系统，但不要使用C#事件系统；相反，遵循观察者模式的设计。
+正如我们在本章中学到的，观察者模式是 C#事件系统的灵感来源。但当然，它并不是这个模式的精确实现。所以，作为一个练习，我会鼓励你重新编写我们刚刚实现的计时器系统，但不要使用 C#事件系统；相反，遵循观察者模式的设计。
 
-您可以使用本章开头所示的UML图作为起点。
+您可以使用本章开头所示的 UML 图作为起点。
 
 在不寻常的方式中实现设计模式是很常见的。通常，设计模式会激发程序员以某种方式结构化他们的代码，但在生产代码库中，你很少会看到特定模式的准确和“按部就班”的实现。
 
 # 进一步阅读
 
-《*设计模式*》，作者：Erich Gamma, Richard Helm, Ralph Johnson, 和 John Vlissides([http://www.pearsoned.co.uk/bookshop/detail.asp?WT.oss=design%20patterns%20elements&WT.oss_r=1&item=171742](http://www.pearsoned.co.uk/bookshop/detail.asp?WT.oss=design%20patterns%20elements&WT.oss_r=1&item=171742))
+《*设计模式*》，作者：Erich Gamma, Richard Helm, Ralph Johnson, 和 John Vlissides([`www.pearsoned.co.uk/bookshop/detail.asp?WT.oss=design%20patterns%20elements&WT.oss_r=1&item=171742`](http://www.pearsoned.co.uk/bookshop/detail.asp?WT.oss=design%20patterns%20elements&WT.oss_r=1&item=171742))

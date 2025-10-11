@@ -1,32 +1,32 @@
-# *第11章*：创建ASP.NET Core 6网络应用程序
+# *第十一章*：创建 ASP.NET Core 6 网络应用程序
 
 到目前为止，我们已经构建了应用程序的所有核心组件，如数据访问层和服务层，所有这些组件主要是服务器端组件，也称为**后端组件**。
 
-在本章中，我们将构建我们的电子商务应用程序的呈现层/用户界面（**UI**），也称为**客户端组件**。UI是应用程序的界面；一个好的呈现层不仅有助于保持用户对应用程序的参与度，而且鼓励用户返回应用程序。这在企业应用程序中尤为重要，一个好的呈现层有助于用户轻松地浏览应用程序，并帮助他们轻松地执行依赖于应用程序的日常活动。
+在本章中，我们将构建我们的电子商务应用程序的呈现层/用户界面（**UI**），也称为**客户端组件**。UI 是应用程序的界面；一个好的呈现层不仅有助于保持用户对应用程序的参与度，而且鼓励用户返回应用程序。这在企业应用程序中尤为重要，一个好的呈现层有助于用户轻松地浏览应用程序，并帮助他们轻松地执行依赖于应用程序的日常活动。
 
-我们将专注于理解ASP.NET Core MVC，并使用ASP.NET Core MVC开发一个网络应用程序。主要涵盖以下主题：
+我们将专注于理解 ASP.NET Core MVC，并使用 ASP.NET Core MVC 开发一个网络应用程序。主要涵盖以下主题：
 
 +   前端网页开发简介
 
-+   将API与服务层集成
++   将 API 与服务层集成
 
 +   创建控制器和操作
 
-+   使用ASP.NET Core MVC创建用户界面
++   使用 ASP.NET Core MVC 创建用户界面
 
-+   理解Blazor
++   理解 Blazor
 
 # 技术要求
 
-对于本章，你需要具备基本的C#、.NET Core、HTML和CSS知识。本章的代码示例可以在这里找到：[https://github.com/PacktPublishing/Enterprise-Application-Development-with-C-10-and-.NET-6-Second-Edition/tree/main/Chapter11/RazorSample](https://github.com/PacktPublishing/Enterprise-Application-Development-with-C-10-and-.NET-6-Second-Edition/tree/main/Chapter11/RazorSample).
+对于本章，你需要具备基本的 C#、.NET Core、HTML 和 CSS 知识。本章的代码示例可以在这里找到：[`github.com/PacktPublishing/Enterprise-Application-Development-with-C-10-and-.NET-6-Second-Edition/tree/main/Chapter11/RazorSample`](https://github.com/PacktPublishing/Enterprise-Application-Development-with-C-10-and-.NET-6-Second-Edition/tree/main/Chapter11/RazorSample).
 
-你可以在这里找到更多代码示例：[https://github.com/PacktPublishing/Enterprise-Application-Development-with-C-10-and-.NET-6-Second-Edition/tree/main/Enterprise%20Application](https://github.com/PacktPublishing/Enterprise-Application-Development-with-C-10-and-.NET-6-Second-Edition/tree/main/Enterprise%20Application).
+你可以在这里找到更多代码示例：[`github.com/PacktPublishing/Enterprise-Application-Development-with-C-10-and-.NET-6-Second-Edition/tree/main/Enterprise%20Application`](https://github.com/PacktPublishing/Enterprise-Application-Development-with-C-10-and-.NET-6-Second-Edition/tree/main/Enterprise%20Application).
 
 # 前端网页开发简介
 
 呈现层主要是指浏览器可以渲染并显示给用户的代码。每当一个页面在浏览器中加载时，它会创建一个包含各种元素（如文本框和标签）的层次结构，这些元素都存在于页面上。这个层次结构被称为**文档对象模型**（**DOM**）。
 
-一个好的前端主要在于能够根据需要操作DOM，并且有许多技术/库支持使用网络事实上的语言JavaScript动态地操作DOM和加载数据。无论是简化JavaScript使用的jQuery，还是支持完整客户端渲染的完整客户端框架，如Angular、React或Vue，或者是ASP.NET Core框架，如ASP.NET Core MVC、Razor Pages或Blazor，它们都归结为处理网络的三个主要构建块：HTML、CSS和JavaScript。让我们来看看这三个构建块：
+一个好的前端主要在于能够根据需要操作 DOM，并且有许多技术/库支持使用网络事实上的语言 JavaScript 动态地操作 DOM 和加载数据。无论是简化 JavaScript 使用的 jQuery，还是支持完整客户端渲染的完整客户端框架，如 Angular、React 或 Vue，或者是 ASP.NET Core 框架，如 ASP.NET Core MVC、Razor Pages 或 Blazor，它们都归结为处理网络的三个主要构建块：HTML、CSS 和 JavaScript。让我们来看看这三个构建块：
 
 +   **超文本标记语言**（**HTML**）：正如全称所述，HTML 是一种浏览器可以理解和显示内容的标记语言。它主要包含一系列称为 **HTML 元素** 的标签，允许开发者定义页面的结构。例如，如果你想创建一个需要允许用户输入他们的名字和姓氏的表单，可以使用输入 HTML 元素来定义它。
 
@@ -36,9 +36,7 @@
 
 +   **JavaScript**: JavaScript 是一种脚本语言，有助于执行各种高级动态操作，例如，验证在表单中输入的文本或类似启用/禁用 HTML 元素条件性或从 API 获取数据等操作。JavaScript 为网页提供了更多功能，并添加了许多开发者可以用来在客户端执行高级操作的编程特性。就像 HTML 和 CSS 一样，所有浏览器都能理解 JavaScript，它构成了表示层的一个重要部分。所有这些组件都可以相互链接，如下面的图所示：
 
-![图 11.1 – HTML、CSS 和 JavaScript
-
-](img/Figure_11.1_B18507.jpg)
+![图 11.1 – HTML、CSS 和 JavaScript](img/Figure_11.1_B18507.jpg)
 
 图 11.1 – HTML、CSS 和 JavaScript
 
@@ -56,15 +54,15 @@ HTML、CSS 和 JavaScript 互相依存，在开发客户端/前端应用程序�
 
 要嵌入 Razor 语法，我们通常使用 `@`，这告诉 Razor 引擎解析并生成 HTML。`@` 后可以跟任何 C# 内置方法来生成 HTML。例如，`<b>@DateTime.Now</b>` 可以用于在 Razor 视图/页面上显示当前日期和时间。除此之外，就像 C# 一样，Razor 语法也支持代码块、控制结构和变量等。以下图展示了通过 Razor 引擎的一些示例 Razor 语法：
 
-![图 11.2 – Razor 语法
-
-](img/Figure_11.2_B18507.jpg)
+![图 11.2 – Razor 语法](img/Figure_11.2_B18507.jpg)
 
 图 11.2 – Razor 语法
 
 Razor 语法还支持定义 HTML 控件；例如，要定义一个文本框，我们可以使用以下 Razor 语法：
 
-[PRE0]
+```cs
+<input asp-for=' FirstName ' />
+```
 
 上述代码被称为 `input` 标记助手，Razor 语法负责处理称为 **指令** 标记助手的绑定数据到 HTML 控件并生成丰富、动态的 HTML。让我们简要讨论一下：
 
@@ -78,19 +76,23 @@ Razor 语法还支持定义 HTML 控件；例如，要定义一个文本框，�
 
 然而，在 ASP.NET Core 中，我们有标签助手，它们帮助我们将数据绑定到 HTML 控件。与 HTML 助手相比，标签助手的优点是它们使用与 HTML 相同的语法，并为标准 HTML 控件分配了额外的属性，这些属性可以由动态数据生成。例如，要生成一个 HTML 文本框控件，通常我们会编写以下代码：
 
-[PRE1]
+```cs
+<input type='text' id='Name' name='Name' value=' Mastering enterprise application development Book'>
+```
 
 使用标签助手，这将被重写为以下代码，其中 `@Name` 是视图强类型关联的模型属性：
 
-[PRE2]
+```cs
+<input type='text' asp-for='@Name'>
+```
 
-因此，正如你所看到的，这完全是关于编写 HTML，但利用 Razor 标记来生成动态 HTML。ASP.NET Core 内置了许多标签助手，更多关于它们的信息可以在以下链接中找到：[https://docs.microsoft.com/en-us/aspnet/core/mvc/views/tag-helpers/built-in/?view=aspnetcore-6.0](https://docs.microsoft.com/en-us/aspnet/core/mvc/views/tag-helpers/built-in/?view=aspnetcore-6.0)。
+因此，正如你所看到的，这完全是关于编写 HTML，但利用 Razor 标记来生成动态 HTML。ASP.NET Core 内置了许多标签助手，更多关于它们的信息可以在以下链接中找到：[`docs.microsoft.com/en-us/aspnet/core/mvc/views/tag-helpers/built-in/?view=aspnetcore-6.0`](https://docs.microsoft.com/en-us/aspnet/core/mvc/views/tag-helpers/built-in/?view=aspnetcore-6.0)。
 
 不需要了解/记住每个标签助手，我们将在开发应用程序 UI 时使用此参考文档。
 
 注意
 
-由于 Razor 语法是标记，因此不需要了解所有语法。以下链接可以用作 Razor 语法的参考：[https://docs.microsoft.com/en-us/aspnet/core/mvc/views/razor?view=aspnetcore-6.0](https://docs.microsoft.com/en-us/aspnet/core/mvc/views/razor?view=aspnetcore-6.0)。
+由于 Razor 语法是标记，因此不需要了解所有语法。以下链接可以用作 Razor 语法的参考：[`docs.microsoft.com/en-us/aspnet/core/mvc/views/razor?view=aspnetcore-6.0`](https://docs.microsoft.com/en-us/aspnet/core/mvc/views/razor?view=aspnetcore-6.0)。
 
 因此，让我们来看看 ASP.NET Core 以及其他常见框架中用于开发表示层的各种选项。
 
@@ -98,83 +100,155 @@ Razor 语法还支持定义 HTML 控件；例如，要定义一个文本框，�
 
 Razor Pages 是使用 ASP.NET Core 实现网络应用程序的默认方式。Razor Pages 依赖于拥有一个可以直接处理请求的 Razor 文件的概念，以及与该 Razor 文件相关联的可选 C# 文件，用于任何额外的处理。可以使用以下命令创建一个典型的 Razor 应用程序：
 
-[PRE3]
+```cs
+dotnet new webapp --framework net6.0 -o RazorSample 
+```
 
 正如你所看到的，项目包含 Razor 页面及其对应的 C# 文件。在打开任何 Razor 视图时，我们会看到一个名为 `@page` 的指令，它有助于浏览页面。例如，`/index` 将被路由到 `index.cshtml`。重要的是，所有 Razor 页面都必须在页面顶部包含 `@page` 指令，并且放置在 `Pages` 文件夹中，因为 ASP.NET Core 运行时会在此文件夹中查找所有 Razor 页面。
 
 可以通过使用另一个名为 `@model` 的指令将 Razor 页面进一步关联到一个 C# 类，也称为 `PageModel` 类。以下是 `index.cshtml` 页面的代码：
 
-[PRE4]
+```cs
+@page
+```
 
-[PRE5]
+```cs
+@model IndexModel
+```
 
-[PRE6]
+```cs
+@{
+```
 
-[PRE7]
+```cs
+    ViewData["Title"] = "Home page";
+```
 
-[PRE8]
+```cs
+}
+```
 
-[PRE9]
+```cs
+<form method="post">
+```
 
-[PRE10]
+```cs
+    <div class="text-center">
+```
 
-[PRE11]
+```cs
+        <select asp-for="WeekDaySelected" 
+```
 
-[PRE12]
+```cs
+          asp-items="Model.WeekDay"></select>
+```
 
-[PRE13]
+```cs
+        <button type=Submit name="Submit">Submit</button>
+```
 
-[PRE14]
+```cs
+        <br>
+```
 
-[PRE15]
+```cs
+        <h3>@ViewData["Message"]</h3>
+```
 
-[PRE16]
+```cs
+    </div>
+```
 
-[PRE17]
+```cs
+</form>
+```
 
 `PageModel` 类不过是一个可以具有特定 `GET` 和 `POST` 调用方法的 C# 类，以便从 API 等动态获取 Razor 页面上的数据。这个类需要继承自 `Microsoft.AspNetCore.Mvc.RazorPages.PageModel`，并且是一个标准的 C# 类。`index.cshtml` 的 `PageModel`，它是 `index.cshtml.cs` 的一部分，如下代码所示：
 
-[PRE18]
+```cs
+public class IndexModel : PageModel
+```
 
-[PRE19]
+```cs
+{
+```
 
-[PRE20]
+```cs
+    public IndexModel(ILogger<IndexModel> logger)
+```
 
-[PRE21]
+```cs
+    {
+```
 
-[PRE22]
+```cs
+    }
+```
 
-[PRE23]
+```cs
+    public List<SelectListItem> WeekDay { get; set; }
+```
 
-[PRE24]
+```cs
+    public void OnGet()
+```
 
-[PRE25]
+```cs
+    {
+```
 
-[PRE26]
+```cs
+        this.WeekDay = new List<SelectListItem>();
+```
 
-[PRE27]
+```cs
+        this.WeekDay.Add(new SelectListItem
+```
 
-[PRE28]
+```cs
+                              {
+```
 
-[PRE29]
+```cs
+                                  Value = 'Monday',
+```
 
-[PRE30]
+```cs
+                                  Text =  'Monday'
+```
 
-[PRE31]
+```cs
+                              });
+```
 
-[PRE32]
+```cs
+        this.WeekDay.Add(new SelectListItem
+```
 
-[PRE33]
+```cs
+                              {
+```
 
-[PRE34]
+```cs
+                                  Value = 'Tuesday',
+```
 
-[PRE35]
+```cs
+                                  Text =  'Tuesday'
+```
 
-[PRE36]
+```cs
+                              });                                  
+```
 
-[PRE37]
+```cs
+    }
+```
 
-[PRE38]
+```cs
+}    
+```
 
 在这里，你可以看到我们正在通过 `OnGet` 方法填充在 Razor 页面上使用的数据，这同样也被称为 `PageModel` 处理器，可以用于初始化 Razor 页面。像 `OnGet` 一样，我们可以添加一个 `OnPost` 处理器，它可以用于将数据从 Razor 页面提交回 `PageModel` 并进一步处理。
 
@@ -186,13 +260,19 @@ Razor Pages 是使用 ASP.NET Core 实现网络应用程序的默认方式。Raz
 
 例如，如果我们想要绑定前面代码中 `select` 控件的值，我们需要首先在 `PageModel` 类中添加一个属性，如下代码所示：
 
-[PRE39]
+```cs
+[BindProperty]
+```
 
-[PRE40]
+```cs
+public string WeekDaySelected { get; set; }
+```
 
 然后，使用 `select` 控件的属性名，如这里所示，Razor Pages 将自动将选中的值绑定到这个属性：
 
-[PRE41]
+```cs
+<select asp-for='WeekDaySelected' asp-items='Model.WeekDay'></select>
+```
 
 我们可以使用异步命名约定为 `OnGet` 和 `OnPost` 方法命名，如果我们在使用异步编程，它们可以命名为 `OnGetAsync/OnPostAsync`。
 
@@ -200,27 +280,29 @@ Razor Pages 还支持根据动词调用方法。方法名的模式应遵循 `OnP
 
 例如，以下代码将调用对应 `PageModel` 类中的 `OnPostDelete/OnPostDeleteAsync` 方法：
 
-[PRE42]
+```cs
+<input type='submit' asp-page-handler='Delete' value='Delete' />s
+```
 
 对于服务配置部分，Razor Pages 可以通过在 `Program` 类中使用 `AddRazorPages` 方法来配置，通过将服务添加到 ASP.NET Core 的 `MapRazorPages` 中间件，并在 `Program` 类中注入，如下代码所示。这样做是为了使所有 Razor 页面都可以使用页面名称进行请求：
 
-[PRE43]
+```cs
+app.MapRazorPages();
+```
 
-这完成了简单的 Razor 页面应用程序设置；我们在 [*第 9 章*](B18507_09_Epub.xhtml#_idTextAnchor860)，*在 .NET 6 中使用数据*，中看到了另一个示例，它使用了 Razor Pages 从数据库中检索数据，使用了 **Entity Framework Core** （**EF Core**）。
+这完成了简单的 Razor 页面应用程序设置；我们在 *第九章*，*在 .NET 6 中使用数据*，中看到了另一个示例，它使用了 Razor Pages 从数据库中检索数据，使用了 **Entity Framework Core** （**EF Core**）。
 
 Razor Pages 是在 ASP.NET Core 中开发 Web 应用程序的最简单形式；然而，对于一种更结构化的开发 Web 应用程序的形式，可以处理复杂功能，我们可以选择 ASP.NET Core MVC。让我们在下一节中探索使用 ASP.NET Core MVC 开发 Web 应用程序。
 
 ## 探索 ASP.NET Core MVC 网站
 
-如其名所示，ASP.NET Core MVC 基于第 10 章*创建 ASP.NET Core 6 Web API*中讨论的 MVC 模式，是 ASP.NET Core 中用于构建 Web 应用程序的框架。我们在第 10 章*创建 ASP.NET Core 6 Web API*中看到，ASP.NET Core Web API 也使用 MVC 模式；然而，ASP.NET Core MVC 还支持用于显示数据的视图。底层设计模式是相同的，其中我们有一个模型来存储数据，一个控制器来传输数据，以及视图来渲染和显示数据。
+如其名所示，ASP.NET Core MVC 基于第十章*创建 ASP.NET Core 6 Web API*中讨论的 MVC 模式，是 ASP.NET Core 中用于构建 Web 应用程序的框架。我们在第十章*创建 ASP.NET Core 6 Web API*中看到，ASP.NET Core Web API 也使用 MVC 模式；然而，ASP.NET Core MVC 还支持用于显示数据的视图。底层设计模式是相同的，其中我们有一个模型来存储数据，一个控制器来传输数据，以及视图来渲染和显示数据。
 
-ASP.NET Core MVC 支持在第 10 章*创建 ASP.NET Core 6 Web API*中讨论的所有功能，例如路由、依赖注入、模型绑定和模型验证，并使用与 Web API 相同的启动技术，即使用 `Program` 类。就像 Web API 一样，.NET 6 应用程序服务和中间件在 `Program` 类中进行配置。
+ASP.NET Core MVC 支持在第十章*创建 ASP.NET Core 6 Web API*中讨论的所有功能，例如路由、依赖注入、模型绑定和模型验证，并使用与 Web API 相同的启动技术，即使用 `Program` 类。就像 Web API 一样，.NET 6 应用程序服务和中间件在 `Program` 类中进行配置。
 
 与 MVC 的一个主要区别是还需要加载视图，因此，我们不是在 `Program` 类中使用 `AddControllers`，而是需要使用 `AddControllersWithViews`。以下图示了一个示例：
 
-![Figure 11.3 – MVC 请求生命周期
-
-![img/Figure_11.3_B18507.jpg](img/Figure_11.3_B18507.jpg)
+![Figure 11.3 – MVC 请求生命周期![img/Figure_11.3_B18507.jpg](img/Figure_11.3_B18507.jpg)
 
 Figure 11.3 – MVC 请求生命周期
 
@@ -228,19 +310,31 @@ Figure 11.3 – MVC 请求生命周期
 
 在 ASP.NET Core MVC 中，控制器操作需要根据 URL 中传递的动作名称进行路由，因此在路由部分，我们不是调用 `MapController`，而是配置 `MapControllerRoute` 并向其传递一个模式。因此，`UseEndpoints` 中间件中的默认路由配置看起来如下代码片段所示：
 
-[PRE44]
+```cs
+app.UseEndpoints(endpoints =>
+```
 
-[PRE45]
+```cs
+{
+```
 
-[PRE46]
+```cs
+endpoints.MapControllerRoute(
+```
 
-[PRE47]
+```cs
+name: 'default',
+```
 
-[PRE48]
+```cs
+pattern: '{controller=Products}/{action=Index}/{id?}');
+```
 
-[PRE49]
+```cs
+});
+```
 
-在这个模式中，我们正在告诉中间件，URL 的第一部分应该是 `controller` 名称，后面跟着动作名称和可选的 `id` 参数。如果 URL 中没有传递任何内容，则默认路由是 `ProductsController` 的 `Index` 动作方法。因此，这主要是我们在第 10 章*创建 ASP.NET Core 6 Web API*中讨论的基于约定的路由。
+在这个模式中，我们正在告诉中间件，URL 的第一部分应该是 `controller` 名称，后面跟着动作名称和可选的 `id` 参数。如果 URL 中没有传递任何内容，则默认路由是 `ProductsController` 的 `Index` 动作方法。因此，这主要是我们在第十章*创建 ASP.NET Core 6 Web API*中讨论的基于约定的路由。
 
 就像 Razor Pages 一样，ASP.NET Core MVC 应用程序中的视图支持 Razor 语法，并允许强类型视图；也就是说，一个视图可以绑定到一个模型进行类型检查，并且模型属性可以与具有编译时智能感知支持的 HTML 控件相关联。
 
@@ -248,7 +342,7 @@ Figure 11.3 – MVC 请求生命周期
 
 注意
 
-总是有一个关于选择前端开发技术的常见问题。以下链接提供了一些关于这个主题的建议：[https://docs.microsoft.com/en-us/dotnet/architecture/modern-web-apps-azure/choose-between-traditional-web-and-single-page-apps](https://docs.microsoft.com/en-us/dotnet/architecture/modern-web-apps-azure/choose-between-traditional-web-and-single-page-apps)。在选择前端技术之前，应该评估所有优点和缺点，因为没有一种适合所有情况的要求。
+总是有一个关于选择前端开发技术的常见问题。以下链接提供了一些关于这个主题的建议：[`docs.microsoft.com/en-us/dotnet/architecture/modern-web-apps-azure/choose-between-traditional-web-and-single-page-apps`](https://docs.microsoft.com/en-us/dotnet/architecture/modern-web-apps-azure/choose-between-traditional-web-and-single-page-apps)。在选择前端技术之前，应该评估所有优点和缺点，因为没有一种适合所有情况的要求。
 
 在这个基础上，让我们继续到下一节，我们将开始将到目前为止开发的后端 API 与我们的表示层集成。
 
@@ -268,7 +362,21 @@ Figure 11.3 – MVC 请求生命周期
 
 1.  首先，让我们向 `Packt.Ecommerce.Web` 项目添加一个名为 `Contracts` 的文件夹，并添加一个名为 `IECommerceService` 的接口。这个接口将包含以下方法：
 
-    [PRE50]
+    ```cs
+    // Method to retrieve all products and filter.
+    Task<IEnumerable<ProductListViewModel>> GetProductsAsync(string filterCriteria = null);
+    // Method to get details of specific product.
+    Task<ProductDetailsViewModel> GetProductByIdAsync(string productId, string productName);
+    // Method to create and order, this method is primarily used to create a cart which is nothing but an order with order status as 'Cart'.
+    Task<OrderDetailsViewModel> CreateOrUpdateOrder(OrderDetailsViewModel order);
+    // Method to retrieve order by ID, also used to retrieve cart/order before checkout.
+    Task<OrderDetailsViewModel> GetOrderByIdAsync(string orderId);
+            Task<InvoiceDetailsViewModel> GetInvoiceByIdAsync(string invoiceId);
+    // Method to submit cart and create invoice.
+    Task<InvoiceDetailsViewModel> SubmitOrder(OrderDetailsViewModel order);
+    // Method to retrieve invoice details by Id.
+    Task<InvoiceDetailsViewModel> GetInvoiceByIdAsync(string invoiceId);
+    ```
 
 1.  现在，让我们添加一个名为 `Services` 的文件夹，并添加一个名为 `EcommerceService` 的类。这个类将继承 `IECommerceService` 并实现所有方法。
 
@@ -280,163 +388,284 @@ Figure 11.3 – MVC 请求生命周期
 
 +   `ApplicationSettings`: 这将使用以下代码使用 `IOptions` 模式配置 `ApplicationSettings` 类：
 
-    [PRE51]
+    ```cs
+    builder.Services.Configure<ApplicationSettings>(this.Configuration.GetSection('ApplicationSettings'));
+    ```
 
-+   `AddHttpClient`: 这将注入 `System.Net.Http.IHttpClientFactory` 和相关类，这将允许我们创建一个 `HttpClient` 对象。此外，我们将配置重试策略和断路器策略，如在第 [*第10章*](B18507_10_Epub.xhtml#_idTextAnchor1040) 中所述，*创建 ASP.NET Core 6 Web API*。
++   `AddHttpClient`: 这将注入 `System.Net.Http.IHttpClientFactory` 和相关类，这将允许我们创建一个 `HttpClient` 对象。此外，我们将配置重试策略和断路器策略，如在第 *第十章* 中所述，*创建 ASP.NET Core 6 Web API*。
 
 +   使用 .NET Core DI 容器将 `EcommerceService` 映射到 `IECommerceService`。
 
 1.  使用以下代码配置应用洞察：
 
-    [PRE52]
+    ```cs
+    string appinsightsInstrumentationKey = this.Configuration.GetValue<string>('AppSettings:InstrumentationKey');
+    if (!string.IsNullOrWhiteSpace(appinsightsInstrumentationKey))
+                {
+                    builder.Services.AddLogging(logging =>
+                    {                                                       logging.AddApplicationInsights(
+                      appinsightsInstrumentationKey);
+                    });                
+                       builder.Services
+                       .AddApplicationInsightsTelemetry 
+                       (appinsightsInstrumentationKey);
+                }
+    ```
 
 接下来，关于中间件，我们将使用`Program`类注入以下中间件，除了默认的路由中间件之外：
 
 +   `UseStatusCodePagesWithReExecute`: 这个中间件用于将请求重定向到除`500`错误代码外的自定义页面。在下一节中，我们将在`ProductController`中添加一个方法，该方法将被执行并基于错误代码加载相关视图。这个中间件接受一个字符串作为输入参数，这实际上是在出现错误时应执行的路由，并且为了传递错误代码，它允许使用占位符`{0}`。因此，中间件配置看起来如下所示：
 
-    [PRE53]
+    ```cs
+    app.UseStatusCodePagesWithReExecute('/Products/Error/{0}');
+    ```
 
-+   **错误处理**：至于表示层，与API不同，我们需要将用户重定向到自定义页面，在运行时失败的情况下，该页面包含相关信息，例如用户友好的错误消息和可以用于稍后检索实际失败的相关的日志ID。然而，在开发环境中，我们可以显示完整的错误以及堆栈。因此，我们将配置两个中间件，如下面的代码所示：
++   **错误处理**：至于表示层，与 API 不同，我们需要将用户重定向到自定义页面，在运行时失败的情况下，该页面包含相关信息，例如用户友好的错误消息和可以用于稍后检索实际失败的相关的日志 ID。然而，在开发环境中，我们可以显示完整的错误以及堆栈。因此，我们将配置两个中间件，如下面的代码所示：
 
-    [PRE54]
+    ```cs
+    {
+    if (env.IsDevelopment())
+        app.UseDeveloperExceptionPage();
+    }
+    else
+    {
+        app.UseExceptionHandler('/Products/Error/500');
+    }
+    ```
 
-在这里，我们可以看到，对于开发环境，我们使用的是`UseDeveloperExceptionPage`中间件，它将加载完整的异常堆栈跟踪，而对于非开发环境，我们使用的是`UseExceptionHandler`中间件，它接受需要执行的错误操作方法的路径。此外，在这里，我们不需要我们的自定义错误处理中间件，因为ASP.NET Core中间件负责将详细的错误记录到日志提供程序，在我们的例子中是应用洞察。
+在这里，我们可以看到，对于开发环境，我们使用的是`UseDeveloperExceptionPage`中间件，它将加载完整的异常堆栈跟踪，而对于非开发环境，我们使用的是`UseExceptionHandler`中间件，它接受需要执行的错误操作方法的路径。此外，在这里，我们不需要我们的自定义错误处理中间件，因为 ASP.NET Core 中间件负责将详细的错误记录到日志提供程序，在我们的例子中是应用洞察。
 
-+   `UseStaticFiles`: 为了允许各种静态文件，如CSS、JavaScript、图像以及任何其他静态文件，我们不需要通过整个请求管道，这就是这个中间件发挥作用的地方，它允许服务静态文件并支持为静态文件短路其余的管道。
++   `UseStaticFiles`: 为了允许各种静态文件，如 CSS、JavaScript、图像以及任何其他静态文件，我们不需要通过整个请求管道，这就是这个中间件发挥作用的地方，它允许服务静态文件并支持为静态文件短路其余的管道。
 
 回到`EcommerceService`类，让我们首先定义这个类的局部变量和构造函数，它将使用以下代码注入`HTTPClient`工厂和`ApplicationSettings`：
 
-[PRE55]
+```cs
+private readonly HttpClient httpClient;
+```
 
-[PRE56]
+```cs
+private readonly ApplicationSettings applicationSettings;
+```
 
-[PRE57]
+```cs
+public ECommerceService(IHttpClientFactory httpClientFactory, IOptions<ApplicationSettings> applicationSettings)
+```
 
-[PRE58]
+```cs
+{
+```
 
-[PRE59]
+```cs
+NotNullValidator.ThrowIfNull(applicationSettings, nameof(applicationSettings));
+```
 
-[PRE60]
+```cs
+IHttpClientFactory httpclientFactory = httpClientFactory;
+```
 
-[PRE61]
+```cs
+this.httpClient = httpclientFactory.CreateClient();
+```
 
-[PRE62]
+```cs
+this.applicationSettings = applicationSettings.Value;
+```
 
-[PRE63]
+```cs
+}
+```
 
-现在，为了按照我们的`IECommerceService`接口实现方法，我们将使用以下步骤来处理Get API：
+现在，为了按照我们的`IECommerceService`接口实现方法，我们将使用以下步骤来处理 Get API：
 
-![图11.4 – API的Get调用
+![图 11.4 – API 的 Get 调用](img/Figure_11.4_B18507.jpg)
 
-](img/Figure_11.4_B18507.jpg)
-
-图11.4 – API的Get调用
+图 11.4 – API 的 Get 调用
 
 根据前面图中的步骤，`GetProductsAsync`的实现，主要用于检索用于着陆页的产品并在进行产品搜索时应用任何过滤器，将如下所示：
 
-[PRE64]
+```cs
+public async Task<IEnumerable<ProductListViewModel>> GetProductsAsync(string filterCriteria = null)
+```
 
-[PRE65]
+```cs
+{
+```
 
-[PRE66]
+```cs
+    IEnumerable<ProductListViewModel> products = new List<ProductListViewModel>();
+```
 
-[PRE67]
+```cs
+    using var productRequest = new 
+```
 
-[PRE68]
+```cs
+      HttpRequestMessage(HttpMethod.Get, 
+```
 
-[PRE69]
+```cs
+        $'{this.applicationSettings.ProductsApiEndpoint}
+```
 
-[PRE70]
+```cs
+        ?filterCriteria={filterCriteria}');
+```
 
-[PRE71]
+```cs
+    var productResponse = await this.httpClient.SendAsync(
+```
 
-[PRE72]
+```cs
+      productRequest).ConfigureAwait(false);
+```
 
-[PRE73]
+```cs
+    if (!productResponse.IsSuccessStatusCode)
+```
 
-[PRE74]
+```cs
+    {        await this.ThrowServiceToServiceErrors(
+```
 
-[PRE75]
+```cs
+               productResponse).ConfigureAwait(false);
+```
 
-[PRE76]
+```cs
+    }
+```
 
-[PRE77]
+```cs
+    if (productResponse.StatusCode != 
+```
 
-[PRE78]
+```cs
+      System.Net.HttpStatusCode.NoContent)
+```
 
-[PRE79]
+```cs
+    {
+```
 
-[PRE80]
+```cs
+        products = await productResponse.Content
+```
 
-[PRE81]
+```cs
+          .ReadFromJsonAsync<Ienumerable
+```
 
-[PRE82]
+```cs
+           <ProductListViewModel>>().ConfigureAwait(false);
+```
 
-[PRE83]
+```cs
+    }
+```
 
-[PRE84]
+```cs
+    return products;
+```
 
-[PRE85]
+```cs
+}
+```
 
 对于`POST`/`PUT` API，我们将有类似的步骤，但略有修改，如下面的图所示：
 
-![图11.5 – API调用后的情况
+![图 11.5 – API 调用后的情况](img/Figure_11.5_B18507.jpg)
 
-](img/Figure_11.5_B18507.jpg)
-
-图11.5 – API的Post调用
+图 11.5 – API 的 Post 调用
 
 基于此，`CreateOrUpdateOrder`的策略实现，主要用于创建购物车，其代码如下所示：
 
-[PRE86]
+```cs
+public async Task<OrderDetailsViewModel> CreateOrUpdateOrder(OrderDetailsViewModel order)
+```
 
-[PRE87]
+```cs
+{
+```
 
-[PRE88]
+```cs
+    NotNullValidator.ThrowIfNull(order, nameof(order));
+```
 
-[PRE89]
+```cs
+    using var orderRequest = new 
+```
 
-[PRE90]
+```cs
+      StringContent(JsonSerializer.Serialize(order), 
+```
 
-[PRE91]
+```cs
+      Encoding.UTF8, ContentType);
+```
 
-[PRE92]
+```cs
+    var orderResponse = await this.httpClient.PostAsync(new 
+```
 
-[PRE93]
+```cs
+      Uri($'{this.applicationSettings.OrdersApiEndpoint}'), 
+```
 
-[PRE94]
+```cs
+      orderRequest).ConfigureAwait(false);
+```
 
-[PRE95]
+```cs
+    if (!orderResponse.IsSuccessStatusCode)
+```
 
-[PRE96]
+```cs
+    {
+```
 
-[PRE97]
+```cs
+        await this.ThrowServiceToServiceErrors(
+```
 
-[PRE98]
+```cs
+          orderResponse).ConfigureAwait(false);
+```
 
-[PRE99]
+```cs
+    }
+```
 
-[PRE100]
+```cs
+    var createdOrder = await orderResponse.Content
+```
 
-[PRE101]
+```cs
+      .ReadFromJsonAsync<OrderDetailsViewModel>()
+```
 
-[PRE102]
+```cs
+      .ConfigureAwait(false);
+```
 
-[PRE103]
+```cs
+    return createdOrder;
+```
 
-[PRE104]
+```cs
+}
+```
 
-同样，我们将使用前面提到的一种策略和相关的API端点来实现`GetProductByIdAsync`、`GetOrderByIdAsync`、`GetInvoiceByIdAsync`和`SubmitOrder`。
+同样，我们将使用前面提到的一种策略和相关的 API 端点来实现`GetProductByIdAsync`、`GetOrderByIdAsync`、`GetInvoiceByIdAsync`和`SubmitOrder`。
 
 现在，让我们创建将与`EcommerceService`通信并加载相关视图的控制器和操作方法。
 
 # 创建控制器和操作
 
-我们已经看到，路由负责将请求URI映射到控制器中的操作方法，因此让我们进一步了解操作方法是如何加载相应视图的。正如您所注意到的，ASP.NET Core MVC项目中的所有视图都是`Views`文件夹的一部分，当操作方法执行完成后，它只需简单地查找`Views/<ControllerName>/<Action>.cshtml`。
+我们已经看到，路由负责将请求 URI 映射到控制器中的操作方法，因此让我们进一步了解操作方法是如何加载相应视图的。正如您所注意到的，ASP.NET Core MVC 项目中的所有视图都是`Views`文件夹的一部分，当操作方法执行完成后，它只需简单地查找`Views/<ControllerName>/<Action>.cshtml`。
 
 例如，将操作方法映射到`Products/Index`路由将加载`Views/Products/Index.cshtml`视图。这是通过在每个操作方法结束时调用`Microsoft.AspNetCore.Mvc.Controller.View`方法来处理的。
 
-除了可以覆盖此行为并按需路由到不同视图的额外重载和辅助方法外，我们将在讨论这些辅助方法之前，就像Web API一样，MVC控制器中的每个操作方法也可以返回`IActionResult`，这意味着我们可以利用辅助方法来重定向到视图。在ASP.NET Core MVC中，每个控制器都继承自基类`Microsoft.AspNetCore.Mvc.Controller`，该类包含一些辅助方法，并通过以下`Microsoft.AspNetCore.Mvc.Controller`类中的辅助方法来处理通过操作方法加载视图：
+除了可以覆盖此行为并按需路由到不同视图的额外重载和辅助方法外，我们将在讨论这些辅助方法之前，就像 Web API 一样，MVC 控制器中的每个操作方法也可以返回`IActionResult`，这意味着我们可以利用辅助方法来重定向到视图。在 ASP.NET Core MVC 中，每个控制器都继承自基类`Microsoft.AspNetCore.Mvc.Controller`，该类包含一些辅助方法，并通过以下`Microsoft.AspNetCore.Mvc.Controller`类中的辅助方法来处理通过操作方法加载视图：
 
 +   `View`：此方法具有多种重载，主要根据控制器名称从`Views`文件夹下的文件夹加载视图。例如，在`ProductsController`中调用此方法可以加载`Views/Products`文件夹中的任何`.cshtml`文件。此外，它还可以接受视图名称，如果需要，可以加载，并支持通过强类型化视图来传递可以由视图检索的对象。
 
@@ -444,7 +673,7 @@ Figure 11.3 – MVC 请求生命周期
 
 简而言之，为了加载视图并从控制器传递数据，我们将通过`View`方法传递相应的模型，并在需要时使用`RedirectToAction`来调用另一个操作方法。
 
-现在，问题是如何处理数据检索（`GET`调用）与数据提交（`POST`调用），在ASP.NET Core MVC中，所有动作方法都支持使用`HttpGet`和`HttpPost`属性来标记HTTP动词。以下是一些可以用来标记方法的规则：
+现在，问题是如何处理数据检索（`GET`调用）与数据提交（`POST`调用），在 ASP.NET Core MVC 中，所有动作方法都支持使用`HttpGet`和`HttpPost`属性来标记 HTTP 动词。以下是一些可以用来标记方法的规则：
 
 +   如果我们想要检索数据，则动作方法应使用`HttpGet`进行标记。
 
@@ -456,33 +685,53 @@ Figure 11.3 – MVC 请求生命周期
 
 所有这些控制器都将具有以下两个共同属性，一个用于日志记录，另一个用于调用`EcommerceService`的方法。它们将通过构造函数注入进一步初始化，如下所示：
 
-[PRE105]
+```cs
+private readonly ILogger<ProductsController> logger;
+```
 
-[PRE106]
+```cs
+private readonly IECommerceService eCommerceService;
+```
 
 让我们现在讨论每个控制器中定义的内容：
 
-+   `ProductsController`：此控制器将包含一个`public async Task<IActionResult> Index(string searchString, string category)`动作方法，用于加载列出所有产品的默认视图，并进一步支持过滤。将会有另一个方法，`public async Task<IActionResult> Details(string productId, string productName)`，它接受产品的ID和名称，并加载指定产品的详细信息。由于这两个方法都用于检索，因此它们将使用`[HttpGet]`进行标记。此外，此控制器将具有之前讨论过的`Error`方法。由于它可以从`UseStatusCodePagesWithReExecute`中间件接收错误代码作为输入参数，因此我们将有简单的逻辑来相应地加载视图：
++   `ProductsController`：此控制器将包含一个`public async Task<IActionResult> Index(string searchString, string category)`动作方法，用于加载列出所有产品的默认视图，并进一步支持过滤。将会有另一个方法，`public async Task<IActionResult> Details(string productId, string productName)`，它接受产品的 ID 和名称，并加载指定产品的详细信息。由于这两个方法都用于检索，因此它们将使用`[HttpGet]`进行标记。此外，此控制器将具有之前讨论过的`Error`方法。由于它可以从`UseStatusCodePagesWithReExecute`中间件接收错误代码作为输入参数，因此我们将有简单的逻辑来相应地加载视图：
 
-    [PRE107]
+    ```cs
+    [Route('/Products/Error/{code:int}')]
+    public IActionResult Error(int code)
+    {
+        if (code == 404)
+        {
+            return 
+              this.View('~/Views/Shared/NotFound.cshtml');
+        }
+        else
+        {
+            return 
+             this.View('~/Views/Shared/Error.cshtml', new 
+             ErrorViewModel { CorrelationId = 
+             Activity.Current?.RootId ?? 
+             this.HttpContext.TraceIdentifier });
+        }
+    }
+    ```
 
-+   `CartController`：此控制器包含一个`public async Task<IActionResult> Index(ProductListViewModel product)`动作方法，用于将产品添加到购物车中。我们将创建一个订单，并将订单状态设置为`'Cart'`，因为这需要接收数据并将其进一步传递到API，该API将被标记为`[HttpPost]`。为了简化，这里将其留为匿名，但可以限制对已登录用户的访问。一旦创建订单，此方法将使用`RedirectToAction`辅助方法，并将重定向到控制器内的`public async Task<IActionResult> Index(string orderId)`动作方法，该方法进一步加载包含所有产品的购物车和结账表单。此方法也可以直接导航到购物车。
++   `CartController`：此控制器包含一个`public async Task<IActionResult> Index(ProductListViewModel product)`动作方法，用于将产品添加到购物车中。我们将创建一个订单，并将订单状态设置为`'Cart'`，因为这需要接收数据并将其进一步传递到 API，该 API 将被标记为`[HttpPost]`。为了简化，这里将其留为匿名，但可以限制对已登录用户的访问。一旦创建订单，此方法将使用`RedirectToAction`辅助方法，并将重定向到控制器内的`public async Task<IActionResult> Index(string orderId)`动作方法，该方法进一步加载包含所有产品的购物车和结账表单。此方法也可以直接导航到购物车。
 
 +   `OrdersController`: 这是流程中的最后一个控制器，其中包含一个`public async Task<IActionResult> Create(OrderDetailsViewModel order)`动作方法，用于在填写支付详情后提交订单。此方法将订单状态更新为`Submitted`，然后为订单创建发票，最后重定向到另一个动作方法`public async Task<IActionResult> Index(string invoiceId)`，该方法加载订单的最终发票并完成交易。
 
 下面的图表示了控制器之间完成购物流程的方法之间的流程：
 
-![图11.6 – 控制器动作方法之间的流程
+![图 11.6 – 控制器动作方法之间的流程](img/Figure_11.6_B18507.jpg)
 
-](img/Figure_11.6_B18507.jpg)
-
-图11.6 – 控制器动作方法之间的流程
+图 11.6 – 控制器动作方法之间的流程
 
 基于这些知识，让我们在下一节中设计视图。
 
-# 使用ASP.NET Core MVC创建UI
+# 使用 ASP.NET Core MVC 创建 UI
 
-到目前为止，我们已经定义了一个服务来与后端API通信，并进一步定义了将使用模型将数据传递给视图的控制器。现在，让我们构建各种视图，这些视图将渲染数据并向用户展示。
+到目前为止，我们已经定义了一个服务来与后端 API 通信，并进一步定义了将使用模型将数据传递给视图的控制器。现在，让我们构建各种视图，这些视图将渲染数据并向用户展示。
 
 首先，让我们看看参与渲染视图的各种组件：
 
@@ -490,21 +739,44 @@ Figure 11.3 – MVC 请求生命周期
 
 要添加一个视图，我们可以在动作方法上右键单击并选择**添加视图**，这将自动创建一个（如果尚未存在）以控制器命名的文件夹，并添加视图。此外，在执行此操作时，我们可以指定视图将绑定到的模型。
 
-+   `Layout`页面：在Web应用程序中，我们通常有一个跨应用共用的部分，例如带有菜单或左侧导航的页眉。为了使我们的页面具有模块化结构并避免重复，ASP.Net Core MVC提供了一个名为`_Layout.cshtml`的布局页面，它是`Views/Shared`文件夹的一部分。这个页面可以用作我们MVC项目中所有视图的父页面。一个典型的布局页面如下所示：
++   `Layout`页面：在 Web 应用程序中，我们通常有一个跨应用共用的部分，例如带有菜单或左侧导航的页眉。为了使我们的页面具有模块化结构并避免重复，ASP.Net Core MVC 提供了一个名为`_Layout.cshtml`的布局页面，它是`Views/Shared`文件夹的一部分。这个页面可以用作我们 MVC 项目中所有视图的父页面。一个典型的布局页面如下所示：
 
-    [PRE108]
+    ```cs
+    <!DOCTYPE html>
+    <html lang='en'>
+    <head>
+        <meta charset='utf-8'>
+        <meta name='viewport' content='width=device-width, 
+         initial-scale=1'>
+        <meta http-equiv='x-ua-compatible' 
+         content='ie=edge'>
+        <title>Ecommerce Packt</title>
+    </head>
+    <body class='hold-transition sidebar-mini layout-top-nav'>    
+            <!-- Navbar -->        
+            <!-- Main content -->        
+             @RenderBody()
+    </body>
+    </html>
+    ```
 
-在这里，你可以看到它允许我们定义应用程序的骨架布局，然后最后，有一个名为`@RenderBody()`的Razor方法，它实际上加载了子视图。要指定任何视图中的布局页面，我们可以使用以下语法，它将`_Layout.cshtml`添加为视图的父页面：
+在这里，你可以看到它允许我们定义应用程序的骨架布局，然后最后，有一个名为`@RenderBody()`的 Razor 方法，它实际上加载了子视图。要指定任何视图中的布局页面，我们可以使用以下语法，它将`_Layout.cshtml`添加为视图的父页面：
 
-[PRE109]
+```cs
+@{
+    Layout = '~/Views/Shared/__Layout.cshtml';
+}
+```
 
 然而，没有必要在所有视图中重复此代码，这正是`_ViewStart.cshtml`发挥作用的地方。让我们看看它是如何帮助我们在视图之间重用一些代码的：
 
 +   `_ViewStart.cshtml`：这是一个通用的视图，位于 `Views` 文件夹下，并由 Razor 引擎执行需要在视图代码之前执行的任何代码。因此，通常情况下，它用于定义布局页面，所以前面的代码可以添加到这个文件中，以便它在整个应用程序中应用。
 
-+   `_ViewImports.cshtml`：这是另一个可以用于在应用程序中导入任何公共指令或命名空间的页面。就像 `_ViewStart` 一样，它也位于根文件夹下；然而，`_ViewStart` 和 `_ViewImport` 可以在一个（或多个）文件夹中，并且它们是按照从根视图文件夹中的开始，到任何子文件夹中的低级别文件夹的顺序执行的。要启用使用 Application Insights 的客户端遥测，我们按照以下代码注入 `JavaScriptSnippet`。我们在 [*第 5 章*](B18507_05_Epub.xhtml#_idTextAnchor445) 中学习了如何将依赖服务注入到视图中，*在 .NET 6 中的依赖注入*。在以下代码中，`JavaScriptSnippet` 被注入到视图中：
++   `_ViewImports.cshtml`：这是另一个可以用于在应用程序中导入任何公共指令或命名空间的页面。就像 `_ViewStart` 一样，它也位于根文件夹下；然而，`_ViewStart` 和 `_ViewImport` 可以在一个（或多个）文件夹中，并且它们是按照从根视图文件夹中的开始，到任何子文件夹中的低级别文件夹的顺序执行的。要启用使用 Application Insights 的客户端遥测，我们按照以下代码注入 `JavaScriptSnippet`。我们在 *第五章* 中学习了如何将依赖服务注入到视图中，*在 .NET 6 中的依赖注入*。在以下代码中，`JavaScriptSnippet` 被注入到视图中：
 
-    [PRE110]
+    ```cs
+        @inject Microsoft.ApplicationInsights.AspNetCore.JavaScriptSnippet JavaScriptSnippet
+    ```
 
 +   `wwwroot`：这是应用程序的根文件夹，所有静态资源，如 JavaScript、CSS 以及任何图像文件，都放置在这里。这里还可以存放我们希望在应用程序中使用的任何 HTML 插件。由于我们已经在应用程序中配置了 `UseStaticFiles` 中间件，因此文件夹中的内容可以直接提供服务，无需任何处理。ASP.NET Core MVC 的默认模板根据类型对文件夹进行了隔离；例如，所有 JavaScript 文件都放置在 `js` 文件夹中，CSS 文件放置在 `css` 文件夹中，等等。我们将坚持使用这种文件夹结构来构建我们的应用程序。
 
@@ -518,9 +790,9 @@ Figure 11.3 – MVC 请求生命周期
 
 让我们执行以下步骤以将 `AdminLTE` 集成到我们的应用程序中：
 
-1.  从这里下载 `AdminLTE` 的最新版本：[https://github.com/ColorlibHQ/AdminLTE/releases](https://github.com/ColorlibHQ/AdminLTE/releases)。
+1.  从这里下载 `AdminLTE` 的最新版本：[`github.com/ColorlibHQ/AdminLTE/releases`](https://github.com/ColorlibHQ/AdminLTE/releases)。
 
-1.  提取之前下载的ZIP文件，并导航到`AdminLTE-3.0.5\dist\css`。复制`adminlte.min.css`，并将其粘贴到`Packt.Ecommerce.Web`的`wwwroot/css`文件夹内。
+1.  提取之前下载的 ZIP 文件，并导航到`AdminLTE-3.0.5\dist\css`。复制`adminlte.min.css`，并将其粘贴到`Packt.Ecommerce.Web`的`wwwroot/css`文件夹内。
 
 1.  导航到`AdminLTE-3.0.5\dist\js`。复制`adminlte.min.js`，并将其粘贴到`Packt.Ecommerce.Web`的`wwwroot/js`文件夹内。
 
@@ -528,7 +800,7 @@ Figure 11.3 – MVC 请求生命周期
 
 1.  复制`AdminLTE-3.0.5\plugins`文件夹，并将其粘贴到`Packt.Ecommerce.Web`的`wwwroot`文件夹内。
 
-更多关于`AdminLTE`的信息可以在[https://adminlte.io/docs/2.4/installation](https://adminlte.io/docs/2.4/installation)找到。
+更多关于`AdminLTE`的信息可以在[`adminlte.io/docs/2.4/installation`](https://adminlte.io/docs/2.4/installation)找到。
 
 现在，导航到`Views/_Layout.cshtml`页面，删除所有现有代码，并用`Packt.Ecommerce.Web\Views\Shared_Layout.cshtml`中的代码替换它。从高层次上讲，布局分为以下几部分：
 
@@ -546,63 +818,82 @@ Figure 11.3 – MVC 请求生命周期
 
 +   在`<head>`标签中添加以下样式定义：
 
-    [PRE111]
+    ```cs
+    <link rel='stylesheet' href='~/plugins/fontawesome-free/css/all.min.css'>
+    <link rel='stylesheet' href='~/css/adminlte.min.css'>
+    ```
 
-+   在`<body>`标签的末尾之前添加以下JavaScript文件：
++   在`<body>`标签的末尾之前添加以下 JavaScript 文件：
 
-    [PRE112]
+    ```cs
+    <!-- REQUIRED SCRIPTS (Order shouldn't matter)-->
+    <!-- jQuery -->
+    <script src='~/plugins/jquery/jquery.min.js'></script>
+    <!-- Bootstrap 4 -->
+    <script src='~/plugins/bootstrap/js/bootstrap.bundle.min.js'></script>
+    <!-- AdminLTE App -->
+    <script src='~/js/adminlte.min.js'></script>
+    ```
 
-通过这种方式，我们已经将`AdminLTE`主题集成到我们的应用程序中。要使用Application Insights启用客户端遥测所需的JavaScript，请在`_Layout.cshtml`的`head`标签内添加以下代码：
+通过这种方式，我们已经将`AdminLTE`主题集成到我们的应用程序中。要使用 Application Insights 启用客户端遥测所需的 JavaScript，请在`_Layout.cshtml`的`head`标签内添加以下代码：
 
-[PRE113]
+```cs
+    @Html.Raw(JavaScriptSnippet.FullScript)
+```
 
-之前的代码注入了发送遥测数据所需的JavaScript，以及仪表化密钥。与服务器端或客户端不同，仪表化密钥是公开的。任何人都可以从浏览器开发者工具中看到仪表化密钥。但是，这就是客户端遥测的设置方式。此时，这种风险是恶意用户或攻击者可以通过仪表化密钥的只写访问权限推送不希望的数据。如果您希望使客户端遥测更安全，您可以从您的服务中公开一个安全的REST API，并从那里记录遥测事件。您将在[*第14章*](B18507_14_Epub.xhtml#_idTextAnchor1674)中了解更多关于Application Insights功能的信息，*健康和诊断*。
+之前的代码注入了发送遥测数据所需的 JavaScript，以及仪表化密钥。与服务器端或客户端不同，仪表化密钥是公开的。任何人都可以从浏览器开发者工具中看到仪表化密钥。但是，这就是客户端遥测的设置方式。此时，这种风险是恶意用户或攻击者可以通过仪表化密钥的只写访问权限推送不希望的数据。如果您希望使客户端遥测更安全，您可以从您的服务中公开一个安全的 REST API，并从那里记录遥测事件。您将在*第十四章*中了解更多关于 Application Insights 功能的信息，*健康和诊断*。
 
 现在，应用程序布局已准备就绪。让我们现在继续定义应用程序中的各种视图。
 
-### 创建Products/Index视图
+### 创建 Products/Index 视图
 
 此视图将用于列出我们电子商务应用程序上所有可用的产品，并且使用`IEnumerable<Packt.Ecommerce.DTO.Models.ProductListViewModel>`模型进行强类型化。它使用`ProductsController`的`Index`操作方法检索数据。
 
 在此视图中，我们将使用简单的 Razor `@foreach (var item in Model)` 循环，并为每个产品显示产品的图片、名称和价格。以下截图展示了此视图的一个示例：
 
-![图11.7 – 产品视图
+![图 11.7 – 产品视图](img/Figure_11.7_B18507.jpg)
 
-](img/Figure_11.7_B18507.jpg)
+图 11.7 – 产品视图
 
-图11.7 – 产品视图
-
-在这里，您可以看到有一个搜索栏和一个来自布局页面的分类下拉菜单。点击产品图片将导航到 `Products/Details` 视图。为了支持此导航，我们将使用 `AnchorTagHelper` 并将产品ID和名称传递给 `ProductsController` 的 `Details` 动作方法，以便进一步在 `Products/Details` 视图中加载产品的详细信息。
+在这里，您可以看到有一个搜索栏和一个来自布局页面的分类下拉菜单。点击产品图片将导航到 `Products/Details` 视图。为了支持此导航，我们将使用 `AnchorTagHelper` 并将产品 ID 和名称传递给 `ProductsController` 的 `Details` 动作方法，以便进一步在 `Products/Details` 视图中加载产品的详细信息。
 
 ### 创建 Products/Details 视图
 
-此视图将根据从 `Products/Index` 视图传递的产品ID和名称加载产品的详细信息。我们将使用以下示例页面：[https://adminlte.io/themes/dev/AdminLTE/pages/examples/e_commerce.html](https://adminlte.io/themes/dev/AdminLTE/pages/examples/e_commerce.html)。
+此视图将根据从 `Products/Index` 视图传递的产品 ID 和名称加载产品的详细信息。我们将使用以下示例页面：[`adminlte.io/themes/dev/AdminLTE/pages/examples/e_commerce.html`](https://adminlte.io/themes/dev/AdminLTE/pages/examples/e_commerce.html)。
 
 此页面将使用 `Packt.Ecommerce.DTO.Models.ProductDetailsViewModel` 进行强类型定义，并显示产品的所有详细信息。以下截图展示了此页面的一个示例：
 
-![图11.8 – 产品详情视图
+![图 11.8 – 产品详情视图](img/Figure_11.8_B18507.jpg)
 
-](img/Figure_11.8_B18507.jpg)
-
-图11.8 – 产品详情视图
+图 11.8 – 产品详情视图
 
 如您所见，有一个 `'Cart'`，这将调用 `CartController` 的 `Index` 动作方法以创建购物车。
 
-要将数据传递回动作方法，我们将借助 `FormTagHelper`，它允许我们将页面包裹在一个HTML表单中，并使用以下代码指定页面可以提交到的动作和控制器：
+要将数据传递回动作方法，我们将借助 `FormTagHelper`，它允许我们将页面包裹在一个 HTML 表单中，并使用以下代码指定页面可以提交到的动作和控制器：
 
-[PRE114]
+```cs
+<form asp-action='Index' asp-controller='Cart'>
+```
 
 使用此代码，一旦提交为 `Submit` 类型，页面就会提交到 `CartController` 的 `Index` 动作方法，以便进一步将其保存到数据库。然而，我们仍然需要将产品详情传递回 `Index` 动作方法，为此，我们将借助 `InputTagHelper` 并为所有需要传递回动作方法的值创建隐藏字段。
 
 这里最重要的是隐藏变量的名称应与模型中属性的名称匹配，因此我们将在表单内添加以下代码，以将产品值传递回控制器：
 
-[PRE115]
+```cs
+<input asp-for='Id' type='hidden'>
+```
 
-[PRE116]
+```cs
+<input asp-for='Name' type='hidden'>
+```
 
-[PRE117]
+```cs
+<input asp-for='Price' type='hidden'>
+```
 
-[PRE118]
+```cs
+<input asp-for='ImageUrls[0]' type='hidden'>
+```
 
 ASP.NET Core MVC 的模型绑定系统读取这些值，并为 `CartController` 的 `Index` 方法创建所需的产品对象，然后进一步调用后端系统以创建订单。
 
@@ -610,51 +901,77 @@ ASP.NET Core MVC 的模型绑定系统读取这些值，并为 `CartController` 
 
 此视图将加载购物车详情，并将有一个填写所有详细信息并完成订单的结账表单。在此，我们可以导航回主页以添加更多产品或完成订单。
 
-此视图使用 `Packt.Ecommerce.DTO.Models.OrderDetailsViewModel` 进行强类型化，并使用 `OrdersController` 的 `Index` 动作方法加载数据。在这里，我们使用了来自 [https://getbootstrap.com/docs/4.5/examples/checkout/](https://getbootstrap.com/docs/4.5/examples/checkout/) 的 Bootstrap 结账表单示例。
+此视图使用 `Packt.Ecommerce.DTO.Models.OrderDetailsViewModel` 进行强类型化，并使用 `OrdersController` 的 `Index` 动作方法加载数据。在这里，我们使用了来自 [`getbootstrap.com/docs/4.5/examples/checkout/`](https://getbootstrap.com/docs/4.5/examples/checkout/) 的 Bootstrap 结账表单示例。
 
 此表单利用模型验证和 HTML 属性对必填字段进行验证，我们借助 ASP.NET Core MVC 标签辅助器和一些 HTML 辅助器来渲染表单。以下代码展示了具有模型验证的示例属性：
 
-[PRE119]
+```cs
+public class AddressViewModel
+```
 
-[PRE120]
+```cs
+{
+```
 
-[PRE121]
+```cs
+        [Required(ErrorMessage = 'Address is required')]
+```
 
-[PRE122]
+```cs
+        public string Address1 { get; set; }      
+```
 
-[PRE123]
+```cs
+        [Required(ErrorMessage = 'City is required')]
+```
 
-[PRE124]
+```cs
+        public string City { get; set; }
+```
 
-[PRE125]
+```cs
+        [Required(ErrorMessage = 'Country is required')]
+```
 
-[PRE126]
+```cs
+        public string Country { get; set; }
+```
 
-[PRE127]
+```cs
+}
+```
 
-此模型用于 [https://github.com/PacktPublishing/Enterprise-Application-Development-with-C-10-and-.NET-6-Second-Edition/blob/main/Enterprise%20Application/src/platform-apis/data/Packt.Ecommerce.DTO.Models/OrderDetailsViewModel.cs](https://github.com/PacktPublishing/Enterprise-Application-Development-with-C-10-and-.NET-6-Second-Edition/blob/main/Enterprise%20Application/src/platform-apis/data/Packt.Ecommerce.DTO.Models/OrderDetailsViewModel.cs) 并在下单时触发必要的验证。
+此模型用于 [`github.com/PacktPublishing/Enterprise-Application-Development-with-C-10-and-.NET-6-Second-Edition/blob/main/Enterprise%20Application/src/platform-apis/data/Packt.Ecommerce.DTO.Models/OrderDetailsViewModel.cs`](https://github.com/PacktPublishing/Enterprise-Application-Development-with-C-10-and-.NET-6-Second-Edition/blob/main/Enterprise%20Application/src/platform-apis/data/Packt.Ecommerce.DTO.Models/OrderDetailsViewModel.cs) 并在下单时触发必要的验证。
 
 由于此表单也需要提交，整个表单被包裹在 `FormTagHelper` 中，如下面的代码所示：
 
-[PRE128]
+```cs
+<form asp-action='Create' asp-controller='Orders'>
+```
 
 要在 UI 上显示这些验证，请将以下脚本添加到 `_layout.cshtml` 中，在添加了所有其他脚本之后：
 
-[PRE129]
+```cs
+<script src='~/lib/jquery-validation/dist/jquery.validate.min.js'></script>
+```
 
-[PRE130]
+```cs
+<script src='~/lib/jquery-validation-unobtrusive/jquery.validate.unobtrusive.min.js'></script>
+```
 
 要显示错误消息，我们可以使用验证消息标签辅助器，如下面的代码片段所示。在服务器端，这可以通过 `ModelState.IsValid` 进一步评估：
 
-[PRE131]
+```cs
+<input asp-for='ShippingAddress.Address1' class='form-control' placeholder='1234 Main St'/>
+```
 
-[PRE132]
+```cs
+<span asp-validation-for='ShippingAddress.Address1' class='text-danger'></span>
+```
 
 此页面的示例截图如下：
 
-![图 11.9 – 购物车和结账页面
-
-](img/Figure_11.9_B18507.jpg)
+![图 11.9 – 购物车和结账页面](img/Figure_11.9_B18507.jpg)
 
 图 11.9 – 购物车和结账页面
 
@@ -662,15 +979,13 @@ ASP.NET Core MVC 的模型绑定系统读取这些值，并为 `CartController` 
 
 注意
 
-在前面的屏幕截图中，尽管在生产应用中我们有一个包含支付信息的结账表单，但我们将与第三方支付网关集成，通常，整个表单都位于应用程序的支付网关侧，出于各种安全原因。[https://razorpay.com/docs/payment-gateway/server-integration/dot-net/](https://razorpay.com/docs/payment-gateway/server-integration/dot-net/) 和 [https://stripe.com/docs/api](https://stripe.com/docs/api) 是这类第三方提供商的几个例子，它们有助于支付网关集成。
+在前面的屏幕截图中，尽管在生产应用中我们有一个包含支付信息的结账表单，但我们将与第三方支付网关集成，通常，整个表单都位于应用程序的支付网关侧，出于各种安全原因。[`razorpay.com/docs/payment-gateway/server-integration/dot-net/`](https://razorpay.com/docs/payment-gateway/server-integration/dot-net/) 和 [`stripe.com/docs/api`](https://stripe.com/docs/api) 是这类第三方提供商的几个例子，它们有助于支付网关集成。
 
 ### 创建 Orders/Index 视图
 
 最后，我们将有一个查看订单发票的视图，这是一个简单的只读视图，显示从 `OrdersController` 的 `Index` 动作方法发送的发票信息。以下截图显示了此页面的一个示例：
 
-![图 11.10 – 最终发票
-
-](img/Figure_11.10_B18507.jpg)
+![图 11.10 – 最终发票](img/Figure_11.10_B18507.jpg)
 
 图 11.10 – 最终发票
 
@@ -682,23 +997,41 @@ Blazor 是从 .NET Core 3.1 开始可用的新框架，用于开发应用程序�
 
 所有的 Blazor 编写代码都放在一个名为 `.Razor` 的地方，用于表示应用程序；无论是整个网页还是一个小对话框弹出窗口，所有内容都在 Blazor 应用程序中作为一个组件创建。一个典型的 Razor 组件如下代码片段所示：
 
-[PRE133]
+```cs
+@page '/counter'
+```
 
-[PRE134]
+```cs
+<h1>Counter</h1>
+```
 
-[PRE135]
+```cs
+<p>Current count: @currentCount</p>
+```
 
-[PRE136]
+```cs
+<button class='btn btn-primary' @onclick='IncrementCount'>Click me</button>
+```
 
-[PRE137]
+```cs
+@code {
+```
 
-[PRE138]
+```cs
+    private int currentCount = 0;
+```
 
-[PRE139]
+```cs
+    private void IncrementCount()
+```
 
-[PRE140]
+```cs
+    {        currentCount++;    }
+```
 
-[PRE141]
+```cs
+}
+```
 
 在此代码中，我们创建了一个页面，该页面在按钮点击时增加计数器，点击事件的逻辑由 C# 代码处理，该代码更新 HTML 中的值。此页面可以通过 `/counter` 相对 URL 访问。
 
@@ -706,21 +1039,17 @@ Blazor 与其他 MVC/Razor Pages 之间的主要区别在于，与请求-响应�
 
 +   **Blazor WebAssembly**（**WASM**）：WASM 是可以在现代浏览器上运行的低级指令，这有助于在浏览器上运行用高级语言（如 C#）编写的代码，而无需任何附加插件。Blazor WASM 托管模型利用 WASM 提供的开放网络标准，在浏览器上的沙盒环境中运行任何 Blazor WASM 应用程序的 C# 代码。在较高层次上，所有 Blazor 组件都编译成 .NET 程序集，并下载到浏览器，WASM 加载 .NET Core 运行时和所有程序集。它进一步使用 JavaScript 互操作来刷新 DOM；唯一的服务器调用将是任何后端 API。架构如下所示：
 
-![图 11.11 – Blazor WASM 托管
-
-](img/Figure_11.11_B18507.jpg)
+![图 11.11 – Blazor WASM 托管](img/Figure_11.11_B18507.jpg)
 
 图 11.11 – Blazor WASM 托管
 
 +   `blazor.server.js` 并使用 SignalR 接收所有 DOM 更新，这意味着每个用户交互都会有一个服务器调用（尽管非常轻量）。架构如下所示：
 
-![图 11.12 – Blazor Server 托管
-
-](img/Figure_11.12_B18507.jpg)
+![图 11.12 – Blazor Server 托管](img/Figure_11.12_B18507.jpg)
 
 图 11.12 – Blazor Server 托管
 
-.NET 6 为两种托管模型提供完整的工具支持，包括它们自己的项目模板，并且各有优缺点，这些将在以下内容中进一步解释：[https://docs.microsoft.com/en-us/aspnet/core/blazor/hosting-models?view=aspnetcore-6.0](https://docs.microsoft.com/en-us/aspnet/core/blazor/hosting-models?view=aspnetcore-6.0)。
+.NET 6 为两种托管模型提供完整的工具支持，包括它们自己的项目模板，并且各有优缺点，这些将在以下内容中进一步解释：[`docs.microsoft.com/en-us/aspnet/core/blazor/hosting-models?view=aspnetcore-6.0`](https://docs.microsoft.com/en-us/aspnet/core/blazor/hosting-models?view=aspnetcore-6.0)。
 
 现在让我们按照以下步骤使用 Blazor Server 应用程序创建一个前端应用程序，这允许我们为我们的电子商务应用程序添加/修改产品详情：
 
@@ -730,57 +1059,129 @@ Blazor 与其他 MVC/Razor Pages 之间的主要区别在于，与请求-响应�
 
 1.  让我们在 `NavMenu.razor` 中添加以下代码以将 `Products` 导航添加到左侧菜单。在这个阶段，如果你运行应用程序，你应该能够看到带有 `Products` 导航的左侧菜单；然而，它不会导航到任何页面：
 
-    [PRE142]
+    ```cs
+    <li class='nav-item px-3'>
+    <NavLink class='nav-link' href='products'>
+      <span class='oi oi-list-rich' aria-
+       hidden='true'></span> Products
+    </NavLink>
+    </li>
+    ```
 
 1.  由于我们将从 API 获取数据，我们需要将 `HTTPClient` 注入到我们的 `Program` 类中，就像在 ASP.NET Core 应用程序中所做的那样。因此，将以下代码添加到 `Program` 类中：
 
-    [PRE143]
+    ```cs
+    builder.Services.AddHttpClient("Products", client =>
+    {
+        client.BaseAddress = new Uri(builder.Configuration["ApplicationSettings:ProductsApiEndpoint"]);
+    });
+    ```
 
 1.  将以下 `ApplicationSettings:ProductsApiEndpoint` 设置添加到 `appsettings.json`：
 
-    [PRE144]
+    ```cs
+    'ApplicationSettings': {
+        'ProductsApiEndpoint': 
+        'https://localhost:7256/api/products/'
+      },
+    ```
 
 1.  由于我们将要绑定 `products` 数据，所以让我们将 `Packt.Ecommerce.DTO.Models` 添加为 `Packt.Ecommerce.Blazorweb` 项目的引用。在 `Pages` 文件夹中，将以下代码添加到 `Products.razor` 页面的 `@code` 块内，我们在其中使用 `IHttpClientFactory` 创建一个 `HttpClient` 对象，该对象将在下一步注入，并在 `OnInitializedAsync` 方法中检索 `products` 数据：
 
-    [PRE145]
+    ```cs
+    private List<ProductListViewModel> products;
+    protected override async Task OnInitializedAsync()
+        {
+            var client = Factory.CreateClient('Products');
+            var result = await 
+              client.GetAsync('').ConfigureAwait(false);
+            result.EnsureSuccessStatusCode();
+            products = new List<ProductListViewModel>();
+            products = await 
+              result.Content.ReadFromJsonAsync
+              <List<ProductListViewModel>>()
+              .ConfigureAwait(false);
+        }
+    ```
 
-1.  接下来，在`Products.Razor`页面的开头添加以下代码（在`@code`块外部）。在这里，我们通过`@page`指令设置此组件的相对路由为`/products`。接下来，我们注入`IHttpClientFactory`和其他所需的命名空间，然后添加渲染产品列表的HTML部分。如您所见，它是HTML和Razor语法的混合体：
+1.  接下来，在`Products.Razor`页面的开头添加以下代码（在`@code`块外部）。在这里，我们通过`@page`指令设置此组件的相对路由为`/products`。接下来，我们注入`IHttpClientFactory`和其他所需的命名空间，然后添加渲染产品列表的 HTML 部分。如您所见，它是 HTML 和 Razor 语法的混合体：
 
-    [PRE146]
+    ```cs
+    @page '/products'
+    @inject IHttpClientFactory Factory
+    @using System.Net.Http.Json;@using Packt.Ecommerce.DTO.Models;
+    <h1>Products</h1>
+    <div>    <a class='btn btn-info' href='addproduct'><i class='oi oi-plus'></i> Add Product</a> </div>
+    @if (products == null)
+    { <p><em>Loading...</em></p> }
+    else { <table class='table'><thead><tr>
+                    <th>Id</th><th>Name</th>
+                    <th>Price</th><th>Quantity</th>
+                    <th>ImageUrls</th><th></th>
+                </tr></thead><tbody>
+                @foreach (var product in products)
+                {<tr>
+                       <td>@product.Id</td>
+                        <td>@product.Name</td>
+                        <td>@product.Price</td>
+                        <td>@product.Quantity</td>
+                        <td><img 
+                             src='@product.ImageUrls[0]' 
+                             class='product-image w-10 
+                             col-3' alt='Product' /></td>
+                        <td><a class='btn btn-info' 
+                              href='editproduct/
+                              @product.Id/@product.Name'>
+                              <i class='oi oi-pencil'>
+                              </i></a></td></tr>
+                }
+            </tbody></table> }
+    ```
 
 在这一点上，如果您运行应用程序，应该会看到以下截图所示的输出：
 
-![图11.13 – 产品列表Blazor UI
+![图 11.13 – 产品列表 Blazor UI](img/Figure_11.13_B18507.jpg)
 
-](img/Figure_11.13_B18507.jpg)
+图 11.13 – 产品列表 Blazor UI
 
-图11.13 – 产品列表Blazor UI
+1.  接下来，让我们创建`Add/Edit`页面，我们将使用 Blazor 表单。表单中可用的一些重要工具/组件如下。
 
-1.  接下来，让我们创建`Add/Edit`页面，我们将使用Blazor表单。表单中可用的一些重要工具/组件如下。
+Blazor 表单是使用 Blazor 中称为`EditForm`的内置模板创建的，并且可以直接使用模型属性绑定到任何 C#对象。一个典型的`EditForm`如下面的代码片段所示。在这里，我们定义在表单提交时调用`OnSubmit`方法。让我们将其添加到`AddProduct.razor`中：
 
-Blazor表单是使用Blazor中称为`EditForm`的内置模板创建的，并且可以直接使用模型属性绑定到任何C#对象。一个典型的`EditForm`如下面的代码片段所示。在这里，我们定义在表单提交时调用`OnSubmit`方法。让我们将其添加到`AddProduct.razor`中：
+```cs
+<EditForm Model='@product' OnSubmit='@OnSubmit'>
+</EditForm>
+```
 
-[PRE147]
+在这里，`product`是我们想要使用的模型对象，在我们的案例中是`Packt.Ecommerce.DTO.Models.ProductDetailsViewModel`。要将数据绑定到任何控件，我们可以使用 HTML 和 Razor 语法的组合，如下面的代码所示。在这里，我们将产品对象的`Name`属性绑定到文本框，同样，将`Category`属性绑定到下拉列表。一旦你在文本框中输入任何值或在下拉列表中选择一个值，它就会自动出现在这些属性中，以便将其传递回任何后端 API 或数据库。让我们以类似的方式将所有必需的属性添加到 HTML 元素中：
 
-在这里，`product`是我们想要使用的模型对象，在我们的案例中是`Packt.Ecommerce.DTO.Models.ProductDetailsViewModel`。要将数据绑定到任何控件，我们可以使用HTML和Razor语法的组合，如下面的代码所示。在这里，我们将产品对象的`Name`属性绑定到文本框，同样，将`Category`属性绑定到下拉列表。一旦你在文本框中输入任何值或在下拉列表中选择一个值，它就会自动出现在这些属性中，以便将其传递回任何后端API或数据库。让我们以类似的方式将所有必需的属性添加到HTML元素中：
+```cs
+<InputText id='category' @bind-Value='product.Name'></InputText>
+<InputSelect @bind-Value='product.Category'>
+<option selected disabled value='-1'> Choose Category</option>
+<option value='Clothing'>Clothing</option>
+<option value='Books'>Books</option>
+</InputSelect>
+```
 
-[PRE148]
+Blazor 表单支持使用数据注解进行数据验证，因此任何我们想要绑定到 UI 的模型都可以有数据注解，Blazor 会自动将这些验证应用到绑定的控件上。要应用验证，我们添加`DataAnnotationsValidator`组件，并可以使用`ValidationSummary`组件来显示所有验证失败的摘要。更多详细信息请参阅[`docs.microsoft.com/en-us/aspnet/core/blazor/forms-validation?view=aspnetcore-6.0`](https://docs.microsoft.com/en-us/aspnet/core/blazor/forms-validation?view=aspnetcore-6.0)。我们还可以在控件级别使用`ValidationMessage`组件，如下面的代码片段所示：
 
-Blazor表单支持使用数据注解进行数据验证，因此任何我们想要绑定到UI的模型都可以有数据注解，Blazor会自动将这些验证应用到绑定的控件上。要应用验证，我们添加`DataAnnotationsValidator`组件，并可以使用`ValidationSummary`组件来显示所有验证失败的摘要。更多详细信息请参阅[https://docs.microsoft.com/en-us/aspnet/core/blazor/forms-validation?view=aspnetcore-6.0](https://docs.microsoft.com/en-us/aspnet/core/blazor/forms-validation?view=aspnetcore-6.0)。我们还可以在控件级别使用`ValidationMessage`组件，如下面的代码片段所示：
+```cs
+<DataAnnotationsValidator />
+<ValidationSummary />
+<InputNumber id='quantity' @bind-Value='product.Quantity'></InputNumber>
+<ValidationMessage For='@(() => product.Quantity)' />
+```
 
-[PRE149]
+1.  在`code`组件中，添加一个`ProductDetailsViewModel`对象，并将其命名为 product，即如`EditForm`的`Model`属性中定义的那样，并进一步实现`OnSubmit`方法。
 
-1.  在`code`组件中，添加一个`ProductDetailsViewModel`对象，并将其命名为product，即如`EditForm`的`Model`属性中定义的那样，并进一步实现`OnSubmit`方法。
+`AddProduct.Razor`和`EditProduct.Razor`的完整代码可以在 GitHub 仓库中找到，一旦运行应用程序，我们就可以看到以下页面：
 
-`AddProduct.Razor`和`EditProduct.Razor`的完整代码可以在GitHub仓库中找到，一旦运行应用程序，我们就可以看到以下页面：
+![图 11.14 – 添加产品 Blazor UI](img/Figure_11.14_B18507.jpg)
 
-![图11.14 – 添加产品Blazor UI
+图 11.14 – 添加产品 Blazor UI
 
-](img/Figure_11.14_B18507.jpg)
-
-图11.14 – 添加产品Blazor UI
-
-这是一个使用 Blazor 构建前端的基本示例，它执行列表、创建和更新操作。然而，Blazor 中还有许多概念可以进一步探索，请参阅[https://docs.microsoft.com/en-us/aspnet/core/blazor/?view=aspnetcore-6.0](https://docs.microsoft.com/en-us/aspnet/core/blazor/?view=aspnetcore-6.0)。
+这是一个使用 Blazor 构建前端的基本示例，它执行列表、创建和更新操作。然而，Blazor 中还有许多概念可以进一步探索，请参阅[`docs.microsoft.com/en-us/aspnet/core/blazor/?view=aspnetcore-6.0`](https://docs.microsoft.com/en-us/aspnet/core/blazor/?view=aspnetcore-6.0)。
 
 # 摘要
 
@@ -830,7 +1231,9 @@ d. 以上皆非
 
 1.  在以下 Razor 页面应用程序的标签助手代码中，哪个方法会在按钮点击时被调用？
 
-    [PRE150]
+    ```cs
+    <input type='submit' asp-page-handler='Delete' value='Delete' />
+    ```
 
 a. `OnGet()`
 
@@ -844,14 +1247,14 @@ d. `OnDeleteAsync()`
 
 # 进一步阅读
 
-+   [https://www.packtpub.com/web-development/html5-and-css3-building-responsive-websites](https://www.packtpub.com/web-development/html5-and-css3-building-responsive-websites)
++   [`www.packtpub.com/web-development/html5-and-css3-building-responsive-websites`](https://www.packtpub.com/web-development/html5-and-css3-building-responsive-websites)
 
-+   [https://www.packtpub.com/product/bootstrap-for-asp-net-mvc-second-edition/9781785889479](https://www.packtpub.com/product/bootstrap-for-asp-net-mvc-second-edition/9781785889479)
++   [`www.packtpub.com/product/bootstrap-for-asp-net-mvc-second-edition/9781785889479`](https://www.packtpub.com/product/bootstrap-for-asp-net-mvc-second-edition/9781785889479)
 
-+   [https://developer.mozilla.org/en-US/docs/WebAssembly](https://developer.mozilla.org/en-US/docs/WebAssembly)
++   [`developer.mozilla.org/en-US/docs/WebAssembly`](https://developer.mozilla.org/en-US/docs/WebAssembly)
 
-+   [https://docs.microsoft.com/en-us/aspnet/core/razor-pages/?view=aspnetcore-6.0](https://docs.microsoft.com/en-us/aspnet/core/razor-pages/?view=aspnetcore-6.0)
++   [`docs.microsoft.com/en-us/aspnet/core/razor-pages/?view=aspnetcore-6.0`](https://docs.microsoft.com/en-us/aspnet/core/razor-pages/?view=aspnetcore-6.0)
 
-+   [https://docs.microsoft.com/en-us/aspnet/core/mvc/views/partial?view=aspnetcore-6.0](https://docs.microsoft.com/en-us/aspnet/core/mvc/views/partial?view=aspnetcore-6.0)
++   [`docs.microsoft.com/en-us/aspnet/core/mvc/views/partial?view=aspnetcore-6.0`](https://docs.microsoft.com/en-us/aspnet/core/mvc/views/partial?view=aspnetcore-6.0)
 
-+   [https://developer.mozilla.org/en-US/docs/Learn/Accessibility](https://developer.mozilla.org/en-US/docs/Learn/Accessibility)
++   [`developer.mozilla.org/en-US/docs/Learn/Accessibility`](https://developer.mozilla.org/en-US/docs/Learn/Accessibility)

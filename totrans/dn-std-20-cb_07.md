@@ -2,49 +2,49 @@
 
 在本章中，我们将探讨以下食谱：
 
-+   使用套接字显示IP地址和名称的库
++   使用套接字显示 IP 地址和名称的库
 
-+   创建一个用于使用库的经典Windows应用程序
++   创建一个用于使用库的经典 Windows 应用程序
 
 +   创建一个发送邮件的库
 
-+   创建一个用于使用库的WPF应用程序
++   创建一个用于使用库的 WPF 应用程序
 
-+   创建一个用于调用REST API的库
++   创建一个用于调用 REST API 的库
 
-+   创建一个用于使用库的ASP.NET MVC应用程序
++   创建一个用于使用库的 ASP.NET MVC 应用程序
 
 # 技术要求
 
-读者应具备基本的C#知识。他们还应了解如何使用Visual Studio，使用NuGet安装包，以及在其他项目中引用项目中的库。
+读者应具备基本的 C#知识。他们还应了解如何使用 Visual Studio，使用 NuGet 安装包，以及在其他项目中引用项目中的库。
 
-本章的代码文件可以在GitHub上找到：
+本章的代码文件可以在 GitHub 上找到：
 
-[https://github.com/PacktPublishing/DotNET-Standard-2-Cookbook/tree/master/Chapter07](https://github.com/PacktPublishing/DotNET-Standard-2-Cookbook/tree/master/Chapter07)
+[`github.com/PacktPublishing/DotNET-Standard-2-Cookbook/tree/master/Chapter07`](https://github.com/PacktPublishing/DotNET-Standard-2-Cookbook/tree/master/Chapter07)
 
 查看以下视频以查看代码的实际运行情况：
 
-[https://goo.gl/Wj2VD9](https://goo.gl/Wj2VD9)
+[`goo.gl/Wj2VD9`](https://goo.gl/Wj2VD9)
 
 # 简介
 
-Microsoft .NET Framework为您提供了一套类库，使您能够轻松地与互联网服务一起工作。这些库允许您轻松地将服务集成到您的应用程序中。在本章中，我们将使用System.Net命名空间中的几个这些类。我们将探讨如何将这些类放入.NET Standard 2.0库中，并在不同的.NET应用程序版本中使用它。
+Microsoft .NET Framework 为您提供了一套类库，使您能够轻松地与互联网服务一起工作。这些库允许您轻松地将服务集成到您的应用程序中。在本章中，我们将使用 System.Net 命名空间中的几个这些类。我们将探讨如何将这些类放入.NET Standard 2.0 库中，并在不同的.NET 应用程序版本中使用它。
 
-# 使用套接字显示IP地址和名称的库
+# 使用套接字显示 IP 地址和名称的库
 
-在本食谱中，我们将构建一个.NET Standard 2.0类库，该类库可以显示当前机器的IP地址。然后，我们将创建一个使用该库的应用程序。
+在本食谱中，我们将构建一个.NET Standard 2.0 类库，该类库可以显示当前机器的 IP 地址。然后，我们将创建一个使用该库的应用程序。
 
 # 准备工作
 
-在开始构建库之前，请确保已安装并配置了最新的Visual Studio 2017，用于创建.NET Standard 2.0库。
+在开始构建库之前，请确保已安装并配置了最新的 Visual Studio 2017，用于创建.NET Standard 2.0 库。
 
 # 如何操作...
 
-1.  打开Visual Studio 2017。
+1.  打开 Visual Studio 2017。
 
 1.  点击“文件”|“项目”以创建项目。
 
-1.  在“新建项目”对话框中，展开左侧窗格中的“其他项目类型”节点，并选择“Visual Studio解决方案”。在右侧窗格中，选择“空白解决方案”。
+1.  在“新建项目”对话框中，展开左侧窗格中的“其他项目类型”节点，并选择“Visual Studio 解决方案”。在右侧窗格中，选择“空白解决方案”。
 
 1.  在“名称”文本框中，键入`Chapter7.Networking`，并在“位置”文本框中选择下拉框中的路径或单击“浏览...”按钮定位路径：
 
@@ -80,35 +80,57 @@ Microsoft .NET Framework为您提供了一套类库，使您能够轻松地与�
 
 1.  让我们在代码窗口中向上滚动并添加以下`using`指令：
 
-[PRE0]
+```cs
+      using System.Net;
+      using System.Net.Sockets;
+      using System.Collections.Generic;
+```
 
 1.  现在，让我们在`IPReader`类中创建这个`public`方法：
 
-[PRE1]
+```cs
+      public List<string> GetMyIPAddress()
+      {
+          var hostName = Dns.GetHostName();
+          var hostAddress = Dns.GetHostAddresses(hostName);
+
+          var ipList = new List<string>();
+
+          foreach (var ipaddres in hostAddress)
+          {
+              if (ipaddres.AddressFamily == AddressFamily.InterNetwork)
+              {
+                  ipList.Add(ipaddres.ToString());
+              }
+          }
+
+          return ipList;
+      }
+```
 
 1.  按*Ctrl* + *Shift* + *B*进行快速构建以检查语法。
 
 # 它是如何工作的...
 
-在步骤1到11中，我们添加了一个空白解决方案，并将一个.NET Standard 2.0类库添加到解决方案中。在这些步骤中，我们已为解决方案和项目赋予了适当的名称。然后，在第12步中，我们将Visual Studio生成的默认`Class1.cs`的名称进行了更改。在第15步中，我们向代码中添加了所需的`using`指令。我们主要使用了`System.Net`和`System.Net.Sockets`来访问所需的类并读取IP地址，然后添加了`System.Collections.Generic`命名空间以创建一个通用的`string List`来存储IP地址。
+在步骤 1 到 11 中，我们添加了一个空白解决方案，并将一个.NET Standard 2.0 类库添加到解决方案中。在这些步骤中，我们已为解决方案和项目赋予了适当的名称。然后，在第 12 步中，我们将 Visual Studio 生成的默认`Class1.cs`的名称进行了更改。在第 15 步中，我们向代码中添加了所需的`using`指令。我们主要使用了`System.Net`和`System.Net.Sockets`来访问所需的类并读取 IP 地址，然后添加了`System.Collections.Generic`命名空间以创建一个通用的`string List`来存储 IP 地址。
 
-在第16步中，我们添加了一个公共方法，该方法将读取您所在本地计算机上的所有可用IP地址。在第一行中，我们将系统主机名存储在一个变量中，在第二行中，我们使用它来获取主机地址。然后，我们创建了一个空列表来存储IP地址。
+在第 16 步中，我们添加了一个公共方法，该方法将读取您所在本地计算机上的所有可用 IP 地址。在第一行中，我们将系统主机名存储在一个变量中，在第二行中，我们使用它来获取主机地址。然后，我们创建了一个空列表来存储 IP 地址。
 
-之后，我们使用`foreach`循环遍历所有找到的IP地址，并在检查是否为内部网络上的IP地址后，将它们存储在列表中。最后，我们返回存储的IP地址列表。
+之后，我们使用`foreach`循环遍历所有找到的 IP 地址，并在检查是否为内部网络上的 IP 地址后，将它们存储在列表中。最后，我们返回存储的 IP 地址列表。
 
-在第17步中，我们进行了快速构建以检查语法。
+在第 17 步中，我们进行了快速构建以检查语法。
 
-# 创建一个经典Windows应用程序以使用库
+# 创建一个经典 Windows 应用程序以使用库
 
-在这个配方中，我们将创建一个经典Windows应用程序来使用库。我们将使用Visual Studio设计器创建UI，添加代码以使用库，并显示从库本身选择的IP地址列表。
+在这个配方中，我们将创建一个经典 Windows 应用程序来使用库。我们将使用 Visual Studio 设计器创建 UI，添加代码以使用库，并显示从库本身选择的 IP 地址列表。
 
 # 准备工作
 
-确保您拥有Visual Studio 2017的最新版本，并且已经完成了前面的配方。我们将使用前面配方中构建的解决方案。
+确保您拥有 Visual Studio 2017 的最新版本，并且已经完成了前面的配方。我们将使用前面配方中构建的解决方案。
 
 # 如何操作...
 
-1.  打开Visual Studio 2017。
+1.  打开 Visual Studio 2017。
 
 1.  现在打开前面配方中的解决方案。点击 文件 | 打开 | 打开项目/解决方案 或按 *Ctrl* + *Shift* + *O* 并选择`Chapter7.Networkings`解决方案。
 
@@ -116,9 +138,9 @@ Microsoft .NET Framework为您提供了一套类库，使您能够轻松地与�
 
 1.  现在，点击`Chapter7.Networking`解决方案标签。点击 文件 | 添加 | 新项目。
 
-1.  在“添加新项目”模板对话框中，展开左侧窗格中的Visual C#节点。
+1.  在“添加新项目”模板对话框中，展开左侧窗格中的 Visual C#节点。
 
-1.  在右侧窗格中，选择Windows经典桌面，并选择Windows窗体应用程序(.NET Framework)：
+1.  在右侧窗格中，选择 Windows 经典桌面，并选择 Windows 窗体应用程序(.NET Framework)：
 
 ![图片](img/2857fe40-c3c8-4da0-9238-566772d8e242.png)
 
@@ -150,7 +172,7 @@ Microsoft .NET Framework为您提供了一套类库，使您能够轻松地与�
 
 1.  现在点击“MainForm.cs[设计]”选项卡。
 
-1.  从工具箱中，将一个按钮控件和一个列表框控件添加到MainWindow窗体：
+1.  从工具箱中，将一个按钮控件和一个列表框控件添加到 MainWindow 窗体：
 
 ![图片](img/4c3b684b-5859-46da-8353-f7f9fb3d5ccd.png)
 
@@ -162,26 +184,31 @@ Microsoft .NET Framework为您提供了一套类库，使您能够轻松地与�
     | --- | --- | --- |
     | 表单 | 文本 | `IP 列表` |
     | 按钮 | 名称 | `ShowButton` |
-    | 按钮 | 文本 | `显示IP列表` |
+    | 按钮 | 文本 | `显示 IP 列表` |
     | 列表框 | 名称 | `IPListBox` |
 
-1.  双击“显示IP列表”按钮以到达代码窗口。
+1.  双击“显示 IP 列表”按钮以到达代码窗口。
 
 1.  向上滚动，直到你到达`using`指令。
 
 1.  将以下`using`指令添加到指令的最后一行：
 
-[PRE2]
+```cs
+      using Chapter7.Networking.ReadIPLib;
+```
 
 1.  现在，再次向下滚动，直到你到达`ShowButton_Click()`方法。
 
 1.  在方法内部输入以下代码：
 
-[PRE3]
+```cs
+      var ipLib = new IPReader();
+      IPListBox.Items.AddRange(ipLib.GetMyIPAddress().ToArray());
+```
 
 1.  现在按*F5*调试代码。
 
-1.  点击“显示IP列表”按钮。
+1.  点击“显示 IP 列表”按钮。
 
 1.  你应该看到如下输出：
 
@@ -191,11 +218,11 @@ Microsoft .NET Framework为您提供了一套类库，使您能够轻松地与�
 
 # 它是如何工作的...
 
-在步骤1到10中，我们打开了之前构建的解决方案并快速构建以检查一切是否完好。然后，我们向解决方案中添加了一个经典Windows窗体应用程序。在步骤11到14中，我们添加了对我们在上一个菜谱中构建的.NET Standard 2.0类库的引用。在步骤15到20中，我们重命名了主窗口并添加了UI。最后，我们以有意义的方式更改了控件属性。
+在步骤 1 到 10 中，我们打开了之前构建的解决方案并快速构建以检查一切是否完好。然后，我们向解决方案中添加了一个经典 Windows 窗体应用程序。在步骤 11 到 14 中，我们添加了对我们在上一个菜谱中构建的.NET Standard 2.0 类库的引用。在步骤 15 到 20 中，我们重命名了主窗口并添加了 UI。最后，我们以有意义的方式更改了控件属性。
 
-在步骤23中，我们在代码中引用了类库。在步骤25中，我们创建了一个`IPReader`类的实例，然后使用了`GetMyIPAddress()`方法。在同一行中，我们将返回的`List<string>`作为数组输出，并使用`ListBox`和`AddRange`方法填充列表框。
+在步骤 23 中，我们在代码中引用了类库。在步骤 25 中，我们创建了一个`IPReader`类的实例，然后使用了`GetMyIPAddress()`方法。在同一行中，我们将返回的`List<string>`作为数组输出，并使用`ListBox`和`AddRange`方法填充列表框。
 
-在步骤26到29中，我们执行了代码并测试了结果。
+在步骤 26 到 29 中，我们执行了代码并测试了结果。
 
 # 创建一个发送邮件的库
 
@@ -203,15 +230,15 @@ Microsoft .NET Framework为您提供了一套类库，使您能够轻松地与�
 
 # 准备工作
 
-确保您已安装Visual Studio 2017的最新版本和所有更新。我们将构建一个.NET Standard 2.0库来发送电子邮件。
+确保您已安装 Visual Studio 2017 的最新版本和所有更新。我们将构建一个.NET Standard 2.0 库来发送电子邮件。
 
 # 如何做到这一点...
 
-1.  打开Visual Studio 2017。
+1.  打开 Visual Studio 2017。
 
 1.  点击文件 | 新建 | 项目 以创建一个项目。
 
-1.  在“新建项目”对话框中，展开左侧面板中的“其他项目类型”节点，并选择Visual Studio解决方案。在右侧面板中，选择空白解决方案。
+1.  在“新建项目”对话框中，展开左侧面板中的“其他项目类型”节点，并选择 Visual Studio 解决方案。在右侧面板中，选择空白解决方案。
 
 1.  在“名称”文本框中，键入`Chapter7.MailBox`，并在“位置”文本框中选择下拉框中的路径或单击“浏览...”按钮以定位路径：
 
@@ -247,15 +274,44 @@ Microsoft .NET Framework为您提供了一套类库，使您能够轻松地与�
 
 1.  让我们在代码窗口中向上滚动并添加以下`using`指令：
 
-[PRE4]
+```cs
+      using System.Net;
+      using System.Net.Mail;
+```
 
 1.  将以下四个属性添加到`SendMail`类中：
 
-[PRE5]
+```cs
+      public string From { get; set; }
+      public string To { get; set; }
+      public string Subject { get; set; }
+      public string Body { get; set; }
+```
 
 1.  最后，添加以下`public`方法以创建和发送邮件：
 
-[PRE6]
+```cs
+      public void Send()
+      {
+          var toAddress = new MailAddress(To);
+          var fromAddress = new MailAddress(From);
+
+          var message = new MailMessage(fromAddress, toAddress);
+          message.Subject = Subject;
+          message.Body = Body;
+
+          var credentials = new NetworkCredential("<your_smtp_username>", "<your_smtp_password>"); 
+
+          var smtp = new SmtpClient();
+          smtp.Host = "<smtp_host>";
+          smtp.Port = <port>;
+          smtp.EnableSsl = true;
+          smtp.Credentials = credentials;
+          smtp.DeliveryMethod = SmtpDeliveryMethod.Network;
+
+          smtp.Send(message); 
+      }
+```
 
 1.  让我们按*Ctrl* + *Shift* + *B*进行快速构建。
 
@@ -347,11 +403,24 @@ Microsoft .NET Framework为您提供了一套类库，使您能够轻松地与�
 
 1.  将以下 `using` 指令添加到指令的最后一行：
 
-[PRE7]
+```cs
+      using Chapter7.MailBox.MailerLib;
+```
 
 1.  滚动到 `SendButton_Click()` 方法，并添加以下代码：
 
-[PRE8]
+```cs
+      var mailer = new SendMail();
+
+      mailer.From = FromTextBox.Text;
+      mailer.To = ToTextBox.Text;
+      mailer.Subject = SubjectTextBox.Text;
+      mailer.Body = BodyTextBox.Text;
+
+      mailer.Send();
+
+      MessageBox.Show("Your mail has been sent");
+```
 
 1.  确保您已更改库中 SMTP 服务器所需的凭据。
 
@@ -365,23 +434,23 @@ Microsoft .NET Framework为您提供了一套类库，使您能够轻松地与�
 
 在步骤 1 到 14 中，我们打开了带有库的解决方案。然后，我们将 WPF 应用程序项目添加到解决方案中。稍后，我们添加了对类库的引用。在步骤 16 到 20 中，我们构建了 UI 并更改了一些属性。在步骤 22 中，我们在代码级别创建了到库的引用。
 
-最后，我们添加了按钮点击的代码，这是直接的，创建了一个`SendMail`类的实例，然后从UI本身填充了属性。最后，在步骤24和25中测试了输出。
+最后，我们添加了按钮点击的代码，这是直接的，创建了一个`SendMail`类的实例，然后从 UI 本身填充了属性。最后，在步骤 24 和 25 中测试了输出。
 
-# 创建一个库来调用REST API
+# 创建一个库来调用 REST API
 
-在这个菜谱中，我们将查看一个调用REST API的.NET Standard 2.0库。RESTful API是允许你通过HTTP访问其功能的服务。我们将在库中使用`System.Net.Http`命名空间向API发送消息并获取结果。
+在这个菜谱中，我们将查看一个调用 REST API 的.NET Standard 2.0 库。RESTful API 是允许你通过 HTTP 访问其功能的服务。我们将在库中使用`System.Net.Http`命名空间向 API 发送消息并获取结果。
 
 # 准备工作
 
-确保你有Visual Studio 2017的最新版本。同时确保你有一个基本的了解，如何访问Web服务，什么是`GET`方法，什么是`POST`方法等等。我们将使用由`JSONPlaceHolder`提供的测试API服务。它是一个简单的REST API测试平台，供开发者使用。
+确保你有 Visual Studio 2017 的最新版本。同时确保你有一个基本的了解，如何访问 Web 服务，什么是`GET`方法，什么是`POST`方法等等。我们将使用由`JSONPlaceHolder`提供的测试 API 服务。它是一个简单的 REST API 测试平台，供开发者使用。
 
 # 如何操作...
 
-1.  打开Visual Studio 2017。
+1.  打开 Visual Studio 2017。
 
 1.  点击“文件 | 新建 | 项目”来创建一个项目。
 
-1.  在“新建项目”对话框中，展开左侧窗格中的“其他项目类型”节点，并选择“Visual Studio解决方案”。在右侧窗格中，选择“空白解决方案”。
+1.  在“新建项目”对话框中，展开左侧窗格中的“其他项目类型”节点，并选择“Visual Studio 解决方案”。在右侧窗格中，选择“空白解决方案”。
 
 1.  在“名称：”文本框中输入`Chapter7.RestAPI`，在“位置：”文本框中选择下拉框中的路径或点击“浏览...”按钮定位路径：
 
@@ -417,19 +486,47 @@ Microsoft .NET Framework为您提供了一套类库，使您能够轻松地与�
 
 1.  让我们在代码窗口中向上滚动并添加以下`using`指令：
 
-[PRE9]
+```cs
+      using System.Net.Http;
+      using System.Threading.Tasks;
+```
 
-1.  现在，创建一个用于存储URL的类级`private`变量：
+1.  现在，创建一个用于存储 URL 的类级`private`变量：
 
-[PRE10]
+```cs
+      private string _serviceURL;
+```
 
 1.  让我们创建默认构造函数来更新之前的变量：
 
-[PRE11]
+```cs
+      public PostsReader(string serviceURL)
+      {
+          _serviceURL = serviceURL;
+      }
+```
 
-1.  最后，让我们添加从REST服务读取的方法：
+1.  最后，让我们添加从 REST 服务读取的方法：
 
-[PRE12]
+```cs
+      public async Task<string> GetPostById(int id)
+      {
+          string output; 
+
+          using (var httpClient = new HttpClient())
+          {
+
+              Uri uri = new Uri($"{_serviceURL}/posts/{id}");
+              using (HttpResponseMessage response = 
+                  await httpClient.GetAsync(uri))
+              {
+                  output = await response.Content.ReadAsStringAsync();
+              }
+          }
+
+          return output;
+      }
+```
 
 1.  按*Ctrl* + *Shift* + *B*进行快速构建以检查语法。
 
@@ -493,7 +590,7 @@ Microsoft .NET Framework为您提供了一套类库，使您能够轻松地与�
 
 1.  选择“添加”|“控制器”。
 
-1.  在“添加Scaffold”对话框中，从模板列表中选择“MVC 5 Controller - Empty”并点击“添加”：
+1.  在“添加 Scaffold”对话框中，从模板列表中选择“MVC 5 Controller - Empty”并点击“添加”：
 
 ![图片](img/57bc63dd-4140-4a3e-9d76-35f34aa6fdd8.png)
 
@@ -515,21 +612,47 @@ Microsoft .NET Framework为您提供了一套类库，使您能够轻松地与�
 
 1.  在代码顶部，紧邻所有指令的最后一行旁边添加此`using`指令：
 
-[PRE13]
+```cs
+      using System.Threading.Tasks;
+      using System.Web.Script.Serialization;
+      using Chapter7.RestAPI.RestLib;
+```
 
 1.  现在将`default Index()`动作更改为以下内容：
 
-[PRE14]
+```cs
+      public async Task<ActionResult> Index()
+```
 
 1.  在`Index()`方法内部添加以下代码：
 
-[PRE15]
+```cs
+      var service = "https://jsonplaceholder.typicode.com";
+      var restClient = new PostsReader(service);
+
+      var result = await restClient.GetPostById(1);
+      ViewBag.Post = new JavaScriptSerializer().Deserialize<Dictionary
+          <string, string>>(result);
+
+      return View();
+```
 
 1.  现在，让我们打开`Index.cshtml`文件，并在`<h2>Index</h2>`标签下方添加以下代码：
 
-[PRE16]
+```cs
+      @{
+          var post = (Dictionary<string, string>)ViewBag.Post;
+      }
 
-1.  现在，确保您已将MVC项目设置为默认项目。
+      @foreach (var item in post)
+      {
+          <p>
+              <strong>@item.Key</strong> : @item.Value
+          </p>
+      }
+```
+
+1.  现在，确保您已将 MVC 项目设置为默认项目。
 
 1.  按*F5*键，你应该会看到如下输出：
 
@@ -537,10 +660,10 @@ Microsoft .NET Framework为您提供了一套类库，使您能够轻松地与�
 
 # 工作原理...
 
-在步骤1到11中，我们打开了解决方案并添加了一个ASP.NET MVC项目。然后，我们为项目命名。在步骤12和13中，我们添加了之前食谱中构建的库的引用。在步骤16到18中，我们向项目中添加了一个空控制器。然后，在步骤21和22中，我们在`HomeController`中添加了一个视图到`Index()`动作。
+在步骤 1 到 11 中，我们打开了解决方案并添加了一个 ASP.NET MVC 项目。然后，我们为项目命名。在步骤 12 和 13 中，我们添加了之前食谱中构建的库的引用。在步骤 16 到 18 中，我们向项目中添加了一个空控制器。然后，在步骤 21 和 22 中，我们在`HomeController`中添加了一个视图到`Index()`动作。
 
-在步骤23中，我们添加了对库本身的代码级引用，并添加了两个我们任务所需的更多命名空间。在步骤24中，我们将`Index()`动作更改为`async`方法。这是必需的，因为我们将从库本身使用`async`方法。在步骤26中，我们为测试床创建了服务URL。然后，我们创建了一个`PostsReader`类的实例。在第三行中，我们使用`GetPostById()`方法从服务中获取结果。再次，在代码的第四行中，我们使用`JavaScriptSerializer`类的一个方法将来自服务的结果反序列化为字典。
+在步骤 23 中，我们添加了对库本身的代码级引用，并添加了两个我们任务所需的更多命名空间。在步骤 24 中，我们将`Index()`动作更改为`async`方法。这是必需的，因为我们将从库本身使用`async`方法。在步骤 26 中，我们为测试床创建了服务 URL。然后，我们创建了一个`PostsReader`类的实例。在第三行中，我们使用`GetPostById()`方法从服务中获取结果。再次，在代码的第四行中，我们使用`JavaScriptSerializer`类的一个方法将来自服务的结果反序列化为字典。
 
-最后，我们将结果存储在`ViewBag`中，并将其传递给`Index`视图。在第27步中，我们从`ViewBag`中获取了字典，并使用`Razor`语法显示内容。
+最后，我们将结果存储在`ViewBag`中，并将其传递给`Index`视图。在第 27 步中，我们从`ViewBag`中获取了字典，并使用`Razor`语法显示内容。
 
-最后，我们在第29步测试了输出。
+最后，我们在第 29 步测试了输出。

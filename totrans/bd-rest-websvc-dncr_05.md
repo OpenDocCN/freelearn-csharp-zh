@@ -18,7 +18,7 @@
 
 这些组件还可以检查请求是否应该传递到下一个组件，或者请求是否应该在下一个组件触发/调用之前或之后由组件处理。这个请求管道是通过使用请求代表构建的。这个请求代表与每个 HTTP 请求交互。
 
-查看以下来自 ASP.NET Core 文档的引用（[https://docs.microsoft.com/en-us/aspnet/core/fundamentals/middleware/](https://docs.microsoft.com/en-us/aspnet/core/fundamentals/middleware/))：
+查看以下来自 ASP.NET Core 文档的引用（[`docs.microsoft.com/en-us/aspnet/core/fundamentals/middleware/`](https://docs.microsoft.com/en-us/aspnet/core/fundamentals/middleware/))：
 
 “中间件是组装到应用程序管道中以处理请求和响应的软件。”
 
@@ -62,11 +62,21 @@
 
 从我们刚刚创建的模拟项目中打开 `Startup.cs` 文件，查看包含以下代码的 `Configure` 方法：
 
-[PRE0]
+```cs
+// This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
+public void Configure(IApplicationBuilder app, IHostingEnvironment env)
+{
+  if (env.IsDevelopment())
+  {
+    app.UseDeveloperExceptionPage();
+  }
+  app.UseMvc();
+}
+```
 
 上述代码是自我解释的：它告诉系统通过启动 `Microsoft.AspNetCore.Builder.IApplicationBuilder` 的 `app.UseMvc()` 扩展方法将 `Mvc` 添加到请求管道中。
 
-你可以在 [https://docs.microsoft.com/en-us/dotnet/api/microsoft.aspnetcore.builder.iapplicationbuilder?view=aspnetcore-2.0](https://docs.microsoft.com/en-us/dotnet/api/microsoft.aspnetcore.builder.iapplicationbuilder?view=aspnetcore-2.0) 获取有关 `IApplicationBuilder` 的更多信息。
+你可以在 [`docs.microsoft.com/en-us/dotnet/api/microsoft.aspnetcore.builder.iapplicationbuilder?view=aspnetcore-2.0`](https://docs.microsoft.com/en-us/dotnet/api/microsoft.aspnetcore.builder.iapplicationbuilder?view=aspnetcore-2.0) 获取有关 `IApplicationBuilder` 的更多信息。
 
 它还指示系统在开发环境中使用特定的异常页面。前面的方法配置了应用程序。
 
@@ -86,7 +96,18 @@
 
 请查看以下 `Use` 方法的代码：
 
-[PRE1]
+```cs
+public void Configure(IApplicationBuilder app)
+{
+  async Task Middleware(HttpContext context, Func<Task> next)
+  {
+    //other stuff
+    await next.Invoke();
+    //other stuff
+  }
+  app.Use(Middleware);
+}
+```
 
 在前面的代码中，我试图通过使用局部函数来解释 `Use` 方法的模拟实现。在这里，你可以看到 `Middleware` 在 `await next.Invoke();` 之前或之后调用或传递请求给下一个委托。你可以编写/实现其他代码片段，但这些代码片段不应该向客户端发送响应，例如那些写入输出、产生 404 状态等的代码片段。
 
@@ -100,7 +121,19 @@
 
 请查看以下代码：
 
-[PRE2]
+```cs
+public void Configure(IApplicationBuilder app, ILoggerFactory logger)
+{
+  logger.AddConsole();
+  //add more stuff that does not responses client
+  async Task RequestDelegate(HttpContext context)
+  {
+    await context.Response.WriteAsync("This ends the request or 
+    short circuits request.");
+  }
+  app.Run(RequestDelegate);
+}
+```
 
 在前面的代码中，我试图通过使用局部函数 `RequestDelegate` 来展示 `Run` 终止请求管道。在这里，我使用了局部函数。
 
@@ -112,87 +145,203 @@
 
 `Map` 方法有助于当你想要连接多个中间件实例时。为此，`Map` 调用另一个请求委托。请查看以下截图以了解此方法的签名：
 
-![](img/9e767d6f-3229-463b-9373-8c8ec0ac298a.png)^(Map方法的签名)
+![](img/9e767d6f-3229-463b-9373-8c8ec0ac298a.png)^(Map 方法的签名)
 
 看看下面的代码：
 
-[PRE3]
+```cs
+public void Configure(IApplicationBuilder app)
+{
+  app.UseMvc();
+  app.Map("/testroute", TestRouteHandler);
+  async Task RequestDelegate(HttpContext context)
+  {
+    await context.Response.WriteAsync("This ends the request or 
+    short circuit request.");
+  }
+  app.Run(RequestDelegate);
+}
+```
 
 在此代码中，我添加了一个`Map`，它只是映射`<url>/testroute`。接下来是之前讨论过的相同的`Run`方法。`TestRoutehandler`是一个私有方法。看看下面的代码：
 
-[PRE4]
+```cs
+private static void  TestRouteHandler(IApplicationBuilder app) 
+{
+  async Task Handler(HttpContext context)
+  {
+    await context.Response.WriteAsync("This is called from testroute.
+    " + "This ends the request or short circuit request.");
+  }
+  app.Run(Handler);
+}
+```
 
 在`app.Run(Handler);`之前是一个正常的委托。现在，运行代码并查看结果。它们应该类似于以下截图：
 
 ![](img/93907e52-1b91-46c5-9e62-7b3ab8e77ac8.png)
 
-你可以看到，Web应用程序的根目录显示了在`Run`委托方法中提到的字符串。你将得到以下截图所示的输出：
+你可以看到，Web 应用程序的根目录显示了在`Run`委托方法中提到的字符串。你将得到以下截图所示的输出：
 
 ![](img/a5cb5a2a-d3dd-417c-8f89-d9d3ddb0df73.png)
 
-# 在中间件中为我们的API添加日志记录
+# 在中间件中为我们的 API 添加日志记录
 
-简而言之，日志记录就是将日志文件集中在一起的过程或行为，以获取API在通信期间发生的事件或其他操作。在本节中，我们将为我们的产品API实现日志记录。
+简而言之，日志记录就是将日志文件集中在一起的过程或行为，以获取 API 在通信期间发生的事件或其他操作。在本节中，我们将为我们的产品 API 实现日志记录。
 
-在我们开始查看如何记录API的事件之前，让我们先快速看一下我们现有的产品API。
+在我们开始查看如何记录 API 的事件之前，让我们先快速看一下我们现有的产品 API。
 
-参考以下 *请求委托* 部分，以刷新你对如何创建一个新的ASP.NET Core项目的记忆。
+参考以下 *请求委托* 部分，以刷新你对如何创建一个新的 ASP.NET Core 项目的记忆。
 
-以下截图显示了我们的产品API的项目结构：
+以下截图显示了我们的产品 API 的项目结构：
 
 ![](img/84ad0efb-4932-4e26-82e1-460cbc488d84.png)
 
 这里是我们的`Product`模型：
 
-[PRE5]
+```cs
+public class Product
+{
+  public Guid Id { get; set; }
+  public string Name { get; set; }
+  public string Description { get; set; }
+  public string Image { get; set; }
+  public decimal Price { get; set; }
+  public Guid CategoryId { get; set; }
+  public virtual Category Category { get; set; }
+}
+```
 
 `Product`模型是一个表示产品的类，包含属性。
 
 这里是我们的存储库接口：
 
-[PRE6]
+```cs
+public interface IProductRepository
+{
+  void Add(Product product);
+  IEnumerable<Product> GetAll();
+  Product GetBy(Guid id);
+  void Remove(Guid id);
+  void Update(Product product);
+}
+```
 
-`IProductRepository`接口有我们API开始时对产品进行操作所需的方法。
+`IProductRepository`接口有我们 API 开始时对产品进行操作所需的方法。
 
 让我们看看我们的`ProductRepository`类：
 
-[PRE7]
+```cs
+public class ProductRepository : IProductRepository
+{
+  private readonly ProductContext _context;
+  public ProductRepository(ProductContext context) => 
+  _context = context;
+  public IEnumerable<Product> GetAll() => _context.Products.
+  Include(c => c.Category).ToList();
+  public Product GetBy(Guid id) => _context.Products.Include
+  (c => c.Category).FirstOrDefault(x => x.Id == id);
+  public void Add(Product product)
+  {
+    _context.Products.Add(product);
+    _context.SaveChanges();
+  }
+  public void Update(Product product)
+  {
+    _context.Update(product);
+    _context.SaveChanges();
+  }
+  public void Remove(Guid id)
+  {
+    var product = GetBy(id);
+    _context.Remove(product);
+    _context.SaveChanges();
+  }
+}
+```
 
 `ProductRepository`类实现了`IProductRepository`接口。前面的代码是自我解释的。
 
 打开 `Startup.cs` 文件并添加以下代码：
 
-[PRE8]
+```cs
+services.AddScoped<IProductRepository, ProductRepository>();
+services.AddDbContext<ProductContext>(
+o => o.UseSqlServer(Configuration.GetConnectionString
+("ProductConnection")));
+services.AddSwaggerGen(swagger =>
+{
+  swagger.SwaggerDoc("v1", new Info { Title = "Product APIs", 
+  Version = "v1" });
+});
+```
 
-为了支持我们的产品API的Swagger，你需要添加`Swashbuckle.ASPNETCore` NuGet包。
+为了支持我们的产品 API 的 Swagger，你需要添加`Swashbuckle.ASPNETCore` NuGet 包。
 
 现在，打开`appsettings.json`文件并添加以下代码：
 
-[PRE9]
+```cs
+"ConnectionStrings": 
+{
+  "ProductConnection": "Data Source=.;Initial 
+  Catalog=ProductsDB;Integrated 
+  Security=True;MultipleActiveResultSets=True"
+}
+```
 
 让我们看看我们的`ProductController`包含什么：
 
-[PRE10]
+```cs
+[HttpGet]
+[Route("productlist")]
+public IActionResult GetList()
+{
+  return new 
+  OkObjectResult(_productRepository.GetAll().
+  Select(ToProductvm).ToList());
+}
+```
 
-上述代码是我们产品API的`GET`资源。它调用我们的`ProductRepository`的`GetAll()`方法，转换响应，并返回它。在之前的代码中，我们已经指示系统使用`ProductRepository`类解析`IProductRepository`接口。参考`Startup`类。
+上述代码是我们产品 API 的`GET`资源。它调用我们的`ProductRepository`的`GetAll()`方法，转换响应，并返回它。在之前的代码中，我们已经指示系统使用`ProductRepository`类解析`IProductRepository`接口。参考`Startup`类。
 
 这里是转换响应的方法：
 
-[PRE11]
+```cs
+private ProductViewModel ToProductvm(Product productModel)
+{
+  return new ProductViewModel
+  {
+    CategoryId = productModel.CategoryId,
+    CategoryDescription = productModel.Category.Description,
+    CategoryName = productModel.Category.Name,
+    ProductDescription = productModel.Description,
+    ProductId = productModel.Id,
+    ProductImage = productModel.Image,
+    ProductName = productModel.Name,
+    ProductPrice = productModel.Price
+  };
+}
+```
 
 前面的代码接受一个`Product`类型的参数，然后返回一个`ProductViewModel`类型的对象。
 
 以下代码显示了我们的控制器构造函数是如何注入的：
 
-[PRE12]
+```cs
+private readonly IProductRepository _productRepository;
+public ProductController(IProductRepository productRepository)
+{
+  _productRepository = productRepository;
+}
+```
 
-在前面的代码中，我们注入了我们的`ProductRepository`，并且每当有人调用产品API的任何资源时，它将自动初始化。
+在前面的代码中，我们注入了我们的`ProductRepository`，并且每当有人调用产品 API 的任何资源时，它将自动初始化。
 
-现在，你已经准备好玩这个应用程序了。从菜单中运行应用程序或点击*F5*。在网页浏览器中，你可以在地址的URL后使用后缀`/swagger`。
+现在，你已经准备好玩这个应用程序了。从菜单中运行应用程序或点击*F5*。在网页浏览器中，你可以在地址的 URL 后使用后缀`/swagger`。
 
-完整的源代码，请参考GitHub仓库链接：[https://github.com/PacktPublishing/Building-RESTful-Web-services-with-DOTNET-Core](https://github.com/PacktPublishing/Building-RESTful-Web-services-with-DOTNET-Core)。
+完整的源代码，请参考 GitHub 仓库链接：[`github.com/PacktPublishing/Building-RESTful-Web-services-with-DOTNET-Core`](https://github.com/PacktPublishing/Building-RESTful-Web-services-with-DOTNET-Core)。
 
-它将显示Swagger API文档，如下所示：
+它将显示 Swagger API 文档，如下所示：
 
 ![图片](img/81c11e65-4875-466e-a068-7a62e931b066.png)
 
@@ -200,33 +349,60 @@
 
 ![图片](img/2d825f3e-e331-434a-8d31-ad740b96efc1.png)
 
-让我们为我们的API实现日志记录功能。请注意，为了使我们的演示简短简单，我没有添加复杂场景来跟踪一切。我只是添加了简单的日志来展示日志记录功能。
+让我们为我们的 API 实现日志记录功能。请注意，为了使我们的演示简短简单，我没有添加复杂场景来跟踪一切。我只是添加了简单的日志来展示日志记录功能。
 
-要开始为我们的产品API实现日志记录，在名为`Logging`的新文件夹中添加一个名为`LogAction`的新类。以下是`LogAction`类的代码：
+要开始为我们的产品 API 实现日志记录，在名为`Logging`的新文件夹中添加一个名为`LogAction`的新类。以下是`LogAction`类的代码：
 
-[PRE13]
+```cs
+public class LogActions 
+{
+  public const int InsertProduct = 1000;
+  public const int ListProducts = 1001;
+  public const int GetProduct = 1002;
+  public const int RemoveProduct = 1003;
+}
+```
 
 上述代码包含的常量只是我们应用程序的操作，也称为**事件**。
 
 更新我们的`ProductController`；现在它应该看起来像以下代码：
 
-[PRE14]
+```cs
+private readonly IProductRepository _productRepository;
+private readonly ILogger _logger;
+public ProductController(IProductRepository productRepository, ILogger logger)
+{
+  _productRepository = productRepository;
+  _logger = logger;
+}
+```
 
-在上述代码中，我们添加了一个`ILogger`接口，它来自依赖注入容器（更多详情请见[https://docs.microsoft.com/en-us/aspnet/core/fundamentals/dependency-injection?view=aspnetcore-2.0 ](https://docs.microsoft.com/en-us/aspnet/core/fundamentals/dependency-injection?view=aspnetcore-2.0)）。
+在上述代码中，我们添加了一个`ILogger`接口，它来自依赖注入容器（更多详情请见[`docs.microsoft.com/en-us/aspnet/core/fundamentals/dependency-injection?view=aspnetcore-2.0 `](https://docs.microsoft.com/en-us/aspnet/core/fundamentals/dependency-injection?view=aspnetcore-2.0)）。
 
-让我们在产品API的`GET`资源中添加日志记录功能：
+让我们在产品 API 的`GET`资源中添加日志记录功能：
 
-[PRE15]
+```cs
+[HttpGet]
+[Route("productlist")]
+public IActionResult GetList()
+{
+  _logger.LogInformation(LogActions.ListProducts, "Getting all
+  products.");
+  return new 
+  OkObjectResult(_productRepository.GetAll().Select(ToProductvm).
+  ToList()); 
+}
+```
 
 上述代码返回产品列表并记录信息。
 
-要测试此场景，我们需要一个客户端或API工具，以便我们可以看到输出。为此，我们将使用`Postman`扩展（更多详情请见[ https://www.getpostman.com/ ](https://www.getpostman.com/)）。
+要测试此场景，我们需要一个客户端或 API 工具，以便我们可以看到输出。为此，我们将使用`Postman`扩展（更多详情请见[ https://www.getpostman.com/ ](https://www.getpostman.com/)）。
 
-首先，我们需要运行应用程序。为此，打开Visual Studio命令提示符，移动到您的项目文件夹，然后输入命令`dotnet run`。您将看到如下所示的类似消息：
+首先，我们需要运行应用程序。为此，打开 Visual Studio 命令提示符，移动到您的项目文件夹，然后输入命令`dotnet run`。您将看到如下所示的类似消息：
 
 ![图片](img/adeff017-ecbf-4077-bd70-3c2e468bb408.png)
 
-现在，启动Postman并调用`GET /api/product/productlist`资源：
+现在，启动 Postman 并调用`GET /api/product/productlist`资源：
 
 ![图片](img/9f77c310-49f6-4d9c-b833-0d264193c9bd.png)
 
@@ -238,7 +414,15 @@
 
 因此，我们需要对我们的`ProductController`进行一些小的修改。看看以下代码片段：
 
-[PRE16]
+```cs
+private readonly IProductRepository _productRepository;
+private readonly ILogger<ProductController> _logger;
+public ProductController(IProductRepository productRepository, ILogger<ProductController> logger)
+{
+  _productRepository = productRepository;
+  _logger = logger;
+}
+```
 
 在上述代码中，我添加了一个泛型`ILogger<ProductController>`类型。由于它是可注入的，它将自动解析。
 
@@ -262,11 +446,63 @@
 
 打开 `Program` 类并更新它。它应该看起来像以下代码片段：
 
-[PRE17]
+```cs
+public static void Main(string[] args)
+{
+  var webHost = new WebHostBuilder()
+  .UseKestrel()
+  .UseContentRoot(Directory.GetCurrentDirectory())
+  .ConfigureAppConfiguration((hostingContext, config) =>
+  {
+    var env = hostingContext.HostingEnvironment;
+    config.AddJsonFile("appsettings.json", optional: true,
+    reloadOnChange: true)
+    .AddJsonFile($"appsettings.{env.EnvironmentName}.json", 
+    optional: true, reloadOnChange: true);
+    config.AddEnvironmentVariables();
+  })
+  .ConfigureLogging((hostingContext, logging) =>
+  {
+    logging.AddConfiguration(hostingContext.Configuration.
+    GetSection("Logging"));
+    logging.AddConsole();
+    logging.AddDebug();
+  })
+  .UseStartup<Startup>()
+  .Build();
+  webHost.Run();
+}
+```
 
 您还需要更新 `appsettings.json` 文件并为记录器编写更多代码，以便您的文件看起来像以下片段：
 
-[PRE18]
+```cs
+{
+  "ApplicationInsights": 
+  {
+    "InstrumentationKey": ""
+  },
+  "Logging": 
+  {
+    "IncludeScopes": false,
+    "Console": 
+    {
+      "LogLevel": 
+      {
+        "Default": "Warning",
+        "System": "Information",
+        "Microsoft": "Information"
+      }
+    }
+  },
+  "ConnectionStrings": 
+  {
+    "ProductConnection": "Data Source=.;Initial
+    Catalog=ProductsDB;Integrated   
+    Security=True;MultipleActiveResultSets=True"
+  }
+}
+```
 
 现在，再次打开 Visual Studio 命令提示符并写入 `dotnet build` 命令。它将构建项目，您将收到类似于以下截图的消息：
 
@@ -310,37 +546,74 @@
 
 ![](img/da2e2fcb-191b-4c64-91ae-cf6b04d6f02d.png)
 
-感谢Justin Williams提供的POST资源的解决方案；他的解决方案可在[https://github.com/JustinJohnWilliams/RequestLogging](https://github.com/JustinJohnWilliams/RequestLogging)找到。
+感谢 Justin Williams 提供的 POST 资源的解决方案；他的解决方案可在[`github.com/JustinJohnWilliams/RequestLogging`](https://github.com/JustinJohnWilliams/RequestLogging)找到。
 
 查看以下我们的`FlixOneStoreLoggerMiddleware`类的代码片段：
 
-[PRE19]
+```cs
+private readonly RequestDelegate _next;
+private readonly ILogger<FlixOneLoggerMiddleware> _logger;
+public FlixOneLoggerMiddleware(RequestDelegate next, ILogger<FlixOneLoggerMiddleware> logger)
+{
+  _next = next;
+  _logger = logger;
+}
+```
 
-在前面的代码中，我们只是利用内置的DI通过`RequestDelegate`来创建我们的自定义中间件。
+在前面的代码中，我们只是利用内置的 DI 通过`RequestDelegate`来创建我们的自定义中间件。
 
 以下代码展示了我们如何为日志配置所有请求和响应：
 
-[PRE20]
+```cs
+public async Task Invoke(HttpContext httpContext)
+{
+  _logger.LogInformation(await  
+  GetFormatedRequest(httpContext.Request));
+  var originalBodyStream = httpContext.Response.Body;
+  using (var responseBody = new MemoryStream())
+  {
+    httpContext.Response.Body = responseBody;
+    await _next(httpContext);
+    _logger.LogInformation(await 
+    GetFormatedResponse(httpContext.Response));
+    await responseBody.CopyToAsync(originalBodyStream);
+  }
+}
+```
 
 参考本章中的“*请求委托*”部分，其中我们探讨了中间件。在前面的代码中，我们只是通过`ILogger`泛型类型帮助记录请求和响应。`await _next(httpContext);`行继续请求管道。
 
 打开`Setup.cs`文件，并在`Configure`方法中添加以下代码：
 
-[PRE21]
+```cs
+loggerFactory.AddConsole(Configuration.GetSection("Logging"));
+loggerFactory.AddDebug();
+//custom middleware
+app.UseFlixOneLoggerMiddleware();
+```
 
 在前面的代码中，我们利用`ILoggerFactory`并添加`Console`和`Debug`来记录请求和响应。`UseFlixOneLoggerMiddleware`方法实际上是一个扩展方法。为此，将以下代码添加到`FlixOneStoreLoggerExtension`类中：
 
-[PRE22]
+```cs
+public static class FlixOneStoreLoggerExtension
+{
+  public static IApplicationBuilder UseFlixOneLoggerMiddleware
+  (this IApplicationBuilder applicationBuilder)
+  {
+    return applicationBuilder.UseMiddleware<FlixOneLoggerMiddleware>();
+  }
+}
+```
 
-现在，每当任何请求到达我们的产品API时，日志应该会显示，如下面的截图所示：
+现在，每当任何请求到达我们的产品 API 时，日志应该会显示，如下面的截图所示：
 
 ![](img/a7b36f72-6571-4284-860f-f2c2f0ed525b.png)
 
 在本节中，我们创建了一个自定义中间件，并记录了所有请求和响应。
 
-# JSON-RPC用于RPC通信
+# JSON-RPC 用于 RPC 通信
 
-JSON-RPC是一个无状态的、轻量级的远程过程调用（RPC）协议。规范（即，JSON-RPC 2.0规范（见[http://www.jsonrpc.org/specification](http://www.jsonrpc.org/specification)获取更多详细信息））定义了各种数据结构和它们的处理规则。
+JSON-RPC 是一个无状态的、轻量级的远程过程调用（RPC）协议。规范（即，JSON-RPC 2.0 规范（见[`www.jsonrpc.org/specification`](http://www.jsonrpc.org/specification)获取更多详细信息））定义了各种数据结构和它们的处理规则。
 
 主要对象按规范在以下部分中展示。
 
@@ -348,9 +621,9 @@ JSON-RPC是一个无状态的、轻量级的远程过程调用（RPC）协议。
 
 `Request`对象代表发送到服务器的任何调用/请求。`Request`对象具有以下成员：
 
-+   **jsonrpc**：一个表示JSON-RPC协议版本的字符串。它**必须**准确（在这种情况下，版本2.0）。
++   **jsonrpc**：一个表示 JSON-RPC 协议版本的字符串。它**必须**准确（在这种情况下，版本 2.0）。
 
-+   **method**：一个字符串，包含要调用的方法名称。以单词`rpc`开头并后跟一个点字符（U+002E或ASCII 46）的方法名称被限制为rpc-内部方法和扩展，**不得**用于其他任何目的。
++   **method**：一个字符串，包含要调用的方法名称。以单词`rpc`开头并后跟一个点字符（U+002E 或 ASCII 46）的方法名称被限制为 rpc-内部方法和扩展，**不得**用于其他任何目的。
 
 +   **params**：一个结构化值，主导参数值。在整个方法调用过程中都要使用此成员。此成员**可能**被删除。
 
@@ -358,9 +631,9 @@ JSON-RPC是一个无状态的、轻量级的远程过程调用（RPC）协议。
 
 # 响应对象
 
-根据规范，每当对服务器进行调用时，服务器必须有一个响应。`Response`以一个包含以下成员的单个JSON对象表示：
+根据规范，每当对服务器进行调用时，服务器必须有一个响应。`Response`以一个包含以下成员的单个 JSON 对象表示：
 
-+   **jsonrpc**：一个表示JSON-RPC协议版本的字符串
++   **jsonrpc**：一个表示 JSON-RPC 协议版本的字符串
 
 +   **result**：一个必需的成员，如果请求成功
 
@@ -368,10 +641,10 @@ JSON-RPC是一个无状态的、轻量级的远程过程调用（RPC）协议。
 
 +   **id**：一个必需的成员
 
-在本节中，我们概述了JSON-RPC规范2.0。
+在本节中，我们概述了 JSON-RPC 规范 2.0。
 
 # 摘要
 
-在本章中，我们讨论了与支付网关、订单跟踪、通知服务等相关的外部API/组件的集成。我们还通过实际代码实现了它们的功能。
+在本章中，我们讨论了与支付网关、订单跟踪、通知服务等相关的外部 API/组件的集成。我们还通过实际代码实现了它们的功能。
 
 测试是我们帮助代码无错误的唯一过程。它也是所有希望使代码整洁和可维护的开发者的实践。在下一章中，我们将涵盖日常开发活动中的测试范式。我们将讨论与测试范式相关的一些重要术语。我们还将涵盖这些术语的理论，然后我们将涵盖代码示例，查看存根和模拟，并了解集成、安全和性能测试。

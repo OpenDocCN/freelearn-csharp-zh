@@ -1,6 +1,6 @@
-# *第10章*：DDD – 领域层
+# *第十章*：DDD – 领域层
 
-上一章是对**领域驱动设计**（**DDD**）的整体概述，其中您学习了DDD的基本层、构建块和原则。您还了解了ABP解决方案的结构及其与DDD的关系。
+上一章是对**领域驱动设计**（**DDD**）的整体概述，其中您学习了 DDD 的基本层、构建块和原则。您还了解了 ABP 解决方案的结构及其与 DDD 的关系。
 
 本章完全专注于领域层的实现细节，包含大量代码示例和最佳实践建议。以下是本章我们将涵盖的主题：
 
@@ -18,13 +18,13 @@
 
 # 技术要求
 
-您可以从GitHub克隆或下载*EventHub*项目的源代码：[https://github.com/volosoft/eventhub](https://github.com/volosoft/eventhub)。
+您可以从 GitHub 克隆或下载*EventHub*项目的源代码：[`github.com/volosoft/eventhub`](https://github.com/volosoft/eventhub)。
 
-如果您想在本地开发环境中运行解决方案，您需要有一个IDE/编辑器（例如Visual Studio）来构建和运行ASP.NET Core解决方案。此外，如果您想创建ABP解决方案，您需要安装ABP CLI，如[*第2章*](B17287_02_Epub_AM.xhtml#_idTextAnchor026)中所述，*ABP框架入门*。
+如果您想在本地开发环境中运行解决方案，您需要有一个 IDE/编辑器（例如 Visual Studio）来构建和运行 ASP.NET Core 解决方案。此外，如果您想创建 ABP 解决方案，您需要安装 ABP CLI，如*第二章*中所述，*ABP 框架入门*。
 
 # 探索示例领域
 
-本章和下一章中的示例将主要基于EventHub解决方案。因此，首先理解领域至关重要。[*第4章*](B17287_04_Epub_AM.xhtml#_idTextAnchor130)，*理解参考解决方案*已经解释了该解决方案。如果您想熟悉应用程序和解决方案结构，可以查看它。在这里，我们将探讨技术细节和领域对象。
+本章和下一章中的示例将主要基于 EventHub 解决方案。因此，首先理解领域至关重要。*第四章*，*理解参考解决方案*已经解释了该解决方案。如果您想熟悉应用程序和解决方案结构，可以查看它。在这里，我们将探讨技术细节和领域对象。
 
 以下列表介绍了并解释了领域的主要概念：
 
@@ -32,15 +32,15 @@
 
 +   事件由**组织**创建（组织）。应用程序中的任何**用户**都可以创建组织并在该组织内组织活动。
 
-+   事件可以有零个或多个**轨道**，每个轨道都有一个轨道名称（通常是一个简单的标签，如1、2、3或A、B、C）。轨道是一系列会议。具有多个轨道的事件使得组织并行会议成为可能。
++   事件可以有零个或多个**轨道**，每个轨道都有一个轨道名称（通常是一个简单的标签，如 1、2、3 或 A、B、C）。轨道是一系列会议。具有多个轨道的事件使得组织并行会议成为可能。
 
 +   一个轨道包含一个或多个**会议**。会议是活动的一部分，参与者通常会在一定时间内聆听演讲者。
 
-+   最后，一个会议可以有一个或多个**演讲者**。演讲者是会议中发言并做展示的人。通常，每个会议都会有一个演讲者。但有时可能会有多个演讲者，或者会议可能没有与演讲者相关联。[*图10.1*](下一节中)显示了事件与其轨道、会议和演讲者之间的关系。
++   最后，一个会议可以有一个或多个**演讲者**。演讲者是会议中发言并做展示的人。通常，每个会议都会有一个演讲者。但有时可能会有多个演讲者，或者会议可能没有与演讲者相关联。*图 10.1*显示了事件与其轨道、会议和演讲者之间的关系。
 
 +   应用程序中的任何用户都可以**注册**事件。注册用户在事件开始前或事件时间更改时会被通知。
 
-你已经了解了EventHub应用程序中的基本对象。下一节将解释DDD的第一个构建块：聚合。
+你已经了解了 EventHub 应用程序中的基本对象。下一节将解释 DDD 的第一个构建块：聚合。
 
 # 设计聚合和实体
 
@@ -52,13 +52,11 @@
 
 下图所示的事件聚合是一个聚合的好例子：
 
-![图10.1 – 事件聚合
+![图 10.1 – 事件聚合](img/Figure_10.1_B17287.jpg)
 
-](img/Figure_10.1_B17287.jpg)
+图 10.1 – 事件聚合
 
-图10.1 – 事件聚合
-
-本章的示例将主要基于`事件`聚合，因为它代表了EventHub解决方案的基本概念。因此，我们应该理解其设计：
+本章的示例将主要基于`事件`聚合，因为它代表了 EventHub 解决方案的基本概念。因此，我们应该理解其设计：
 
 +   在这里，`事件`对象是聚合根，具有`GUID`主键。它包含一个`Track`对象集合（一个事件可以有零个或多个轨道）。
 
@@ -88,7 +86,22 @@
 
 这里是一个实现该过程的简化示例应用程序服务方法：
 
-[PRE0]
+```cs
+public class EventAppService
+    : EventHubAppService, IEventAppService
+{
+    //...
+    public async Task AddSessionAsync(Guid eventId,
+                                      AddSessionDto input)
+    {
+        var @event = 
+            await _eventRepository.GetAsync(eventId);
+        @event.AddSession(input.TrackId, input.Title,
+            input.StartTime, input.EndTime);
+        await _eventRepository.UpdateAsync(@event);
+    }
+}
+```
 
 对于这个例子，`event.AddSession` 方法内部会检查新会话的开始时间和结束时间是否与同一轨道上的另一个会话冲突。此外，会话的时间范围不应超出活动的时间范围。我们可能还有其他业务规则。我们可能希望限制活动中的会话数量或检查会话的演讲者是否在同一时间范围内有其他演讲。
 
@@ -98,43 +111,57 @@
 
 关于 `IRepository.GetAsync` 方法
 
-存储库的 `GetAsync` 方法（在先前的示例代码块中使用）将 `Event` 对象作为一个聚合体（带有所有子集合）作为一个单元检索。对于 MongoDB，它默认工作，但你需要配置你的聚合体以启用 EF Core 的该行为。请参阅[*第 6 章*](B17287_06_Epub_AM.xhtml#_idTextAnchor177)*，使用数据访问基础设施*中的*聚合模式*部分，以记住如何配置它。
+存储库的 `GetAsync` 方法（在先前的示例代码块中使用）将 `Event` 对象作为一个聚合体（带有所有子集合）作为一个单元检索。对于 MongoDB，它默认工作，但你需要配置你的聚合体以启用 EF Core 的该行为。请参阅*第六章**，使用数据访问基础设施*中的*聚合模式*部分，以记住如何配置它。
 
 作为单个单元检索和保存聚合体为我们提供了机会，可以对单个聚合体的对象进行多项更改，并使用单个数据库操作将它们全部保存。这样，该聚合体中的所有更改在本质上都是原子的，无需显式数据库事务。
 
 工作单元系统
 
-如果你需要更改多个聚合（相同或不同类型），你仍然需要一个数据库事务。在这种情况下，ABP的单元工作系统（在[*第6章*](B17287_06_Epub_AM.xhtml#_idTextAnchor177)，*与数据访问基础设施一起工作*）会自动按照惯例处理数据库事务。
+如果你需要更改多个聚合（相同或不同类型），你仍然需要一个数据库事务。在这种情况下，ABP 的单元工作系统（在*第六章*，*与数据访问基础设施一起工作*）会自动按照惯例处理数据库事务。
 
 ### 一个可序列化的对象
 
-一个聚合应该可序列化和可传输，作为一个单独的单元，包括其所有属性和子集合。这意味着你可以将其转换为字节数组或XML或JSON值，然后从序列化值反序列化（重新构造）它。
+一个聚合应该可序列化和可传输，作为一个单独的单元，包括其所有属性和子集合。这意味着你可以将其转换为字节数组或 XML 或 JSON 值，然后从序列化值反序列化（重新构造）它。
 
-EF Core不会序列化你的实体，但文档数据库，如MongoDB，可能会将你的聚合序列化为BSON/JSON值以存储在数据源中。
+EF Core 不会序列化你的实体，但文档数据库，如 MongoDB，可能会将你的聚合序列化为 BSON/JSON 值以存储在数据源中。
 
 这个原则不是聚合的设计要求，但在确定聚合边界时是一个很好的指南。例如，你不能有引用其他聚合实体的属性。否则，引用的对象也将作为你聚合的一部分被序列化。
 
 让我们看看一些更多的原则。下一节中引入的第一条规则是使聚合可序列化的关键实践。
 
-## 通过ID引用其他聚合
+## 通过 ID 引用其他聚合
 
-第一条规则指出，一个聚合（包括聚合根和其他类）不应该有导航属性到其他聚合，但在必要时可以存储它们的ID值。
+第一条规则指出，一个聚合（包括聚合根和其他类）不应该有导航属性到其他聚合，但在必要时可以存储它们的 ID 值。
 
 这个规则使聚合成为一个自包含、可序列化的单元。它还有助于通过隐藏聚合细节来防止聚合的业务逻辑泄露到另一个聚合中。
 
 请参阅以下示例代码块：
 
-[PRE1]
+```cs
+public class Event : FullAuditedAggregateRoot<Guid>
+{
+    public Organization Organization { get; private set; }
+    public string Title { get; private set; }
+    ...
+}
+```
 
-`Event`类有一个导航属性到`Organization`聚合，这违反了该规则。如果我们将`Event`对象序列化为JSON值，相关的`Organization`对象也会被序列化。
+`Event`类有一个导航属性到`Organization`聚合，这违反了该规则。如果我们将`Event`对象序列化为 JSON 值，相关的`Organization`对象也会被序列化。
 
 在适当的实现中，`Event`类可以有一个`OrganizationId`属性来关联`Organization`：
 
-[PRE2]
+```cs
+public class Event : FullAuditedAggregateRoot<Guid>
+{
+    public Guid OrganizationId { get; private set; }
+    public string Title { get; private set; }
+    ...
+}
+```
 
 一旦我们有一个`Event`对象并且需要访问相关的组织详情，我们应该使用`OrganizationId`（或执行一个`JOIN`查询以在开始时一起加载它们）从数据库中查询`Organization`对象。
 
-如果你使用的是文档数据库，如 MongoDB，这个规则对你来说将显得很自然。因为如果你向 `Organization` 聚合添加导航属性，那么相关的 `Organization` 对象将被序列化并保存在数据库中 `Event` 对象的集合中，这会重复组织数据并将其复制到所有事件中。然而，在使用关系数据库时，EF Core 等ORM允许你使用这样的导航属性并处理关系而不会出现任何问题。我仍然建议实施这个规则，因为它可以使你的聚合更简单，并减少加载相关数据的复杂性。如果你不想应用这个规则，可以参考 [*第9章*](B17287_09_Epub_AM.xhtml#_idTextAnchor300) 的 *数据库提供者独立性* 部分，*理解领域驱动设计*。
+如果你使用的是文档数据库，如 MongoDB，这个规则对你来说将显得很自然。因为如果你向 `Organization` 聚合添加导航属性，那么相关的 `Organization` 对象将被序列化并保存在数据库中 `Event` 对象的集合中，这会重复组织数据并将其复制到所有事件中。然而，在使用关系数据库时，EF Core 等 ORM 允许你使用这样的导航属性并处理关系而不会出现任何问题。我仍然建议实施这个规则，因为它可以使你的聚合更简单，并减少加载相关数据的复杂性。如果你不想应用这个规则，可以参考 *第九章* 的 *数据库提供者独立性* 部分，*理解领域驱动设计*。
 
 下一节表达了一个最佳实践：保持你的聚合小！
 
@@ -142,11 +169,24 @@ EF Core不会序列化你的实体，但文档数据库，如MongoDB，可能会
 
 一旦我们将一个聚合作为一个单一单元加载和保存，如果聚合太大，我们可能会遇到性能和内存使用问题。保持聚合简单和小巧是一个基本原则，这不仅关乎性能，还关乎降低复杂性。
 
-使聚合变大的主要方面是子集合实体可能的数量。如果一个聚合根的子集合包含数百个项目，这是一个设计不良的迹象。在一个好的聚合设计中，子集合中的项目不应超过几十个，并且在边缘情况下应保持在100-150以下。
+使聚合变大的主要方面是子集合实体可能的数量。如果一个聚合根的子集合包含数百个项目，这是一个设计不良的迹象。在一个好的聚合设计中，子集合中的项目不应超过几十个，并且在边缘情况下应保持在 100-150 以下。
 
 请参见以下代码块中的 `Event` 聚合：
 
-[PRE3]
+```cs
+public class Event : FullAuditedAggregateRoot<Guid>
+{
+  ...
+  public ICollection<Track> Tracks { get; set; }
+  public ICollection<EventRegistration> Registrations { 
+      get; set; }
+}
+public class EventRegistration : Entity
+{
+    public Guid EventId { get; set; }
+    public Guid UserId { get; set; }
+}
+```
 
 在这个例子中，`Event` 聚合有两个子集合：`Tracks` 和 `Registrations`。
 
@@ -166,13 +206,13 @@ EF Core不会序列化你的实体，但文档数据库，如MongoDB，可能会
 
 并发控制
 
-大聚合对象的一个问题是它们增加了并发更新问题的概率，因为大对象更有可能被多个用户同时更改。ABP 框架提供了一个标准的并发控制模型。请参阅文档：[https://docs.abp.io/en/abp/latest/Concurrency-Check](https://docs.abp.io/en/abp/latest/Concurrency-Check)。
+大聚合对象的一个问题是它们增加了并发更新问题的概率，因为大对象更有可能被多个用户同时更改。ABP 框架提供了一个标准的并发控制模型。请参阅文档：[`docs.abp.io/en/abp/latest/Concurrency-Check`](https://docs.abp.io/en/abp/latest/Concurrency-Check)。
 
 在下一节中，我们将讨论实体的单键和复合键。
 
 ## 确定实体的主键
 
-实体通过其 ID（一个唯一标识符或预构建模块的实体的 `Guid` 类型。它还假设用户 ID 和租户 ID 类型是 `Guid`。我们已在 [*第 6 章*](B17287_06_Epub_AM.xhtml#_idTextAnchor177) 的 *“使用数据访问基础设施”* 部分中讨论了此主题）来确定。
+实体通过其 ID（一个唯一标识符或预构建模块的实体的 `Guid` 类型。它还假设用户 ID 和租户 ID 类型是 `Guid`。我们已在 *第六章* 的 *“使用数据访问基础设施”* 部分中讨论了此主题）来确定。
 
 ABP 还允许您为实体使用复合主键。复合主键由两个或多个属性（实体的属性）组成，这些属性组合成一个唯一值。
 
@@ -186,7 +226,22 @@ ABP 还允许您为实体使用复合主键。复合主键由两个或多个属�
 
 `Speaker` 实体类在以下代码块中显示：
 
-[PRE4]
+```cs
+public class Speaker : Entity
+{
+    public Guid SessionId { get; private set; }
+    public Guid UserId { get; private set; }
+    public Speaker(Guid sessionId, Guid userId)
+    {
+        SessionId = sessionId;
+        UserId = userId;
+    }
+    public override object[] GetKeys()
+    {
+        return new object[] {SessionId, UserId};
+    }
+}
+```
 
 `SessionId` 和 `UserId` 构成了 `Speaker` 实体的唯一标识符。`Speaker` 类是从 `Entity` 类（没有泛型参数）派生的。当您从非泛型 `Entity` 类派生时，ABP 框架会强制您定义 `GetKeys` 方法以获取复合键的组件。如果您想使用复合键，请参考您数据库提供者的文档（如 EF Core）以了解如何配置它们。
 
@@ -200,33 +255,91 @@ ABP 还允许您为实体使用复合主键。复合主键由两个或多个属�
 
 下面的代码块展示了来自*EventHub*项目的实体（一个聚合根实体）：
 
-[PRE5]
+```cs
+public class Country : BasicAggregateRoot<Guid>
+{
+    public string Name { get; private set; }
+    private Country() { } // parameterless constructor
+    public Country(Guid id, string name) 
+        //primary constructor
+        : base(id)
+    {
+        Name = Check.NotNullOrWhiteSpace(
+               name, nameof(name),
+               CountryConsts.MaxNameLength);
+    }
+}
+```
 
-`Country`是一个非常简单的实体，它只有一个属性：`Name`。`Name`属性是必需的，因此`Country`的主要构造函数（实际构造函数，旨在由应用程序开发者使用）通过定义一个`name`参数并检查它是否为空或超过最大长度约束，强制开发者设置一个有效的值到该属性。`Check`是ABP框架的一个静态类，具有各种用于验证方法参数并抛出`ArgumentException`错误的`ArgumentException`错误。
+`Country`是一个非常简单的实体，它只有一个属性：`Name`。`Name`属性是必需的，因此`Country`的主要构造函数（实际构造函数，旨在由应用程序开发者使用）通过定义一个`name`参数并检查它是否为空或超过最大长度约束，强制开发者设置一个有效的值到该属性。`Check`是 ABP 框架的一个静态类，具有各种用于验证方法参数并抛出`ArgumentException`错误的`ArgumentException`错误。
 
 `Name`属性有一个私有设置器，因此创建对象后无法更改此值。我们可以假设在这个例子中，国家不会更改其名称。
 
-`Country`类的主要构造函数接受另一个参数`Guid id`。我们不在构造函数中使用`Guid.NewGuid()`，因为我们想使用ABP框架的`IGuidGenerator`服务，该服务生成顺序GUID值（见[*第6章*](B17287_06_Epub_AM.xhtml#_idTextAnchor177)的*GUID PK*部分，*与数据访问基础设施一起工作*）。我们直接将`id`值传递给基类构造函数（在这个例子中是`BasicAggregateRoot<Guid>`），该构造函数内部设置实体的`Id`属性。
+`Country`类的主要构造函数接受另一个参数`Guid id`。我们不在构造函数中使用`Guid.NewGuid()`，因为我们想使用 ABP 框架的`IGuidGenerator`服务，该服务生成顺序 GUID 值（见*第六章*的*GUID PK*部分，*与数据访问基础设施一起工作*）。我们直接将`id`值传递给基类构造函数（在这个例子中是`BasicAggregateRoot<Guid>`），该构造函数内部设置实体的`Id`属性。
 
 无参数构造函数的需求
 
-`Country`类还定义了一个私有、无参数的构造函数。这个构造函数仅用于ORM，以便它们可以在从数据库读取时构建对象。应用程序开发者不使用它。
+`Country`类还定义了一个私有、无参数的构造函数。这个构造函数仅用于 ORM，以便它们可以在从数据库读取时构建对象。应用程序开发者不使用它。
 
 让我们看看一个更复杂的例子，展示`Event`实体的主要构造函数：
 
-[PRE6]
+```cs
+internal Event(
+    Guid id,
+    Guid organizationId,
+    string urlCode,
+    string title,
+    DateTime startTime,
+    DateTime endTime,
+    string description)
+    : base(id)
+{
+    OrganizationId = organizationId;
+    UrlCode = Check.NotNullOrWhiteSpace(urlCode, urlCode,
+              EventConsts.UrlCodeLength,
+              EventConsts.UrlCodeLength);
+
+    SetTitle(title);
+    SetDescription(description);
+    SetTimeInternal(startTime, endTime);    
+    Tracks = new Collection<Track>();
+}
+```
 
 `Event`类的构造函数接受作为参数的最小必需属性，并检查并设置它们为属性。所有这些属性都有私有设置器（见源代码），并且通过构造函数或`Event`类的某些方法设置。构造函数使用这些方法来设置`Title`、`Description`、`StartTime`和`EndTime`属性。
 
 让我们看看`SetTitle`方法的具体实现：
 
-[PRE7]
+```cs
+public Event SetTitle(string title)
+{
+    Title = Check.NotNullOrWhiteSpace(title, nameof(title),
+            EventConsts.MaxTitleLength,
+            EventConsts.MinTitleLength);
+    Url = EventUrlHelper.ConvertTitleToUrlPart(Title) + "-" 
+          + UrlCode;
+    return this;
+}
+```
 
 `SetTitle`方法通过检查约束将给定的`title`值分配给`Title`属性。然后它设置`Url`属性，这是一个基于`Title`属性的计算值，以及`UrlCode`属性。此方法为`public`，以便在需要更改`Event`实体的`Title`属性时使用。
 
 `UrlCode`是一个八位随机唯一值，它被发送到构造函数，并且永远不会改变。让我们看看构造函数调用的另一个方法：
 
-[PRE8]
+```cs
+private Event SetTimeInternal(DateTime startTime, 
+                              DateTime endTime)
+{
+    if (startTime > endTime)
+    {
+        throw new BusinessException(EventHubErrorCodes
+            .EventEndTimeCantBeEarlierThanStartTime);
+    }
+    StartTime = startTime;
+    EndTime = endTime;
+    return this;
+}
+```
 
 在这里，我们有一个业务规则：`StartTime`值不能晚于`EndTime`值。
 
@@ -238,9 +351,31 @@ ABP 还允许您为实体使用复合主键。复合主键由两个或多个属�
 
 `Event`类的主要构造函数是`internal`，因此上层不能直接创建一个新的`Event`对象。我们应该使用`EventManager`的`CreateAsync`方法来创建一个新的`Event`对象：
 
-[PRE9]
+```cs
+public class EventManager : DomainService
+{
+    ...
+    public async Task<Event> CreateAsync(
+        Organization organization,
+        string title,
+        DateTime startTime,
+        DateTime endTime,
+        string description)
+    {
+        return new Event(
+            GuidGenerator.Create(),
+            organization.Id,
+            await _eventUrlCodeGenerator.GenerateAsync(),
+            title,
+            startTime,
+            endTime,
+            description
+        );
+    }
+}
+```
 
-我们将在本章的“实现领域服务”部分稍后回到领域服务。通过这个简单的`CreateAsync`方法，我们创建了一个有效的`Event`对象，并返回了新对象。我们需要这样的工厂方法，因为我们使用了`eventUrlCodeGenerator`服务来为新事件生成URL代码。`eventUrlCodeGenerator`服务内部为新事件创建一个随机的、八位的代码，并检查该代码是否被另一个事件使用过（如果你想了解更多，请查看其源代码）。这就是为什么它是`async`：它执行数据库操作。
+我们将在本章的“实现领域服务”部分稍后回到领域服务。通过这个简单的`CreateAsync`方法，我们创建了一个有效的`Event`对象，并返回了新对象。我们需要这样的工厂方法，因为我们使用了`eventUrlCodeGenerator`服务来为新事件生成 URL 代码。`eventUrlCodeGenerator`服务内部为新事件创建一个随机的、八位的代码，并检查该代码是否被另一个事件使用过（如果你想了解更多，请查看其源代码）。这就是为什么它是`async`：它执行数据库操作。
 
 我们使用领域服务的工厂方法创建了一个新的`Event`对象，因为`Event`类的构造函数不能使用`eventUrlCodeGenerator`服务。因此，如果你在创建新实体时需要外部服务/对象，你可以创建工厂方法。
 
@@ -260,7 +395,22 @@ ABP 还允许您为实体使用复合主键。复合主键由两个或多个属�
 
 看一下 `Event` 类的 `Description` 属性：
 
-[PRE10]
+```cs
+public class Event : FullAuditedAggregateRoot<Guid>
+{
+    ...
+    public string Description { get; private set; }
+
+    public Event SetDescription(string description)
+    {
+        Description = Check.NotNullOrWhiteSpace(
+            description, nameof(description),
+            EventConsts.MaxDescriptionLength,
+            EventConsts.MinDescriptionLength);
+        return this;
+    }
+}
+```
 
 `Description` 属性的设置器是 `private` 的。我们提供 `SetDescription` 方法作为更改其值的唯一方式。在这个方法中，我们验证 `description` 值：它应该是一个长度超过 `50` (`MinDescriptionLength`) 且小于 `2000` (`MaxDescriptionLength`) 的字符串。这些常量定义在 `*EventHub.Domain.Shared*` 项目中，因此我们可以在 DTO 中重用它们，正如我们将在下一章中看到的。
 
@@ -270,13 +420,60 @@ ABP 还允许您为实体使用复合主键。复合主键由两个或多个属�
 
 让我们来看一个更复杂的例子，再次来自 `Event` 类：
 
-[PRE11]
+```cs
+public Event AddSession(Guid trackId, Guid sessionId,
+    string title, DateTime startTime, DateTime endTime,
+    string description, string language)
+{
+    if (startTime < this.StartTime || this.EndTime < 
+        endTime)
+    {
+        throw new BusinessException(EventHubErrorCodes
+            .SessionTimeShouldBeInTheEventTime);
+    }
+    var track = GetTrack(trackId);
+    track.AddSession(sessionId, title, startTime, endTime,
+                     description, language);
+    return this;
+}
+private Track GetTrack(Guid trackId)
+{
+    return Tracks.FirstOrDefault(t => t.Id == trackId) ??
+        throw new EntityNotFoundException(typeof(Track),
+                                          trackId);
+}
+```
 
 `AddSession` 方法接受一个 `trackId` 参数，因为一个会话应该属于一个轨道。它还接受新会话的 `sessionId`（作为参数获取，以便客户端可以使用 `IGuidGenerator` 服务来创建值）。其余参数是新会话的必需属性。
 
 `AddSession` 方法首先检查新会话是否在活动的时间范围内，然后找到正确的轨道（否则抛出异常），并将剩余的工作委托给 `track` 对象。让我们看看 `track.AddSession` 方法：
 
-[PRE12]
+```cs
+internal Track AddSession(Guid sessionId, string title,
+    DateTime startTime, DateTime endTime,
+    string description, string language)
+{
+    if (startTime > endTime)
+    {
+        throw new BusinessException(EventHubErrorCodes
+            .EndTimeCantBeEarlierThanStartTime);
+    }
+    foreach (var session in Sessions)
+    {
+      if (startTime.IsBetween(session.StartTime,
+          session.EndTime) ||
+          endTime.IsBetween(session.StartTime, 
+          session.EndTime))
+      {
+        throw new BusinessException(EventHubErrorCodes
+            .SessionTimeConflictsWithAnExistingSession);
+      }
+    }    
+    Sessions.Add(new Session(sessionId, Id, title, 
+                 startTime, endTime, description));    
+    return this;
+}
+```
 
 首先，这个方法是 `internal` 的，以防止在领域层之外使用它。它总是由本节前面展示的 `Event.AddSession` 方法使用。
 
@@ -294,7 +491,26 @@ ABP 还允许您为实体使用复合主键。复合主键由两个或多个属�
 
 以下是在`Event`类上的实现示例：
 
-[PRE13]
+```cs
+public async Task SetCapacityAsync(
+    IRepository<EventRegistration, Guid>
+        registrationRepository, int? capacity)
+{
+    if (capacity.HasValue)
+    {
+        var registeredUserCount = await 
+            registrationRepository.CountAsync(x =>
+                x.EventId == @event.Id);
+        if (capacity.Value < registeredUserCount)
+        {
+            throw new BusinessException(
+            EventHubErrorCodes
+            .CapacityCanNotBeLowerThanRegisteredUserCount);
+        }
+    }
+    this.Capacity = capacity;
+}
+```
 
 `SetCapacityAsync`方法使用存储库对象执行数据库查询以获取当前注册用户数。如果计数高于新容量值，则抛出异常。由于它执行异步数据库调用，`SetCapacityAsync`方法是异步的。客户端（通常是一个应用程序服务方法）负责向此方法注入和传递存储库服务。
 
@@ -310,7 +526,29 @@ ABP 还允许您为实体使用复合主键。复合主键由两个或多个属�
 
 让我们重新实现（在上一节中）的`SetCapacityAsync`方法作为领域服务方法：
 
-[PRE14]
+```cs
+public class EventManager : DomainService
+{
+    ...
+    public async Task SetCapacityAsync(Event @event, 
+                                       int? capacity)
+    {
+        if (capacity.HasValue)
+        {
+            var registeredUserCount = await
+                _eventRegistrationRepository.CountAsync(
+                    x => x.EventId == @event.Id);
+            if (capacity.Value < registeredUserCount)
+            {
+                throw new BusinessException(
+                EventHubErrorCodes.CapacityCanNotBeLower
+                ThanRegisteredUserCount);
+            }
+        }
+        @event.Capacity = capacity;
+    }
+}
+```
 
 在这种情况下，我们将`IRepository<EventRegistration, Guid>`注入到`EventManager`领域服务中（有关所有详细信息的源代码请参阅），并将`Event`对象作为参数获取。现在`Event.Capacity`属性的设置器是`internal`，这样它就只能在内层领域，即`EventManager`类中设置。
 
@@ -318,9 +556,22 @@ ABP 还允许您为实体使用复合主键。复合主键由两个或多个属�
 
 我们将在下一章探讨应用服务。然而，我认为在这里展示一个示例应用服务方法是有用的，该方法在一个请求中更新事件上的多个属性：
 
-[PRE15]
+```cs
+public async Task UpdateAsync(Guid id, 
+                              UpdateEventDto input)
+{
+    var @event = await _eventRepository.GetAsync(id);
+O
+    @event.SetTitle(input.Title);
+    @event.SetTime(input.StartTime, input.EndTime);
+    await _eventManager.SetCapacityAsync(@event,
+                                         input.Capacity);
+    @event.Language = input.Language;
+    await _eventRepository.UpdateAsync(@event);
+}
+```
 
-`UpdateAsync`方法接受一个包含要更新属性的DTO。它首先从数据库中检索`Event`对象作为一个单一单元，然后使用`Event`对象上的`SetTitle`和`SetTime`方法。这些方法内部验证提供的值，并适当地更改属性值。
+`UpdateAsync`方法接受一个包含要更新属性的 DTO。它首先从数据库中检索`Event`对象作为一个单一单元，然后使用`Event`对象上的`SetTitle`和`SetTime`方法。这些方法内部验证提供的值，并适当地更改属性值。
 
 `UpdateAsync`方法随后使用领域服务方法`eventManager.SetCapacity`来更改容量值。
 
@@ -350,19 +601,28 @@ ABP 还允许您为实体使用复合主键。复合主键由两个或多个属�
 
 +   存储库是为聚合根实体创建的，而不是为子集合实体创建的。这是因为子集合实体应该通过聚合根来访问。通常，你为每个聚合根有一个存储库。
 
-+   存储库与领域对象协同工作，而不是与DTO协同工作。
++   存储库与领域对象协同工作，而不是与 DTO 协同工作。
 
-+   在理想的设计中，存储库接口应该独立于数据库提供者。因此，不要获取或返回EF Core对象，例如`DbContext`或`DbSet`。
++   在理想的设计中，存储库接口应该独立于数据库提供者。因此，不要获取或返回 EF Core 对象，例如`DbContext`或`DbSet`。
 
 +   不要在存储库类中实现业务逻辑。
 
-ABP提供了一种开箱即用的存储库模式实现。我们在[*第6章*](B17287_06_Epub_AM.xhtml#_idTextAnchor177)“与数据访问基础设施协同工作”中探讨了如何使用通用存储库和实现自定义存储库。在这里，我将讨论一些最佳实践。
+ABP 提供了一种开箱即用的存储库模式实现。我们在*第六章*“与数据访问基础设施协同工作”中探讨了如何使用通用存储库和实现自定义存储库。在这里，我将讨论一些最佳实践。
 
 在前面列表中的最后一条规则“不要在存储库类中实现业务逻辑”是最重要的规则，因为其他规则都很容易理解。在存储库中实现业务逻辑通常是由于错误地考虑业务逻辑。
 
 请看以下示例存储库接口：
 
-[PRE16]
+```cs
+public interface IEventRepository : IRepository<Event,
+                                                Guid>
+{
+    Task UpdateSessionTimeAsync(
+        Guid sessionId, DateTime startTime, DateTime
+            endTime);
+    Task<List<Event>> GetNearbyEventsAsync();
+}
+```
 
 初看之下，似乎没有问题；这些方法只是执行一些数据库操作。然而，问题出在细节上。
 
@@ -370,33 +630,76 @@ ABP提供了一种开箱即用的存储库模式实现。我们在[*第6章*](B1
 
 第二个方法 `GetNearbyEventsAsync` 获取与当前用户在同一城市的活动列表。这个方法的问题在于 *当前用户* 是一个应用层概念，需要活跃的用户会话。仓储不应该与当前用户一起工作。如果我们想在没有当前用户的当前上下文中重用相同的 *附近* 逻辑在后台服务中怎么办？最好是将城市、日期范围和其他参数传递给方法，让它简单地获取事件。实体属性只是仓储的值。仓储不应该有任何领域知识，也不应该使用应用层功能。
 
-仓储主要用于创建、更新、删除和查询实体。ABP的通用仓储实现提供了大多数常见的操作。它还提供了一个 `IQueryable` 对象，您可以使用它来构建和执行使用LINQ的查询。然而，在应用层构建复杂的查询会将您的应用逻辑与理想中应在基础设施层的数据查询逻辑混合在一起。
+仓储主要用于创建、更新、删除和查询实体。ABP 的通用仓储实现提供了大多数常见的操作。它还提供了一个 `IQueryable` 对象，您可以使用它来构建和执行使用 LINQ 的查询。然而，在应用层构建复杂的查询会将您的应用逻辑与理想中应在基础设施层的数据查询逻辑混合在一起。
 
 请看以下示例方法，它使用 `IRepository<Event, Guid>` 获取给定用户演讲的事件列表：
 
-[PRE17]
+```cs
+public async Task<List<Event>> GetSpokenEventsAsync(Guid
+                                                    userId)
+{
+    var queryable = 
+        await _eventRepository.GetQueryableAsync();
+    var query = queryable.Where(x => x.Tracks
+        .Any(track => track.Sessions
+          .Any(session => session.Speakers
+            .Any(speaker => speaker.UserId == userId))));
+    return await AsyncExecuter.ToListAsync(query);
+}
+```
 
 在第一行，我们正在获取一个 `IQueryable<Event>` 对象。然后我们使用 `Where` 方法来过滤事件。最后，我们执行查询以获取事件列表。
 
 将此类查询写入应用程序服务的问题是将查询逻辑泄露到应用层，使得当我们需要在其他地方重用查询逻辑时变得不可能。为了克服这个问题，我们通常创建一个自定义仓储方法来查询事件：
 
-[PRE18]
+```cs
+public interface IEventRepository : IRepository<Event,
+                                                Guid>
+{
+    Task<List<Event>> GetSpokenEventsAsync(Guid userId);
+}
+```
 
 现在，我们可以在需要获取用户曾经演讲的事件的任何地方使用这个自定义仓储方法。
 
 创建自定义仓储方法是一个好方法。但随着应用的扩展，我们会有很多类似的方法。假设我们想在指定日期范围内获取事件列表，我们已经添加了一个新方法：
 
-[PRE19]
+```cs
+public interface IEventRepository : IRepository<Event,
+                                                Guid>
+{
+    Task<List<Event>> GetSpokenEventsAsync(Guid userId);
+    Task<List<Event>> GetEventsByDateRangeAsync(DateTime
+        minDate, DateTime maxDate);
+}
+```
 
 如果我们想按日期范围和演讲者过滤器查询事件呢？创建另一个方法，如下面的代码块所示：
 
-[PRE20]
+```cs
+Task<List<Event>> GetSpokenEventsByDateRangeAsync(Guid userId, DateTime minDate, DateTime maxDate)
+```
 
-实际上，ABP提供了 `GetListAsync` 方法，它接受一个表达式。因此，我们可以移除所有这些方法，并使用带有任意谓词的 `GetListAsync` 方法。
+实际上，ABP 提供了 `GetListAsync` 方法，它接受一个表达式。因此，我们可以移除所有这些方法，并使用带有任意谓词的 `GetListAsync` 方法。
 
-以下示例使用 `GetListAsync` 方法获取用户在接下来30天内作为演讲者的事件列表：
+以下示例使用 `GetListAsync` 方法获取用户在接下来 30 天内作为演讲者的事件列表：
 
-[PRE21]
+```cs
+public async Task<List<Event>> GetSpokenEventsAsync(Guid
+                                                    userId)
+{
+    var startTime = Clock.Now;
+    var endTime = Clock.Now.AddDays(30);
+    return await _eventRepository.GetListAsync(x =>
+        x.Tracks
+        .Any(track => track.Sessions
+            .Any(session => session.Speakers
+                .Any(speaker => speaker.UserId == userId)))
+        && x.StartTime > startTime && x.StartTime <= 
+            endTime    
+    );
+}
+```
 
 然而，我们又回到了之前的问题：将查询复杂性与应用代码混合。此外，查询不是变得越来越难以理解吗？你知道，在现实生活中，我们有很多更复杂的查询。
 
@@ -412,23 +715,46 @@ ABP提供了一种开箱即用的存储库模式实现。我们在[*第6章*](B1
 
 让我们从一个非常简单的规范类开始：
 
-[PRE22]
+```cs
+public class OnlineEventSpecification :
+    Specification<Event>
+{
+    public override Expression<Func<Event, bool>>
+        ToExpression()
+    {
+        return x => x.IsOnline == true;
+    }
+}
+```
 
 `OnlineEventSpecification` 用于过滤线上事件，这意味着它选择一个事件，如果它是线上事件。它是从 ABP 框架提供的基类 `Specification<T>` 派生出来的，以轻松创建规范类。我们重写 `ToExpression` 方法来过滤事件对象。此方法应返回一个 lambda 表达式，如果给定的 `Event` 实体（在这里，是 `x` 对象）满足条件（我们可以简单地写 `return x => x.IsOnline`）。
 
 现在，如果我们想获取线上事件的列表，我们只需使用带有规范对象的存储库的 `GetListAsync` 方法：
 
-[PRE23]
+```cs
+var events = _eventRepository
+    .GetListAsync(new OnlineEventSpecification());
+```
 
 规范隐式转换为表达式（记住，`GetListAsync` 方法可以获取表达式）。如果您想显式转换它们，可以调用 `ToExpression` 方法：
 
-[PRE24]
+```cs
+var events = _eventRepository
+    .GetListAsync(
+        new OnlineEventSpecification().ToExpression());
+```
 
 因此，我们可以在可以使用表达式的任何地方使用规范。这样，我们可以将表达式封装为命名的、可重用的对象。
 
 `Specification` 类提供了一个名为 `IsSatisfiedBy` 的方法，用于测试单个对象。如果您有一个 `Event` 对象，您可以轻松地检查它是否是线上活动：
 
-[PRE25]
+```cs
+Event evnt = GetEvent();
+if (new OnlineEventSpecification().IsSatisfiedBy(evnt))
+{
+    // ...
+}
+```
 
 在这个例子中，我们以某种方式获得了一个 `Event` 对象，我们想检查它是否是线上的。`IsSatisfiedBy` 接收一个 `Event` 对象，如果该对象满足条件，则返回 `true`。我接受这个例子看起来很荒谬，因为我们可以直接写 `if(evnt.IsOnline)`。这样的简单规范是不必要的。然而，在下一节中，我们将看到更复杂的例子，以使其更加清晰。
 
@@ -436,17 +762,48 @@ ABP提供了一种开箱即用的存储库模式实现。我们在[*第6章*](B1
 
 规范可以具有用于过滤表达式的参数。请参见以下示例：
 
-[PRE26]
+```cs
+public class SpeakerSpecification : Specification<Event>
+{
+    public Guid UserId { get; }
+    public SpeakerSpecification(Guid userId)
+    {
+        UserId = userId;
+    }
+
+    public override Expression<Func<Event, bool>>
+        ToExpression()
+    {
+        return x => x.Tracks
+            .Any(t => t.Sessions
+                .Any(s => s.Speakers
+                    .Any(sp => sp.UserId == UserId)));
+    }
+}
+```
 
 我们创建了一个参数化规范类，用于检查给定的用户是否在活动中是演讲者。一旦我们有了这个规范类，我们就可以像以下代码块所示那样过滤事件：
 
-[PRE27]
+```cs
+public async Task<List<Event>> GetSpokenEventsAsync(Guid
+                                                    userId)
+{
+    return await _eventRepository.GetListAsync(
+        new SpeakerSpecification(userId));
+}
+```
 
 在这里，我们只是通过提供一个新的 `SpeakerSpecification` 对象来重用了存储库的 `GetListAsync` 方法。从现在起，如果我们需要在应用程序的另一个地方稍后重用相同的表达式，我们可以重用这个规范类，而无需复制/粘贴表达式。如果我们稍后需要更改条件，所有这些地方都将使用更新的表达式。
 
 如果我们需要检查用户是否在给定的 `Event` 中是演讲者，我们可以通过调用其 `IsSatisfiedBy` 方法来重用 `SpeakerSpecification` 类：
 
-[PRE28]
+```cs
+Event evnt = GetEvent();
+if (new SpeakerSpecification(userId).IsSatisfiedBy(evnt))
+{
+    // ...
+}
+```
 
 规范非常强大，可以创建命名和可重用的过滤器，但它们还有另一个功能：将规范组合起来创建一个组合规范对象。
 
@@ -456,19 +813,43 @@ ABP提供了一种开箱即用的存储库模式实现。我们在[*第6章*](B1
 
 假设我想找到给定用户是演讲者且活动是线上的事件：
 
-[PRE29]
+```cs
+var events = _eventRepository.GetListAsync(
+    new SpeakerSpecification(userId)
+        .And(new OnlineEventSpecification())
+        .ToExpression()
+);
+```
 
 在这个例子中，我结合了 `SpeakerSpecification` 和 `OnlineEventSpecification` 对象来创建一个组合规范对象。在这种情况下，显式调用 `ToExpression` 类是必要的，因为 C# 不支持从接口（`And` 方法返回 `ISpecification<T>` 引用）隐式转换。
 
 以下示例查找在接下来的 30 天内给定用户作为演讲者的现场（离线）活动：
 
-[PRE30]
+```cs
+var events = _eventRepository.GetListAsync(
+    new SpeakerSpecification(userId)
+        .And(new DateRangeSpecification(Clock.Now,
+             Clock.Now.AddDays(30)))
+        .AndNot(new OnlineEventSpecification())
+        .ToExpression()
+);
+```
 
 在这个例子中，我们使用 `AndNot` 方法反转了 `OnlineEventSpecification` 对象的过滤逻辑。我们还使用了一个尚未定义的 `DateRangeSpecification` 对象。自己实现它是一个很好的练习。
 
 一个有趣的例子是将 `AndSpecification` 类扩展以创建一个组合两个规范的规范类：
 
-[PRE31]
+```cs
+public class OnlineSpeakerSpecification : 
+    AndSpecification<Event>
+{
+    public OnlineSpeakerSpecification(Guid userId)
+        : base(new SpeakerSpecification(userId),
+               new OnlineEventSpecification())
+    {
+    }
+}
+```
 
 在这个例子中，`OnlineSpeakerSpecification` 类结合了 `SpeakerSpecification` 类和 `OnlineEventSpecification` 类，并且可以在你想使用规范对象时使用。
 
@@ -498,17 +879,53 @@ ABP 框架提供了两种类型的事件总线来发布领域事件，每种类�
 
 请参阅 `Event` 类的 `SetTime` 方法的简化实现：
 
-[PRE32]
+```cs
+public void SetTime(DateTime startTime, DateTime endTime)
+{
+    if (startTime > endTime)
+    {
+        throw new BusinessException(EventHubErrorCodes     
+            .EndTimeCantBeEarlierThanStartTime);
+    }
+    StartTime = startTime;
+    EndTime = endTime;
+    if (!IsDraft)
+    {
+        AddLocalEvent(new EventTimeChangedEventData(this));
+    }
+}
+```
 
 在这个例子中，我们正在添加一个本地事件，该事件将在更新实体时发布。ABP 框架覆盖了 EF Core 的 `SaveChangesAsync` 方法来发布事件（对于 MongoDB，这是在仓储的 `UpdateAsync` 方法中完成的）。
 
 在这里，`EventTimeChangedEventData` 是一个简单的类，用于存储事件数据：
 
-[PRE33]
+```cs
+public class EventTimeChangedEventData
+{
+    public Event Event { get; }
+    public EventTimeChangedEventData(Event @event)
+    {
+        Event = @event;
+    }
+}
+```
 
 可以通过创建一个实现 `ILocalEventHandler<TEventData>` 接口的类来处理发布的事件：
 
-[PRE34]
+```cs
+public class UserEmailingHandler :
+    ILocalEventHandler<EventTimeChangedEventData>,
+    ITransientDependency
+{
+    public async Task HandleEventAsync(
+        EventTimeChangedEventData eventData)
+    {
+        var @event = eventData.Event;
+        // TODO: Send email to the registered users!
+    }
+}
+```
 
 `UserEmailingHandler` 类可以注入任何服务（或仓储）以获取注册用户的列表，然后发送电子邮件通知他们时间变更。对于同一事件，你可能会有多个处理器。如果任何处理器抛出异常，由于事件处理器是在同一数据库事务中执行的，因此主要数据库事务将被回滚。
 
@@ -516,7 +933,32 @@ ABP 框架提供了两种类型的事件总线来发布领域事件，每种类�
 
 假设我们不想在 `Event` 类内部发布 `EventTimeChangedEventData` 事件，而想在可以利用依赖注入系统的任意类中发布它。请看以下示例应用服务：
 
-[PRE35]
+```cs
+public class EventAppService : EventHubAppService, 
+    IEventAppService
+{
+    private readonly IRepository<Event, Guid> 
+        _eventRepository;
+    private readonly ILocalEventBus _localEventBus;
+    public EventAppService(
+        IRepository<Event, Guid> eventRepository,
+        ILocalEventBus localEventBus)
+    {
+        _eventRepository = eventRepository;
+        _localEventBus = localEventBus;
+    }
+    public async Task SetTimeAsync(
+        Guid eventId, DateTime startTime, DateTime endTime)
+    {
+        var @event = 
+            await _eventRepository.GetAsync(eventId);
+        @event.SetTime(startTime, endTime);
+        await _eventRepository.UpdateAsync(@event);
+        await _localEventBus.PublishAsync(
+            new EventTimeChangedEventData(@event));
+    }
+}
+```
 
 `EventAppService` 类注入了仓储和 `ILocalEventBus` 服务。在 `SetTimeAsync` 方法中，我们使用本地事件总线发布相同的事件。
 
@@ -530,35 +972,75 @@ ABP 框架提供了两种类型的事件总线来发布领域事件，每种类�
 
 ## 使用分布式事件总线
 
-在分布式事件总线中，事件通过消息代理服务（如RabbitMQ或Kafka）发布。如果你正在构建微服务/分布式解决方案，分布式事件总线可以异步地通知其他服务中的处理程序。
+在分布式事件总线中，事件通过消息代理服务（如 RabbitMQ 或 Kafka）发布。如果你正在构建微服务/分布式解决方案，分布式事件总线可以异步地通知其他服务中的处理程序。
 
 使用分布式事件总线与本地事件总线非常相似，但理解它们之间的差异和限制是很重要的。
 
 假设我们想在`Event`类的`SetTime`方法中事件时间变化时发布分布式事件：
 
-[PRE36]
+```cs
+public void SetTime(DateTime startTime, DateTime endTime)
+{
+    if (startTime > endTime)
+    {
+        throw new BusinessException(EventHubErrorCodes 
+            .EndTimeCantBeEarlierThanStartTime);
+    }
+    StartTime = startTime;
+    EndTime = endTime;
+    if (!IsDraft)
+    {
+        AddDistributedEvent(new EventTimeChangedEto
+        {
+            EventId = Id, Title = Title,
+            StartTime = StartTime, EndTime = EndTime
+        });
+    }
+}
+```
 
-在这里，我们调用`AddDistributedEvent`方法来发布事件（当实体在数据库中更新时发布）。与本地事件的一个重要区别是，我们不是将实体（`this`）对象作为事件数据传递，而是将一些属性复制到一个新对象中。这个新对象将在进程之间传输。它将在当前进程中序列化，并在目标进程中反序列化（ABP框架为你处理序列化和反序列化）。因此，创建一个只携带所需属性而不是完整对象的DTO-like对象更好。我们建议使用**Eto**（**事件传输对象**）后缀作为命名约定，但这不是必需的。
+在这里，我们调用`AddDistributedEvent`方法来发布事件（当实体在数据库中更新时发布）。与本地事件的一个重要区别是，我们不是将实体（`this`）对象作为事件数据传递，而是将一些属性复制到一个新对象中。这个新对象将在进程之间传输。它将在当前进程中序列化，并在目标进程中反序列化（ABP 框架为你处理序列化和反序列化）。因此，创建一个只携带所需属性而不是完整对象的 DTO-like 对象更好。我们建议使用**Eto**（**事件传输对象**）后缀作为命名约定，但这不是必需的。
 
 `AddDistributedEvent`（以及`AddLocalEvent`）方法仅在聚合根实体中可用，而不是在子集合实体中。然而，使用`IDistributedEventBus`服务在任意服务中发布分布式事件仍然是可能的：
 
-[PRE37]
+```cs
+await _distributedEventBus.PublishAsync(
+    new EventTimeChangedEto
+    {
+        EventId = @event.Id,
+        Title = @event.Title,
+        StartTime = @event.StartTime,
+        EndTime = @event.EndTime
+    });
+```
 
 注入`IDistributedEventBus`服务并使用`PublishAsync`方法——这就足够了。
 
 想要接收通知的应用程序/服务可以创建一个实现`IDistributedEventHandler<T>`接口的类，如下面的代码块所示：
 
-[PRE38]
+```cs
+public class UserEmailingHandler :
+    IDistributedEventHandler<EventTimeChangedEto>,
+    ITransientDependency
+{
+    public Task HandleEventAsync(EventTimeChangedEto 
+                                 eventData)
+    {
+        var eventId = eventData.EventId;
+        // TODO: Send email to the registered users! 
+    }
+}
+```
 
-事件处理程序可以使用`EventTimeChangedEto`类的所有属性。如果需要更多数据，可以将其添加到`ETO`类中。或者，在分布式场景中，你可以从数据库查询详细信息或对相应的服务执行API调用。
+事件处理程序可以使用`EventTimeChangedEto`类的所有属性。如果需要更多数据，可以将其添加到`ETO`类中。或者，在分布式场景中，你可以从数据库查询详细信息或对相应的服务执行 API 调用。
 
 # 摘要
 
-本章介绍了实现DDD的第一部分。我们探讨了领域层构建块，并了解了使用ABP框架的设计和实现实践。
+本章介绍了实现 DDD 的第一部分。我们探讨了领域层构建块，并了解了使用 ABP 框架的设计和实现实践。
 
-聚合是DDD最基础的构建块，我们改变聚合状态的方式非常重要，需要小心处理。聚合应通过实现业务规则来保持其有效性和一致性。正确绘制聚合边界是至关重要的。
+聚合是 DDD 最基础的构建块，我们改变聚合状态的方式非常重要，需要小心处理。聚合应通过实现业务规则来保持其有效性和一致性。正确绘制聚合边界是至关重要的。
 
-另一方面，领域服务对于实现涉及多个聚合或外部服务的领域逻辑非常有用。它们与领域对象一起工作，而不是与DTOs一起工作。
+另一方面，领域服务对于实现涉及多个聚合或外部服务的领域逻辑非常有用。它们与领域对象一起工作，而不是与 DTOs 一起工作。
 
 仓储模式抽象了数据访问逻辑，并为领域层和应用层中的其他服务提供了一个易于使用的接口。重要的是不要将业务逻辑泄露到仓储中。规范模式是一种封装数据过滤逻辑的方法。当你想要选择业务对象时，你可以重用和组合它们。
 

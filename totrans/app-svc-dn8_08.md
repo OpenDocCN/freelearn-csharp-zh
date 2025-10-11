@@ -1,46 +1,69 @@
 # 8
 
-# 使用最小API构建和保障Web服务
+# 使用最小 API 构建和保障 Web 服务
 
-本章介绍使用ASP.NET Core最小API构建和保障Web服务。这包括实施保护Web服务免受攻击的技术以及身份验证和授权。
+本章介绍使用 ASP.NET Core 最小 API 构建和保障 Web 服务。这包括实施保护 Web 服务免受攻击的技术以及身份验证和授权。
 
 本章将涵盖以下主题：
 
-+   使用ASP.NET Core最小API构建Web服务
++   使用 ASP.NET Core 最小 API 构建 Web 服务
 
-+   使用CORS放宽同源安全策略
++   使用 CORS 放宽同源安全策略
 
 +   使用速率限制预防拒绝服务攻击
 
-+   使用原生AOT改进启动时间和资源
++   使用原生 AOT 改进启动时间和资源
 
 +   理解身份服务
 
-# 使用ASP.NET Core最小API构建Web服务
+# 使用 ASP.NET Core 最小 API 构建 Web 服务
 
-在ASP.NET Core的旧版本中，您会使用控制器构建Web服务，每个端点都有一个操作方法，有点像使用ASP.NET Core MVC和控制器以及模型构建网站，但没有视图。从.NET 6开始，您有另一个通常更好的选择：**ASP.NET Core** **最小API**。
+在 ASP.NET Core 的旧版本中，您会使用控制器构建 Web 服务，每个端点都有一个操作方法，有点像使用 ASP.NET Core MVC 和控制器以及模型构建网站，但没有视图。从.NET 6 开始，您有另一个通常更好的选择：**ASP.NET Core** **最小 API**。
 
-## 最小API基于Web服务的优势
+## 最小 API 基于 Web 服务的优势
 
-在ASP.NET Core的早期版本中，与替代Web开发平台相比，实现一个简单的Web服务需要大量的样板代码。例如，一个最小的`Hello World` Web服务实现，它有一个返回纯文本的单个端点，可以使用**Express.js**仅用九行代码实现，如下所示：
+在 ASP.NET Core 的早期版本中，与替代 Web 开发平台相比，实现一个简单的 Web 服务需要大量的样板代码。例如，一个最小的`Hello World` Web 服务实现，它有一个返回纯文本的单个端点，可以使用**Express.js**仅用九行代码实现，如下所示：
 
-[PRE0]
+```cs
+const express = require('express')
+const app = express()
+const port = 3000
+app.get('/', (req, res) => {
+  res.send('Hello World!')
+})
+app.listen(port, () => {
+  console.log(`Example app listening on port ${port}`)
+}) 
+```
 
-在ASP.NET Core 5或更早版本中，这需要超过五十行代码！
+在 ASP.NET Core 5 或更早版本中，这需要超过五十行代码！
 
-使用ASP.NET Core 6或更高版本，现在只需五行代码和六行配置即可，如下所示的两个代码块：
+使用 ASP.NET Core 6 或更高版本，现在只需五行代码和六行配置即可，如下所示的两个代码块：
 
-[PRE1]
+```cs
+int port = 3000;
+var app = WebApplication.Create();
+app.MapGet("/", () => "Hello World!");
+Console.WriteLine($"Example app listening on port {port}");
+await app.RunAsync($"https://localhost:{port}/"); 
+```
 
-平台在项目文件中指定，隐式`using`语句SDK功能执行一些繁重的工作。默认情况下启用，如下所示，在以下标记中突出显示：
+平台在项目文件中指定，隐式`using`语句 SDK 功能执行一些繁重的工作。默认情况下启用，如下所示，在以下标记中突出显示：
 
-[PRE2]
+```cs
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+ **<ImplicitUsings>enable</ImplicitUsings>**
+  </PropertyGroup>
+</Project> 
+```
 
-**良好实践**：最小API的另一个好处是它们不使用动态生成的代码，与基于控制器的Web API不同。这使得它们可以使用原生AOT生成更小、更快的服务，这对于在容器中实现和托管微服务更有利。我们将在本章后面介绍原生AOT与最小API。尽可能使用最小API而不是控制器来实现您的Web服务。
+**良好实践**：最小 API 的另一个好处是它们不使用动态生成的代码，与基于控制器的 Web API 不同。这使得它们可以使用原生 AOT 生成更小、更快的服务，这对于在容器中实现和托管微服务更有利。我们将在本章后面介绍原生 AOT 与最小 API。尽可能使用最小 API 而不是控制器来实现您的 Web 服务。
 
-## 理解最小API路由映射
+## 理解最小 API 路由映射
 
-`WebApplication`实例具有您可以调用的方法，用于将路由映射到lambda表达式或语句：
+`WebApplication`实例具有您可以调用的方法，用于将路由映射到 lambda 表达式或语句：
 
 +   `MapGet`: 将路由映射到`GET`请求以检索实体。
 
@@ -52,21 +75,36 @@
 
 +   `MapDelete`: 将路由映射到`DELETE`请求以删除实体。
 
-+   `MapMethods`: 将路由映射到任何其他HTTP方法或方法，例如`CONNECT`或`HEAD`。
++   `MapMethods`: 将路由映射到任何其他 HTTP 方法或方法，例如`CONNECT`或`HEAD`。
 
 例如，您可能希望将相对路径 `api/customers` 的 HTTP `GET` 请求映射到由 lambda 表达式或返回包含客户列表的 JSON 文档的函数定义的委托，以及插入和删除的等效映射，如下面的代码所示：
 
-[PRE3]
+```cs
+app.MapGet("api/customers", GetCustomers);
+app.MapPost("api/customers", InsertCustomer);
+app.MapDelete("api/customers/{id}", DeleteCustomer); 
+```
 
 您可能希望将相对路径 `api/customers` 的 HTTP `CONNECT` 请求映射到 lambda 语句块，如下面的代码所示：
 
-[PRE4]
+```cs
+app.MapMethods("api/customers", new[] { "CONNECT" }, () =>
+  { 
+    // Do something.
+  }); 
+```
 
 如果您有多个共享相同相对路径的端点，则可以定义一个 **路由组**。`MapGroup` 方法在 .NET 7 中引入：
 
-[PRE5]
+```cs
+RouteGroupBuilder group = app.MapGroup("api/customers")
+group.MapGet("/", GetCustomers)
+  .MapGet("/{id}", GetCustomerById)
+  .MapPost("/", InsertCustomer)
+  .MapDelete("/{id}", DeleteCustomer); 
+```
 
-**更多信息**：您可以在以下链接中了解更多关于路由映射的信息：[https://learn.microsoft.com/en-us/aspnet/core/fundamentals/minimal-apis/route-handlers](https://learn.microsoft.com/en-us/aspnet/core/fundamentals/minimal-apis/route-handlers).
+**更多信息**：您可以在以下链接中了解更多关于路由映射的信息：[`learn.microsoft.com/en-us/aspnet/core/fundamentals/minimal-apis/route-handlers`](https://learn.microsoft.com/en-us/aspnet/core/fundamentals/minimal-apis/route-handlers).
 
 ## 理解参数映射
 
@@ -82,7 +120,16 @@
 
 例如，要更新数据库中的实体，您需要从已注册的依赖服务中检索数据库上下文，将标识符作为查询字符串或路由段传递，以及请求体中的新实体，如下面的代码所示：
 
-[PRE6]
+```cs
+app.MapPut("api/customers/{id}", async (
+  [FromServices] NorthwindContext db,
+  [FromRoute] string id, // or [FromQuery] string id,
+  [FromBody] Customer customer) =>
+{
+  Customer? existingCustomer = await db.Customers.FindAsync(id);
+  ...
+}); 
+```
 
 ## 理解返回值
 
@@ -153,31 +200,75 @@
 
     **警告！**如果您正在使用 JetBrains Rider，其用户界面可能还没有创建使用最小 API 的 Web API 项目的选项。我建议使用 `dotnet new` 创建项目，然后将项目添加到您的解决方案中。
 
-1.  将您在 *第 3 章* 中创建的 Northwind 数据库上下文项目（针对 SQL Server）添加为项目引用，如下所示：
+1.  将您在 *第三章* 中创建的 Northwind 数据库上下文项目（针对 SQL Server）添加为项目引用，如下所示：
 
-    [PRE7]
+    ```cs
+    <ItemGroup>
+      <ProjectReference Include="..\..\Chapter03\Northwind.Common.DataContext
+    .SqlServer\Northwind.Common.DataContext.SqlServer.csproj" />
+    </ItemGroup> 
+    ```
 
-    路径不能有换行符。如果您没有完成在 *第 3 章* 中创建类库的任务，那么请从 GitHub 仓库下载解决方案项目。
+    路径不能有换行符。如果您没有完成在 *第三章* 中创建类库的任务，那么请从 GitHub 仓库下载解决方案项目。
 
 1.  在项目文件中，将 `invariantGlobalization` 更改为 `false`，并将警告视为错误，如下所示：
 
-    [PRE8]
+    ```cs
+    <Project Sdk="Microsoft.NET.Sdk.Web">
+      <PropertyGroup>
+        <TargetFramework>net8.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <InvariantGlobalization>**false**</InvariantGlobalization>
+     **<TreatWarningsAsErrors>****true****</TreatWarningsAsErrors>**
+      </PropertyGroup> 
+    ```
 
-    在 .NET 8 的 ASP.NET Core Web API 项目模板中，显式设置不变量全球化为 `true` 是新的。它旨在使网络服务不受文化限制，因此可以在世界任何地方部署并具有相同的行为。通过将此属性设置为 `false`，网络服务将默认为当前托管计算机的文化。你可以在以下链接中了解更多关于不变量全球化模式的信息：[https://github.com/dotnet/runtime/blob/main/docs/design/features/globalization-invariant-mode.md](https://github.com/dotnet/runtime/blob/main/docs/design/features/globalization-invariant-mode.md)
+    在 .NET 8 的 ASP.NET Core Web API 项目模板中，显式设置不变量全球化为 `true` 是新的。它旨在使网络服务不受文化限制，因此可以在世界任何地方部署并具有相同的行为。通过将此属性设置为 `false`，网络服务将默认为当前托管计算机的文化。你可以在以下链接中了解更多关于不变量全球化模式的信息：[`github.com/dotnet/runtime/blob/main/docs/design/features/globalization-invariant-mode.md`](https://github.com/dotnet/runtime/blob/main/docs/design/features/globalization-invariant-mode.md)
 
 1.  在命令提示符或终端中，构建 `Northwind.WebApi.Service` 项目，以确保当前解决方案外部的实体模型类库项目被正确编译，如下所示（命令）：
 
-    [PRE9]
+    ```cs
+    dotnet build 
+    ```
 
 1.  在 `Properties` 文件夹中，在 `launchSettings.json` 文件中，将名为 `https` 的配置文件的 `applicationUrl` 修改为使用端口 `5081`，如下所示（高亮显示）的配置：
 
-    [PRE10]
+    ```cs
+    "profiles": {
+      ...
+    **"https"****:****{**
+        "commandName": "Project",
+        "dotnetRunMessages": true,
+        "launchBrowser": true,
+        "launchUrl": "swagger",
+    **"applicationUrl"****:****"https://localhost:5081"****,**
+        "environmentVariables": {
+          "ASPNETCORE_ENVIRONMENT": "Development"
+        } 
+    ```
 
-    Visual Studio 2022 将读取此设置文件，如果 `launchBrowser` 设置为 `true`，则自动运行一个网络浏览器，然后导航到 `applicationUrl` 和 `launchUrl`。Visual Studio Code 和 `dotnet run` 不会这样做，因此你需要手动运行一个网络浏览器并手动导航到 [https://localhost:5081/swagger](https://localhost:5081/swagger)。
+    Visual Studio 2022 将读取此设置文件，如果 `launchBrowser` 设置为 `true`，则自动运行一个网络浏览器，然后导航到 `applicationUrl` 和 `launchUrl`。Visual Studio Code 和 `dotnet run` 不会这样做，因此你需要手动运行一个网络浏览器并手动导航到 [`localhost:5081/swagger`](https://localhost:5081/swagger)。
 
 1.  在 `Program.cs` 文件中，删除关于天气服务的语句，并用导入命名空间以将 `NorthwindContext` 添加到配置服务的语句替换，如下所示（高亮显示）：
 
-    [PRE11]
+    ```cs
+    **using** **Northwind.EntityModels;** **// To use the AddNorthwindContext method.**
+    var builder = WebApplication.CreateBuilder(args);
+    // Add services to the container.
+    // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
+    builder.Services.AddEndpointsApiExplorer();
+    builder.Services.AddSwaggerGen();
+    **builder.Services.AddNorthwindContext();**
+    var app = builder.Build();
+    // Configure the HTTP request pipeline.
+    if (app.Environment.IsDevelopment())
+    {
+      app.UseSwagger();
+      app.UseSwaggerUI();
+    }
+    app.UseHttpsRedirection(); 
+    ```
 
 1.  添加一个名为 `WebApplication.Extensions.cs` 的新类文件。
 
@@ -185,31 +276,162 @@
 
 1.  在 `WebApplication.Extensions.cs` 文件中，导入用于控制 HTTP 结果、将参数绑定到依赖服务以及与 `Northwind` 实体模型一起工作的命名空间，然后定义一个扩展方法为 `WebApplication` 类配置对所有记录在我们 API 表中的 HTTP `GET` 请求的响应，如下所示：
 
-    [PRE12]
+    ```cs
+    using Microsoft.AspNetCore.Http.HttpResults; // To use Results.
+    using Microsoft.AspNetCore.Mvc; // To use [FromServices] and so on.
+    using Northwind.EntityModels; // To use NorthwindContext, Product.
+    namespace Packt.Extensions;
+    public static class WebApplicationExtensions
+    {
+      public static WebApplication MapGets(this WebApplication app,
+        int pageSize = 10)
+      {
+        app.MapGet("/", () => "Hello World!")
+          .ExcludeFromDescription();
+        app.MapGet("api/products", (
+          [FromServices] NorthwindContext db,
+          [FromQuery] int? page) =>
+          db.Products
+            .Where(p => p.UnitsInStock > 0 && !p.Discontinued)
+            .OrderBy(product => product.ProductId)
+            .Skip(((page ?? 1) - 1) * pageSize)
+            .Take(pageSize)
+          )
+          .WithName("GetProducts")
+          .WithOpenApi(operation =>
+          {
+            operation.Description =
+              "Get products with UnitsInStock > 0 and Discontinued = false.";
+            operation.Summary = "Get in-stock products that are not discontinued.";
+            return operation;
+          })
+          .Produces<Product[]>(StatusCodes.Status200OK);
+        app.MapGet("api/products/outofstock", 
+          ([FromServices] NorthwindContext db) => db.Products
+            .Where(p => p.UnitsInStock == 0 && !p.Discontinued)
+          )
+          .WithName("GetProductsOutOfStock")
+          .WithOpenApi()
+          .Produces<Product[]>(StatusCodes.Status200OK);
+        app.MapGet("api/products/discontinued", 
+          ([FromServices] NorthwindContext db) =>
+            db.Products.Where(product => product.Discontinued)
+          )
+          .WithName("GetProductsDiscontinued")
+          .WithOpenApi()
+          .Produces<Product[]>(StatusCodes.Status200OK);
+        app.MapGet("api/products/{id:int}",
+          async Task<Results<Ok<Product>, NotFound>> (
+          [FromServices] NorthwindContext db,
+          [FromRoute] int id) =>
+            await db.Products.FindAsync(id) is Product product ?
+              TypedResults.Ok(product) : TypedResults.NotFound())
+          .WithName("GetProductById")
+          .WithOpenApi()
+          .Produces<Product>(StatusCodes.Status200OK)
+          .Produces(StatusCodes.Status404NotFound);
+        app.MapGet("api/products/{name}", (
+          [FromServices] NorthwindContext db,
+          [FromRoute] string name) =>
+            db.Products.Where(p => p.ProductName.Contains(name)))
+          .WithName("GetProductsByName")
+          .WithOpenApi()
+          .Produces<Product[]>(StatusCodes.Status200OK);
+        return app;
+      }
+    } 
+    ```
 
 1.  在 `WebApplication.Extensions.cs` 文件中，为 `WebApplication` 类定义一个扩展方法，以配置对 API 表中记录的 HTTP `POST` 请求的响应，如下所示：
 
-    [PRE13]
+    ```cs
+    public static WebApplication MapPosts(this WebApplication app)
+    {
+      app.MapPost("api/products", async ([FromBody] Product product, 
+        [FromServices] NorthwindContext db) =>
+      {
+        db.Products.Add(product);
+        await db.SaveChangesAsync();
+        return Results.Created($"api/products/{product.ProductId}", product);
+      }).WithOpenApi()
+        .Produces<Product>(StatusCodes.Status201Created);
+      return app;
+    } 
+    ```
 
 1.  在 `WebApplication.Extensions.cs` 文件中，为 `WebApplication` 类定义一个扩展方法，以配置对 API 表中记录的 HTTP `PUT` 请求的响应，如下所示：
 
-    [PRE14]
+    ```cs
+    public static WebApplication MapPuts(this WebApplication app)
+    {
+      app.MapPut("api/products/{id:int}", async (
+        [FromRoute] int id, 
+        [FromBody] Product product, 
+        [FromServices] NorthwindContext db) =>
+      {
+        Product? foundProduct = await db.Products.FindAsync(id);
+        if (foundProduct is null) return Results.NotFound();
+        foundProduct.ProductName = product.ProductName;
+        foundProduct.CategoryId = product.CategoryId;
+        foundProduct.SupplierId = product.SupplierId;
+        foundProduct.QuantityPerUnit = product.QuantityPerUnit;
+        foundProduct.UnitsInStock = product.UnitsInStock;
+        foundProduct.UnitsOnOrder = product.UnitsOnOrder;
+        foundProduct.ReorderLevel = product.ReorderLevel;
+        foundProduct.UnitPrice = product.UnitPrice;
+        foundProduct.Discontinued = product.Discontinued;
+        await db.SaveChangesAsync();
+        return Results.NoContent();
+      }).WithOpenApi()
+        .Produces(StatusCodes.Status404NotFound)
+        .Produces(StatusCodes.Status204NoContent);
+      return app;
+    } 
+    ```
 
 1.  在 `WebApplication.Extensions.cs` 文件中，为 `WebApplication` 类定义一个扩展方法，以配置对 API 表中记录的 HTTP `DELETE` 请求的响应，如下所示：
 
-    [PRE15]
+    ```cs
+    public static WebApplication MapDeletes(this WebApplication app)
+    {
+      app.MapDelete("api/products/{id:int}", async (
+        [FromRoute] int id, 
+        [FromServices] NorthwindContext db) =>
+      {
+        if (await db.Products.FindAsync(id) is Product product)
+        {
+          db.Products.Remove(product);
+          await db.SaveChangesAsync();
+          return Results.NoContent();
+        }
+        return Results.NotFound();
+      }).WithOpenApi()
+        .Produces(StatusCodes.Status404NotFound)
+        .Produces(StatusCodes.Status204NoContent);
+      return app;
+    } 
+    ```
 
 1.  在 `Program.cs` 文件中，导入你刚刚定义的扩展方法所使用的命名空间，如下所示：
 
-    [PRE16]
+    ```cs
+    using Packt.Extensions; // To use MapGets and so on. 
+    ```
 
 1.  在 `Program.cs` 中，在调用 `app.Run()` 之前，调用你的自定义扩展方法来映射 `GET`、`POST`、`PUT` 和 `DELETE` 请求，注意当你请求所有产品时，你可以覆盖默认的 10 个实体页面大小，如下面的代码所示：
 
-    [PRE17]
+    ```cs
+    app.MapGets() // Default pageSize: 10.
+      .MapPosts()
+      .MapPuts()
+      .MapDeletes(); 
+    ```
 
 1.  在 `Program.cs` 中，确保文件中的最后一个语句运行了网络应用，如下面的代码所示：
 
-    [PRE18]
+    ```cs
+    app.Run(); 
+    ```
 
 ## 使用 Swagger 测试网络服务
 
@@ -221,13 +443,22 @@
 
     +   如果你正在使用 Visual Studio 2022，那么在下拉列表中选择 **https** 配置文件，然后导航到 **Debug** | **Start Without Debugging** 或按 *Ctrl* + *F5*。网页浏览器应该会自动导航到 Swagger 文档网页。
 
-    +   如果你正在使用 Visual Studio Code，那么输入命令 `dotnet run --launch-profile https`，手动启动一个网页浏览器，并导航到 Swagger 文档网页：[https://localhost:5081/swagger](https://localhost:5081/swagger)。
+    +   如果你正在使用 Visual Studio Code，那么输入命令 `dotnet run --launch-profile https`，手动启动一个网页浏览器，并导航到 Swagger 文档网页：[`localhost:5081/swagger`](https://localhost:5081/swagger)。
 
     在 Windows 上，如果需要，你必须将 Windows Defender 防火墙设置为允许访问你的本地网络服务。
 
 1.  在控制台或终端中，注意有关你的网络服务的信息，如下面的输出所示：
 
-    [PRE19]
+    ```cs
+    info: Microsoft.Hosting.Lifetime[14]
+          Now listening on: https://localhost:5081
+    info: Microsoft.Hosting.Lifetime[0]
+          Application started. Press Ctrl+C to shut down.
+    info: Microsoft.Hosting.Lifetime[0]
+          Hosting environment: Development
+    info: Microsoft.Hosting.Lifetime[0]
+          Content root path: C:\apps-services-net8\Chapter08\Northwind.WebApi.Service 
+    ```
 
 1.  在你的网页浏览器中，注意 Swagger 文档，如图 *8.1* 所示：
 
@@ -255,7 +486,23 @@
 
 1.  点击 **Try it out**，输入所需的 **id** 参数为 `77`，点击 **Execute**，并注意响应包含名为 **Original Frankfurter grüne Soße** 的产品，如下面的 JSON 文档所示：
 
-    [PRE20]
+    ```cs
+    {
+      "productId": 77,
+      "productName": "Original Frankfurter grüne Soße",
+      "supplierId": 12,
+      "categoryId": 2,
+      "quantityPerUnit": "12 boxes",
+      "unitPrice": 13,
+      "unitsInStock": 32,
+      "unitsOnOrder": 0,
+      "reorderLevel": 15,
+      "discontinued": false,
+      "category": null,
+      "supplier": null,
+      "orderDetails": []
+    } 
+    ```
 
 1.  点击 **GET /api/products/{id}** 以折叠该部分。
 
@@ -269,11 +516,11 @@
 
 使用 Swagger 用户界面测试 Web 服务可能会变得繁琐。更好的工具是名为 **REST Client** 的 Visual Studio Code 扩展或 Visual Studio 2022 版本 17.6 或更高版本提供的 **Endpoints Explorer** 和 `.http` 文件支持。
 
-**更多信息**：你可以在以下链接了解 Visual Studio 2022 及其 HTTP 编辑器：[https://learn.microsoft.com/en-us/aspnet/core/test/http-files](https://learn.microsoft.com/en-us/aspnet/core/test/http-files)。
+**更多信息**：你可以在以下链接了解 Visual Studio 2022 及其 HTTP 编辑器：[`learn.microsoft.com/en-us/aspnet/core/test/http-files`](https://learn.microsoft.com/en-us/aspnet/core/test/http-files)。
 
 JetBrains Rider 有一个类似的工具窗口名为 **Endpoints**。
 
-如果你正在使用 JetBrains Rider，你可以在以下链接了解其 HTTP 文件工具：[https://www.jetbrains.com/help/rider/Http_client_in__product__code_editor.html](https://www.jetbrains.com/help/rider/Http_client_in__product__code_editor.html)。它与另外两个代码编辑器略有不同。特别是，Rider 处理设置变量的方式更为繁琐，如图所示：[https://www.jetbrains.com/help/rider/Exploring_HTTP_Syntax.html#example-working-with-environment-files](https://www.jetbrains.com/help/rider/Exploring_HTTP_Syntax.html#example-working-with-environment-files)。你可能更喜欢使用带有 REST Client 扩展的 Visual Studio Code 来处理这一部分。
+如果你正在使用 JetBrains Rider，你可以在以下链接了解其 HTTP 文件工具：[`www.jetbrains.com/help/rider/Http_client_in__product__code_editor.html`](https://www.jetbrains.com/help/rider/Http_client_in__product__code_editor.html)。它与另外两个代码编辑器略有不同。特别是，Rider 处理设置变量的方式更为繁琐，如图所示：[`www.jetbrains.com/help/rider/Exploring_HTTP_Syntax.html#example-working-with-environment-files`](https://www.jetbrains.com/help/rider/Exploring_HTTP_Syntax.html#example-working-with-environment-files)。你可能更喜欢使用带有 REST Client 扩展的 Visual Studio Code 来处理这一部分。
 
 让我们看看这些工具如何帮助我们测试 Web 服务：
 
@@ -291,7 +538,12 @@ JetBrains Rider 有一个类似的工具窗口名为 **Endpoints**。
 
 1.  在 `HttpRequests` 文件夹中，创建一个名为 `webapi-get-products.http` 的文件，并修改其内容以声明一个变量来保存 Web API 服务产品端点的基址，以及一个获取前 10 页产品的请求，如下面的代码所示：
 
-    [PRE21]
+    ```cs
+    ### Configure a variable for the web service base address.
+    @base_address = https://localhost:5081/api/products/
+    ### Get first page of 10 products that are in stock and not discontinued.
+    GET {{base_address}} 
+    ```
 
     **良好实践**：REST 客户端在请求开始时不要求使用 `GET`，因为它会默认假设为 `GET`。但截至写作时，Visual Studio 的 HTTP 编辑器需要显式指定 `GET`。因此，我建议您为所有工具指定 HTTP 方法，并且我将为我的所有 `.http` 文件这样做。
 
@@ -307,13 +559,38 @@ JetBrains Rider 有一个类似的工具窗口名为 **Endpoints**。
 
 1.  在 `webapi-get-products.http` 文件中，通过 `###` 分隔添加更多请求，如下所示：
 
-    [PRE22]
+    ```cs
+    ### Get third page of 10 products that are in stock and not discontinued
+    GET {{base_address}}?page=3
+    ### Get products that are out-of-stock but not discontinued
+    GET {{base_address}}outofstock
+    ### Get products that are discontinued
+    GET {{base_address}}discontinued
+    ### Get product 77
+    GET {{base_address}}77
+    ### Get products that contain "man"
+    GET {{base_address}}man 
+    ```
 
     您可以通过点击绿色三角形“播放”按钮、右键单击并选择 **发送请求** 或按 *Ctrl* + *Alt* + *S* 在 Visual Studio 2022 中执行 HTTP 请求。在 Visual Studio Code 中，点击每个查询上方的 **发送请求**，或导航到 **视图** | **命令面板** 并选择 **Rest Client: 发送请求**，或使用其快捷键（在 Windows 上为 *Ctrl* + *Alt* + *R*）。
 
 1.  在 `HttpRequests` 文件夹中，创建一个名为 `webapi-insert-product.http` 的文件，并修改其内容以包含一个用于插入新产品的 **POST** 请求，如下所示：
 
-    [PRE23]
+    ```cs
+    POST https://localhost:5081/api/products/
+    Content-Type: application/json
+    {
+      "productName": "Harry's Hamburgers",
+      "supplierId": 7,
+      "categoryId": 6,
+      "quantityPerUnit": "6 per box",
+      "unitPrice": 24.99,
+      "unitsInStock": 0,
+      "unitsOnOrder": 20,
+      "reorderLevel": 10,
+      "discontinued": false
+    } 
+    ```
 
 1.  点击 **发送请求**，并注意响应表明新产品已成功添加，因为状态码为 `201`，其位置包括其产品 ID，如 *图 8.4* 所示：![](img/B19587_08_04.png)
 
@@ -323,7 +600,21 @@ JetBrains Rider 有一个类似的工具窗口名为 **Endpoints**。
 
 1.  在 `HttpRequests` 文件夹中，创建一个名为 `webapi-update-product.http` 的文件，并修改其内容以包含一个用于更新产品 ID 为 `78`（或分配给您的 `Harry's Hamburgers` 的任何数字）的 `PUT` 请求，其中包含不同的每单位数量、单价和库存单位，如下所示：
 
-    [PRE24]
+    ```cs
+    PUT https://localhost:5081/api/products/78
+    Content-Type: application/json
+    {
+      "productName": "Harry's Hamburgers",
+      "supplierId": 7,
+      "categoryId": 6,
+      "quantityPerUnit": "12 per box",
+      "unitPrice": 44.99,
+      "unitsInStock": 50,
+      "unitsOnOrder": 20,
+      "reorderLevel": 10,
+      "discontinued": false
+    } 
+    ```
 
 1.  发送请求并注意您应该收到一个 204 状态码的响应，表示更新成功。
 
@@ -331,7 +622,9 @@ JetBrains Rider 有一个类似的工具窗口名为 **Endpoints**。
 
 1.  在 `HttpRequests` 文件夹中，创建一个名为 `webapi-delete-product.http` 的文件，并修改其内容以包含针对新产品的 `DELETE` 请求，如下所示：
 
-    [PRE25]
+    ```cs
+    DELETE https://localhost:5081/api/products/78 
+    ```
 
 1.  注意成功响应，如 *图 8.5* 所示：
 
@@ -349,7 +642,10 @@ JetBrains Rider 有一个类似的工具窗口名为 **Endpoints**。
 
 1.  在 `WebApplication.Extensions.cs` 中，对于返回 `Hello World` 的根路径，将其从 OpenAPI 文档中排除，如下面的代码所示，高亮显示：
 
-    [PRE26]
+    ```cs
+    app.MapGet("/", () => "Hello World!")
+     **.ExcludeFromDescription();** 
+    ```
 
 1.  使用 `https` 配置启动 `Northwind.WebApi.Service` 项目，不进行调试，并注意路径现在没有文档记录。
 
@@ -369,7 +665,7 @@ JetBrains Rider 有一个类似的工具窗口名为 **Endpoints**。
 
 +   一个数据库提供程序，例如 SQLite 或 SQL Server。
 
-**更多信息**：您可以在以下链接中了解更多关于此项目项模板的信息：[https://devblogs.microsoft.com/visualstudio/web-api-development-in-visual-studio-2022/#scaffolding-in-visual-studio/](https://devblogs.microsoft.com/visualstudio/web-api-development-in-visual-studio-2022/#scaffolding-in-visual-studio/)。
+**更多信息**：您可以在以下链接中了解更多关于此项目项模板的信息：[`devblogs.microsoft.com/visualstudio/web-api-development-in-visual-studio-2022/#scaffolding-in-visual-studio/`](https://devblogs.microsoft.com/visualstudio/web-api-development-in-visual-studio-2022/#scaffolding-in-visual-studio/)。
 
 # 使用 CORS 放宽同源安全策略
 
@@ -409,21 +705,55 @@ JetBrains Rider 有一个类似的工具窗口名为 **Endpoints**。
 
 1.  在 `IServiceCollection.Extensions.cs` 文件中，导入用于控制哪些 HTTP 字段被记录的命名空间，然后为 `IServiceCollection` 接口定义一个扩展方法以添加 HTTP 日志记录，包括 `Origin` 标头以及包括响应体在内的所有字段，如下所示：
 
-    [PRE27]
+    ```cs
+    using Microsoft.AspNetCore.HttpLogging; // To use HttpLoggingFields.
+    namespace Packt.Extensions;
+    public static class IServiceCollectionExtensions
+    {
+      public static IServiceCollection AddCustomHttpLogging(
+        this IServiceCollection services)
+      {
+        services.AddHttpLogging(options =>
+        {
+          // Add the Origin header so it will not be redacted.
+          options.RequestHeaders.Add("Origin");
+          // By default, the response body is not included.
+          options.LoggingFields = HttpLoggingFields.All;
+        });
+        return services;
+      }
+    } 
+    ```
 
 1.  在 `Program.cs` 文件中，在调用 `builder.Build()` 之前，添加一条语句以添加自定义 HTTP 日志记录，如下所示：
 
-    [PRE28]
+    ```cs
+    builder.Services.AddCustomHttpLogging(); 
+    ```
 
 1.  在 `Program.cs` 文件中，在调用 `UseHttpsRedirection()` 之后，添加一条语句以使用 HTTP 日志记录，如下所示：
 
-    [PRE29]
+    ```cs
+    app.UseHttpLogging(); 
+    ```
 
 1.  在 `appsettings.Development.json` 文件中，添加一个条目以设置 HTTP 日志记录级别为 `Information`，如下所示（高亮显示）：
 
-    [PRE30]
+    ```cs
+    {
+      "Logging": {
+        "LogLevel": {
+          "Default": "Information",
+          "Microsoft.AspNetCore": "Warning"**,**
+    **// To enable logging HTTP requests, this must be**
+    **// set to Information (3) or higher.**
+    **"Microsoft.AspNetCore.HttpLogging"****:****"Information"**
+        }
+      }
+    } 
+    ```
 
-**良好实践**：JSON 规范不允许注释，但带有注释的 JSON 格式允许。您可以使用 JavaScript 风格的注释 `//` 或 `/* */`。您可以在以下链接中了解更多信息：[https://code.visualstudio.com/docs/languages/json#_json-with-comments](https://code.visualstudio.com/docs/languages/json#_json-with-comments)。如果您使用的是挑剔的代码编辑器，只需删除我添加的注释即可。
+**良好实践**：JSON 规范不允许注释，但带有注释的 JSON 格式允许。您可以使用 JavaScript 风格的注释 `//` 或 `/* */`。您可以在以下链接中了解更多信息：[`code.visualstudio.com/docs/languages/json#_json-with-comments`](https://code.visualstudio.com/docs/languages/json#_json-with-comments)。如果您使用的是挑剔的代码编辑器，只需删除我添加的注释即可。
 
 ## 创建网页 JavaScript 客户端
 
@@ -447,117 +777,309 @@ JetBrains Rider 有一个类似的工具窗口名为 **Endpoints**。
 
         +   **不要使用顶级语句**：已清除。
 
-        +   在Visual Studio 2022中，配置启动项目为当前选择。
+        +   在 Visual Studio 2022 中，配置启动项目为当前选择。
 
 1.  在`Northwind.WebApi.Client.Mvc`项目中，在`Properties`文件夹中，在`launchSettings.json`文件中，将`https`配置文件的`applicationUrl`更改为使用端口`5082`，如下所示：
 
-    [PRE31]
+    ```cs
+    "applicationUrl": "https://localhost:5082", 
+    ```
 
 1.  在`Northwind.WebApi.Client.Mvc`项目文件中，将警告视为错误。
 
-1.  在`Views/Home`文件夹中，在`Index.cshtml`中，将现有的标记替换为下面的标记，该标记包含一个指向尚未定义的路由的链接，用于定义一个文本框和按钮，以及一个JavaScript块，该块调用Web服务以获取包含部分名称的产品，如下所示代码：
+1.  在`Views/Home`文件夹中，在`Index.cshtml`中，将现有的标记替换为下面的标记，该标记包含一个指向尚未定义的路由的链接，用于定义一个文本框和按钮，以及一个 JavaScript 块，该块调用 Web 服务以获取包含部分名称的产品，如下所示代码：
 
-    [PRE32]
+    ```cs
+    @{
+      ViewData["Title"] = "Products using JavaScript";
+    }
+    <div class="text-center">
+      <h1 class="display-4">@ViewData["Title"]</h1>
+      <div>
+          Go to <a href="/home/products">Products using .NET</a>
+      </div>
+      <div>
+        <input id="productName" placeholder="Enter part of a product name" />
+        <input id="getProductsButton" type="button" value="Get Products" />
+      </div>
+      <div>
+        <table id="productsTable" class="table">
+            <thead>
+                <tr>
+                    <th scope="col">Product Name</th>
+                </tr>
+            </thead>
+            <tbody id="tableBody">
+            </tbody>
+        </table>
+      </div>
+      <script>
+        var baseaddress = "https://localhost:5081/";
+        function xhr_load() {
+            console.log(this.responseText);
+            var products = JSON.parse(this.responseText);
+            var out = "";
+            var i;
+            for (i = 0; i < products.length; i++) {
+                out += '<tr><td><a href="' + baseaddress + 'api/products/' + 
+                    products[i].productId + '">' +
+                    products[i].productName + '</a></td></tr>';
+            }
+            document.getElementById("tableBody").innerHTML = out;
+        }
+        function getProductsButton_click() {
+            xhr.open("GET", baseaddress + "api/products/" + 
+              document.getElementById("productName").value);
+            xhr.send();
+        }
+        document.getElementById("getProductsButton")
+          .addEventListener("click", getProductsButton_click);
+        var xhr = new XMLHttpRequest();
+        xhr.addEventListener("load", xhr_load);
+      </script>
+    </div> 
+    ```
 
 1.  使用`https`配置文件启动`Northwind.WebApi.Service`项目，不进行调试。
 
 1.  使用`https`配置文件启动`Northwind.WebApi.Client.Mvc`项目，不进行调试。
 
-    如果你正在使用Visual Studio Code，那么浏览器将不会自动启动。启动Chrome，然后导航到[https://localhost:5082](https://localhost:5082)。
+    如果你正在使用 Visual Studio Code，那么浏览器将不会自动启动。启动 Chrome，然后导航到[`localhost:5082`](https://localhost:5082)。
 
-1.  在Chrome浏览器中，显示**开发者工具**和**控制台**。
+1.  在 Chrome 浏览器中，显示**开发者工具**和**控制台**。
 
-1.  在**使用JavaScript的**产品网页中，在文本框中输入`man`，点击**获取产品**按钮，并注意错误，如下所示输出和*图8.6*：
+1.  在**使用 JavaScript 的**产品网页中，在文本框中输入`man`，点击**获取产品**按钮，并注意错误，如下所示输出和*图 8.6*：
 
-    [PRE33]
+    ```cs
+    Access to XMLHttpRequest at 'https://localhost:5081/api/products/man' from origin 'https://localhost:5082' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.
+    GET https://localhost:5081/api/products/man net::ERR_FAILED 200 
+    ```
 
 ![](img/B19587_08_06.png)
 
-图8.6：Chrome开发者工具控制台中的CORS错误
+图 8.6：Chrome 开发者工具控制台中的 CORS 错误
 
-1.  在`Northwind.WebApi.Service`项目的命令提示符或终端中，注意请求的HTTP日志，以及`Host`在不同的端口号上，与`Origin`不同，因此它们不是同源，如下所示突出显示的输出：
+1.  在`Northwind.WebApi.Service`项目的命令提示符或终端中，注意请求的 HTTP 日志，以及`Host`在不同的端口号上，与`Origin`不同，因此它们不是同源，如下所示突出显示的输出：
 
-    [PRE34]
+    ```cs
+    info: Microsoft.AspNetCore.HttpLogging.HttpLoggingMiddleware[1]
+          Request:
+          Protocol: HTTP/2
+          Method: GET
+          Scheme: https
+          PathBase:
+          Path: /api/products/man
+          Accept: */*
+     **Host: localhost:5081**
+          User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/113.0.0.0 Safari/537.36
+          Accept-Encoding: gzip, deflate, br
+          Accept-Language: en-US,en;q=0.9,sv;q=0.8
+     **Origin: https://localhost:5082**
+          Referer: [Redacted]
+          sec-ch-ua: [Redacted]
+          sec-ch-ua-mobile: [Redacted]
+          sec-ch-ua-platform: [Redacted]
+          sec-fetch-site: [Redacted]
+          sec-fetch-mode: [Redacted]
+          sec-fetch-dest: [Redacted] 
+    ```
 
-1.  还请注意输出显示Web服务确实执行了数据库查询，并将产品以JSON文档响应返回给浏览器，如下所示输出：
+1.  还请注意输出显示 Web 服务确实执行了数据库查询，并将产品以 JSON 文档响应返回给浏览器，如下所示输出：
 
-    [PRE35]
+    ```cs
+    info: Microsoft.AspNetCore.HttpLogging.HttpLoggingMiddleware[2]
+          Response:
+          StatusCode: 200
+          Content-Type: application/json; charset=utf-8
+    info: Microsoft.AspNetCore.HttpLogging.HttpLoggingMiddleware[4]
+          ResponseBody: [{"productId":12,"productName":
+          "Queso Manchego La Pastora","supplierId":5,"categoryId":4,
+          "quantityPerUnit":"10 - 500 g pkgs.","unitPrice":38.0000,
+          "unitsInStock":86,"unitsOnOrder":0,"reorderLevel":0,
+          "discontinued":false,"category":null,"supplier":null,
+          "orderDetails":[]},
+          {"productId":51,"productName":"Manjimup Dried Apples",
+          "supplierId":24,"categoryId":7,
+          "quantityPerUnit":"50 - 300 g pkgs.","unitPrice":53.0000,
+          "unitsInStock":20,"unitsOnOrder":0,"reorderLevel":10,
+          "discontinued":false,"category":null,"supplier":null,
+          "orderDetails":[]}] 
+    ```
 
-    虽然浏览器收到了包含请求数据的响应，但是浏览器通过拒绝向JavaScript显示HTTP响应来强制执行同源策略。Web服务不是通过CORS“安全”的。
+    虽然浏览器收到了包含请求数据的响应，但是浏览器通过拒绝向 JavaScript 显示 HTTP 响应来强制执行同源策略。Web 服务不是通过 CORS“安全”的。
 
-1.  关闭浏览器和关闭Web服务器。
+1.  关闭浏览器和关闭 Web 服务器。
 
-## 创建.NET客户端
+## 创建.NET 客户端
 
-接下来，让我们创建一个.NET客户端来访问Web服务，以查看同源策略不适用于非Web浏览器：
+接下来，让我们创建一个.NET 客户端来访问 Web 服务，以查看同源策略不适用于非 Web 浏览器：
 
 1.  在`Northwind.WebApi.Client.Mvc`项目中，添加对实体模型项目的引用，以便我们可以使用`Product`类，如下所示标记：
 
-    [PRE36]
+    ```cs
+    <ItemGroup>
+      <ProjectReference Include="..\..\Chapter03\Northwind.Common.EntityModels .SqlServer\Northwind.Common.EntityModels.SqlServer.csproj" />
+    </ItemGroup> 
+    ```
 
 1.  在命令提示符或终端中通过输入以下命令构建`Northwind.WebApi.Client.Mvc`项目：`dotnet build`。
 
-1.  在`Northwind.WebApi.Client.Mvc`项目中，在`Program.cs`中，导入用于处理HTTP头部的命名空间，如下所示代码：
+1.  在`Northwind.WebApi.Client.Mvc`项目中，在`Program.cs`中，导入用于处理 HTTP 头部的命名空间，如下所示代码：
 
-    [PRE37]
+    ```cs
+    using System.Net.Http.Headers; // To use MediaTypeWithQualityHeaderValue. 
+    ```
 
-1.  在`Program.cs`中，在调用`builder.Build()`之前，添加语句来配置HTTP客户端工厂以调用Web服务，如下所示代码：
+1.  在`Program.cs`中，在调用`builder.Build()`之前，添加语句来配置 HTTP 客户端工厂以调用 Web 服务，如下所示代码：
 
-    [PRE38]
+    ```cs
+    builder.Services.AddHttpClient(name: "Northwind.WebApi.Service",
+      configureClient: options =>
+      {
+        options.BaseAddress = new("https://localhost:5081/");
+        options.DefaultRequestHeaders.Accept.Add(
+          new MediaTypeWithQualityHeaderValue(
+            "application/json", 1.0));
+      }); 
+    ```
 
 1.  在`Controllers`文件夹中，在`HomeController.cs`中，导入实体模型的命名空间，如下所示代码：
 
-    [PRE39]
+    ```cs
+    using Northwind.EntityModels; // To use Product. 
+    ```
 
-1.  在`HomeController.cs`中，添加语句将注册的HTTP客户端工厂存储在私有的`readonly`字段中，如下代码所示高亮显示：
+1.  在`HomeController.cs`中，添加语句将注册的 HTTP 客户端工厂存储在私有的`readonly`字段中，如下代码所示高亮显示：
 
-    [PRE40]
+    ```cs
+    private readonly ILogger<HomeController> _logger;
+    **private****readonly** **IHttpClientFactory _httpClientFactory;**
+    public HomeController(ILogger<HomeController> logger,
+      **IHttpClientFactory httpClientFactory**)
+    {
+      _logger = logger;
+     **_httpClientFactory = httpClientFactory;**
+    } 
+    ```
 
-1.  在`HomeController.cs`中，添加一个名为`Products`的异步操作方法，该方法将使用HTTP工厂请求包含在自定义MVC路由中作为可选`name`参数输入的值的产品的名称，如下代码所示：
+1.  在`HomeController.cs`中，添加一个名为`Products`的异步操作方法，该方法将使用 HTTP 工厂请求包含在自定义 MVC 路由中作为可选`name`参数输入的值的产品的名称，如下代码所示：
 
-    [PRE41]
+    ```cs
+    [Route("home/products/{name?}")]
+    public async Task<IActionResult> Products(string? name)
+    {
+      HttpClient client = _httpClientFactory.CreateClient(
+        name: "Northwind.WebApi.Service");
+      HttpRequestMessage request = new(
+        method: HttpMethod.Get, requestUri: $"api/products/{name}");
+      HttpResponseMessage response = await client.SendAsync(request);
+      IEnumerable<Product>? model = await response.Content
+        .ReadFromJsonAsync<IEnumerable<Product>>();
+      ViewData["baseaddress"] = client.BaseAddress;
+      return View(model);
+    } 
+    ```
 
-1.  在`Views/Home`文件夹中，添加一个名为`Products.cshtml`的新文件。（Visual Studio 2022项目项模板命名为**Razor View - Empty**。JetBrains Rider项目项模板命名为**Razor MVC View**。）
+1.  在`Views/Home`文件夹中，添加一个名为`Products.cshtml`的新文件。（Visual Studio 2022 项目项模板命名为**Razor View - Empty**。JetBrains Rider 项目项模板命名为**Razor MVC View**。）
 
 1.  在`Products.cshtml`中，修改其内容以输出一个表格，显示与在文本框中输入的产品名称部分匹配的产品，如下标记所示：
 
-    [PRE42]
+    ```cs
+    @using Northwind.EntityModels
+    @model IEnumerable<Product>?
+    @{
+      ViewData["Title"] = "Products using .NET";
+    }
+    <div class="text-center">
+      <h1 class="display-4">@ViewData["Title"]</h1>
+      <div>
+        Go to <a href="/">Products using JavaScript</a>
+      </div>
+      <form action="/home/products">
+        <input name="name" placeholder="Enter part of a product name" />
+        <input type="submit" value="Get Products" />
+      </form>
+      <div>
+        <table class="table">
+          <thead>
+            <tr>
+              <th scope="col">Product Name</th>
+            </tr>
+          </thead>
+          <tbody>
+            @if (Model is not null)
+            {
+              @foreach (Product p in Model)
+              {
+                <tr><td><a href="@(ViewData["baseaddress"])api/products/
+    @p.ProductId">@p.ProductName</a></td></tr>
+              }
+            }
+          </tbody>
+        </table>
+      </div>
+    </div> 
+    ```
 
 1.  使用无调试的`https`配置启动`Northwind.WebApi.Service`项目。
 
 1.  使用无调试的`https`配置启动`Northwind.WebApi.Client.Mvc`项目。
 
-1.  在主页上，点击链接跳转到**使用.NET的产品**，并注意表中显示了前十个库存且未停售的产品，从**Chai**到**Queso Manchego La Pastora**。
+1.  在主页上，点击链接跳转到**使用.NET 的产品**，并注意表中显示了前十个库存且未停售的产品，从**Chai**到**Queso Manchego La Pastora**。
 
-1.  在文本框中输入`man`，点击**Get Products**，注意表中显示了两个产品，如图8.7所示：![](img/B19587_08_07.png)
+1.  在文本框中输入`man`，点击**Get Products**，注意表中显示了两个产品，如图 8.7 所示：![](img/B19587_08_07.png)
 
-    图8.7：使用.NET从Web服务获取两个产品
+    图 8.7：使用.NET 从 Web 服务获取两个产品
 
-    是.NET HTTP客户端在调用Web服务，因此不适用同源策略。如果你像之前一样在命令行或终端中检查日志，你会看到端口不同，但这并不重要。
+    是.NET HTTP 客户端在调用 Web 服务，因此不适用同源策略。如果你像之前一样在命令行或终端中检查日志，你会看到端口不同，但这并不重要。
 
-1.  点击产品名称之一，直接向该Web服务请求单个产品并注意响应，如下文档所示：
+1.  点击产品名称之一，直接向该 Web 服务请求单个产品并注意响应，如下文档所示：
 
-    [PRE43]
+    ```cs
+    {"productId":12,"productName":"Queso Manchego La Pastora",
+    "supplierId":5,"categoryId":4,
+    "quantityPerUnit":"10 - 500 g pkgs.","unitPrice":38.0000,
+    "unitsInStock":86,"unitsOnOrder":0,"reorderLevel":0,
+    "discontinued":false,"category":null,"supplier":null,"orderDetails":[]} 
+    ```
 
-1.  关闭浏览器并关闭Web服务器。
+1.  关闭浏览器并关闭 Web 服务器。
 
-## 理解CORS
+## 理解 CORS
 
-**跨源资源共享**（**CORS**）是一种基于HTTP头的功能，它要求浏览器在特定场景下禁用其同源安全策略。HTTP头指示哪些源应该被允许，除了同源之外。
+**跨源资源共享**（**CORS**）是一种基于 HTTP 头的功能，它要求浏览器在特定场景下禁用其同源安全策略。HTTP 头指示哪些源应该被允许，除了同源之外。
 
-让我们在Web服务中启用CORS，以便它可以发送额外的头信息，告知浏览器它允许从不同的源访问资源：
+让我们在 Web 服务中启用 CORS，以便它可以发送额外的头信息，告知浏览器它允许从不同的源访问资源：
 
-1.  在`Northwind.WebApi.Service`项目中，在`WebApplication.Extensions.cs`中，添加一个扩展方法以向Web服务添加CORS支持，如下代码所示：
+1.  在`Northwind.WebApi.Service`项目中，在`WebApplication.Extensions.cs`中，添加一个扩展方法以向 Web 服务添加 CORS 支持，如下代码所示：
 
-    [PRE44]
+    ```cs
+    public static IServiceCollection AddCustomCors(
+      this IServiceCollection services)
+    {
+      services.AddCors(options =>
+      {
+        options.AddPolicy(name: "Northwind.Mvc.Policy",
+          policy =>
+          {
+            policy.WithOrigins("https://localhost:5082");
+          });
+      });
+      return services;
+    } 
+    ```
 
-1.  在`Program.cs`中，在创建`builder`之后，调用自定义扩展方法以添加CORS支持，如下代码所示：
+1.  在`Program.cs`中，在创建`builder`之后，调用自定义扩展方法以添加 CORS 支持，如下代码所示：
 
-    [PRE45]
+    ```cs
+    builder.Services.AddCustomCors(); 
+    ```
 
-1.  在`Program.cs`中，在调用`UseHttpLogging`之后，在映射`GET`请求之前，添加一个语句来使用CORS策略，如下代码所示：
+1.  在`Program.cs`中，在调用`UseHttpLogging`之后，在映射`GET`请求之前，添加一个语句来使用 CORS 策略，如下代码所示：
 
-    [PRE46]
+    ```cs
+    app.UseCors(policyName: "Northwind.Mvc.Policy"); 
+    ```
 
 1.  使用无调试的`https`配置启动`Northwind.WebApi.Service`项目。
 
@@ -579,11 +1101,24 @@ JetBrains Rider 有一个类似的工具窗口名为 **Endpoints**。
 
 1.  在 `Northwind.WebApi.Service` 项目中，在 `Program.cs` 文件中，将 `UseCors` 调用的策略名称指定改为不指定，如下所示，高亮显示的代码：
 
-    [PRE47]
+    ```cs
+    **//** app.UseCors(policyName: "Northwind.Mvc.Policy");
+    **// Without a named policy the middleware is added but not active.**
+    **app.UseCors();** 
+    ```
 
 1.  在 `WebApplication.Extensions.cs` 文件中，在获取包含部分产品名称的产品时 `MapGet` 调用的末尾，添加一个 `RequiresCors` 调用，如下所示，高亮显示的代码：
 
-    [PRE48]
+    ```cs
+    app.MapGet("api/products/{name}", (
+      [FromServices] NorthwindContext db,
+      [FromRoute] string name) =>
+        db.Products.Where(p => p.ProductName.Contains(name)))
+      .WithName("GetProductsByName")
+      .WithOpenApi()
+      .Produces<Product[]>(StatusCodes.Status200OK)
+     **.RequireCors(policyName:** **"Northwind.Mvc.Policy"****);** 
+    ```
 
 1.  使用 `https` 配置文件启动 `Northwind.WebApi.Service` 项目，且不进行调试。
 
@@ -607,7 +1142,7 @@ JetBrains Rider 有一个类似的工具窗口名为 **Endpoints**。
 
 +   暴露 HTTP 响应头，意味着在响应中包含哪些未加密的头信息（因为默认情况下，响应头会被加密），例如，`x-custom-header`。
 
-你可以在以下链接中了解更多关于 CORS 策略的选项：[https://learn.microsoft.com/en-us/aspnet/core/security/cors#cors-policy-options](https://learn.microsoft.com/en-us/aspnet/core/security/cors#cors-policy-options)
+你可以在以下链接中了解更多关于 CORS 策略的选项：[`learn.microsoft.com/en-us/aspnet/core/security/cors#cors-policy-options`](https://learn.microsoft.com/en-us/aspnet/core/security/cors#cors-policy-options)
 
 既然你知道 CORS 并不能保护 web 服务，那么让我们看看一种有用的技术，它可以防止一种常见的攻击形式。
 
@@ -623,7 +1158,7 @@ JetBrains Rider 有一个类似的工具窗口名为 **Endpoints**。
 
 当客户端超过设定的请求速率限制时，客户端应收到 `429 Too Many Requests` 或 `503 Service Unavailable` 的 HTTP 响应。
 
-**良好实践**：如果您需要构建一个大规模可扩展的 Web 服务并保护其 API，您应该使用像 Azure API Management 这样的云服务，而不是尝试实现自己的速率限制。您可以在以下链接中了解更多信息：[https://learn.microsoft.com/en-us/azure/api-management/](https://learn.microsoft.com/en-us/azure/api-management/)。
+**良好实践**：如果您需要构建一个大规模可扩展的 Web 服务并保护其 API，您应该使用像 Azure API Management 这样的云服务，而不是尝试实现自己的速率限制。您可以在以下链接中了解更多信息：[`learn.microsoft.com/en-us/azure/api-management/`](https://learn.microsoft.com/en-us/azure/api-management/)。
 
 ## 使用 AspNetCoreRateLimit 包进行速率限制
 
@@ -631,13 +1166,64 @@ JetBrains Rider 有一个类似的工具窗口名为 **Endpoints**。
 
 1.  在 `Northwind.WebApi.Service` 项目中，添加对 `AspNetCoreRateLimit` 包的引用，如下所示：
 
-    [PRE49]
+    ```cs
+    <PackageReference Include="AspNetCoreRateLimit" Version="5.0.0" /> 
+    ```
 
 1.  构建包含 `Northwind.WebApi.Service` 项目的解决方案以恢复包。
 
 1.  在 `appsettings.Development.json` 中，添加默认速率限制选项和客户端特定策略的配置，如下所示的高亮配置：
 
-    [PRE50]
+    ```cs
+    {
+      "Logging": {
+        "LogLevel": {
+          "Default": "Information",
+          "Microsoft.AspNetCore": "Warning",
+          "Microsoft.AspNetCore.HttpLogging": "Information"
+        }
+      }**,**
+    **"ClientRateLimiting"****:****{**
+    **"EnableEndpointRateLimiting"****:****false****,**
+    **"StackBlockedRequests"****:****false****,**
+    **"ClientIdHeader"****:****"X-Client-Id"****,**
+    **"HttpStatusCode"****:****429****,**
+    **"EndpointWhitelist"****:****[****"get:/api/license"****,****"*:/api/status"****],**
+    **"ClientWhitelist"****:****[****"dev-id-1"****,****"dev-id-2"****],**
+    **"GeneralRules"****:****[**
+    **{**
+    **"Endpoint"****:****"*"****,**
+    **"Period"****:****"10s"****,**
+    **"Limit"****:****2**
+    **},**
+    **{**
+    **"Endpoint"****:****"*"****,**
+    **"Period"****:****"12h"****,**
+    **"Limit"****:****100**
+    **}**
+    **]**
+    **},**
+    **"ClientRateLimitPolicies"****:****{**
+    **"ClientRules"****:****[**
+    **{**
+    **"ClientId"****:****"console-client-abc123"****,**
+    **"Rules"****:****[**
+    **{**
+    **"Endpoint"****:****"*"****,**
+    **"****Period"****:****"10s"****,**
+    **"Limit"****:****5**
+    **},**
+    **{**
+    **"Endpoint"****:****"*"****,**
+    **"Period"****:****"12h"****,**
+    **"Limit"****:****250**
+    **}**
+    **]**
+    **}**
+    **]**
+    **}**
+    } 
+    ```
 
     注意：
 
@@ -651,37 +1237,85 @@ JetBrains Rider 有一个类似的工具窗口名为 **Endpoints**。
 
     +   两个客户端 ID，名为 `dev-id-1` 和 `dev-id-2`，将不会被速率限制，因为它们位于客户端白名单中。这些可能是仅供内部开发者使用的特殊客户端账户，这些账户不会在组织外部共享。
 
-    +   配置了两个通用（默认）规则：第一个规则每10秒设置2个请求的速率限制，第二个规则每12小时设置100个请求的速率限制。
+    +   配置了两个通用（默认）规则：第一个规则每 10 秒设置 2 个请求的速率限制，第二个规则每 12 小时设置 100 个请求的速率限制。
 
     +   配置了两个比默认规则更宽松的客户端特定规则：对于名为 `console-client-abc123` 的客户端 ID，允许每 10 秒内最多发送 5 个请求，每 12 小时最多发送 250 个请求。
 
 1.  在 `IServiceCollection.Extensions.cs` 中，导入用于处理速率限制选项的命名空间，如下所示：
 
-    [PRE51]
+    ```cs
+    using AspNetCoreRateLimit; // To use ClientRateLimitOptions and so on. 
+    ```
 
 1.  在 `IServiceCollection.Extensions.cs` 中，定义一个扩展方法，从应用程序设置中加载速率限制配置并设置速率限制选项，如下所示：
 
-    [PRE52]
+    ```cs
+    public static IServiceCollection AddCustomRateLimiting(
+      this IServiceCollection services, ConfigurationManager configuration)
+    {
+      // Add services to store rate limit counters and rules in memory.
+      services.AddMemoryCache();
+      services.AddInMemoryRateLimiting();
+      // Load default rate limit options from appsettings.json.
+      services.Configure<ClientRateLimitOptions>(
+        configuration.GetSection("ClientRateLimiting"));
+      // Load client-specific policies from appsettings.json.
+      services.Configure<ClientRateLimitPolicies>(
+        configuration.GetSection("ClientRateLimitPolicies"));
+      // Register the configuration.
+      services.AddSingleton
+        <IRateLimitConfiguration, RateLimitConfiguration>();
+      return services;
+    } 
+    ```
 
 1.  在 `Program.cs` 中，在创建 `builder` 之后，添加语句从应用程序设置中加载速率限制配置并设置速率限制选项，如下所示：
 
-    [PRE53]
+    ```cs
+    builder.Services.AddCustomRateLimiting(builder.Configuration); 
+    ```
 
 1.  在 `IServiceCollection.Extensions.cs` 中，在配置 HTTP 记录的调用中，添加一条语句以允许两个速率限制头不被截断，如下所示（高亮显示）：
 
-    [PRE54]
+    ```cs
+    services.AddHttpLogging(options =>
+    {
+      // Add the Origin header so it will not be redacted.
+      options.RequestHeaders.Add("Origin");
+    **// Add the rate limiting headers so they will not be redacted.**
+     **options.RequestHeaders.Add(****"X-Client-Id"****);**
+     **options.ResponseHeaders.Add(****"Retry-After"****);**
+      // By default, the response body is not included.
+      options.LoggingFields = HttpLoggingFields.All;
+    }); 
+    ```
 
 1.  在 `WebApplication.Extensions.cs` 中，导入用于处理速率限制策略存储的命名空间，如下所示：
 
-    [PRE55]
+    ```cs
+    using AspNetCoreRateLimit; // To use IClientPolicyStore and so on. 
+    ```
 
 1.  在 `WebApplication.Extensions.cs` 中，添加语句以定义一个扩展方法来初始化客户端策略存储，这意味着从配置中加载策略，然后使用客户端速率限制，如下所示：
 
-    [PRE56]
+    ```cs
+    public static async Task UseCustomClientRateLimiting(this WebApplication app)
+    {
+      using (IServiceScope scope = app.Services.CreateScope())
+      {
+        IClientPolicyStore clientPolicyStore = scope.ServiceProvider
+          .GetRequiredService<IClientPolicyStore>();
+        await clientPolicyStore.SeedAsync();
+      }
+      app.UseClientRateLimiting();
+    } 
+    ```
 
 1.  在 `Program.cs` 中，在调用 `UseHttpLogging` 之后，添加一个调用以使用客户端速率限制，如下所示：
 
-    [PRE57]
+    ```cs
+    await app.UseCustomClientRateLimiting(); 
+    ```
 
 ## 创建速率限制控制台客户端
 
@@ -691,7 +1325,12 @@ JetBrains Rider 有一个类似的工具窗口名为 **Endpoints**。
 
 1.  在 `Northwind.WebApi.Client.Console` 项目中，将警告视为错误，全局和静态导入 `System.Console` 类，并添加对实体模型项目的引用，如下所示：
 
-    [PRE58]
+    ```cs
+    <ItemGroup>
+      <ProjectReference Include="..\..\Chapter03\Northwind.Common.EntityModels
+    .SqlServer\Northwind.Common.EntityModels.SqlServer.csproj" />
+    </ItemGroup> 
+    ```
 
 1.  在命令提示符或终端中构建 `Northwind.WebApi.Client.Console` 项目，以编译引用的项目并将其实例复制到适当的 `bin` 文件夹。
 
@@ -699,11 +1338,73 @@ JetBrains Rider 有一个类似的工具窗口名为 **Endpoints**。
 
 1.  在 `Program.Helpers.cs` 中，添加语句以定义一个方法，用于 `partial Program` 类，以便以前景色写入一些文本，如下所示：
 
-    [PRE59]
+    ```cs
+    partial class Program
+    {
+      private static void WriteInColor(string text, ConsoleColor foregroundColor)
+      {
+        ConsoleColor previousColor = ForegroundColor;
+        ForegroundColor = foregroundColor;
+        Write(text);
+        ForegroundColor = previousColor;
+      }
+    } 
+    ```
 
 1.  在 `Program.cs` 中，删除现有的语句。添加语句提示用户输入客户端名称以识别它，然后创建一个 HTTP 客户端，每秒向 Web 服务发送一次请求以获取产品第一页，直到用户按下 *Ctrl* + *C* 停止控制台应用程序，如下所示：
 
-    [PRE60]
+    ```cs
+    using Northwind.EntityModels; // To use Product.
+    using System.Net.Http.Json; // To use ReadFromJsonAsync<T> method.
+    Write("Enter a client name or press Enter: ");
+    string? clientName = ReadLine();
+    if (string.IsNullOrEmpty(clientName))
+    {
+      clientName = $"console-client-{Guid.NewGuid()}";
+    }
+    WriteLine($"X-Client-Id will be: {clientName}");
+    HttpClient client = new();
+    client.BaseAddress = new("https://localhost:5081");
+    client.DefaultRequestHeaders.Accept.Add(new("application/json"));
+    // Specify the rate limiting client id for this console app.
+    client.DefaultRequestHeaders.Add("X-Client-Id", clientName);
+    while (true)
+    {
+      WriteInColor(string.Format("{0:hh:mm:ss}: ", 
+        DateTime.UtcNow), ConsoleColor.DarkGreen);
+      int waitFor = 1; // Second.
+      try
+      {
+        HttpResponseMessage response = await client.GetAsync("api/products");
+        if (response.IsSuccessStatusCode)
+        {
+          Product[]? products = 
+            await response.Content.ReadFromJsonAsync<Product[]>();
+          if (products != null)
+          {
+            foreach (Product product in products)
+            {
+              Write(product.ProductName);
+              Write(", ");
+            }
+            WriteLine();
+          }
+        }
+        else
+        {
+          WriteInColor(string.Format("{0}: {1}", (int)response.StatusCode,
+            await response.Content.ReadAsStringAsync()),
+            ConsoleColor.DarkRed);
+          WriteLine();
+        }
+      }
+      catch (Exception ex)
+      {
+        WriteLine(ex.Message);
+      }
+      await Task.Delay(TimeSpan.FromSeconds(waitFor));
+    } 
+    ```
 
 1.  如果您的数据库服务器没有运行（例如，因为您正在 Docker、虚拟机或云中托管它），请确保启动它。
 
@@ -719,7 +1420,24 @@ JetBrains Rider 有一个类似的工具窗口名为 **Endpoints**。
 
 1.  注意，每个客户端在开始接收 `429` 状态代码之前可以发出两个请求，如下所示，并在 *图 8.9* 中显示：
 
-    [PRE61]
+    ```cs
+    Enter a client name or press Enter:
+    X-Client-Id will be: console-client-d54c61ba-66bb-4e39-9c1a-7af6e2bf647e
+    07:32:18: Chai, Chang, Aniseed Syrup, Chef Anton's Cajun Seasoning, Grandma's Boysenberry Spread, Uncle Bob's Organic Dried Pears, Northwoods Cranberry Sauce, Ikura, Queso Cabrales, Queso Manchego La Pastora,
+    07:32:20: Chai, Chang, Aniseed Syrup, Chef Anton's Cajun Seasoning, Grandma's Boysenberry Spread, Uncle Bob's Organic Dried Pears, Northwoods Cranberry Sauce, Ikura, Queso Cabrales, Queso Manchego La Pastora,
+    07:32:21: 429: API calls quota exceeded! maximum admitted 2 per 10s.
+    07:32:22: 429: API calls quota exceeded! maximum admitted 2 per 10s.
+    07:32:23: 429: API calls quota exceeded! maximum admitted 2 per 10s.
+    07:32:24: 429: API calls quota exceeded! maximum admitted 2 per 10s.
+    07:32:25: 429: API calls quota exceeded! maximum admitted 2 per 10s.
+    07:32:26: 429: API calls quota exceeded! maximum admitted 2 per 10s.
+    07:32:27: 429: API calls quota exceeded! maximum admitted 2 per 10s.
+    07:32:28: Chai, Chang, Aniseed Syrup, Chef Anton's Cajun Seasoning, Grandma's Boysenberry Spread, Uncle Bob's Organic Dried Pears, Northwoods Cranberry Sauce, Ikura, Queso Cabrales, Queso Manchego La Pastora,
+    07:32:29: Chai, Chang, Aniseed Syrup, Chef Anton's Cajun Seasoning, Grandma's Boysenberry Spread, Uncle Bob's Organic Dried Pears, Northwoods Cranberry Sauce, Ikura, Queso Cabrales, Queso Manchego La Pastora,
+    07:32:30: 429: API calls quota exceeded! maximum admitted 2 per 10s.
+    07:32:31: 429: API calls quota exceeded! maximum admitted 2 per 10s.
+    07:32:32: 429: API calls quota exceeded! maximum admitted 2 per 10s. 
+    ```
 
 ![](img/B19587_08_09.png)
 
@@ -729,11 +1447,42 @@ JetBrains Rider 有一个类似的工具窗口名为 **Endpoints**。
 
 1.  在 Web 服务命令行中，注意显示每个来自控制台客户端的请求的 HTTP 日志，该请求以名为 `X-Client-Id` 的标头发送客户端 ID，请求被阻止，因为该客户端已超出配额，以及包含客户端应在重试前等待的秒数的名为 `Retry-After` 的标头的响应，如下所示，代码中已突出显示：
 
-    [PRE62]
+    ```cs
+    info: Microsoft.AspNetCore.HttpLogging.HttpLoggingMiddleware[1]
+          Request:
+          Protocol: HTTP/1.1
+          Method: GET
+          Scheme: https
+          PathBase:
+          Path: /api/products
+          Accept: application/json
+          Host: localhost:5081
+     **X-Client-Id: console-client-d54c61ba-66bb-4e39-9c1a-7af6e2bf647e**
+    info: AspNetCoreRateLimit.ClientRateLimitMiddleware[0]
+     **Request get:/api/products from ClientId console-client-d54c61ba-66bb-4e39-9c1a-7af6e2bf647e has been blocked, quota 2/10s exceeded by 3\. Blocked by rule *, TraceIdentifier 0HMIKGNJQEK5P:0000000E. MonitorMode: False**
+    info: Microsoft.AspNetCore.HttpLogging.HttpLoggingMiddleware[2]
+          Response:
+          StatusCode: 429
+          Content-Type: text/plain
+          **Retry-After: 6**
+    info: Microsoft.AspNetCore.HttpLogging.HttpLoggingMiddleware[4]
+          ResponseBody: API calls quota exceeded! maximum admitted 2 per 10s. 
+    ```
 
 1.  在 `Northwind.WebApi.Client.Console` 项目中，在 `Program.cs` 文件中，在将错误信息以深红色写入控制台之前，添加语句读取 `Retry-After` 标头以获取等待的秒数，如下所示，代码中已突出显示：
 
-    [PRE63]
+    ```cs
+    **string** **retryAfter = response.Headers**
+     **.GetValues(****"Retry-After"****).ToArray()[****0****];**
+    **if** **(****int****.TryParse(retryAfter,** **out** **waitFor))**
+    **{**
+     **retryAfter =** **string****.Format(**
+    **"I will retry after {0} seconds."****, waitFor);**
+    **}**
+    WriteInColor(string.Format("{0}: {1} {2}", (int)response.StatusCode,
+      await response.Content.ReadAsStringAsync(), retryAfter),
+      ConsoleColor.DarkRed); 
+    ```
 
     注意 `waitFor` 变量是从 `Retry-After` 标头值设置的。这随后用于使用异步延迟暂停控制台应用程序，如下所示，代码中已突出显示：
 
@@ -745,7 +1494,16 @@ JetBrains Rider 有一个类似的工具窗口名为 **Endpoints**。
 
 1.  注意控制台应用程序现在将合理地等待建议的秒数，然后再进行对服务的下一次调用，如下所示，代码中已突出显示：
 
-    [PRE64]
+    ```cs
+    Enter a client name:
+    X-Client-Id will be: console-client-add7613f-51a9-4c4a-8ec7-0244203d2e19
+    07:45:01: Chai, Chang, Aniseed Syrup, Chef Anton's Cajun Seasoning, Grandma's Boysenberry Spread, Uncle Bob's Organic Dried Pears, Northwoods Cranberry Sauce, Ikura, Queso Cabrales, Queso Manchego La Pastora,
+    07:45:02: Chai, Chang, Aniseed Syrup, Chef Anton's Cajun Seasoning, Grandma's Boysenberry Spread, Uncle Bob's Organic Dried Pears, Northwoods Cranberry Sauce, Ikura, Queso Cabrales, Queso Manchego La Pastora,
+    07:45:03: 429: API calls quota exceeded! maximum admitted 2 per 10s. I will retry after 8 seconds.
+    07:45:11: Chai, Chang, Aniseed Syrup, Chef Anton's Cajun Seasoning, Grandma's Boysenberry Spread, Uncle Bob's Organic Dried Pears, Northwoods Cranberry Sauce, Ikura, Queso Cabrales, Queso Manchego La Pastora,
+    07:45:12: Chai, Chang, Aniseed Syrup, Chef Anton's Cajun Seasoning, Grandma's Boysenberry Spread, Uncle Bob's Organic Dried Pears, Northwoods Cranberry Sauce, Ikura, Queso Cabrales, Queso Manchego La Pastora,
+    07:45:13: 429: API calls quota exceeded! maximum admitted 2 per 10s. I will retry after 8 seconds. 
+    ```
 
 1.  停止并重新启动 `Northwind.WebApi.Client.Console` 项目，不进行调试。
 
@@ -755,15 +1513,18 @@ JetBrains Rider 有一个类似的工具窗口名为 **Endpoints**。
 
 1.  在控制台应用程序中，输入名称 `console-client-abc123`，并注意此控制台应用程序客户端 ID 的速率限制不同，如下所示，代码中已突出显示：
 
-    [PRE65]
+    ```cs
+    info: AspNetCoreRateLimit.ClientRateLimitMiddleware[0]
+          Request get:/api/products from ClientId console-client-abc123 has been blocked, quota 5/10s exceeded by 1\. Blocked by rule *, TraceIdentifier 0HMIKGS1TPSHJ:00000006\. MonitorMode: False 
+    ```
 
 ## 使用 ASP.NET Core 中间件进行速率限制
 
 ASP.NET Core 7 引入了它自己的基本速率限制中间件，最初作为单独的 NuGet 包分发，但现在包含在 ASP.NET Core 中。它依赖于另一个 Microsoft 包，`System.Threading.RateLimiting`。它不如第三方包功能丰富，本书中不会介绍它，尽管我已在以下链接处编写了一个仅在线的章节：
 
-[https://github.com/markjprice/apps-services-net8/blob/main/docs/ch08-rate-limiting.md](https://github.com/markjprice/apps-services-net8/blob/main/docs/ch08-rate-limiting.md)
+[`github.com/markjprice/apps-services-net8/blob/main/docs/ch08-rate-limiting.md`](https://github.com/markjprice/apps-services-net8/blob/main/docs/ch08-rate-limiting.md)
 
-你可以在以下链接中了解 ASP.NET Core 速率限制器：[https://learn.microsoft.com/en-us/aspnet/core/performance/rate-limit](https://learn.microsoft.com/en-us/aspnet/core/performance/rate-limit)。
+你可以在以下链接中了解 ASP.NET Core 速率限制器：[`learn.microsoft.com/en-us/aspnet/core/performance/rate-limit`](https://learn.microsoft.com/en-us/aspnet/core/performance/rate-limit)。
 
 保护你的网络服务免受攻击很重要。那么，提高你的网络服务性能呢？我们能做些什么？
 
@@ -801,7 +1562,7 @@ ASP.NET Core 7 引入了它自己的基本速率限制中间件，最初作为�
 
 最常用的注释来指示类型或成员不支持 AOT 是 `[RequiresDynamicCode]` 属性。
 
-**更多信息**：您可以在以下链接中了解更多关于 AOT 警告的信息：[https://learn.microsoft.com/en-us/dotnet/core/deploying/native-aot/fixing-warnings](https://learn.microsoft.com/en-us/dotnet/core/deploying/native-aot/fixing-warnings).
+**更多信息**：您可以在以下链接中了解更多关于 AOT 警告的信息：[`learn.microsoft.com/en-us/dotnet/core/deploying/native-aot/fixing-warnings`](https://learn.microsoft.com/en-us/dotnet/core/deploying/native-aot/fixing-warnings).
 
 ## 反射和本地 AOT
 
@@ -823,13 +1584,15 @@ ASP.NET Core 7 引入了它自己的基本速率限制中间件，最初作为�
 
 正如您之前所看到的，您通过将 HTTP 请求映射到 lambda 表达式来实现 ASP.NET Core 最小 API 网络服务，例如以下代码所示：
 
-[PRE66]
+```cs
+ app.MapGet("/", () => "Hello World!"); 
+```
 
 在运行时，ASP.NET Core 使用 `RequestDelegateFactory` （**RDF**）类将您的 `MapX` 调用转换为 `RequestDelegate` 实例。但这是动态代码，因此与本地 AOT 不兼容。
 
 在 ASP.NET Core 8 中，当启用本地 AOT 时，运行时使用 RDF 被一个名为 **请求委托生成器** （**RDG**）的源生成器所取代，该生成器执行类似的工作，但发生在编译时。这确保生成的代码可以被本地 AOT 发布过程静态分析。
 
-**更多信息**：您可以在以下链接中学习如何创建自己的源生成器：[https://github.com/markjprice/apps-services-net8/blob/main/docs/ch01-dynamic-code.md#creating-source-generators](https://github.com/markjprice/apps-services-net8/blob/main/docs/ch01-dynamic-code.md#creating-source-generators).
+**更多信息**：您可以在以下链接中学习如何创建自己的源生成器：[`github.com/markjprice/apps-services-net8/blob/main/docs/ch01-dynamic-code.md#creating-source-generators`](https://github.com/markjprice/apps-services-net8/blob/main/docs/ch01-dynamic-code.md#creating-source-generators).
 
 ## 本地 AOT 的要求
 
@@ -837,163 +1600,350 @@ ASP.NET Core 7 引入了它自己的基本速率限制中间件，最初作为�
 
 +   在 Windows 上，您必须安装包含所有默认组件的 Visual Studio 2022 **桌面开发与 C++** 工作负载。
 
-+   在Linux上，你必须安装.NET运行时所依赖的库的编译器工具链和开发包。例如，对于Ubuntu 18.04或更高版本：`sudo apt-get install clang zlib1g-dev`。
++   在 Linux 上，你必须安装.NET 运行时所依赖的库的编译器工具链和开发包。例如，对于 Ubuntu 18.04 或更高版本：`sudo apt-get install clang zlib1g-dev`。
 
-**警告！**跨平台原生AOT发布不受支持。这意味着你必须在你将部署的操作系统上运行发布。例如，你不能在Linux上发布原生AOT项目，然后将其在Windows上运行。
+**警告！**跨平台原生 AOT 发布不受支持。这意味着你必须在你将部署的操作系统上运行发布。例如，你不能在 Linux 上发布原生 AOT 项目，然后将其在 Windows 上运行。
 
-## 为项目启用原生AOT
+## 为项目启用原生 AOT
 
-要在项目中启用原生AOT发布，请将`<PublishAot>`元素添加到项目文件中，如下所示，高亮显示的标记：
+要在项目中启用原生 AOT 发布，请将`<PublishAot>`元素添加到项目文件中，如下所示，高亮显示的标记：
 
-[PRE67]
+```cs
+ <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+ **<PublishAot>****true****</PublishAot>** 
+```
 
-## 启用与原生AOT的JSON序列化
+## 启用与原生 AOT 的 JSON 序列化
 
-使用原生AOT进行JSON序列化需要使用`System.Text.Json`源生成器。所有作为参数或返回值传递的模型类型都必须在`JsonSerializerContext`中注册，如下所示：
+使用原生 AOT 进行 JSON 序列化需要使用`System.Text.Json`源生成器。所有作为参数或返回值传递的模型类型都必须在`JsonSerializerContext`中注册，如下所示：
 
-[PRE68]
+```cs
+[JsonSerializable(typeof(Product)] // A single Product.
+[JsonSerializable(typeof(Product[]))] // An array of Products.
+public partial class MyJsonSerializerContext : JsonSerializerContext { } 
+```
 
-您必须将自定义JSON序列化器上下文添加到服务依赖项中，如下所示：
+您必须将自定义 JSON 序列化器上下文添加到服务依赖项中，如下所示：
 
-[PRE69]
+```cs
+builder.Services.ConfigureHttpJsonOptions(options =>
+{
+  options.SerializerOptions.AddContext<MyJsonSerializerContext>();
+}); 
+```
 
-## 构建原生AOT项目
+## 构建原生 AOT 项目
 
 现在让我们看看使用新项目模板的一个实际例子：
 
-1.  在名为`Chapter08`的解决方案中，添加一个与原生AOT兼容的Web服务项目，如下所示：
+1.  在名为`Chapter08`的解决方案中，添加一个与原生 AOT 兼容的 Web 服务项目，如下所示：
 
     +   项目模板：**ASP.NET Core Web API (native AOT)** / `webapiaot`
 
-        这是.NET 8引入的新项目模板。它与**Web API** / `webapi`项目模板不同。由于原生AOT支持目前仅限于最小API，因此它没有使用控制器选项。它也没有HTTPS选项，因为在云原生部署中HTTPS通常由反向代理处理。在JetBrains Rider中，选择**ASP.NET Core Web应用程序**，然后选择**类型**为**Web API (native AOT)**。
+        这是.NET 8 引入的新项目模板。它与**Web API** / `webapi`项目模板不同。由于原生 AOT 支持目前仅限于最小 API，因此它没有使用控制器选项。它也没有 HTTPS 选项，因为在云原生部署中 HTTPS 通常由反向代理处理。在 JetBrains Rider 中，选择**ASP.NET Core Web 应用程序**，然后选择**类型**为**Web API (native AOT)**。
 
     +   解决方案文件和文件夹：`Chapter08`
 
     +   项目文件和文件夹：`Northwind.MinimalAot.Service`
 
-    +   **启用Docker**：已清除。
+    +   **启用 Docker**：已清除。
 
     +   **不要使用顶层语句**：已清除。
 
     +   在`Properties`文件夹中，在`launchSettings.json`中，注意只配置了`http`；删除`launchUrl`并修改端口号为`5083`，如下所示，高亮显示的配置：
 
-        [PRE70]
+        ```cs
+        {
+          "$schema": "http://json.schemastore.org/launchsettings.json",
+          "profiles": {
+            "http": {
+              "commandName": "Project",
+              "dotnetRunMessages": true,
+              "launchBrowser": true,
+              "launchUrl": "",
+              "applicationUrl": "http://localhost:**5083**",
+              "environmentVariables": {
+                "ASPNETCORE_ENVIRONMENT": "Development"
+              }
+            }
+          }
+        } 
+        ```
 
-1.  在项目文件中，将不变全球化设置为`false`，将警告视为错误，注意原生AOT发布已启用，并为ADO.NET的SQL Server添加一个包引用，如下所示，高亮显示的标记：
+1.  在项目文件中，将不变全球化设置为`false`，将警告视为错误，注意原生 AOT 发布已启用，并为 ADO.NET 的 SQL Server 添加一个包引用，如下所示，高亮显示的标记：
 
-    [PRE71]
+    ```cs
+    <Project Sdk="Microsoft.NET.Sdk.Web">
+      <PropertyGroup>
+        <TargetFramework>net8.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <InvariantGlobalization>**false**</InvariantGlobalization>
+     **<TreatWarningsAsErrors>****true****</TreatWarningsAsErrors>**
+     **<PublishAot>****true****</PublishAot>**
+      </PropertyGroup>
+     **<ItemGroup>**
+     **<PackageReference Include=****"Microsoft.Data.SqlClient"** **Version=****"5.1.2"** **/>**
+     **</ItemGroup>**
+    </Project> 
+    ```
 
 1.  添加一个名为`Product.cs`的新类文件，并修改其内容以定义一个类，该类仅代表从`Products`表中的每一行中我们想要的三列，如下所示：
 
-    [PRE72]
+    ```cs
+    namespace Northwind.Models;
+    public class Product
+    {
+      public int ProductId { get; set; }
+      public string? ProductName { get; set; }
+      public decimal? UnitPrice { get; set; }
+    } 
+    ```
 
 1.  添加一个名为`NorthwindJsonSerializerContext.cs`的新类文件。
 
-1.  在`NorthwindJsonSerializerContext.cs`中，定义一个类，该类允许将`Product`和`Product`对象列表序列化为JSON，如下所示：
+1.  在`NorthwindJsonSerializerContext.cs`中，定义一个类，该类允许将`Product`和`Product`对象列表序列化为 JSON，如下所示：
 
-    [PRE73]
+    ```cs
+    using System.Text.Json.Serialization; // To use JsonSerializerContext.
+    using Northwind.Models; // To use Product.
+    namespace Northwind.Serialization;
+    [JsonSerializable(typeof(Product))]
+    [JsonSerializable(typeof(List<Product>))]
+    internal partial class NorthwindJsonSerializerContext
+      : JsonSerializerContext { } 
+    ```
 
 1.  删除`Northwind.MinimalAot.Service.http`文件。
 
 1.  添加一个名为`WebApplication.Extensions.cs`的新类文件。
 
-1.  在`WebApplication.Extensions.cs`中，为`WebApplication`类定义一个扩展方法，将一些HTTP `GET`请求映射为返回纯文本响应，以及使用ADO.NET从Northwind数据库获取所有产品或最低价格产品的列表，如下所示代码：
+1.  在`WebApplication.Extensions.cs`中，为`WebApplication`类定义一个扩展方法，将一些 HTTP `GET`请求映射为返回纯文本响应，以及使用 ADO.NET 从 Northwind 数据库获取所有产品或最低价格产品的列表，如下所示代码：
 
-    [PRE74]
+    ```cs
+    using Microsoft.Data.SqlClient; // To use SqlConnection and so on.
+    using Northwind.Models; // To use Product.
+    using System.Data; // To use CommandType.
+    namespace Packt.Extensions;
+    public static class WebApplicationExtensions
+    {
+      public static WebApplication MapGets(this WebApplication app)
+      {
+        // app.MapGet(pattern, handler);
+        app.MapGet("/", () => "Hello from a native AOT minimal API web service.");
+        app.MapGet("/products", GetProducts);
+        app.MapGet("/products/{minimumUnitPrice:decimal?}", GetProducts);
+        return app;
+      }
+      private static List<Product> GetProducts(decimal? minimumUnitPrice = null)
+      {
+        SqlConnectionStringBuilder builder = new();
+        builder.InitialCatalog = "Northwind";
+        builder.MultipleActiveResultSets = true;
+        builder.Encrypt = true;
+        builder.TrustServerCertificate = true;
+        builder.ConnectTimeout = 10; // Default is 30 seconds.
+        builder.DataSource = "."; // Local SQL Server
+        builder.IntegratedSecurity = true;
+        /*
+        // To use SQL Server Authentication:
+        builder.UserID = Environment.GetEnvironmentVariable("MY_SQL_USR");
+        builder.Password = Environment.GetEnvironmentVariable("MY_SQL_PWD");
+        builder.PersistSecurityInfo = false;
+        */
+        SqlConnection connection = new(builder.ConnectionString);
+        connection.Open();
+        SqlCommand cmd = connection.CreateCommand();
+        cmd.CommandType = CommandType.Text;
+        cmd.CommandText =
+          "SELECT ProductId, ProductName, UnitPrice FROM Products";
+        if (minimumUnitPrice.HasValue)
+        {
+          cmd.CommandText += " WHERE UnitPrice >= @minimumUnitPrice";
+          cmd.Parameters.AddWithValue("minimumUnitPrice", minimumUnitPrice);
+        }
+        SqlDataReader r = cmd.ExecuteReader();
+        List<Product> products = new();
+        while (r.Read())
+        {
+          Product p = new()
+          {
+            ProductId = r.GetInt32("ProductId"),
+            ProductName = r.GetString("ProductName"),
+            UnitPrice = r.GetDecimal("UnitPrice")
+          };
+          products.Add(p);
+        }
+        r.Close();
+        return products;
+      }
+    } 
+    ```
 
-    使用原生AOT时，我们无法使用EF Core，因此我们正在使用较低级别的ADO.NET SqlClient API。无论如何，这更快、更高效。在未来，也许在.NET 9或.NET 10中，我们将能够使用我们的EF Core模型来处理Northwind。
+    使用原生 AOT 时，我们无法使用 EF Core，因此我们正在使用较低级别的 ADO.NET SqlClient API。无论如何，这更快、更高效。在未来，也许在.NET 9 或.NET 10 中，我们将能够使用我们的 EF Core 模型来处理 Northwind。
 
-1.  在`Program.cs`中，注意对`CreateSlimBuilder`方法的调用，这确保默认情况下只启用ASP.NET Core的基本功能，因此它最小化了部署的web服务大小，如下所示代码：
+1.  在`Program.cs`中，注意对`CreateSlimBuilder`方法的调用，这确保默认情况下只启用 ASP.NET Core 的基本功能，因此它最小化了部署的 web 服务大小，如下所示代码：
 
-    [PRE75]
+    ```cs
+    var builder = WebApplication.CreateSlimBuilder(args); 
+    ```
 
-    `CreateSlimBuilder`方法不包括对HTTPS或HTTP/3的支持，尽管如果你需要，你可以自己添加这些。它支持`appsettings.json`的JSON文件配置和日志记录。
+    `CreateSlimBuilder`方法不包括对 HTTPS 或 HTTP/3 的支持，尽管如果你需要，你可以自己添加这些。它支持`appsettings.json`的 JSON 文件配置和日志记录。
 
 1.  在`Program.cs`中，在调用`builder.Build()`之后，删除生成一些示例待办事项和映射一些端点的语句，如下所示代码：
 
-    [PRE76]
+    ```cs
+    var sampleTodos = new Todo[]
+    {
+      new(1, "Walk the dog"),
+      new(2, "Do the dishes", DateOnly.FromDateTime(DateTime.Now)),
+      new(3, "Do the laundry", DateOnly.FromDateTime(DateTime.Now.AddDays(1))),
+      new(4, "Clean the bathroom"),
+      new(5, "Clean the car", DateOnly.FromDateTime(DateTime.Now.AddDays(2)))
+    };
+    var todosApi = app.MapGroup("/todos");
+    todosApi.MapGet("/", () => sampleTodos);
+    todosApi.MapGet("/{id}", (int id) =>
+        sampleTodos.FirstOrDefault(a => a.Id == id) is { } todo
+            ? Results.Ok(todo)
+            : Results.NotFound()); 
+    ```
 
 1.  在`Program.cs`文件底部，删除定义`Todo`记录和`AppJsonSerializerContext`类的语句，如下所示代码：
 
-    [PRE77]
+    ```cs
+    public record Todo(int Id, string? Title, DateOnly? DueBy = null, bool IsComplete = false);
+    [JsonSerializable(typeof(Todo[]))]
+    internal partial class AppJsonSerializerContext : JsonSerializerContext
+    {
+    } 
+    ```
 
-1.  在`Program.cs`中，删除命名空间导入，导入我们的JSON序列化上下文和扩展方法的命名空间，修改插入JSON序列化上下文的语句以使用Northwind的，然后在运行web `app`之前调用`MapGets`方法，如下所示高亮显示的代码：
+1.  在`Program.cs`中，删除命名空间导入，导入我们的 JSON 序列化上下文和扩展方法的命名空间，修改插入 JSON 序列化上下文的语句以使用 Northwind 的，然后在运行 web `app`之前调用`MapGets`方法，如下所示高亮显示的代码：
 
-    [PRE78]
+    ```cs
+    **using** **Northwind.Serialization;**
+    **using** **Packt.Extensions;** **// To use MapGets().**
+    var builder = WebApplication.CreateSlimBuilder(args);
+    builder.Services.ConfigureHttpJsonOptions(options =>
+    {
+      options.SerializerOptions.TypeInfoResolverChain
+        .Insert(0, **NorthwindJsonSerializerContext**.Default);
+    });
+    var app = builder.Build();
+    **app.MapGets();**
+    app.Run(); 
+    ```
 
-1.  如果你的数据库服务器没有运行（例如，因为你正在Docker、虚拟机或云中托管它），那么请确保启动它。
+1.  如果你的数据库服务器没有运行（例如，因为你正在 Docker、虚拟机或云中托管它），那么请确保启动它。
 
-1.  使用`http`配置文件启动web服务项目：
+1.  使用`http`配置文件启动 web 服务项目：
 
-    +   如果你正在使用Visual Studio 2022，则在下拉列表中选择**http**配置文件，然后导航到**调试** | **不调试启动**或按*Ctrl* + *F5*。
+    +   如果你正在使用 Visual Studio 2022，则在下拉列表中选择**http**配置文件，然后导航到**调试** | **不调试启动**或按*Ctrl* + *F5*。
 
-    +   如果你正在使用Visual Studio Code，则输入命令`dotnet run --launch-profile http`，手动启动一个web浏览器，并导航到web服务：`https://localhost:5083/`。
+    +   如果你正在使用 Visual Studio Code，则输入命令`dotnet run --launch-profile http`，手动启动一个 web 浏览器，并导航到 web 服务：`https://localhost:5083/`。
 
-1.  在web浏览器中，注意纯文本响应：`Hello from a native AOT minimal API web service.`。
+1.  在 web 浏览器中，注意纯文本响应：`Hello from a native AOT minimal API web service.`。
 
 1.  在地址栏中添加 `/products`，并注意响应中显示的产品数组，如下所示的部分输出：
 
-    [PRE79]
+    ```cs
+    [{"productId":1,"productName":"Chai","unitPrice":18.0000},
+     {"productId":2,"productName":"Chang","unitPrice":19.0000},
+     {"productId":3,"productName":"Aniseed Syrup","unitPrice":10.0000},
+     {"productId":4,"productName":"Chef Anton's Cajun Seasoning",
+      "unitPrice":22.0000},
+     {"productId":5,"productName":"Chef Anton's Gumbo Mix",
+      "unitPrice":21.3500},
+     {"productId":6,"productName":"Grandma's Boysenberry Spread",
+      "unitPrice":25.0000},
+     {"productId":7,"productName":"Uncle Bob's Organic Dried Pears",
+      "unitPrice":30.0000},
+     {"productId":8,"productName":"Northwoods Cranberry Sauce",
+      "unitPrice":40.0000},
+     {"productId":9,"productName":"Mishi Kobe Niku","unitPrice":97.0000},
+     {"productId":10,"productName":"Ikura","unitPrice":31.0000},
+     {"productId":11,"productName":"Queso Cabrales","unitPrice":21.0000},
+     {"productId":12,"productName":"Queso Manchego La Pastora",
+      "unitPrice":38.0000}, 
+    ```
 
 1.  在地址栏中添加 `/products/100`，并注意响应中的两个产品数组，如下所示的部分输出：
 
-    [PRE80]
+    ```cs
+    [{"productId":29,"productName":"Thüringer Rostbratwurst","unitPrice":123.7900},{"productId":38,"productName":"Côte de Blaye","unitPrice":263.5000}] 
+    ```
 
-1.  关闭浏览器并关闭web服务器。
+1.  关闭浏览器并关闭 web 服务器。
 
-## 发布原生AOT项目
+## 发布原生 AOT 项目
 
-在开发期间，当服务未经修剪且经过即时编译（JIT）时，功能正常的服务在发布时使用原生AOT可能仍然会失败。因此，在假设项目可以工作之前，你应该先进行发布。
+在开发期间，当服务未经修剪且经过即时编译（JIT）时，功能正常的服务在发布时使用原生 AOT 可能仍然会失败。因此，在假设项目可以工作之前，你应该先进行发布。
 
-如果您的项目在发布时没有产生任何AOT警告，那么您可以有信心，您的服务在发布后将会正常工作。
+如果您的项目在发布时没有产生任何 AOT 警告，那么您可以有信心，您的服务在发布后将会正常工作。
 
 让我们回顾一下源生成的代码并发布我们的网络服务：
 
 1.  在`Northwind.MinimalAot.Service`项目文件中，添加一个元素以输出编译器生成的文件，如下所示突出显示的标记：
 
-    [PRE81]
+    ```cs
+    <PropertyGroup>
+      <TargetFramework>net8.0</TargetFramework>
+      ...
+     **<EmitCompilerGeneratedFiles>****true****</EmitCompilerGeneratedFiles>**
+    </PropertyGroup> 
+    ```
 
 1.  构建项目`Northwind.MinimalAot.Service`。
 
-1.  如果您正在使用Visual Studio 2022，请在**解决方案资源管理器**中切换**显示所有文件**。
+1.  如果您正在使用 Visual Studio 2022，请在**解决方案资源管理器**中切换**显示所有文件**。
 
-1.  展开文件夹`obj\Debug\net8.0\generated`，并注意源生成器为AOT和JSON序列化创建的文件夹和文件，并注意您将在接下来的几个步骤中打开其中一些文件，如图8.10所示：
+1.  展开文件夹`obj\Debug\net8.0\generated`，并注意源生成器为 AOT 和 JSON 序列化创建的文件夹和文件，并注意您将在接下来的几个步骤中打开其中一些文件，如图 8.10 所示：
 
 ![](img/B19587_08_10.png)
 
-图8.10：AOT网络服务项目中源生成器创建的文件夹和文件
+图 8.10：AOT 网络服务项目中源生成器创建的文件夹和文件
 
-1.  打开`GeneratedRouteBuilderExtensions.g.cs`文件，并注意它包含用于定义最小API网络服务的映射路由的代码。
+1.  打开`GeneratedRouteBuilderExtensions.g.cs`文件，并注意它包含用于定义最小 API 网络服务的映射路由的代码。
 
 1.  打开`NorthwindJsonSerializerContext.Decimal.g.cs`文件，并注意它包含用于将`decimal`值序列化为作为最小单位价格参数传递给路由之一的代码。
 
 1.  打开`NorthwindJsonSerializerContext.ListProduct.g.cs`文件，并注意它包含用于将`Product`对象列表序列化为响应的代码，这些对象是两条路由之一返回的。
 
-1.  在`Northwind.MinimalAot.Service`文件夹中，在命令提示符或终端中，使用本地AOT发布网络服务，如下所示命令：
+1.  在`Northwind.MinimalAot.Service`文件夹中，在命令提示符或终端中，使用本地 AOT 发布网络服务，如下所示命令：
 
-    [PRE82]
+    ```cs
+    dotnet publish 
+    ```
 
 1.  注意有关生成本地代码以及针对`Microsoft.Data.SqlClient`等包的裁剪警告的消息，如下部分输出所示：
 
-    [PRE83]
+    ```cs
+    Generating native code
+    C:\Users\markj\.nuget\packages\microsoft.data.sqlclient\5.1.1\runtimes\win\lib\net6.0\Microsoft.Data.SqlClient.dll : warning IL2104: Assembly 'Microsoft.Data.SqlClient' produced trim warnings. For more information see https://aka.ms/dotnet-illink/libraries [C:\apps-services-net8\Chapter08\Northwind.MinimalAot.Service\Northwind.MinimalAot.Service.csproj]
+    /_/src/libraries/System.Data.Common/src/System/Data/DataTable.cs(6704): Trim analysis warning IL2026: System.Data.DataTable.System.Xml.Serialization.IXmlSerializable.ReadXml(XmlReader): Using member 'System.Data.DataTable.ReadXmlSerializableInternal(XmlReader)' which has 'RequiresUnreferencedCodeAttribute' can break functionality when trimming application code. DataTable.ReadXml uses XmlSerialization underneath which is not trimming safe. Members from serialized types may be trimmed if not referenced directly. [C:\apps-services-net8\Chapter08\Northwind.MinimalAot.Service\Northwind.MinimalAot.Service.csproj] 
+    ```
 
     我们没有使用`DataTable.ReadXml`方法，该方法调用一个可能被裁剪的成员，因此我们可以忽略前面的警告。
 
-1.  启动**文件资源管理器**并打开`bin\Release\net8.0\win-x64\publish`文件夹，并注意EXE文件大约有30MB。这些以及`Microsoft.Data.SqlClient.SNI.dll`文件是需要在另一台Windows计算机上部署以使网络服务正常工作的唯一文件。`appsettings.json`文件仅在需要覆盖配置时才需要。PDB文件仅在调试时需要。
+1.  启动**文件资源管理器**并打开`bin\Release\net8.0\win-x64\publish`文件夹，并注意 EXE 文件大约有 30MB。这些以及`Microsoft.Data.SqlClient.SNI.dll`文件是需要在另一台 Windows 计算机上部署以使网络服务正常工作的唯一文件。`appsettings.json`文件仅在需要覆盖配置时才需要。PDB 文件仅在调试时需要。
 
-1.  运行`Northwind.MinimalAot.Service.exe`，并注意网络服务启动非常快，它默认将使用端口`5000`，如图8.11所示：
+1.  运行`Northwind.MinimalAot.Service.exe`，并注意网络服务启动非常快，它默认将使用端口`5000`，如图 8.11 所示：
 
-![](img/B19587_08_11.png)图8.11：文件资源管理器显示已发布的可执行文件和正在运行AOT网络服务
+![](img/B19587_08_11.png)图 8.11：文件资源管理器显示已发布的可执行文件和正在运行 AOT 网络服务
 
 1.  启动一个网页浏览器，导航到`http://localhost:5000/`，并注意网络服务通过返回纯文本响应来正确工作。
 
-1.  导航到`http://localhost:5000/products/100`，并注意网络服务响应包含最小单位价格为100的两个产品。
+1.  导航到`http://localhost:5000/products/100`，并注意网络服务响应包含最小单位价格为 100 的两个产品。
 
 1.  关闭网页浏览器并关闭网络服务。
 
 1.  在`Northwind.WebApi.Service`项目文件中，在命令提示符或终端中发布网络服务，如下所示命令：
 
-    [PRE84]
+    ```cs
+    dotnet publish 
+    ```
 
 1.  启动 **文件资源管理器**，打开 `bin\Release\net8.0\win-x64\publish` 文件夹，并注意 `Northwind.WebApi.Service.exe` 文件小于 154 KB。这是因为它是框架依赖的，意味着它需要在计算机上安装 .NET 才能工作。此外，还有许多必须与 EXE 文件一起部署的文件，总大小约为 14 MB。
 
@@ -1029,45 +1979,111 @@ ASP.NET Core 7 引入了它自己的基本速率限制中间件，最初作为�
 
 1.  在 `Northwind.WebApi.Service` 项目中，添加对 JWT 承载身份验证包的引用，如下所示：
 
-    [PRE85]
+    ```cs
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer"
+                      Version="8.0.0" /> 
+    ```
 
 1.  构建 `Northwind.WebApi.Service` 项目以恢复包。
 
 1.  在 `Program.cs` 中，在创建 `builder` 之后，添加语句以使用 JWT 添加授权和身份验证，如下所示（高亮显示）：
 
-    [PRE86]
+    ```cs
+    var builder = WebApplication.CreateBuilder(args);
+    **builder.Services.AddAuthorization();**
+    **builder.Services.AddAuthentication(defaultScheme:** **"Bearer"****)**
+     **.AddJwtBearer();** 
+    ```
 
 1.  在 `Program.cs` 中，在构建应用程序之后，添加一个语句来使用授权，如下所示（高亮显示）：
 
-    [PRE87]
+    ```cs
+    var app = builder.Build();
+    **app.UseAuthorization();** 
+    ```
 
 1.  在 `WebApplication.Extensions.cs` 中，导入安全声明的命名空间，如下所示：
 
-    [PRE88]
+    ```cs
+    using System.Security.Claims; // To use ClaimsPrincipal. 
+    ```
 
 1.  在 `WebApplication.Extensions.cs` 中，在将根路径的 HTTP `GET` 请求映射到返回纯文本 `Hello World` 响应之后，添加一个语句将秘密路径的 HTTP `GET` 请求映射到如果授权则返回认证用户的名称，如下所示：
 
-    [PRE89]
+    ```cs
+    app.MapGet("/", () => "Hello World!")
+      .ExcludeFromDescription();
+    **app.MapGet(****"/secret"****, (ClaimsPrincipal user) =>** 
+    **string****.Format(****"Welcome, {0}. The secret ingredient is love."****,**
+     **user.Identity?.Name ??** **"secure user"****))**
+     **.RequireAuthorization();** 
+    ```
 
 1.  在 `Northwind.WebApi.Service` 项目文件夹中，在命令提示符或终端中，创建一个本地 JWT，如下所示：
 
-    [PRE90]
+    ```cs
+    dotnet user-jwts create 
+    ```
 
 1.  注意自动分配的 `ID`、`Name` 和 `Token`，如下所示的部分输出：
 
-    [PRE91]
+    ```cs
+    New JWT saved with ID 'd7e22000'.
+    Name: markjprice
+    Token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1bmlxdWVfbmFtZSI6Im1hcmtqcHJpY2UiLCJzdWIiOiJtYXJran...lci1qd3RzIn0.pGEbYKRjU98dEjxLSx7GAEm41LXMS0J80iIjuZbqrj4 
+    ```
 
 1.  在命令提示符或终端中，打印分配的 ID 的所有信息，如下所示：
 
-    [PRE92]
+    ```cs
+    dotnet user-jwts print d7e22000 --show-all 
+    ```
 
 1.  注意方案是 `Bearer`，因此必须在每次请求中发送令牌，受众列表列出了授权客户端域名和端口号，令牌在三个月后过期，JSON 对象表示头和有效负载，最后是紧凑型令牌，其 Base64 编码的三部分由点分隔，如下所示的部分输出：
 
-    [PRE93]
+    ```cs
+    Found JWT with ID 'd7e22000'.
+    ID: d7e22000
+    Name: markjprice
+    Scheme: Bearer
+    Audience(s): http://localhost:30225, https://localhost:44344, http://localhost:5080, https://localhost:5081
+    Not Before: 2023-09-26T10:58:18.0000000+00:00
+    Expires On: 2023-12-26T10:58:18.0000000+00:00
+    Issued On: 2023-09-26T10:58:19.0000000+00:00
+    Scopes: none
+    Roles: [none]
+    Custom Claims: [none]
+    Token Header: {"alg":"HS256","typ":"JWT"}
+    Token Payload: {"unique_name":"markjprice","sub":"markjprice","jti":"d7e22000","aud":["http://localhost:30225","https://localhost:44344","http://localhost:5080","https://localhost:5081"],"nbf":1664189898,"exp":1672052298,"iat":1664189899,"iss":"dotnet-user-jwts"}
+    Compact Token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1bmlxdWVfbmFtZSI6Im1hcmtqcHJpY2UiLCJzdWIiOiJtYXJranByaWNl...uZXQtdXNlci1qd3RzIn0.pGEbYKRjU98dEjxLSx7GAEm41LXMS0J80iIjuZbqrj4 
+    ```
 
 1.  在 `Northwind.WebApi.Service` 项目中，在 `appsettings.Development.json` 中，注意名为 `Authentication` 的新部分，如下所示（高亮显示）：
 
-    [PRE94]
+    ```cs
+    {
+      "Logging": {
+        "LogLevel": {
+          "Default": "Information",
+          "Microsoft.AspNetCore": "Warning",
+          "Microsoft.AspNetCore.HttpLogging": "Information"
+        }
+      },
+    **"Authentication"****:****{**
+    **"Schemes"****:****{**
+    **"Bearer"****:****{**
+    **"ValidAudiences"****:****[**
+    **"http://localhost:30225"****,**
+    **"https://localhost:44344"****,**
+    **"****http://localhost:5080"**
+    **"https://localhost:5081"**
+    **],**
+    **"ValidIssuer"****:****"dotnet-user-jwts"**
+    **}**
+    **}**
+    **}**
+    } 
+    ```
 
 1.  使用无调试的 `https` 配置启动 `Northwind.WebApi.Service` 项目。
 
@@ -1077,11 +2093,17 @@ ASP.NET Core 7 引入了它自己的基本速率限制中间件，最初作为�
 
 1.  在 `HttpRequests` 文件夹中，创建一个名为 `webapi-secure-request.http` 的文件，并修改其内容以包含获取秘密成分的请求，如下所示（但当然使用您的 `Bearer` 令牌）：
 
-    [PRE95]
+    ```cs
+    ### Get the secret ingredient.
+    GET https://localhost:5081/secret/
+    Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1bmlxdWVfbmFtZSI6Im1hcmtqcHJpY2UiLCJzdWIiOiJtYXJranByaWNl...uZXQtdXNlci1qd3RzIn0.pGEbYKRjU98dEjxLSx7GAEm41LXMS0J80iIjuZbqrj4 
+    ```
 
 1.  点击 **发送请求**，并注意响应，如下所示：
 
-    [PRE96]
+    ```cs
+    Welcome, secure user. The secret ingredient is love. 
+    ```
 
 1.  关闭浏览器并关闭网络服务。
 
@@ -1117,29 +2139,29 @@ ASP.NET Core 7 引入了它自己的基本速率限制中间件，最初作为�
 
 微软有内部 HTTP/REST API 设计指南。微软团队在设计他们的 HTTP API 时会参考此文档。它们是您自己 HTTP API 标准的绝佳起点。您可以在以下链接中查看它们：
 
-[https://github.com/microsoft/api-guidelines](https://github.com/microsoft/api-guidelines)
+[`github.com/microsoft/api-guidelines`](https://github.com/microsoft/api-guidelines)
 
 指南中有一个专门针对 CORS 的部分，您可以通过以下链接查看它们：
 
-[https://github.com/microsoft/api-guidelines/blob/vNext/Guidelines.md#8-cors](https://github.com/microsoft/api-guidelines/blob/vNext/Guidelines.md#8-cors)
+[`github.com/microsoft/api-guidelines/blob/vNext/Guidelines.md#8-cors`](https://github.com/microsoft/api-guidelines/blob/vNext/Guidelines.md#8-cors)
 
 ## 练习 8.3 – 探索主题
 
 使用以下页面上的链接了解本章涵盖主题的更多详细信息：
 
-[https://github.com/markjprice/apps-services-net8/blob/main/docs/book-links.md#chapter-8---building-and-securing-web-services-using-minimal-apis](https://github.com/markjprice/apps-services-net8/blob/main/docs/book-links.md#chapter-8---building-and-securing-web-services-using-minimal-apis)
+[`github.com/markjprice/apps-services-net8/blob/main/docs/book-links.md#chapter-8---building-and-securing-web-services-using-minimal-apis`](https://github.com/markjprice/apps-services-net8/blob/main/docs/book-links.md#chapter-8---building-and-securing-web-services-using-minimal-apis)
 
 ## 练习 8.4 – 通过 OData 服务公开数据
 
 在本在线章节中学习如何快速实现一个可以使用 OData 包装 EF Core 实体模型的 Web API 服务：
 
-[https://github.com/markjprice/apps-services-net8/blob/main/docs/ch08-odata.md](https://github.com/markjprice/apps-services-net8/blob/main/docs/ch08-odata.md)
+[`github.com/markjprice/apps-services-net8/blob/main/docs/ch08-odata.md`](https://github.com/markjprice/apps-services-net8/blob/main/docs/ch08-odata.md)
 
 ## 练习 8.5 – Auth0 项目模板
 
 如果您需要实现 Auth0 进行身份验证和授权，则可以使用项目模板来生成代码。描述这些项目模板及其使用方法的文章可在以下链接中找到：
 
-[https://auth0.com/blog/introducing-auth0-templates-for-dotnet/](https://auth0.com/blog/introducing-auth0-templates-for-dotnet/)
+[`auth0.com/blog/introducing-auth0-templates-for-dotnet/`](https://auth0.com/blog/introducing-auth0-templates-for-dotnet/)
 
 # 摘要
 

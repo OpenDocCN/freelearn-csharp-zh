@@ -6,27 +6,27 @@
 
 +   抽象工厂的基本原理
 
-+   使用抽象工厂模式设计NPC生成器
++   使用抽象工厂模式设计 NPC 生成器
 
 解释工厂方法（Factory Method）和抽象工厂（Abstract Factory）之间的核心区别有时会被用作技术面试中的陷阱问题。因此，对这类问题有一个清晰的答案可以给面试官留下深刻印象。
 
 # 技术要求
 
-本章非常注重实践，因此你需要对Unity和C#有基本的了解。
+本章非常注重实践，因此你需要对 Unity 和 C#有基本的了解。
 
-我们将使用以下Unity引擎和C#语言概念：
+我们将使用以下 Unity 引擎和 C#语言概念：
 
 +   枚举
 
 如果你对这些概念不熟悉，请在开始本章之前复习它们。
 
-本章的代码文件可以在GitHub上找到：
+本章的代码文件可以在 GitHub 上找到：
 
-[https://github.com/PacktPublishing/Hands-On-Game-Development-Patterns-with-Unity-2018](https://github.com/PacktPublishing/Hands-On-Game-Development-Patterns-with-Unity-2018)
+[`github.com/PacktPublishing/Hands-On-Game-Development-Patterns-with-Unity-2018`](https://github.com/PacktPublishing/Hands-On-Game-Development-Patterns-with-Unity-2018)
 
 查看以下视频，以查看代码的实际应用：
 
-[http://bit.ly/2HKybdy](http://bit.ly/2HKybdy)
+[`bit.ly/2HKybdy`](http://bit.ly/2HKybdy)
 
 # 抽象工厂概述
 
@@ -54,85 +54,288 @@
 
 # 用例示例
 
-我们将扩展[第4章](53f1b25e-e9c8-47b4-aa76-82c71fffdb8c.xhtml)中的用例“*工厂方法*”，通过添加一个新的可生成NPC的类型，称为“动物”。因此，在我们的例子中，人类和动物被认为是不可玩的角色，但它们有独立的制造过程，所以它们将需要单独的工厂。这种需求可以通过抽象工厂轻松实现。
+我们将扩展第四章中的用例“*工厂方法*”，通过添加一个新的可生成 NPC 的类型，称为“动物”。因此，在我们的例子中，人类和动物被认为是不可玩的角色，但它们有独立的制造过程，所以它们将需要单独的工厂。这种需求可以通过抽象工厂轻松实现。
 
 # 代码示例
 
-我们的代码示例几乎与我们在[第4章](53f1b25e-e9c8-47b4-aa76-82c71fffdb8c.xhtml)中完成的那个相同，*工厂方法*。但我们将通过包括特定的NPC系列来增加系统的深度；在我们的情况下，人类和动物。
+我们的代码示例几乎与我们在第四章中完成的那个相同，*工厂方法*。但我们将通过包括特定的 NPC 系列来增加系统的深度；在我们的情况下，人类和动物。
 
 1.  抽象工厂的一个关键元素是每个产品系列都有一个相关的工厂：
 
-[PRE0]
+```cs
+using UnityEngine;
 
-注意到这个类是按照工厂方法模式实现的，因为我们使用简单的`switch` case来根据请求的类型返回正确的`Factory`给客户端。
+public class FactoryProducer : MonoBehaviour
+{
+    public static AbstractFactory GetFactory(FactoryType factoryType)
+    {
+        switch (factoryType)
+        {
+            case FactoryType.Human:
+                AbstractFactory humanFactory = new HumanFactory();
+                return humanFactory;
+            case FactoryType.Animal:
+                AbstractFactory animalFactory = new AnimalFactory();
+                return animalFactory;
+        }
+            return null;
+    }
+}
+```
+
+注意到这个类是按照工厂方法模式实现的，因为我们使用简单的`switch` case 来根据请求的类型返回正确的`Factory`给客户端。
 
 1.  现在，我们需要一个`抽象`类来保持每个特定产品`Factory`实现的连贯性：
 
-[PRE1]
+```cs
+public abstract class AbstractFactory
+{
+    public abstract IHuman GetHuman(HumanType humanType);
+    public abstract IAnimal GetAnimal(AnimalType animalType);
+}
+```
 
 1.  接下来是我们的第一个具体产品工厂，`HumanFactory`：
 
-[PRE2]
+```cs
+public class HumanFactory : AbstractFactory
+{
+    public override IHuman GetHuman(HumanType humanType)
+    {
+        switch (humanType)
+        {
+            case HumanType.Beggar:
+                IHuman beggar = new Beggar();
+                return beggar;
+            case HumanType.Farmer:
+                IHuman farmer = new Farmer();
+                return farmer;
+            case HumanType.Shopowner:
+                IHuman shopowner = new Shopowner();
+                return shopowner;
+        }
+        return null;
+    }
+
+    public override IAnimal GetAnimal(AnimalType animalType)
+    {
+        return null;
+    }
+}
+```
 
 1.  现在，`AnimalFactory`，它将生产猫和狗：
 
-[PRE3]
+```cs
+public class AnimalFactory : AbstractFactory
+{
+    public override IAnimal GetAnimal(AnimalType animalType)
+    {
+        switch (animalType)
+        {
+            case AnimalType.Cat:
+                IAnimal cat = new Cat();
+                return cat;
+            case AnimalType.Dog:
+                IAnimal dog = new Dog();
+                return dog;
+        }
+        return null;
+    }
 
-注意到这两个类都实现了对方的`GetAnimal()`或`GetHuman()`函数，但根据上下文返回`null`。这种方法是在客户端在请求特定类型的NPC时引用了错误的工厂时使用的；而不是抛出异常，它将收到一个`null`。
+    public override IHuman GetHuman(HumanType humanType)
+    {
+        return null;
+    }
+}
+```
+
+注意到这两个类都实现了对方的`GetAnimal()`或`GetHuman()`函数，但根据上下文返回`null`。这种方法是在客户端在请求特定类型的 NPC 时引用了错误的工厂时使用的；而不是抛出异常，它将收到一个`null`。
 
 1.  我们将不再在`switch`类型的条件块中使用字符串，我们将为每个支持的产品类型实现枚举，包括相关的工厂，如下所示。这种方法将避免错误并保持一致性：
 
 +   `FactoryType`:
 
-[PRE4]
+```cs
+public enum FactoryType
+{
+    Human,
+    Animal
+}
+```
 
 +   `HumanType`:
 
-[PRE5]
+```cs
+public enum HumanType
+{
+    Farmer,
+    Beggar,
+    Shopowner
+}
+```
 
 +   `AnimalType`:
 
-[PRE6]
+```cs
+public enum AnimalType
+{
+    Dog,
+    Cat
+}
+```
 
 1.  我们的食物不会说话，但人类会说话，所以它们不能共享一个标准接口。在这种情况下，我们将为每种类型实现一个，如下所示：
 
 +   `IHuman`:
 
-[PRE7]
+```cs
+public interface IHuman
+{
+    void Speak();
+}
+```
 
 +   `IAnimal`:
 
-[PRE8]
+```cs
+public interface IAnimal
+{
+    void Voice();
+}
+```
 
-1.  现在，我们需要编写所有人类和动物NPC的每个具体类，如下所示：
+1.  现在，我们需要编写所有人类和动物 NPC 的每个具体类，如下所示：
 
 +   `Beggar`:
 
-[PRE9]
+```cs
+using UnityEngine;
+
+public class Beggar : IHuman
+{
+    public void Speak()
+    {
+        Debug.Log("Beggar: Do you have some change to spare?");
+    }
+}
+```
 
 +   `Farmer`:
 
-[PRE10]
+```cs
+using UnityEngine;
+
+public class Farmer : IHuman
+{
+    public void Speak()
+    {
+            Debug.Log("Farmer: You reap what you sow!");
+    }
+}
+```
 
 +   `Shopowner`:
 
-[PRE11]
+```cs
+using UnityEngine;
+
+public class Shopowner : IHuman
+{
+    public void Speak()
+    {
+        Debug.Log("Shopowner: Do you wish to purchase something?");
+    }
+}
+```
 
 +   `Dog`:
 
-[PRE12]
+```cs
+using UnityEngine;
+
+public class Dog : IAnimal
+{
+    public void Voice()
+    {
+        Debug.Log("Dog: Woof!");
+    }
+}
+```
 
 +   `Cat`:
 
-[PRE13]
+```cs
+public class Cat : IAnimal
+{
+    public void Voice()
+    {
+        Debug.Log("Cat: Meow!");
+    }
+}
+```
 
-1.  最后，我们可以扩展我们的`NPCSpawner`类以支持生成动物和人类NPC：
+1.  最后，我们可以扩展我们的`NPCSpawner`类以支持生成动物和人类 NPC：
 
-[PRE14]
+```cs
+public class NPCSpawner : MonoBehaviour
+{
+    private IAnimal m_Cat;
+    private IAnimal m_Dog;
+
+    private IHuman m_Farmer;
+    private IHuman m_Beggar;
+    private IHuman m_Shopowner;
+
+    private AbstractFactory factory;
+
+    public void SpawnAnimals()
+    {
+        factory = FactoryProducer.GetFactory(FactoryType.Animal);
+
+        m_Cat = factory.GetAnimal(AnimalType.Cat);
+        m_Dog = factory.GetAnimal(AnimalType.Dog);
+
+        m_Cat.Voice();
+        m_Dog.Voice();
+    }
+
+    public void SpawnHumans()
+    {
+        factory = FactoryProducer.GetFactory(FactoryType.Human);
+
+        m_Beggar = factory.GetHuman(HumanType.Beggar);
+        m_Farmer = factory.GetHuman(HumanType.Farmer);
+        m_Shopowner = factory.GetHuman(HumanType.Shopowner);
+
+        m_Beggar.Speak();
+        m_Farmer.Speak();
+        m_Shopowner.Speak();
+    }
+}
+```
 
 1.  作为我们概念的证明，我们的`Client`类可以从我们的`Spawner`请求`Animal`和`Human` NPC，而无需了解最终产品的创建过程：
 
-[PRE15]
+```cs
+public class Client : MonoBehaviour
+{
+    public NPCSpawner m_SpawnerNPC;
+
+    public void Update()
+    {
+        if (Input.GetKeyDown(KeyCode.U))
+        {
+            m_SpawnerNPC.SpawnHumans();
+        }
+
+        if (Input.GetKeyDown(KeyCode.A))
+        {
+            m_SpawnerNPC.SpawnAnimals();
+        }
+    }
+}
+```
 
 如你所见，抽象工厂比其表亲工厂方法提供了更多的灵活性。我们现在可以管理产品系列，并为制造过程添加更多抽象层。
 
@@ -142,16 +345,16 @@
 
 在下一章中，我们将探讨可能是所有设计模式中最著名的一个：单例。
 
-在学习工厂模式的过程中，你可能会注意到我们使用了与传统制造过程相关的几个术语。制造业和软件产业密切相关。与工厂管理相关的最佳实践启发了DevOps和看板背后的几个核心思想，这些思想现在是稳健软件开发流程的基石。
+在学习工厂模式的过程中，你可能会注意到我们使用了与传统制造过程相关的几个术语。制造业和软件产业密切相关。与工厂管理相关的最佳实践启发了 DevOps 和看板背后的几个核心思想，这些思想现在是稳健软件开发流程的基石。
 
 # 实践练习
 
 在本书的这一部分，我们已经回顾了工厂模式中最流行的两种形式：抽象工厂和工厂方法。然而，作为一个练习，我建议通过实现第三种形式来扩展你对工厂的了解，例如，静态工厂方法。
 
-你可以在Joshua Bloch的经典著作《Effective Java》中了解静态工厂方法模式。更多信息可以在“进一步阅读”部分找到。
+你可以在 Joshua Bloch 的经典著作《Effective Java》中了解静态工厂方法模式。更多信息可以在“进一步阅读”部分找到。
 
 # 进一步阅读
 
-+   Kevin Behr、George Spafford和Gene Kim合著的《凤凰项目》[*The Phoenix Project*](https://itrevolution.com/book/the-phoenix-project)
++   Kevin Behr、George Spafford 和 Gene Kim 合著的《凤凰项目》[*The Phoenix Project*](https://itrevolution.com/book/the-phoenix-project)
 
-+   *《有效Java》* by Joshua Bloch[https://www.pearson.com/us/higher-education/program/Bloch-Effective-Java-3rd-Edition/PGM1763855.html](https://www.pearson.com/us/higher-education/program/Bloch-Effective-Java-3rd-Edition/PGM1763855.html)
++   *《有效 Java》* by Joshua Bloch[`www.pearson.com/us/higher-education/program/Bloch-Effective-Java-3rd-Edition/PGM1763855.html`](https://www.pearson.com/us/higher-education/program/Bloch-Effective-Java-3rd-Edition/PGM1763855.html)

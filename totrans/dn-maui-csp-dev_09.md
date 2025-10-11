@@ -10,7 +10,7 @@
 
 单元测试对于创建健壮的应用程序和确保在发货前您的应用程序正常工作至关重要。它也是调试的关键方面，可以立即告诉您您刚刚更改或添加的内容是否破坏了应用程序的某些方面。
 
-为了便于进行单元测试，您希望使用依赖注入，这样您就可以模拟耗时的服务，例如API、数据库等。我们将花费时间与模拟一起，确保我们正在按预期处理数据。
+为了便于进行单元测试，您希望使用依赖注入，这样您就可以模拟耗时的服务，例如 API、数据库等。我们将花费时间与模拟一起，确保我们正在按预期处理数据。
 
 本章的具体内容包括：
 
@@ -26,15 +26,15 @@
 
 # 技术要求
 
-要跟随本章内容，您需要Visual Studio。您还需要安装两个NuGet包，具体请参考本章本身所示。如果您打算边读边输入代码，您应该从上一章的源代码开始：[https://github.com/PacktPublishing/.NET-MAUI-for-C-Sharp-Developers/tree/persistence](https://github.com/PacktPublishing/.NET-MAUI-for-C-Sharp-Developers/tree/persistence)。
+要跟随本章内容，您需要 Visual Studio。您还需要安装两个 NuGet 包，具体请参考本章本身所示。如果您打算边读边输入代码，您应该从上一章的源代码开始：[`github.com/PacktPublishing/.NET-MAUI-for-C-Sharp-Developers/tree/persistence`](https://github.com/PacktPublishing/.NET-MAUI-for-C-Sharp-Developers/tree/persistence)。
 
-本章的源代码可以在以下位置找到：[https://github.com/PacktPublishing/.NET-MAUI-for-C-Sharp-Developers/tree/UnitTests](https://github.com/PacktPublishing/.NET-MAUI-for-C-Sharp-Developers/tree/UnitTests)。
+本章的源代码可以在以下位置找到：[`github.com/PacktPublishing/.NET-MAUI-for-C-Sharp-Developers/tree/UnitTests`](https://github.com/PacktPublishing/.NET-MAUI-for-C-Sharp-Developers/tree/UnitTests)。
 
 # 为什么创建单元测试？
 
-您将在生产应用程序上运行许多类型的测试。这些包括单元测试（测试应用程序的一个小部分——通常是方法）、集成测试（程序各部分运行在一起的效果）、UI测试（确保与UI的交互按预期进行）和端到端测试（确保整个程序按预期工作）。
+您将在生产应用程序上运行许多类型的测试。这些包括单元测试（测试应用程序的一个小部分——通常是方法）、集成测试（程序各部分运行在一起的效果）、UI 测试（确保与 UI 的交互按预期进行）和端到端测试（确保整个程序按预期工作）。
 
-**单元测试**是这个过程的关键部分，并为每个方法和每个逻辑单元创建。实际上，通常为每个单元创建多个测试，以便您可以测试happy path、sad path和边界条件。
+**单元测试**是这个过程的关键部分，并为每个方法和每个逻辑单元创建。实际上，通常为每个单元创建多个测试，以便您可以测试 happy path、sad path 和边界条件。
 
 **happy path**是指数据符合预期的情况。**sad path**是指数据可预测地错误（例如，用户未输入必填字段）的情况。
 
@@ -42,7 +42,7 @@
 
 单元测试的一个关键好处是它们可以使您的代码更少**脆弱**。没有单元测试，很容易陷入一种情况，即这里的更改破坏了那里的代码，而您直到运行整个程序或更糟糕的是，您的客户发现了这个问题，才知道代码被破坏了。
 
-所有这一切的关键是，研究表明，在单元测试期间发现的错误比在开发后期发现的错误更容易修复且成本更低。例如，在20世纪90年代，Capers Jones分析了400多个软件项目的错误数据，并发现每个开发阶段的错误修复成本增加了6到7倍。
+所有这一切的关键是，研究表明，在单元测试期间发现的错误比在开发后期发现的错误更容易修复且成本更低。例如，在 20 世纪 90 年代，Capers Jones 分析了 400 多个软件项目的错误数据，并发现每个开发阶段的错误修复成本增加了 6 到 7 倍。
 
 此外，单元测试是应用程序的优秀文档，精确地描述了在广泛的情况下你期望发生什么。与注释不同，注释会生锈——也就是说，与代码不同步——单元测试永远不会脱离代码，因为当你的代码以使预期结果发生变化的方式改变时，它们会中断。
 
@@ -78,17 +78,13 @@
 
 要开始，右键单击解决方案并选择 **添加新项目**。在对话框中，使用下拉菜单选择 **单元测试**。有多个单元测试框架。最受欢迎的是较老的 **NUnit** 和较新的 **xUnit**。我们将选择 **xUnit 测试项目**，如图 *图 9**.1* 所示：
 
-![图 9.1 – 选择单元测试类型
-
-](img/Figure_9.1_B19723.jpg)
+![图 9.1 – 选择单元测试类型](img/Figure_9.1_B19723.jpg)
 
 图 9.1 – 选择单元测试类型
 
 1.  点击 `.Tests`，如图所示：
 
-![图 9.2 – 命名测试项目
-
-](img/Figure_9.2_B19723.jpg)
+![图 9.2 – 命名测试项目](img/Figure_9.2_B19723.jpg)
 
 图 9.2 – 命名测试项目
 
@@ -100,9 +96,7 @@ Visual Studio 将创建你的项目以及第一个单元测试类和方法。由
 
 在做任何事情之前，我们需要让 `ForgetMeNotDemo.Tests` 知道 `ForgetMeNotDemo` 项目。为此，右键单击测试项目并选择 **添加** | **项目引用**，并在 **ForgetMeNotDemo** 旁边勾选复选框，如图 *图 9**.3* 所示：
 
-![图 9.3 – 从单元测试项目中引用 ForgetMeNotDemo
-
-](img/Figure_9.3_B19723.jpg)
+![图 9.3 – 从单元测试项目中引用 ForgetMeNotDemo](img/Figure_9.3_B19723.jpg)
 
 图 9.3 – 从单元测试项目中引用 ForgetMeNotDemo
 
@@ -116,7 +110,19 @@ Visual Studio 将创建你的项目以及第一个单元测试类和方法。由
 
 为了确保世界一切正常，打开 `UnitTest1` 并添加一个必须通过测试的方法：
 
-[PRE0]
+```cs
+namespace ForgetMeNotDemo.Tests
+{
+  public class UnitTest1
+  {
+    [Fact]
+    public void MustBeTrue()
+    {
+      Assert.True(true);
+    }
+  }
+}
+```
 
 xUnit 测试有两种类型：
 
@@ -134,19 +140,30 @@ xUnit 测试有两种类型：
 
 问题在于你的 .NET MAUI `.csproj` 项目文件列出了以下 `TargetFrameworks`：
 
-[PRE1]
+```cs
+<TargetFrameworks>net7.0-android;net7.0-ios;net7.0-
+  maccatalyst</TargetFrameworks>
+```
 
 然而，单元测试项目文件看起来像这样：
 
-[PRE2]
+```cs
+<TargetFramework>7.0</TargetFramework>
+```
 
 为了修复这种差异，退出 Visual Studio 并使用你喜欢的文本编辑器（不是 Word 或其他添加特殊字符的程序 – 我喜欢使用 Visual Studio Code，但随便你用什么）打开你的 .NET MAUI 项目 `.csproj` 文件。将 `<TargetFramework>` 修改为包含 `.net7.0`：
 
-[PRE3]
+```cs
+<TargetFrameworks>net7.0;net7.0-android;net7.0-ios;net7.0-
+  maccatalyst</TargetFrameworks>
+```
 
 您已经完成了一半。下一个问题是，我们需要将测试输出为 DLL，但项目的输出是 EXE。最好的解决方法是添加一个条件 - 只有当目标框架不是 7.0 时才输出为 EXE：
 
-[PRE4]
+```cs
+<OutputType Condition="'$(TargetFramework)' !=
+  'net7.0'">Exe</OutputType>
+```
 
 重新打开 Visual Studio 并打开解决方案。您的测试现在应该可以工作了。
 
@@ -154,17 +171,13 @@ xUnit 测试有两种类型：
 
 首先，将 `UnitTest1` 重命名为 `PreferencesTests`。然后，转到菜单并选择 **测试** | **测试探索器**。这将打开（惊喜！）**测试探索器**。点击如图 *图 9**.4* 所示的绿色 *播放* 按钮：
 
-![图 9.4 – 播放按钮
-
-](img/Figure_9.4_B19723.jpg)
+![图 9.4 – 播放按钮](img/Figure_9.4_B19723.jpg)
 
 图 9.4 – 播放按钮
 
 您的项目将构建并测试探索器将运行您的测试，并显示如图 *图 9**.5* 所示的结果：
 
-![图 9.5 – 测试结果
-
-](img/Figure_9.5_B19723.jpg)
+![图 9.5 – 测试结果](img/Figure_9.5_B19723.jpg)
 
 图 9.5 – 测试结果
 
@@ -190,7 +203,19 @@ xUnit 测试有两种类型：
 
 单元测试的经典设计模式是 **Arrange, Act, Assert** (**AAA**) 模式。也就是说，您设置测试（Arrange），然后调用一个或两个方法（Act），然后检查以确保您得到了预期的结果（Assert）。让我们看看它是如何实施的（注意，这个测试有两个缺陷将在后面讨论）：
 
-[PRE5]
+```cs
+  [Fact]
+  public async void AfterCallingInitPreferencesIsNotEmpty()
+  {
+    // Arrange
+    IPreferenceService service = new PreferenceService();
+    preferencesViewModel = new PreferencesViewModel();
+    // Act
+    await preferencesViewModel.Init();
+    // Assert
+    Assert.NotEmpty(preferencesViewModel.PreferenceList);
+  }
+```
 
 在这里，我们设置了 `IPreferenceService`，这是我们创建 `PreferencesViewModel` 所需要的，然后我们创建了一个该 `ViewModel` 的实例。
 
@@ -216,29 +241,23 @@ xUnit 测试有两种类型：
 
 +   `Assert.Contains<T>(T expected,` `Ienumerable<t> collection)`
 
-还有更多。完整的列表可以在`xUnit`仓库中找到：[https://github.com/xunit/assert.xunit/blob/main/Assert.cs](https://github.com/xunit/assert.xunit/blob/main/Assert.cs)。各种断言被组织成类，每个类都有各种`Assert`方法。部分列表如图*9**.6*所示：
+还有更多。完整的列表可以在`xUnit`仓库中找到：[`github.com/xunit/assert.xunit/blob/main/Assert.cs`](https://github.com/xunit/assert.xunit/blob/main/Assert.cs)。各种断言被组织成类，每个类都有各种`Assert`方法。部分列表如图*9**.6*所示：
 
-![图9.6 – 断言类部分列表
+![图 9.6 – 断言类部分列表](img/Figure_9.6_B19723.jpg)
 
-](img/Figure_9.6_B19723.jpg)
-
-图9.6 – 断言类部分列表
+图 9.6 – 断言类部分列表
 
 在我们的情况下，我们断言在运行`Init`之后，`PreferenceList`不为空。打开**测试资源管理器**，然后点击**运行视图中的所有测试**按钮，如图所示：
 
-![图9.7 – 运行视图中的所有测试按钮
+![图 9.7 – 运行视图中的所有测试按钮](img/Figure_9.7_B19723.jpg)
 
-](img/Figure_9.7_B19723.jpg)
-
-图9.7 – 运行视图中的所有测试按钮
+图 9.7 – 运行视图中的所有测试按钮
 
 测试运行后，测试资源管理器会给我们显示结果，如下图所示：
 
-![图9.8 – 测试资源管理器结果
+![图 9.8 – 测试资源管理器结果](img/Figure_9.8_B19723.jpg)
 
-](img/Figure_9.8_B19723.jpg)
-
-图9.8 – 测试资源管理器结果
+图 9.8 – 测试资源管理器结果
 
 让我们看看图中每个编号选项的含义：
 
@@ -250,23 +269,28 @@ xUnit 测试有两种类型：
 
 [4] 测试的总结和持续时间说明
 
-[5] 在文本所在上下文中的每个通过的测试。绿色勾号表示通过，红色叉号表示失败。注意，每个测试的时间都被列出。还要注意，测试最多花费了6毫秒，但整个测试套件花费了408毫秒。这种差异是开始测试过程的开销。这很快就会被所有测试的时间所淹没。
+[5] 在文本所在上下文中的每个通过的测试。绿色勾号表示通过，红色叉号表示失败。注意，每个测试的时间都被列出。还要注意，测试最多花费了 6 毫秒，但整个测试套件花费了 408 毫秒。这种差异是开始测试过程的开销。这很快就会被所有测试的时间所淹没。
 
 ## 这个测试有什么问题？
 
-我之前提到，这个测试有两个显著的缺陷。第一个是调用`Init`可能不会填充`PreferenceList`，因为服务可能返回零条记录。我们需要通过断言`PreferenceList`不是null来调整这一点。
+我之前提到，这个测试有两个显著的缺陷。第一个是调用`Init`可能不会填充`PreferenceList`，因为服务可能返回零条记录。我们需要通过断言`PreferenceList`不是 null 来调整这一点。
 
 第二个，更重要的问题是，这个测试依赖于运行`PreferenceService`。如果我们检查`PreferenceService`的代码，我们会看到对`GetPreferences`的调用有一个重大问题：
 
-[PRE6]
+```cs
+public async Task<List<Preference>> GetPreferences()
+{
+  return await GetPreferencesMock();
+}
+```
 
-目前，在开发应用程序时，我们调用`GetPreferencesMock`，这只是在`PreferenceService`中的一个方法。但那不是我们完成应用程序的方式。在[*第11章*](B19723_11.xhtml#_idTextAnchor216)中，我们将将其转换为进行API调用。API调用可能需要不确定的时间，并且可能会使我们的测试停止。
+目前，在开发应用程序时，我们调用`GetPreferencesMock`，这只是在`PreferenceService`中的一个方法。但那不是我们完成应用程序的方式。在*第十一章*中，我们将将其转换为进行 API 调用。API 调用可能需要不确定的时间，并且可能会使我们的测试停止。
 
 为了解决这个问题，我们需要一个快速返回且返回可预测集合（或如果我们想测试这种情况，则为空集合）的模拟`PreferenceService`。
 
 # 模拟
 
-经常在测试时，你需要与一个需要不确定时间的方法进行交互，例如从数据库中检索数据，或者更糟糕的是，从API（即从互联网而不是从你的设备本地）中检索数据。
+经常在测试时，你需要与一个需要不确定时间的方法进行交互，例如从数据库中检索数据，或者更糟糕的是，从 API（即从互联网而不是从你的设备本地）中检索数据。
 
 调用此类方法可能会使你的单元测试突然停止，使其几乎无法使用。为了避免这种情况，我们使用一个名为 **模拟** 的对象创建数据库或 API 的假表示。
 
@@ -278,7 +302,13 @@ xUnit 测试有两种类型：
 
 到目前为止，每次我们需要在类内部使用一个对象时，我们都是传入该对象，或者在类的主体中创建它。这会创建一个 `PreferencesViewModel`，我们需要一个 `PreferenceService` 对象。我们迄今为止采取的方法是在构造函数中 *new 一个*：
 
-[PRE7]
+```cs
+private readonly PreferenceService service;
+public PreferencesViewModel()
+{
+  service = new();
+}
+```
 
 依赖注入解耦了类，并允许进行更强大的单元测试，正如我们在继续讨论模拟时将看到的。我们不想 *new 一个* `PreferenceService`，而是想传入一个接口，让 .NET MAUI 为我们创建它（也就是说，没有调用函数会将接口添加到构造函数调用中 – 这将自动完成）。
 
@@ -298,17 +328,13 @@ Resharper
 
 1.  右键单击类名，选择 **重构此**。将出现一个如图所示的上下文菜单：
 
-![图 9.9 – 重构上下文菜单
-
-](img/Figure_9.9_B19723.jpg)
+![图 9.9 – 重构上下文菜单](img/Figure_9.9_B19723.jpg)
 
 图 9.9 – 重构上下文菜单
 
 1.  选择 **提取接口**，将出现一个如图所示的对话框：
 
-![图 9.10 – 提取接口
-
-](img/Figure_9.10_B19723.jpg)
+![图 9.10 – 提取接口](img/Figure_9.10_B19723.jpg)
 
 图 9.10 – 提取接口
 
@@ -316,19 +342,25 @@ Resharper
 
 嘿，奇迹！你将在同一目录（`Services`）中有一个接口文件，如图 *图 9.11* 所示：
 
-![图 9.11 – 在服务文件夹中创建新的接口文件
-
-](img/Figure_9.11_B19723.jpg)
+![图 9.11 – 在服务文件夹中创建新的接口文件](img/Figure_9.11_B19723.jpg)
 
 图 9.11 – 在服务文件夹中创建新的接口文件
 
 打开你的新文件，你会看到一个典型的 C# 接口：
 
-[PRE8]
+```cs
+public interface IPreferenceService
+{
+  public Task<List<Preference>> GetPreferences();
+  public Task<List<Preference>> GetPreferencesMock();
+}
+```
 
 现在，检查原始的 `PreferenceService`。Resharper 足够友好地指定了 `PreferenceService` 实现 `IPreferenceService`：
 
-[PRE9]
+```cs
+public class PreferenceService : IPreferenceService
+```
 
 请将 `PreferenceService.GetPreferencesMock` 公开。
 
@@ -338,7 +370,13 @@ Resharper
 
 让我们回到 `PreferencesViewModel`。由于我们知道我们将使用依赖注入将 `PreferenceService` 发送到 `ViewModel`，我们可以修改 `PreferenceService` 的声明和构造函数：
 
-[PRE10]
+```cs
+Private readonly IPreferenceService service;   [1]
+public PreferencesViewModel(IPreferenceService service) [2]
+{
+  this.service = service; [3]
+}
+```
 
 [1] 我们将局部服务成员更改为接口。
 
@@ -354,7 +392,28 @@ Resharper
 
 .NET MAUI 内置了一个 IoC 容器，我们通过注册我们想要管理的接口来使用它。你可以在 `MauiProgram.cs` 中的 `CreateMauiApp` 方法中这样做：
 
-[PRE11]
+```cs
+public static MauiApp CreateMauiApp()
+{
+    var builder = MauiApp.CreateBuilder(); [1]
+     builder
+    .UseMauiApp<App>()
+    .UseMauiCommunityToolkit()
+    .UseMauiCommunityToolkitMarkup()
+    .ConfigureFonts(fonts =>
+    {
+      fonts.AddFont("OpenSans-Regular.ttf",
+        "OpenSansRegular");
+      fonts.AddFont("OpenSans-Semibold.ttf",
+        "OpenSansSemibold");
+    })
+    .UseMauiMaps();
+if DEBUG
+    builder.Logging.AddDebug();
+endif
+    return builder.Build();
+}
+```
 
 如 `[1]` 中所示，我们首先实例化一个 `MauiAppBuilder` 对象。然后，我们在构建器上附加了许多其他配置要求。
 
@@ -366,7 +425,10 @@ Resharper
 
 要注册 `IPreferences` 接口，我们添加一个调用 `Builder.Services.AddTransient`，传入接口和实现该接口的类：
 
-[PRE12]
+```cs
+builder.Services.AddTransient<IPreferenceService,
+  PreferenceService>();
+```
 
 `Builder.Services` 提供了两种注册接口的方式：
 
@@ -378,21 +440,54 @@ Resharper
 
 当我们在这里时，让我们注册所有 ViewModels。我们不需要为它们提供接口，因为我们不会通过依赖注入将它们传递到任何地方：
 
-[PRE13]
+```cs
+builder.Services.AddTransient<AboutViewModel>();
+builder.Services.AddTransient<BuddiesViewModel>();
+builder.Services.AddTransient<BuddyDetailsViewModel>();
+builder.Services.AddTransient<PreferencesViewModel>();
+builder.Services.AddTransient<LoginViewModel>();
+```
 
 将它们组合起来，这就是现在的 `CreateMauiApp` 看起来的样子：
 
-[PRE14]
+```cs
+public static MauiApp CreateMauiApp()
+{
+    var builder = MauiApp.CreateBuilder();
+  builder
+    .UseMauiApp<App>()
+    .UseMauiCommunityToolkit()
+    .UseMauiCommunityToolkitMarkup()
+    .ConfigureFonts(fonts =>
+    {
+      fonts.AddFont("OpenSans-Regular.ttf",
+         "OpenSansRegular");
+      fonts.AddFont("OpenSans-Semibold.ttf",
+         "OpenSansSemibold");
+    })
+    .UseMauiMaps();
+if DEBUG
+    builder.Logging.AddDebug();
+endif
+  builder.Services.AddTransient<IPreferenceService,
+    PreferenceService>();
+  builder.Services.AddTransient<AboutViewModel>();
+  builder.Services.AddTransient<BuddyDetailsViewModel>();
+  builder.Services.AddTransient<PreferencesViewModel>();
+  builder.Services.AddTransient<LoginViewModel>();
+  return builder.Build();
+}
+```
 
 注意，所有的注册都是在我们在 `Builder` 对象上调用 `Build` 的结果返回之前发生的。
 
-我们将使用依赖注入来注入模拟对象，这些对象通常会被用于不可预测的时间。也就是说，我们不必等待数据库或API调用，我们可以注入一个模拟数据库或模拟服务，并立即得到一个可预测的响应。
+我们将使用依赖注入来注入模拟对象，这些对象通常会被用于不可预测的时间。也就是说，我们不必等待数据库或 API 调用，我们可以注入一个模拟数据库或模拟服务，并立即得到一个可预测的响应。
 
 我们的第一步是决定使用哪个模拟库。
 
-# 使用NSubstitute包
+# 使用 NSubstitute 包
 
-有许多不同的模拟库可供选择，有些是免费的，有些是商业的。对于这本书，我们将使用**NSubstitute**，这是一个开源且免费的选项，可以作为NuGet包使用。
+有许多不同的模拟库可供选择，有些是免费的，有些是商业的。对于这本书，我们将使用**NSubstitute**，这是一个开源且免费的选项，可以作为 NuGet 包使用。
 
 要开始，请按照以下步骤操作：
 
@@ -400,35 +495,29 @@ Resharper
 
 1.  前往`NSubstitute`。
 
-你想要的第一包是Anthony Egerton等人编写的**NSubstitute**，如图所示：
+你想要的第一包是 Anthony Egerton 等人编写的**NSubstitute**，如图所示：
 
-![图9.12 – NSubstitute NuGet包
+![图 9.12 – NSubstitute NuGet 包](img/Figure_9.12_B19723.jpg)
 
-](img/Figure_9.12_B19723.jpg)
+图 9.12 – NSubstitute NuGet 包
 
-图9.12 – NSubstitute NuGet包
+1.  在右侧，点击你想要添加此内容的工程（`ForgetMeNotDemo.Tests`），然后点击**Install**，如图*图 9.13*所示：
 
-1.  在右侧，点击你想要添加此内容的工程（`ForgetMeNotDemo.Tests`），然后点击**Install**，如图*图9.13*所示：
+![图 9.13 – 安装 NSubstitute](img/Figure_9.13_B19723.jpg)
 
-![图9.13 – 安装NSubstitute
-
-](img/Figure_9.13_B19723.jpg)
-
-图9.13 – 安装NSubstitute
+图 9.13 – 安装 NSubstitute
 
 1.  安装完成后，安装**NSubstitute.Analyzers.CSharp**，如图所示：
 
-![图9.14 – 选择NSubstitute.Analyzers.CSharp
+![图 9.14 – 选择 NSubstitute.Analyzers.CSharp](img/Figure_9.14_B19723.jpg)
 
-](img/Figure_9.14_B19723.jpg)
+图 9.14 – 选择 NSubstitute.Analyzers.CSharp
 
-图9.14 – 选择NSubstitute.Analyzers.CSharp
+虽然不是强制性的，但这个第二个库将检测你在使用 NSubstitute 时可能犯的错误。像之前一样将其安装到测试项目中。
 
-虽然不是强制性的，但这个第二个库将检测你在使用NSubstitute时可能犯的错误。像之前一样将其安装到测试项目中。
+## 将 NSubstitute 添加到测试固定装置中
 
-## 将NSubstitute添加到测试固定装置中
-
-要将NSubstitute添加到测试固定装置中，请将`using NSubstitute;`添加到C#文件的顶部。
+要将 NSubstitute 添加到测试固定装置中，请将`using NSubstitute;`添加到 C#文件的顶部。
 
 我们现在可以创建`PreferenceService`的替代品。
 
@@ -448,7 +537,19 @@ Resharper
 
 在我们的单元测试中，让我们为服务声明一个模拟：
 
-[PRE15]
+```cs
+[Fact]
+public async void AfterCallingInitPreferencesIsNotEmpty()
+{
+  // Arrange
+  var service = Substitute.For<IPreferenceService>();   [1]
+  var = new PreferencesViewModel(service); [2]
+  // Act
+  await preferencesViewModel.Init();
+  // Assert
+  Assert.NotEmpty(preferencesViewModel.PreferenceList);
+}
+```
 
 [1] 声明`IpreferenceService`的模拟。
 
@@ -460,11 +561,35 @@ Resharper
 
 这里是`Arrange`方法的顶部，我们在其中创建了一些`Preference`对象，然后将它们添加到一个列表中：
 
-[PRE16]
+```cs
+public async void AfterCallingInitPreferencesIsNotEmpty()
+{
+  // Arrange
+  Preference pref1 = new()
+  {
+    Id = 1,
+    PreferencePrompt = "Shirt Size",
+    PreferenceValue = "Large"
+  };
+  Preference pref2 = new()
+  {
+    PreferencePrompt = "Favorite Music Genre",
+    PreferenceValue = "Jazz"
+  };
+  List<Preference> prefs = new()
+  {
+    pref1,
+    pref2
+  };
+```
 
 我们现在可以创建我们的替代品：
 
-[PRE17]
+```cs
+var serviceMock = Substitute.For<IPreferenceService>(); [1]
+  serviceMock.GetPreferences() [2]
+  .Returns(prefs); [3]
+```
 
 [1] 创建模拟。
 
@@ -474,7 +599,10 @@ Resharper
 
 我们使用模拟来调用`PreferencesViewModel`构造函数，你将记得它需要`IpreferenceService`：
 
-[PRE18]
+```cs
+preferencesViewModel = new PreferencesViewModel
+  (serviceMock);
+```
 
 在测试的`Act`部分，我们将对那个`PreferencesViewModel`对象调用`Init`，然后断言列表不为空。这次会成功，因为所依赖的服务现在可以预测会返回两个首选项的列表。
 
@@ -482,17 +610,35 @@ Resharper
 
 如果`PreferenceService`没有返回记录会发生什么？这会导致`ViewModel`崩溃吗？我们可以测试这一点：
 
-[PRE19]
+```cs
+  [Fact]
+  public async void AfterCallingInitPreferencesIsEmptyButNo
+    Exception()
+  {
+    // Arrange
+    List<Preference> preferences = new(); [1]
+    var serviceMock = Substitute.For<IPreferenceService>();
+    serviceMock.GetPreferences()
+      .Returns(preferences); [2]
+    preferencesViewModel = new PreferencesViewModel
+      (serviceMock);
+    // Act
+    var exception = await Record.ExceptionAsync (async ()
+      => await preferencesViewModel.Init()); [3]
+    // Assert
+    Assert.Null(exception); [4]
+  }
+```
 
 [1] 将`List<Preference>`设置为空。
 
 [2] 让服务返回空的首选项列表。
 
-[3] 使用`Record.ExceptionAsync`并传入对`Init`的调用。这将返回异常或null，如果没有抛出异常。
+[3] 使用`Record.ExceptionAsync`并传入对`Init`的调用。这将返回异常或 null，如果没有抛出异常。
 
 [4] 断言没有抛出异常。
 
-所有NSubstitute用法的完整描述可在[https://nsubstitute.github.io/help.html](https://nsubstitute.github.io/help.html)找到。
+所有 NSubstitute 用法的完整描述可在[`nsubstitute.github.io/help.html`](https://nsubstitute.github.io/help.html)找到。
 
 # 摘要
 
@@ -500,7 +646,7 @@ Resharper
 
 我们看到，有时你的单元测试必须与较慢的外部系统（API、数据库等）交互，并且你可以通过使用模拟来保持亚秒级响应时间；我们选择的模拟库是`NSubstitute`，尽管还有其他免费的模拟系统（一个非常流行的是**Moq**）。
 
-为了便于使用模拟，我们探讨了依赖注入并简要回顾了IoC容器的作用。在下一章*消费REST服务*中，我们将查看从基于云的服务（Azure）获取数据，而不是模拟数据。
+为了便于使用模拟，我们探讨了依赖注入并简要回顾了 IoC 容器的作用。在下一章*消费 REST 服务*中，我们将查看从基于云的服务（Azure）获取数据，而不是模拟数据。
 
 # 问答
 
@@ -514,14 +660,14 @@ Resharper
 
 # 你试试看
 
-识别ViewModel或服务中与API或数据库交互的方法，并编写一个使用模拟的单元测试。
+识别 ViewModel 或服务中与 API 或数据库交互的方法，并编写一个使用模拟的单元测试。
 
-# 第3部分 - 高级主题
+# 第三部分 - 高级主题
 
-在本节的最后一部分，我们将深入探讨忍者级别的主题，包括如何与基于REST的服务（在我们的案例中是Azure）进行交互，以及如何根据运行时数据修改我们应用程序的外观。
+在本节的最后一部分，我们将深入探讨忍者级别的主题，包括如何与基于 REST 的服务（在我们的案例中是 Azure）进行交互，以及如何根据运行时数据修改我们应用程序的外观。
 
 本部分包含以下章节：
 
-+   [*第10章*](B19723_10.xhtml#_idTextAnchor187)，*消费REST服务*
++   *第十章*，*消费 REST 服务*
 
-+   [*第11章*](B19723_11.xhtml#_idTextAnchor216)，*探索高级主题*
++   *第十一章*，*探索高级主题*

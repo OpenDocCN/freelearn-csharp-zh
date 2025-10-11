@@ -1,8 +1,8 @@
-# *第8章*：使用ABP的功能和服务
+# *第八章*：使用 ABP 的功能和服务
 
-ABP框架是一个全栈应用程序开发框架，因此它为企业的每个方面提供了许多构建块。在前三章中，我们已经探讨了ABP框架提供的核心服务、数据访问基础设施和横切关注点解决方案。
+ABP 框架是一个全栈应用程序开发框架，因此它为企业的每个方面提供了许多构建块。在前三章中，我们已经探讨了 ABP 框架提供的核心服务、数据访问基础设施和横切关注点解决方案。
 
-在本节“第2部分”的最后一章，“ABP框架基础”中，我们将继续探讨在业务应用程序中经常使用的ABP功能，顺序如下：
+在本节“第二部分”的最后一章，“ABP 框架基础”中，我们将继续探讨在业务应用程序中经常使用的 ABP 功能，顺序如下：
 
 +   获取当前用户
 
@@ -16,17 +16,38 @@ ABP框架是一个全栈应用程序开发框架，因此它为企业的每个�
 
 # 技术要求
 
-如果您想跟随并尝试这些示例，您需要安装一个**集成开发环境**（**IDE**）/编辑器（例如Visual Studio）来构建ASP.NET Core项目。
+如果您想跟随并尝试这些示例，您需要安装一个**集成开发环境**（**IDE**）/编辑器（例如 Visual Studio）来构建 ASP.NET Core 项目。
 
-您可以从以下GitHub仓库下载代码示例：[https://github.com/PacktPublishing/Mastering-ABP-Framework](https://github.com/PacktPublishing/Mastering-ABP-Framework).
+您可以从以下 GitHub 仓库下载代码示例：[`github.com/PacktPublishing/Mastering-ABP-Framework`](https://github.com/PacktPublishing/Mastering-ABP-Framework).
 
 # 获取当前用户
 
-如果您的应用程序需要某些功能进行用户身份验证，通常您需要获取当前用户的信息。ABP提供了`ICurrentUser`服务来获取当前登录用户的详细信息。对于Web应用程序，`ICurrentUser`的实现完全集成到ASP.NET Core的认证系统中，因此您可以轻松获取当前用户的声明。
+如果您的应用程序需要某些功能进行用户身份验证，通常您需要获取当前用户的信息。ABP 提供了`ICurrentUser`服务来获取当前登录用户的详细信息。对于 Web 应用程序，`ICurrentUser`的实现完全集成到 ASP.NET Core 的认证系统中，因此您可以轻松获取当前用户的声明。
 
 以下代码块展示了`ICurrentUser`服务的简单用法：
 
-[PRE0]
+```cs
+using System;
+using Volo.Abp.DependencyInjection;
+using Volo.Abp.Users;
+namespace DemoApp
+{
+    public class MyService : ITransientDependency
+    {
+        private readonly ICurrentUser _currentUser;
+        public MyService(ICurrentUser currentUser)
+        {
+            _currentUser = currentUser;
+        }
+        public void Demo()
+        {
+            Guid? userId = _currentUser.Id;
+            string userName = _currentUser.UserName;
+            string email = _currentUser.Email;
+        }
+    }
+}
+```
 
 在此示例中，`MyService`构造函数注入了`ICurrentUser`服务，然后获取当前用户的唯一`Id`、`Username`和`Email`值。
 
@@ -38,7 +59,7 @@ ABP框架是一个全栈应用程序开发框架，因此它为企业的每个�
 
 +   `UserName`（`string`）：当前用户的用户名。如果当前用户未登录，则返回`null`。
 
-+   `TenantId`（`Guid?`）：当前用户的租户ID。对于多租户应用程序是可用的。如果当前用户与租户无关，则返回`null`。
++   `TenantId`（`Guid?`）：当前用户的租户 ID。对于多租户应用程序是可用的。如果当前用户与租户无关，则返回`null`。
 
 +   `Email`（`string`）：当前用户的电子邮件地址。如果当前用户未登录或未设置电子邮件地址，则返回`null`。
 
@@ -50,31 +71,56 @@ ABP框架是一个全栈应用程序开发框架，因此它为企业的每个�
 
 +   `Roles`（`string[]`）：当前用户的所有角色作为一个字符串数组。
 
-    注入ICurrentUser服务
+    注入 ICurrentUser 服务
 
-    `ICurrentUser`是一个广泛使用的服务。因此，一些基础ABP类（如`ApplicationService`和`AbpController`）预先注入了它。在这些类中，你可以直接使用`CurrentUser`属性，而不是手动注入此服务。
+    `ICurrentUser`是一个广泛使用的服务。因此，一些基础 ABP 类（如`ApplicationService`和`AbpController`）预先注入了它。在这些类中，你可以直接使用`CurrentUser`属性，而不是手动注入此服务。
 
-ABP可以与任何身份验证提供者一起工作，因为它使用ASP.NET Core提供的当前声明。**声明**是在用户登录时发放的键值对，并存储在身份验证票据中。如果你使用基于cookie的身份验证，它们存储在cookie中，并在每次请求中发送到服务器。如果你使用基于令牌的身份验证，它们由客户端在每次请求中发送，通常在**超文本传输协议**（**HTTP**）头中。
+ABP 可以与任何身份验证提供者一起工作，因为它使用 ASP.NET Core 提供的当前声明。**声明**是在用户登录时发放的键值对，并存储在身份验证票据中。如果你使用基于 cookie 的身份验证，它们存储在 cookie 中，并在每次请求中发送到服务器。如果你使用基于令牌的身份验证，它们由客户端在每次请求中发送，通常在**超文本传输协议**（**HTTP**）头中。
 
 `ICurrentUser`服务从当前声明中获取所有信息。如果你想直接查询当前声明，可以使用`FindClaim`、`FindClaims`和`GetAllClaims`方法。如果你创建了自定义声明，这些方法特别有用。
 
 ## 定义自定义声明
 
-ABP提供了一种简单的方法将你的自定义声明添加到身份验证票据中，以便你可以在同一用户的下一个请求中安全地获取这些自定义值。你可以实现`IAbpClaimsPrincipalContributor`接口，将自定义声明添加到身份验证票据中。
+ABP 提供了一种简单的方法将你的自定义声明添加到身份验证票据中，以便你可以在同一用户的下一个请求中安全地获取这些自定义值。你可以实现`IAbpClaimsPrincipalContributor`接口，将自定义声明添加到身份验证票据中。
 
 在以下示例中，我们正在将社会保险号码信息——一个自定义声明——添加到身份验证票据中：
 
-[PRE1]
+```cs
+public class SocialSecurityNumberClaimsPrincipalContributor 
+    : IAbpClaimsPrincipalContributor, ITransientDependency
+{
+    public async Task ContributeAsync(
+        AbpClaimsPrincipalContributorContext context)
+    {
+        ClaimsIdentity identity = context.ClaimsPrincipal
+            .Identities.FirstOrDefault();
+        var userId = identity?.FindUserId();
+        if (userId.HasValue)
+        {
+            var userService = context.ServiceProvider
+              .GetRequiredService<IUserService>();            
+            var socialSecurityNumber = await userService
+              .GetSocialSecurityNumberAsync(userId.Value);
+            if (socialSecurityNumber != null)
+            {
+                identity.AddClaim(new Claim
+                  ("SocialSecurityNumber",   
+                    socialSecurityNumber));
+            }
+        }
+    }
+}
+```
 
-在此示例中，我们首先获取`ClaimsIdentity`并找到当前用户的ID。然后，我们从`IUserService`获取社会保险号码，这是一个你应该自己开发的自定义服务。你可以从`ServiceProvider`获取任何服务来查询所需的数据。最后，我们向`identity`添加一个新的`Claim`。`SocialSecurityNumberClaimsPrincipalContributor`随后在用户登录应用程序时使用。
+在此示例中，我们首先获取`ClaimsIdentity`并找到当前用户的 ID。然后，我们从`IUserService`获取社会保险号码，这是一个你应该自己开发的自定义服务。你可以从`ServiceProvider`获取任何服务来查询所需的数据。最后，我们向`identity`添加一个新的`Claim`。`SocialSecurityNumberClaimsPrincipalContributor`随后在用户登录应用程序时使用。
 
-你可以使用自定义声明来授权当前用户满足特定业务需求、过滤数据或仅显示在UI上。请注意，除非你使身份验证票据无效并强制用户重新认证，否则身份验证票据的声明不能更改，因此不要在声明中存储频繁更改的数据。如果你的目的是存储可以在以后快速访问的用户数据，你可以使用缓存系统（将在*数据缓存*部分介绍）。
+你可以使用自定义声明来授权当前用户满足特定业务需求、过滤数据或仅显示在 UI 上。请注意，除非你使身份验证票据无效并强制用户重新认证，否则身份验证票据的声明不能更改，因此不要在声明中存储频繁更改的数据。如果你的目的是存储可以在以后快速访问的用户数据，你可以使用缓存系统（将在*数据缓存*部分介绍）。
 
 `ICurrentUser`是在你的应用程序代码中频繁使用的核心服务。下一节将介绍数据过滤系统，它在大多数情况下可以无缝工作。
 
 # 使用数据过滤系统
 
-在数据库操作中过滤数据是非常常见的。如果你使用`WHERE`子句。如果你在C#中使用`Where`扩展方法。虽然这些过滤条件在查询中可能有所不同，但如果你实现了如软删除和多租户等模式，一些表达式将应用于你运行的每个查询。
+在数据库操作中过滤数据是非常常见的。如果你使用`WHERE`子句。如果你在 C#中使用`Where`扩展方法。虽然这些过滤条件在查询中可能有所不同，但如果你实现了如软删除和多租户等模式，一些表达式将应用于你运行的每个查询。
 
 ABP 自动化数据过滤过程，帮助你避免在应用程序代码的每个地方重复相同的过滤逻辑。
 
@@ -88,7 +134,13 @@ ABP 自动化数据过滤过程，帮助你避免在应用程序代码的每个�
 
 ABP 定义了 `ISoftDelete` 接口，以标准化标记实体为软删除的属性。你可以为实体实现该接口，如下面的代码块所示：
 
-[PRE2]
+```cs
+public class Order : AggregateRoot<Guid>, ISoftDelete
+{
+    public bool IsDeleted { get; set; }
+    //...other properties
+}
+```
 
 在这个例子中，`Order` 实体有一个由 `ISoftDelete` 接口定义的 `IsDeleted` 属性。一旦你实现了该接口，ABP 会为你自动完成以下任务：
 
@@ -108,15 +160,21 @@ ABP 定义了 `ISoftDelete` 接口，以标准化标记实体为软删除的属�
 
 多租户是一种广泛使用的模式，用于在软件即服务（**SaaS**）解决方案中共享租户之间的资源。在多租户应用程序中隔离不同租户之间的数据至关重要。一个租户不能读取或写入另一个租户的数据，即使它们位于同一个物理数据库中。
 
-ABP 拥有一个完整的多租户系统，这将在[*第16章*](B17287_16_Epub_AM.xhtml#_idTextAnchor457)中详细解释，*实现多租户*。然而，在这里提及多租户过滤器也是好的，因为它与数据过滤系统相关。
+ABP 拥有一个完整的多租户系统，这将在*第十六章*中详细解释，*实现多租户*。然而，在这里提及多租户过滤器也是好的，因为它与数据过滤系统相关。
 
 ABP 定义了 `IMultiTenant` 接口，以启用实体的多租户数据过滤器。我们可以为实体实现该接口，如下面的代码块所示：
 
-[PRE3]
+```cs
+public class Order : AggregateRoot<Guid>, IMultiTenant
+{
+    public Guid? TenantId { get; set; }
+    //...other properties
+}
+```
 
 `IMultiTenant` 接口定义了 `TenantId` 属性，如下面的示例所示。ABP 使用 `Guid` 值作为租户 ID。
 
-一旦我们实现了`IMultiTenant`接口，ABP将自动使用当前租户的ID对所有`Order`实体的查询进行过滤。当前租户的ID是从`ICurrentTenant`服务中获取的，这将在[*第16章*](B17287_16_Epub_AM.xhtml#_idTextAnchor457)中解释，*实现多租户*。
+一旦我们实现了`IMultiTenant`接口，ABP 将自动使用当前租户的 ID 对所有`Order`实体的查询进行过滤。当前租户的 ID 是从`ICurrentTenant`服务中获取的，这将在*第十六章*中解释，*实现多租户*。
 
 多个数据过滤器的使用
 
@@ -126,15 +184,36 @@ ABP 定义了 `IMultiTenant` 接口，以启用实体的多租户数据过滤器
 
 ## 禁用数据过滤器
 
-在某些情况下，禁用自动过滤器可能是必要的——例如，您可能想要禁用软删除过滤器以从数据库中读取已删除的实体，或者您可能希望允许用户恢复已删除的实体。您可能想要禁用多租户过滤器以查询多租户系统中的所有租户的数据。无论出于何种原因，ABP都提供了一个简单且安全的方法来禁用数据过滤器。
+在某些情况下，禁用自动过滤器可能是必要的——例如，您可能想要禁用软删除过滤器以从数据库中读取已删除的实体，或者您可能希望允许用户恢复已删除的实体。您可能想要禁用多租户过滤器以查询多租户系统中的所有租户的数据。无论出于何种原因，ABP 都提供了一个简单且安全的方法来禁用数据过滤器。
 
 以下示例展示了如何通过使用`IDataFilter`服务禁用`ISoftDelete`数据过滤器来从数据库中获取所有订单，包括已删除的订单：
 
-[PRE4]
+```cs
+public class OrderService : ITransientDependency
+{
+    private readonly IRepository<Order, Guid> 
+    _orderRepository;
+    private readonly IdataFilter _dataFilter;
+    public OrderService(
+        Irepository<Order, Guid> orderRepository,
+        IdataFilter dataFilter)
+    {
+        _orderRepository = orderRepository;
+        _dataFilter = dataFilter;
+    }
+    public async Task<List<Order>> GetAllOrders()
+    {
+        using (_dataFilter.Disable<IsoftDelete>())
+        {
+            return await _orderRepository.GetListAsync();
+        }
+    }
+}
+```
 
 在本例中，`OrderService`注入了`Order`存储库和`IdataFilter`服务。然后它使用`_dataFilter.Disable<IsoftDelete>()`表达式来禁用软删除过滤器。在`using`语句中，过滤器被禁用，我们也可以查询已删除的订单。
 
-总是使用using语句
+总是使用 using 语句
 
 `Disable`方法返回一个可处置的对象，这样我们就可以在`using`语句中使用它。一旦`using`块结束，过滤器将自动恢复到之前的状态，这意味着如果它在`using`块之前已启用，它将返回到启用状态。如果它在`using`语句之前已经禁用，则`Disable`方法不会影响它，并且它在`using`语句之后保持禁用状态。这个系统允许我们安全地禁用过滤器，而不会影响调用`GetAllOrders`方法的任何逻辑。始终建议在`using`语句中禁用过滤器。
 
@@ -152,67 +231,108 @@ ABP 定义了 `IMultiTenant` 接口，以启用实体的多租户数据过滤器
 
 假设你想要存档你的实体，并自动过滤存档数据，以便默认情况下不将它们检索到应用程序中。对于这个例子，我们可以定义这样一个简单的接口（你可以在你的领域层中定义这个接口），如下所示：
 
-[PRE5]
+```cs
+public interface Iarchivable
+{
+    bool IsArchived { get; }
+}
+```
 
 `IsArchived` 属性将用于过滤实体。默认情况下，具有 `IsArchived` 为 `true` 的实体将被排除。一旦我们定义了这样的接口，我们就可以为可以存档的实体实现它。请看以下示例：
 
-[PRE6]
+```cs
+public class Order : AggregateRoot<Guid>, Iarchivable
+{
+    public bool IsArchived { get; set; }
+    //...other properties
+}
+```
 
 在这个例子中，`Order` 实体实现了 `Iarchivable` 接口，这使得可以在该实体上应用数据过滤器。
 
 注意，`Iarchivable` 接口没有为 `IsArchived` 定义设置器，但 `Order` 实体定义了它。这是我的设计决策；我们不需要在接口上设置 `IsArchived`，但需要在实体上设置它。
 
-由于数据过滤是在数据库提供程序级别完成的，因此自定义过滤器实现也取决于数据库提供程序。本节将展示如何为 EF Core 提供程序实现 `Iarchivable` 过滤器。如果你在寻找 MongoDB，请参阅 ABP 的文档：[https://docs.abp.io/en/abp/latest/Data-Filtering](https://docs.abp.io/en/abp/latest/Data-Filtering)。
+由于数据过滤是在数据库提供程序级别完成的，因此自定义过滤器实现也取决于数据库提供程序。本节将展示如何为 EF Core 提供程序实现 `Iarchivable` 过滤器。如果你在寻找 MongoDB，请参阅 ABP 的文档：[`docs.abp.io/en/abp/latest/Data-Filtering`](https://docs.abp.io/en/abp/latest/Data-Filtering)。
 
 ABP 使用 EF Core 的 `DbContext` 类。
 
 第一步是在你的 `DbContext` 类中定义一个属性，该属性将用于过滤表达式，如下所示：
 
-[PRE7]
+```cs
+protected bool IsArchiveFilterEnabled => DataFilter?.IsEnabled<Iarchivable>() ?? false;
+```
 
 此属性直接使用 `IdataFilter` 服务来获取过滤状态。`DataFilter` 属性来自基 `AbpDbContext` 类，如果 `DbContext` 实例未从 `null` 检查中解析出来，则它可以是 `null`。
 
 下一步是重写 `ShouldFilterEntity` 方法以决定是否应该过滤给定的实体类型：
 
-[PRE8]
+```cs
+protected override bool ShouldFilterEntity<Tentity>(
+    ImutableEntityType entityType)
+{
+    If (typeof(IArchivable) 
+        .IsAssignableFrom(typeof(TEntity)))
+    {
+        return true;
+    }
+
+    return base.ShouldFilterEntity<TEntity>(entityType);
+}
+```
 
 ABP 框架为这个 `DbContext` 类中的每个实体类型调用此方法（它只调用一次——在应用程序启动后第一次使用 `DbContext` 类时）。如果此方法返回 `true`，则启用该实体的 EF Core 全局过滤器。在这里，我只是检查了给定的实体是否实现了 `IArchivable` 接口，并在该情况下返回 `true`。否则，调用 `base` 方法，以便它检查其他数据过滤器。
 
 `ShouldFilterEntity` 只决定是否启用过滤。实际的过滤逻辑应该通过重写 `CreateFilterExpression` 方法来实现：
 
-[PRE9]
+```cs
+protected override Expression<Func<TEntity, bool>> CreateFilterExpression<TEntity>()
+{
+    var expression = 
+        base.CreateFilterExpression<Tentity>();
+    if (typeof(Iarchivable)  
+        .IsAssignableFrom(typeof(TEntity)))
+    {
+        Expression<Func<TEntity, bool>> archiveFilter =
+            e => !IsArchiveFilterEnabled ||
+                 !EF.Property<bool>(e, "IsArchived");
+        expression = expression == null 
+            ? archiveFilter 
+            : CombineExpressions(expression, 
+                archiveFilter);
+    }
+    return expression;
+}
+```
 
 实现似乎有点复杂，因为它创建了并组合了表达式。重要的是如何定义`archiveFilter`表达式。`!IsArchiveFilterEnabled`检查过滤器是否已禁用。如果过滤器已禁用，则不会评估其他条件，并且将检索所有实体而不进行过滤。`!EF.Property<bool>(e, "IsArchived")`检查该实体的`IsArchived`值是否为`false`，因此消除了`IsArchived`值为`true`的实体。
 
 如您从前面的代码块中看到的，我未在过滤器实现中使用`Order`实体。这意味着实现是通用的，可以与任何实体类型一起工作——您只需要为要应用过滤器的实体实现`IArchivable`接口。
 
-总结来说，ABP使我们能够轻松创建和控制全局查询过滤器。它还使用该系统实现两种流行的模式——软删除和多租户。下一节将介绍审计日志系统，这是ABP的另一个在企业级软件解决方案中非常常见的功能。
+总结来说，ABP 使我们能够轻松创建和控制全局查询过滤器。它还使用该系统实现两种流行的模式——软删除和多租户。下一节将介绍审计日志系统，这是 ABP 的另一个在企业级软件解决方案中非常常见的功能。
 
 # 控制审计日志系统
 
-ABP的审计日志系统跟踪所有请求和实体更改，并将它们写入数据库。然后，您可以获取关于在您的应用程序中做了什么、何时做的以及谁做的报告。
+ABP 的审计日志系统跟踪所有请求和实体更改，并将它们写入数据库。然后，您可以获取关于在您的应用程序中做了什么、何时做的以及谁做的报告。
 
-当您从启动模板创建新解决方案时，审计日志系统已安装并正确配置。大多数时候，您无需任何配置即可使用它。然而，ABP允许您控制、自定义和扩展审计日志系统。但首先，让我们了解审计日志对象是什么。
+当您从启动模板创建新解决方案时，审计日志系统已安装并正确配置。大多数时候，您无需任何配置即可使用它。然而，ABP 允许您控制、自定义和扩展审计日志系统。但首先，让我们了解审计日志对象是什么。
 
 ## 审计日志对象
 
-审计日志对象是一组在有限的作用域内（通常是在Web应用的HTTP请求中）一起执行的动作和相关实体更改。我们将在下一节中更多地讨论审计日志作用域。
+审计日志对象是一组在有限的作用域内（通常是在 Web 应用的 HTTP 请求中）一起执行的动作和相关实体更改。我们将在下一节中更多地讨论审计日志作用域。
 
-*图8.1* 中的图表示审计日志对象：
+*图 8.1* 中的图表示审计日志对象：
 
-![图8.1 – 审计日志对象
+![图 8.1 – 审计日志对象](img/Figure_8.1_B17287.jpg)
 
-](img/Figure_8.1_B17287.jpg)
-
-图8.1 – 审计日志对象
+图 8.1 – 审计日志对象
 
 让我们从根对象开始解释该图，如下所示：
 
-+   `AuditLogInfo`: 在每个作用域（通常是一个Web请求）中，都有一个包含有关当前用户、当前租户、HTTP请求、客户端和浏览器详细信息以及操作执行时间和持续时间的`AuditLogInfo`对象。
++   `AuditLogInfo`: 在每个作用域（通常是一个 Web 请求）中，都有一个包含有关当前用户、当前租户、HTTP 请求、客户端和浏览器详细信息以及操作执行时间和持续时间的`AuditLogInfo`对象。
 
 +   `AuditLogActionInfo`: 在每个审计日志中，可能有零个或多个动作。动作通常是控制器动作调用、页面处理程序调用或应用程序服务方法调用。它包括调用中的类名、方法名和方法参数。
 
-+   `EntityChangeInfo`: 审计日志对象可能包含零个或多个对数据库中实体的更改。每个实体更改包含更改类型（创建、更新或删除）、实体类型（完整类名）以及更改实体的ID。
++   `EntityChangeInfo`: 审计日志对象可能包含零个或多个对数据库中实体的更改。每个实体更改包含更改类型（创建、更新或删除）、实体类型（完整类名）以及更改实体的 ID。
 
 +   `EntityPropertyChangeInfo`：对于每个实体变化，它会在属性（数据库中的字段）上记录变化。此对象包含受影响属性的名字、类型、旧值和新值。
 
@@ -238,9 +358,11 @@ MongoDB 限制
 
 创建审计日志作用域的第一种和最常见的方式是在 ASP.NET Core 管道配置中使用审计日志中间件：
 
-[PRE10]
+```cs
+app.UseAuditing();
+```
 
-这通常放置在 `app.UseEndpoints()` 或 `app.UseConfiguredEndpoints()` 端点配置之前。当你使用这个中间件时，每个HTTP请求都会写入一个单独的审计日志记录，这在大多数情况下是期望的行为，并且默认情况下已经在启动模板中配置好了。
+这通常放置在 `app.UseEndpoints()` 或 `app.UseConfiguredEndpoints()` 端点配置之前。当你使用这个中间件时，每个 HTTP 请求都会写入一个单独的审计日志记录，这在大多数情况下是期望的行为，并且默认情况下已经在启动模板中配置好了。
 
 ### 审计日志拦截器
 
@@ -250,7 +372,31 @@ MongoDB 限制
 
 你通常不需要这样做，但如果你想手动创建审计作用域，可以使用 `IAuditingManager` 服务，如下面的代码块所示：
 
-[PRE11]
+```cs
+public class MyServiceWithAuditing : ITransientDependency
+{
+    //...inject IAuditingManager _auditingManager;
+    public async Task DoItAsync()
+    {
+        using (var auditingScope = 
+            _auditingManager.BeginScope())
+        {
+            try
+            {
+                //TODO: call other services...
+            }
+            catch (Exception ex)
+            {  _auditingManager.Current.Log.Exceptions.Add(ex);
+                throw;
+            }
+            finally
+            {
+                await auditingScope.SaveAsync();
+            }
+        }
+    }
+}
+```
 
 一旦注入了 `IAuditingManager` 服务，你可以使用 `BeginScope` 方法创建一个新的作用域。然后，创建一个 `try`-`catch` 块来保存审计日志，包括异常情况。在 `try` 部分中，你只需执行你的逻辑，调用其他服务等。所有这些操作以及这些操作中的更改都作为单个审计日志对象保存在 `finally` 块中。
 
@@ -262,7 +408,12 @@ MongoDB 限制
 
 `AbpAuditingOptions` 类用于配置审计系统的默认选项。它可以使用标准的 `options` 模式进行配置，如下面的示例所示：
 
-[PRE12]
+```cs
+Configure<AbpAuditingOptions>(options =>
+{
+    options.IsEnabled = false;
+});
+```
 
 您可以在模块的 `ConfigureServices` 方法中配置 `options`。以下列表显示了审计系统的主要选项：
 
@@ -294,11 +445,24 @@ MongoDB 限制
 
 在以下示例中，我为所有实体启用了 `EntityHistorySelectors` 选项：
 
-[PRE13]
+```cs
+Configure<AbpAuditingOptions>(options =>
+{
+    options.EntityHistorySelectors.AddAllEntities();
+});
+```
 
 `AddAllEntities` 方法是一个快捷方式。`EntityHistorySelectors` 是一个命名选择器的列表，你可以添加一个 lambda 表达式来选择你想要的实体。以下代码与前面的配置代码等效：
 
-[PRE14]
+```cs
+Configure<AbpAuditingOptions>(options =>
+{
+    options.EntityHistorySelectors.Add(
+        new NamedTypeSelector("MySelectorName", type => 
+            true)
+    );
+});
+```
 
 `NamedTypeSelector` 的第一个参数是选择器名称——在这个例子中是 `MySelectorName`。选择器名称是任意的，并且可以在以后用来在选择器列表中查找或删除选择器。通常你不会使用它；只需给它一个独特的名称。`NamedTypeSelector` 的第二个参数接受一个表达式。它为你提供一个实体 `type` 并等待 `true` 或 `false`。如果你想为给定的实体类型启用实体历史记录，则返回 `true`。因此，你可以传递一个如 `type => type.Namespace.StartsWith("MyRootNamespace")` 的表达式来选择所有具有命名空间的实体。你可以添加你需要的任意数量的选择器。所有选择器都会被测试。如果其中任何一个返回 `true`，则实体将被选中以记录属性更改。
 
@@ -316,25 +480,67 @@ ABP 定义了 `[DisableAuditing]` 和 `[Audited]` 属性来声明性地控制记
 
 以下示例在应用服务类上使用了 `[DisableAuditing]` 属性：
 
-[PRE15]
+```cs
+[DisableAuditing]
+public class OrderAppService : ApplicationService, IOrderAppService
+{
+    public async Task CreateAsync(CreateOrderDto input)
+    {
+    }
+    public async Task DeleteAsync(Guid id)
+    {
+    }
+}
+```
 
 使用这种用法，ABP 不会将这些方法的执行包括在审计日志对象中。如果你只想禁用其中一个方法，你可以在方法级别使用它：
 
-[PRE16]
+```cs
+public class OrderAppService : ApplicationService, IOrderAppService
+{
+    [DisableAuditing]
+    public async Task CreateAsync(CreateOrderDto input)
+    {
+    }
+    public async Task DeleteAsync(Guid id)
+    {
+    }
+}
+```
 
 在这种情况下，`CreateAsync` 方法调用不包括在审计日志中，而 `DeleteAsync` 方法调用被写入审计日志对象。同样的行为可以使用以下代码实现：
 
-[PRE17]
+```cs
+[DisableAuditing]
+public class OrderAppService : ApplicationService, IOrderAppService
+{
+    public async Task CreateAsync(CreateOrderDto input)
+    {
+    }
+    [Audited]
+    public async Task DeleteAsync(Guid id)
+    {
+    }
+}
+```
 
 我禁用了所有方法（除了 `DeleteAsync` 方法），因为 `DeleteAsync` 方法声明了 `[Audited]` 属性。
 
-`[Audited]`属性可以用于任何类（与DI系统一起使用）以在该类上启用审计日志，即使该类默认不进行审计日志记录。此外，您可以在任何类的任何方法中使用它，只为该特定方法调用启用它。如果您在类上使用`[Audited]`属性，然后可以使用`[DisableAuditing]`属性禁用特定方法。
+`[Audited]`属性可以用于任何类（与 DI 系统一起使用）以在该类上启用审计日志，即使该类默认不进行审计日志记录。此外，您可以在任何类的任何方法中使用它，只为该特定方法调用启用它。如果您在类上使用`[Audited]`属性，然后可以使用`[DisableAuditing]`属性禁用特定方法。
 
-当ABP在审计日志对象中包含方法调用信息时，它也会包含执行方法的所有参数。这对于了解您的系统中哪些更改非常有用；然而，在某些情况下，您可能想排除输入的一些属性。考虑一个场景，您从用户那里获取信用卡信息。您可能不想将其包含在审计日志中。在这种情况下，您可以在输入对象的任何属性上使用`[DisableAuditing]`属性。请参阅以下示例，它从`Dto`输入的属性中排除了审计日志：
+当 ABP 在审计日志对象中包含方法调用信息时，它也会包含执行方法的所有参数。这对于了解您的系统中哪些更改非常有用；然而，在某些情况下，您可能想排除输入的一些属性。考虑一个场景，您从用户那里获取信用卡信息。您可能不想将其包含在审计日志中。在这种情况下，您可以在输入对象的任何属性上使用`[DisableAuditing]`属性。请参阅以下示例，它从`Dto`输入的属性中排除了审计日志：
 
-[PRE18]
+```cs
+public class CreateOrderDto
+{
+    public Guid CustomerId { get; set; }
+    public string DeliveryAddress { get; set; }
+    [DisableAuditing]
+    public string CreditCardNumber { get; set; }
+}
+```
 
-对于此示例，ABP不会将`CreditCardNumber`值写入审计日志。
+对于此示例，ABP 不会将`CreditCardNumber`值写入审计日志。
 
 禁用方法调用审计日志不会影响实体历史记录。如果一个实体被更改并且它被选中进行审计日志记录，更改仍然会被记录。下一节将解释如何控制实体历史记录的审计日志系统。
 
@@ -342,7 +548,12 @@ ABP 定义了 `[DisableAuditing]` 和 `[Audited]` 属性来声明性地控制记
 
 在*启用实体历史记录*部分，我们看到了如何通过定义选择器来为一个或多个实体启用实体历史记录。然而，如果您只想为单个实体启用实体历史记录，有一个替代且更简单的方法：只需在您的实体类上方添加`[Audited]`属性：
 
-[PRE19]
+```cs
+[Audited]
+public class Order : AggregateRoot<Guid>
+{
+}
+```
 
 在此示例中，我向`Order`实体添加了`[Audited]`属性，以配置审计日志系统为该实体启用实体历史记录。
 
@@ -350,39 +561,49 @@ ABP 定义了 `[DisableAuditing]` 和 `[Audited]` 属性来声明性地控制记
 
 `[DisableAuditing]`属性也可以用于实体的属性，以排除此属性从审计日志中，如下例所示：
 
-[PRE20]
+```cs
+[Audited]
+public class Order : AggregateRoot<Guid>
+{
+    public Guid CustomerId { get; set; }
+    [DisableAuditing]
+    public string CreditCardNumber { get; set; }
+}
+```
 
-对于那个例子，ABP不会将`CreditCardNumber`值写入审计日志。
+对于那个例子，ABP 不会将`CreditCardNumber`值写入审计日志。
 
 ### 存储审计日志
 
-ABP框架的核心设计是通过在需要接触数据源的地方引入抽象，不假设任何数据存储。审计日志系统也不例外。它定义了`IAuditingStore`接口来抽象审计日志对象保存的位置。该接口只有一个方法：
+ABP 框架的核心设计是通过在需要接触数据源的地方引入抽象，不假设任何数据存储。审计日志系统也不例外。它定义了`IAuditingStore`接口来抽象审计日志对象保存的位置。该接口只有一个方法：
 
-[PRE21]
+```cs
+Task SaveAsync(AuditLogInfo auditInfo);
+```
 
-您可以实现此接口以将审计日志保存到您想要的位置。如果您使用ABP的启动模板创建新解决方案，它已配置为将审计日志保存到应用程序的主要数据库中，因此您通常不需要手动实现`IAuditingStore`接口。
+您可以实现此接口以将审计日志保存到您想要的位置。如果您使用 ABP 的启动模板创建新解决方案，它已配置为将审计日志保存到应用程序的主要数据库中，因此您通常不需要手动实现`IAuditingStore`接口。
 
-我们已经看到了控制和管理审计日志系统的方法。审计日志是企业系统跟踪和记录系统更改的必要系统。下一节将介绍缓存系统，这是Web应用程序的另一个基本功能。
+我们已经看到了控制和管理审计日志系统的方法。审计日志是企业系统跟踪和记录系统更改的必要系统。下一节将介绍缓存系统，这是 Web 应用程序的另一个基本功能。
 
 # 缓存数据
 
-缓存是提高应用程序性能和可伸缩性的最基本系统之一。ABP扩展了ASP.NET Core的**分布式缓存**系统，并使其与ABP框架的其他功能兼容，如多租户。
+缓存是提高应用程序性能和可伸缩性的最基本系统之一。ABP 扩展了 ASP.NET Core 的**分布式缓存**系统，并使其与 ABP 框架的其他功能兼容，如多租户。
 
-如果您运行多个应用程序实例或拥有分布式系统，如微服务解决方案，分布式缓存是必不可少的。它提供了不同应用程序之间的一致性，并允许共享缓存值。分布式缓存通常是一个外部独立的应用程序，例如Redis和Memcached。
+如果您运行多个应用程序实例或拥有分布式系统，如微服务解决方案，分布式缓存是必不可少的。它提供了不同应用程序之间的一致性，并允许共享缓存值。分布式缓存通常是一个外部独立的应用程序，例如 Redis 和 Memcached。
 
-即使您的应用程序只有一个运行实例，也建议使用分布式缓存系统。无需担心性能，因为分布式缓存的默认实现是在内存中工作的。这意味着除非您明确配置一个真实的分布式缓存提供者，如Redis，否则它不是分布式的。
+即使您的应用程序只有一个运行实例，也建议使用分布式缓存系统。无需担心性能，因为分布式缓存的默认实现是在内存中工作的。这意味着除非您明确配置一个真实的分布式缓存提供者，如 Redis，否则它不是分布式的。
 
-ASP.NET Core中的分布式缓存
+ASP.NET Core 中的分布式缓存
 
-本节重点介绍ABP的缓存功能，并不涵盖所有ASP.NET Core的分布式缓存系统功能。您可以参考Microsoft的文档来了解有关ASP.NET Core中分布式缓存的更多信息：[https://docs.microsoft.com/en-us/aspnet/core/performance/caching/distributed](https://docs.microsoft.com/en-us/aspnet/core/performance/caching/distributed)。
+本节重点介绍 ABP 的缓存功能，并不涵盖所有 ASP.NET Core 的分布式缓存系统功能。您可以参考 Microsoft 的文档来了解有关 ASP.NET Core 中分布式缓存的更多信息：[`docs.microsoft.com/en-us/aspnet/core/performance/caching/distributed`](https://docs.microsoft.com/en-us/aspnet/core/performance/caching/distributed)。
 
-在本节中，我将向您展示如何使用`IDistributedCache<T>`接口，配置选项，并处理错误处理和批量操作。我们还将了解如何使用Redis作为分布式缓存提供者。最后，我将讨论如何使缓存值无效。
+在本节中，我将向您展示如何使用`IDistributedCache<T>`接口，配置选项，并处理错误处理和批量操作。我们还将了解如何使用 Redis 作为分布式缓存提供者。最后，我将讨论如何使缓存值无效。
 
 让我们从基础开始——`IDistributedCache<T>`接口。
 
-## 使用IDistributedCache<T>接口
+## 使用 IDistributedCache<T>接口
 
-ASP.NET Core定义了一个`IDistributedCache`接口，但它不是类型安全的。它设置和获取`byte`数组而不是对象。ABP的`IDistributedCache<T>`接口，另一方面，被设计为泛型，具有类型安全的参数方法（`T`代表存储在缓存中的项的类型）。它内部使用标准的`IDistributedCache`接口，以确保与ASP.NET Core的缓存系统100%兼容。ABP的`IDistributedCache<T>`接口有两个主要优势，如下所示：
+ASP.NET Core 定义了一个`IDistributedCache`接口，但它不是类型安全的。它设置和获取`byte`数组而不是对象。ABP 的`IDistributedCache<T>`接口，另一方面，被设计为泛型，具有类型安全的参数方法（`T`代表存储在缓存中的项的类型）。它内部使用标准的`IDistributedCache`接口，以确保与 ASP.NET Core 的缓存系统 100%兼容。ABP 的`IDistributedCache<T>`接口有两个主要优势，如下所示：
 
 +   自动将对象序列化和反序列化为`byte`数组。因此，您无需处理序列化和反序列化。
 
@@ -390,17 +611,48 @@ ASP.NET Core定义了一个`IDistributedCache`接口，但它不是类型安全�
 
 使用`IDistributedCache<T>`接口的第一步是定义一个类来表示缓存中的项。我已经定义了以下类来在缓存中存储用户信息：
 
-[PRE22]
+```cs
+public class UserCacheItem
+{
+    public Guid Id { get; set; }
+    public string UserName { get; set; }
+    public string EmailAddress { get; set; }
+}
+```
 
 这是一个普通的 C# 类。唯一的限制是它应该是可序列化的，因为它在保存到缓存时被序列化为 JSON，在从缓存读取时被反序列化（例如，不要添加引用到其他对象，这些对象不应该或不能存储在缓存中；保持简单）。
 
 一旦我们定义了缓存项类，我们就可以注入 `IDistributedCache<T>` 接口，如下面的代码块所示：
 
-[PRE23]
+```cs
+public class MyUserService : ITransientDependency
+{
+    private readonly IDistributedCache<UserCacheItem> 
+        _userCache;
+    public MyUserService(IDistributedCache<UserCacheItem> 
+        userCache)
+    {
+        _userCache = userCache;
+    }
+}
+```
 
 我已注入了 `IDistributedCache<UserCacheItem>` 服务以处理 `UserCacheItem` 对象的分布式缓存。以下代码块显示了我们可以如何使用它来获取缓存的用户信息，如果给定的用户未在缓存中找到，则回退到数据库查询：
 
-[PRE24]
+```cs
+public async Task<UserCacheItem> GetUserInfoAsync(Guid userId)
+{
+    return await _userCache.GetOrAddAsync(
+        userId.ToString(), 
+        async () => await GetUserFromDatabaseAsync(userId),
+        () => new DistributedCacheEntryOptions
+        {
+            AbsoluteExpiration = 
+                DateTimeOffset.Now.AddHours(1)
+        }
+    );
+}
+```
 
 我已向 `GetOrAddAsync` 方法传递了三个参数：
 
@@ -440,7 +692,14 @@ ASP.NET Core定义了一个`IDistributedCache`接口，但它不是类型安全�
 
 `AbpDistributedCacheOptions` 是配置缓存系统的主要选项类。你可以在模块类的 `ConfigureServices` 方法中配置它（你可以在领域层或应用层中这样做），如下所示：
 
-[PRE25]
+```cs
+Configure<AbpDistributedCacheOptions>(options =>
+{
+    options.GlobalCacheEntryOptions
+        .AbsoluteExpirationRelativeToNow = 
+            TimeSpan.FromHours(2);
+});
+```
 
 我已在此代码块中将 `GlobalCacheEntryOptions` 属性配置为将默认缓存过期时间设置为 `2` 小时。
 
@@ -464,23 +723,33 @@ ASP.NET Core定义了一个`IDistributedCache`接口，但它不是类型安全�
 
 如果您想创建一个在租户之间共享的缓存，您可以使用 `[IgnoreMultiTenancy]` 属性为缓存项类，如下面的代码块所示：
 
-[PRE26]
+```cs
+[IgnoreMultiTenancy]
+public class MyCacheItem
+{ /* ... */ }
+```
 
 对于这个例子，`MyCacheItem` 的值可以被不同的租户访问。
 
 ## 使用 Redis 作为分布式缓存提供者
 
-Redis 是一个流行的工具，用作分布式缓存。ASP.NET Core 为 Redis 提供了一个缓存集成包。您可以通过遵循 Microsoft 的文档（[https://docs.microsoft.com/en-us/aspnet/core/performance/caching/distributed](https://docs.microsoft.com/en-us/aspnet/core/performance/caching/distributed)）来使用它，并且它运行得非常好。
+Redis 是一个流行的工具，用作分布式缓存。ASP.NET Core 为 Redis 提供了一个缓存集成包。您可以通过遵循 Microsoft 的文档（[`docs.microsoft.com/en-us/aspnet/core/performance/caching/distributed`](https://docs.microsoft.com/en-us/aspnet/core/performance/caching/distributed)）来使用它，并且它运行得非常好。
 
 ABP 还提供了一个 Redis 集成包，它扩展了 Microsoft 的集成以支持批量操作（如 *Using the IDistributedCache<T> interface* 部分中提到的 `GetManyAsync`）。因此，建议使用 ABP 的集成 `Volo.Abp.Caching.StackExchangeRedis` NuGet 包来使用 Redis 作为缓存提供者。您可以使用以下命令在您想要使用的项目的目录中使用 ABP **命令行界面**（**CLI**）来安装它：
 
-[PRE27]
+```cs
+abp add-package Volo.Abp.Caching.StackExchangeRedis
+```
 
 安装完成后，您只需将配置添加到 `appsettings.json` 文件中，以连接到 Redis 服务器，如下所示：
 
-[PRE28]
+```cs
+"Redis": {
+  "Configuration": "127.0.0.1"
+}
+```
 
-您将服务器地址和端口（一个连接字符串）写入到 `Configuration` 选项中。请参阅 Microsoft 的文档以获取配置的详细信息：[https://docs.microsoft.com/en-us/aspnet/core/performance/caching/distributed](https://docs.microsoft.com/en-us/aspnet/core/performance/caching/distributed)。
+您将服务器地址和端口（一个连接字符串）写入到 `Configuration` 选项中。请参阅 Microsoft 的文档以获取配置的详细信息：[`docs.microsoft.com/en-us/aspnet/core/performance/caching/distributed`](https://docs.microsoft.com/en-us/aspnet/core/performance/caching/distributed)。
 
 ## 缓存值失效
 
@@ -490,7 +759,24 @@ ABP 还提供了一个 Redis 集成包，它扩展了 Microsoft 的集成以支�
 
 一个具体的情况是我们可能希望在实体发生变化（被更新或删除）时使缓存项失效。对于这种情况，我们可以注册 ABP 框架发布的事件。以下代码在相关用户实体发生变化时使用户缓存项失效：
 
-[PRE29]
+```cs
+public class MyUserService : 
+    ILocalEventHandler<EntityChangedEventData<IdentityUser>>,
+    ITransientDependency
+{
+    private readonly IDistributedCache<UserCacheItem> 
+        _userCache;
+    private readonly IRepository<IdentityUser, Guid> 
+         _userRepository;
+    //...omitted other code parts 
+    public async Task HandleEventAsync(
+        EntityChangedEventData<IdentityUser> data)
+    {
+        await _userCache.RemoveAsync 
+            (data.Entity.Id.ToString());
+    }
+}
+```
 
 `MyUserService`注册了一个`EntityChangedEventData<IdentityUser>`本地事件。当创建一个新的`IdentityUser`实体或更新或删除现有的`IdentityUser`实体时，将触发此事件。在这种情况下，会调用`HandleEventAsync`方法，并将相关实体在`data.Entity`属性中。此方法简单地从缓存中删除具有更改实体`Id`值的用户。
 
@@ -498,15 +784,15 @@ ABP 还提供了一个 Redis 集成包，它扩展了 Microsoft 的集成以支�
 
 关于事件总线系统
 
-本地和分布式事件是ABP框架的有趣特性，但本书中没有包括。如果你想了解更多关于它们的信息，请参阅ABP文档：[https://docs.abp.io/en/abp/latest/Event-Bus](https://docs.abp.io/en/abp/latest/Event-Bus)。
+本地和分布式事件是 ABP 框架的有趣特性，但本书中没有包括。如果你想了解更多关于它们的信息，请参阅 ABP 文档：[`docs.abp.io/en/abp/latest/Event-Bus`](https://docs.abp.io/en/abp/latest/Event-Bus)。
 
-在本节中，我们学习了如何与分布式缓存系统协同工作，配置选项，并处理错误处理。我们还介绍了Redis缓存提供程序的安装。最后，我们介绍了可以帮助我们使缓存值无效的自动ABP事件。
+在本节中，我们学习了如何与分布式缓存系统协同工作，配置选项，并处理错误处理。我们还介绍了 Redis 缓存提供程序的安装。最后，我们介绍了可以帮助我们使缓存值无效的自动 ABP 事件。
 
-下一个部分将涉及UI本地化，这是我在本章中将要介绍的ABP的最后一个功能。
+下一个部分将涉及 UI 本地化，这是我在本章中将要介绍的 ABP 的最后一个功能。
 
 # 本地化用户界面
 
-如果你正在构建一个全球产品，你可能希望根据当前用户的语言显示本地化的UI。ASP.NET Core提供了一个系统来本地化你的应用程序的UI。ABP增加了一些有用的功能和约定，使其更加容易和灵活。
+如果你正在构建一个全球产品，你可能希望根据当前用户的语言显示本地化的 UI。ASP.NET Core 提供了一个系统来本地化你的应用程序的 UI。ABP 增加了一些有用的功能和约定，使其更加容易和灵活。
 
 本节解释了如何定义你想要支持的语言，为不同的语言创建文本，并获取当前用户的正确文本。你将了解本地化资源概念和嵌入式本地化资源文件。
 
@@ -514,21 +800,31 @@ ABP 还提供了一个 Redis 集成包，它扩展了 Microsoft 的集成以支�
 
 ## 配置支持的语言
 
-关于本地化的第一个问题是这样的：*你希望在UI上支持哪些语言？* ABP提供了一个简单的配置来定义语言，使用`AbpLocalizationOptions`，如下面的代码块所示：
+关于本地化的第一个问题是这样的：*你希望在 UI 上支持哪些语言？* ABP 提供了一个简单的配置来定义语言，使用`AbpLocalizationOptions`，如下面的代码块所示：
 
-[PRE30]
+```cs
+Configure<AbpLocalizationOptions>(options =>
+{
+    options.Languages.Add(new LanguageInfo("en", "en", 
+        "English"));
+    options.Languages.Add(new LanguageInfo("tr", "tr", 
+        "Türkçe"));
+    options.Languages.Add(new LanguageInfo("es", "es", 
+        "Español"));
+});
+```
 
-你可以将这段代码写入你的模块类的`ConfigureServices`方法中。实际上，当你使用ABP应用程序启动模板创建新解决方案时，这个配置（以及许多语言）已经完成了。你只需根据需要编辑列表即可。
+你可以将这段代码写入你的模块类的`ConfigureServices`方法中。实际上，当你使用 ABP 应用程序启动模板创建新解决方案时，这个配置（以及许多语言）已经完成了。你只需根据需要编辑列表即可。
 
 `LanguageInfo`构造函数接受几个参数：
 
 +   `cultureName`：语言的文化名称（代码），在运行时设置为`CultureInfo.CurrentCulture`。
 
-+   `uiCultureName`：语言的UI文化名称（代码），在运行时设置为`CultureInfo.CurrentUICulture`。
++   `uiCultureName`：语言的 UI 文化名称（代码），在运行时设置为`CultureInfo.CurrentUICulture`。
 
 +   `displayName`：在用户选择此语言时显示的语言名称。建议用其原始语言书写该名称。
 
-+   `flagIcon`：一个字符串值，UI可以使用它来在语言名称附近显示国家国旗。
++   `flagIcon`：一个字符串值，UI 可以使用它来在语言名称附近显示国家国旗。
 
 ABP 根据当前的 HTTP 请求确定这些语言之一。
 
@@ -536,7 +832,9 @@ ABP 根据当前的 HTTP 请求确定这些语言之一。
 
 ABP 通过使用 `AbpRequestLocalizationMiddleware` 类来确定当前语言。这是一个 ASP.NET Core 中间件，通过以下代码行添加到 ASP.NET Core 请求管道中：
 
-[PRE31]
+```cs
+app.UseAbpRequestLocalization();
+```
 
 当请求通过此中间件时，将选择配置的语言之一并将其设置为 `CultureInfo.CurrentCulture` 和 `CultureInfo.CurrentUICulture`。这是 .NET 中设置和获取当前文化定位的标准系统。
 
@@ -550,19 +848,17 @@ ABP 通过使用 `AbpRequestLocalizationMiddleware` 类来确定当前语言。�
 
     关于 ASP.NET Core 的本地化系统
 
-    本节中解释的行为是默认行为。然而，ASP.NET Core 的语言确定系统更加灵活和可定制。请参阅 Microsoft 的文档以获取更多信息：[https://docs.microsoft.com/en-us/aspnet/core/fundamentals/localization](https://docs.microsoft.com/en-us/aspnet/core/fundamentals/localization).
+    本节中解释的行为是默认行为。然而，ASP.NET Core 的语言确定系统更加灵活和可定制。请参阅 Microsoft 的文档以获取更多信息：[`docs.microsoft.com/en-us/aspnet/core/fundamentals/localization`](https://docs.microsoft.com/en-us/aspnet/core/fundamentals/localization).
 
 在定义我们想要支持的语言之后，我们可以定义我们的本地化资源。
 
 ## 定义本地化资源
 
-ABP 与 ASP.NET Core 的本地化系统 100% 兼容。因此，你可以通过遵循 Microsoft 的文档使用 `.resx` 文件作为本地化资源：[https://docs.microsoft.com/en-us/aspnet/core/fundamentals/localization](https://docs.microsoft.com/en-us/aspnet/core/fundamentals/localization)。然而，ABP 提供了一种轻量级、灵活且可扩展的方式来定义本地化文本，使用简单的 JSON 文件。
+ABP 与 ASP.NET Core 的本地化系统 100% 兼容。因此，你可以通过遵循 Microsoft 的文档使用 `.resx` 文件作为本地化资源：[`docs.microsoft.com/en-us/aspnet/core/fundamentals/localization`](https://docs.microsoft.com/en-us/aspnet/core/fundamentals/localization)。然而，ABP 提供了一种轻量级、灵活且可扩展的方式来定义本地化文本，使用简单的 JSON 文件。
 
 当你使用 ABP 启动模板创建一个新的解决方案时，`Domain.Shared` 项目包含应用程序的本地化资源以及本地化 JSON 文件：
 
-![图 8.2 – 本地化资源和本地化 JSON 文件
-
-](img/Figure_8.2_B17287.jpg)
+![图 8.2 – 本地化资源和本地化 JSON 文件](img/Figure_8.2_B17287.jpg)
 
 图 8.2 – 本地化资源和本地化 JSON 文件
 
@@ -570,37 +866,64 @@ ABP 与 ASP.NET Core 的本地化系统 100% 兼容。因此，你可以通过�
 
 本地化资源类是一个空类，如下面的代码所示：
 
-[PRE32]
+```cs
+[LocalizationResourceName("DemoApp")]
+public class DemoAppResource
+{ }
+```
 
 当您想要在该本地化资源中使用文本时，此类引用相关资源。`LocalizationResourceName`属性为资源设置一个字符串名称。每个本地化资源都有一个唯一的名称，该名称在客户端代码中用于引用资源。我们将在*在客户端使用本地化*部分中探讨客户端本地化。
 
 应用程序的默认本地化资源
 
-在您的应用程序中，通常只有一个（默认）本地化资源，该资源在创建新的ABP解决方案时随启动模板一起提供。默认本地化资源类的名称以项目名称开头——例如，如果您将项目名称指定为`ProductManagement`，则类名为`ProductManagementResource`。
+在您的应用程序中，通常只有一个（默认）本地化资源，该资源在创建新的 ABP 解决方案时随启动模板一起提供。默认本地化资源类的名称以项目名称开头——例如，如果您将项目名称指定为`ProductManagement`，则类名为`ProductManagementResource`。
 
-一旦我们有了本地化资源，我们就可以为每个我们支持的语言创建一个JSON文件。
+一旦我们有了本地化资源，我们就可以为每个我们支持的语言创建一个 JSON 文件。
 
-## 与本地化JSON文件一起工作
+## 与本地化 JSON 文件一起工作
 
-本地化文件是一个简单的JSON格式文件，如下面的代码块所示：
+本地化文件是一个简单的 JSON 格式文件，如下面的代码块所示：
 
-[PRE33]
+```cs
+{
+  "culture": "en",
+  "texts": {
+    "Home": "Home",
+    "WelcomeMessage": "Welcome to the application."
+  }
+}
+```
 
 该文件中有两个主要的根元素，如下所述：
 
 +   `culture`：相关语言的区域代码。它与在*配置支持的语言*部分中引入的区域代码相匹配。
 
-+   `texts`：包含本地化文本的键值对。键用于访问本地化文本，应在所有不同语言的JSON文件中相同。值是当前文化（语言）的本地化文本。
++   `texts`：包含本地化文本的键值对。键用于访问本地化文本，应在所有不同语言的 JSON 文件中相同。值是当前文化（语言）的本地化文本。
 
 在为每种语言定义了本地化文本之后，我们可以在运行时请求本地化文本。
 
 ## 获取本地化文本
 
-ASP.NET Core定义了一个`IStringLocalizer<T>`接口，用于获取当前文化的本地化文本，其中`T`代表本地化资源类。您可以将该接口注入到您的类中，如下面的代码块所示：
+ASP.NET Core 定义了一个`IStringLocalizer<T>`接口，用于获取当前文化的本地化文本，其中`T`代表本地化资源类。您可以将该接口注入到您的类中，如下面的代码块所示：
 
-[PRE34]
+```cs
+public class LocalizationDemoService : ITransientDependency
+{
+    private readonly IStringLocalizer<DemoAppResource> 
+        _localizer;
+    public LocalizationDemoService(
+        IStringLocalizer<DemoAppResource> localizer)
+    {
+        _localizer = localizer;
+    }
+    public string GetWelcomeMessage()
+    {
+        return _localizer["WelcomeMessage"];
+    }
+}
+```
 
-在前面的代码块中，`LocalizationDemoService`类注入了`IStringLocalizer<DemoAppResource>`服务，该服务用于访问`DemoAppResource`类的本地化文本。在`GetWelcomeMessage`方法中，我们简单地获取`WelcomeMessage`键的本地化文本。如果当前语言是英语，它将返回我们在上一节中定义的JSON文件中的`Welcome to the application.`。
+在前面的代码块中，`LocalizationDemoService`类注入了`IStringLocalizer<DemoAppResource>`服务，该服务用于访问`DemoAppResource`类的本地化文本。在`GetWelcomeMessage`方法中，我们简单地获取`WelcomeMessage`键的本地化文本。如果当前语言是英语，它将返回我们在上一节中定义的 JSON 文件中的`Welcome to the application.`。
 
 我们可以在本地化文本时传递参数。
 
@@ -608,17 +931,24 @@ ASP.NET Core定义了一个`IStringLocalizer<T>`接口，用于获取当前文�
 
 本地化文本可以包含参数，如下面的示例所示：
 
-[PRE35]
+```cs
+"WelcomeMessageWithName": "Welcome {0} to the application."
+```
 
 可以将参数传递给本地化器，如下面的代码块所示：
 
-[PRE36]
+```cs
+public string GetWelcomeMessage(string name)
+{
+    return _localizer["WelcomeMessageWithName", name];
+}
+```
 
 本例中给出的名称替换了`{0}`占位符。
 
 ### 回退逻辑
 
-当请求的文本在当前文化的JSON文件中找不到时，本地化系统会使用父级或默认文化进行回退。
+当请求的文本在当前文化的 JSON 文件中找不到时，本地化系统会使用父级或默认文化进行回退。
 
 例如，假设您请求获取`WelcomeMessage`文本，而当前区域代码（`CultureInfo.CurrentUICulture`）为`de-DE`（德国-德国）。在这种情况下，以下情况之一会发生：
 
@@ -632,7 +962,20 @@ ASP.NET Core定义了一个`IStringLocalizer<T>`接口，用于获取当前文�
 
 在使用之前，应将本地化资源添加到 `AbpLocalizationOptions` 中。此配置已在启动模板中完成，如下所示：
 
-[PRE37]
+```cs
+Configure<AbpVirtualFileSystemOptions>(options =>
+{
+    options.FileSets.AddEmbedded<DemoAppDomainSharedModule>(); 
+    });
+Configure<AbpLocalizationOptions>(options =>
+{
+    options.Resources
+        .Add<DemoAppResource>("en")
+        .AddBaseTypes(typeof(AbpValidationResource))
+        .AddVirtualJson("/Localization/DemoApp");
+    options.DefaultResourceType = typeof(DemoAppResource);
+});
+```
 
 本地化 JSON 文件通常定义为嵌入式资源。我们正在配置 ABP 的虚拟文件系统（使用 `AbpVirtualFileSystemOptions`），将此程序集中的所有嵌入式文件添加到虚拟文件系统中，以便本地化文件也被添加。
 
@@ -650,13 +993,30 @@ ABP 的本地化系统相当先进。它允许您通过从另一个本地化资�
 
 以下示例展示了如何在应用程序服务方法中本地化文本：
 
-[PRE38]
+```cs
+public class MyAppService : ApplicationService
+{
+    public async Task FooAsync()
+    {
+        var str = L["WelcomeMessage"];
+    }
+}
+```
 
 在本例中，`L` 属性由 `ApplicationService` 基类定义，因此您不需要手动注入 `IStringLocalizer<T>` 服务。您可能会想知道，因为我们没有指定本地化资源，这里使用的是哪一个。答案是上一节中解释的 `DefaultResourceType` 选项。
 
 如果您想为特定应用程序服务指定另一个本地化资源，则请在服务的构造函数中设置 `LocalizationResource` 属性：
 
-[PRE39]
+```cs
+public class MyAppService : ApplicationService
+{
+    public MyAppService()
+    {
+        LocalizationResource = typeof(AnotherResource);
+    }
+    //...
+}
+```
 
 除了 `ApplicationService` 类之外，一些其他常见的基类，如 `AbpController` 和 `AbpPageModel`，也提供了相同的 `L` 属性，作为注入 `IStringLocalizer<T>` 服务的快捷方式。
 
@@ -666,9 +1026,11 @@ ABP 的本地化系统的一个优点是所有本地化资源都可以直接在�
 
 例如，以下代码在 ASP.NET Core MVC/Razor Pages 应用程序的 JavaScript 代码中将 `WelcomeMessage` 键本地化：
 
-[PRE40]
+```cs
+var str = abp.localization.localize('WelcomeMessage', 'DemoApp');
+```
 
-`DemoApp` 是本地化资源名称，而 `WelcomeMessage` 是这里的本地化键。客户端本地化将在本书的 *第 4 部分*，*用户界面和 API 开发* 中介绍。
+`DemoApp` 是本地化资源名称，而 `WelcomeMessage` 是这里的本地化键。客户端本地化将在本书的 *第四部分*，*用户界面和 API 开发* 中介绍。
 
 # 摘要
 
@@ -684,4 +1046,4 @@ ABP 的本地化系统的一个优点是所有本地化资源都可以直接在�
 
 最后，我们探讨了 ASP.NET Core 和 ABP 框架的本地化基础设施，以便我们可以在应用程序中轻松定义和消费本地化文本。
 
-现在我们已经到达本章的结尾，我们已经完成了本书的 *第 2 部分*，*ABP 框架基础*，涵盖了 ABP 框架和 ASP.NET Core 基础设施的基本知识。下一部分是使用 ABP 框架实现 **领域驱动设计**（**DDD**）的实用指南。DDD 是 ABP 基于的核心概念之一。它包括构建可维护业务解决方案的原则、模式和最佳实践。
+现在我们已经到达本章的结尾，我们已经完成了本书的 *第二部分*，*ABP 框架基础*，涵盖了 ABP 框架和 ASP.NET Core 基础设施的基本知识。下一部分是使用 ABP 框架实现 **领域驱动设计**（**DDD**）的实用指南。DDD 是 ABP 基于的核心概念之一。它包括构建可维护业务解决方案的原则、模式和最佳实践。

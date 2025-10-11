@@ -16,7 +16,7 @@
 
 +   复制粘贴、打印和书签内容
 
-您知道 Packt 为每本书都提供电子书版本，包括 PDF 和 ePub 文件吗？您可以在 [packt.com](http://packt.com) 升级到电子书版本，并且作为印刷书客户，您有权获得电子书副本的折扣。有关更多信息，请联系我们 [customercare@packtpub.com](mailto:customercare@packtpub.com)。
+您知道 Packt 为每本书都提供电子书版本，包括 PDF 和 ePub 文件吗？您可以在 [packt.com](http://packt.com) 升级到电子书版本，并且作为印刷书客户，您有权获得电子书副本的折扣。有关更多信息，请联系我们 customercare@packtpub.com。
 
 在 [www.packt.com](http://www.packt.com)，您还可以阅读一系列免费的技术文章，注册各种免费通讯，并享受 Packt 书籍和电子书的独家折扣和优惠。
 
@@ -24,7 +24,7 @@
 
 如果您喜欢这本书，您可能对 Packt 的其他书籍也感兴趣：
 
-[![](img/9781801077361_Cover.png)](https://packt.link/9781801077361)
+![](https://packt.link/9781801077361)
 
 **C# 10 和 .NET 6 – 第六版 – 现代跨平台开发**
 
@@ -48,7 +48,7 @@ ISBN: 9781801077361
 
 +   使用 XAML 构建跨平台应用程序
 
-[![](img/9781803235257_Cover.png)](https://packt.link/9781803235257)
+![](https://packt.link/9781803235257)
 
 **C# 10 和 .NET 6 软件架构 – 第三版**
 

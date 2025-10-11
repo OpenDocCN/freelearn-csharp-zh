@@ -42,9 +42,9 @@
 
 ![图片](img/2fc9cc77-5198-4a08-a0db-1ed23a81f705.png)
 
-每个圆形矩形代表一个边界。同一矩形内的类和抽象是同一边界的一部分。在.NET生态系统中，每个边界都是一个项目，我们的接口是高级和低级类之间的桥梁。
+每个圆形矩形代表一个边界。同一矩形内的类和抽象是同一边界的一部分。在.NET 生态系统中，每个边界都是一个项目，我们的接口是高级和低级类之间的桥梁。
 
-一个常见的错误是将接口和实现类放在同一个边界内。在.NET中，这意味着将`IPaymentService`接口和`PaymentService`放在同一个项目中。这种方法并不一定错误，但它并不尊重**依赖倒置原则**。
+一个常见的错误是将接口和实现类放在同一个边界内。在.NET 中，这意味着将`IPaymentService`接口和`PaymentService`放在同一个项目中。这种方法并不一定错误，但它并不尊重**依赖倒置原则**。
 
 总之，依赖倒置原则用于构建非常灵活的系统，它帮助我们设计出更易读、灵活和可维护的代码。
 
@@ -58,7 +58,7 @@
 
 "一套软件设计模式，使我们能够开发出松耦合的代码。"
 
-依赖注入的目标是实现松散耦合的代码，并因此编写可维护的代码。在《.NET中的依赖注入》这本书中，Mark Seemann描述了一个明亮的、现实生活中的松散耦合代码的例子。他将紧密耦合的代码与便宜的酒店吹风机进行比较：一些旅舍、酒店和更衣室将吹风机直接绑定在墙上，没有插头以防止客人偷走。如果吹风机停止工作，所有者必须切断电源并叫技术人员，技术人员必须断开吹风机并更换一个新的。这种方法是一个非常繁琐的程序。
+依赖注入的目标是实现松散耦合的代码，并因此编写可维护的代码。在《.NET 中的依赖注入》这本书中，Mark Seemann 描述了一个明亮的、现实生活中的松散耦合代码的例子。他将紧密耦合的代码与便宜的酒店吹风机进行比较：一些旅舍、酒店和更衣室将吹风机直接绑定在墙上，没有插头以防止客人偷走。如果吹风机停止工作，所有者必须切断电源并叫技术人员，技术人员必须断开吹风机并更换一个新的。这种方法是一个非常繁琐的程序。
 
 另一方面，如果吹风机插在墙上，所有者必须更换一个新的。这是一个关于*依赖注入*的隐喻。
 
@@ -78,23 +78,59 @@
 
 随着我们的代码库不断增长，这些好处就越有用。对于小型代码库，依赖注入可能看起来是一个无用的开销，但当我们处理分布式和大型代码库时，它变得至关重要。在下一节中，我们将看到如何将依赖注入的概念应用到
 
-# ASP.NET Core中的依赖注入
+# ASP.NET Core 中的依赖注入
 
-依赖注入的概念是ASP.NET Core的一个基本组成部分。依赖注入系统是ASP.NET Core框架自带的功能，并且是我们应用程序中实例化组件的首选方式。
+依赖注入的概念是 ASP.NET Core 的一个基本组成部分。依赖注入系统是 ASP.NET Core 框架自带的功能，并且是我们应用程序中实例化组件的首选方式。
 
-ASP.NET Core通常将依赖注入容器管理的类型描述为*服务*。因此，*所有服务*都存储在由`IServiceProvider`接口表示的内置容器中。
+ASP.NET Core 通常将依赖注入容器管理的类型描述为*服务*。因此，*所有服务*都存储在由`IServiceProvider`接口表示的内置容器中。
 
 在本章的下一部分，我们将看到一些依赖注入的示例。作为第一步，让我们在`SampleAPI`项目中的`Controllers`文件夹内创建一个新的类，命名为`ValuesController.cs`：
 
-[PRE0]
+```cs
+using System.Collections.Generic;
+using Microsoft.AspNetCore.Mvc;
+
+namespace SampleAPI.Controllers
+{
+    [ApiController]
+    [Route("[controller]")]
+    public class ValuesController : ControllerBase
+    {
+        public string Get()
+        {
+            return string.Empty;
+        }
+    }
+}
+```
 
 上述代码片段声明了一个 `ValuesController` 类，其中包含一个简单的 `Get` 方法。可以通过执行以下 CLI 命令来调用路由：
 
-[PRE1]
+```cs
+dotnet run
+```
 
 这也可以通过调用以下端点来实现：`https://localhost:5001/values`。作为第二步，我们需要创建一个新的 `PaymentService.cs` 文件，包含以下代码：
 
-[PRE2]
+```cs
+namespace SampleAPI
+{
+    public interface IPaymentService
+    {
+        string GetMessage();
+    }
+
+    public class PaymentService : IPaymentService
+    {
+        public string GetMessage() => "Pay me!";
+    }
+
+    public class ExternalPaymentService : IPaymentService
+    {
+        public string GetMessage() => "Pay me!, I'm an external service!";
+    }
+}
+```
 
 `PaymentService.cs` 文件定义了 `IPaymentService` 接口，该接口描述了一个 `GetMessage` 签名。此外，`IPaymentService` 接口由返回字符串的 `PaymentService` 类实现。同样，我们定义了一个 `ExternalPaymentService` 类，该类以不同的行为实现了 `IPaymentService` 接口。下一节将描述如何注册 `IPaymentService` 接口以使用 `PaymentService` 类。
 
@@ -102,7 +138,21 @@ ASP.NET Core通常将依赖注入容器管理的类型描述为*服务*。因此
 
 我们可以在 `Startup` 类的 `ConfigureServices` 中注册 `IPaymentService` 接口，添加以下代码：
 
-[PRE3]
+```cs
+      public class Startup
+     {
+           // ...
+
+         public void ConfigureServices(IServiceCollection services)
+         {
+ services
+                    .AddTransient<IPaymentService, PaymentService>() .AddControllers();       
+         }
+
+           // ...
+
+     }
+```
 
 上述代码展示了使用 ASP.NET Core 容器实例化服务的一个简单示例。为了使代码更易读，我省略了 `Startup` 类的一些部分。运行时执行 `services.AddTransient<IPaymentService, PaymentService>()` 方法，以便将 `IPaymentService` 接口与在 `PaymentService` 类中描述的具体实现进行映射。`AddTransient` 方法还定义了我们的服务的作用域。我们将在本章后面详细讨论作用域。
 
@@ -112,15 +162,75 @@ ASP.NET Core通常将依赖注入容器管理的类型描述为*服务*。因此
 
 在实际应用中，根据环境变量有条件地注册一些服务是一种常见的做法。当我们想要以不同的方式初始化第三方依赖项，例如数据源时，这种做法非常有用。以下代码展示了如何根据环境有条件地注册服务：
 
-[PRE4]
+```cs
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 
-示例使用`IWebHostEnvironment`接口来检测`IsDevelopment()`环境。在这种情况下，它会初始化`PaymentService`。否则，它会初始化`ExternalPaymentService`实现。这种做法在测试环境中很常见，尤其是在初始化测试服务或数据源时。在广泛的企业应用中，为了测试和开发目的，通常会在条件注册服务。在第10章[Implementing the RESTful HTTP Layer](266d98e8-df54-4024-aefb-b5871b3b35fa.xhtml)中，我们将看到一些具体的应用实例，这些实例已经应用于集成测试。保持测试环境隔离对于避免假阳性结果至关重要。此外，条件注册服务也有助于我们提高代码的灵活性。在接下来的小节中，我们将看到如何使用构造函数注入和操作注入来解决控制器类的依赖关系。
+namespace SampleAPI
+{
+    public class Startup
+    {
+
+        public Startup(IConfiguration configuration, 
+ IWebHostEnvironment env)
+        {
+            Configuration = configuration;
+            Environment = env;
+        }
+
+        public IConfiguration Configuration { get; }
+
+        public IWebHostEnvironment Environment { get; }
+
+        public void ConfigureServices(IServiceCollection services)
+        {
+            if (Environment.IsDevelopment())
+            {
+                services.AddTransient<IPaymentService, PaymentService>();
+            }
+            else
+            {
+                services.AddTransient<IPaymentService, 
+ ExternalPaymentService>();
+            }
+        }
+
+        // ...
+    }
+}
+```
+
+示例使用`IWebHostEnvironment`接口来检测`IsDevelopment()`环境。在这种情况下，它会初始化`PaymentService`。否则，它会初始化`ExternalPaymentService`实现。这种做法在测试环境中很常见，尤其是在初始化测试服务或数据源时。在广泛的企业应用中，为了测试和开发目的，通常会在条件注册服务。在第十章 Implementing the RESTful HTTP Layer 中，我们将看到一些具体的应用实例，这些实例已经应用于集成测试。保持测试环境隔离对于避免假阳性结果至关重要。此外，条件注册服务也有助于我们提高代码的灵活性。在接下来的小节中，我们将看到如何使用构造函数注入和操作注入来解决控制器类的依赖关系。
 
 # 构造函数注入
 
-我们刚刚看到了如何在我们的`Startup`类中初始化服务，但如何消费这些服务呢？默认情况下，ASP.NET Core内置的依赖注入容器使用构造函数注入模式来检索服务*。我们可以通过将接口作为控制器构造函数的参数来修改`ValueController`以使用`IPaymentServices`：`public ValuesController(IPaymentService paymentService, string[] paymentTypes = new string[] { 1, 2, 3 })`。
+我们刚刚看到了如何在我们的`Startup`类中初始化服务，但如何消费这些服务呢？默认情况下，ASP.NET Core 内置的依赖注入容器使用构造函数注入模式来检索服务*。我们可以通过将接口作为控制器构造函数的参数来修改`ValueController`以使用`IPaymentServices`：`public ValuesController(IPaymentService paymentService, string[] paymentTypes = new string[] { 1, 2, 3 })`。
 
-[PRE5]
+```cs
+using Microsoft.AspNetCore.Mvc;
+
+namespace SampleAPI.Controllers
+{
+    [ApiController]
+    [Route("[controller]")]
+    public class ValuesController : ControllerBase
+    {
+        private IPaymentService paymentService { get; set; }
+
+        public ValuesController(IPaymentService paymentService)
+        {
+            this.paymentService = paymentService;
+        }
+
+        public string Get()
+        {
+            return paymentService.GetMessage();
+        }
+    }
+}
+```
 
 如您所见，我们可以在我们类的构造函数中注入`IPaymentService`接口。需要注意的是，为了符合构造函数注入*规范*，构造函数必须遵守以下规则：
 
@@ -132,25 +242,42 @@ ASP.NET Core通常将依赖注入容器管理的类型描述为*服务*。因此
 
 依赖关系的解析发生在运行时执行过程中；因此，我们需要遵守这些规则，以避免在更改控制器类的依赖关系时遇到陷阱。
 
-总结来说，依赖注入提供了一种智能的方式来解决类的依赖问题。你也应该尽量遵守**单一职责原则**（**SRP**）。SRP指出，一个类应该只负责功能的一部分。拥有大量注入依赖的类可能不符合SRP。避免这些不良的设计实践可以提高我们代码的可维护性，并避免我们的类与静态功能紧密耦合，这会阻止它们被测试。接下来，我们将继续下一节，该节将介绍动作方法注入技术。
+总结来说，依赖注入提供了一种智能的方式来解决类的依赖问题。你也应该尽量遵守**单一职责原则**（**SRP**）。SRP 指出，一个类应该只负责功能的一部分。拥有大量注入依赖的类可能不符合 SRP。避免这些不良的设计实践可以提高我们代码的可维护性，并避免我们的类与静态功能紧密耦合，这会阻止它们被测试。接下来，我们将继续下一节，该节将介绍动作方法注入技术。
 
 # 动作方法注入
 
 构造函数注入的一个有效替代方案是动作方法注入。有时，控制器只在一个动作方法中使用一些依赖项。在这些情况下，将我们的依赖项仅注入到这个动作方法中，可能有助于提高我们代码的性能。要执行动作方法注入，我们应该使用`[FromServices]`属性。例如，看看以下代码片段：
 
-[PRE6]
+```cs
+using Microsoft.AspNetCore.Mvc;
 
-如前所述，该示例使用了动作方法注入。我们将服务注入到`Get`动作方法中，这是唯一的依赖项消费者。尽管构造函数注入被广泛采用，但当你在整个控制器中不使用依赖项时，动作方法注入技术变得很有用。这仅保证了在动作方法被调用时依赖项的延迟解析。我们还应该注意，这种方法严格依赖于MVC堆栈，因为服务的解析是在执行过程中的模型绑定阶段完成的；因此，它仅支持在动作方法和过滤器类中。下一节将专注于ASP.NET Core提供的服务生命周期类型。
+namespace SampleAPI.Controllers
+{
+    [ApiController]
+    [Route("[controller]")]
+    public class ValuesController : ControllerBase
+    {
+        [HttpGet]
+        public ActionResult<string> Get(
+            [FromServices]IPaymentService paymentService)
+        {
+            return paymentService.GetMessage();
+        }
+    }
+}
+```
+
+如前所述，该示例使用了动作方法注入。我们将服务注入到`Get`动作方法中，这是唯一的依赖项消费者。尽管构造函数注入被广泛采用，但当你在整个控制器中不使用依赖项时，动作方法注入技术变得很有用。这仅保证了在动作方法被调用时依赖项的延迟解析。我们还应该注意，这种方法严格依赖于 MVC 堆栈，因为服务的解析是在执行过程中的模型绑定阶段完成的；因此，它仅支持在动作方法和过滤器类中。下一节将专注于 ASP.NET Core 提供的服务生命周期类型。
 
 # 服务生命周期
 
 在处理依赖注入时，我们需要掌握的一个关键点是服务生命周期。服务生命周期是关于性能的一个基本概念，因为错误的服务生命周期可能会导致复杂的性能下降。
 
-在.NET中，对象的生命周期很简单：对象被*实例化*，*使用*，最后由垃圾回收器*销毁*。在性能方面，*销毁*阶段是最相关的。在依赖注入过程中，特定依赖项的消费者不控制其生命周期。实际上，依赖项通常由依赖注入容器初始化，并且它们会一直存在，直到所有消费者都持有它们。
+在.NET 中，对象的生命周期很简单：对象被*实例化*，*使用*，最后由垃圾回收器*销毁*。在性能方面，*销毁*阶段是最相关的。在依赖注入过程中，特定依赖项的消费者不控制其生命周期。实际上，依赖项通常由依赖注入容器初始化，并且它们会一直存在，直到所有消费者都持有它们。
 
-在大型应用程序中，工程师面临的一个典型性能问题是 *内存泄漏*。垃圾收集器无法清理对象，因为它们仍然被消费者引用。结果，服务器的内存不断增加，直到达到饱和。找到和解决这类性能问题并不容易。在.NET生态系统中，像dotMemory这样的工具可以帮助您分析应用程序创建的对象实例，并最终检测到这类性能问题。
+在大型应用程序中，工程师面临的一个典型性能问题是 *内存泄漏*。垃圾收集器无法清理对象，因为它们仍然被消费者引用。结果，服务器的内存不断增加，直到达到饱和。找到和解决这类性能问题并不容易。在.NET 生态系统中，像 dotMemory 这样的工具可以帮助您分析应用程序创建的对象实例，并最终检测到这类性能问题。
 
-说到依赖注入，ASP.NET Core中的默认生命周期类型是 *瞬态*、*作用域* 和 *单例*。让我们更详细地讨论它们。
+说到依赖注入，ASP.NET Core 中的默认生命周期类型是 *瞬态*、*作用域* 和 *单例*。让我们更详细地讨论它们。
 
 # 瞬态生命周期
 
@@ -166,24 +293,45 @@ ASP.NET Core通常将依赖注入容器管理的类型描述为*服务*。因此
 
 # 生命周期疯狂
 
-“生命周期疯狂”这个术语来自Jeffrey Richter的《CLR via C#》，其中关于线程的章节。理解依赖项的生命周期对于避免我们应用程序中的性能问题非常重要。首先，我们应该避免以下情况：
+“生命周期疯狂”这个术语来自 Jeffrey Richter 的《CLR via C#》，其中关于线程的章节。理解依赖项的生命周期对于避免我们应用程序中的性能问题非常重要。首先，我们应该避免以下情况：
 
 +   **在单例消费者中消费作用域依赖项**：如前所述，作用域生命周期意味着每个请求都会创建一个新的实例。当我们尝试在单例生命周期中消费作用域实例时，运行时会抛出以下异常：`InvalidOperationException: Cannot consume scoped service 'Services.MyScopedService' from singleton 'Services.MySingletonService'`。这是因为当单例实例引用它时，运行时无法为每个请求创建作用域服务。
 
 +   **在单例消费者中消费瞬态依赖项**：同样，如果我们在一个单例实例中使用瞬态依赖项，运行时不会每次都创建瞬态服务的新的实例。此外，由于瞬态服务是在单例中声明的，它将只初始化一次。而且，运行时*不会抛出异常*，因为单例始终使用同一个实例。
 
-为了防止可能的错误和运行时错误，避免单例引用scoped或瞬态服务的情况非常重要。在第一种情况下，运行时会抛出异常，而在第二种情况下，单例消费者将始终使用同一个实例。这些行为必须避免，以防止在我们的API内部出现内存问题和性能下降。以下小节将解释如何在中间件类中使用依赖注入。
+为了防止可能的错误和运行时错误，避免单例引用 scoped 或瞬态服务的情况非常重要。在第一种情况下，运行时会抛出异常，而在第二种情况下，单例消费者将始终使用同一个实例。这些行为必须避免，以防止在我们的 API 内部出现内存问题和性能下降。以下小节将解释如何在中间件类中使用依赖注入。
 
 # 将服务注入中间件
 
 如前所述，中间件可以通过依赖注入容器实例化依赖项。我们应该考虑中间件的寿命：它们在每个应用程序生命周期中只初始化一次。因此，如果我们尝试在我们的中间件中消费*scoped*或*瞬态*实例，我们不应该通过中间件的构造函数注入它们，因为这会导致一些依赖项解析问题。避免这种情况的一个好方法是使用`Invoke`或`InvokeAsync`方法中的参数注入：
 
-[PRE7]
+```cs
+  namespace Middleware
+ {
+     public class MyMiddleware
+     {
+         readonly RequestDelegate _next;
 
-另一个中间件实现将`IPaymentService`注入到`InvokeAsync`方法中。与中间件构造函数不同，`InvokeAsync`方法对每个请求都会被调用。因此，它既适用于*scoped生命周期*也适用于*瞬态生命周期*。
+         public MyMiddleware(RequestDelegate next)
+         {
+             _next = next;
+         }
 
-当你想要将一个transientservice或scoped service注入到中间件中时，你应该在`Invoke`或`InvokeAsync`方法中注入它们，以避免生命周期问题。此外，中间件是一个横切组件，这意味着应用程序在每次请求时都会运行它们。因此，在实现中间件时，你必须格外小心，以避免将性能问题传播到所有应用程序中。
+         public async Task InvokeAsync(HttpContext context, 
+ IPaymentService paymentService)
+         {
+             Console.WriteLine(paymentService.GetMessage());
+
+             await _next(context);
+         }
+     }
+ } 
+```
+
+另一个中间件实现将`IPaymentService`注入到`InvokeAsync`方法中。与中间件构造函数不同，`InvokeAsync`方法对每个请求都会被调用。因此，它既适用于*scoped 生命周期*也适用于*瞬态生命周期*。
+
+当你想要将一个 transientservice 或 scoped service 注入到中间件中时，你应该在`Invoke`或`InvokeAsync`方法中注入它们，以避免生命周期问题。此外，中间件是一个横切组件，这意味着应用程序在每次请求时都会运行它们。因此，在实现中间件时，你必须格外小心，以避免将性能问题传播到所有应用程序中。
 
 # 摘要
 
-本章向我们展示了如何处理ASP.NET Core默认的依赖注入引擎。本章提供了与依赖注入相关的各种示例，包括如何在控制器和中间件中使用依赖注入，以及描述已注册服务的生命周期概念。下一章将详细讨论控制器和操作方法。它将向您展示如何使用这些方法来序列化数据并将其作为Web服务公开。
+本章向我们展示了如何处理 ASP.NET Core 默认的依赖注入引擎。本章提供了与依赖注入相关的各种示例，包括如何在控制器和中间件中使用依赖注入，以及描述已注册服务的生命周期概念。下一章将详细讨论控制器和操作方法。它将向您展示如何使用这些方法来序列化数据并将其作为 Web 服务公开。

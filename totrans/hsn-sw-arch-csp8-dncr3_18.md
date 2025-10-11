@@ -1,6 +1,6 @@
-# C# 8编码的最佳实践
+# C# 8 编码的最佳实践
 
-当你在项目中担任软件架构师时，你有责任定义和/或维护一个编码标准，这将指导团队根据公司的期望进行编程。本章涵盖了帮助你编写安全、简单和可维护软件的一些最佳编码实践。它还包括C#编码的技巧和窍门。
+当你在项目中担任软件架构师时，你有责任定义和/或维护一个编码标准，这将指导团队根据公司的期望进行编程。本章涵盖了帮助你编写安全、简单和可维护软件的一些最佳编码实践。它还包括 C#编码的技巧和窍门。
 
 本章将涵盖以下主题：
 
@@ -8,17 +8,17 @@
 
 +   使用版本控制系统的必要性
 
-+   在C#中编写安全代码
++   在 C#中编写安全代码
 
-+   .NET core编码技巧和窍门
++   .NET core 编码技巧和窍门
 
 +   书籍使用案例 - 编写代码时的注意事项与禁忌
 
 # 技术要求
 
-本章需要Visual Studio 2019免费社区版或更高版本，并安装所有数据库工具。
+本章需要 Visual Studio 2019 免费社区版或更高版本，并安装所有数据库工具。
 
-你可以在这里找到本章的示例代码：[https://github.com/PacktPublishing/Hands-On-Software-Architecture-with-CSharp-8/tree/master/ch14](https://github.com/PacktPublishing/Hands-On-Software-Architecture-with-CSharp-8/tree/master/ch14).
+你可以在这里找到本章的示例代码：[`github.com/PacktPublishing/Hands-On-Software-Architecture-with-CSharp-8/tree/master/ch14`](https://github.com/PacktPublishing/Hands-On-Software-Architecture-with-CSharp-8/tree/master/ch14).
 
 # 你的代码越复杂，你的编程能力就越差
 
@@ -26,11 +26,11 @@
 
 因此，如果你想编写好的代码，你需要关注如何编写它，考虑到你不是唯一一个将来会阅读它的人。这是一个改变你编写代码方式的良好建议。这就是我们将如何讨论本章的每个要点。
 
-如果你对编写良好代码重要性的理解与编写时的简洁性和清晰性理念相一致，你应该看看Visual Studio工具代码度量：
+如果你对编写良好代码重要性的理解与编写时的简洁性和清晰性理念相一致，你应该看看 Visual Studio 工具代码度量：
 
 ![](img/7a548e09-2e4e-4060-8ca5-5127de261882.png)
 
-代码度量工具将提供度量值，这些度量值将为你提供关于你交付的软件质量的洞察。该工具提供的度量值列在这里，并可在以下链接中找到 [https://docs.microsoft.com/en-us/visualstudio/code-quality/code-metrics-values?view=vs-2019](https://docs.microsoft.com/en-us/visualstudio/code-quality/code-metrics-values?view=vs-2019):
+代码度量工具将提供度量值，这些度量值将为你提供关于你交付的软件质量的洞察。该工具提供的度量值列在这里，并可在以下链接中找到 [`docs.microsoft.com/en-us/visualstudio/code-quality/code-metrics-values?view=vs-2019`](https://docs.microsoft.com/en-us/visualstudio/code-quality/code-metrics-values?view=vs-2019):
 
 +   可维护性指数
 
@@ -46,11 +46,11 @@
 
 # 可维护性指数
 
-这个指数表明了维护代码的难易程度——代码越容易维护，指数就越高（限于100）。易于维护是保持软件健康的关键点之一。显然，任何软件在未来都需要进行更改，因为变化是不可避免的。因此，如果你有低维护性，考虑重构你的代码。编写专门负责单一职责的类和方法，避免重复代码，并限制每个方法的代码行数，这些都是你可以提高维护性指数的例子。
+这个指数表明了维护代码的难易程度——代码越容易维护，指数就越高（限于 100）。易于维护是保持软件健康的关键点之一。显然，任何软件在未来都需要进行更改，因为变化是不可避免的。因此，如果你有低维护性，考虑重构你的代码。编写专门负责单一职责的类和方法，避免重复代码，并限制每个方法的代码行数，这些都是你可以提高维护性指数的例子。
 
 # 循环复杂度
 
-《循环复杂度度量》一书的作者是托马斯·J·麦卡贝。他根据可用的代码路径数（图节点）来定义软件函数的复杂度。路径越多，函数越复杂。麦卡贝认为每个函数的复杂度得分必须小于10。这意味着，如果代码中有更复杂的方法，你必须重构它，将这些代码的部分转换为独立的方法。有一些真实场景中，这种行为很容易被检测到：
+《循环复杂度度量》一书的作者是托马斯·J·麦卡贝。他根据可用的代码路径数（图节点）来定义软件函数的复杂度。路径越多，函数越复杂。麦卡贝认为每个函数的复杂度得分必须小于 10。这意味着，如果代码中有更复杂的方法，你必须重构它，将这些代码的部分转换为独立的方法。有一些真实场景中，这种行为很容易被检测到：
 
 +   循环嵌套循环
 
@@ -60,7 +60,83 @@
 
 例如，看看这个方法处理信用卡交易不同响应的第一版本。正如你可以检查的，循环复杂度大于麦卡贝作为基础的数字。这种情况发生的原因是每个主`switch`案例中的`if`-`else`的数量：
 
-[PRE0]
+```cs
+static void Main()
+{
+    var billingMode = GetBillingMode();
+    var messageResponse = ProcessCreditCardMethod();
+    switch (messageResponse)
+    {
+        case "A":
+            if (billingMode == "M1")
+                Console.WriteLine($"Billing Mode {billingMode} for Message 
+                Response {messageResponse}");
+            else
+                Console.WriteLine($"Billing Mode {billingMode} for Message 
+                Response {messageResponse}");
+            break;
+        case "B":
+            if (billingMode == "M2")
+                Console.WriteLine($"Billing Mode {billingMode} for Message 
+                Response {messageResponse}");
+            else
+                Console.WriteLine($"Billing Mode {billingMode} for Message 
+                Response {messageResponse}");
+            break;
+        case "C":
+            if (billingMode == "M3")
+                Console.WriteLine($"Billing Mode {billingMode} for Message 
+                Response {messageResponse}");
+            else
+                Console.WriteLine($"Billing Mode {billingMode} for Message 
+                Response {messageResponse}");
+            break;
+        case "D":
+            if (billingMode == "M4")
+                Console.WriteLine($"Billing Mode {billingMode} for Message 
+                Response {messageResponse}");
+            else
+                Console.WriteLine($"Billing Mode {billingMode} for Message 
+                Response {messageResponse}");
+            break;
+        case "E":
+            if (billingMode == "M5")
+                Console.WriteLine($"Billing Mode {billingMode} for Message 
+                Response {messageResponse}");
+            else
+                Console.WriteLine($"Billing Mode {billingMode} for Message 
+                Response {messageResponse}");
+            break;
+        case "F":
+            if (billingMode == "M6")
+                Console.WriteLine($"Billing Mode {billingMode} for Message 
+                Response {messageResponse}");
+            else
+                Console.WriteLine($"Billing Mode {billingMode} for Message 
+                Response {messageResponse}");
+            break;
+        case "G":
+            if (billingMode == "M7")
+                Console.WriteLine($"Billing Mode {billingMode} for Message 
+                Response {messageResponse}");
+            else
+                Console.WriteLine($"Billing Mode {billingMode} for Message 
+                Response {messageResponse}");
+            break;
+        case "S":
+            if (billingMode == "M8")
+                Console.WriteLine($"Billing Mode {billingMode} for Message 
+                Response {messageResponse}");
+            else
+                Console.WriteLine($"Billing Mode {billingMode} for Message 
+                Response {messageResponse}");
+            break;
+        default:
+            Console.WriteLine("The result of processing is unknown");
+            break;
+    }
+}
+```
 
 如果你计算这段代码的代码度量，你会发现当涉及到循环复杂度时，结果非常糟糕，就像你在下面的截图中所看到的那样：
 
@@ -76,9 +152,22 @@
 
 通过使用上述技术重构这段代码，结果是一段更容易理解的代码，就像你在下面的代码片段中看到的主方法一样：
 
-[PRE1]
+```cs
+static void Main()
+{
+    var billingMode = GetBillingMode();
+    var messageResponse = ProcessCreditCardMethod();
+    Dictionary<CreditCardProcessingResult, CheckResultMethod> 
+    methodsForCheckingResult =
+    GetMethodsForCheckingResult();
+    if (methodsForCheckingResult.ContainsKey(messageResponse))
+        methodsForCheckingResultmessageResponse;
+    else
+        Console.WriteLine("The result of processing is unknown");
+}
+```
 
-完整的代码可以在本章的GitHub上找到，展示了如何实现低复杂度的代码。下面的截图显示了根据代码度量得出的这些结果：
+完整的代码可以在本章的 GitHub 上找到，展示了如何实现低复杂度的代码。下面的截图显示了根据代码度量得出的这些结果：
 
 ![](img/b0691000-1cfc-4488-a125-15c82e9c080b.png)
 
@@ -120,23 +209,23 @@
 
 # 代码行数
 
-此指标有助于你理解你正在处理的代码的大小。由于行数并不能表明复杂性，因此无法将代码行数与复杂性联系起来。另一方面，代码行数显示了软件的大小和软件设计。例如，如果你在一个类中有太多的代码行（超过1,000行代码—1 KLOC），这表明这是一个糟糕的设计。
+此指标有助于你理解你正在处理的代码的大小。由于行数并不能表明复杂性，因此无法将代码行数与复杂性联系起来。另一方面，代码行数显示了软件的大小和软件设计。例如，如果你在一个类中有太多的代码行（超过 1,000 行代码—1 KLOC），这表明这是一个糟糕的设计。
 
 # 使用版本控制系统
 
 你可能会觉得这本书中关于这个话题的内容有点明显，但许多人和公司仍然没有将版本控制系统视为软件开发的基本工具！写这个话题的目的是强迫你理解它。如果你不使用版本控制系统，没有任何架构模型或最佳实践可以拯救软件开发。
 
-在过去几年里，我们一直在享受在线版本控制系统（如GitHub、BitBucket和Azure DevOps）带来的优势。事实上，在你的软件开发生命周期中必须有一个这样的工具，而且没有理由不再使用它，因为大多数提供商都为小型团队提供免费版本。即使是你自己开发，这些工具也有助于跟踪你的更改、管理你的软件版本，并保证你的代码的一致性和完整性。
+在过去几年里，我们一直在享受在线版本控制系统（如 GitHub、BitBucket 和 Azure DevOps）带来的优势。事实上，在你的软件开发生命周期中必须有一个这样的工具，而且没有理由不再使用它，因为大多数提供商都为小型团队提供免费版本。即使是你自己开发，这些工具也有助于跟踪你的更改、管理你的软件版本，并保证你的代码的一致性和完整性。
 
 # 在团队中处理版本控制系统
 
 当你一个人使用版本控制系统工具时，这很显然。你希望保持你的代码安全。但这类系统肯定是为了解决编写代码时的团队问题而开发的。因此，引入了一些功能，如分支和合并，以保持代码完整性，即使在开发者数量相当大的情况下也是如此。
 
-作为一名软件架构师，你将不得不决定在你的团队中采用哪种分支策略。Azure DevOps和GitHub建议不同的方法来实现这一点，并且在某些场景下它们都是很有用的。
+作为一名软件架构师，你将不得不决定在你的团队中采用哪种分支策略。Azure DevOps 和 GitHub 建议不同的方法来实现这一点，并且在某些场景下它们都是很有用的。
 
-关于Azure DevOps团队如何处理这个问题的信息可以在这里找到：[https://devblogs.microsoft.com/devops/release-flow-how-we-do-branching-on-the-vsts-team/](https://devblogs.microsoft.com/devops/release-flow-how-we-do-branching-on-the-vsts-team/)。GitHub在这里描述了其流程：[https://guides.github.com/introduction/flow/](https://guides.github.com/introduction/flow/)。我们不知道哪一个最适合你的需求，但我们确实想让你明白，你需要有一个控制代码的策略。
+关于 Azure DevOps 团队如何处理这个问题的信息可以在这里找到：[`devblogs.microsoft.com/devops/release-flow-how-we-do-branching-on-the-vsts-team/`](https://devblogs.microsoft.com/devops/release-flow-how-we-do-branching-on-the-vsts-team/)。GitHub 在这里描述了其流程：[`guides.github.com/introduction/flow/`](https://guides.github.com/introduction/flow/)。我们不知道哪一个最适合你的需求，但我们确实想让你明白，你需要有一个控制代码的策略。
 
-# 在C#中编写安全代码
+# 在 C#中编写安全代码
 
 C#可以被认为是一种设计上安全的编程语言。除非你强制使用，否则不需要指针，并且大多数情况下，内存释放由垃圾回收器管理。即便如此，你也应该注意一些事项，以便从你的代码中获得更好的安全结果。让我们来看看它们。
 
@@ -144,17 +233,47 @@ C#可以被认为是一种设计上安全的编程语言。除非你强制使用
 
 编程中的异常如此频繁，以至于你可能会找到一种方法来管理它们，无论何时发生。`try`-`catch`语句就是为了管理这些异常而构建的，它们对于保持代码安全至关重要。有很多情况下应用程序崩溃，原因就是没有使用`try`-`catch`。以下代码展示了缺少使用`try`-`catch`语句的例子：
 
-[PRE2]
+```cs
+private static int CodeWithNoTryCatch(string textToConvert)
+{
+    return Convert.ToInt32(textToConvert);
+}
+```
 
 另一方面，错误的`try`-`catch`使用也可能对你的代码造成损害，特别是因为你将看不到该代码的正确行为，并可能误解提供的结果。以下代码展示了空`try`-`catch`语句的示例：
 
-[PRE3]
+```cs
+private static int CodeWithEmptyTryCatch(string textToConvert)
+{
+    try
+    {
+        return Convert.ToInt32(textToConvert);
+    }
+    catch
+    {
+        return 0;
+    }
+}
+```
 
 `try`-`catch`语句必须始终与日志解决方案相关联，这样你就可以得到系统的响应，指示正确的行为，同时不会导致应用程序崩溃。以下代码展示了带有日志管理的理想`try`-`catch`语句：
 
-[PRE4]
+```cs
+private static int CodeWithCorrectTryCatch(string textToConvert)
+{
+    try
+    {
+        return Convert.ToInt32(textToConvert);
+    }
+    catch (Exception err)
+    {
+        Logger.GenerateLog(err);
+        return 0;
+    }
+}
+```
 
-作为一名软件架构师，你应该进行代码审查以修复代码中发现的这类行为。系统的不稳定通常与代码中缺少try-catch语句有关。
+作为一名软件架构师，你应该进行代码审查以修复代码中发现的这类行为。系统的不稳定通常与代码中缺少 try-catch 语句有关。
 
 # try-finally 和 using
 
@@ -162,11 +281,42 @@ C#可以被认为是一种设计上安全的编程语言。除非你强制使用
 
 与 I/O 交互的对象通常不是由垃圾回收器管理的：文件系统、套接字等。以下代码是`FileStream`对象使用错误的示例，因为它认为垃圾回收器会释放使用的内存，但实际上不会：
 
-[PRE5]
+```cs
+private static void CodeWithIncorrectFileStreamManagement()
+{
+    FileStream file = new FileStream("C:\\file.txt", FileMode.CreateNew);
+    byte[] data = GetFileData();
+    file.Write(data, 0, data.Length);
+}
+```
 
 此外，垃圾回收器与需要释放的对象交互需要一段时间，有时你可能想自己来做这件事。在这两种情况下，使用`try`-`finally`或`using`语句是最佳实践：
 
-[PRE6]
+```cs
+private static void CodeWithCorrectFileStreamManagementFirstOption()
+{
+    using (FileStream file = new FileStream("C:\\file.txt", 
+    FileMode.CreateNew))
+    {
+        byte[] data = GetFileData();
+        file.Write(data, 0, data.Length);
+    }
+}
+
+private static void CodeWithCorrectFileStreamManagementSecondOption()
+{
+    FileStream file = new FileStream("C:\\file.txt", FileMode.CreateNew);
+    try
+    {
+        byte[] data = GetFileData();
+        file.Write(data, 0, data.Length);
+    }
+    finally
+    {
+        file.Dispose();
+    }
+}
+```
 
 上述代码展示了如何处理不由垃圾回收器管理的对象。你既有`try`-`finally`也有`using`的实现。作为一名软件架构师，你需要注意这类代码。缺少`try`-`finally`或`using`语句可能导致软件在运行时出现严重问题。
 
@@ -180,29 +330,29 @@ C#可以被认为是一种设计上安全的编程语言。除非你强制使用
 
 # .NET Core 编码技巧和窍门
 
-.NET Core实现了一些有助于我们编写更好代码的良好功能。其中最有用的是**依赖注入**（**DI**），这在[第9章](a2d50e08-6698-47f6-a9b5-188de08134c0.xhtml)，*设计模式和.NET Core实现*中已经讨论过。考虑这一点有几个很好的理由。第一个是因为你不需要担心注入对象的释放，因为你不是它们的创建者。
+.NET Core 实现了一些有助于我们编写更好代码的良好功能。其中最有用的是**依赖注入**（**DI**），这在第九章，*设计模式和.NET Core 实现*中已经讨论过。考虑这一点有几个很好的理由。第一个是因为你不需要担心注入对象的释放，因为你不是它们的创建者。
 
-此外，DI使你能够注入`ILogger`，这是一个非常有用的调试异常的工具，这些异常将需要在你的代码中通过try-catch语句来管理。此外，使用.NET Core进行C#编程必须遵循任何编程语言的通用良好实践。以下列表显示了其中的一些：
+此外，DI 使你能够注入`ILogger`，这是一个非常有用的调试异常的工具，这些异常将需要在你的代码中通过 try-catch 语句来管理。此外，使用.NET Core 进行 C#编程必须遵循任何编程语言的通用良好实践。以下列表显示了其中的一些：
 
 +   **类、方法和变量应该有可理解的名称**：名称应该解释读者需要知道的一切。不应该需要解释性注释。
 
 +   **方法不能有高复杂度**：应该检查方法的圈复杂度，以确保方法不要有太多的代码行。
 
-+   **应避免重复代码**：在像C#这样的高级编程语言中，没有必要存在重复代码。
++   **应避免重复代码**：在像 C#这样的高级编程语言中，没有必要存在重复代码。
 
-+   **在使用对象之前应进行检查**：由于可能存在null对象，代码必须进行null类型检查。
++   **在使用对象之前应进行检查**：由于可能存在 null 对象，代码必须进行 null 类型检查。
 
 +   **应使用常量和枚举器**：避免代码中的魔法数字和文本的好方法是将这些信息转换为常量和枚举器，这通常更容易理解。
 
 +   **应避免不安全代码**：除非没有其他实现代码的方法，否则应避免使用不安全代码。
 
-+   **try-catch语句不能为空**：在没有处理`catch`区域的`try-catch`语句中没有理由。
++   **try-catch 语句不能为空**：在没有处理`catch`区域的`try-catch`语句中没有理由。
 
-+   **try-finally/using语句应该始终使用**：即使对于垃圾回收器将负责处理的对象，也应考虑处理你负责创建的对象。
++   **try-finally/using 语句应该始终使用**：即使对于垃圾回收器将负责处理的对象，也应考虑处理你负责创建的对象。
 
 +   **至少公共方法应该有注释**：考虑到公共方法是用于你库外部的那些方法，它们必须被解释以正确使用。
 
-+   **switch-case语句必须有默认处理**：由于`switch-case`语句可能接收到在某些情况下未知的人口变量，默认处理将保证在这种情况下代码不会中断。
++   **switch-case 语句必须有默认处理**：由于`switch-case`语句可能接收到在某些情况下未知的人口变量，默认处理将保证在这种情况下代码不会中断。
 
 作为软件架构师，一个好的做法是为你的开发者提供一个所有程序员都会使用的代码模式，以此来保持代码风格的一致性。你可以将代码模式用作编码检查的清单，这将丰富软件代码的质量。
 
@@ -210,11 +360,11 @@ C#可以被认为是一种设计上安全的编程语言。除非你强制使用
 
 作为一名软件架构师，你必须定义一个符合你所服务公司需求的代码标准。
 
-在本书的示例项目中（关于WWTravelClub项目的更多信息，请参阅[第1章](14b5c5da-4042-439e-9e5a-2e19ba4c4930.xhtml)，*理解软件架构的重要性*），情况并无不同。我们决定展示该标准的做法是描述我们在编写示例时遵循的一系列“做”和“不做”的清单。值得一提的是，这个清单是一个很好的开始标准，作为软件架构师，你应该与团队中的开发者讨论这个清单，以便以实际和良好的方式对其进行改进：
+在本书的示例项目中（关于 WWTravelClub 项目的更多信息，请参阅第一章，*理解软件架构的重要性*），情况并无不同。我们决定展示该标准的做法是描述我们在编写示例时遵循的一系列“做”和“不做”的清单。值得一提的是，这个清单是一个很好的开始标准，作为软件架构师，你应该与团队中的开发者讨论这个清单，以便以实际和良好的方式对其进行改进：
 
 +   **务必**用英语编写你的代码。
 
-+   **务必**遵循C#编码标准，使用驼峰命名法。
++   **务必**遵循 C#编码标准，使用驼峰命名法。
 
 +   **务必**使用易于理解的名称编写类、方法和变量。
 
@@ -230,19 +380,19 @@ C#可以被认为是一种设计上安全的编程语言。除非你强制使用
 
 +   **不要**编写空的`try`*-*`catch`语句。
 
-+   **不要**编写超过10个循环复杂度的方法。
++   **不要**编写超过 10 个循环复杂度的方法。
 
 +   **不要**在`for`/`while`/`do`*-*`while`/`foreach`语句中使用`break`和`continue`。
 
 +   **不要**使用`goto`语句。
 
-这些“做”和“不做”的规则很容易遵循，而且，更重要的是，它们将为你的团队产生的代码带来巨大的成果。在[第16章](47fba7aa-d9c6-46ad-b16a-1719f0d906f8.xhtml)，*使用工具编写更好的代码*中，我们将讨论帮助你实施这些规则的工具。
+这些“做”和“不做”的规则很容易遵循，而且，更重要的是，它们将为你的团队产生的代码带来巨大的成果。在第十六章，*使用工具编写更好的代码*中，我们将讨论帮助你实施这些规则的工具。
 
 # **摘要**
 
 在本章中，我们讨论了一些编写安全代码的重要提示。本章介绍了一个分析代码指标的工具，这样你可以管理你正在开发的软件的复杂性和可维护性。最后，我们提出了一些保证你的软件不会因为内存泄漏和异常而崩溃的好建议。在现实生活中，软件架构师总会被要求解决这类问题。
 
-在下一章中，我们将学习一些单元测试技术、单元测试的原则以及一个专注于C#测试项目的软件过程模型。
+在下一章中，我们将学习一些单元测试技术、单元测试的原则以及一个专注于 C#测试项目的软件过程模型。
 
 # **问题**
 
@@ -258,7 +408,7 @@ C#可以被认为是一种设计上安全的编程语言。除非你强制使用
 
 1.  实现`IDisposable`接口的重要性是什么？
 
-1.  当涉及到编码时，我们从.NET Core中获得了哪些优势？
+1.  当涉及到编码时，我们从.NET Core 中获得了哪些优势？
 
 # **进一步阅读**
 
@@ -268,20 +418,20 @@ C#可以被认为是一种设计上安全的编程语言。除非你强制使用
 
 +   《重构：改善既有代码的设计》by Martin Fowler. Addison Wesley, 1999。
 
-+   *托马斯·J·麦卡贝的复杂度度量*。IEEE 软件工程杂志，第 2 卷第 4 期，1976 年，第 308-320 页 ([https://dblp.uni-trier.de/db/journals/tse/tse2.html](https://dblp.uni-trier.de/db/journals/tse/tse2.html)).
++   *托马斯·J·麦卡贝的复杂度度量*。IEEE 软件工程杂志，第 2 卷第 4 期，1976 年，第 308-320 页 ([`dblp.uni-trier.de/db/journals/tse/tse2.html`](https://dblp.uni-trier.de/db/journals/tse/tse2.html)).
 
-+   [https://blogs.msdn.microsoft.com/zainnab/2011/05/25/code-metrics-class-coupling/](https://blogs.msdn.microsoft.com/zainnab/2011/05/25/code-metrics-class-coupling/)
++   [`blogs.msdn.microsoft.com/zainnab/2011/05/25/code-metrics-class-coupling/`](https://blogs.msdn.microsoft.com/zainnab/2011/05/25/code-metrics-class-coupling/)
 
-+   [https://docs.microsoft.com/en-us/visualstudio/code-quality/code-metrics-values?view=vs-2019](https://docs.microsoft.com/en-us/visualstudio/code-quality/code-metrics-values?view=vs-2019)
++   [`docs.microsoft.com/en-us/visualstudio/code-quality/code-metrics-values?view=vs-2019`](https://docs.microsoft.com/en-us/visualstudio/code-quality/code-metrics-values?view=vs-2019)
 
-+   [https://github.com/](https://github.com/)
++   [`github.com/`](https://github.com/)
 
-+   [https://bitbucket.org/](https://bitbucket.org/)
++   [`bitbucket.org/`](https://bitbucket.org/)
 
-+   [https://azure.microsoft.com/en-us/services/devops/](https://azure.microsoft.com/en-us/services/devops/)
++   [`azure.microsoft.com/en-us/services/devops/`](https://azure.microsoft.com/en-us/services/devops/)
 
-+   [https://guides.github.com/introduction/flow/](https://guides.github.com/introduction/flow/)
++   [`guides.github.com/introduction/flow/`](https://guides.github.com/introduction/flow/)
 
-+   [https://blogs.msdn.microsoft.com/devops/2018/04/19/release-flow-how-we-do-branching-on-the-vsts-team/](https://blogs.msdn.microsoft.com/devops/2018/04/19/release-flow-how-we-do-branching-on-the-vsts-team/)
++   [`blogs.msdn.microsoft.com/devops/2018/04/19/release-flow-how-we-do-branching-on-the-vsts-team/`](https://blogs.msdn.microsoft.com/devops/2018/04/19/release-flow-how-we-do-branching-on-the-vsts-team/)
 
-+   [https://docs.microsoft.com/aspnet/core/fundamentals/logging/](https://docs.microsoft.com/aspnet/core/fundamentals/logging/)
++   [`docs.microsoft.com/aspnet/core/fundamentals/logging/`](https://docs.microsoft.com/aspnet/core/fundamentals/logging/)

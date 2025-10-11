@@ -1,6 +1,6 @@
-# RPG角色设计
+# RPG 角色设计
 
-我们现在处于开发过程中的一个有趣阶段。在本章中，我们将讨论我们RPG角色的设计，并查看我们需要设计和实现的一些属性和特征。
+我们现在处于开发过程中的一个有趣阶段。在本章中，我们将讨论我们 RPG 角色的设计，并查看我们需要设计和实现的一些属性和特征。
 
 下面是本章涵盖的主题概述：
 
@@ -28,7 +28,7 @@
 
 # 角色定义
 
-要有一个有意义且有趣的RPG，游戏通常应该有多个角色类。在[第一章](part0021.html#K0RQ0-7a1ef7ae3ef249cdb149f8344d2e8e79)“什么是RPG？”中，我们定义了以下类类型：
+要有一个有意义且有趣的 RPG，游戏通常应该有多个角色类。在第一章“什么是 RPG？”中，我们定义了以下类类型：
 
 +   野蛮人
 
@@ -38,7 +38,7 @@
 
 由于时间限制，我们无法实现所有角色类型。展示一两个角色类型的实现应该为你开发自己的角色类提供一个良好的基础。毕竟，这是本书的整体目标。
 
-当然，主要角色之一是**玩家角色**（**PC**）。让我们先集中精力实现PC，然后我们可以开始定义和设计`野蛮人`类、`村民`类，也许还有`兽人`类。
+当然，主要角色之一是**玩家角色**（**PC**）。让我们先集中精力实现 PC，然后我们可以开始定义和设计`野蛮人`类、`村民`类，也许还有`兽人`类。
 
 我的角色模型将从资源商店获取。你可以下载相同的角色，或者设计自己的角色。你也可以使用不同类型的角色模型。关键是要根据规格实现角色，这些规格将在本章及以后定义。
 
@@ -100,7 +100,22 @@
 
 列出的属性是所有角色类将继承的属性。现在让我们将其放入代码中。创建一个新的 C# 脚本，命名为 `BaseCharacter.cs`。打开脚本并将以下代码放入文件中：
 
-[PRE0]
+```cs
+namespace com.noorcon.rpg2e 
+{ 
+   public class BaseCharacter 
+   { 
+      public string Name; 
+      public string Description; 
+
+      public float Strength; 
+      public float Defense; 
+      public float Dexterity; 
+      public float Intelligence; 
+      public float Health; 
+   } 
+} 
+```
 
 # 角色状态
 
@@ -156,7 +171,7 @@
 
 # 野蛮人
 
-此模型包含几种身体类型——肥胖、普通和瘦弱，这些类型是通过身体和布料上的混合形状设置的。它包含15种不同的身体和配件纹理，一种武器纹理和两种盾牌纹理。这为我们提供了一系列独特的角色定义和自定义选项，以增强RPG中不同NPC的范围。
+此模型包含几种身体类型——肥胖、普通和瘦弱，这些类型是通过身体和布料上的混合形状设置的。它包含 15 种不同的身体和配件纹理，一种武器纹理和两种盾牌纹理。这为我们提供了一系列独特的角色定义和自定义选项，以增强 RPG 中不同 NPC 的范围。
 
 我们将探讨如何在角色自定义时利用它们。以下截图展示了野蛮人的一个示例：
 
@@ -166,7 +181,7 @@
 
 # 村民
 
-村民模型为我们提供了两组模型：儿童和成人。在成人组中，我们有男性、女性和僧侣类型。提供了16个男性、3个僧侣、8个女性、4个儿童和2个装备纹理。对于女性类型，有两种纹理类型：标准发型，用于散发的头发，和帽子，与帽子等头部配件一起使用。
+村民模型为我们提供了两组模型：儿童和成人。在成人组中，我们有男性、女性和僧侣类型。提供了 16 个男性、3 个僧侣、8 个女性、4 个儿童和 2 个装备纹理。对于女性类型，有两种纹理类型：标准发型，用于散发的头发，和帽子，与帽子等头部配件一起使用。
 
 有两组不同的动画集：一组用于`成人`网格类型，另一组用于`儿童`网格类型。与成人相比，儿童类型的状态较少。以下截图展示了男性、女性和儿童村民：
 
@@ -208,13 +223,13 @@
 
 ![图片](img/00060.jpeg)
 
-在骨架选项卡中，有一些选项您可以应用于您的模型。假设您的角色是类人型，如果您尚未选择，您需要选择类人动画类型。Avatar定义也可以从模型创建或分配，如果您已经定义了Avatar。最后，您可以点击“配置...”按钮以查看设置好的骨架模型的配置。请参阅以下截图：
+在骨架选项卡中，有一些选项您可以应用于您的模型。假设您的角色是类人型，如果您尚未选择，您需要选择类人动画类型。Avatar 定义也可以从模型创建或分配，如果您已经定义了 Avatar。最后，您可以点击“配置...”按钮以查看设置好的骨架模型的配置。请参阅以下截图：
 
 ![图片](img/00061.jpeg)
 
 类人骨骼结构
 
-注意从前面的截图可以看出，你的模型为其骨骼定义了映射。如果你的模型是 Humanoid 类型，并且如果你的模型结构已经被正确命名，系统将自动分配正确的骨骼和关节。如果你的命名不符合Unity规范，你可以导航你的模型结构并手动为身体、头部、左手和右手中的每个点分配。
+注意从前面的截图可以看出，你的模型为其骨骼定义了映射。如果你的模型是 Humanoid 类型，并且如果你的模型结构已经被正确命名，系统将自动分配正确的骨骼和关节。如果你的命名不符合 Unity 规范，你可以导航你的模型结构并手动为身体、头部、左手和右手中的每个点分配。
 
 肌肉和设置选项卡将允许你定义和限制模型关节的运动。这些对于创建更逼真的角色动作非常有用和实用。你可以自己进一步研究这些主题，因为它们可能需要一整章或两章来涵盖。
 
@@ -222,15 +237,15 @@
 
 传统上，角色的动作和运动是通过代码分别完成的。随着 *Mecanim* 的引入，你现在可以应用所谓的 *根运动*。这根据根运动中的数据修改了角色的游戏内变换。
 
-我们将为我们的角色使用根运动。根运动与Animator Controller和动画状态机一起工作。身体变换和方向存储在动画剪辑中。这使得创建一个通过Animator Controller播放适当动画剪辑的状态机变得更容易。
+我们将为我们的角色使用根运动。根运动与 Animator Controller 和动画状态机一起工作。身体变换和方向存储在动画剪辑中。这使得创建一个通过 Animator Controller 播放适当动画剪辑的状态机变得更容易。
 
 # 动画控制器
 
-在本节中，我们将使用新的Animator Controller来创建我们的角色状态并确定状态变化的准则。让我们在项目窗口中创建一个新的文件夹并命名为 `Animator`。选择新创建的文件夹。
+在本节中，我们将使用新的 Animator Controller 来创建我们的角色状态并确定状态变化的准则。让我们在项目窗口中创建一个新的文件夹并命名为 `Animator`。选择新创建的文件夹。
 
-要创建一个Animator Controller，在项目窗口中，右键单击并选择 *创建 | 动画控制器*。给它起一个名字。我称之为 `BaseAnimatorController`。双击控制器以打开Animator窗口。
+要创建一个 Animator Controller，在项目窗口中，右键单击并选择 *创建 | 动画控制器*。给它起一个名字。我称之为 `BaseAnimatorController`。双击控制器以打开 Animator 窗口。
 
-Animator Controller 是一个非常复杂的工具，你需要花一些时间来研究通过它可用的不同方面和功能。以下截图是空控制器的快照。我已经标记了Animator窗口的主要部分。有两个可见的选项卡，即层选项卡和 *参数* 选项卡。在 *层* 选项卡中，你可以创建不同的层，这些层包含你的动画状态以及从一种状态到另一种状态的相关 `转换`。*参数* 选项卡是定义你的参数的地方，这些参数将由Animator Controller以及你的代码访问和修改。
+Animator Controller 是一个非常复杂的工具，你需要花一些时间来研究通过它可用的不同方面和功能。以下截图是空控制器的快照。我已经标记了 Animator 窗口的主要部分。有两个可见的选项卡，即层选项卡和 *参数* 选项卡。在 *层* 选项卡中，你可以创建不同的层，这些层包含你的动画状态以及从一种状态到另一种状态的相关 `转换`。*参数* 选项卡是定义你的参数的地方，这些参数将由 Animator Controller 以及你的代码访问和修改。
 
 要完全理解 Mecanim 系统，你需要了解一系列的主题。在这本书中，我们不会涵盖所有方面，但会涉及一些对我们游戏所需的关键方面进行探讨。请看以下截图：
 
@@ -242,7 +257,7 @@ Animator Controller 是一个非常复杂的工具，你需要花一些时间来
 
 ![图片](img/00063.jpeg)
 
-您的模型可能或可能没有附加动画。Mecanim系统的整个想法是使角色模型师能够在他们的模型上工作，同时动画师可以使用类人形角色的骨架来动画化角色。这反过来使得将一系列动画应用于不同类型的角色模型变得更加容易和更好！
+您的模型可能或可能没有附加动画。Mecanim 系统的整个想法是使角色模型师能够在他们的模型上工作，同时动画师可以使用类人形角色的骨架来动画化角色。这反过来使得将一系列动画应用于不同类型的角色模型变得更加容易和更好！
 
 为了识别状态，最好给它提供一个独特且易于在状态图中识别的名称。您需要给它分配一个动作；这是当状态激活时将播放的动画剪辑。下一个重要的属性将是*转换*属性。转换将确定状态将移动到另一个状态的条件，如果存在这样的要求。
 
@@ -256,7 +271,7 @@ Animator Controller 是一个非常复杂的工具，你需要花一些时间来
 
 在这个例子中，行走和跑步状态实际上是一个混合树。混合树用于使从一个动画状态到下一个动画状态的过渡更加自然。为了使混合动作有意义，混合的动作必须是相似性质和时序的。
 
-混合树用于通过将它们的所有部分以不同程度地结合在一起，允许多个动画平滑地混合。每个动作对最终效果贡献的程度是通过一个混合参数控制的，这个参数只是与Animator Controller关联的数字动画参数之一。
+混合树用于通过将它们的所有部分以不同程度地结合在一起，允许多个动画平滑地混合。每个动作对最终效果贡献的程度是通过一个混合参数控制的，这个参数只是与 Animator Controller 关联的数字动画参数之一。
 
 例如，行走状态可能看起来像以下屏幕截图：
 
@@ -266,9 +281,9 @@ Animator Controller 是一个非常复杂的工具，你需要花一些时间来
 
 在我们的第一个*混合树*节点中，我们有五个输出：`HumanoidWalkLeftSharp`、`HumanoidWalkLeft`、`WalkFWD`、`HumanoidWalkRight`和`HumanoidWalkRightSharp`。这些是根据名为*水平*的参数值播放的动画剪辑。
 
-这些动画来自*Mecanim的原始Mocap数据*。
+这些动画来自*Mecanim 的原始 Mocap 数据*。
 
-在行为区域，你会注意到为参数设置了一些阈值；这些阈值决定了要播放的动画。水平参数的值通过我们的C#代码通过传递水平轴的值来设置，该值在输入管理器中定义。请看以下截图：
+在行为区域，你会注意到为参数设置了一些阈值；这些阈值决定了要播放的动画。水平参数的值通过我们的 C#代码通过传递水平轴的值来设置，该值在输入管理器中定义。请看以下截图：
 
 ![图片](img/00066.jpeg)
 
@@ -282,9 +297,9 @@ Animator Controller 是一个非常复杂的工具，你需要花一些时间来
 
 状态图
 
-在这个阶段，我已经提前实现了*空闲*、*行走*、*奔跑*、*空闲跳跃*、*奔跑跳跃、攻击1/2/3*、*拳头*和*死亡*的状态图。
+在这个阶段，我已经提前实现了*空闲*、*行走*、*奔跑*、*空闲跳跃*、*奔跑跳跃、攻击 1/2/3*、*拳头*和*死亡*的状态图。
 
-定义从空闲状态到行走和奔跑状态的转换的参数是速度参数。如果速度值大于0.1，它将从空闲状态转换为行走状态；如果它大于0.6，它将从行走状态转换为奔跑状态。从奔跑状态到行走状态，以及从行走状态到奔跑状态的转换情况相反。
+定义从空闲状态到行走和奔跑状态的转换的参数是速度参数。如果速度值大于 0.1，它将从空闲状态转换为行走状态；如果它大于 0.6，它将从行走状态转换为奔跑状态。从奔跑状态到行走状态，以及从行走状态到奔跑状态的转换情况相反。
 
 然而，请注意，角色只能从空闲状态或奔跑状态进入跳跃状态。控制这种转换的参数是`Jump`参数，它是一个通过按键盘上的空格键设置的布尔值。
 
@@ -296,13 +311,128 @@ Animator Controller 是一个非常复杂的工具，你需要花一些时间来
 
 是时候让我们的角色在场景中移动了。这通常由角色控制器处理。角色控制器将被用来处理玩家在游戏中与角色的大部分交互。
 
-创建一个新的C#脚本，并将其命名为`BarbarianCharacterController.cs`。在`BarbarianCharacterController`类中输入以下代码。目前代码非常基础。让我们列出代码，然后我们可以开始讨论代码的不同部分：
+创建一个新的 C#脚本，并将其命名为`BarbarianCharacterController.cs`。在`BarbarianCharacterController`类中输入以下代码。目前代码非常基础。让我们列出代码，然后我们可以开始讨论代码的不同部分：
 
-[PRE1]
+```cs
+using UnityEngine; 
 
-在`Start()`函数中，我们将获取Animator Controller的引用。我们将使用`FixedUpdate()`函数来执行角色移动的更新，如下面的代码所示：
+namespace com.noorcon.rpg2e 
+{ 
+   public class BarbarianCharacterController : MonoBehaviour 
+   { 
 
-[PRE2]
+      public Animator animator; 
+      public float directionDampTime; 
+
+      public float speed = 6.0f; 
+      public float h = 0.0f; 
+      public float v = 0.0f; 
+
+      bool attack = false; 
+      bool punch = false; 
+      bool run = false; 
+
+      bool jump = false; 
+      bool die = false; 
+      bool dead = false; 
+
+      // Use this for initialization 
+      void Start() 
+      { 
+         this.animator = GetComponent<Animator>() as Animator; 
+      } 
+
+      // Update is called once per frame 
+      private Vector3 moveDirection = Vector3.zero; 
+
+      void Update() 
+      { 
+
+         if (dead) 
+         { 
+            if (die) 
+            { 
+               die = !die; 
+               animator.SetBool("Die", die); 
+            } 
+         return; 
+      } 
+
+         if (Input.GetKeyDown(KeyCode.C)) 
+         { 
+            attack = true; 
+         } 
+         if (Input.GetKeyUp(KeyCode.C)) 
+         { 
+            attack = false; 
+         } 
+         animator.SetBool("Attack", attack); 
+
+         if (Input.GetKeyDown(KeyCode.P)) 
+         { 
+            punch = true; 
+         } 
+         if (Input.GetKeyUp(KeyCode.P)) 
+         { 
+            punch = false; 
+         } 
+         animator.SetBool("Punch", punch); 
+
+         if (Input.GetKeyDown(KeyCode.LeftShift)) 
+         { 
+            this.run = true; 
+         } 
+         if (Input.GetKeyUp(KeyCode.LeftShift)) 
+         { 
+            this.run = false; 
+         } 
+         animator.SetBool("Run", run); 
+
+         if (Input.GetKeyDown(KeyCode.Space)) 
+         { 
+            jump = true; 
+         } 
+         if (Input.GetKeyUp(KeyCode.Space)) 
+         { 
+            jump = false; 
+         } 
+         animator.SetBool("Jump", jump); 
+
+         if (Input.GetKeyDown(KeyCode.I)) 
+         { 
+            die = true; 
+            dead = true; 
+         } 
+
+         animator.SetBool("Die", die); 
+      } 
+
+```
+
+在`Start()`函数中，我们将获取 Animator Controller 的引用。我们将使用`FixedUpdate()`函数来执行角色移动的更新，如下面的代码所示：
+
+```cs
+      void FixedUpdate() 
+      { 
+         // The Inputs are defined in the Input Manager 
+         // get value for horizontal axis 
+         h = Input.GetAxis("Horizontal"); 
+         // get value for vertical axis 
+         v = Input.GetAxis("Vertical"); 
+
+         speed = new Vector2(h, v).sqrMagnitude; 
+
+         // Used to get values on console 
+         Debug.Log(string.Format("H:{0} - V:{1} - Speed:{2}", h, v,    
+         speed)); 
+
+         animator.SetFloat("Speed", speed); 
+         animator.SetFloat("Horizontal", h); 
+         animator.SetFloat("Vertical", v); 
+      } 
+   } 
+} 
+```
 
 `Update()` 函数和 `FixedUpdate()` 函数的区别是什么？`Update()` 函数在每一帧都会被调用，通常用于更新非物理对象的移动、简单的计时器和输入处理。`Update()` 函数的更新间隔时间会有所不同。`FixedUpdate()` 函数在物理步骤中调用。间隔是固定的，用于调整 Rigidbody 上的物理。
 
@@ -340,7 +470,7 @@ Animator Controller 是一个非常复杂的工具，你需要花一些时间来
 
 ![](img/00070.jpeg)
 
-现在，你将进入动画的编辑模式，如图下面的屏幕截图所示。我把它放在旁边，以展示动画选项卡，选择我们想要修改的每个动画，一次一个，并将循环时间属性设置为True。
+现在，你将进入动画的编辑模式，如图下面的屏幕截图所示。我把它放在旁边，以展示动画选项卡，选择我们想要修改的每个动画，一次一个，并将循环时间属性设置为 True。
 
 在这个特定的屏幕截图中，你还会注意到动画的几个其他重要属性，例如*根变换旋转*、*镜像*、*曲线*、*事件*、*遮罩*和*运动*。当我们为我们的角色动画设置逆运动学时，我们会使用曲线属性。这基本上设置了预定义参数的值，这些值可以通过*Mecanim*来设置或获取。看看下面的屏幕截图：
 
@@ -362,29 +492,143 @@ Animator Controller 是一个非常复杂的工具，你需要花一些时间来
 
 **逆运动学**（**IK**）在游戏编程中非常重要。它通常用于使角色的动作更加逼真。逆运动学的一个主要用途是计算玩家的脚以及它们与站立地面的关系。
 
-简而言之，IK用于根据空间中的给定位置确定角色的关节位置和旋转。例如，确保玩家的脚在行走的地面上的着陆位置正确。
+简而言之，IK 用于根据空间中的给定位置确定角色的关节位置和旋转。例如，确保玩家的脚在行走的地面上的着陆位置正确。
 
-Unity有一个内置的逆运动学系统，可以用来进行这方面的基本计算。让我们继续为我们的角色实现脚部逆运动学。在我们为我们的拟人角色启用逆运动学之前，有一些事情需要设置。
+Unity 有一个内置的逆运动学系统，可以用来进行这方面的基本计算。让我们继续为我们的角色实现脚部逆运动学。在我们为我们的拟人角色启用逆运动学之前，有一些事情需要设置。
 
-首件事是检查你的动画控制器中的层级，并使用引擎图标进入设置窗口。确保已勾选*IK传递*，如图下所示。如果你还没有这样做，你还需要提供一个遮罩。遮罩用于指定哪些骨骼部分受到逆运动学的影响。请参考以下截图：
+首件事是检查你的动画控制器中的层级，并使用引擎图标进入设置窗口。确保已勾选*IK 传递*，如图下所示。如果你还没有这样做，你还需要提供一个遮罩。遮罩用于指定哪些骨骼部分受到逆运动学的影响。请参考以下截图：
 
 ![图片](img/00072.jpeg)
 
 逆运动学遮罩
 
-一旦设置好，乐趣就开始了。我们需要创建一个C#脚本来处理我们的IK。创建一个名为`IKHandle.cs`的C#脚本。将以下代码输入到脚本中：
+一旦设置好，乐趣就开始了。我们需要创建一个 C#脚本来处理我们的 IK。创建一个名为`IKHandle.cs`的 C#脚本。将以下代码输入到脚本中：
 
-[PRE3]
+```cs
+using UnityEngine; 
 
-这个脚本有些复杂。为了使逆运动学，即IK，正常工作，我们需要在空间中识别几个重要的点。其中一个点是我们要让脚移动到的目标位置在空间中的位置，另一个点是提示。这两个空间点用于控制特定关节的骨骼运动和变换，以便成功完成目标位置的IK。请参考以下代码：
+namespace com.noorcon.rpg2e 
+{ 
+   public class IKHandle : MonoBehaviour 
+   { 
+      Animator anim; 
 
-[PRE4]
+      #region USED FOR MANUAL TESTING 
+      Transform leftIKTarget; 
+      Transform rightIKTarget; 
+
+      Transform hintLeft; 
+      Transform hintRight; 
+
+      float ikWeight = 1f; 
+      #endregion 
+
+      // to make it dynamic 
+      [Header("Dynamic IK Values")] 
+      Vector3 LeftFootPosition; 
+      Vector3 RightFootPosition; 
+
+      Quaternion LeftFootRotation; 
+      Quaternion RightFootRotation; 
+
+      float LeftFootWeight; 
+      float RightFootWeight; 
+
+      public Transform LeftFoot; 
+      public Transform RightFoot; 
+
+      [Header("Adjustment Properties for IK")] 
+      public float OffsetY; 
+
+      public float LookIkWeight = 1.0f; 
+      public float BodyWeight = 0.7f; 
+      public float HeadWeight = 0.9f; 
+      public float EyesWeight = 1.0f; 
+      public float ClampWeight = 1.0f; 
+
+      public Transform LookPosition; 
+
+      // Use this for initialization 
+      void Start() 
+      { 
+         anim = GetComponent<Animator>(); 
+
+         LeftFoot = anim.GetBoneTransform(HumanBodyBones.LeftFoot); 
+         RightFoot = anim.GetBoneTransform(HumanBodyBones.RightFoot); 
+
+         LeftFootRotation = LeftFoot.rotation; 
+         RightFootRotation = RightFoot.rotation; 
+
+      } 
+```
+
+这个脚本有些复杂。为了使逆运动学，即 IK，正常工作，我们需要在空间中识别几个重要的点。其中一个点是我们要让脚移动到的目标位置在空间中的位置，另一个点是提示。这两个空间点用于控制特定关节的骨骼运动和变换，以便成功完成目标位置的 IK。请参考以下代码：
+
+```cs
+      // Update is called once per frame 
+      void Update() 
+      { 
+         // we can set the look position here somewhere 
+         Ray ray = new Ray(Camera.main.transform.position, 
+         Camera.main.transform.forward); 
+
+         Debug.DrawRay(Camera.main.transform.position, 
+         Camera.main.transform.forward * 15, Color.cyan); 
+
+         //lookPosition.position = ray.GetPoint(15); 
+
+         RaycastHit leftHit; 
+         RaycastHit rightHit; 
+
+         Vector3 lpos = LeftFoot.TransformPoint(Vector3.zero); 
+         Vector3 rpos = RightFoot.TransformPoint(Vector3.zero); 
+
+         if (Physics.Raycast(lpos, -Vector3.up, out leftHit, 1)) 
+         { 
+            LeftFootPosition = leftHit.point; 
+            LeftFootRotation = Quaternion.FromToRotation(transform.up, 
+            leftHit.normal) * transform.rotation; 
+         } 
+
+         if (Physics.Raycast(rpos, -Vector3.up, out rightHit, 1)) 
+         { 
+            RightFootPosition = rightHit.point; 
+            RightFootRotation = Quaternion.FromToRotation(transform.up,    
+            rightHit.normal) * transform.rotation; 
+         } 
+      } 
+
+      void OnAnimatorIK() 
+      { 
+         LeftFootWeight = anim.GetFloat("MyLeftFoot"); 
+         RightFootWeight = anim.GetFloat("MyRightFoot"); 
+
+         anim.SetIKPositionWeight(AvatarIKGoal.LeftFoot, 
+         LeftFootWeight); 
+         anim.SetIKPositionWeight(AvatarIKGoal.RightFoot, 
+         RightFootWeight); 
+         anim.SetIKPosition(AvatarIKGoal.LeftFoot, LeftFootPosition + 
+         new Vector3(0f, OffsetY, 0f)); 
+         anim.SetIKPosition(AvatarIKGoal.RightFoot, RightFootPosition + 
+         new Vector3(0f, OffsetY, 0f)); 
+
+         anim.SetIKRotationWeight(AvatarIKGoal.LeftFoot, 
+         LeftFootWeight); 
+         anim.SetIKRotationWeight(AvatarIKGoal.RightFoot, 
+         RightFootWeight); 
+         anim.SetIKRotation(AvatarIKGoal.LeftFoot, LeftFootRotation); 
+         anim.SetIKRotation(AvatarIKGoal.RightFoot, RightFootRotation); 
+
+      } 
+   } 
+} 
+```
 
 `LeftFootPosition`和`RightFootPosition`变量用于在运行时表示左右脚的目标位置。`LeftFootRotation`和`RightFootRotation`用于存储左右脚的旋转。
 
 我们还需要两个变量来在模型中实际引用我们的左右脚。这是通过`LeftFoot`和`RightFoot`变量完成的。
 
-其中一些变量在`Start()`函数中初始化。具体来说，我们从为人类角色定义的Animator Controller骨骼结构中获取左右脚的引用。
+其中一些变量在`Start()`函数中初始化。具体来说，我们从为人类角色定义的 Animator Controller 骨骼结构中获取左右脚的引用。
 
 在`Update()`函数中，我们使用`Physics.Raycast()`执行一些射线投射，以确定左右脚的位置。然后，这些数据被使用并存储在`LeftFootPosition`和`RightFootPosition`变量中，以及它们在`LeftFootRotation`和`RightFootRotation`变量中的等效旋转数据。请看以下截图：
 
@@ -392,9 +636,9 @@ Unity有一个内置的逆运动学系统，可以用来进行这方面的基本
 
 动画曲线
 
-实际的IK动画是在`OnAnimatorIK()`函数中应用的。`LeftFootWeight`和`RightFootWeight`变量用于通过Animator Controller中的动画剪辑`Curve`函数获取为`MyLeftFoot`和`MyRightFoot`设置的参数值。
+实际的 IK 动画是在`OnAnimatorIK()`函数中应用的。`LeftFootWeight`和`RightFootWeight`变量用于通过 Animator Controller 中的动画剪辑`Curve`函数获取为`MyLeftFoot`和`MyRightFoot`设置的参数值。
 
-关键在于正确定义将用于驱动IK权重的动画剪辑曲线。前面的截图只显示了空闲状态的曲线。两只脚都放在地面上，因此值设置为1。对于你的行走和跑步剪辑，你的曲线将不同。
+关键在于正确定义将用于驱动 IK 权重的动画剪辑曲线。前面的截图只显示了空闲状态的曲线。两只脚都放在地面上，因此值设置为 1。对于你的行走和跑步剪辑，你的曲线将不同。
 
 最后，使用`SetIKPositionWeight()`和`SetIKPosition()`函数来正确调整脚相对于地面的位置和旋转！请注意，这是为每只脚分别执行的。
 
@@ -402,19 +646,19 @@ Unity有一个内置的逆运动学系统，可以用来进行这方面的基本
 
 # 设置动画曲线
 
-这一步对于IK的正常工作非常重要。我将使用空闲动画来演示需要配置的内容，以确保动画控制器中的参数设置正确。请看以下截图：
+这一步对于 IK 的正常工作非常重要。我将使用空闲动画来演示需要配置的内容，以确保动画控制器中的参数设置正确。请看以下截图：
 
 ![图片](img/00074.jpeg)
 
 动画曲线修改
 
-为了使IK正常工作并看起来不错，你需要为与脚部运动相关的每个动画设置曲线。由于我们有五套行走和跑步的动画，你需要为每个动画曲线执行相同的操作，以正确设置传递给IK脚本的权重值。
+为了使 IK 正常工作并看起来不错，你需要为与脚部运动相关的每个动画设置曲线。由于我们有五套行走和跑步的动画，你需要为每个动画曲线执行相同的操作，以正确设置传递给 IK 脚本的权重值。
 
 # 概述
 
-我们在本章中涵盖了大量内容。我们讨论了我们将在游戏中使用的不同角色定义，查看所有角色将共享的基础角色类属性，并创建了`BaseCharacter`类，以便在游戏后期使用。我们还讨论了角色在游戏中的主要状态，以及如何使用Animator Controller来实现它们。
+我们在本章中涵盖了大量内容。我们讨论了我们将在游戏中使用的不同角色定义，查看所有角色将共享的基础角色类属性，并创建了`BaseCharacter`类，以便在游戏后期使用。我们还讨论了角色在游戏中的主要状态，以及如何使用 Animator Controller 来实现它们。
 
-我们探讨了如何为我们的角色模型绑定，使其为Mecanim系统做好准备，以及如何使用Mecanim系统创建动画和状态图，这些图将决定角色在游戏中的行为。然后我们实现了我们的初始角色控制器脚本，该脚本处理我们角色的状态。这给了我们机会查看混合树以及使用参数从一个状态过渡到下一个状态。然后我们探讨了如果需要的话如何修改动画剪辑。
+我们探讨了如何为我们的角色模型绑定，使其为 Mecanim 系统做好准备，以及如何使用 Mecanim 系统创建动画和状态图，这些图将决定角色在游戏中的行为。然后我们实现了我们的初始角色控制器脚本，该脚本处理我们角色的状态。这给了我们机会查看混合树以及使用参数从一个状态过渡到下一个状态。然后我们探讨了如果需要的话如何修改动画剪辑。
 
 最后，我们学习了逆运动学，这将帮助我们的角色在游戏环境中表现得更加真实。
 

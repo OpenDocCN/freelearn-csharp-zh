@@ -20,7 +20,7 @@
 
 # 技术要求
 
-本章的源代码可以在 GitHub 仓库的此分支下找到：[https://github.com/PacktPublishing/.NET-MAUI-for-C-Sharp-Developers/tree/Layouts](https://github.com/PacktPublishing/.NET-MAUI-for-C-Sharp-Developers/tree/Layouts)
+本章的源代码可以在 GitHub 仓库的此分支下找到：[`github.com/PacktPublishing/.NET-MAUI-for-C-Sharp-Developers/tree/Layouts`](https://github.com/PacktPublishing/.NET-MAUI-for-C-Sharp-Developers/tree/Layouts)
 
 # 堆叠布局
 
@@ -36,7 +36,35 @@
 
 我们已经看到了 `VerticalStackLayout` 和 `HorizontalStackLayout` 的应用。正如其名称所示，`VerticalStackLayout` 将一个控件放置在另一个控件的上方，而 `HorizontalStackLayout` 则将它们并排放置。使用 `margins`（对象之间的空间）和 `padding`（对象周围的空间），您只需使用这些控件就能调整出一个不错的布局：
 
-[PRE0]
+```cs
+<VerticalStackLayout x:Name="LoginStackLayout">
+    <HorizontalStackLayout WidthRequest="300">
+        <Label
+            Style="{StaticResource LargeLabel}"
+            Text="User Name" />
+        <Entry
+            HorizontalOptions="End"
+            Placeholder="User Name"
+            Text="{Binding Name}"
+            WidthRequest="150" />
+    </HorizontalStackLayout>
+    <HorizontalStackLayout WidthRequest="300">
+        <Label
+            Style="{StaticResource SmallLabel}"
+            Text="Password" />
+        <Entry
+            HorizontalOptions="End"
+            IsPassword="True"
+            Placeholder="Password"
+            Text="{Binding Password}"
+            WidthRequest="150" />
+    </HorizontalStackLayout>
+    <BoxView
+        Color="Red"
+        HeightRequest="2"
+        Margin="0,20"
+        WidthRequest="400" />
+```
 
 在这里，在 `LoginPage` 页面上，我们从一个 `VerticalStackLayout` 对象开始，它将包含其下直到关闭 `</VerticalStackLayout>` 标签的所有内容。紧接着，我们声明一个 `HorizontalStackLayout` 对象，它包含一个 `Label`（作为提示）和一个 `Entry`（收集用户的名字）。
 
@@ -54,15 +82,137 @@
 
 我们可以使用`Grid`重新创建`LoginPage`页面。让我们看看第一次近似的全貌（我已经省略了资源部分，因为它没有变化）：
 
-[PRE1]
+```cs
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    Title="Login Page"
+    x:Class="ForgetMeNotDemo.View.LoginPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:behaviors="http://schemas.microsoft.com/dotnet
+     /2022/maui/toolkit"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml">
+    <VerticalStackLayout x:Name="LoginStackLayout">   [1]
+        <Grid  [2]
+            ColumnDefinitions="*,*,*"  [3]
+            RowDefinitions="*,*,*,*,*"  [4]
+            x:Name="LoginGrid">
+            <Label
+                Grid.Column="0"  [5]
+                Grid.Row="0"  [6]
+                HorizontalOptions="End" [7]
+                Margin="5,20,0,10"
+                Text="User Name"
+                VerticalOptions="Center" [8] />
+            <Entry
+                Grid.Column="1"
+                Grid.ColumnSpan="2" [9]
+                Grid.Row="0"
+                HorizontalOptions="Center"
+                Margin="5,20,0,10"
+                Placeholder="User Name"
+                Text="{Binding Name}"
+                VerticalOptions="End"
+                WidthRequest="150" />
+            <Label                     [10]
+                Grid.Column="0"
+                Grid.Row="1"
+                HorizontalOptions="End"
+                Margin="5,10"
+                Text="Password"
+                VerticalOptions="Center" />
+            <Entry
+                Grid.Column="1"
+                Grid.ColumnSpan="2"
+                Grid.Row="1"
+                HorizontalOptions="Center"
+                IsPassword="True"
+                Placeholder="Password"
+                Text="{Binding Password}"
+                VerticalOptions="Start"
+                WidthRequest="150" />
+            <BoxView
+                Color="Red"
+                Grid.Column="0"
+                Grid.ColumnSpan="3" [11]
+                Grid.Row="2"
+                HeightRequest="2"
+                Margin="0,10"
+                WidthRequest="400" />
+```
 
 接下来要添加的是框架：
 
-[PRE2]
+```cs
+            <Frame
+                BorderColor="Blue"
+                CornerRadius="10"
+                Grid.Column="0"
+                Grid.Row="3"
+                HasShadow="True"
+                HeightRequest="50"
+                WidthRequest="50">
+                <Frame.Background>
+                    <LinearGradientBrush EndPoint="1,0">
+                        <GradientStop Color="Yellow" Offset="0.2" />
+                        <GradientStop Color="Red"
+                            Offset="0.1" />
+                    </LinearGradientBrush>
+                </Frame.Background>
+            </Frame>
+            <Frame
+                BorderColor="Blue"
+                CornerRadius="10"
+                Grid.Column="1"
+                Grid.ColumnSpan="2"
+                Grid.Row="3"
+                HasShadow="True"
+                HeightRequest="50"
+                WidthRequest="100">
+                <Frame.Background>
+                    <RadialGradientBrush>
+                        <GradientStop Color="Yellow"
+                            Offset="0.2" />
+                        <GradientStop Color="Red"
+                            Offset="0.1" />
+                    </RadialGradientBrush>
+                </Frame.Background>
+            </Frame>
+```
 
 在设置好这些之后，我们可以添加三个按钮，然后关闭`Grid`和`VerticalStackLayout`：
 
-[PRE3]
+```cs
+            <Button
+                BackgroundColor="Gray"
+                Command="{Binding SubmitCommand}"
+                Grid.Column="0"
+                Grid.Row="4"
+                Margin="5"
+                Text="Submit" />
+            <Button
+                BackgroundColor="Gray"
+                Command="{Binding CreateCommand}"
+                Grid.Column="1"
+                Grid.Row="4"
+                Margin="5"
+                Text="Create Account" />
+            <Button
+                BackgroundColor="Gray"
+                Clicked="OnForgotPassword"
+                Grid.Column="2"
+                Grid.Row="4"
+                Margin="5"
+                Text="Forgot Password" />
+            <Label
+                Grid.Column="0"
+                Grid.ColumnSpan="3"
+                Grid.Row="5"
+                Text="
+                x:Name="CreateAccount" />
+        </Grid>
+    </VerticalStackLayout>
+</ContentPage>
+```
 
 [1] 我们将`Grid`放入`VerticalStackLayout`中，这样我们就可以在网格下方添加`ProgressBar`（将其添加到`VerticalStackLayout`的`Children`集合中，该集合将只有两个成员：`Grid`和`ProgressBar`）。
 
@@ -80,31 +230,29 @@
 
 [4] 类似地，我们声明了五个大小相等的行。
 
-[5] 我们将标签放置在列0中。
+[5] 我们将标签放置在列 0 中。
 
-[6] 我们将标签放置在行0中。
+[6] 我们将标签放置在行 0 中。
 
 [7] 水平选项是相对于控件所在的列而言的。
 
 [8] 垂直选项是相对于控件所在的行而言的。
 
-[9] 一个控件可以跨越多个列。在这种情况下，条目从列1开始，跨越2列（即它占据了列1和2）。
+[9] 一个控件可以跨越多个列。在这种情况下，条目从列 1 开始，跨越 2 列（即它占据了列 1 和 2）。
 
 [10] 注意，我们不需要`HorizontalStackLayout`，因为提示与输入之间的位置是由它们所在的列及其水平选项（例如，开始、居中或结束）决定的。
 
-[11] `BoxView`想要跨越整个网格，因此它从列0开始，列跨度为3。
+[11] `BoxView`想要跨越整个网格，因此它从列 0 开始，列跨度为 3。
 
-注意，其他内容无需更改。我调整了页边距和垂直选项，以获得所需的**像素级**对齐，但除此之外，XAML保持不变。
+注意，其他内容无需更改。我调整了页边距和垂直选项，以获得所需的**像素级**对齐，但除此之外，XAML 保持不变。
 
 另一点需要注意的是，我们有将垂直和水平选项以及页边距提取到样式中的机会。
 
-将`StackLayout`转换为网格的结果显示在*图6.1*中。
+将`StackLayout`转换为网格的结果显示在*图 6.1*中。
 
-![图6.1 – 第一个网格布局
+![图 6.1 – 第一个网格布局](img/Figure_6.1_B19723.jpg)
 
-](img/Figure_6.1_B19723.jpg)
-
-图6.1 – 第一个网格布局
+图 6.1 – 第一个网格布局
 
 注意，`ProgressBar`仍然可见。它在代码隐藏中添加到`VerticalStackLayout`，就像之前一样。
 
@@ -112,7 +260,7 @@
 
 `RowHeight`和`ColumnWidth`可以以三种方式之一定义：
 
-1.  *绝对值*：DIU中的值
+1.  *绝对值*：DIU 中的值
 
 1.  *自动大小*：根据单元格内容自动调整大小
 
@@ -120,17 +268,23 @@
 
 目前，`Grid`的顶部看起来是这样的：
 
-[PRE4]
+```cs
+        <Grid  [2]
+            ColumnDefinitions="*,*,*"
+            RowDefinitions="*,*,*,*,*"
+```
 
 我们可以使用`auto`来表示每个控件将占据每行所需的房间量：
 
-[PRE5]
+```cs
+        <Grid  [2]
+            ColumnDefinitions="*,*,*"
+            RowDefinitions="auto,auto,auto,auto,auto"
+```
 
-让我们也将框架的高度设置为`150`。`auto`为新扩大的框架分配足够的房间，如图*图6.2*所示。
+让我们也将框架的高度设置为`150`。`auto`为新扩大的框架分配足够的房间，如图*图 6.2*所示。
 
-![图 6.2 – 使用自动调整大小
-
-](img/Figure_6.2_B19723.jpg)
+![图 6.2 – 使用自动调整大小](img/Figure_6.2_B19723.jpg)
 
 图 6.2 – 使用自动调整大小
 
@@ -140,13 +294,15 @@
 
 我们可以将之前显示的行重写如下：
 
-[PRE6]
+```cs
+<Grid
+    ColumnDefinitions="*,*,*"
+    RowDefinitions="*,*,auto,auto,50,auto"
+```
 
 现在的计算将是找到三个 `auto` 行的实际大小，并添加 `50` 设备无关单位，用于第五行。然后，我们将网格大小中剩余的部分平均分配给第一行和第二行。结果如下所示：
 
-![图 6.3 – 结合星号、绝对和自动
-
-](img/Figure_6.3_B19723.jpg)
+![图 6.3 – 结合星号、绝对和自动](img/Figure_6.3_B19723.jpg)
 
 图 6.3 – 结合星号、绝对和自动
 
@@ -162,7 +318,20 @@
 
 首先，我们将定义枚举，这些枚举将分别作为我们行和列的名称：
 
-[PRE7]
+```cs
+enum Row
+{
+  Username,
+  Password,
+  Buttons
+}
+enum Column
+{
+  Submit,
+  Create,
+  Forgot
+}
+```
 
 你可以使用什么来命名完全取决于你；通常，你会使用一些描述那些行和列内容的名称。因此，在这里，我的第一行将包含 `Username`，我的第二行将包含 `Password`，我的第三行将包含我们的三个 `Buttons`。
 
@@ -170,7 +339,84 @@
 
 这是完整的类，我将其命名为 `LoginCS.cs`：
 
-[PRE8]
+```cs
+class LoginCS : ContentPage
+{
+  public LoginCS()  [1]
+  {
+    BindingContext = new LoginViewModel();
+    Content = new VerticalStackLayout() [2]
+    {
+      Children =
+                {
+                    new Grid()  [3]
+                    {
+                        RowDefinitions = GridRowsColumns
+                           .Rows.Define(
+                            (Row.Username,Auto), [4]
+                            (Row.Password,Auto),
+                            (Row.Buttons, Auto)
+                            ),
+                        ColumnDefinitions = GridRowsColumns
+                            .Columns.Define(
+                            (Column.Submit,Star), [5]
+                            (Column.Create, Star),
+                            (Column.Forgot, Star)
+                            ),
+                        Children =
+                        {
+                            new Label()
+                                .Text("User name")
+                                .Row(Row.Username)
+                                    .Column(0), [6]
+                            new Entry()
+                                .Placeholder("User name")
+                                .Bind(Entry.TextProperty,
+                                  nameof(LoginViewModel
+                                   .Name))
+                                .Row(Row.Username)
+                                   .Column(1)
+                                .ColumnSpan(2),
+                            new Label()
+                                .Text("Password")
+                                .Row(Row.Password)
+                                  .Column(0),
+                            new Entry {IsPassword = true}
+                                .Placeholder("Password")
+                                .Bind(Entry.TextProperty,
+                                    nameof(LoginViewModel
+                                      .Password))
+                                .Row(Row.Password)
+                                  .Column(1)
+                                .ColumnSpan(2),
+                            new Button()
+                                .Text("Submit")
+                                .Row(Row.Buttons).Column
+                                  (Column.Submit) [7]
+                                .Margin(5)
+                                .BindCommand(nameof
+                                 (LoginViewModel
+                                   .SubmitCommand)),
+                            new Button()
+                                .Text("Create Account")
+                                .Margin(5)
+                                .Row(Row.Buttons).Column
+                                  (Column.Create)
+                                .BindCommand(nameof
+                                (LoginViewModel
+                                  .CreateCommand)),
+                            new Button()
+                                .Margin(5)
+                                .Text("Forgot Password")
+                                .Row(Row.Buttons)
+                                   .Column(Column.Forgot)
+                        }
+                    }
+                }
+    };
+  }
+}
+```
 
 [1] 工作在构造函数中完成
 
@@ -202,7 +448,10 @@
 
 我们在 `PreferencesPage` 中看到了 `ScrollView` 的使用，我们在 `ScrollView` 控件中包裹了 `VerticalStackLayout`：
 
-[PRE9]
+```cs
+<ScrollView>
+    <VerticalStackLayout>
+```
 
 预设的数量略多于一次显示在手机屏幕上的数量。如果你在 `PreferenceService` 中添加更多预设，你可以更清楚地看到滚动效果。
 
@@ -228,13 +477,14 @@ FlexLayout – 看起来熟悉吗？
 
 移除 `VerticalStackLayout` 并用 `FlexLayout` 替换它。将方向设置为 `Row`：
 
-[PRE10]
+```cs
+<FlexLayout
+    Direction="Row">
+```
 
 *Figure 6**.4* 展示了结果。它很丑，但它传达了正在发生的事情。多余的项目水平包装。
 
-![Figure 6.4 – 使用 FlexLayout 打乱屏幕
-
-](img/Figure_6.4_B19723.jpg)
+![Figure 6.4 – 使用 FlexLayout 打乱屏幕](img/Figure_6.4_B19723.jpg)
 
 Figure 6.4 – 使用 FlexLayout 打乱屏幕
 
@@ -248,21 +498,21 @@ Figure 6.4 – 使用 FlexLayout 打乱屏幕
 
 我们将回到 `Login` 页面，并在结束前，我们添加一个包含四个按钮的 `HorizontalStackLayout`，这些按钮不太适合，如图 *6**.5* 所示。
 
-![Figure 6.5 – 按钮没有适应行
-
-](img/Figure_6.5_B19723.jpg)
+![Figure 6.5 – 按钮没有适应行](img/Figure_6.5_B19723.jpg)
 
 Figure 6.5 – 按钮没有适应行
 
 现在，我们将用 `FlexLayout` 替换 `HorizontalStackLayout`，并将 `Wrap` 设置为 `Wrap`：
 
-[PRE11]
+```cs
+<FlexLayout
+    Direction="Row"
+    Wrap="Wrap">
+```
 
 `FlexLayout` *看到*第四个按钮无法适应，并将其包裹到下一行，如图下所示：
 
-![图 6.6 – FlexLayout 包裹按钮
-
-](img/Figure_6.6_B19723.jpg)
+![图 6.6 – FlexLayout 包裹按钮](img/Figure_6.6_B19723.jpg)
 
 图 6.6 – FlexLayout 包裹按钮
 
@@ -282,13 +532,21 @@ Figure 6.5 – 按钮没有适应行
 
 1.  如果一个 `Button` 对象定义如下：
 
-    [PRE12]
+    ```cs
+    new Button()
+    ```
 
-    [PRE13]
+    ```cs
+        .Margin(5)
+    ```
 
-    [PRE14]
+    ```cs
+        .Text("Forgot Password")
+    ```
 
-    [PRE15]
+    ```cs
+        .Row(Row.Buttons).Column(Column.Forgot)
+    ```
 
 我们对其位置了解多少？
 
@@ -310,8 +568,8 @@ Figure 6.5 – 按钮没有适应行
 
 本部分包含以下章节：
 
-+   [*第 7 章*](B19723_07.xhtml#_idTextAnchor129), *理解导航*
++   *第七章*, *理解导航*
 
-+   [*第 8 章*](B19723_08.xhtml#_idTextAnchor144), *存储和检索数据*
++   *第八章*, *存储和检索数据*
 
-+   [*第 9 章*](B19723_09.xhtml#_idTextAnchor160), *单元测试*
++   *第九章*, *单元测试*

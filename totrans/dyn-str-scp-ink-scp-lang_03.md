@@ -1,6 +1,6 @@
 # *第二章*: 节点、转向和循环模式
 
-本章介绍了节点的概念，即墨水故事的章节，以及转向，这是在它们之间移动的功能。然后我们将进入定义和移动到节点以创建简单的循环模式。通过结合选择（在[*第一章*](B17597_01_Final_PG_ePub.xhtml#_idTextAnchor014)，*文本、流程、选择和编织*中介绍），我们将看到您如何开始体验由选择选项、故事在节点之间移动以及使用循环模式从墨水中的简单规则构建复杂交互的叙事。
+本章介绍了节点的概念，即墨水故事的章节，以及转向，这是在它们之间移动的功能。然后我们将进入定义和移动到节点以创建简单的循环模式。通过结合选择（在*第一章*，*文本、流程、选择和编织*中介绍），我们将看到您如何开始体验由选择选项、故事在节点之间移动以及使用循环模式从墨水中的简单规则构建复杂交互的叙事。
 
 本章将涵盖以下主要主题：
 
@@ -14,11 +14,11 @@
 
 # 技术要求
 
-本章中使用的示例，在`*.ink`文件中，可以在GitHub上找到，网址为[https://github.com/PacktPublishing/Dynamic-Story-Scripting-with-the-ink-Scripting-Language/tree/main/Chapter2](https://github.com/PacktPublishing/Dynamic-Story-Scripting-with-the-ink-Scripting-Language/tree/main/Chapter2)。
+本章中使用的示例，在`*.ink`文件中，可以在 GitHub 上找到，网址为[`github.com/PacktPublishing/Dynamic-Story-Scripting-with-the-ink-Scripting-Language/tree/main/Chapter2`](https://github.com/PacktPublishing/Dynamic-Story-Scripting-with-the-ink-Scripting-Language/tree/main/Chapter2)。
 
 # 将流程打结
 
-在[*第一章*](B17597_01_Final_PG_ePub.xhtml#_idTextAnchor014)，*文本、流程、选择和编织*中，选择被解释为能够将故事分支到不同的部分。展示了简单的分支结构，但故事中的移动是从一个编织到另一个的流动。当在墨水中给部分命名时，它成为其核心概念之一：一个`==`)和节点名称的单行。在此定义之后，直到遇到下一个节点之前的每一行都成为原始节点的一部分。通过给部分命名，它们可以在墨水中导航，为读者创造更复杂的叙事体验。
+在*第一章*，*文本、流程、选择和编织*中，选择被解释为能够将故事分支到不同的部分。展示了简单的分支结构，但故事中的移动是从一个编织到另一个的流动。当在墨水中给部分命名时，它成为其核心概念之一：一个`==`)和节点名称的单行。在此定义之后，直到遇到下一个节点之前的每一行都成为原始节点的一部分。通过给部分命名，它们可以在墨水中导航，为读者创造更复杂的叙事体验。
 
 ## 创建节点
 
@@ -26,7 +26,17 @@
 
 例如，基于侦探与犯罪的不同嫌疑人交谈的墨水故事可能会根据其角色将其分成不同的节点，如下面的代码片段所示：
 
-[PRE0]
+```cs
+The detective considered the suspects in front of her.
+
+== lady_taylor
+
+== lord_davies
+
+== sir_jones
+
+== lady_turner
+```
 
 墨水中的节点名称必须遵循以下三个具体规则，如下所述：
 
@@ -42,13 +52,18 @@
 
 创建节点本身如果没有一种方法在它们之间移动，就几乎没有用处。在 ink 中，在节点之间移动被称为 `-`) 和一个大于号 (`>`)。这个组合 `->` 指示流程将移动到下一个节点，如下面的代码片段所示：
 
-[PRE1]
+```cs
+-> example_knot
+
+== example_knot
+Some content.
+```
 
 一旦定义，节点就可以被同一故事中的任何其他代码访问。在采用节点的 ink 故事中，代码的第一行是转换操作并不罕见。
 
 ## 使用 DONE 和 END
 
-在 [*第一章*](B17597_01_Final_PG_ePub.xhtml#_idTextAnchor014) 中关于“*流程*”概念介绍的 *《文本、流程、选择和交织》* 一文中，提到了所有三个之前章节中的代码示例共有的一个特定错误。因为在不同节点之间转换引入了创建复杂叙事的可能性，墨水需要知道故事至少有一个结局才能停止故事 *继续进行*。为了帮助墨水在故事即将结束时发出信号，所有故事都内置了两个名为 `DONE` 和 `END` 的节点。与使用小写字母和——经常——下划线的其他节点不同，这些节点使用大写字母编写。
+在 *第一章* 中关于“*流程*”概念介绍的 *《文本、流程、选择和交织》* 一文中，提到了所有三个之前章节中的代码示例共有的一个特定错误。因为在不同节点之间转换引入了创建复杂叙事的可能性，墨水需要知道故事至少有一个结局才能停止故事 *继续进行*。为了帮助墨水在故事即将结束时发出信号，所有故事都内置了两个名为 `DONE` 和 `END` 的节点。与使用小写字母和——经常——下划线的其他节点不同，这些节点使用大写字母编写。
 
 `DONE` 和 `END` 之间的区别在于它们的用法。当故事转换到 `DONE` (`-> DONE`) 时，它表示当前流程的结束，但不是故事的结束。然而，`END` 表示所有可能流程的结束，并完全结束一个故事。使用 `DONE` 允许创建新的流程结构。`END` 停止故事，不允许发生其他任何事情。
 
@@ -56,41 +71,16 @@
 
 示例 1
 
-[PRE2]
+```cs
+-> example_knot
+== example_knot
+Some content.
+-> DONE
+```
 
 在 Inky 中，每条输出末尾显示的短语`End of story`是使用特殊的节点 `END`。如果没有内容显示，故事已经结束。在 ink 的术语中，它已经转换到了 `END`。以下是显示这一点的屏幕截图：
 
-![Figure 2.1 – End of story
-
-![Figure 2.1 – End of story
-
-图 2.1 – 故事结束
-
-# 在部分之间移动
-
-节点允许作者将 ink 故事划分为他们可以命名的部分。转换操作允许在这些节点之间移动。在 [*第一章*](B17597_01_Final_PG_ePub.xhtml#_idTextAnchor014) 的 *《文本、流程、选择和交织》* 中，使用星号 (`*`) 和分支故事的能力引入了选择。将转换作为选择的结果允许作者制作一个交织，一组选择，其中每个选择都可以转换到不同的节点。
-
-例如，回到本章前面提到的侦探示例，一个带有选择的更新版本，每个选择都会转换到角色的节点，看起来会是这样：
-
-示例 2
-
-[PRE3]
-
-在更新版本中，增加了一个*编织*。其中每个选择都会立即转向与一个字符匹配的结点。在结点内部，使用内置的 `DONE` 结点来让墨水知道在结点内容之后应该停止流程。在新代码中，仅使用选择、转向和结点的三个概念就创建了一个更复杂的故事。
-
-## 结点和针脚
-
-结点允许墨水故事被分成不同的部分。在结点内部，可以添加额外的子部分，称为 `=`) 和其名称。针脚遵循与结点相同的命名规则：它们可以包含数字、字母和下划线，但不能使用任何其他特殊字符。针脚也仅可以出现在现有的结点内部。
-
-返回到 `example_knot` 代码，可以添加两个针脚，如下所示：
-
-[PRE4]
-
-流程在结点处“跑出”的常见错误也适用于针脚。作为故事的一部分，它们也必须转向另一个结点或针脚，或者使用内置的结点来停止流程或故事。在下面的屏幕截图中，你可以看到一个在针脚中流程跑出的例子：
-
-![图 2.2 – 示例针脚中流程跑出的错误
-
-](img/Figure_2.2_B17597.jpg)
+![Figure 2.1 – End of story![Figure 2.1 – End of story 图 2.1 – 故事结束# 在部分之间移动节点允许作者将 ink 故事划分为他们可以命名的部分。转换操作允许在这些节点之间移动。在 *第一章* 的 *《文本、流程、选择和交织》* 中，使用星号 (`*`) 和分支故事的能力引入了选择。将转换作为选择的结果允许作者制作一个交织，一组选择，其中每个选择都可以转换到不同的节点。例如，回到本章前面提到的侦探示例，一个带有选择的更新版本，每个选择都会转换到角色的节点，看起来会是这样：示例 2```csThe detective considered the suspects in front of her.* Lady Taylor    -> lady_taylor* Lord Davies    -> lord_davies* Sir Jones    -> sir_jones* Lady Turner    -> lady_turner== lady_taylorStanding off to the side of the gathered crowd and looking out the window was Lady Taylor. She was elegantly dressed in a cream evening gown and the light from the storm outside was a stark contrast to the flowing dress and quiet form of the woman.The detective made her way over to question her.-> DONE== lord_davies"Ah! Detective!" barked the commanding voice of Lord Davies. With a drink in his hand and the red evidence of practiced drinking on his face, he began again. "Over here! I know you will want to hear what happened from me."The detective considered the man and then turned to face him.-> DONE== sir_jonesThe detective turned to the fireplace. Leaning against it was "Sir Jones." The detective knew this was a nickname for the person in front of her. They were neither of the rank "sir" in this area nor was their name "Jones." They had appeared about six months ago at parties like this one and was quite a fixture at this point. No one knew much about them other than that they went by the name "Sir Jones" now.The detective regarded them for a moment and headed over.-> DONE == lady_turnerLady Turner had been crying. The evidence of sorrow was etched into the drying black edges of her makeup at the bottom of her eyes as she tried to clean up her face. As the detective looked over, Lady Turner caught her eye and seemed to communicate how much she did not like to show the evidence of crying on her face and was trying to clear it quickly.The detective walked to her and sat down.-> DONE```在更新版本中，增加了一个*编织*。其中每个选择都会立即转向与一个字符匹配的结点。在结点内部，使用内置的 `DONE` 结点来让墨水知道在结点内容之后应该停止流程。在新代码中，仅使用选择、转向和结点的三个概念就创建了一个更复杂的故事。## 结点和针脚结点允许墨水故事被分成不同的部分。在结点内部，可以添加额外的子部分，称为 `=`) 和其名称。针脚遵循与结点相同的命名规则：它们可以包含数字、字母和下划线，但不能使用任何其他特殊字符。针脚也仅可以出现在现有的结点内部。返回到 `example_knot` 代码，可以添加两个针脚，如下所示：```cs-> example_knot== example_knot= stitch_one= stitch_two```流程在结点处“跑出”的常见错误也适用于针脚。作为故事的一部分，它们也必须转向另一个结点或针脚，或者使用内置的结点来停止流程或故事。在下面的屏幕截图中，你可以看到一个在针脚中流程跑出的例子：![图 2.2 – 示例针脚中流程跑出的错误](img/Figure_2.2_B17597.jpg)
 
 图 2.2 – 示例针脚中流程跑出的错误
 
@@ -98,13 +88,19 @@
 
 示例 3
 
-[PRE5]
+```cs
+-> example_knot
+== example_knot
+= stitch_one
+Diverting to example_knot will automatically show this.
+-> DONE
+= stitch_two
+-> DONE
+```
 
 这将是输出：
 
-![图 2.3 – 从 example_knot 转向的 Inky 输出
-
-](img/Figure_2.3_B17597.jpg)
+![图 2.3 – 从 example_knot 转向的 Inky 输出](img/Figure_2.3_B17597.jpg)
 
 图 2.3 – 从 example_knot 转向的 Inky 输出
 
@@ -114,13 +110,20 @@
 
 示例 4
 
-[PRE6]
+```cs
+-> example_knot.stitch_two
+== example_knot
+= stitch_one
+Diverting to example_knot will automatically show this.
+-> DONE
+= stitch_two
+This will now appear because the stitch is being diverted to directly.
+-> DONE
+```
 
 这将是输出：
 
-![图 2.4 – 从 example_knot.stitch_two 针脚转向的墨水输出
-
-](img/Figure_2.4_B17597.jpg)
+![图 2.4 – 从 example_knot.stitch_two 针脚转向的墨水输出](img/Figure_2.4_B17597.jpg)
 
 图 2.4 – 从 example_knot.stitch_two 针脚转向的墨水输出
 
@@ -136,9 +139,7 @@
 
 在 Inky 中，可以通过使用**新包含墨水文件**菜单选项向现有项目添加额外的文件，如图所示，并命名新文件：
 
-![图 2.5 – Inky 的新包含墨水文件菜单选项
-
-](img/Figure_2.5_B17597.jpg)
+![图 2.5 – Inky 的新包含墨水文件菜单选项](img/Figure_2.5_B17597.jpg)
 
 图 2.5 – Inky 的新包含墨水文件菜单选项
 
@@ -152,13 +153,28 @@ Inky 在创建包含的 ink 文件时不会自动将 `.ink` 添加到文件名�
 
 示例 5
 
-[PRE7]
+```cs
+INCLUDE books.ink
+You stand in front of a shelf with two books.
+* [Red Book]
+    -> books.red_book
+* [Blue Book]
+    -> books.blue_book
+```
 
 在新示例中，每个选择项都会导向另一个文件中的一个针。因为 Inky 使用 `INCLUDE` 将文件组合成一个单一的项目，所以 `books.ink` 文件中的节点和针可以像所有代码都是同一个文件的一部分一样访问，如下面的代码示例所示：
 
 示例 5 (books.ink)
 
-[PRE8]
+```cs
+== books
+= red_book
+The red book slides open as a deep, masculine voice fills your mind.
+-> DONE
+= blue_book
+The blue book slowly flips open as a reluctant, feminine voice creeps into your thoughts.
+-> DONE
+```
 
 在 ink 中，流程从上到下运行。从第一个文件开始，流程会显示两个选择项的交织。然后选择 `Red Book` 选项会导向另一个文件中的针，最终导向 `DONE` 特殊节点中的 `divert`，如下面的截图所示：
 
@@ -180,7 +196,15 @@ Inky 在创建包含的 ink 文件时不会自动将 `.ink` 添加到文件名�
 
 示例 6
 
-[PRE9]
+```cs
+You look at the rock in front of you.
+-> rock
+== rock
+* Push the rock up the hill.
+    -> rock
+* Ignore the rock for now.
+    -> DONE
+```
 
 选择项，那些带有星号（`*`）的，在整个故事中只能使用一次。在先前的例子中，如果选择了第一个选项，循环会重复，但第二个选项随后就会作为唯一的选择出现，如下面的截图所示：
 
@@ -194,11 +218,19 @@ Inky 在创建包含的 ink 文件时不会自动将 `.ink` 添加到文件名�
 
 ## 重新访问粘性选择
 
-在[*第一章*](B17597_01_Final_PG_ePub.xhtml#_idTextAnchor014)中，介绍了*文本、流程、选择和编织*。粘性选择作为从上到下的流程的一部分展示，且不重复任何部分，当时似乎并不太有用。然而，在循环模式中使用转向和结时，粘性选择通常是最佳选择类型，如下面的代码示例所示：
+在*第一章*中，介绍了*文本、流程、选择和编织*。粘性选择作为从上到下的流程的一部分展示，且不重复任何部分，当时似乎并不太有用。然而，在循环模式中使用转向和结时，粘性选择通常是最佳选择类型，如下面的代码示例所示：
 
 示例 7
 
-[PRE10]
+```cs
+You look at the rock in front of you.
+-> rock
+== rock
++ Push the rock up the hill.
+    -> rock
++ Ignore the rock for now.
+    -> rock
+```
 
 在更新的代码中，两个选项都是粘性选择。这种新代码允许重复模式和一致的编织选项，无论循环次数如何，如下面的屏幕截图所示：
 
@@ -216,13 +248,29 @@ Inky 在创建包含的 ink 文件时不会自动将 `.ink` 添加到文件名�
 
 使用括号（`(` 和 `)`）包围一个名称，并在选择符号（一个加号 `+` 或星号 `*`）之后，以及选择本身的文本来创建标记选项。标记选项遵循与结和针名称相同的规则：它们可以包含数字、大写和小写字母以及下划线。它们不能包含空格或其他特殊符号。以下代码片段展示了这一点：
 
-[PRE11]
+```cs
+You look at the rock in front of you.
+-> rock
+== rock
++ (push) Push the rock up the hill.
+    -> rock
+* Push the rock over the edge.
+    -> DONE
+```
 
 在新的示例代码中，为第一个选项添加了一个名为`push`的标签，并在故事中作为一个变量存在。因为它本身是选项的一部分，所以每次在故事中重新访问该选项时，其值都会增加。这允许作者测试玩家是否多次选择了相同的选项。以下代码示例说明了这一点：
 
 示例 8
 
-[PRE12]
+```cs
+You look at the rock in front of you.
+-> rock
+== rock
++ (push) Push the rock up the hill.
+    -> rock
+* {push >= 4} Push the rock over the edge.
+    -> DONE
+```
 
 在最新的更改中，还添加了一个条件选项，使用大括号（`{` 和 `}`）包围变量和值之间的比较。在新代码中，当故事开始时，读者可以选择`推石头上山`选项。当他们这样做时，该选项标签的值也会增加。一旦其值至少为`4`，第二个选项就会变得可用，读者可以将石头推到边缘，如下面的屏幕截图所示：
 
@@ -234,7 +282,15 @@ Inky 在创建包含的 ink 文件时不会自动将 `.ink` 添加到文件名�
 
 示例 9
 
-[PRE13]
+```cs
+You look at the rock in front of you.
+-> rock
+== rock
++ (push) {push < 6} Push the rock up the hill.
+    -> rock
+* {push >= 6} Push the rock over the edge.
+    -> DONE
+```
 
 在新的示例代码中，当故事开始时，读者只能看到一个选项。他们必须做出相同的选项六次，然后第一个选项才会被移除，第二个选项才会变得可用。一旦读者选择了这个选项，故事最终结束。
 
@@ -244,7 +300,34 @@ Inky 在创建包含的 ink 文件时不会自动将 `.ink` 添加到文件名�
 
 示例 10
 
-[PRE14]
+```cs
+You pause to double-check check the folder again. Yes, you have all the evidence here.
+You nod at your partner and he enters the other room. You take a breath and open the door.
+The suspect sits in front of you. As you take a seat, she turns to look at you.
+-> interrogation
+== interrogation
++ (knife) {knife < 1} [Ask about the knife]
+    The suspect shakes their head. "I don't know nothing!"
+    -> interrogation
++ (knife_again) {knife == 1 && knife_again < 1} [Ask about the     knife again.]
+    You take a picture of the knife out of the folder and put       it down on the table without saying another word.
+    -> interrogation
++ (knife_once_again) {knife_again == 1 && knife_once_again < 1} [Ask about the knife one more time.]
+    "Yes. Fine. It's mine," the suspect replies and crosses       her arms. Looking at them, you notice the slight cuts on        the underside of her arm.
+    -> interrogation
++ (cuts) {knife_once_again == 1 && cuts < 1} [Ask about the   cuts on her arm.]
+    You point to the cuts on her arms. 
+    She shrugs. "It was an accident."
+    You frown and point at the knife.
+    "It's my knife, yes," she says, looking away.
+    -> interrogation
++ {cuts == 1} [Take out the picture of the gun next.]
+    "This is not yours, though," you say, taking out the       picture.
+    She does not look back.
+    "He attacked you. And not for the first time," you say       and point to the older scars still visible. "You finally         had enough. You shot him."
+    She still looks away, but you can see her shoulders slump.       She knows that you know. 
+    -> DONE
+```
 
 在新代码中，使用复杂的标记和条件选项组合来跟踪在审问嫌疑人时的信息。做出一个选择会按顺序解锁下一个，因为流程会循环回相同的节点，随着信息的逐渐解锁，读者通过每次做出一个选择来学习更多。
 
@@ -260,7 +343,7 @@ Inky 在创建包含的 ink 文件时不会自动将 `.ink` 添加到文件名�
 
 节点可以转向自身。正如我们所看到的，这是创建循环结构的关键，在这种结构中，可以使用其他概念，如标记和条件选项，并将它们结合起来。标记允许我们创建变量来跟踪一个选项被显示的次数。然后，标记选项进一步发展到使用条件选项，测试在循环结构中使用时一个选项被选择的次数。最后，我们通过使用循环结构，其中每个选择都改变了标签的值并按顺序解锁每个选择，来制作动态编织。
 
-在下一章中，我们将基于结和分叉的概念进行构建。通过导航到故事的不同部分，可以展示不同的文本，或者在多个循环中，一个ink概念，使得在故事中或因为多个循环，不同的选择成为可能。这允许ink对读者重新访问结和选项做出反应，以展示不同的内容。
+在下一章中，我们将基于结和分叉的概念进行构建。通过导航到故事的不同部分，可以展示不同的文本，或者在多个循环中，一个 ink 概念，使得在故事中或因为多个循环，不同的选择成为可能。这允许 ink 对读者重新访问结和选项做出反应，以展示不同的内容。
 
 # 问题
 
@@ -270,6 +353,6 @@ Inky 在创建包含的 ink 文件时不会自动将 `.ink` 添加到文件名�
 
 1.  缝合是什么？
 
-1.  如何在ink中使用`INCLUDE`？
+1.  如何在 ink 中使用`INCLUDE`？
 
 1.  标记选项和条件选项之间的区别是什么？

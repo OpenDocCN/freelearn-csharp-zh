@@ -46,13 +46,31 @@
 
 您可能想知道是谁确切地告诉我们遵循这种结构。好吧，有一个名为 W3 的组织为特定技术提出标准。他们为 SOAP 结构做了同样的事情。
 
-您可以轻松地在 [http://www.w3.org/2001/12/soap-envelope](http://www.w3.org/2001/12/soap-envelope) 上找到有关 SOAP 封装的详细信息。同样，您可以在 [http://www.w3.org/2001/12/soap-encoding](http://www.w3.org/2001/12/soap-encoding) 上查看有关 SOAP 编码和数据类型的详细信息。
+您可以轻松地在 [`www.w3.org/2001/12/soap-envelope`](http://www.w3.org/2001/12/soap-envelope) 上找到有关 SOAP 封装的详细信息。同样，您可以在 [`www.w3.org/2001/12/soap-encoding`](http://www.w3.org/2001/12/soap-encoding) 上查看有关 SOAP 编码和数据类型的详细信息。
 
 我们关于 SOAP 消息结构的讨论是由 W3 组织定义的。然而，这个组织不断研究优化结构，并时不时地引入更稳健的规范。因此，我们必须根据他们提供的最新规范进行更新并相应地实施。
 
 下面的块描述了 SOAP 消息的一般结构：
 
-[PRE0]
+```cs
+<?xml version = "1.0"?>
+<SOAP-ENV:Envelope xmlns:SOAP-ENV = "http://www.w3.org/2001/12/soap-envelope" 
+ SOAP-ENV:encodingStyle = "http://www.w3.org/2001/12/soap-encoding">
+  <SOAP-ENV:Header>
+    ...
+    ...
+  </SOAP-ENV:Header>
+  <SOAP-ENV:Body>
+    ...
+    ...
+    <SOAP-ENV:Fault>
+      ...
+      ...
+    </SOAP-ENV:Fault>
+    ...
+  </SOAP-ENV:Body>
+</SOAP_ENV:Envelope>
+```
 
 接收者通过一个封包的指示来通知整个 SOAP 消息。这意味着，如果客户端收到的消息中包含一个封包，那么消息已经完全接收，客户端可以解析并用于进一步处理。因此，SOAP 封包在包装整个消息方面发挥着作用。
 
@@ -74,13 +92,36 @@
 
 以下是一个符合 v1.2 规范的 SOAP 消息的示例：
 
-[PRE1]
+```cs
+<?xml version = "1.0"?>
+<SOAP-ENV:Envelope 
+ xmlns:SOAP-ENV = "http://www.w3.org/2001/12/soap-envelope" 
+ SOAP-ENV:encodingStyle = "http://www.w3.org/2001/12/soap-encoding">
+ ...
+ SOAP Message information goes here
+ ...
+</SOAP-ENV:Envelope>
+```
 
 # SOAP 通过 HTTP POST
 
 在 HTTP 头部中提到的 `Authors` 实际上是包含一个 `POST` 动作方法的控制器或程序的 URL，所有内容都托管在 [www.packtpub.com](http://www.packtpub.com)。
 
-[PRE2]
+```cs
+POST /Authors HTTP/1.1
+Host: www.packtpub.com
+Content-Type: application/soap; charset="utf-8"
+Content-Length: nnnn
+
+<?xml version = "1.0"?>
+<SOAP-ENV:Envelope 
+xmlns:SOAP-ENV = "http://www.w3.org/2001/12/soap-envelope" 
+SOAP-ENV:encodingStyle = " http://www.w3.org/2001/12/soap-encoding">
+  ...
+  Message information goes here
+  ...
+</SOAP-ENV:Envelope>
+```
 
 # REST
 
@@ -98,33 +139,33 @@ REST 是一种网络计算机系统之间的架构风格，以便系统可以轻
 
 由于用户界面与业务和数据存储相关的操作分离，可以通过简化服务器组件来提高灵活性和可扩展性。此外，这种分离允许每个组件独立发展。
 
-REST端点通过特定的URL暴露。不同的客户端可以使用URL进行连接，然后执行预期的操作并获取响应。
+REST 端点通过特定的 URL 暴露。不同的客户端可以使用 URL 进行连接，然后执行预期的操作并获取响应。
 
-在这本书中，我们将构建一个具有最小操作的简单电子商务Web服务，用户可以使用购物车并下订单。这些操作将通过端点公开。正如我们讨论的那样，端点可以很容易地从不同类型的客户端中消费，包括移动应用、Web应用、服务器端代码等。
+在这本书中，我们将构建一个具有最小操作的简单电子商务 Web 服务，用户可以使用购物车并下订单。这些操作将通过端点公开。正如我们讨论的那样，端点可以很容易地从不同类型的客户端中消费，包括移动应用、Web 应用、服务器端代码等。
 
 # 无状态
 
 这个概念非常容易理解。在服务器/客户端架构中，服务器需要知道哪个客户端正在请求它的数据，相应地，它决定发送什么以及不发送什么。
 
-然而，REST系统是无状态的。这意味着服务器不需要知道任何关于客户端状态的信息，反之亦然。这最终会减少服务器在每次请求到来时识别客户端的开销。
+然而，REST 系统是无状态的。这意味着服务器不需要知道任何关于客户端状态的信息，反之亦然。这最终会减少服务器在每次请求到来时识别客户端的开销。
 
-但现在的问题是，客户端和服务器是如何交互的？答案是通过对适当的消息进行交互。假设一个用户想查看一个订单的详细信息。它只需通过发送订单ID来向服务器请求，服务器就会以`.json`或`.xml`格式返回订单详情，这些格式可以很容易地被客户端解析。每条消息都有处理该消息所需的所有信息。
+但现在的问题是，客户端和服务器是如何交互的？答案是通过对适当的消息进行交互。假设一个用户想查看一个订单的详细信息。它只需通过发送订单 ID 来向服务器请求，服务器就会以`.json`或`.xml`格式返回订单详情，这些格式可以很容易地被客户端解析。每条消息都有处理该消息所需的所有信息。
 
-这些约束（以及一些其他约束，如*caching*、*layered system*、*uniform interface*和*code on demand*）在Web服务上实现时，有助于RESTful应用程序实现可靠性、优化性能和可扩展性。原因在于组件可以独立管理、完美更新且无需影响整个系统即可重用。
+这些约束（以及一些其他约束，如*caching*、*layered system*、*uniform interface*和*code on demand*）在 Web 服务上实现时，有助于 RESTful 应用程序实现可靠性、优化性能和可扩展性。原因在于组件可以独立管理、完美更新且无需影响整个系统即可重用。
 
 让我们在下一节中具体看看服务器和客户端之间是如何进行通信的。
 
 # 设置环境
 
-在我们探索通信机制之前，让我们首先设置开发环境。我们将使用Visual Studio 2017作为我们的示例。
+在我们探索通信机制之前，让我们首先设置开发环境。我们将使用 Visual Studio 2017 作为我们的示例。
 
-打开Visual Studio并执行我们最喜欢的步骤，文件 | 新建 | 项目，这将打开一个包含可用模板的对话框窗口，如以下截图所示：
+打开 Visual Studio 并执行我们最喜欢的步骤，文件 | 新建 | 项目，这将打开一个包含可用模板的对话框窗口，如以下截图所示：
 
 ![图片](img/942c014e-419a-4f13-ad2a-952404753a71.png)
 
-选择如前截图所示的ASP.NET Core Web应用程序。别忘了在左侧面板中选择.NET Core。现在一切看起来都很酷。
+选择如前截图所示的 ASP.NET Core Web 应用程序。别忘了在左侧面板中选择.NET Core。现在一切看起来都很酷。
 
-让我们点击“确定”，然后我们将进入另一个对话框，在那里我们可以选择更多与我们的Web应用相关的模板。显然，我们将点击“Web API”，然后点击“确定”。
+让我们点击“确定”，然后我们将进入另一个对话框，在那里我们可以选择更多与我们的 Web 应用相关的模板。显然，我们将点击“Web API”，然后点击“确定”。
 
 ![图片](img/65a05503-18af-4f76-85b3-7546b4c189b5.png)
 
@@ -132,7 +173,7 @@ REST端点通过特定的URL暴露。不同的客户端可以使用URL进行连�
 
 ![图片](img/970fa804-0df1-455c-b192-a74719363e49.png)
 
-现在，这里有一个有趣的事实。注意，`ValuesController`类继承自`Controller`基类。如果你在ASP.NET Core之前熟悉Web API，你可能会知道基类是`ApiController`。这种变化的原因是为了在API和MVC结构之间保持一致性。`Controller`是ASP.NET MVC中的基类。现在在ASP.NET Core中，MVC和Web API模板都继承自相同的基类。在ASP.NET Core中，MVC和Web API被合并为一个编程模型。
+现在，这里有一个有趣的事实。注意，`ValuesController`类继承自`Controller`基类。如果你在 ASP.NET Core 之前熟悉 Web API，你可能会知道基类是`ApiController`。这种变化的原因是为了在 API 和 MVC 结构之间保持一致性。`Controller`是 ASP.NET MVC 中的基类。现在在 ASP.NET Core 中，MVC 和 Web API 模板都继承自相同的基类。在 ASP.NET Core 中，MVC 和 Web API 被合并为一个编程模型。
 
 # 运行应用程序
 
@@ -144,13 +185,20 @@ REST端点通过特定的URL暴露。不同的客户端可以使用URL进行连�
 
 # 这里在做什么？
 
-注意URL，`localhost:57571/api/values`，它将请求发送到`ValuesController`，因为控制器上定义的路由是`[Route("api/[controller]")]`。按照惯例，控制器名称总是附加文本*Controller*。因此`api/values`命中`ValuesController`。
+注意 URL，`localhost:57571/api/values`，它将请求发送到`ValuesController`，因为控制器上定义的路由是`[Route("api/[controller]")]`。按照惯例，控制器名称总是附加文本*Controller*。因此`api/values`命中`ValuesController`。
 
-现在的问题是，它是如何返回`value1`和`value2`的。这是因为我们直接通过浏览器访问了URL，最终发送了一个`GET`请求到控制器。由于控制器已经有一个`Get`方法，它被执行了。`Get`方法如下：
+现在的问题是，它是如何返回`value1`和`value2`的。这是因为我们直接通过浏览器访问了 URL，最终发送了一个`GET`请求到控制器。由于控制器已经有一个`Get`方法，它被执行了。`Get`方法如下：
 
-[PRE3]
+```cs
+// GET api/values
+[HttpGet]
+public IEnumerable<string> Get()
+{
+  return new string[] { "value1", "value2" };
+}
+```
 
-此方法返回一个字符串数组，它在浏览器中打印出来。为了理解，URL格式已经在方法上方了（`*``api/values`*`*`）。
+此方法返回一个字符串数组，它在浏览器中打印出来。为了理解，URL 格式已经在方法上方了（`*``api/values`*`*`）。
 
 # 有趣的事实
 
@@ -158,7 +206,18 @@ REST端点通过特定的URL暴露。不同的客户端可以使用URL进行连�
 
 1.  在控制器中添加另一个方法，`Get12()`，并移除`[HttpGet]`方法：
 
-[PRE4]
+```cs
+public IEnumerable<string> Get12()
+{
+  return new string[] { "value1", "value2", "value3" };
+}
+// GET api/values
+//[HttpGet] - Remove this attribute
+public IEnumerable<string> Get()
+{
+  return new string[] { "value1", "value2" };
+}
+```
 
 你认为输出会是什么？很有趣。以下是输出：
 
@@ -168,7 +227,19 @@ REST端点通过特定的URL暴露。不同的客户端可以使用URL进行连�
 
 1.  现在，让我们计划恢复属性并测试会发生什么。然而，我们将装饰新的`Get12`方法，并保持旧的`Get`方法带有注释的属性不变。因此，代码将是：
 
-[PRE5]
+```cs
+[HttpGet]
+public IEnumerable<string> Get12()
+{
+  return new string[] { "value1", "value2", "value3" };
+}
+// GET api/values
+//[HttpGet]
+public IEnumerable<string> Get()
+{
+  return new string[] { "value1", "value2" };
+}
+```
 
 让我们快速看一下我们对输出做了什么：
 
@@ -178,7 +249,19 @@ REST端点通过特定的URL暴露。不同的客户端可以使用URL进行连�
 
 1.  通过向两个方法中添加一个属性，可以体验到更多的乐趣：
 
-[PRE6]
+```cs
+[HttpGet]
+public IEnumerable<string> Get12()
+{
+  return new string[] { "value1", "value2", "value3" };
+}
+// GET api/values
+[HttpGet]
+public IEnumerable<string> Get()
+{
+  return new string[] { "value1", "value2" };
+}
+```
 
 你能猜到输出结果吗？是的，它与我们之前看到的情况相同，当时我们有两个不带属性的方法，并且出现了 **AmbiguousActionException** 异常，如下面的截图所示：
 
@@ -186,7 +269,22 @@ REST端点通过特定的URL暴露。不同的客户端可以使用URL进行连�
 
 1.  最后，让我们再添加一个名为 `HelloWorld()` 的方法，并带有属性以及现有的属性。让我们从其他方法中移除属性：
 
-[PRE7]
+```cs
+[HttpGet]
+public string HelloWorld()
+{
+  return "Hello World";
+}
+public IEnumerable<string> Get12()
+{
+  return new string[] { "value1", "value2", "value3" };
+}
+// GET api/values
+public IEnumerable<string> Get()
+{
+  return new string[] { "value1", "value2" };
+}
+```
 
 完美！让我们看看输出结果。在浏览器中显示的是：Hello World
 
@@ -232,19 +330,54 @@ REST端点通过特定的URL暴露。不同的客户端可以使用URL进行连�
 
 # Postman
 
-要测试 API，我们可以使用一个非常易于使用的工具，名为 *Postman*。它可以从：[https://www.getpostman.com/](https://www.getpostman.com/) 下载。请下载并打开它。我们将在下一节中看到如何通过 Postman 发送请求，并分析我们从 Web API 收到的响应。
+要测试 API，我们可以使用一个非常易于使用的工具，名为 *Postman*。它可以从：[`www.getpostman.com/`](https://www.getpostman.com/) 下载。请下载并打开它。我们将在下一节中看到如何通过 Postman 发送请求，并分析我们从 Web API 收到的响应。
 
 # GET
 
 我将添加另一个名为 `ProductsController` 的控制器。目前，让我们有一个简单的动作方法 `GET`，它将返回一些产品。目前，这些产品在动作方法中是硬编码的。该方法看起来如下：
 
-[PRE8]
+```cs
+using Microsoft.AspNetCore.Mvc;
+using System.Collections.Generic;
+namespace DemoECommerceApp.Controllers
+{
+  [Produces("application/json")]
+  [Route("api/[Controller]")]
+  public class ProductsController : Controller
+  {
+    // GET: api/Products
+    [HttpGet]
+    public IEnumerable<Product> Get()
+    {
+      return new Product[]
+      {
+        new Product(1, "Oats", new decimal(3.07)),
+        new Product(2, "Toothpaste", new decimal(10.89)),
+        new Product(3, "Television", new decimal(500.90))
+      };
+    }
+  }
+}
+```
 
 `[路由]` 属性提供了一个定义良好的模板 `"api/[控制器]"`。在这里，控制器名称是 `ProductsController`。当我们使用 URL `api/Products` 进行请求时，框架将搜索具有该路由定义的控制器。`[控制器]` 占位符是一个特殊的命名约定，将在运行时替换为文本（控制器名称）`Products`。然而，您可以直接编写带有控制器名称的完全限定模板，例如 `[Route (api/Products)]`。
 
 因此，这个 `GET` 方法将返回三个产品及其详细信息。`Product` 类可以设计如下，具有一个用于构建 *Product* 对象的构造函数：
 
-[PRE9]
+```cs
+public class Product
+{
+  public Product(int id, string name, decimal price)
+  {
+    Id = id;
+    Name = name;
+    Price = price;
+  }
+  public int Id { get; set; }
+  public string Name { get; set; }
+  public decimal Price { get; set; }
+}
+```
 
 我们完成了。让我们通过 *Postman* 进行 `GET 请求` 来分析 REST 中的请求和响应机制。对于 `GET 请求`，很简单。只需打开 Postman。然后按照以下截图中的步骤操作：
 
@@ -262,9 +395,9 @@ REST端点通过特定的URL暴露。不同的客户端可以使用URL进行连�
 
 HTTP 头部允许客户端和服务器分别在与请求和响应交互时发送和接收额外的信息。这决定了 HTTP 事务的确切行为。您可以参考以下资源来了解有关头部的更多信息。我们将在下一节中快速查看头部：
 
-+   [https://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html](https://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html)
++   [`www.w3.org/Protocols/rfc2616/rfc2616-sec14.html`](https://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html)
 
-+   [https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers)
++   [`developer.mozilla.org/en-US/docs/Web/HTTP/Headers`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers)
 
 在 Postman 中，您可以点击 **代码**，如下面的截图所示：
 
@@ -314,7 +447,7 @@ Postman 响应头
 
 # ASP.NET Core HTTP 属性
 
-根据 *互联网工程任务组 (IETF) RFC-7231* 文档 ([https://tools.ietf.org/html/rfc7231](https://tools.ietf.org/html/rfc7231))，ASP.NET Core 实现了八种 HTTP 动词中的七种 HTTP 属性。框架中从动词列表中排除的唯一一个是 HTTP TRACE 动词。
+根据 *互联网工程任务组 (IETF) RFC-7231* 文档 ([`tools.ietf.org/html/rfc7231`](https://tools.ietf.org/html/rfc7231))，ASP.NET Core 实现了八种 HTTP 动词中的七种 HTTP 属性。框架中从动词列表中排除的唯一一个是 HTTP TRACE 动词。
 
 以下是在 ASP.NET Core 中提供的完整 HTTP 动词属性列表：
 
@@ -336,7 +469,7 @@ Postman 响应头
 
 框架还提供了一个对路由也很重要的属性，名为`RouteAttribute`。
 
-动作方法的参数还有一些其他属性，用于帮助识别从请求的不同位置（如URL、Body等）传递给API动作的参数。以下是一些框架中用于动作参数的属性：
+动作方法的参数还有一些其他属性，用于帮助识别从请求的不同位置（如 URL、Body 等）传递给 API 动作的参数。以下是一些框架中用于动作参数的属性：
 
 +   `FromServicesAttribute`
 
@@ -350,23 +483,30 @@ Postman 响应头
 
 # POST
 
-使用`POST`来创建资源。在我们的例子中，我们将尝试使用POST请求向服务器创建产品。在这样做之前，我们将对我们的项目做一些修改。你可以在GitHub上找到所有相关代码（[https://github.com/PacktPublishing/Building-RESTful-Web-services-with-DOTNET-Core](https://github.com/PacktPublishing/Building-RESTful-Web-services-with-DOTNET-Core)），所以请放心！
+使用`POST`来创建资源。在我们的例子中，我们将尝试使用 POST 请求向服务器创建产品。在这样做之前，我们将对我们的项目做一些修改。你可以在 GitHub 上找到所有相关代码（[`github.com/PacktPublishing/Building-RESTful-Web-services-with-DOTNET-Core`](https://github.com/PacktPublishing/Building-RESTful-Web-services-with-DOTNET-Core)），所以请放心！
 
-那还等什么？让我们按照以下方式编写Post方法：
+那还等什么？让我们按照以下方式编写 Post 方法：
 
-[PRE10]
+```cs
+ // POST: api/Products
+[HttpPost]
+public async Task<IActionResult> Post([FromBody]Product product)
+  => (await _productService.CreateProductAsync(product))
+    ? (IActionResult)Created($"api/products/{product.Id}", product) // HTTP 201
+    : StatusCode(500); // HTTP 500
+```
 
 动作方法调用相关服务的`CreateProductAsync`方法，并检查操作是否成功。如果成功，则返回`201`，否则返回`500`。请注意，为了返回正确的状态码，我们正在利用`IActionResult`接口。这个接口有一组大量的子类，可以通过`Controller`类访问。由于我们继承了`Controller`基类，我们可以轻松地使用如`StatusCode`等方法，根据我们对资源的操作返回我们期望的状态。
 
-在上一节中，我们提到，在`POST`请求成功时，我们应该收到201 CREATED状态码，而在失败时，应该发送一个通用的500内部服务器错误响应。这正是代码所做的事情。
+在上一节中，我们提到，在`POST`请求成功时，我们应该收到 201 CREATED 状态码，而在失败时，应该发送一个通用的 500 内部服务器错误响应。这正是代码所做的事情。
 
-另一个有趣的事情是：`Created("api/products/{product.Id}", product)`。这是`Controller`类中的一个方法，它将URL分配给位置，并将201分配给响应的状态码。你不信吗？好吧，让我立即通过*Postman*来证明这一点。
+另一个有趣的事情是：`Created("api/products/{product.Id}", product)`。这是`Controller`类中的一个方法，它将 URL 分配给位置，并将 201 分配给响应的状态码。你不信吗？好吧，让我立即通过*Postman*来证明这一点。
 
 看看以下是从*Postman*请求屏幕中捕获的截图：
 
 ![](img/63d0c202-8c23-4619-8af2-04c5a66798fb.png)
 
-注意，我们以JSON格式传递了产品的数据，创建产品后，API返回了201 Created状态码和创建的新产品的URL，即api/products/1。这意味着，当你以`GET`请求运行此URL时，你会收到新创建的产品详情。简单，不是吗？
+注意，我们以 JSON 格式传递了产品的数据，创建产品后，API 返回了 201 Created 状态码和创建的新产品的 URL，即 api/products/1。这意味着，当你以`GET`请求运行此 URL 时，你会收到新创建的产品详情。简单，不是吗？
 
 如您所见，传递的产品详情的数据类型是 JSON，但问题是，谁告诉服务器它是以那种格式存储的？嗯，那是请求头 `content-type` 设置的值为 `application/json`。您可以在最后一张截图中看到。默认编码为 `charset=utf-8`，由 *Postman* 添加。
 
@@ -378,11 +518,16 @@ Postman 响应头
 
 对于之前提到的 `GET` 请求，该请求通过 ID 返回产品详情，我们可以设计如下操作方法：
 
-[PRE11]
+```cs
+// GET: api/Products/1
+[HttpGet("{id}")]
+public Task<Product> Get(int id)
+  => _productService.GetOrderAsync(id);
+```
 
 在这里，我们为 `[HttpGet]` 提供了一个模板参数 `"{id}"`。这将确保有一个 HTTP Get 路由，例如 `api/orders/1` 可用——其中 ID 是传递给 `GET` 请求的变量。
 
-我们有一个名为 `ProductService` 的服务，它实现了 `IProductService` 接口，并且通过控制器的构造函数，服务（依赖项）被注入，这被称为 *依赖注入*。在 .NET Core 中，使用内置的 *控制反转容器* 处理依赖项非常容易。如果您不明白我在说什么，那么我强烈建议您阅读我关于这个主题的另一本书，*Dependency Injection in .NET Core* ([https://www.packtpub.com/application-development/dependency-injection-net-core-20](https://www.packtpub.com/application-development/dependency-injection-net-core-20))。
+我们有一个名为 `ProductService` 的服务，它实现了 `IProductService` 接口，并且通过控制器的构造函数，服务（依赖项）被注入，这被称为 *依赖注入*。在 .NET Core 中，使用内置的 *控制反转容器* 处理依赖项非常容易。如果您不明白我在说什么，那么我强烈建议您阅读我关于这个主题的另一本书，*Dependency Injection in .NET Core* ([`www.packtpub.com/application-development/dependency-injection-net-core-20`](https://www.packtpub.com/application-development/dependency-injection-net-core-20))。
 
 # PUT
 
@@ -390,7 +535,14 @@ HTTP PUT 动词是幂等的。这意味着第一个带有特定有效负载的 H
 
 考虑以下示例，我们将更新一个产品：
 
-[PRE12]
+```cs
+// PUT: api/Products/1
+[HttpPut("{id}")]
+public async Task<IActionResult> Put(int id, [FromBody]Product product)
+  => (await _productService.UpdateProductAsync(id, product))
+    ? Ok()
+    : StatusCode(500);
+```
 
 `[HttpPut]` 属性提供了一个类似于 `[HttpGet]` 中的模板 `{id}`。在 `PUT` 的情况下，它将从 URL 中获取 ID，并从请求体中获取 `Product` 对象，这由 `[FromBody]` 属性指定，正如我们在上一节中 `POST` 的情况所做的那样。
 
@@ -408,7 +560,14 @@ HTTP PUT 动词是幂等的。这意味着第一个带有特定有效负载的 H
 
 参考以下代码块：
 
-[PRE13]
+```cs
+// DELETE: api/Products/1
+[HttpDelete("{id}")]
+public async Task<IActionResult> Delete(int id)
+  => (await _productService.DeleteOrderAsync(id))
+    ? (IActionResult)Ok()
+    : NoContent();
+```
 
 注意 `DeleteOrderAsync` 方法，它提供了要删除的产品 ID。现在，你可以从该方法返回一个布尔值，这将指示操作是否成功。如果你找不到该 ID 的任何产品，只需返回 `false`。然后，我们将根据情况决定向客户端返回什么。
 
@@ -435,17 +594,17 @@ HTTP PUT 动词是幂等的。这意味着第一个带有特定有效负载的 H
 
 传统上，在 Web 应用程序中，客户端请求服务器提供网页。然后，服务器在必要时验证和认证请求后，向客户端响应请求的 HTML 页面。下一个请求可能发生在用户点击页面上的某个链接、提交表单等情况。服务器再次处理请求，并返回另一个 HTML 页面的响应。
 
-你难道不认为我们不应该获取整个HTML页面（这将会与最后加载的页面外观和感觉基本相同），而应该只获取我们所需的数据，并更新当前加载的页面本身，而不需要向服务器发送回帖？是的，现代Web开发在这方面就是这样工作的。今天，我们只需要根据需要从服务器获取数据使用Ajax。在收到数据后，我们只需使用JavaScript或客户端框架（如Angular）更新UI。
+你难道不认为我们不应该获取整个 HTML 页面（这将会与最后加载的页面外观和感觉基本相同），而应该只获取我们所需的数据，并更新当前加载的页面本身，而不需要向服务器发送回帖？是的，现代 Web 开发在这方面就是这样工作的。今天，我们只需要根据需要从服务器获取数据使用 Ajax。在收到数据后，我们只需使用 JavaScript 或客户端框架（如 Angular）更新 UI。
 
-这就是我们所说的**单页面应用**（SPA）。在第一次向服务器请求时，服务器会响应整个应用页面。与传统Web应用不同，后续请求不会要求获取HTML页面，而是会使用Ajax请求获取数据，其中内容类型通常是JSON。在获取数据后，浏览器只需更新页面中已更改的部分，而不是重新加载整个页面。SPA通过快速响应用户在相同页面上的操作，无疑提高了用户体验，因为重新加载页面会暂时分散用户的注意力。
+这就是我们所说的**单页面应用**（SPA）。在第一次向服务器请求时，服务器会响应整个应用页面。与传统 Web 应用不同，后续请求不会要求获取 HTML 页面，而是会使用 Ajax 请求获取数据，其中内容类型通常是 JSON。在获取数据后，浏览器只需更新页面中已更改的部分，而不是重新加载整个页面。SPA 通过快速响应用户在相同页面上的操作，无疑提高了用户体验，因为重新加载页面会暂时分散用户的注意力。
 
-然而，实现单页面应用（SPA）并不像我们想象的那么简单，我们必须确保在需要时页面上显示的是最新数据。在这里，当设计SPA时，新兴技术，如ASP.NET Web API，以及JavaScript框架，如AngularJS和CSS3，都派上了用场。
+然而，实现单页面应用（SPA）并不像我们想象的那么简单，我们必须确保在需要时页面上显示的是最新数据。在这里，当设计 SPA 时，新兴技术，如 ASP.NET Web API，以及 JavaScript 框架，如 AngularJS 和 CSS3，都派上了用场。
 
-您的应用程序可以调用REST API的不同端点来完成特定任务，并在收到响应后更新UI，而无需重新加载页面。
+您的应用程序可以调用 REST API 的不同端点来完成特定任务，并在收到响应后更新 UI，而无需重新加载页面。
 
 # 面向服务架构
 
-与SPA一样，Web API在面向服务架构（SOA）中扮演着重要的角色。正如其名所示，它是一种从业务导向的角度处理责任分离的架构方法，将其分解为独立的服务。通常，这些独立的服务或组件可以使用RESTful Web API进行设计。
+与 SPA 一样，Web API 在面向服务架构（SOA）中扮演着重要的角色。正如其名所示，它是一种从业务导向的角度处理责任分离的架构方法，将其分解为独立的服务。通常，这些独立的服务或组件可以使用 RESTful Web API 进行设计。
 
 考虑一个电子商务应用，它可能包含不同的组件，如订单、账单、支付处理、客户资料管理等。这些组件各自有自己的业务逻辑，并且可以独立实现。
 
@@ -453,9 +612,9 @@ HTTP PUT 动词是幂等的。这意味着第一个带有特定有效负载的 H
 
 ![图片](img/caf5879a-a824-4cf6-a707-2668eeace98e.png)
 
-为了使它们独立，可以为这些组件公开RESTful API，这些API可以很容易地被任何客户端/应用程序消费，包括其他组件，只要它们满足认证和授权要求。
+为了使它们独立，可以为这些组件公开 RESTful API，这些 API 可以很容易地被任何客户端/应用程序消费，包括其他组件，只要它们满足认证和授权要求。
 
-以下是一个单体或传统应用架构与面向服务架构（SOA）的图示。它清楚地说明了SOA如何为同一业务应用引入可重用组件。此外，通过Web API实现它们，可以使其对外暴露，供任何应用程序（包括其他组件）消费，只要它们满足认证和授权要求：
+以下是一个单体或传统应用架构与面向服务架构（SOA）的图示。它清楚地说明了 SOA 如何为同一业务应用引入可重用组件。此外，通过 Web API 实现它们，可以使其对外暴露，供任何应用程序（包括其他组件）消费，只要它们满足认证和授权要求：
 
 ![图片](img/b0c2ee14-34e7-4937-b027-18e9b449c2dd.png)
 

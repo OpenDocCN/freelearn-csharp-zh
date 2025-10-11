@@ -1,4 +1,4 @@
-# *第 3 章*：自定义依赖注入
+# *第三章*：自定义依赖注入
 
 在本章的第三部分，我们将探讨 ASP.NET Core **依赖注入**（**DI**）以及如何根据需要自定义它以使用不同的 DI 容器。
 
@@ -22,13 +22,18 @@
 
 要遵循本章的描述，您需要创建一个 ASP.NET Core MVC 应用程序。打开您的控制台、shell 或 Bash 终端，切换到您的工作目录。使用以下命令创建一个新的 MVC 应用程序：
 
-[PRE0]
+```cs
+dotnet new mvc -n DiSample -o DiSample
+```
 
 现在，通过双击项目文件或在 Visual Studio Code 中在已打开的控制台中输入以下命令来在 Visual Studio 中打开项目：
 
-[PRE1]
+```cs
+cd DiSample
+code .
+```
 
-本章中的所有代码示例都可以在本书的 GitHub 仓库中找到：[https://github.com/PacktPublishing/Customizing-ASP.NET-Core-6.0-Second-Edition/tree/main/Chapter03](https://github.com/PacktPublishing/Customizing-ASP.NET-Core-6.0-Second-Edition/tree/main/Chapter03)。
+本章中的所有代码示例都可以在本书的 GitHub 仓库中找到：[`github.com/PacktPublishing/Customizing-ASP.NET-Core-6.0-Second-Edition/tree/main/Chapter03`](https://github.com/PacktPublishing/Customizing-ASP.NET-Core-6.0-Second-Edition/tree/main/Chapter03)。
 
 # 使用不同的 DI 容器
 
@@ -46,11 +51,30 @@
 
 让我们比较当前的 `ConfigureServices` 方法与之前的长期支持版本，看看有什么变化。如果您使用版本 3.1 创建了新的 ASP.NET Core 项目并打开 `Startup.cs`，您将找到配置服务的函数，如下所示：
 
-[PRE2]
+```cs
+public void ConfigureServices(IServiceCollection services)
+{
+    services.Configure<CookiePolicyOptions>(options =>
+    {
+        // This lambda determines whether user
+        // consent for non-essential cookies is
+        // needed for a given request.
+         options.CheckConsentNeeded = context => true;
+    });
+    services.AddControllersWithViews();
+    services.AddRazorPages();
+}
+```
 
 相比之下，在 ASP.NET Core 6.0 中，已经不再有 `Startup.cs`，服务的配置是在 `Program.cs` 中完成的，如下所示：
 
-[PRE3]
+```cs
+var builder = WebApplication.CreateBuilder(args);
+// Add services to the container.
+builder.Services.AddControllersWithViews();
+var app = builder.Build();
+// The rest of the file isn't relevant for this chapter
+```
 
 在这两种情况下，方法都会获取 `IServiceCollection`，它已经包含了一堆 ASP.NET Core 所需的服务。这个服务是由托管服务和在调用 `ConfigureServices` 方法之前执行的 ASP.NET Core 的部分添加的。
 
@@ -58,7 +82,9 @@
 
 实际的 DI 容器被所谓的 `IServiceCollection` 包装，并注册了一个扩展方法来从服务集合中创建 `IServiceProvider`，如下面的代码片段所示：
 
-[PRE4]
+```cs
+IServiceProvider provider = services.BuildServiceProvider()
+```
 
 `ServiceProvider` 包含一个不可变的容器，在运行时无法更改。使用默认的 `ConfigureServices` 方法，在调用此方法之后，会在后台创建 `IServiceProvider`。
 
@@ -70,19 +96,43 @@
 
 1.  让我们首先使用 `Autofac` 作为第三方容器。在你的命令行中输入以下命令来加载 NuGet 包：
 
-    [PRE5]
+    ```cs
+    Autofac is good for this because you are easily able to see what is happening here.
+    ```
 
 1.  要注册自定义的 IoC 容器，你需要注册不同的 `IServiceProviderFactory`。在这种情况下，如果你使用 `Autofac`，你将想要使用 `AutofacServiceProviderFactory`。`IServiceProviderFactory` 将创建一个 `ServiceProvider` 实例。如果第三方容器支持 ASP.NET Core，它应该提供一个。
 
     你应该将这个小的扩展方法放在 `Program.cs` 中，以将 `AutofacServiceProviderFactory` 注册到 `IHostBuilder`：
 
-    [PRE6]
+    ```cs
+    using Autofac;
+    using Autofac.Extensions.DependencyInjection;
+
+    namespace DiSample;
+    public static class IHostBuilderExtension
+    {
+        public static IHostBuilder 
+          UseAutofacServiceProviderFactory(
+            this IHostBuilder hostbuilder)
+        {
+            hostbuilder.UseServiceProviderFactory
+              <ContainerBuilder>(
+            new AutofacServiceProviderFactory());
+            return hostbuilder;
+        }
+    }
+    ```
 
     不要忘记添加 `Autofac` 和 `Autofac.Extensions.DependencyInjection` 的 using 语句。
 
 1.  要使用这个扩展方法，你可以在 `Program.cs` 中使用 `AutofacServiceProvider`：
 
-    [PRE7]
+    ```cs
+    var builder = WebApplication.CreateBuilder(args);
+    builder.Host.UseAutofacServiceProviderFactory();
+    // Add services to the container.
+    builder.Services.AddControllersWithViews();
+    ```
 
 这将 `AutofacServiceProviderFactory` 函数添加到 `IHostBuilder` 并启用 `Autofac` IoC 容器。如果你已经设置了它，那么在默认方式下向 `IServiceCollection` 添加服务时，你将使用 `Autofac`。
 
@@ -92,7 +142,7 @@
 
 注意
 
-安德鲁·洛克（Andrew Lock）发布了一篇相当详细的关于 Scrutor 的博客文章。与其重复他的话，我建议您直接阅读那篇文章来了解更多信息：*使用 Scrutor 自动将服务注册到 ASP.NET Core DI 容器*，可在[https://andrewlock.net/using-scrutor-to-automatically-register-your-services-with-the-asp-net-core-di-container/](https://andrewlock.net/using-scrutor-to-automatically-register-your-services-with-the-asp-net-core-di-container/)找到。
+安德鲁·洛克（Andrew Lock）发布了一篇相当详细的关于 Scrutor 的博客文章。与其重复他的话，我建议您直接阅读那篇文章来了解更多信息：*使用 Scrutor 自动将服务注册到 ASP.NET Core DI 容器*，可在[`andrewlock.net/using-scrutor-to-automatically-register-your-services-with-the-asp-net-core-di-container/`](https://andrewlock.net/using-scrutor-to-automatically-register-your-services-with-the-asp-net-core-di-container/)找到。
 
 # 摘要
 

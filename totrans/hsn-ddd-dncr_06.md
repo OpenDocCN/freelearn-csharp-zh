@@ -6,13 +6,13 @@
 
 +   应用层——洋葱架构的外层边缘
 
-+   从Web API调用领域模型
++   从 Web API 调用领域模型
 
 +   持久化领域模型更改
 
 # 技术要求
 
-除了[第5章](034423e8-8080-4073-bd08-b98a129384a4.xhtml)中关于*实现模型*的技术要求之外，您还需要安装Docker，因为我们将使用容器来运行必要的基础设施组件，例如数据库。Docker支持所有流行的平台，包括Windows、macOS和Linux。如果您需要了解更多关于如何安装Docker的信息，请参阅Docker安装文档([https://docs.docker.com/install/](https://docs.docker.com/install/))。
+除了第五章中关于*实现模型*的技术要求之外，您还需要安装 Docker，因为我们将使用容器来运行必要的基础设施组件，例如数据库。Docker 支持所有流行的平台，包括 Windows、macOS 和 Linux。如果您需要了解更多关于如何安装 Docker 的信息，请参阅 Docker 安装文档([`docs.docker.com/install/`](https://docs.docker.com/install/))。
 
 # 领域模型之外
 
@@ -20,9 +20,9 @@
 
 运行时环境的整个世界围绕着我们的领域模型，在本节中，我们将剖析构建一个适当系统所需的所有必要组件，并查看这些组件需要如何相互绑定，以及如何与领域模型绑定在一起。
 
-# 公开Web API
+# 公开 Web API
 
-我们的系统需要向用户提供一些可见性，因此，在某个时候，我们将需要构建一个用户界面。这个主题将在我们继续前进时进行讨论，但现在是时候能够以某种方式公开我们的应用，以便未来的UI可以建立在它之上。我们预计我们的系统将拥有多个UI。考虑一个**单页Web应用**（SPA）和移动应用。作为这两种类型前端的后端，我们需要构建一个Web API。我会避免使用REST API这个术语，因为它远不止是一个简单的Web API，我们也不会深入探讨这个主题。相反，我们将专注于通过HTTP调用我们的领域模型，以执行一些有用的操作。
+我们的系统需要向用户提供一些可见性，因此，在某个时候，我们将需要构建一个用户界面。这个主题将在我们继续前进时进行讨论，但现在是时候能够以某种方式公开我们的应用，以便未来的 UI 可以建立在它之上。我们预计我们的系统将拥有多个 UI。考虑一个**单页 Web 应用**（SPA）和移动应用。作为这两种类型前端的后端，我们需要构建一个 Web API。我会避免使用 REST API 这个术语，因为它远不止是一个简单的 Web API，我们也不会深入探讨这个主题。相反，我们将专注于通过 HTTP 调用我们的领域模型，以执行一些有用的操作。
 
 首先，让我们创建一个 ASP.NET Web API 控制器，我们将在这里放置一些 HTTP 端点处理器。为了做到这一点，我们需要在我们的 `Marketplace` 项目中添加一个类，因为现在我们不会在领域模型内部工作，而是在模型外部工作。
 
@@ -36,11 +36,37 @@
 
 假设我们有一个以下契约类的示例：
 
-[PRE0]
+```cs
+public class UpdateCustomerAddressDetails
+{
+    public string BillingStreet { get; set; }
+    public string BillingCity { get; set; }
+    public string BillingPostalCode { get; set; }
+    public string BillingCountry { get; set; }
+    public string DeliveryStreet { get; set; }
+    public string DeliveryCity { get; set; }
+    public string DeliveryPostalCode { get; set; }
+    public string DeliveryCountry { get; set; }
+}
+```
 
 使用复杂类型而不是分别列出两个地址的所有属性，非常方便。在我们添加一个名为 `Address` 的新类型之后，我们的契约将变得更加紧凑：
 
-[PRE1]
+```cs
+public class Address
+{
+    public string Street { get; set; }
+    public string City { get; set; }
+    public string PostalCode { get; set; }
+    public string Country { get; set; }
+}
+
+public class UpdateCustomerAddressDetails
+{
+    public Address BillingAddress { get; set; }
+    public Address DeliveryAddress { get; set; }
+}
+```
 
 请注意，复杂类型会增加兼容性问题，因为当你更改类型时，所有使用该类型的契约也将更改，并且这种更改将是隐式的。由于你没有内部消费者使用此契约，你将无法看到使用此契约的客户端是否会受到影响。此类信息只能通过测试获得。
 
@@ -56,45 +82,184 @@ POCO 类型的一些更改被认为是非破坏性的，例如以下更改：
 
 我们已经知道我们可以对我们的领域执行哪些操作，因此我们可以添加一些合约来从外部世界调用这些操作。让我们创建一个文件，我们将在这里放置我们的第一个合约。我们已经有了一个`Contracts`文件夹，所以我们可以在这个文件夹中创建一个新的 C# 类文件，命名为`ClassifiedAds.cs`。文件就位后，我们可以在那里添加我们的第一个合约：
 
-[PRE2]
+```cs
+using System;
+
+namespace Marketplace.Contracts
+{
+    public static class ClassifiedAds
+    {
+        public static class V1
+        {
+            public class Create
+            {
+                public Guid Id { get; set; }
+                public Guid OwnerId { get; set; }
+            }
+        }
+    }
+}
+```
 
 在这里，我们使用嵌套的静态类`ClassifiedAds`和`V1`作为命名空间的替代，这样在必要时我们可以在一个文件中拥有更多版本。这种方法允许我们使用静态成员导入来使代码更加简洁。
 
-我们在这里有一个**命令**。我第一次在[第 1 章](948b7834-c47c-4321-a91c-2ba58068c52e.xhtml)，“为什么是领域驱动设计？”，当我们讨论 CQRS 时提到了**命令**。命令允许用户和其他系统在我们的领域模型中执行操作。当一个命令成功处理时，领域模型状态会发生变化，并发出新的领域事件。现在，当我们有一个命令在代码中实现时，我们需要接受来自外部世界的这个命令，我们将使用 HTTP 端点来实现这一点。
+我们在这里有一个**命令**。我第一次在第一章，“为什么是领域驱动设计？”，当我们讨论 CQRS 时提到了**命令**。命令允许用户和其他系统在我们的领域模型中执行操作。当一个命令成功处理时，领域模型状态会发生变化，并发出新的领域事件。现在，当我们有一个命令在代码中实现时，我们需要接受来自外部世界的这个命令，我们将使用 HTTP 端点来实现这一点。
 
 # HTTP 端点
 
-由于现在API最明显的通信方法是使用同步HTTP调用，我们将从这里开始。我们将使用ASP.NET Web API。因此，我们需要添加一个控制器来接受我们的命令。让我们在可执行项目的`Api`文件夹中添加一个名为`ClassifiedAdsCommandsApi.cs`的文件，让这个类继承自`Controller`，并添加一个`Post`方法来处理我们在上一节中添加的命令：
+由于现在 API 最明显的通信方法是使用同步 HTTP 调用，我们将从这里开始。我们将使用 ASP.NET Web API。因此，我们需要添加一个控制器来接受我们的命令。让我们在可执行项目的`Api`文件夹中添加一个名为`ClassifiedAdsCommandsApi.cs`的文件，让这个类继承自`Controller`，并添加一个`Post`方法来处理我们在上一节中添加的命令：
 
-[PRE3]
+```cs
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Mvc;
 
-我们目前还没有做任何事情。相反，我们正在创建一个可以接受外部世界命令的web API。我们稍后会添加处理这些命令的代码。记住，这是我们针对HTTP基础设施的适配器，它在洋葱架构的最外层找到其位置。这就是我们称这个层为**边缘**的原因，因为它的外面没有任何我们可以认为是应用一部分的东西。应用可以通过多种方式与外部世界通信，所以如果我们添加了其他边缘，比如消息传递，我们期望这个新的通信适配器能够处理相同的命令。
+namespace Marketplace.Api
+{
+    [Route("/ad")]
+    public class ClassifiedAdsCommandsApi : Controller
+    {
+        [HttpPost]
+        public async Task<IActionResult> Post(
+            Contracts.ClassifiedAds.V1.Create request)
+        {
+            // handle the request here
 
-现在，我们需要向应用程序启动代码中添加更多代码以使web API工作。我们需要对`Program`类做一些事情：
+            return Ok();
+        }
+    }
+}
+```
+
+我们目前还没有做任何事情。相反，我们正在创建一个可以接受外部世界命令的 web API。我们稍后会添加处理这些命令的代码。记住，这是我们针对 HTTP 基础设施的适配器，它在洋葱架构的最外层找到其位置。这就是我们称这个层为**边缘**的原因，因为它的外面没有任何我们可以认为是应用一部分的东西。应用可以通过多种方式与外部世界通信，所以如果我们添加了其他边缘，比如消息传递，我们期望这个新的通信适配器能够处理相同的命令。
+
+现在，我们需要向应用程序启动代码中添加更多代码以使 web API 工作。我们需要对`Program`类做一些事情：
 
 1.  +   构建配置。
 
-    +   配置web宿主。
+    +   配置 web 宿主。
 
-    +   执行web宿主。
+    +   执行 web 宿主。
 
 要执行这些操作，我们需要让`Program`类看起来像这样：
 
-[PRE4]
+```cs
+using System.IO;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using static System.Environment;
+using static System.Reflection.Assembly;
 
-这里目前没有太多的事情发生。我们确保当前目录是可执行文件所在的位置，因为这也是我们可以找到配置文件的地方。然后我们读取配置，从配置中创建并启动web宿主。目前我们没有配置文件，因此没有配置，但稍后我们会添加一些。
+namespace Marketplace
+{
+    public static class Program
+    {
+        static Program() => 
+            CurrentDirectory = Path.GetDirectoryName(GetEntryAssembly().Location);
 
-现在，我们正在使用`Startup`类来配置服务，它也需要一些关注。在`Startup`类中，我们需要配置web API以便它可以使用我们的控制器。此外，我们需要一种简单的方法来与API交互，而无需任何用户界面。一种既好又简单的方法是使用与Web API集成的Swagger ([https://swagger.io/](https://swagger.io/))。在我们开始使用它之前，我们需要添加一个Swagger Web API集成NuGet包，`Swashbuckle.AspNetCore`。使用新的`.csproj`文件格式，添加集成的最简单方法可能是直接将包引用添加到项目文件中。在这里，您可以看到`Marketplace.csproj`文件的新内容，并且更改被突出显示：
+        public static void Main(string[] args)
+        {
+            var configuration = BuildConfiguration(args);
 
-[PRE5]
+            ConfigureWebHost(configuration).Build().Run();
+        }
+
+        private static IConfiguration BuildConfiguration(string[] args)
+            => new ConfigurationBuilder()
+                .SetBasePath(CurrentDirectory)
+                .Build();
+
+        private static IWebHostBuilder ConfigureWebHost(
+            IConfiguration configuration)
+            => new WebHostBuilder()
+                .UseStartup<Startup>()
+                .UseConfiguration(configuration)
+                .ConfigureServices(services => 
+                    services.AddSingleton(configuration))
+                .UseContentRoot(CurrentDirectory)
+                .UseKestrel();
+    }
+}
+```
+
+这里目前没有太多的事情发生。我们确保当前目录是可执行文件所在的位置，因为这也是我们可以找到配置文件的地方。然后我们读取配置，从配置中创建并启动 web 宿主。目前我们没有配置文件，因此没有配置，但稍后我们会添加一些。
+
+现在，我们正在使用`Startup`类来配置服务，它也需要一些关注。在`Startup`类中，我们需要配置 web API 以便它可以使用我们的控制器。此外，我们需要一种简单的方法来与 API 交互，而无需任何用户界面。一种既好又简单的方法是使用与 Web API 集成的 Swagger ([`swagger.io/`](https://swagger.io/))。在我们开始使用它之前，我们需要添加一个 Swagger Web API 集成 NuGet 包，`Swashbuckle.AspNetCore`。使用新的`.csproj`文件格式，添加集成的最简单方法可能是直接将包引用添加到项目文件中。在这里，您可以看到`Marketplace.csproj`文件的新内容，并且更改被突出显示：
+
+```cs
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>netcoreapp2.1</TargetFramework>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="4.0.1" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Marketplace.Domain\Marketplace.Domain.csproj" />
+  </ItemGroup>
+</Project>
+```
 
 `Swashbuckle.AspNetCore` 包在您阅读这本书的时候可能版本不同。请使用最新可用的版本。
 
-当您保存项目文件时，您的IDE将安装包并将引用添加到您的项目中。
+当您保存项目文件时，您的 IDE 将安装包并将引用添加到您的项目中。
 
-现在，我们可以更改`Startup`类，以便它注册Web API内部组件、我们的控制器以及所有必要的Swagger生成。我们还添加了一个嵌入式的Swagger UI，这样我们就可以直接从浏览器测试我们的API，而无需任何额外的软件：
+现在，我们可以更改`Startup`类，以便它注册 Web API 内部组件、我们的控制器以及所有必要的 Swagger 生成。我们还添加了一个嵌入式的 Swagger UI，这样我们就可以直接从浏览器测试我们的 API，而无需任何额外的软件：
 
-[PRE6]
+```cs
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Swashbuckle.AspNetCore.Swagger;
+using static System.Environment;
+// ReSharper disable UnusedMember.Global
+
+namespace Marketplace
+{
+    public class Startup
+    {
+        public Startup(IHostingEnvironment environment, 
+            IConfiguration configuration)
+        {
+            Environment = environment;
+            Configuration = configuration;
+        }
+
+        private IConfiguration Configuration { get; }
+        private IHostingEnvironment Environment { get; }
+
+        public void ConfigureServices(IServiceCollection services)
+        {
+            services.AddMvc();
+            services.AddSwaggerGen(c =>
+                c.SwaggerDoc("v1",
+                    new Info
+                    {
+                        Title = "ClassifiedAds",
+                        Version = "v1"
+                    }));
+        }
+
+        public void Configure(IApplicationBuilder app, 
+            IHostingEnvironment env)
+        {
+            if (env.IsDevelopment())
+            {
+                app.UseDeveloperExceptionPage();
+            }
+
+            app.UseMvcWithDefaultRoute();
+            app.UseSwagger();
+            app.UseSwaggerUI(c =>
+                c.SwaggerEndpoint(
+                    "/swagger/v1/swagger.json", 
+                    "ClassifiedAds v1"));
+        }
+    }
+}
+```
 
 现在一切就绪，我们准备第一次启动应用程序。按下*F5*后，您应该在控制台看到以下内容：
 
@@ -102,25 +267,25 @@ POCO 类型的一些更改被认为是非破坏性的，例如以下更改：
 
 应用程序最终运行
 
-现在，让我们在浏览器中打开Swagger UI，访问`http://localhost:5000/swagger`。我们应该看到一个操作（POST），当我们展开它时，以下内容应该出现：
+现在，让我们在浏览器中打开 Swagger UI，访问`http://localhost:5000/swagger`。我们应该看到一个操作（POST），当我们展开它时，以下内容应该出现：
 
 ![图片](img/0cb25b4e-48ce-4930-9a4d-8d82bcfcd8ff.png)
 
-Swagger用户界面用于测试API
+Swagger 用户界面用于测试 API
 
-您可以点击“尝试一下”按钮并向API发送一些请求，但它不会做任何事情，因为我们总是返回`200 OK`响应。
+您可以点击“尝试一下”按钮并向 API 发送一些请求，但它不会做任何事情，因为我们总是返回`200 OK`响应。
 
-我们已经完成了所有必要的步骤来暴露一个原始的Web API端点，并提供了支持它的引导代码。我们还创建了一个API合约，它代表创建分类广告的命令。现在是时候让这个命令生效了。
+我们已经完成了所有必要的步骤来暴露一个原始的 Web API 端点，并提供了支持它的引导代码。我们还创建了一个 API 合约，它代表创建分类广告的命令。现在是时候让这个命令生效了。
 
 # 应用层
 
-边缘部分——在我们的案例中，是一个简单的Web API——接受来自外部世界的请求。我们边缘组件的主要任务是接受一些请求，这些请求以JSON文档、XML文档、通过RabbitMQ的消息或任何其他通信渠道和序列化类型发送；将其转换为命令；然后确保这个命令得到处理。
+边缘部分——在我们的案例中，是一个简单的 Web API——接受来自外部世界的请求。我们边缘组件的主要任务是接受一些请求，这些请求以 JSON 文档、XML 文档、通过 RabbitMQ 的消息或任何其他通信渠道和序列化类型发送；将其转换为命令；然后确保这个命令得到处理。
 
 边缘部分当然可以直接与领域模型工作，但这意味着我们接受这样一个事实，我们总是只与一种边缘类型一起工作，使用一种通信协议。此外，边缘组件通常对通信基础设施有很强的依赖性——虽然这对于集成测试来说是可行的，但为这样的组件编写单元测试可能会具有挑战性。
 
 为了将通信基础设施与实际请求处理隔离开来，我们可以引入应用层。在这个层中，我们需要一个组件来接受来自边缘的命令并使用我们的领域模型来处理这些命令。这样的组件被称为**应用服务**。
 
-如果您参考[第4章](bea6a7db-f270-4c0b-a3c3-bedb4182cafb.xhtml)，*设计模型*，并查看洋葱架构的图片，您将在基础设施和领域模型之间找到应用服务。应用服务对用于从外部发送命令的传输没有依赖性。
+如果您参考第四章，*设计模型*，并查看洋葱架构的图片，您将在基础设施和领域模型之间找到应用服务。应用服务对用于从外部发送命令的传输没有依赖性。
 
 然而，服务需要有一种方式来加载和存储实体，因为应用程序服务的典型操作将执行如下命令：
 
@@ -130,57 +295,177 @@ Swagger用户界面用于测试API
 
 在这个流程中存在一些异常。当应用程序服务接收到需要创建新实体的命令时，它不会从实体存储中加载任何内容，因为还没有可以加载的内容。它将创建实体并将其保存到实体存储中。同样，当处理命令需要删除实体时，应用程序服务将加载实体，但不一定将其保存回去。它可能只是从存储中删除这个实体，但这在很大程度上取决于模型。例如，如果业务要求保留所有数据，我们可能只是将实体标记为已删除，然后将更改持久化到实体存储中。
 
-让我们在项目中添加一个新的应用程序服务类并编写一些代码。首先，我们需要在我们的可执行Web API项目的`Api`文件夹中创建一个新的文件。有些人可能会争论应用程序服务不是API的一部分，但到目前为止，我们只有一个边缘，并且没有真正的原因将它们分开。新文件的名称将是`ClassifiedAdApplicationService.cs`，它具有以下代码：
+让我们在项目中添加一个新的应用程序服务类并编写一些代码。首先，我们需要在我们的可执行 Web API 项目的`Api`文件夹中创建一个新的文件。有些人可能会争论应用程序服务不是 API 的一部分，但到目前为止，我们只有一个边缘，并且没有真正的原因将它们分开。新文件的名称将是`ClassifiedAdApplicationService.cs`，它具有以下代码：
 
-[PRE7]
+```cs
+namespace Marketplace.Api
+{
+    public class ClassifiedAdsApplicationService
+    {
+        public void Handle(Contracts.ClassifiedAds.V1.Create command)
+        {
+            // we need to create a new Classified Ad here
+        }
+    }
+}
+```
 
-现在，我们需要从我们的API中调用应用程序服务。我们需要将应用程序服务作为依赖项添加到我们的控制器中，并在启动时，我们将依赖项注册到ASP.NET Core服务定位器中。首先，我们进行注册。由于我们的应用程序服务类还没有依赖项，我们可以使用单例，因此我们在`Startup`类的`ConfigureServices`方法中添加一行：
+现在，我们需要从我们的 API 中调用应用程序服务。我们需要将应用程序服务作为依赖项添加到我们的控制器中，并在启动时，我们将依赖项注册到 ASP.NET Core 服务定位器中。首先，我们进行注册。由于我们的应用程序服务类还没有依赖项，我们可以使用单例，因此我们在`Startup`类的`ConfigureServices`方法中添加一行：
 
-[PRE8]
+```cs
+public void ConfigureServices(IServiceCollection services)
+{
+    services.AddSingleton(new ClassifiedAdsApplicationService());
+    ...
+}
+```
 
 当这一切完成之后，我们可以将`ClassifiedAdsApplicationService`类作为依赖项添加到`ClassifiedAdsCommandsApi`控制器中，并从我们的`Post`方法中调用`Handle`方法：
 
-[PRE9]
+```cs
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Mvc;
+
+namespace Marketplace.Api
+{
+    [Route("/ad")]
+    public class ClassifiedAdsCommandsApi : Controller
+    {
+        private readonly ClassifiedAdsApplicationService _applicationService;
+
+        public ClassifiedAdsCommandsApi(
+            ClassifiedAdsApplicationService applicationService)
+            => _applicationService = applicationService;
+
+        [HttpPost]
+        public async Task<IActionResult> Post(
+            Contracts.ClassifiedAds.V1.Create request)
+        {
+            _applicationService.Handle(request);
+
+            return Ok();
+        }
+    }
+}
+```
 
 在下一节中，我们将深入探讨命令处理，包括将实体保存到实体存储和检索它们。我们还将为这些命令添加更多的命令和处理器。
 
 # 处理命令
 
-在上一节中，我们创建了一个简单的Web API并了解到API是应用程序的*边缘*。边缘与外部世界进行通信，并通过HTTP或其他通信协议接受请求。为了执行这些请求，我们需要一个作为边缘组件和领域模型之间中介的*应用程序服务*。应用程序服务还负责持久化实体。
+在上一节中，我们创建了一个简单的 Web API 并了解到 API 是应用程序的*边缘*。边缘与外部世界进行通信，并通过 HTTP 或其他通信协议接受请求。为了执行这些请求，我们需要一个作为边缘组件和领域模型之间中介的*应用程序服务*。应用程序服务还负责持久化实体。
 
 今后，我们将学习更多关于处理命令和持久化的知识。我们还将讨论处理异常和检查传入请求是否有效。
 
 # 命令处理器模式
 
-在CQRS中处理命令有几种方法。一个已建立的模式是使用命令处理器。这并不特定于CQRS，但它被广泛使用，因为它非常合适。命令处理器是一个类，它有一个方法来处理单个命令类型。例如，我们可能有一个这样的命令处理器：
+在 CQRS 中处理命令有几种方法。一个已建立的模式是使用命令处理器。这并不特定于 CQRS，但它被广泛使用，因为它非常合适。命令处理器是一个类，它有一个方法来处理单个命令类型。例如，我们可能有一个这样的命令处理器：
 
-[PRE10]
+```cs
+public class CreateClassifiedAdHandler : 
+    IHandleCommand<Contracts.ClassifiedAds.V1.Create>
+{
+    private readonly IEntityStore _store;
+
+    public CreateClassifiedAdHandler(IEntityStore store) 
+        => _store = store;
+
+    public Task Handle(Contracts.ClassifiedAds.V1.Create command)
+    {
+        var classifiedAd = new ClassifiedAd(
+            new ClassifiedAdId(command.Id), 
+            new UserId(command.OwnerId));
+
+        return _store.Save(classifiedAd);
+    }
+}
+```
 
 命令处理器之前使用了两个接口。接口看起来像这样：
 
-[PRE11]
+```cs
+public interface IHandleCommand<in T>
+{
+    Task Handle(T command);
+}
+
+public interface IEntityStore
+{
+    Task<T> Load<T>(string id);
+    Task Save<T>(T entity);
+}
+```
 
 请记住，`IEntityStore`接口是简化的，并不是所有持久化方法都可以通过这样的接口表示。
 
 请不要误解，我并不是试图在你的脑海中播种通用仓库的想法。实际上，实体存储并不是仓库模式的精确数学。当仓库的目的是模拟一组对象并隐藏持久性时，实体存储是完全相反的。它不表示一个集合。它确实做了它告诉你的——持久化一个单一的对象并检索它。而且，尽管通用仓库通常被认为是一个反模式，但我不会对实体存储接口应用同样的规则。
 
-然后，我们可以在API中使用这个命令处理程序：
+然后，我们可以在 API 中使用这个命令处理程序：
 
-[PRE12]
+```cs
+using System.Threading.Tasks;
+using Marketplace.Contracts;
+using Microsoft.AspNetCore.Mvc;
+using static Marketplace.Contracts.ClassifiedAds;
+
+namespace Marketplace.Api
+{
+    [Route("/ad")]
+    public class ClassifiedAdsCommandsApi : Controller
+    {
+        private readonly IHandleCommand<V1.Create>
+            _createAdCommandHandler;
+
+        public ClassifiedAdsCommandsApi(
+            IHandleCommand<V1.Create> 
+            createAdCommandHandler
+        ) =>
+            _createAdCommandHandler = createAdCommandHandler;
+
+        [HttpPost]
+        public Task Post(V1.Create request) => 
+            _createAdCommandHandler.Handle(request);
+    }
+}
+```
 
 你可以看到这里我们通过`IHandleCommand`接口引用了命令处理程序。这给了我们一些选择我们想要使用的实现方式的自由。首先，我们可以注册我们已有的实现：
 
-[PRE13]
+```cs
+services.AddSingleton<IEntityStore, RavenDbEntityStore>();
+services.AddScoped<
+    IHandleCommand<Contracts.ClassifiedAds.V1.Create>,
+    CreateClassifiedAdHandler>();
+```
 
 在这里，我们注册了`RavenDbEntityStore`类，它实现了`IEntityStore`。我们不会在这里查看实际的实现，但既然`RavenDb`是文档数据库，这样的类可能很容易实现。
 
-我们到目前为止所做的是非常直接的，但由于我们在API中使用`IHandleCommand<T>`接口，我们可以做一些更有趣的事情。例如，我们可以创建一个通用的命令处理程序，它会重试失败：
+我们到目前为止所做的是非常直接的，但由于我们在 API 中使用`IHandleCommand<T>`接口，我们可以做一些更有趣的事情。例如，我们可以创建一个通用的命令处理程序，它会重试失败：
 
-[PRE14]
+```cs
+public class RetryingCommandHandler<T> : IHandleCommand<T>
+{
+    static RetryPolicy _policy = Policy
+          .Handle<InvalidOperationException>()
+          .Retry();
+
+    private IHandleCommand<T> _next;
+
+    public RetryingCommandHandler(IHandleCommand<T> next)
+        => _next = next;
+
+    public Task Handle(T command) 
+        => _policy.ExecuteAsync(() => _next.Handle(command));
+}
+```
 
 我们只需要将服务注册更改如下：
 
-[PRE15]
+```cs
+services.AddScoped<IHandleCommand<V1.Create>>(c =>
+    new RetryingCommandHandler<V1.Create>(
+        new CreateClassifiedAdHandler(c.GetService<RavenDbEntityStore>())));
+```
 
 在这里，我们将实际的命令处理程序包裹在通用的重试处理程序中。由于它们都实现了相同的接口，我们可以通过这些类的组合来构建一个管道。我们可以继续向链中添加更多元素，例如使用断路器或记录器。
 
@@ -188,7 +473,31 @@ Swagger用户界面用于测试API
 
 命令处理器模式很有吸引力，并且遵循 **单一职责原则**（**SRP**）。同时，我们 API 中的每个 HTTP 方法都需要一个单独的命令处理器作为依赖项。如果我们有两个或三个方法，这并不是什么大问题，但我们可能会有更多。仅通过查看我们的 EventStorming 会话的结果，我们可能预测我们的分类广告 Web API 将会有超过 10 个方法，以及足够的命令处理器。命令处理器需要实体存储作为依赖项，并且由于所有 Web API 控制器都是按范围实例化的，因此所有命令处理器也将被实例化和注入，包括它们的所有依赖项。通过使用工厂委托而不是每个请求的依赖项来减轻庞大依赖树的实例化，这样每个方法就能实例化其处理器：
 
-[PRE16]
+```cs
+using System;
+using System.Threading.Tasks;
+using Marketplace.Contracts;
+using Microsoft.AspNetCore.Mvc;
+using static Marketplace.Contracts.ClassifiedAds;
+
+namespace Marketplace.Api
+{
+    [Route("/ad")]
+    public class ClassifiedAdsCommandsApi : Controller
+    {
+        private readonly Func<IHandleCommand<V1.Create>>
+            _createAdCommandHandlerFactory;
+
+        public ClassifiedAdsCommandsApi(
+            Func<IHandleCommand<V1.Create>> createAdCommandHandlerFactory) 
+            => _createAdCommandHandlerFactory = createAdCommandHandlerFactory;
+
+        [HttpPost]
+        public Task Post(V1.Create request) => 
+            _createAdCommandHandlerFactory().Handle(request);
+    }
+}
+```
 
 这种方法需要更高级的注册，因为我们不是使用实际类型，而是一个委托。另一个解决方案可能是使用 `Lazy<IHandleCommand<T>>` 作为依赖项。同样，这也需要更复杂的注册。注册挑战可能通过使用另一个依赖注入容器来解决，例如支持自动工厂委托和 `Lazy<T>` 的 Autofac。
 
@@ -198,27 +507,78 @@ Swagger用户界面用于测试API
 
 事实上，我们的应用服务将看起来和表现得很像一组命令处理器。一个 *经典* 的应用服务会公开一些带有多个参数的方法，如下所示：
 
-[PRE17]
+```cs
+public interface IPaymentApplicationService
+{
+    Guid Authorize(
+        string creditCardNumber, 
+        int expiryYear,
+        int expiryMonth,
+        int cvcCode,
+        intcamount);
+    void Capture(Guid authorizationId);
+}
+```
 
 使用这种声明方式是完全可以接受的，但它与组合不太兼容。将此类应用服务添加到具有日志记录、重试策略等的管道中并不容易。要构建管道，我们需要所有处理器具有兼容的参数，但 `IPaymentApplicationService` 的这些方法根本不允许我们这样做。管道中的每个其他调用都必须具有相同的参数集，而且一旦我们想要向任何方法添加一个参数，我们就注定要在构成管道的多个类中进行大量更改。这不是我们愿意做的事情。
 
 或者，我们可以有一个实现多个 `IHandle<T>` 接口的应用服务类。这可以工作，但每个命令将需要单独的引导代码，尽管我们在管道中添加的是相同的元素：
 
-[PRE18]
+```cs
+services.AddScoped<IHandleCommand<V1.Create>>(c =>
+    new RetryingCommandHandler<V1.Create>(
+        new CreateClassifiedAdHandler(c.GetService<RavenDbEntityStore>())));
+services.AddScoped<IHandleCommand<V1.Create>>(c =>
+    new RetryingCommandHandler<V1.Rename>(
+        new RenameClassifiedAdHandler(c.GetService<RavenDbEntityStore>())));
+// more handlers need to be added with the same composition
+```
 
-或者，我们可以将我们的应用程序服务泛化以处理任何类型的命令，并再次使用C# 7的高级模式匹配功能（就像我们在事件处理中做的那样）。在这种情况下，应用程序服务的签名将如下所示：
+或者，我们可以将我们的应用程序服务泛化以处理任何类型的命令，并再次使用 C# 7 的高级模式匹配功能（就像我们在事件处理中做的那样）。在这种情况下，应用程序服务的签名将如下所示：
 
-[PRE19]
+```cs
+public interface IApplicationService
+{
+    Task Handle(object command);
+}
+```
 
 我们之前用于管道的所有过滤器，如重试过滤器或日志过滤器，都可以实现这个简单的接口。由于那些类不需要获取命令的内容，所以一切都会正常工作。我们的分类广告服务将看起来像这样：
 
-[PRE20]
+```cs
+using System;
+using System.Threading.Tasks;
+using Marketplace.Framework;
+using static Marketplace.Contracts.ClassifiedAds;
 
-通过以这种方式实现我们的应用程序服务，我们将有一个单一的依赖关系来处理所有的API调用，并且我们保持开放的大门来构建一个更复杂的命令处理管道，就像我们能够对单个命令处理器做到的那样。
+namespace Marketplace.Api
+{
+    public class ClassifiedAdsApplicationService 
+        : IApplicationService
+    {
+        public async Task Handle(object command)
+        {
+            switch (command)
+            {
+                case V1.Create cmd:
+                    // we need to create a new Classified Ad here
+                    break;
 
-当然，这里的权衡是我们有一个处理多个命令的类，有些人可能会认为它违反了SRP原则。同时，这个类的内聚度很高，我们将在本章的后面看到更多关于它如何适当地处理多个命令并从边缘调用我们的应用程序服务的内容。
+                default:
+                    throw new InvalidOperationException(
+                        $"Command type {command.GetType().FullName} is 
+                        unknown");
+            }
+        }
+    }
+}
+```
 
-让我们现在添加更多命令并相应地扩展我们的应用程序服务和HTTP边缘。
+通过以这种方式实现我们的应用程序服务，我们将有一个单一的依赖关系来处理所有的 API 调用，并且我们保持开放的大门来构建一个更复杂的命令处理管道，就像我们能够对单个命令处理器做到的那样。
+
+当然，这里的权衡是我们有一个处理多个命令的类，有些人可能会认为它违反了 SRP 原则。同时，这个类的内聚度很高，我们将在本章的后面看到更多关于它如何适当地处理多个命令并从边缘调用我们的应用程序服务的内容。
+
+让我们现在添加更多命令并相应地扩展我们的应用程序服务和 HTTP 边缘。
 
 首先，我们需要回到我们的实体并检查我们可以命令它执行哪些操作。这些操作如下：
 
@@ -230,27 +590,237 @@ Swagger用户界面用于测试API
 
 1.  请求发布。
 
-我们可以添加四个命令来执行这些操作，因为我们根据我们的EventStorming会议可以预期，这是我们用户想要做的。
+我们可以添加四个命令来执行这些操作，因为我们根据我们的 EventStorming 会议可以预期，这是我们用户想要做的。
 
 扩展后的命令列表将如下所示：
 
-[PRE21]
+```cs
+using System;
 
-每个命令都需要有它将要操作的实体的ID。其他属性是命令特定的。
+namespace Marketplace.Contracts
+{
+    public static class ClassifiedAds
+    {
+        public static class V1
+        {
+            public class Create
+            {
+                public Guid Id { get; set; }
+                public Guid OwnerId { get; set; }
+            }
 
-第二，我们可以扩展我们的边缘以接受这些命令作为HTTP请求。新API版本的代码如下：
+            public class SetTitle
+            {
+                public Guid Id { get; set; }
+                public string Title { get; set; }
+            }
 
-[PRE22]
+            public class UpdateText
+            {
+                public Guid Id { get; set; }
+                public string Text { get; set; }
+            }
 
-你可能已经看到了一些创建有用抽象或例程的候选者。你也许也可以预测一些当这段代码在生产环境中运行时可能出现的问题。前面的边缘代码也违反了一个重要的原则，即API客户端需要只向命令处理器发送有效的命令。在我们的代码中，没有任何东西进行这样的检查。不用担心；我们将回到API代码并解决这些问题。现在，让我们集中精力在关键部分。
+            public class UpdatePrice
+            {
+                public Guid Id { get; set; }
+                public decimal Price { get; set; }
+                public string Currency { get; set; }
+            }
+
+            public class RequestToPublish
+            {
+                public Guid Id { get; set; }
+            }
+        }
+    }
+}
+```
+
+每个命令都需要有它将要操作的实体的 ID。其他属性是命令特定的。
+
+第二，我们可以扩展我们的边缘以接受这些命令作为 HTTP 请求。新 API 版本的代码如下：
+
+```cs
+using System.Threading.Tasks;
+using Marketplace.Contracts;
+using Microsoft.AspNetCore.Mvc;
+using static Marketplace.Contracts.ClassifiedAds;
+
+namespace Marketplace.Api
+{
+    [Route("/ad")]
+    public class ClassifiedAdsCommandsApi : Controller
+    {
+        private readonly ClassifiedAdsApplicationService 
+        _applicationService;
+
+        public ClassifiedAdsCommandsApi(
+            ClassifiedAdsApplicationService applicationService)
+            => _applicationService = applicationService;
+
+        [HttpPost]
+        public async Task<IActionResult> Post(V1.Create request)
+        {
+            await _applicationService.Handle(request);
+            return Ok();
+        }
+
+        [Route("name")]
+        [HttpPut]
+        public async Task<IActionResult> Put(V1.SetTitle request)
+        {
+            await _applicationService.Handle(request);
+            return Ok();
+        }
+
+        [Route("text")]
+        [HttpPut]
+        public async Task<IActionResult> Put(V1.UpdateText request)
+        {
+            await _applicationService.Handle(request);
+            return Ok();
+        }
+
+        [Route("price")]
+        [HttpPut]
+        public async Task<IActionResult> Put(V1.UpdatePrice request)
+        {
+            await _applicationService.Handle(request);
+            return Ok();
+        }
+
+        [Route("publish")]
+        [HttpPut]
+        public async Task<IActionResult> Put(V1.RequestToPublish request)
+        {
+            await _applicationService.Handle(request);
+            return Ok();
+        }
+    }
+}
+```
+
+你可能已经看到了一些创建有用抽象或例程的候选者。你也许也可以预测一些当这段代码在生产环境中运行时可能出现的问题。前面的边缘代码也违反了一个重要的原则，即 API 客户端需要只向命令处理器发送有效的命令。在我们的代码中，没有任何东西进行这样的检查。不用担心；我们将回到 API 代码并解决这些问题。现在，让我们集中精力在关键部分。
 
 如你所见，我们的应用程序服务预计将处理五个命令。我们需要确保它这样做。我们应用程序服务的新代码如下：
 
-[PRE23]
+```cs
+using System;
+using System.Threading.Tasks;
+using Marketplace.Contracts;
+using Marketplace.Domain;
+using Marketplace.Framework;
+using static Marketplace.Contracts.ClassifiedAds;
+
+namespace Marketplace.Api
+{
+    public class ClassifiedAdsApplicationService 
+        : IApplicationService
+    {
+        private readonly IEntityStore _store;
+        private ICurrencyLookup _currencyLookup;
+
+        public ClassifiedAdsApplicationService(
+            IEntityStore store, ICurrencyLookup currencyLookup)
+        {
+            _store = store;
+            _currencyLookup = currencyLookup;
+        }
+
+        public async Task Handle(object command)
+        {
+            ClassifiedAd classifiedAd;
+            switch (command)
+            {
+                case V1.Create cmd:
+                    if (await _store.Exists<ClassifiedAd>(cmd.Id.ToString()))
+                        throw new InvalidOperationException(
+                            $"Entity with id {cmd.Id} already exists");
+
+                    classifiedAd = new ClassifiedAd(
+                        new ClassifiedAdId(cmd.Id),
+                        new UserId(cmd.OwnerId));
+
+                    await _store.Save(classifiedAd);
+                    break;
+
+                case V1.SetTitle cmd:
+                    classifiedAd = await _store.Load<ClassifiedAd>(cmd.Id.ToString());
+                    if (classifiedAd == null)
+                        throw new InvalidOperationException(
+                            $"Entity with id {cmd.Id} cannot be found");
+
+                    classifiedAd.SetTitle(ClassifiedAdTitle.FromString(cmd.Title));
+                    await _store.Save(classifiedAd);
+                    break;
+
+                case V1.UpdateText cmd:
+                    classifiedAd = await _store.Load<ClassifiedAd>(cmd.Id.ToString());
+                    if (classifiedAd == null)
+                        throw new InvalidOperationException(
+                            $"Entity with id {cmd.Id} cannot be found");
+
+                    classifiedAd.UpdateText(ClassifiedAdText.FromString(cmd.Text));
+                    await _store.Save(classifiedAd);
+                    break;
+
+                case V1.UpdatePrice cmd:
+                    classifiedAd = await _store.Load<ClassifiedAd>(cmd.Id.ToString());
+                    if (classifiedAd == null)
+                        throw new InvalidOperationException(
+                            $"Entity with id {cmd.Id} cannot be found");
+
+                    classifiedAd.UpdatePrice(
+                        Price.FromDecimal(cmd.Price, cmd.Currency, _currencyLookup));
+                    await _store.Save(classifiedAd);
+                    break;
+
+                case V1.RequestToPublish cmd:
+                    classifiedAd = await _store.Load<ClassifiedAd>(cmd.Id.ToString());
+                    if (classifiedAd == null)
+                        throw new InvalidOperationException(
+                            $"Entity with id {cmd.Id} cannot be found");
+
+                    classifiedAd.RequestToPublish();
+                    await _store.Save(classifiedAd);
+                    break;
+
+                default:
+                    throw new InvalidOperationException(
+                        $"Command type {command.GetType().FullName} is unknown");
+            }
+        }
+    }
+}
+```
 
 这里，我们再次使用`IEntityStore`抽象。这个接口非常简单：
 
-[PRE24]
+```cs
+using System.Threading.Tasks;
+
+namespace Marketplace.Framework
+{
+    public interface IEntityStore
+    {
+        /// <summary>
+        /// Loads an entity by id
+        /// </summary>
+        Task<T> Load<T>(string entityId) where T : Entity;
+
+        /// <summary>
+        /// Persists an entity
+        /// </summary>
+        Task Save<T>(T entity) where T : Entity;
+
+        /// <summary>
+        /// Check if entity with a given id already exists
+        /// <typeparam name="T">Entity type</typeparam>
+        Task<bool> Exists<T>(string entityId);
+    }
+}
+```
 
 我们将为不同的持久化类型实现这个接口。
 
@@ -258,11 +828,106 @@ Swagger用户界面用于测试API
 
 另一个值得提及的是，应用服务负责将原始类型，如字符串或十进制数，转换为值对象。边缘始终使用可序列化的类型，这些类型不依赖于领域模型。然而，应用服务操作与领域相关；它需要告诉我们的领域模型要做什么，由于我们的领域模型更喜欢以值对象的形式接收数据，因此应用服务负责转换。
 
-处理现有实体命令的代码看起来与处理现有实体更新非常相似。实际上，只有调用实体方法的行有所不同。因此，我们可以通过直接的一般化来显著简化`Handle`方法，并用switch表达式替换`switch`模式匹配运算符：
+处理现有实体命令的代码看起来与处理现有实体更新非常相似。实际上，只有调用实体方法的行有所不同。因此，我们可以通过直接的一般化来显著简化`Handle`方法，并用 switch 表达式替换`switch`模式匹配运算符：
 
-[PRE25]
+```cs
+using System;
+using System.Threading.Tasks;
+using Marketplace.Domain;
+using Marketplace.Framework;
+using static Marketplace.Contracts.ClassifiedAds;
 
-从应用服务代码中可以看出，应用服务本身在应用边缘和领域模型之间扮演着至关重要的中介角色。边缘可以是任何与外界通信的东西。我们以HTTP API为例，但它也可以是消息接口或完全不同的东西。对于边缘来说，重要的要求是能够接受命令、检查它们并让应用服务处理这些命令。
+namespace Marketplace.Api
+{
+    public class ClassifiedAdsApplicationService
+        : IApplicationService
+    {
+        private readonly IClassifiedAdRepository _repository;
+        private readonly ICurrencyLookup _currencyLookup;
+
+        public ClassifiedAdsApplicationService(
+            IClassifiedAdRepository repository,
+            ICurrencyLookup currencyLookup
+        )
+        {
+            _repository = repository;
+            _currencyLookup = currencyLookup;
+        }
+
+        public Task Handle(object command) =>
+            command switch
+            {
+                V1.Create cmd =>
+                    HandleCreate(cmd),
+                V1.SetTitle cmd =>
+                    HandleUpdate(
+                        cmd.Id,
+                        c => c.SetTitle(
+                            ClassifiedAdTitle.FromString(cmd.Title)
+                        )
+                    ),
+                V1.UpdateText cmd =>
+                    HandleUpdate(
+                        cmd.Id,
+                        c => c.UpdateText(
+                            ClassifiedAdText.FromString(cmd.Text)
+                        )
+                    ),
+                V1.UpdatePrice cmd =>
+                    HandleUpdate(
+                        cmd.Id,
+                        c => c.UpdatePrice(
+                            Price.FromDecimal(
+                                cmd.Price,
+                                cmd.Currency,
+                                _currencyLookup
+                            )
+                        )
+                    ),
+                V1.RequestToPublish cmd =>
+                    HandleUpdate(
+                        cmd.Id,
+                        c => c.RequestToPublish()
+                    ),
+                _ => Task.CompletedTask
+            };
+
+        private async Task HandleCreate(V1.Create cmd)
+        {
+            if (await _repository.Exists(cmd.Id.ToString()))
+                throw new InvalidOperationException(
+                    $"Entity with id {cmd.Id} already exists");
+
+            var classifiedAd = new ClassifiedAd(
+                new ClassifiedAdId(cmd.Id),
+                new UserId(cmd.OwnerId)
+            );
+
+            await _repository.Save(classifiedAd);
+        }
+
+        private async Task HandleUpdate(
+            Guid classifiedAdId,
+            Action<ClassifiedAd> operation
+        )
+        {
+            var classifiedAd = await _repository.Load(
+                classifiedAdId.ToString()
+            );
+            if (classifiedAd == null)
+                throw new InvalidOperationException(
+                    $"Entity with id {classifiedAdId} cannot be found"
+                );
+
+            operation(classifiedAd);
+
+            await _repository.Save(classifiedAd);
+        }
+    }
+}
+```
+
+从应用服务代码中可以看出，应用服务本身在应用边缘和领域模型之间扮演着至关重要的中介角色。边缘可以是任何与外界通信的东西。我们以 HTTP API 为例，但它也可以是消息接口或完全不同的东西。对于边缘来说，重要的要求是能够接受命令、检查它们并让应用服务处理这些命令。
 
 当我们处理一个命令时，无论我们使用多个命令处理器还是单个应用服务，操作序列通常非常相似。命令处理器需要从实体存储中检索持久化的实体，调用领域模型来完成工作，然后持久化更改。在我们的例子中，我们只调用了一个实体方法，但这种情况并不总是如此。我们将在下一章讨论一致性和事务边界时进一步探讨这一点。
 
@@ -270,8 +935,8 @@ Swagger用户界面用于测试API
 
 在本章中，我们探讨了如何将用户的意图表示为用户发送给我们的系统的命令。我们学习了如何处理这些命令，查看了一些命令处理器模式的示例，然后转向应用服务。
 
-我们探讨了API版本控制；尽管它与本书的主题没有直接关系，但这一实践的重要性不容忽视。我们将在第10章[事件溯源](75bc64ae-a642-42b2-a44a-05ae0cb2b750.xhtml)中简要提及版本控制话题。
+我们探讨了 API 版本控制；尽管它与本书的主题没有直接关系，但这一实践的重要性不容忽视。我们将在第十章事件溯源中简要提及版本控制话题。
 
-在本章中，我们的应用程序服务得到了扩展，我们使用了C#的最新特性之一，来自函数式世界的礼物，称为**高级模式匹配**。我们利用这个特性简化了应用程序服务接口，最终只保留了一个方法。通过这种方式，我们还启用了使用组合，另一种函数式风格的途径，将命令处理与操作关注点（如日志记录和重试）链式连接。我们还将探讨这如何帮助我们检查命令的有效性。
+在本章中，我们的应用程序服务得到了扩展，我们使用了 C#的最新特性之一，来自函数式世界的礼物，称为**高级模式匹配**。我们利用这个特性简化了应用程序服务接口，最终只保留了一个方法。通过这种方式，我们还启用了使用组合，另一种函数式风格的途径，将命令处理与操作关注点（如日志记录和重试）链式连接。我们还将探讨这如何帮助我们检查命令的有效性。
 
 在下一章中，我们将更深入地探讨实体持久化。我们将学习需要处理哪些类型的致性以及理解致性边界的重要性。

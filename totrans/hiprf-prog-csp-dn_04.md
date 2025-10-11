@@ -1,4 +1,4 @@
-# *第 3 章*：预定义数据类型和内存分配
+# *第三章*：预定义数据类型和内存分配
 
 在本章中，你将了解 **C#** 预定义（即 *内置*）数据类型和 C# 对象类型，以及不同类型的 **内存分配**。
 
@@ -34,7 +34,7 @@
 
 +   必需：BenchmarkDotNet
 
-本章的代码文件可以在本书的 GitHub 仓库中找到：[https://github.com/PacktPublishing/High-Performance-Programming-in-CSharp-and-.NET/tree/master/CH03](https://github.com/PacktPublishing/High-Performance-Programming-in-CSharp-and-.NET/tree/master/CH03)
+本章的代码文件可以在本书的 GitHub 仓库中找到：[`github.com/PacktPublishing/High-Performance-Programming-in-CSharp-and-.NET/tree/master/CH03`](https://github.com/PacktPublishing/High-Performance-Programming-in-CSharp-and-.NET/tree/master/CH03)
 
 您需要克隆 Git 仓库并执行发布构建。编译后的可执行文件将在 C:\Development\perfview\src\PerfView\bin\Release\net45 下找到。
 
@@ -68,9 +68,7 @@
 
 *表 3.1* 描述了不同的值类型、它们的内存大小、是否可以为空，以及它们的默认值、最小值和最大值，并在适用的情况下提供注释：
 
-![表 3.1 – C# 中的预定义值数据类型
-
-](img/Table_3.1_B16617.jpg)
+![表 3.1 – C# 中的预定义值数据类型](img/Table_3.1_B16617.jpg)
 
 表 3.1 – C# 中的预定义值数据类型
 
@@ -110,27 +108,49 @@
 
 我们将编写一个简单的 `CH03_StringsAreImmutable`。然后，按照以下方式更新 `Main(string[] _)` 方法：
 
-[PRE0]
+```cs
+static void Main(string[] _)
+```
 
-[PRE1]
+```cs
+{
+```
 
-[PRE2]
+```cs
+Console.WriteLine("Chapter 3: Strings are immutable");
+```
 
-[PRE3]
+```cs
+var greeting1 = "Hello, world!";
+```
 
-[PRE4]
+```cs
+var greeting2 = greeting1;
+```
 
-[PRE5]
+```cs
+Console.WriteLine($"greeting1={greeting1}");
+```
 
-[PRE6]
+```cs
+Console.WriteLine($"greeting2={greeting2}");
+```
 
-[PRE7]
+```cs
+greeting1 += " Isn't life grand!";
+```
 
-[PRE8]
+```cs
+Console.WriteLine($"greeting1={greeting1}");
+```
 
-[PRE9]
+```cs
+Console.WriteLine($"greeting1={greeting2}");
+```
 
-[PRE10]
+```cs
+}
+```
 
 我们将输出一个标题到控制台，然后我们将 `greeting1` `string` 类型设置为 `"Hello, world!"`。然后，我们将 `greeting1` 赋值给 `string` 类型的 `greeting2`。两个 `string` 变量的内容都输出到控制台窗口。然后，我们在 `greeting1` 的末尾追加 `" Isn't life grand!"` 来修改 `greeting1`。接下来，我们输出 `greeting1` 和 `greeting2` 的内容。运行程序，你应该看到以下内容：
 
@@ -148,7 +168,7 @@ Figure 3.1 – 不可变字符串示例
 
 注意
 
-请查看以下链接中的 *第 I.8.9.3 节* 以获取有关委托的更多信息：[https://www.ecma-international.org/publications/files/ECMA-ST/ECMA-335.pdf](https://www.ecma-international.org/publications/files/ECMA-ST/ECMA-335.pdf)。
+请查看以下链接中的 *第 I.8.9.3 节* 以获取有关委托的更多信息：[`www.ecma-international.org/publications/files/ECMA-ST/ECMA-335.pdf`](https://www.ecma-international.org/publications/files/ECMA-ST/ECMA-335.pdf)。
 
 我们现在将描述 `dynamic` 引用类型。
 
@@ -166,87 +186,145 @@ Figure 3.1 – 不可变字符串示例
 
 启动一个新的 .NET 6 控制台应用程序，名为 `CH03_DynamicPerformance`。你需要以下引用：
 
-[PRE11]
+```cs
+using System;
+```
 
-[PRE12]
+```cs
+using System.Diagnostics;
+```
 
-[PRE13]
+```cs
+using System.Security.Cryptography;
+```
 
-[PRE14]
+```cs
+using BenchmarkDotNet.Attributes;
+```
 
-[PRE15]
+```cs
+using BenchmarkDotNet.Running;
+```
 
 在 `Program` 类的顶部添加一个新的成员变量：
 
-[PRE16]
+```cs
+dynamic _dynamicType;
+```
 
 在我们运行基准测试后，将使用 ILDASM 对这个变量声明进行调查。接下来，更新 `Main(string[] _)` 方法如下：
 
-[PRE17]
+```cs
+static void Main(string[] _)
+```
 
-[PRE18]
+```cs
+{
+```
 
-[PRE19]
+```cs
+      BenchmarkRunner.Run<BenchmarkTests>();
+```
 
-[PRE20]
+```cs
+}
+```
 
 我们在名为 `BenchmarkTests` 的类中运行基准测试。使用与前面示例相同的语句添加一个新类 `BenchmarkTests`。然后，添加 `MeasureVarUsage()` 方法：
 
-[PRE21]
+```cs
+[Benchmark]
+```
 
-[PRE22]
+```cs
+public void MeasureVarUsage()
+```
 
-[PRE23]
+```cs
+{
+```
 
-[PRE24]
+```cs
+      var x = 3.14159;
+```
 
-[PRE25]
+```cs
+}
+```
 
 这个方法将一个 `double` 对象分配给运行时解析类型的 `x` 变量。接下来，添加 `MeasureVarDynamicUsage()` 方法：
 
-[PRE26]
+```cs
+[Benchmark]
+```
 
-[PRE27]
+```cs
+public void MeasureVarDynamicUsage()
+```
 
-[PRE28]
+```cs
+{
+```
 
-[PRE29]
+```cs
+      var x = (dynamic)3.14159;
+```
 
-[PRE30]
+```cs
+}
+```
 
 这里，我们仍然在运行时解析类型的 `x` 变量上分配一个数字。但这次，我们在数字前加上 `(dynamic)` 转换。记住，`dynamic` 关键字只存在于编译时。当编译时，`dynamic` 类型变为 `object` 类型。现在，添加 `MeasureTypeDynamicUsage()` 方法：
 
-[PRE31]
+```cs
+[Benchmark]
+```
 
-[PRE32]
+```cs
+public void MeasureTypeDynamicUsage()
+```
 
-[PRE33]
+```cs
+{
+```
 
-[PRE34]
+```cs
+      double x = (dynamic)3.14159;
+```
 
-[PRE35]
+```cs
+}
+```
 
 这次，我们将变量声明为 `double` 并将分配的数字转换为 `(dynamic)`。在运行时，这个数字将被包装在 `object` 类型中，因此需要解包。并且为我们的最终方法，添加 `MeasureTypeTypeUsage()` 方法：
 
-[PRE36]
+```cs
+[Benchmark]
+```
 
-[PRE37]
+```cs
+public void MeasureTypeTypeUsage()
+```
 
-[PRE38]
+```cs
+{
+```
 
-[PRE39]
+```cs
+      double x = 3.14159;
+```
 
-[PRE40]
+```cs
+}
+```
 
 在这个方法中，我们声明一个 `double` 类型并分配一个 `double` 类型。以发布模式编译项目。然后，打开命令行并导航到您的发布文件夹。输入可执行文件名并按 *Enter*。这将导致 BenchmarkDotNet 检测项目中的基准测试并依次运行它们。你应该会看到一个类似于以下摘要的结果，尽管平均时间可能不同：
 
-![图3.2 – 变量类型声明和赋值的基准平均时间
+![图 3.2 – 变量类型声明和赋值的基准平均时间](img/Figure_3.2_B16617.jpg)
 
-](img/Figure_3.2_B16617.jpg)
+图 3.2 – 变量类型声明和赋值的基准平均时间
 
-图3.2 – 变量类型声明和赋值的基准平均时间
-
-*图3.2* 展示了当我们根据使用的方法声明变量和赋值时，性能存在差异。声明和赋值最快组合是 `var variableName = (dynamic)value`。
+*图 3.2* 展示了当我们根据使用的方法声明变量和赋值时，性能存在差异。声明和赋值最快组合是 `var variableName = (dynamic)value`。
 
 好的，我们已经运行了基准测试。那么，让我们查看动态变量的 IL 代码。打开开发者命令提示符，然后输入 `ildasm.exe` 并按 *Enter*。这将启动 ILDASM 应用程序。
 
@@ -272,25 +350,25 @@ Figure 3.1 – 不可变字符串示例
 
 在 `AssemblyLoadContext` 类中用于动态加载程序集。通过 *进程和/或容器*，Microsoft 意味着您应该将单个应用程序/模块拆分为单独的、相互交互的应用程序/模块/进程/容器。因此，Microsoft 鼓励您使用微服务重构代码，这样您就不再需要使用应用程序域。
 
-`System.Runtime.Loader.AssemblyLoadContext` 对象表示一个加载上下文。一个 *加载上下文* 为加载、解析和卸载程序集创建了一个作用域。有关 `AssemblyLoadContext` 类的更多信息，请参阅官方 Microsoft 文档：[https://docs.microsoft.com/dotnet/api/system.runtime.loader.assemblyloadcontext?view=net-5.0](https://docs.microsoft.com/dotnet/api/system.runtime.loader.assemblyloadcontext?view=net-5.0)。
+`System.Runtime.Loader.AssemblyLoadContext` 对象表示一个加载上下文。一个 *加载上下文* 为加载、解析和卸载程序集创建了一个作用域。有关 `AssemblyLoadContext` 类的更多信息，请参阅官方 Microsoft 文档：[`docs.microsoft.com/dotnet/api/system.runtime.loader.assemblyloadcontext?view=net-5.0`](https://docs.microsoft.com/dotnet/api/system.runtime.loader.assemblyloadcontext?view=net-5.0)。
 
 静态类仅由运行时实例化一次。您不能自己实例化一个静态类。静态构造函数在类被加载到内存时执行。如果一个非静态类有一个静态构造函数和一个实例构造函数，静态构造函数将在实例构造函数之前被调用。静态构造函数是无参的，并且每个类只能有一个静态构造函数。静态构造函数没有访问修饰符。当类加载时为静态变量分配内存，当类卸载时释放内存。变量、构造函数和方法属于类，而不是实例化的对象。因此，修改变量将修改类的所有实例中的变量。
 
 在调用栈上，静态方法通常比实例方法调用更快。编译器会发出非虚拟调用站点静态成员。非虚拟调用站点防止了运行时检查，这些检查确保当前对象指针非空。尽管你可能看不到任何可视的性能改进，但对于性能敏感的代码，性能提升是可以衡量的。
 
-现在我们已经涵盖了各种预定义的C#数据类型，是时候看看C#的内存以及它是如何工作的了。
+现在我们已经涵盖了各种预定义的 C#数据类型，是时候看看 C#的内存以及它是如何工作的了。
 
-# 理解C#中使用的各种内存类型
+# 理解 C#中使用的各种内存类型
 
 C#中有两种主要的内存类型：栈和堆。堆进一步分为*小对象堆*和*大对象堆*。在物理内存方面，栈和堆之间没有区别，因为它们都存储在物理内存中。它们的不同之处在于它们的实现。
 
-当你的应用程序启动时，它会被分配一部分内存。一个指针将被分配给你的应用程序，这将是你应用程序的内存起始点。指针上方是栈，指针下方是堆。堆向下增长，栈向上增长，如*图3.4*所示：
+当你的应用程序启动时，它会被分配一部分内存。一个指针将被分配给你的应用程序，这将是你应用程序的内存起始点。指针上方是栈，指针下方是堆。堆向下增长，栈向上增长，如*图 3.4*所示：
 
 ![Figure 3.4 – The stack, heap, and application starting point memory address]
 
 ![Figure 3.4_B16617.jpg]
 
-图3.4 – 栈、堆和应用启动点内存地址
+图 3.4 – 栈、堆和应用启动点内存地址
 
 以下图表直观地表示了一个简单程序中的栈和堆：
 
@@ -298,9 +376,9 @@ C#中有两种主要的内存类型：栈和堆。堆进一步分为*小对象�
 
 ![Figure 3.5_B16617.jpg]
 
-图3.5 – 栈和堆在工作
+图 3.5 – 栈和堆在工作
 
-要理解C#中的不同类型的内存，首先，我们将看看栈以及它是如何操作的。
+要理解 C#中的不同类型的内存，首先，我们将看看栈以及它是如何操作的。
 
 ## 栈
 
@@ -318,7 +396,7 @@ C#中有两种主要的内存类型：栈和堆。堆进一步分为*小对象�
 
 使用栈，你可以简单地从栈上弹出和添加东西。为了提高应用程序的性能，查找应用程序中的堆使用情况。测量使用栈和使用堆时的性能。如果栈更快，那么用栈使用替换堆使用。
 
-请记住，使用内存的成本不是在分配时，而是在释放时。栈上项的释放比堆上项的释放更可预测。在某些情况下，垃圾收集器在释放0代或1代内存时执行类似的指针运算。
+请记住，使用内存的成本不是在分配时，而是在释放时。栈上项的释放比堆上项的释放更可预测。在某些情况下，垃圾收集器在释放 0 代或 1 代内存时执行类似的指针运算。
 
 内存调用也很昂贵，因为它们被放置在栈上，但可能也引用堆。方法性能受未执行代码的影响。因此，你应该重构你的方法，使其尽可能小，并删除任何不会执行的代码，例如不再使用的死代码。这将减少正在使用的局部变量数量，从而减少栈大小。这样，你将消除性能损失。
 
@@ -332,9 +410,7 @@ C#中有两种主要的内存类型：栈和堆。堆进一步分为*小对象�
 
 引用类型数组被放置在堆上。引用数组的变量将被放置在栈上，并分配给堆上数组的内存地址。数组本身将包含一个连续的内存地址列表，如图 *图 3.5* 所示：
 
-![图 3.6 – 堆中显示对象及其在数组中的内存地址
-
-](img/Figure_3.6_B16617.jpg)
+![图 3.6 – 堆中显示对象及其在数组中的内存地址](img/Figure_3.6_B16617.jpg)
 
 图 3.6 – 堆中显示对象及其在数组中的内存地址
 
@@ -358,283 +434,537 @@ C#中有两种主要的内存类型：栈和堆。堆进一步分为*小对象�
 
 +   **大对象堆**：当一个新对象被实例化，其大小为 80,000 字节或更大时，它将被添加到大对象堆上。大对象总是分配在第 2 代，因为它们只在第 2 代收集期间进行垃圾回收。
 
-当我们查看垃圾收集时，我们将更详细地查看堆，见 [*第 4 章*](B16617_04_Final_SB_Epub.xhtml#_idTextAnchor072)，*内存管理*。
+当我们查看垃圾收集时，我们将更详细地查看堆，见 *第四章*，*内存管理*。
 
 ## 构建栈与构建堆（示例项目）
 
 现在，我们将编写一个简单的项目，该项目将获取具有和没有引用类型属性的实例化和结构体的 tick 数。首先，添加一个新的 .NET 6 控制台应用程序，名为 `CH03_StackAndHeap`。然后，添加 `BenchmarkDotNet nuget` 包。你需要使用以下 `using` 语句：
 
-[PRE41]
+```cs
+using System;
+```
 
-[PRE42]
+```cs
+using System.Diagnostics;
+```
 
-[PRE43]
+```cs
+using System.Security.Cryptography;
+```
 
-[PRE44]
+```cs
+using BenchmarkDotNet.Attributes;
+```
 
-[PRE45]
+```cs
+using BenchmarkDotNet.Running;
+```
 
 然后，更新 `Main(string[] _)` 方法，如下所示：
 
-[PRE46]
+```cs
+static void Main(string[] _)
+```
 
-[PRE47]
+```cs
+{
+```
 
-[PRE48]
+```cs
+      BenchmarkRunner.Run<BenchmarkTests>();
+```
 
-[PRE49]
+```cs
+}
+```
 
 在该方法中，我们正在调用包含我们的基准测试的 `BenchmarkTests` 类。现在，添加 `ClassNoReference` 类：
 
-[PRE50]
+```cs
+internal class ClassNoReferences
+```
 
-[PRE51]
+```cs
+{
+```
 
-[PRE52]
+```cs
+      public ClassNoReferences(
+```
 
-[PRE53]
+```cs
+          int id,
+```
 
-[PRE54]
+```cs
+          decimal price,
+```
 
-[PRE55]
+```cs
+          DateTime purchaseDate
+```
 
-[PRE56]
+```cs
+      )
+```
 
-[PRE57]
+```cs
+      {
+```
 
-[PRE58]
+```cs
+          Id = id;
+```
 
-[PRE59]
+```cs
+          Price = price;
+```
 
-[PRE60]
+```cs
+          PurchaseDate = purchaseDate;
+```
 
-[PRE61]
+```cs
+      }
+```
 
-[PRE62]
+```cs
+      public int Id { get; private set; }
+```
 
-[PRE63]
+```cs
+      public decimal Price { get; private set; }
+```
 
-[PRE64]
+```cs
+      public DateTime PurchaseDate { get; private set; }
+```
 
-[PRE65]
+```cs
+}
+```
 
 这个类有三个值类型属性而没有引用类型属性。在 `BenchmarkTests` 类中添加 `ProcessClassNoReferences()` 方法：
 
-[PRE66]
+```cs
+[Benchmark]
+```
 
-[PRE67]
+```cs
+public void ProcessClassNoReferences()
+```
 
-[PRE68]
+```cs
+{
+```
 
-[PRE69]
+```cs
+      var _ = new ClassNoReferences()
+```
 
-[PRE70]
+```cs
+      {
+```
 
-[PRE71]
+```cs
+          1,
+```
 
-[PRE72]
+```cs
+          1.50M
+```
 
-[PRE73]
+```cs
+          DateTime.Now
+```
 
-[PRE74]
+```cs
+      };
+```
 
-[PRE75]
+```cs
+}
+```
 
 `ProcessClassNoReferences()` 方法声明了一个新的 `ClassNoReferences` 类实例。它将被用作基准测试方法。添加 `StructNoReferences` 类：
 
-[PRE76]
+```cs
+internal class StructNoReferences
+```
 
-[PRE77]
+```cs
+{
+```
 
-[PRE78]
+```cs
+      public StructNoReferences(
+```
 
-[PRE79]
+```cs
+          int id,
+```
 
-[PRE80]
+```cs
+          decimal price,
+```
 
-[PRE81]
+```cs
+          DateTime purchaseDate
+```
 
-[PRE82]
+```cs
+      )
+```
 
-[PRE83]
+```cs
+      {
+```
 
-[PRE84]
+```cs
+          Id = id;
+```
 
-[PRE85]
+```cs
+          Price = price;
+```
 
-[PRE86]
+```cs
+          PurchaseDate = purchaseDate;
+```
 
-[PRE87]
+```cs
+      }
+```
 
-[PRE88]
+```cs
+      public int Id { get; private set; }     
+```
 
-[PRE89]
+```cs
+      public decimal Price { get; private set; }
+```
 
-[PRE90]
+```cs
+      public DateTime PurchaseDate { get; private set; }
+```
 
-[PRE91]
+```cs
+}
+```
 
 这个结构有三个值类型属性而没有引用类型。让我们向 `BenchmarkTests` 类添加 `ProcessStructNoReferences()` 方法：
 
-[PRE92]
+```cs
+[Benchmark]
+```
 
-[PRE93]
+```cs
+public void ProcessStructNoReferences()
+```
 
-[PRE94]
+```cs
+{
+```
 
-[PRE95]
+```cs
+      var _ = new StructNoReferences()
+```
 
-[PRE96]
+```cs
+      {
+```
 
-[PRE97]
+```cs
+         1,
+```
 
-[PRE98]
+```cs
+         1.50M,
+```
 
-[PRE99]
+```cs
+         DateTime.Now
+```
 
-[PRE100]
+```cs
+      };
+```
 
-[PRE101]
+```cs
+}
+```
 
 `ProcessStructNoReferences()` 方法将被用作基准，并创建一个新的 `StructNoReferences` 结构体。接下来，添加 `ClassWithReferences` 类：
 
-[PRE102]
+```cs
+class ClassWithReferences
+```
 
-[PRE103]
+```cs
+{
+```
 
-[PRE104]
+```cs
+    public ClassWithReferences(
+```
 
-[PRE105]
+```cs
+        int id,
+```
 
-[PRE106]
+```cs
+        string name,
+```
 
-[PRE107]
+```cs
+        decimal price,
+```
 
-[PRE108]
+```cs
+        DateTime purchaseDate,
+```
 
-[PRE109]
+```cs
+        Dictionary<string, string> keyValueData
+```
 
-[PRE110]
+```cs
+    )
+```
 
-[PRE111]
+```cs
+    {
+```
 
-[PRE112]
+```cs
+        Id = id;
+```
 
-[PRE113]
+```cs
+        Name = name;
+```
 
-[PRE114]
+```cs
+        Price = price;
+```
 
-[PRE115]
+```cs
+        PurchaseDate = purchaseDate;
+```
 
-[PRE116]
+```cs
+        KeyValueData = keyValueData;
+```
 
-[PRE117]
+```cs
+    }
+```
 
-[PRE118]
+```cs
+    public int Id { get; private set; }
+```
 
-[PRE119]
+```cs
+    public string Name { get; private set; }
+```
 
-[PRE120]
+```cs
+    public decimal Price { get; private set; }
+```
 
-[PRE121]
+```cs
+    public DateTime PurchaseDate { get; private set; }
+```
 
-[PRE122]
+```cs
+    public Dictionary<string, string> KeyValueData 
+```
 
-[PRE123]
+```cs
+        { get; private set; }
+```
 
-[PRE124]
+```cs
+}
+```
 
 这个类具有值类型和引用类型属性。现在，我们将添加 `ProcessClassWithReferences()` 方法：
 
-[PRE125]
+```cs
+[Benchmark]
+```
 
-[PRE126]
+```cs
+public void ProcessClassWithReferences()
+```
 
-[PRE127]
+```cs
+{
+```
 
-[PRE128]
+```cs
+      var _ = new ClassWithReferences(
+```
 
-[PRE129]
+```cs
+         Id = 1,
+```
 
-[PRE130]
+```cs
+         "The quick brown fox jumped over the lazy dog.",
+```
 
-[PRE131]
+```cs
+         1.50M,
+```
 
-[PRE132]
+```cs
+         DateTime.Now,
+```
 
-[PRE133]
+```cs
+);
+```
 
-[PRE134]
+```cs
+}
+```
 
 `ProcessClassWithReferences()` 方法将被用作基准，并创建一个 `ClassWithReferences` 类的实例。接下来，我们将添加 `StructWithReferences` 结构体：
 
-[PRE135]
+```cs
+internal struct StructWithReferences
+```
 
-[PRE136]
+```cs
+{
+```
 
-[PRE137]
+```cs
+      public StructWithReferences(
+```
 
-[PRE138]
+```cs
+          int id,
+```
 
-[PRE139]
+```cs
+          string name,
+```
 
-[PRE140]
+```cs
+          decimal price,
+```
 
-[PRE141]
+```cs
+          DateTime purchaseDate,
+```
 
-[PRE142]
+```cs
+          Dictionary<string, string> keyValueData
+```
 
-[PRE143]
+```cs
+      )
+```
 
-[PRE144]
+```cs
+      {
+```
 
-[PRE145]
+```cs
+          Id = id;
+```
 
-[PRE146]
+```cs
+          Name = name;
+```
 
-[PRE147]
+```cs
+          Price = price;
+```
 
-[PRE148]
+```cs
+          PurchaseDate = purchaseDate;
+```
 
-[PRE149]
+```cs
+          KeyValueData = keyValueData;
+```
 
-[PRE150]
+```cs
+      }
+```
 
-[PRE151]
+```cs
+      public int Id { get; private set; }
+```
 
-[PRE152]
+```cs
+      public string Name { get; private set; }
+```
 
-[PRE153]
+```cs
+      public decimal Price { get; private set; }
+```
 
-[PRE154]
+```cs
+      public DateTime PurchaseDate { get; private set; }
+```
 
-[PRE155]
+```cs
+      public Dictionary<string, string> KeyValueData 
+```
 
-[PRE156]
+```cs
+          { get; private set; }
+```
 
-[PRE157]
+```cs
+}
+```
 
 这个结构体具有值类型和引用类型。现在，我们将添加我们的最终方法，`ProcessStructWithReferences()`：
 
-[PRE158]
+```cs
+[Benchmark]
+```
 
-[PRE159]
+```cs
+public void ProcessStructWithReferences()
+```
 
-[PRE160]
+```cs
+{
+```
 
-[PRE161]
+```cs
+      var _ = new StructWithReferences()
+```
 
-[PRE162]
+```cs
+      {
+```
 
-[PRE163]
+```cs
+         Id = 1,
+```
 
-[PRE164]
+```cs
+         Name = "Discard",
+```
 
-[PRE165]
+```cs
+         Price = 1.50M
+```
 
-[PRE166]
+```cs
+      };
+```
 
-[PRE167]
+```cs
+}
+```
 
 `ProcessStructWithReferences()` 方法将被用作基准，并创建一个新的 `StructureWithReferences` 结构体。
 
@@ -644,7 +974,7 @@ C#中有两种主要的内存类型：栈和堆。堆进一步分为*小对象�
 
 ![img/Figure_3.7.jpg]
 
-图3.7 – 比较带和不带引用的结构体和类的基准测试报告
+图 3.7 – 比较带和不带引用的结构体和类的基准测试报告
 
 基准测试结果揭示了以下见解：
 
@@ -662,7 +992,7 @@ C#中有两种主要的内存类型：栈和堆。堆进一步分为*小对象�
 
 +   从逻辑上讲，结构体代表一个单一值。
 
-+   结构体实例的大小小于16字节。
++   结构体实例的大小小于 16 字节。
 
 +   结构体是不可变的。
 
@@ -688,87 +1018,147 @@ C#中有两种主要的内存类型：栈和堆。堆进一步分为*小对象�
 
 ## 构建按引用传递的示例程序
 
-我们将编写一个非常简单的程序来演示按值传递和按引用传递的效果。添加一个新的.NET 6控制台应用程序，名为`CH03_PassByValueAndReference`。然后，按照以下方式修改`Main(string[] _)`方法：
+我们将编写一个非常简单的程序来演示按值传递和按引用传递的效果。添加一个新的.NET 6 控制台应用程序，名为`CH03_PassByValueAndReference`。然后，按照以下方式修改`Main(string[] _)`方法：
 
-[PRE168]
+```cs
+static void Main(string[] args)
+```
 
-[PRE169]
+```cs
+{
+```
 
-[PRE170]
+```cs
+int x = 0;
+```
 
-[PRE171]
+```cs
+Console.WriteLine("Chapter 3: Pass by value and reference");     
+```
 
-[PRE172]
+```cs
+Console.WriteLine($"=====================================");
+```
 
-[PRE173]
+```cs
+Console.WriteLine($"int x = 0;");
+```
 
-[PRE174]
+```cs
+AddByValue(x);
+```
 
-[PRE175]
+```cs
+Console.WriteLine($"    AddByValue(x): {x}");
+```
 
-[PRE176]
+```cs
+AddByReference(ref x);
+```
 
-[PRE177]
+```cs
+Console.WriteLine($"AddByReference(x): {x}");
+```
 
-[PRE178]
+```cs
+}
+```
 
 在这里，我们声明了一个名为`x`的整数并给它赋值为`0`。一些文本被输出到控制台窗口，我们调用两个方法并在它们被调用后输出`x`的值。让我们添加第一个被调用的方法——`AddByValue(int x)`方法：
 
-[PRE179]
+```cs
+static void AddByValue(int x)
+```
 
-[PRE180]
+```cs
+{
+```
 
-[PRE181]
+```cs
+      x++;
+```
 
-[PRE182]
+```cs
+}
+```
 
 如您所见，这是一个非常简单的函数，它增加了传入变量的值。现在，让我们重复同样的过程，但这次我们将按引用传递值：
 
-[PRE183]
+```cs
+static void AddByReference(ref int x)
+```
 
-[PRE184]
+```cs
+{
+```
 
-[PRE185]
+```cs
+      x++;
+```
 
-[PRE186]
+```cs
+}
+```
 
 运行程序，你应该看到以下输出：
 
-![图3.8 – 使用按值传递和按引用传递增加x后的值
+![图 3.8 – 使用按值传递和按引用传递增加 x 后的值![图片](img/Figure_3.8_B16617.jpg)
 
-![图片](img/Figure_3.8_B16617.jpg)
-
-图3.8 – 使用按值传递和按引用传递增加x后的值
+图 3.8 – 使用按值传递和按引用传递增加 x 后的值
 
 我们可以看到，当我们按值传递时，原始值不会被更新。但是当我们按引用传递时，它会更新。现在我们将扩展应用以涵盖`in`参数修饰符。
 
 使用`in`关键字传递的参数是按引用传递的。然而，`in`参数不能被修改。让我们演示这一点——添加一个名为`InParameterModifier()`的新方法：
 
-[PRE187]
+```cs
+static void InParameterModifier()
+```
 
-[PRE188]
+```cs
+{
+```
 
-[PRE189]
+```cs
+      int argument = 13;
+```
 
-[PRE190]
+```cs
+      InParameterModifier(argument);
+```
 
-[PRE191]
+```cs
+      Console.WriteLine(argument);
+```
 
-[PRE192]
+```cs
+}
+```
 
 在`InParameterModifier()`方法中，我们创建了一个整数并将其赋值为`13`。然后我们调用一个同名的函数并将变量作为参数传入。然后，我们将值打印到控制台窗口。现在，我们将编写`InParameterModifier(in int argument)`方法：
 
-[PRE193]
+```cs
+static void InParameterModifier(in int argument)
+```
 
-[PRE194]
+```cs
+{
+```
 
-[PRE195]
+```cs
+      // Error CS8331: Cannot assign to variable 'in int'
+```
 
-[PRE196]
+```cs
+      // because it is a readonly variable.
+```
 
-[PRE197]
+```cs
+      // argument = 47; 
+```
 
-[PRE198]
+```cs
+}
+```
 
 代码被注释掉了，因为如果我们给参数赋值，你将看到注释中提到的编译器警告。从`Main(string[] _)`对象中调用该方法并运行程序。你会看到变量保持在`13`，因为编译器阻止我们在被调用的方法中更改它。最后，在我们程序的下一部分，我们将探讨`out`关键字。
 
@@ -776,27 +1166,47 @@ C#中有两种主要的内存类型：栈和堆。堆进一步分为*小对象�
 
 我们将添加两个方法来演示`out`参数的工作方式。向`Program`类添加一个名为`OutParameterModifier()`的新方法：
 
-[PRE199]
+```cs
+static void OutParameterModifier()
+```
 
-[PRE200]
+```cs
+{
+```
 
-[PRE201]
+```cs
+      int x;
+```
 
-[PRE202]
+```cs
+      OutParameterModifier(out x);
+```
 
-[PRE203]
+```cs
+      Console.WriteLine($"The value of x is: {x}.");
+```
 
-[PRE204]
+```cs
+}
+```
 
 在前面的代码中，我们声明了一个整数变量。然后，我们调用一个具有`out`参数的方法，并将我们的整数及其默认值`0`传递给它。接下来，在方法返回后，我们打印出整数的值。现在，添加`outParameter(out x)`方法：
 
-[PRE205]
+```cs
+static void OutParameterModifier(out int argument)
+```
 
-[PRE206]
+```cs
+{
+```
 
-[PRE207]
+```cs
+      argument = 123;
+```
 
-[PRE208]
+```cs
+}
+```
 
 这里，我们只是将参数设置为`123`并退出。从`Main(string[] _)`中调用`OutParameterModifier()`方法。如果你运行代码，你会看到我们调用的方法中的整数被更新为`123`。这如图*3.9*所示：
 
@@ -804,7 +1214,7 @@ C#中有两种主要的内存类型：栈和堆。堆进一步分为*小对象�
 
 ![Figure 3.9 – Our integer has been updated inside the method we passed it into
 
-图3.9 – 我们传递的方法中的整数已被更新
+图 3.9 – 我们传递的方法中的整数已被更新
 
 在下一节中，我们将探讨*装箱*和*解箱*。
 
@@ -814,9 +1224,9 @@ C#中有两种主要的内存类型：栈和堆。堆进一步分为*小对象�
 
 ## 执行装箱
 
-当一个变量被装箱时，你是在将其包装在一个将被存储在堆上的对象中。正如你所知，堆上的对象会产生成本，因为它们必须由运行时来管理。除此之外，你还会增加变量使用的内存，以及处理该变量所需的CPU周期数。
+当一个变量被装箱时，你是在将其包装在一个将被存储在堆上的对象中。正如你所知，堆上的对象会产生成本，因为它们必须由运行时来管理。除此之外，你还会增加变量使用的内存，以及处理该变量所需的 CPU 周期数。
 
-在32位操作系统上，一个空的`class`定义占用12字节，而在64位操作系统上占用24字节。这听起来可能并不多。但如果将不需要装箱的值类型装箱，你将无谓地浪费12或24字节的内存。
+在 32 位操作系统上，一个空的`class`定义占用 12 字节，而在 64 位操作系统上占用 24 字节。这听起来可能并不多。但如果将不需要装箱的值类型装箱，你将无谓地浪费 12 或 24 字节的内存。
 
 现在，我们将探讨当你解箱一个变量时会发生什么
 
@@ -828,61 +1238,99 @@ C#中有两种主要的内存类型：栈和堆。堆进一步分为*小对象�
 
 现在，我们将编写一个简单的 .NET 6 控制台应用程序，使用 `BenchmarkDotNet` 来展示不封装与封装/解封装在性能上的差异。首先，启动一个新的 .NET 6 控制台应用程序，并将其命名为 `CH03_BoxingAndUnboxing`。您需要添加 `BenchmarkDotNet` 包和以下两个命名空间：
 
-[PRE209]
+```cs
+using System;
+```
 
-[PRE210]
+```cs
+using System.Diagnostics;
+```
 
-[PRE211]
+```cs
+using System.Security.Cryptography;
+```
 
-[PRE212]
+```cs
+using BenchmarkDotNet.Attributes;
+```
 
-[PRE213]
+```cs
+using BenchmarkDotNet.Running;
+```
 
 我们需要这些命名空间来执行基准测试。在 `Main(string[] _)` 方法中，添加以下行：
 
-[PRE214]
+```cs
+BenchmarkRunner.Run<BoxingAndUnboxingBenchmarkTests>();
+```
 
 这行代码开始运行基准测试。接下来，添加一个名为 `BoxingAndUnboxingBenchmarkTests` 的新类：
 
-[PRE215]
+```cs
+public class BoxingAndUnboxingBenchmarkTests { }
+```
 
 此类将包含两个基准测试方法，分别称为 `NonBoxingUnboxingTest()` 和 `BoxingUnboxingTest()`。添加 `NonBoxingUnboxingTest()` 方法：
 
-[PRE216]
+```cs
+[Benchmark]
+```
 
-[PRE217]
+```cs
+public void NonBoxingUnboxingTest()
+```
 
-[PRE218]
+```cs
+{
+```
 
-[PRE219]
+```cs
+      int z = 0, a = 4, b = 4;
+```
 
-[PRE220]
+```cs
+      z = a + b;
+```
 
-[PRE221]
+```cs
+}
+```
 
 在此方法中，我们声明并赋值三个整数：`z = 0`、`a = 1` 和 `b = 6`。然后我们将 `a` 和 `b` 相加，并将结果赋值给 `z`。现在，添加 `BoxingUnboxingTest()` 方法：
 
-[PRE222]
+```cs
+[Benchmark]
+```
 
-[PRE223]
+```cs
+public void BoxingUnboxingTest()
+```
 
-[PRE224]
+```cs
+{
+```
 
-[PRE225]
+```cs
+      object a = 4, b = 4;
+```
 
-[PRE226]
+```cs
+      int z;
+```
 
-[PRE227]
+```cs
+      z = (int)a + (int)b;
+```
 
-[PRE228]
+```cs
+} 
+```
 
 这次，我们声明并赋值两个对象：`a = 4` 和 `b = 4`。我们还声明了一个整数：`z`。然后，我们将 `a` 和 `b` 转换为整数，将它们相加，并将结果赋值给 `z` 整数变量。
 
 执行您的代码的发布构建。然后，打开命令行并导航到您的可执行文件。从命令行运行您的可执行文件，您应该会看到以下摘要：
 
-![图 3.10 – 封装与解封装示例项目添加输出
-
-](img/Figure_3.10.jpg)
+![图 3.10 – 封装与解封装示例项目添加输出](img/Figure_3.10.jpg)
 
 图 3.10 – 封装与解封装示例项目添加输出
 
@@ -890,9 +1338,7 @@ C#中有两种主要的内存类型：栈和堆。堆进一步分为*小对象�
 
 如果您打开 `ILDASM`，这将加载中间语言反汇编器。打开您的构建文件夹中的 DLL 文件，展开树形结构，直到您看到 `Main : void(string[])` 行，如图 *图 3.11* 所示：
 
-![图 3.11 – 中间语言反汇编器 (ILDASM)
-
-](img/Figure_3.11_B16617.jpg)
+![图 3.11 – 中间语言反汇编器 (ILDASM)](img/Figure_3.11_B16617.jpg)
 
 图 3.11 – 中间语言反汇编器 (ILDASM)
 
@@ -904,29 +1350,29 @@ C#中有两种主要的内存类型：栈和堆。堆进一步分为*小对象�
 
 图 3.12 – 我们 Main(string[] _) 方法的反汇编中间语言
 
-研究反汇编代码。当你看到`box`命令时，值类型被封装在一个对象中，这是一个引用类型，它会被放置在堆上。而当你看到`unbox.any`命令时，值类型被从对象中解包并分配给一个属于栈的int值类型。
+研究反汇编代码。当你看到`box`命令时，值类型被封装在一个对象中，这是一个引用类型，它会被放置在堆上。而当你看到`unbox.any`命令时，值类型被从对象中解包并分配给一个属于栈的 int 值类型。
 
 现在，你理解了为什么装箱和拆箱会影响应用程序的性能，现在我们来到了本章的结尾。在下一章中，我们将关注垃圾回收器的工作原理以及我们可以做些什么来提高其性能。但首先，让我们总结一下我们已经学到的内容。然后，鼓励你回答以下问题，并进一步阅读这个主题。
 
 # 摘要
 
-我们在本章开始时探讨了各种预定义的.NET数据类型。首先，我们描述了各种值类型，然后转向预定义的引用类型。然后，我们通过探索静态类型来结束对预定义.NET数据类型的讨论。
+我们在本章开始时探讨了各种预定义的.NET 数据类型。首先，我们描述了各种值类型，然后转向预定义的引用类型。然后，我们通过探索静态类型来结束对预定义.NET 数据类型的讨论。
 
 你了解到值类型位于栈上。但如果它们是数组的一部分，它们会与数组一起放置在堆上，而数组是一个引用类型。你还了解到引用类型位于堆上，并且它们有指向它们的指针，这些指针以栈上变量的形式存在。
 
-接下来，我们探讨了C#中使用的不同类型的内存。首先，我们看到了栈。然后，我们看到了堆，它由小对象堆和大对象堆组成。在查看栈和堆之间的差异后，我们发现栈的执行速度比堆快得多。原因是栈内存不需要由运行时管理。当需要时，它简单地被推入栈中，当不再需要时，它被弹出栈。相比之下，堆必须由运行时管理，它分配对象——它跟踪所有引用这些对象的变量的引用计数，然后在它们不再需要时释放对象。
+接下来，我们探讨了 C#中使用的不同类型的内存。首先，我们看到了栈。然后，我们看到了堆，它由小对象堆和大对象堆组成。在查看栈和堆之间的差异后，我们发现栈的执行速度比堆快得多。原因是栈内存不需要由运行时管理。当需要时，它简单地被推入栈中，当不再需要时，它被弹出栈。相比之下，堆必须由运行时管理，它分配对象——它跟踪所有引用这些对象的变量的引用计数，然后在它们不再需要时释放对象。
 
 我们接着探讨了按值传递和按引用传递。按值传递时，会复制一个值并将其传递给构造函数或方法。这个副本被使用，而原始值保持不变。当按引用传递时，会创建一个值的副本并将其放置在栈上，并分配给堆上对象的内存位置。
 
 最后，我们探讨了变量的装箱和拆箱以及为什么这会对应用程序的性能产生负面影响。
 
-通过本章所学的内容，你可以通过使用正确的类型来减少应用程序使用的内存量，并且可以通过避免装箱和拆箱来减少每操作的tick数。现在，既然你知道了内存分配的工作原理，你可以在实际可行的情况下通过保持方法小和优先使用栈来提高性能。
+通过本章所学的内容，你可以通过使用正确的类型来减少应用程序使用的内存量，并且可以通过避免装箱和拆箱来减少每操作的 tick 数。现在，既然你知道了内存分配的工作原理，你可以在实际可行的情况下通过保持方法小和优先使用栈来提高性能。
 
 在下一章中，我们将学习更多关于垃圾回收的内容。
 
 # 问题
 
-1.  列出预定义的.NET值类型。
+1.  列出预定义的.NET 值类型。
 
 1.  列出预定义的引用类型。
 
@@ -946,32 +1392,32 @@ C#中有两种主要的内存类型：栈和堆。堆进一步分为*小对象�
 
 +   *C#类型系统*
 
-+   [https://docs.microsoft.com/en-us/dotnet/csharp/programming-guide/types/](https://docs.microsoft.com/en-us/dotnet/csharp/programming-guide/types/)
++   [`docs.microsoft.com/en-us/dotnet/csharp/programming-guide/types/`](https://docs.microsoft.com/en-us/dotnet/csharp/programming-guide/types/)
 
 +   *C#不同类型的堆内存*
 
-+   [https://vivekcek.wordpress.com/tag/stub-heap/](https://vivekcek.wordpress.com/tag/stub-heap/)
++   [`vivekcek.wordpress.com/tag/stub-heap/`](https://vivekcek.wordpress.com/tag/stub-heap/)
 
-+   *深入.NET框架内部以查看CLR如何创建运行时对象*
++   *深入.NET 框架内部以查看 CLR 如何创建运行时对象*
 
-+   [https://web.archive.org/web/20140724084944/http://msdn.microsoft.com/en-us/magazine/cc163791.aspx](https://web.archive.org/web/20140724084944/http://msdn.microsoft.com/en-us/magazine/cc163791.aspx)
++   [`web.archive.org/web/20140724084944/http://msdn.microsoft.com/en-us/magazine/cc163791.aspx`](https://web.archive.org/web/20140724084944/http://msdn.microsoft.com/en-us/magazine/cc163791.aspx)
 
 +   *传递参数（C#编程指南）*
 
-+   [https://docs.microsoft.com/en-us/dotnet/csharp/programming-guide/classes-and-structs/passing-parameters](https://docs.microsoft.com/en-us/dotnet/csharp/programming-guide/classes-and-structs/passing-parameters)
++   [`docs.microsoft.com/en-us/dotnet/csharp/programming-guide/classes-and-structs/passing-parameters`](https://docs.microsoft.com/en-us/dotnet/csharp/programming-guide/classes-and-structs/passing-parameters)
 
 +   *装箱与拆箱（C#编程指南）*
 
-+   [https://docs.microsoft.com/en-us/dotnet/csharp/programming-guide/types/boxing-and-unboxing](https://docs.microsoft.com/en-us/dotnet/csharp/programming-guide/types/boxing-and-unboxing)
++   [`docs.microsoft.com/en-us/dotnet/csharp/programming-guide/types/boxing-and-unboxing`](https://docs.microsoft.com/en-us/dotnet/csharp/programming-guide/types/boxing-and-unboxing)
 
-+   *Windows系统上的大对象堆*
++   *Windows 系统上的大对象堆*
 
-+   [https://docs.microsoft.com/en-us/dotnet/standard/garbage-collection/large-object-heap](https://docs.microsoft.com/en-us/dotnet/standard/garbage-collection/large-object-heap)
++   [`docs.microsoft.com/en-us/dotnet/standard/garbage-collection/large-object-heap`](https://docs.microsoft.com/en-us/dotnet/standard/garbage-collection/large-object-heap)
 
-+   *.NET内存分配和性能*
++   *.NET 内存分配和性能*
 
-+   [https://www.youtube.com/watch?v=aylUPfOVM90](https://www.youtube.com/watch?v=aylUPfOVM90)
++   [`www.youtube.com/watch?v=aylUPfOVM90`](https://www.youtube.com/watch?v=aylUPfOVM90)
 
-+   *在.NET Core中替换AppDomain*
++   *在.NET Core 中替换 AppDomain*
 
-+   [https://www.michael-whelan.net/replacing-appdomain-in-dotnet-core/](https://www.michael-whelan.net/replacing-appdomain-in-dotnet-core/)
++   [`www.michael-whelan.net/replacing-appdomain-in-dotnet-core/`](https://www.michael-whelan.net/replacing-appdomain-in-dotnet-core/)

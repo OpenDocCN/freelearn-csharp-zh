@@ -46,81 +46,94 @@ ASP.NET Core 是微软提供的最强大的 Web 框架，它充满了使它更�
 
 # 本书涵盖的内容
 
-[*第 1 章*](B17996_01_ePub.xhtml#_idTextAnchor019)，*自定义日志记录*，教你如何自定义日志行为以及如何添加自定义日志提供程序。
+*第一章*，*自定义日志记录*，教你如何自定义日志行为以及如何添加自定义日志提供程序。
 
-[*第 2 章*](B17996_02_ePub.xhtml#_idTextAnchor031)，*自定义应用程序配置*，帮助你了解如何使用不同的配置源并添加自定义配置提供程序。
+*第二章*，*自定义应用程序配置*，帮助你了解如何使用不同的配置源并添加自定义配置提供程序。
 
-[*第 3 章*](B17996_03_ePub.xhtml#_idTextAnchor049)，*自定义依赖注入*，教你了解 **依赖注入** (**DI**) 的工作原理以及如何使用不同的 DI 容器。
+*第三章*，*自定义依赖注入*，教你了解 **依赖注入** (**DI**) 的工作原理以及如何使用不同的 DI 容器。
 
-[*第 4 章*](B17996_04_ePub.xhtml#_idTextAnchor066)，*使用 Kestrel 配置和自定义 HTTPS*，探讨了不同的 HTTPS 配置方法。
+*第四章*，*使用 Kestrel 配置和自定义 HTTPS*，探讨了不同的 HTTPS 配置方法。
 
-[*第 5 章*](B17996_05_ePub.xhtml#_idTextAnchor077)，*配置 WebHostBuilder*，帮助你了解如何在托管层设置配置。
+*第五章*，*配置 WebHostBuilder*，帮助你了解如何在托管层设置配置。
 
-[*第 6 章*](B17996_06_ePub.xhtml#_idTextAnchor092)，*使用不同的托管模型*，教你了解不同平台上的不同托管类型。
+*第六章*，*使用不同的托管模型*，教你了解不同平台上的不同托管类型。
 
-[*第 7 章*](B17996_07_ePub.xhtml#_idTextAnchor111)，*使用 IHostedService 和 BackgroundService*，让你了解如何在后台执行任务。
+*第七章*，*使用 IHostedService 和 BackgroundService*，让你了解如何在后台执行任务。
 
-[*第 8 章*](B17996_08_ePub.xhtml#_idTextAnchor124)，*编写自定义中间件*，处理 HTTP 上下文使用中间件。
+*第八章*，*编写自定义中间件*，处理 HTTP 上下文使用中间件。
 
-[*第 9 章*](B17996_09_ePub.xhtml#_idTextAnchor143)，*使用端点路由*，帮助你了解如何使用新的路由来提供自定义端点。
+*第九章*，*使用端点路由*，帮助你了解如何使用新的路由来提供自定义端点。
 
-[*第 10 章*](B17996_10_ePub.xhtml#_idTextAnchor156)，*自定义 ASP.NET Core 身份验证*，解释了如何扩展应用程序的用户属性，并帮助你更改身份 UI。
+*第十章*，*自定义 ASP.NET Core 身份验证*，解释了如何扩展应用程序的用户属性，并帮助你更改身份 UI。
 
-[*第11章*](B17996_11_ePub.xhtml#_idTextAnchor163), *配置身份管理*，帮助您管理您的用户及其角色。
+*第十一章*, *配置身份管理*，帮助您管理您的用户及其角色。
 
-[*第12章*](B17996_12_ePub.xhtml#_idTextAnchor172), *使用自定义输出格式化程序进行内容协商*，教您如何根据HTTP Accept头输出不同的内容类型。
+*第十二章*, *使用自定义输出格式化程序进行内容协商*，教您如何根据 HTTP Accept 头输出不同的内容类型。
 
-[*第13章*](B17996_13_ePub.xhtml#_idTextAnchor186), *使用自定义ModelBinder管理输入*，帮助您创建具有不同类型内容的输入模型。
+*第十三章*, *使用自定义 ModelBinder 管理输入*，帮助您创建具有不同类型内容的输入模型。
 
-[*第14章*](B17996_14_ePub.xhtml#_idTextAnchor207), *创建自定义ActionFilter*，介绍了使用ActionFilter的面向方面编程。
+*第十四章*, *创建自定义 ActionFilter*，介绍了使用 ActionFilter 的面向方面编程。
 
-[*第15章*](B17996_15_ePub.xhtml#_idTextAnchor218), *使用缓存*，帮助您使您的应用程序更快。
+*第十五章*, *使用缓存*，帮助您使您的应用程序更快。
 
-[*第16章*](B17996_16_ePub.xhtml#_idTextAnchor231), *创建自定义TagHelper*，使您能够通过创建TagHelper简化UI层。
+*第十六章*, *创建自定义 TagHelper*，使您能够通过创建 TagHelper 简化 UI 层。
 
 # 要充分利用本书
 
-读者应具备基本的ASP.NET Core和C#知识，以及Visual Studio、Visual Studio Code或任何支持ASP.NET Core和C#的其他代码编辑器。
+读者应具备基本的 ASP.NET Core 和 C#知识，以及 Visual Studio、Visual Studio Code 或任何支持 ASP.NET Core 和 C#的其他代码编辑器。
 
 ![图片](img/B17996_Preface_Table1.jpg)
 
-您应该在您的机器上安装最新的.NET 6.0 SDK。请访问[https://dotnet.microsoft.com/download/dotnet-core/](https://dotnet.microsoft.com/download/dotnet-core/)以获取最新版本。
+您应该在您的机器上安装最新的.NET 6.0 SDK。请访问[`dotnet.microsoft.com/download/dotnet-core/`](https://dotnet.microsoft.com/download/dotnet-core/)以获取最新版本。
 
-随意使用您喜欢的任何支持ASP.NET Core和C#的代码编辑器。我们推荐使用Visual Studio Code（[https://code.visualstudio.com/](https://code.visualstudio.com/）），它适用于所有平台，并且本书的作者也在使用它。
+随意使用您喜欢的任何支持 ASP.NET Core 和 C#的代码编辑器。我们推荐使用 Visual Studio Code（[`code.visualstudio.com/`](https://code.visualstudio.com/）），它适用于所有平台，并且本书的作者也在使用它。
 
-本书中的所有项目都将使用控制台、命令提示符、shell或PowerShell创建。请随意使用您感到舒适的任何控制台。作者使用Windows命令提示符，托管在cmder shell中（[https://cmder.net/](https://cmder.net/））。我们不推荐使用Visual Studio创建项目，因为基本配置可能会更改，并且Web项目将启动在本书中描述的端口之外。
+本书中的所有项目都将使用控制台、命令提示符、shell 或 PowerShell 创建。请随意使用您感到舒适的任何控制台。作者使用 Windows 命令提示符，托管在 cmder shell 中（[https://cmder.net/](https://cmder.net/））。我们不推荐使用 Visual Studio 创建项目，因为基本配置可能会更改，并且 Web 项目将启动在本书中描述的端口之外。
 
-您是否卡在.NET Core 3.1或.NET 5.0上？如果您由于任何原因无法在您的机器上使用.NET 6.0，所有示例也都可以使用.NET Core 3.1和.NET 5.0。有些章节在.NET 6.0与.NET 5.0有差异时，会包含与.NET 5.0的比较。
+您是否卡在.NET Core 3.1 或.NET 5.0 上？如果您由于任何原因无法在您的机器上使用.NET 6.0，所有示例也都可以使用.NET Core 3.1 和.NET 5.0。有些章节在.NET 6.0 与.NET 5.0 有差异时，会包含与.NET 5.0 的比较。
 
-**如果您正在使用本书的数字版，我们建议您亲自输入代码或从本书的GitHub仓库（下一节中有一个链接）获取代码。这样做将帮助您避免与代码复制和粘贴相关的任何潜在错误。**
+**如果您正在使用本书的数字版，我们建议您亲自输入代码或从本书的 GitHub 仓库（下一节中有一个链接）获取代码。这样做将帮助您避免与代码复制和粘贴相关的任何潜在错误。**
 
 # 下载示例代码文件
 
-您可以从GitHub下载本书的示例代码文件[https://github.com/PacktPublishing/Customizing-ASP.NET-Core-6.0-Second-Edition](https://github.com/PacktPublishing/Customizing-ASP.NET-Core-6.0-Second-Edition)。如果代码有更新，它将在GitHub仓库中更新。如果代码有更新，它将在GitHub仓库中更新。
+您可以从 GitHub 下载本书的示例代码文件[https://github.com/PacktPublishing/Customizing-ASP.NET-Core-6.0-Second-Edition](https://github.com/PacktPublishing/Customizing-ASP.NET-Core-6.0-Second-Edition)。如果代码有更新，它将在 GitHub 仓库中更新。如果代码有更新，它将在 GitHub 仓库中更新。
 
-我们还有其他来自我们丰富的书籍和视频目录的代码包可供在[https://github.com/PacktPublishing/](https://github.com/PacktPublishing/)找到。查看它们吧！
+我们还有其他来自我们丰富的书籍和视频目录的代码包可供在[`github.com/PacktPublishing/`](https://github.com/PacktPublishing/)找到。查看它们吧！
 
 # 下载彩色图像
 
-我们还提供了一份包含本书中使用的截图和图表彩色图像的PDF文件。您可以从这里下载：[https://static.packt-cdn.com/downloads/9781803233604_ColorImages.pdf](https://static.packt-cdn.com/downloads/9781803233604_ColorImages.pdf)。
+我们还提供了一份包含本书中使用的截图和图表彩色图像的 PDF 文件。您可以从这里下载：[`static.packt-cdn.com/downloads/9781803233604_ColorImages.pdf`](https://static.packt-cdn.com/downloads/9781803233604_ColorImages.pdf)。
 
 # 使用的约定
 
 本书使用了多种文本约定。
 
-`文本中的代码`：表示文本中的代码单词、数据库表名、文件夹名、文件名、文件扩展名、路径名、虚拟URL、用户输入和Twitter昵称。以下是一个示例：“您可以使用`ConfigureAppConfiguration`来配置应用程序配置。”
+`文本中的代码`：表示文本中的代码单词、数据库表名、文件夹名、文件名、文件扩展名、路径名、虚拟 URL、用户输入和 Twitter 昵称。以下是一个示例：“您可以使用`ConfigureAppConfiguration`来配置应用程序配置。”
 
 代码块按以下方式设置：
 
-[PRE0]
+```cs
+builder.Configuration.AddJsonFile(
+        "appsettings.json",
+        optional: false,
+        reloadOnChange: true);
+```
 
 当我们希望将您的注意力引到代码块的一个特定部分时，相关的行或项目将以粗体显示：
 
-[PRE1]
+```cs
+builder.Logging.AddConfiguration(builder.Configuration.
+GetSection("Logging"));
+builder.Logging.AddConsole();
+builder.Logging.AddDebug();
+```
 
 任何命令行输入或输出都按以下方式编写：
 
-[PRE2]
+```cs
+cd LoggingSample
+code .
+```
 
 **粗体**：表示新术语、重要单词或您在屏幕上看到的单词。例如，菜单或对话框中的单词以**粗体**显示。以下是一个示例：“点击左上角的**注册**，您将看到以下页面。”
 
@@ -132,11 +145,11 @@ ASP.NET Core 是微软提供的最强大的 Web 框架，它充满了使它更�
 
 我们始终欢迎读者的反馈。
 
-**一般反馈**：如果您对本书的任何方面有疑问，请通过电子邮件发送至[customercare@packtpub.com](mailto:customercare@packtpub.com)，并在邮件主题中提及书名。
+**一般反馈**：如果您对本书的任何方面有疑问，请通过电子邮件发送至 customercare@packtpub.com，并在邮件主题中提及书名。
 
 **勘误表**：尽管我们已经尽一切努力确保内容的准确性，但错误仍然可能发生。如果您在这本书中发现了错误，我们将不胜感激，如果您能向我们报告这一点。请访问[www.packtpub.com/support/errata](https://www.packtpub.com/support/errata)并填写表格。
 
-**盗版**：如果您在互联网上遇到我们作品的任何形式的非法副本，如果您能提供位置地址或网站名称，我们将不胜感激。请通过[copyright@packt.com](mailto:copyright@packt.com)与我们联系，并提供材料的链接。
+**盗版**：如果您在互联网上遇到我们作品的任何形式的非法副本，如果您能提供位置地址或网站名称，我们将不胜感激。请通过 copyright@packt.com 与我们联系，并提供材料的链接。
 
 **如果您有兴趣成为作者**：如果您在某个主题上具有专业知识，并且您有兴趣撰写或为书籍做出贡献，请访问[authors.packtpub.com](https://authors.packtpub.com)。
 

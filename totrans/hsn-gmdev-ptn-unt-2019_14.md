@@ -24,11 +24,11 @@
 
 本章的代码文件可以在 GitHub 上找到：
 
-[https://github.com/PacktPublishing/Hands-On-Game-Development-Patterns-with-Unity-2018](https://github.com/PacktPublishing/Hands-On-Game-Development-Patterns-with-Unity-2018)
+[`github.com/PacktPublishing/Hands-On-Game-Development-Patterns-with-Unity-2018`](https://github.com/PacktPublishing/Hands-On-Game-Development-Patterns-with-Unity-2018)
 
 观看以下视频以查看代码的实际操作：
 
-[http://bit.ly/2UfzpTD](http://bit.ly/2UfzpTD)
+[`bit.ly/2UfzpTD`](http://bit.ly/2UfzpTD)
 
 # 状态模式的基本原理
 
@@ -80,33 +80,98 @@
 
 1.  让我们先实现一个接口，用于定义我们的状态：
 
-[PRE0]
+```cs
+public interface IShipState
+{
+    void Execute(Ship ship);
+}
+```
 
 如您所见，`Execute`函数接收一个`Ship`类型的实体。这个声明意味着我们将能够将我们的状态附加到任何飞船上并执行，这使得我们的代码非常模块化和可扩展。
 
 1.  现在我们将定义每个状态并添加一些上下文代码到`Execute()`方法中：
 
-[PRE1]
+```cs
+public class NormalShipState : IShipState
+{
+    public void Execute(Ship ship)
+    {
+        ship.LogStatus("NORMAL: ship operating as normal.");
+    }
+}
+```
 
 `正常`状态是我们的默认状态，它执行正常运行的飞船的行为。
 
 1.  接下来是`警报`状态。在这种情况下，飞船的船员和系统都会发出警报：
 
-[PRE2]
+```cs
+public class AlertShipState : IShipState
+{
+    public void Execute(Ship ship)
+    {
+        ship.LogStatus("ALERT: all hands on deck.");
+    }
+}
+```
 
 1.  最后，是`禁用`状态。这意味着飞船无法移动，船员正在逃离：
 
-[PRE3]
+```cs
+public class DisabledShipState : IShipState
+{
+    public void Execute(Ship ship)
+    {
+        ship.LogStatus("DISABLED: crew jumping ship.");
+    }
+}
+```
 
 对于我们的代码示例，我们通过仅实现一些控制台输出以指示当前状态来简化事情，但在实际项目中，我们可以轻松触发每个状态变化的声音提示、粒子效果和动画。
 
 1.  现在我们已经收集了一组可以附加到飞船上的状态。下一步，让我们编写`Ship`类的具体实现：
 
-[PRE4]
+```cs
+using UnityEngine;
+
+public class Ship : MonoBehaviour
+{
+    private IShipState m_CurrentState;
+
+    void Awake ()
+    {
+        m_CurrentState = new NormalShipState();
+        m_CurrentState.Execute(this);
+    }
+
+    public void Normalize()
+    {
+        m_CurrentState = new NormalShipState();
+        m_CurrentState.Execute(this);
+    }
+
+    public void TriggerRedAlert()
+    {
+        m_CurrentState = new AlertShipState();
+        m_CurrentState.Execute(this);
+    }
+
+    public void DisableShip()
+    {
+        m_CurrentState = new DisabledShipState();
+        m_CurrentState.Execute(this);
+    }
+
+    public void LogStatus(string status)
+    {
+        Debug.Log(status);
+    }
+}
+```
 
 让我们回顾一下我们使用此模式所取得的成果：
 
-+   我们消除了管理飞船状态行为之间转换所需的switch cases或`if-elses`。
++   我们消除了管理飞船状态行为之间转换所需的 switch cases 或`if-elses`。
 
 +   我们将飞船的行为解耦成可以动态附加到任何类型飞船的自包含组件。
 
@@ -114,7 +179,32 @@
 
 1.  我们代码示例的最后部分是我们的`Client`类，我们将使用它通过用户的输入来触发每个状态以测试它们：
 
-[PRE5]
+```cs
+using UnityEngine;
+
+public class Client : MonoBehaviour
+{
+    public Ship ship;
+
+    void Update()
+    {
+        if (Input.GetKeyDown("n"))
+        {
+            ship.Normalize();
+        }
+
+        if (Input.GetKeyDown("a"))
+        {
+            ship.TriggerRedAlert();
+        }
+
+        if (Input.GetKeyDown("d"))
+        {
+            ship.DisableShip();
+        }
+    }
+}
+```
 
 在这个例子中，我们手动触发飞船的有限状态，但我们同样可以轻松地使用事件或健康系统来触发它们。换句话说，通过使用状态模式，我们获得了将多个状态行为附加到任何实体并动态通过任何机制触发的灵活性，而不必编写长而复杂的条件语句。
 
@@ -132,6 +222,6 @@
 
 # 进一步阅读
 
-《*设计模式：可复用面向对象软件元素*》，作者Erich Gamma、John Vlissides、Ralph Johnson和Richard Helm
+《*设计模式：可复用面向对象软件元素*》，作者 Erich Gamma、John Vlissides、Ralph Johnson 和 Richard Helm
 
-([http://www.informit.com/store/design-patterns-elements-of-reusable-object-oriented-9780201633610](http://www.informit.com/store/design-patterns-elements-of-reusable-object-oriented-9780201633610))
+([`www.informit.com/store/design-patterns-elements-of-reusable-object-oriented-9780201633610`](http://www.informit.com/store/design-patterns-elements-of-reusable-object-oriented-9780201633610))

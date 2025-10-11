@@ -10,21 +10,21 @@
 
 # 技术要求
 
-本章是实践性的。你需要对Unity和C#有基本的了解。
+本章是实践性的。你需要对 Unity 和 C#有基本的了解。
 
-我们将使用以下Unity引擎和C#语言概念：
+我们将使用以下 Unity 引擎和 C#语言概念：
 
 +   接口
 
 如果你对这个概念不熟悉，请在开始本章之前复习它。
 
-本章的代码文件可以在GitHub上找到：
+本章的代码文件可以在 GitHub 上找到：
 
-[https://github.com/PacktPublishing/Hands-On-Game-Development-Patterns-with-Unity-2018](https://github.com/PacktPublishing/Hands-On-Game-Development-Patterns-with-Unity-2018)
+[`github.com/PacktPublishing/Hands-On-Game-Development-Patterns-with-Unity-2018`](https://github.com/PacktPublishing/Hands-On-Game-Development-Patterns-with-Unity-2018)
 
 查看以下视频以查看代码的实际操作：
 
-[http://bit.ly/2OsR6d6](http://bit.ly/2OsR6d6)
+[`bit.ly/2OsR6d6`](http://bit.ly/2OsR6d6)
 
 # 访问者模式概述
 
@@ -70,68 +70,198 @@
 
 1.  让我们先实现访问者接口，在其中我们声明我们将要操作的那些机器人部件：
 
-[PRE0]
+```cs
+public interface IRobotPartVisitor
+{
+    void Visit(Robot robot);
+    void Visit(Battery battery);
+    void Visit(MechanicalArm mechanicalArm);
+    void Visit(ThermalImager thermalImager);
+}
+```
 
 1.  为了帮助我们理解这个模式，让我们实现两个具体的访问者模式，如下所示；第一个访问所有我们的机器人部件并将它们打开，而另一个则关闭它们：
 
 +   `RobotPartActivateVisitor`：
 
-[PRE1]
+```cs
+using UnityEngine;
+
+public class RobotPartActivateVisitor : IRobotPartVisitor
+{
+    public void Visit(Robot robot)
+    {
+        Debug.Log("Robot waking up.");
+    }
+
+    public void Visit(Battery battery)
+    {
+        Debug.Log("Battery is charged up.");
+    }
+
+    public void Visit(MechanicalArm mechanicalArm)
+    {
+        Debug.Log("The mechanical arm is actiaved.");
+    }
+
+    public void Visit(ThermalImager thermalImager)
+    {
+        Debug.Log("The thermal imager is turned on.");
+    }
+}
+```
 
 +   `RobotPartShutdownVisitor`：
 
-[PRE2]
+```cs
+using UnityEngine;
+
+public class RobotPartShutdownVisitor : IRobotPartVisitor
+{
+    public void Visit(Robot robot)
+    {
+        Debug.Log("Robot is going back to sleep.");
+    }
+
+    public void Visit(Battery battery)
+    {
+        Debug.Log("Battery is charging down.");
+    }
+
+    public void Visit(MechanicalArm mechanicalArm)
+    {
+        Debug.Log("The mechanical arm is folding back to it's default position.");
+    }
+
+    public void Visit(ThermalImager thermalImager)
+    {
+        Debug.Log("The thermal imager is turned off.");
+    }
+}
+```
 
 如您所见，到目前为止这相当直接；我们为每个机器人部件都有一个`Visit()`函数。这种方法允许我们单独操作它们。
 
 1.  现在我们已经准备好了访问者，是时候实现我们的可访问者了。让我们先编写我们的`Visitable`接口：
 
-[PRE3]
+```cs
+public interface IRobotPart
+{
+    void Accept(IRobotPartVisitor robotPartVisitor);
+}
+```
 
 1.  现在让我们实现我们的具体可访问者：
 
 +   `Battery`：
 
-[PRE4]
+```cs
+public class Battery : IRobotPart
+{
+    public void Accept(IRobotPartVisitor robotPartVisitor)
+    {
+        robotPartVisitor.Visit(this);
+    }
+}
+```
 
 +   `ThermalImager`：
 
-[PRE5]
+```cs
+public class ThermalImager : IRobotPart
+{
+    public void Accept(IRobotPartVisitor robotPartVisitor)
+    {
+        robotPartVisitor.Visit(this);
+    }
+}
+```
 
 +   `MechanicalArm`：
 
-[PRE6]
+```cs
+public class MechanicalArm : IRobotPart
+{
+    public void Accept(IRobotPartVisitor robotPartVisitor)
+    {
+        robotPartVisitor.Visit(this);
+    }
+}
+```
 
 注意我们在`Accept()`函数中如何引用访问者接口。这段代码使得我们的访问者能够操作我们的可访问者。
 
 1.  是时候构建我们的`Robot`了，通过在其构造函数中引用它们来附加所有核心部件：
 
-[PRE7]
+```cs
+using UnityEngine;
+
+public class Robot : IRobotPart
+{
+    private IRobotPart[] robotParts;
+
+    public Robot()
+    {
+        robotParts = new IRobotPart[] { new MechanicalArm(), new ThermalImager(), new Battery() };
+    }
+
+    public void Accept(IRobotPartVisitor robotPartVisitor)
+    {
+        for (int i = 0; i < robotParts.Length; i++)
+        {
+            robotParts[i].Accept(robotPartVisitor);
+        }
+        robotPartVisitor.Visit(this);
+    }
+}
+```
 
 1.  最后，我们有我们的`Client`类，它通过实际触发访问者操作我们的机器人部件来充当一个概念验证：
 
-[PRE8]
+```cs
+using UnityEngine;
+
+public class Client : MonoBehaviour
+{
+    void Update()
+    {
+        // Active robot
+        if (Input.GetKeyDown(KeyCode.O))
+        {
+            IRobotPart robot = new Robot();
+            robot.Accept(new RobotPartActivateVisitor());
+        }
+
+        // Shutdown robot
+        if (Input.GetKeyDown(KeyCode.S))
+        {
+            IRobotPart robot = new Robot();
+            robot.Accept(new RobotPartShutdownVisitor());
+        }
+    }
+}
+```
 
 因此，我们已经实现了一个简单但灵活的访问者模式用例。需要注意的是，任何实现了`Accept()`函数的访问者都可以操作可访问对象。这种机制允许在不对对象直接修改的情况下对可访问对象执行各种操作。
 
 # 概述
 
-在本章中，我们回顾了访问者模式，这可能是本书中最高级的模式之一，因为它要求我们从不同的角度来处理面向对象编程，并开始将对象视为结构，而不是存在于堆上的抽象实体。现在我们可以运用所学知识，扩展访问者模式以实现需要操作复杂层次数据结构的系统，例如XML文件或目录树。
+在本章中，我们回顾了访问者模式，这可能是本书中最高级的模式之一，因为它要求我们从不同的角度来处理面向对象编程，并开始将对象视为结构，而不是存在于堆上的抽象实体。现在我们可以运用所学知识，扩展访问者模式以实现需要操作复杂层次数据结构的系统，例如 XML 文件或目录树。
 
-在下一章中，我们将回顾一个实用但简单的模式，这个模式在Unity中经常被过度使用，即外观模式（Façade pattern）。
+在下一章中，我们将回顾一个实用但简单的模式，这个模式在 Unity 中经常被过度使用，即外观模式（Façade pattern）。
 
 # 实践练习
 
 作为一项实际练习，我建议研究一下访问者模式（Visitor pattern）的高级用法。一个完美的例子是将访问者模式应用于导航和处理**抽象语法树**（Abstract Syntax Tree，**AST**）。这类实现可以展示访问者模式提供的架构可能性。
 
-关于AST的信息，请参阅*进一步阅读*部分。
+关于 AST 的信息，请参阅*进一步阅读*部分。
 
 # 进一步阅读
 
 +   *《深入设计模式》，作者：亚历山大·舒韦茨（Alexander Shvets）*
 
-    [https://refactoring.guru/design-patterns/book](https://refactoring.guru/design-patterns/book)
+    [`refactoring.guru/design-patterns/book`](https://refactoring.guru/design-patterns/book)
 
 +   *抽象语法树*
 
-    [https://en.wikipedia.org/wiki/Abstract_syntax_tree](https://en.wikipedia.org/wiki/Abstract_syntax_tree)
+    [`en.wikipedia.org/wiki/Abstract_syntax_tree`](https://en.wikipedia.org/wiki/Abstract_syntax_tree)

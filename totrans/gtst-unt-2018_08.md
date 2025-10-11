@@ -2,7 +2,7 @@
 
 在上一章中，我们专注于我们的游戏玩家角色——黄瓜人。我们导入了角色，审查了控制方式，检查了动画，并对游戏中的角色进行了必要的配置更改，以便完全使用我们的角色。我们审查了玩家角色的动画和角色的动画控制器。我们还确定了与玩家角色相关的脚本，并审查了其中几个。此外，我们还对游戏的地形进行了修改，以便在游戏过程中更好地适应玩家角色。
 
-在本章中，我们将专注于非玩家角色。我们的黄瓜甲虫将作为我们游戏中的非玩家角色，并将成为黄瓜人的敌人。我们将通过直接放置的方式将黄瓜甲虫纳入我们的游戏。我们将回顾甲虫的11个动画，并对非玩家角色的动画控制器进行修改。此外，我们将编写脚本以控制非玩家角色。我们还将向游戏世界中添加黄瓜地、黄瓜和樱桃。
+在本章中，我们将专注于非玩家角色。我们的黄瓜甲虫将作为我们游戏中的非玩家角色，并将成为黄瓜人的敌人。我们将通过直接放置的方式将黄瓜甲虫纳入我们的游戏。我们将回顾甲虫的 11 个动画，并对非玩家角色的动画控制器进行修改。此外，我们将编写脚本以控制非玩家角色。我们还将向游戏世界中添加黄瓜地、黄瓜和樱桃。
 
 在本章中，我们将涵盖以下主题：
 
@@ -24,7 +24,7 @@
 
 # 理解非玩家角色
 
-非玩家角色，通常简称为NPC，只是不受人类玩家控制的游戏角色。这些角色通过脚本进行控制，其行为通常对游戏中的条件做出响应。
+非玩家角色，通常简称为 NPC，只是不受人类玩家控制的游戏角色。这些角色通过脚本进行控制，其行为通常对游戏中的条件做出响应。
 
 我们游戏中的非玩家角色是黄瓜甲虫。如图所示，这些甲虫有六条腿可以行走；在特殊情况下，它们也可以用后腿行走：
 
@@ -34,7 +34,7 @@
 
 在下一节中，你将导入为这款游戏专门准备的黄瓜甲虫资产包。该资产包中只有一个甲虫。我们将通过脚本制作多个甲虫副本。
 
-在你继续到下一节之前，你应该打开你的Unity游戏项目。或者，你也可以从出版商的配套网站上下载可用的`Starting-Chapter-08` Unity项目。
+在你继续到下一节之前，你应该打开你的 Unity 游戏项目。或者，你也可以从出版商的配套网站上下载可用的`Starting-Chapter-08` Unity 项目。
 
 # 将非玩家角色导入我们的游戏
 
@@ -42,9 +42,9 @@
 
 1.  从出版商的配套网站上下载`Cucumber_Beetle.unitypackage`文件
 
-1.  在Unity中，打开你的游戏项目后，从顶部菜单选择Assets | Import Package | Custom Package。
+1.  在 Unity 中，打开你的游戏项目后，从顶部菜单选择 Assets | Import Package | Custom Package。
 
-1.  导航到步骤1中下载的资产包的位置，并点击打开按钮
+1.  导航到步骤 1 中下载的资产包的位置，并点击打开按钮
 
 1.  当出现导入资产包对话框窗口时，点击导入按钮
 
@@ -82,7 +82,7 @@
 
 您可以通过在项目面板中点击动画文件（如`Eat_Ground.fbx`）来预览这些动画。然后，在检查器面板中，点击播放按钮来观看动画。
 
-我们有11个黄瓜甲虫动画，我们将在本章后面使用脚本确定何时播放动画。
+我们有 11 个黄瓜甲虫动画，我们将在本章后面使用脚本确定何时播放动画。
 
 在下一节中，我们将把黄瓜甲虫添加到我们的游戏中。
 
@@ -102,7 +102,7 @@
 
 # 使用动画控制器
 
-我们将使用动画控制器来组织NPC的动画。动画控制器还将用于管理动画之间的转换。
+我们将使用动画控制器来组织 NPC 的动画。动画控制器还将用于管理动画之间的转换。
 
 在我们开始修改动画控制器之前，我们需要确定我们的甲虫有哪些状态，然后确定每个状态相对于其他状态可以有哪些转换。
 
@@ -160,7 +160,7 @@
 
 让我们将注意力转回到动画控制器窗口。您会注意到该窗口的左侧面板中有两个标签：层和参数。层标签显示一个基础层。虽然我们可以创建额外的层，但我们的游戏不需要这样做。参数标签为空，这是正常的。我们将使用动画控制器窗口的布局区域进行更改。这就是带有网格背景的区域。
 
-让我们从以下更改开始。对于所有11个新状态按钮，执行以下操作：
+让我们从以下更改开始。对于所有 11 个新状态按钮，执行以下操作：
 
 1.  左键点击状态按钮
 
@@ -172,7 +172,7 @@
 
 1.  再次检查状态按钮以确保您的更改已生效
 
-当你完成了前五个步骤的所有11个状态后，你的动画控制器窗口应该与以下截图相匹配：
+当你完成了前五个步骤的所有 11 个状态后，你的动画控制器窗口应该与以下截图相匹配：
 
 ![图片](img/388a048e-5c23-47fa-96ee-ac427307fa31.png)
 
@@ -200,7 +200,7 @@
 
 ![图片](img/69fae59c-6c5b-4110-8b79-c41251f458da.png)
 
-如您在最终安排中看到的，我们有11个状态和二十多个转换。您还会注意到**Die on Ground**和**Die Standing**状态没有任何转换。为了在我们游戏中使用这些动画，它们必须放入动画控制器中。
+如您在最终安排中看到的，我们有 11 个状态和二十多个转换。您还会注意到**Die on Ground**和**Die Standing**状态没有任何转换。为了在我们游戏中使用这些动画，它们必须放入动画控制器中。
 
 让我们进行一个快速实验：
 
@@ -238,7 +238,30 @@
 
 1.  编辑脚本，使其与以下代码块匹配：
 
-[PRE0]
+```cs
+ using System.Collections;
+ using System.Collections.Generic;
+ using UnityEngine;
+
+ public class BeetleNPC : MonoBehaviour {
+
+     Animator animator;
+
+     // Use this for initialization
+     void Start () {
+         animator = GetComponent&lt;Animator>();    
+     }
+
+     // Collision Detection Test
+     void OnCollisionEnter(Collision col) 
+     {
+         if (col.gameObject.CompareTag("Player"))
+         {
+             animator.Play("Die on Ground");
+         }
+     }
+ } 
+```
 
 此代码检测黄瓜人和甲虫之间的碰撞。如果检测到碰撞，则播放`Die on Ground`动画。如以下截图所示，黄瓜人击败了黄瓜甲虫：
 
@@ -248,7 +271,7 @@
 
 +   在本节前面，你在动画控制器窗口中重命名了所有状态。你给状态起的名字是你在代码中要引用的名字。
 
-+   由于我们使用的动画没有其他状态之间的过渡，黄瓜甲虫将保持在动画的最终位置，除非我们编写脚本进行其他操作。所以，如果我们有100只甲虫并且击败了它们，所有100只都会在游戏世界中保持背部朝上。
++   由于我们使用的动画没有其他状态之间的过渡，黄瓜甲虫将保持在动画的最终位置，除非我们编写脚本进行其他操作。所以，如果我们有 100 只甲虫并且击败了它们，所有 100 只都会在游戏世界中保持背部朝上。
 
 这是对我们的黄瓜甲虫进行的一个简单而成功的脚本测试。我们需要编写更多的脚本来管理游戏中的甲虫。首先，我们将对游戏世界进行一些修改。
 
@@ -278,7 +301,7 @@
 
 由于我们的沙盒是我们更大游戏环境的一个较小表示，我们需要一个或多个樱花树。正如你所回忆的，黄瓜人将从樱花树上收集樱桃，并使用它们对黄瓜甲虫进行远程攻击。
 
-在[第6章](04be4d7b-8c85-4d9e-baf2-43965183f99f.xhtml)，*为我们的游戏创建和导入3D对象*中，我们导入了我们的`樱桃树`对象，并对其进行了修改以适应我们的游戏。现在，我们只需简单地将额外的樱桃树添加到我们的沙盒区域。您可以直接从项目 | 资产 | 预制体中将CherryTreeCollider拖动到场景视图中的沙盒区域。
+在第六章，*为我们的游戏创建和导入 3D 对象*中，我们导入了我们的`樱桃树`对象，并对其进行了修改以适应我们的游戏。现在，我们只需简单地将额外的樱桃树添加到我们的沙盒区域。您可以直接从项目 | 资产 | 预制体中将 CherryTreeCollider 拖动到场景视图中的沙盒区域。
 
 接下来，您将想要使用场景视图放大沙盒区域，以确保您的树木不在地面之上或需要额外的调整。
 
@@ -290,7 +313,7 @@
 
 创建出生点的步骤如下：
 
-1.  在层次结构面板中，右键单击沙盒，选择3D对象 | 圆柱体。
+1.  在层次结构面板中，右键单击沙盒，选择 3D 对象 | 圆柱体。
 
 1.  在检查器面板中，将圆柱体重命名为`SpawnPad1`。
 
@@ -306,7 +329,7 @@
 
 ![](img/f515e789-5b3d-42c1-984d-4a52462f5e5b.png)
 
-1.  选择`SpawnPad1`后，在检查器视图中取消选中Mesh Renderer | 接收阴影复选框。这将防止阴影投射到我们的出生点。这一步并不是非常重要，但有助于使我们的出生点看起来不那么有机，而且由于我们将在该平台上生成黄瓜人，它增加了一个很好的视觉效果。
+1.  选择`SpawnPad1`后，在检查器视图中取消选中 Mesh Renderer | 接收阴影复选框。这将防止阴影投射到我们的出生点。这一步并不是非常重要，但有助于使我们的出生点看起来不那么有机，而且由于我们将在该平台上生成黄瓜人，它增加了一个很好的视觉效果。
 
 1.  使用变换工具，调整平台的位置，使其位于黄瓜人的脚底下方，正好或略高于草地水平。
 
@@ -326,11 +349,11 @@
 
 # 将黄瓜补丁添加到我们的地形中
 
-在[第6章](04be4d7b-8c85-4d9e-baf2-43965183f99f.xhtml)，*为我们的游戏创建和导入3D对象*中，我们使用了平面来指定六个黄瓜田地区域。在本节中，我们将创建第七个黄瓜田地区域，并在沙盒区域中使用它。我们还将种植新的黄瓜田地区域内的黄瓜田地。
+在第六章，*为我们的游戏创建和导入 3D 对象*中，我们使用了平面来指定六个黄瓜田地区域。在本节中，我们将创建第七个黄瓜田地区域，并在沙盒区域中使用它。我们还将种植新的黄瓜田地区域内的黄瓜田地。
 
 # 在沙盒中创建黄瓜田地区域
 
-本节将指导你完成在沙盒中创建黄瓜田地区域所需的步骤。在层次结构面板中，你应该有一个包含各种尺寸黄瓜田地区域的`Cucumber Patch Areas`游戏对象，每个都是一个`plane`类型的3D对象。如果你没有这些对象，它们在下面的屏幕截图中显示，你可以通过重新访问[第6章](04be4d7b-8c85-4d9e-baf2-43965183f99f.xhtml)，*为我们的游戏创建和导入3D对象*，或者从出版商的配套网站上下载`Starting-Chapter-08`Unity项目：
+本节将指导你完成在沙盒中创建黄瓜田地区域所需的步骤。在层次结构面板中，你应该有一个包含各种尺寸黄瓜田地区域的`Cucumber Patch Areas`游戏对象，每个都是一个`plane`类型的 3D 对象。如果你没有这些对象，它们在下面的屏幕截图中显示，你可以通过重新访问第六章，*为我们的游戏创建和导入 3D 对象*，或者从出版商的配套网站上下载`Starting-Chapter-08`Unity 项目：
 
 ![图片](img/b3fcc4a9-2c3d-4f56-a10f-2164a8c2d156.png)
 
@@ -376,7 +399,7 @@
 
 1.  在场景视图中，使用变换工具重新定位复制的黄瓜块组。
 
-1.  重复步骤7和8，直到你对你的沙盒满意为止。
+1.  重复步骤 7 和 8，直到你对你的沙盒满意为止。
 
 以下截图展示了你的沙盒可能看起来像什么，其中包含新创建的黄瓜块。你的沙盒可能会有所不同，这是正常的：
 
@@ -386,21 +409,21 @@
 
 # 将黄瓜添加到我们的地形中
 
-在我们的游戏中，黄瓜将被用来给甲虫提供寻找和食用的东西。我们将在沙盒区域放置几个黄瓜，并在[第10章](fdacd7a8-63fe-454d-9d50-f9f40070e484.xhtml)“脚本我们的得分系统”中，在游戏过程中跟踪它们的数量。在本节中，我们将为我们的使用准备黄瓜，并在游戏中填充它们。
+在我们的游戏中，黄瓜将被用来给甲虫提供寻找和食用的东西。我们将在沙盒区域放置几个黄瓜，并在第十章“脚本我们的得分系统”中，在游戏过程中跟踪它们的数量。在本节中，我们将为我们的使用准备黄瓜，并在游戏中填充它们。
 
 你之前已经下载了必要的黄瓜资源。如以下截图所示，`Cucumber`在`Assets/Cucumber`文件夹中是可访问的。你会注意到当我们选择`Cucumber`时，项目面板底部将`Cucumber`文件识别为`.fbx`文件：
 
 ![图片](img/0313ce77-b146-4e54-8762-bb62c3425dec.png)
 
-`.fbx`文件是从3D建模软件导出的，这样我们就可以在游戏中使用它。当选择该资源时，检查器视图会显示导入设置。我们想要访问变换、网格渲染器和其他组件，因此我们将将其转换为预制件并做一些更改。以下是初始步骤：
+`.fbx`文件是从 3D 建模软件导出的，这样我们就可以在游戏中使用它。当选择该资源时，检查器视图会显示导入设置。我们想要访问变换、网格渲染器和其他组件，因此我们将将其转换为预制件并做一些更改。以下是初始步骤：
 
-1.  将`Cucumber.fbx`文件从Assets | Cucumber拖动到层次结构面板。
+1.  将`Cucumber.fbx`文件从 Assets | Cucumber 拖动到层次结构面板。
 
 1.  在层次结构面板中选择`Cucumber`，将其拖动到项目面板中的`Assets`/`Prefabs`文件夹。
 
 1.  从层次结构面板中删除`Cucumber`。
 
-1.  在项目面板中，选择Assets | Prefabs | Cucumber。
+1.  在项目面板中，选择 Assets | Prefabs | Cucumber。
 
 当我们从层级面板将刚刚移动的`Cucumber`文件拖到`Prefabs`文件夹时，项目面板底部显示的以下截图将`Cucumber`识别为预制件：
 
@@ -410,7 +433,7 @@
 
 1.  在检查器面板中，选择标签 | 添加标签。
 
-1.  在标签和图层界面中，点击视图右侧的加号图标。如下所示，加号图标下方是CherryTree标签，右侧：
+1.  在标签和图层界面中，点击视图右侧的加号图标。如下所示，加号图标下方是 CherryTree 标签，右侧：
 
 ![图片](img/1e6da26c-2888-40ca-a56d-da287af4e472.png)
 
@@ -446,7 +469,7 @@
 
 1.  使用变换工具旋转、调整大小和重新定位黄瓜。
 
-1.  确保你的沙盒区域至少有10个黄瓜。
+1.  确保你的沙盒区域至少有 10 个黄瓜。
 
 1.  在层级面板中，将所有新创建的黄瓜移动到沙盒下的`cucumbers`游戏对象中。这只是为了保持层级面板的整洁。
 
@@ -522,7 +545,7 @@
 
 我们不需要对默认的角色控制器进行任何更改，但我们确实需要一个。
 
-接下来，让我们简化操作，为甲虫创建一些临时的包含墙壁。您可以简单地添加3D立方体游戏对象，并使用变换工具将它们定位，以便它们与沙盒或沙盒的一部分相邻。您可以将墙壁放入名为`Walls`的空游戏对象中，并在层次结构面板中组织它们，使其位于`Sandbox`游戏对象内部。以下截图是一个示例：
+接下来，让我们简化操作，为甲虫创建一些临时的包含墙壁。您可以简单地添加 3D 立方体游戏对象，并使用变换工具将它们定位，以便它们与沙盒或沙盒的一部分相邻。您可以将墙壁放入名为`Walls`的空游戏对象中，并在层次结构面板中组织它们，使其位于`Sandbox`游戏对象内部。以下截图是一个示例：
 
 ![](img/dea4e9b1-e644-4930-aaaf-aba9e0563c7c.png)
 
@@ -530,23 +553,84 @@
 
 这段代码的第一个部分简单地导入了 `System.Collections`、`System.Collections.Generic` 和 `UnityEngine`。该部分还包括我们的 `BeetlePatrol` 类头：
 
-[PRE1]
+```cs
+ using System.Collections;
+ using System.Collections.Generic;
+ using UnityEngine;
+
+ public class BeetlePatrol : MonoBehaviour { 
+```
 
 在下一节中，我们提供了变量。第一个变量 `isDie` 是一个全局变量，我们将使用它来确定黄瓜甲虫是否应该停止巡逻。其余的变量是局部的。它们的使用在查看后续代码部分后将是显而易见的：
 
-[PRE2]
+```cs
+// Variables
+public static bool isDie = false;
+
+public float speed = 5;
+public float directionChangeInterval = 1;
+public float maxHeadingChange = 30;
+
+Animator beetleAnim;
+
+CharacterController controller;
+float heading;
+Vector3 targetRotation;
+
+```
 
 下一个代码部分是我们的 `Start()` 方法，它只在游戏开始时运行。这段代码设置了甲虫巡逻的初始旋转：
 
-[PRE3]
+```cs
+void Start () {
+
+     controller = GetComponent&lt;CharacterController>();
+     beetleAnim = GetComponent&lt;Animator> ();
+
+     // Set random initial rotation
+     heading = Random.Range(0, 360);
+     transform.eulerAngles = new Vector3(0, heading, 0);
+
+     StartCoroutine(NewHeading()); 
+} 
+```
 
 在以下代码中显示的我们的 `Update()` 方法是下一个部分。这段代码将在每个游戏帧中执行一次。在这里，您可以看到如果条件 `isDie` 是 `false`（或不是 `true`），则代码将被执行：
 
-[PRE4]
+```cs
+void Update () {
+
+     if (!isDie) {
+          transform.eulerAngles = Vector3.Slerp (transform.eulerAngles, targetRotation, 
+               Time.deltaTime * directionChangeInterval);
+          var forward = transform.TransformDirection (Vector3.forward);
+          controller.SimpleMove (forward * speed);
+     }
+
+} 
+```
 
 这最后一段代码提供了两个方法。`NewHeading()` 和 `NewHeadingRoutine()` 方法计算甲虫移动的新方向：
 
-[PRE5]
+```cs
+IEnumerator NewHeading () {
+
+     while (true) {
+          NewHeadingRoutine();
+          yield return new WaitForSeconds(directionChangeInterval);
+     }
+}
+
+void NewHeadingRoutine () {
+
+     var floor = transform.eulerAngles.y - maxHeadingChange;
+     var ceil  = transform.eulerAngles.y + maxHeadingChange;
+     heading = Random.Range(floor, ceil);
+     targetRotation = new Vector3(0, heading, 0);
+ }
+
+} // this is the end of the Beetle Patrol class
+```
 
 保存您的脚本。接下来，我们需要将其与 `Beetle` 预制件关联。选择预制件后，在检查器面板中点击添加组件按钮。然后，选择 Scripts | Beetle Patrol。
 
@@ -562,23 +646,54 @@
 
 `BeetleNPC` 脚本需要一个新的变量和两个方法，其中一个将用作协程。让我们从新的变量开始。正如您在下面的代码片段中可以看到的，我们现在有一个第二个变量，`cucumberToDestroy`。我们将使用它来引用被甲虫吃掉的那个黄瓜：
 
-[PRE6]
+```cs
+Animator animator;
+public GameObject cucumberToDestroy; 
+```
 
 接下来，我们将添加一个类似于我们在本章之前创建的 `OnCollissionEnter` 的 `OnTriggerEvent()` 方法。如你所见，我们正在测试草莓虫是否与黄瓜相撞。当检测到这种情况时，将执行四行代码。第一行将 `cucumberToDestroy` 变量指向草莓虫相撞的具体黄瓜。下一行将 `isEating` 值设置为 `true`。我们将更新 `BeetlePatrol` 脚本来适应这一变化。第三条语句播放进食动画。最后一条语句调用 `DestroyCucumber` 函数，我们将在下一节中查看该函数：
 
-[PRE7]
+```cs
+void OnTriggerEnter(Collider theObject) {
+     if (theObject.gameObject.CompareTag ("Cucumber")) {
+         cucumberToDestroy = theObject.gameObject;
+         BeetlePatrol.isEating = true;
+         animator.Play ("Eating on Ground");
+         StartCoroutine ("DestroyCucumber");
+     }
+} 
+```
 
 对 `BeetleNPC` 脚本的最后修改是 `DestroyCucumber()` 函数。我们使用此函数来延迟黄瓜的销毁。这模拟了草莓虫吃黄瓜所需的时间。你可以根据需要更改 `WaitForSecondsRealTime` 参数。该参数代表现实世界中的秒数。一旦延迟结束，对象将被销毁，`isEating` 变量将被设置为 `false`：
 
-[PRE8]
+```cs
+IEnumerator DestroyCucumber() {
+
+     yield return new WaitForSecondsRealtime (4);
+     Destroy (cucumberToDestroy.gameObject);
+     BeetlePatrol.isEating = false;
+} 
+```
 
 我们需要对我们的 `BeetlePatrol` 脚本进行两项修改。首先，如以下代码所示，我们将添加新的 `isEating` 变量：
 
-[PRE9]
+```cs
+ public static bool isDie, isEating = false; 
+```
 
 我们对 `BeetlePatrol` 脚本的最后修改是更新条件语句，如下所示代码所示。现在，如果草莓虫正在死亡或进食，我们将停止巡逻：
 
-[PRE10]
+```cs
+void Update () {
+
+     if (!isDie && !isEating) {
+          transform.eulerAngles = Vector3.Slerp (transform.eulerAngles, targetRotation, 
+               Time.deltaTime * directionChangeInterval);
+          var forward = transform.TransformDirection (Vector3.forward);
+          controller.SimpleMove (forward * speed);
+     }
+} 
+```
 
 # 草莓虫攻击地面的玩家
 
@@ -594,25 +709,51 @@
 
 我们将在 `OnCollisionEnter()` 方法中使用以下三行代码来强制草莓虫在碰撞时面对黄瓜人。如以下代码所示，我们创建一个变量以便轻松引用黄瓜人，然后为黄瓜人的当前变换创建第二个变量。第三行代码告诉当前黄瓜虫面对黄瓜人：
 
-[PRE11]
+```cs
+var cm = GameObject.Find ("CucumberMan");
+var tf = cm.transform;
+this.gameObject.transform.LookAt (tf); 
+```
 
 现在，我们只需编辑 `OnCollisionEnter` 方法，包括两个语句。第一个语句播放 Attacking on Ground 动画。第二个语句调用将销毁当前黄瓜虫的函数。以下是这两行代码：
 
-[PRE12]
+```cs
+animator.Play ("Attacking on Ground");
+StartCoroutine ("DestroySelf"); 
+```
 
 对 `BeetleNPC` 脚本的最后修改是 `DestroySelf()` 函数。我们使用此函数来模拟当前黄瓜虫的战斗和生命结束。函数内部有三个语句。第一个语句模拟攻击时间。第二个语句播放 `Die on Ground` 动画。最后一行销毁游戏对象，即当前黄瓜虫：
 
-[PRE13]
+```cs
+IEnumerator DestroySelf() {
+
+     yield return new WaitForSecondsRealtime (4);
+     animator.Play ("Die on Ground");
+     Destroy (this.gameObject, 4);
+} 
+```
 
 我们需要对我们的`BeetlePatrol`脚本进行两项修改。首先，如以下代码所示，我们将添加新的`isAttacking`变量：
 
-[PRE14]
+```cs
+ public static bool isDie, isEating, isAttacking =</span> false; 
+```
 
 我们对`BeetlePatrol`脚本的最后一次修改是更新条件语句，如下所示。现在，如果甲虫正在死亡、进食或攻击，我们将停止巡逻：
 
-[PRE15]
+```cs
+void Update () {
 
-我们将在第10章[脚本化我们的得分系统](fdacd7a8-63fe-454d-9d50-f9f40070e484.xhtml)中对脚本和行为进行进一步的修改。
+     if (!isDie && !isEating && !isAttacking)) {
+          transform.eulerAngles = Vector3.Slerp (transform.eulerAngles, 
+               targetRotation, Time.deltaTime * directionChangeInterval);
+          var forward = transform.TransformDirection (Vector3.forward);
+          controller.SimpleMove (forward * speed);
+     }
+} 
+```
+
+我们将在第十章脚本化我们的得分系统中对脚本和行为进行进一步的修改。
 
 # 甲虫站立以攻击
 
@@ -634,31 +775,119 @@
 
 本节展示了导入和类级别变量。你会注意到最后三个变量（`cherryHit`、`smoothTime`和`smoothVelocity`）是新的。我们将使用`cherryHit`来跟踪导致甲虫死亡的序列。其余两个变量将用于控制甲虫到达黄瓜人的速度和流畅度：
 
-[PRE16]
+```cs
+ using System.Collections;
+ using System.Collections.Generic;
+ using UnityEngine;
+
+ public class BeetleNPC : MonoBehaviour {
+
+     Animator animator;
+     public GameObject cucumberToDestroy;
+     public bool cherryHit = false;
+     public float smoothTime = 3.0f; 
+     public Vector3 smoothVelocity = Vector3.zero;
+```
 
 没有对`Start()`方法进行修改：
 
-[PRE17]
+```cs
+ void Start () {
+      animator = GetComponent&lt;Animator>();
+ }
+```
 
 我们现在开始使用`Update()`方法。这是必要的，以便展示甲虫可以朝向黄瓜人移动的每一帧。你还可以看到我们在条件语句中使用了`cherryHit`变量：
 
-[PRE18]
+```cs
+void Update () {
+     if (cherryHit) {
+          var cm = GameObject.Find ("CucumberMan");
+          var tf = cm.transform;
+          this.gameObject.transform.LookAt (tf);
+
+          animator.Play ("Standing Run");
+
+          transform.position = Vector3.SmoothDamp (transform.position, tf.position,
+               ref smoothVelocity, smoothTime);
+     }
+}
+
+```
 
 我们脚本的下一部分是`OnCollisionEnter()`方法。我们将之前在这个方法中的语句移动，以便它们被一个`if`语句封装。如果`cheeryHit`为`false`，则将执行原始代码，否则将执行`else`语句之后的两个代码行。我们看到那里我们触发了两个动画：
 
-[PRE19]
+```cs
+
+ void OnCollisionEnter(Collision col) {
+      if (col.gameObject.CompareTag ("Player")) {
+
+           if (!cherryHit) {
+                BeetlePatrol.isAttacking = true;
+
+                var cm = GameObject.Find ("CucumberMan");
+                var tf = cm.transform;
+                this.gameObject.transform.LookAt (tf);
+
+                animator.Play ("Attacking on Ground");
+                StartCoroutine ("DestroySelfOnGround");
+           } else {
+                animator.Play ("Standing Attack");
+                StartCoroutine ("DestroySelfStanding");
+           }
+     }
+}
+```
 
 下一部分代码是之前创建的用于处理与黄瓜碰撞的`OnTriggerEnter()`方法。从以下代码中可以看出，我们添加了一个`else if`语句来检查我们是否与一个标签为`Cherry`的`gameObject`发生了碰撞。当这个条件为`true`时，我们将`isAttacking`布尔变量设置为`true`，这样由`BeetlePatrol`脚本驱动的向前运动就会停止。我们还设置了`cherryHit`的值为`true`，并播放显示甲虫站立的动画：
 
-[PRE20]
+```cs
+void OnTriggerEnter(Collider theObject) {
+     if (theObject.gameObject.CompareTag ("Cucumber")) {
+
+          cucumberToDestroy = theObject.gameObject;
+          BeetlePatrol.isEating = true;
+          animator.Play ("Eating on Ground");
+          StartCoroutine ("DestroyCucumber");
+ } else if (theObject.gameObject.CompareTag ("Cherry")) {
+          BeetlePatrol.isAttacking = true;
+          cherryHit = true;
+          animator.Play ("Stand");
+ }
+}
+```
 
 我们`BeetleNPC`脚本的最后部分包含三个与`Destroy`相关的函数。你已经熟悉`DestroyCucumber()`。我们将`DestroySelf()`函数重命名为`DestroySelfOnGround()`，并添加了新的`DestroySelfStanding()`：
 
-[PRE21]
+```cs
+IEnumerator DestroyCucumber() {
+     yield return new WaitForSecondsRealtime (4);
+     Destroy (cucumberToDestroy.gameObject);
+     BeetlePatrol.isEating = false;
+}
+
+IEnumerator DestroySelfOnGround() {
+
+     yield return new WaitForSecondsRealtime (4);
+     animator.Play ("Die on Ground");
+     Destroy (this.gameObject, 4);
+}
+
+IEnumerator DestroySelfStanding() {
+
+     yield return new WaitForSecondsRealtime (4);
+     animator.Play ("Die Standing");
+
+     Destroy (this.gameObject, 4);
+     cherryHit = false;
+}
+
+} // End of BeetleNPC.cs
+```
 
 为了测试这个功能，我们需要在我们的场景中放置一些樱桃。首先，从发布者的网站上下载`Cherries.unitypackage`资产包。这个包包含一个已经设置好以在我们的游戏中工作的`Cherry.prefab`文件。它有一个`Cherry`标签和一个带有`Is Trigger`选中的`Box Collider`。
 
-在[第10章](fdacd7a8-63fe-454d-9d50-f9f40070e484.xhtml)，*脚本化我们的得分系统*中，我们将为黄瓜人添加投掷樱桃的能力。现在，让我们在我们的沙盒中放置一些樱桃以进行测试。以下截图所示的一种方法是将樱桃围绕在甲虫周围。这将使我们的测试更容易、更快：
+在第十章，*脚本化我们的得分系统*中，我们将为黄瓜人添加投掷樱桃的能力。现在，让我们在我们的沙盒中放置一些樱桃以进行测试。以下截图所示的一种方法是将樱桃围绕在甲虫周围。这将使我们的测试更容易、更快：
 
 ![图片](img/8837ae96-dafb-4c65-bb23-9d27fe991f24.png)
 
@@ -666,6 +895,6 @@
 
 # 摘要
 
-在本章中，我们专注于我们游戏中的非玩家角色——黄瓜甲虫。我们回顾了甲虫的11个动画，并对非玩家角色的动画控制器进行了修改。此外，我们还编写了控制非玩家角色的脚本。我们的脚本产生了几个甲虫行为：巡逻、消耗黄瓜、地面战斗，以及被樱桃击中时站立、奔跑和用后腿攻击。我们还向我们的游戏世界添加了黄瓜地、黄瓜和樱桃。
+在本章中，我们专注于我们游戏中的非玩家角色——黄瓜甲虫。我们回顾了甲虫的 11 个动画，并对非玩家角色的动画控制器进行了修改。此外，我们还编写了控制非玩家角色的脚本。我们的脚本产生了几个甲虫行为：巡逻、消耗黄瓜、地面战斗，以及被樱桃击中时站立、奔跑和用后腿攻击。我们还向我们的游戏世界添加了黄瓜地、黄瓜和樱桃。
 
-在[第9章](6e2e628c-4c81-4ec3-bd4f-2ae0f2a29aab.xhtml)，*添加抬头显示*中，我们将设计、开发和整合一个**抬头显示**（**HUD**）到我们的游戏中。我们将创建文本和图形，提供得分、健康和额外信息的视觉指示，以帮助玩家在游戏过程中保持对局势的了解。
+在第九章，*添加抬头显示*中，我们将设计、开发和整合一个**抬头显示**（**HUD**）到我们的游戏中。我们将创建文本和图形，提供得分、健康和额外信息的视觉指示，以帮助玩家在游戏过程中保持对局势的了解。

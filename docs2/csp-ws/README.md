@@ -1,4 +1,4 @@
-# Python 机器学习算法交易实用指南
+# C# 研讨会
 
 > 原文：[`zh.annas-archive.org/md5/fcb09c483bdb21866eb6782158d1f8d5`](https://zh.annas-archive.org/md5/fcb09c483bdb21866eb6782158d1f8d5)
 > 

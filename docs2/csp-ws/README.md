@@ -1,6 +1,6 @@
 # C# 研讨会
 
-> 原文：[`zh.annas-archive.org/md5/fcb09c483bdb21866eb6782158d1f8d5`](https://zh.annas-archive.org/md5/fcb09c483bdb21866eb6782158d1f8d5)
+> 原文：[`zh.annas-archive.org/md5/f6da699441e38fed3c110fb2972db3eb`](https://zh.annas-archive.org/md5/f6da699441e38fed3c110fb2972db3eb)
 > 
 > 译者：[飞龙](https://github.com/wizardforcel)
 > 

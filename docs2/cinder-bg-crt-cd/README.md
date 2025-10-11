@@ -1,6 +1,6 @@
-# Python 机器学习算法交易实用指南
+# Cinder 创造性编程入门指南
 
-> 原文：[`zh.annas-archive.org/md5/fcb09c483bdb21866eb6782158d1f8d5`](https://zh.annas-archive.org/md5/fcb09c483bdb21866eb6782158d1f8d5)
+> 原文：[`zh.annas-archive.org/md5/ff242635ffa8fae765566ebbc873aed4`](https://zh.annas-archive.org/md5/ff242635ffa8fae765566ebbc873aed4)
 > 
 > 译者：[飞龙](https://github.com/wizardforcel)
 > 

@@ -1,6 +1,6 @@
-# Python 机器学习算法交易实用指南
+# 微软 Dynamic NAV 2013 应用设计
 
-> 原文：[`zh.annas-archive.org/md5/fcb09c483bdb21866eb6782158d1f8d5`](https://zh.annas-archive.org/md5/fcb09c483bdb21866eb6782158d1f8d5)
+> 原文：[`zh.annas-archive.org/md5/9d06224588c3fc7b97e3177915130829`](https://zh.annas-archive.org/md5/9d06224588c3fc7b97e3177915130829)
 > 
 > 译者：[飞龙](https://github.com/wizardforcel)
 > 

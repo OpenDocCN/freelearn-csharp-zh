@@ -1,6 +1,6 @@
-# Python 机器学习算法交易实用指南
+# F# 4.0 设计模式
 
-> 原文：[`zh.annas-archive.org/md5/fcb09c483bdb21866eb6782158d1f8d5`](https://zh.annas-archive.org/md5/fcb09c483bdb21866eb6782158d1f8d5)
+> 原文：[`zh.annas-archive.org/md5/4484e562120fa3b271b1c603dd9a4474`](https://zh.annas-archive.org/md5/4484e562120fa3b271b1c603dd9a4474)
 > 
 > 译者：[飞龙](https://github.com/wizardforcel)
 > 

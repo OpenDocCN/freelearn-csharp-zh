@@ -1,6 +1,6 @@
-# Python 机器学习算法交易实用指南
+# 精通 Unity 脚本编程
 
-> 原文：[`zh.annas-archive.org/md5/fcb09c483bdb21866eb6782158d1f8d5`](https://zh.annas-archive.org/md5/fcb09c483bdb21866eb6782158d1f8d5)
+> 原文：[`zh.annas-archive.org/md5/e1dee71bde9a8ddda1244d738767875b`](https://zh.annas-archive.org/md5/e1dee71bde9a8ddda1244d738767875b)
 > 
 > 译者：[飞龙](https://github.com/wizardforcel)
 > 

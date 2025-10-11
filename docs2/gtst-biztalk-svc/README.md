@@ -1,6 +1,6 @@
-# Python 机器学习算法交易实用指南
+# BizTalk 服务入门指南
 
-> 原文：[`zh.annas-archive.org/md5/fcb09c483bdb21866eb6782158d1f8d5`](https://zh.annas-archive.org/md5/fcb09c483bdb21866eb6782158d1f8d5)
+> 原文：[`zh.annas-archive.org/md5/672de9f20ff11eabbe5128e4ae104589`](https://zh.annas-archive.org/md5/672de9f20ff11eabbe5128e4ae104589)
 > 
 > 译者：[飞龙](https://github.com/wizardforcel)
 > 

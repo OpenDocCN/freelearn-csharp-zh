@@ -1,0 +1,1743 @@
+- en: Chapter 6. Optimizing Type Provider
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: We now have a basic understanding of the basic and advanced concurrency features
+    of F#. We also have enough tooling knowledge and hence, enough knowledge about
+    tooling support in Visual Studio. Based on this knowledge, we can also enhance
+    the performance optimizations when implementing and using other F# language features.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In this chapter, we will focus on bringing the previous knowledge into optimizing
+    type provider. Type provider is a unique feature of F#; it was introduced in F#
+    3.0.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: Type provider was introduced in F# 3.0 release, at the same time as Visual Studio
+    2012 release. It is important to know that F# 3.0 is part of train releases of
+    Visual Studio 2012, not Visual Studio 2013\. Many external articles (including
+    some blogs) outside the MSDN blogs and MSDN Library mistakenly assume that F#
+    3.0 has a type provider that comes with Visual Studio 2013\. The release of F#
+    that comes with Visual Studio 2013 is F# 3.1, not F# 3.0.
+  prefs: []
+  type: TYPE_NORMAL
+- en: It is also important to first know what type provider is and the main goal or
+    purposes of having or using it, before we optimize it. Knowing the concepts behind
+    type provider will give us an insight of which part of optimizations are available
+    for us when we use and implement type providers. This insight will also help us
+    avoid pitfalls when dealing with type providers implementation in detail.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We now discuss these topics of optimizing type provider:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Overview of F# type provider
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Best practices in implementing type provider
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Optimizing generative type provider
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Common pitfalls in type provider implementation
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Overview of F# type provider
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Before we go deeper into optimizing F# type providers, let's have a conceptual
+    introduction to what a type provider is.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: From now on, F# type providers will be described as type providers, omitting
+    the *F#* prefix. It is also common just to use type providers because type provider
+    is a unique feature of F#.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Basically, type provider is a type of generators. It generates types (classes)
+    to be used in code specific to special purposes. Some of the classes remain available
+    in the runtime; some of them don't (get erased).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The type provider feature begins with F# 3.0 release, and it is the main theme
+    of F# 3.0 release: solving the data manipulation problem. The specific *problem*
+    in data manipulation problem is how we handle the data''s metadata information
+    while focusing on the correctness of syntaxes and type safety. The type safety,
+    in this sense, does not have to be strict or even strong, it is also available
+    as erased typed as object.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Using type provider implementations, we expect that when we use data, the information
+    about the data itself (metadata) is available as we are using it. For example,
+    having a type provider for SQL Server database will give us the table and the
+    name of the column metadata to be available for us when we are using the type
+    provider. This metadata information is available at development type immediately
+    as the type provider is translating the schema information of SQL Server database
+    metadata into types and properties available immediately.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'This is the starting point of F# type provider documentation on MSDN Library:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[https://docs.microsoft.com/en-us/dotnet/articles/fsharp/tutorials/type-providers/index](https://docs.microsoft.com/en-us/dotnet/articles/fsharp/tutorials/type-providers/index)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In a simple definition, *type provider is a combination of language and library
+    features that describe the information to represent data, including the types
+    and its properties*. This is also one of the unique selling points of type providers:
+    the ability to present type metadata of a data into the language immediately.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Type providers will provide the type resolution at compile time immediately,
+    and this is different from the implementation of other code generators that perform
+    type generations as well. This is also unique in F# compared to other managed
+    programming languages on.NET such as C#/VB.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In the long definition, type provider is a design-time component that provides
+    a computed space of types. Therefore, Intellisense is available immediately. All
+    of the types are strongly typed at design time, and it can be carried on at runtime
+    if the generative type provider strategy is used instead of the erased strategy
+    that treats all of the generated types as objects (`System.Object` in .NET BCL).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Therefore, the following are the goals of type providers:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: To provide more information on the data accessed from external source.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: To provide more metadata information to be available immediately as part of
+    the language, as type with its properties.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: To make the type provided available as strongly typed in order to be used in
+    the editor. This is possible because before the type provided is available in
+    the editor, it is processed and compiled first; hence it is also available to
+    be inferred.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: To make the type provided to be explicitly available at compile time. This is
+    crucial because a type provider must be available at compile time because the
+    resulting type provided must be available immediately to be used when we type
+    in the editor of Visual Studio, as related to point 3.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Point 3 is crucial because the type provider is doing its processing while in
+    the editor as we type our code (as long as we compile our references and provide
+    the type provider initialization first). This gives F# type provider strong and
+    unique advantages.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following are the unique advantages of type providers:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Type resolved is immediately available in the editor when writing code (in the
+    IDE editing session).
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Since type resolved is immediately available in the editor, type inference
+    is also available immediately, and this gives us the availability of Visual Studio''s
+    Intellisense of the resulting generated type (either using erased or generative).
+    This is closely related to the third goal of type providers: the type provided
+    is available strongly typed.'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: The type provided includes not just properties but also additional necessary
+    methods as well.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: There is no code generation when providing type generation.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: The implemented type provider is compatible with other managed programming languages
+    as well, although the implementation of a type provider itself cannot be done
+    outside an F# project.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Point 2 is crucial because if the type resolved does not provide the properties
+    and the methods correctly, and if the metadata provided does not match the intention
+    of the type providers, the type provider is not a good type provider and the resulting
+    type might not work as expected.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Point 3 is important because of the fact that the resulting type provided is
+    available immediately, not requiring us to rebuild the whole project (or related
+    generated code's project).
+  prefs: []
+  type: TYPE_NORMAL
+- en: We may conclude that the F# type provider can be used to tame the sea of information
+    into more meaningful data with the agreed schema and metadata directly into our
+    experience of writing the code, and this is also often mentioned in the documentation
+    of Microsoft's Visual F#, and it was introduced particularly from F# creator Don
+    Syme in his Build 2011 conference presentation session of F# 3.0.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'For more information on Don Syme''s Build 2011 F# 3.0 talk, this is the presentation''s
+    landing page on Channel 9:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[https://channel9.msdn.com/Events/Build/BUILD2011/SAC-904T](https://channel9.msdn.com/Events/Build/BUILD2011/SAC-904T)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following diagram illustrates an abstract picture of F# type provider:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Overview of F# type provider](img/image00309.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: F# itself has type provider implementations built in since F# 3.0 under the
+    `FSharp.Data.TypeProviders` namespace and the `FSharp.Data.TypeProviders.dll`
+    assembly.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: We must use the `Microsoft.FSharp.Data.TypeProviders` namespace if it is going
+    to be used in outside F# projects, because the compiled name is `Microsoft.FSharp.Data.TypeProviders`.
+    This namespace name is not related to the name of the `FSharp.Data.TypeProviders`
+    as assembly.
+  prefs: []
+  type: TYPE_NORMAL
+- en: There are other type providers as well, and most outside F# type providers are
+    managed under the governance of F# Foundations as community projects. All of these
+    community projects are hosted on GitHub and we all are encouraged to contribute
+    as well.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'These are the ecosystems of F# type providers that we have in the first half
+    of 2016:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: F# Data (for CSV, HTML, WorldBank)
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: F# Data Toolbox (for Twitter and SAS)
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: FSharp.Management (for WMI, Registry, Powershell, and Windows filesystem)
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Azure Storage type provider
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'To keep up with the latest development of these community projects under F#
+    Foundations, please visit: [http://fsprojects.github.io/](http://fsprojects.github.io/).'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We can conclude that there are some common scenarios where a type provider
+    is the best fit:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Accessing data from an external source in the form of a strong type JSON returned
+    from web API. For example, World Bank data.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Accessing data from predefined schema. For example, well-defined XML and its
+    derivatives, such as XML DataSet (XSD) and XSL.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Accessing data with predefined data format defined and documented. The way to
+    access the data has a predefined protocol and its own query dialect. For example,
+    returning data from Windows Management Instrumentation query (often called WMI
+    query) using WMI protocol with its own query language, WQL.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Let's dive into the details of why the third advantage of type providers is
+    important and comparison with other type generators as well.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Comparing the type provider with other type generators
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: F# type provider is not the only sample of advanced type generator. Type generators
+    are commonly found in modern software platform ecosystems (including the tooling),
+    such as .NET/Visual Studio, Java/Eclipse, and Mono/Xamarin Studio.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Type generators in F# type providers do not employ a code generator as compared
+    to other type generator models. They rely on the compiler and tooling infrastructure
+    at compile time. The type provided is not just immediately available but is also
+    flexible to outside changes by simply rebuilding the project.
+  prefs: []
+  type: TYPE_NORMAL
+- en: This is in contrast to many type generators that employ code generation strategy.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following diagram illustrates the abstract working of these two type generators:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Comparing the type provider with other type generators](img/image00310.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: For example, Entity Framework 6 (using the database first and model first),
+    `SqlMetal` in LINQ to SQL, `TLBIMP` to yield COM interop objects, and legacy web
+    service reference (before Visual Studio 2010) are implemented using code generators.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Entity Framework 6's first database and model heavily rely on code generators
+    to ensure the availability of the types mapped as classes from the underlying
+    database, and this is normal and is intended as is because the mapping between
+    database and the mapped object is manual, including the constructions of constraint
+    mappings.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The design mode model uses a combination of EDMX and CSDL/SSDL files, which
+    is completely generated as code, and we should not modify the CSDL file directly
+    because it will always be overridden with the changes in EDMX file.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The same fact also applies with the WSDL/ASMX of the legacy web service in the
+    previous version of Visual Studio before VS 2010\. The ASMX file generated is
+    also employing code generations, and they have their own translations that map
+    the C#/VB code to the SOAP header envelopes. The resulting mapping code of WSDL/ASMX
+    is closely linked as tightly integrated, and we should not modify the ASMX directly
+    as we usually focus on the code behind the `asmx.cs` or the `asmx.vb` file. The
+    modifications on the references of the ASMX will always override the generated
+    references of the WSDL file, and this is quite cumbersome and might be error-prone
+    because the code generations of the web services depend on the project that has
+    the original ASMX.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Interoperability with other managed programming languages
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: The type provider is fully compatible with other managed programming languages
+    that run on top of .NET CLR. Not just because it's implemented as managed language
+    on top of CLR, but it is essentially the same CLR-compliant assembly.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'But there is a caveat: when the F# type provider is used in other managed languages
+    directly, it will not yield the Intellisense feature. Why? Because the type provided
+    by F# type provider is available based on the specific attribute of `[<assembly:TypeProviderAssembly>]`,
+    and this attribute is handled by F# compiler in Visual Studio IDE when the project
+    is rebuilt.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: This attribute in this assembly scope is important because this attribute is
+    telling the F# compiler that *the type provided by F# type provider is added at
+    compile time*.
+  prefs: []
+  type: TYPE_NORMAL
+- en: It is important to know that only the F# compiler has the capability of adding
+    additional type metadata as part of the resulting type provided using the attribute
+    of `TypeProviderAssembly`. This means that we cannot use the F# type provider
+    directly in other managed languages because their compilers must have the capability
+    to identify the type provider-related assembly, and the whole compiler infrastructure
+    has to match F# compiler infrastructure.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We can simply add references by adding our F# code that use the type library
+    as a library/assembly references to our C#/VB projects.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Understanding the type provider building blocks
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: A predefined data source that has very good established documentations and strong
+    conventions such as SQL Server database and **Windows Management Instrumentation**
+    (**WMI**) is one of the best samples to have type provider implementations because
+    all of the necessary descriptions of the data and the way to access it is documented
+    extensively in detail.
+  prefs: []
+  type: TYPE_NORMAL
+- en: For more information about WMI, consult the MSDN Library at
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[https://msdn.microsoft.com/en-us/library/aa394572(v=vs.85).aspx](https://msdn.microsoft.com/en-us/library/aa394572(v=vs.85).aspx)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Let's visit the minimum requirements of type provider implementation.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Minimum requirements of type providers
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: We have discussed the importance of certain restrictions on how a type provider
+    should get the data. Now let's wrap the minimum requirements.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'A successful type provider is expected to have the following traits:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The type provided must not be statically coded, it should be able to adapt immediately
+    based on the defined parameters. For example, a connection string of a database
+    server, which is then used to provide configuration for the type provided by SQL
+    tables and its columns.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Related to point 1, the parameter to be used as base configuration must be specified.
+    Therefore, there is no default parameterless constructor for any type provider
+    because the configuration must be specified.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: The schema mapping or the type and property mapping must be defined to be strongly
+    typed even though the resulting type provided does not have to be strongly typed.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: The mapping has to be carefully designed not to add irrelevant type information
+    because it will add overheads on type instantiation. However, for erased type
+    providers, the mapping properties and methods might be optional.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: The provided type is always a type that has a setter and getter, and it is therefore
+    not a standard F# type; it is actually a class. Related to the preceding point,
+    the properties of the classes should be as simple as possible, and the class should
+    only contain properties, not properties and methods.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Point 2 is crucial and very important. Fortunately, F# requires us by default
+    to always use type providers with a constructor that has a parameter to be supplied.
+    The parameter itself cannot be `null`; otherwise, the type provider cannot produce
+    a type with metadata successfully and will always yield a breaking exception and
+    undesirable results.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Point 3 of schema mapping defines how we implement the resulting type provided
+    by a type provider. This is also defined as a general strategy for implementing
+    type providers.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Strategies of type provider implementation
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'The type provider implementation strategies fall into the following two conceptual
+    strategies:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**Generative type providers**: The generated type provided is also available
+    at runtime; therefore, the type metadata information of the type provided is always
+    available at runtime. The assembly can be referenced by other assemblies because
+    the type information metadata is kept. The reference is also fully compatible
+    with other managed programming languages as well because the type metadata of
+    the provided type is fully resolved and the assembly itself is fully available
+    to use on top of the normal .NET CLR-compliant.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Erased type providers**: The generated type provided metadata is erased at
+    runtime. This means the type provided metadata information is not available at
+    runtime. The consequence of erased type provider is quite obvious: all generated
+    types will always be typed as an object type at runtime. This is useful when generating
+    type providers for semi-unstructured data and when the focus of resulting type
+    provided metadata is less than the resulting data. This erased type strategy is
+    also a recommended strategy to implement type providers for types that focus on
+    the object''s behaviors (the methods and the inherited methods) instead of the
+    object''s properties. Focusing on the object''s behaviors means that we only care
+    about what the object can do, instead of its properties and attributes.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: These two strategies are also defined as how you implement a type provider because
+    it must be chosen at first, as it will affect the returning type.
+  prefs: []
+  type: TYPE_NORMAL
+- en: All of the returning provided types result as assemblies. Erased type and generative
+    type provider requires more work in the sense of implementations because they
+    require more careful planning on how the generated type is returned.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The next section will give us a deeper overview of choosing strategies.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Choosing strategies of type provider implementation
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: Before we dive deeper and start planning the implementation of type providers,
+    we should choose one of the two strategies. There is no strategy that has a combination
+    of both of them because this will again define the resulting provided type.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The high-level overview of the reason for choosing between erased and generative
+    type provider is already provided by Microsoft in this MSDN Library:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[https://docs.microsoft.com/en-us/dotnet/articles/fsharp/tutorials/type-providers/creating-a-type-provider](https://docs.microsoft.com/en-us/dotnet/articles/fsharp/tutorials/type-providers/creating-a-type-provider)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'But unfortunately, the explanation on the reason for choosing the erased type
+    provider is not quite clear. Check out the following definition:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '*When you are writing a provider for an information space that is so large
+    and interconnected that it isn''t technically feasible to generate real .NET types
+    for the information space.*'
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: This definition may look simple but it is not enough to quickly understand.
+    The term *so large* should be more explained in detail, along with *interconnected*.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Why? The definition might have ambiguous meanings/semantics. These are the
+    ambiguous semantics:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: In what sense is the data *so large*? The volume or the number of data?
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: What is the meaning of interconnected? Is it connected by the data itself or
+    does the data come from multiple sources?
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The term large data and interconnected will be explained as part of the detailed
+    reasons why we decide to use erased type provider.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Erased type provider is best for the following cases:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: You don't care much about the format and the structure of the data returned.
+    This also applies for unstructured data. Some common cases are if the metadata
+    does not matter much and also if the data itself is unstructured. For example,
+    having a type provider for Twitter feeds as it's mostly unstructured.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'The volume of data is too large: you don''t care about the type and the format
+    of structure of the data because the volume of data to be mapped is so large,
+    and it is not quite feasible or even efficient to try generating strong and strict
+    type provided as the result. For example, the returning semi-structured data from
+    World Bank or NASA Hubble images with metadata. This is a very huge dataset, and
+    the volume for each data item for each row itself is already very large. From
+    the perspective of NASA Hubble images, one image can have a size ranging from
+    100 MB to more than 500 MB, and one stream of data can be hundreds of images.
+    In this case, it is also related to point 1 because most images are unstructured;
+    therefore, it fits in point 1 and this point 2\. This is also the same semantic
+    in the term *so large*; it is so large in terms of the volume of data, *not in
+    the number of data*.'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: You don't care about the format of the data because the format of the data itself
+    often changes. This is common when getting data from querying social media. For
+    example, querying data from Facebook using the Facebook API is quite challenging
+    because Facebook keeps changing its API specifications almost once every year.
+    Choosing a generative type provider is not fit for this because generative type
+    provider implicitly requires us to have a tight coupling in the types and hence
+    the assembly generated.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: The data that you query contains heavy relations that links to themselves not
+    just with normal JOIN clauses or SQL EQUI JOIN clauses but may also contain a
+    recursive relation to itself. This scenario is common when we are defining a structure
+    inside an unstructured data by examining the content of the data and extracting
+    some part of it. For example, a tweet from a stream of Twitter may contain hashtags
+    that might be linked, and the link might be loosely linked or it can be categorized
+    into a higher category. This is the same as *interconnected* as defined in the
+    MSDN documentation in the type provider tutorial.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Note
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: When we define large datasets, we can argue about the size. But even in today's
+    age of ubiquitous cheap large storage and high speed Internet (broadband), having
+    to analyze data larger than 100 MB for each row is still very large and takes
+    a lot of time to process even just to read it. This is crucial because the speed
+    of storage can't keep up with the memory and CPU speed as the size of data to
+    be read takes long time to process before it is put into memory. Also, type providers
+    usually work best to handle data to be represented in the code and this will increase
+    CPU time or I/O overheads because of the activities of querying large data and
+    subsequently processing it into types with properties mapped from the data source.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'For more definition on SQL EQUI JOIN clauses (including various SQL `LEFT`/`RIGHT
+    JOIN`), visit MSDN Library at:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[https://msdn.microsoft.com/en-us/library/ms177634.aspx](https://msdn.microsoft.com/en-us/library/ms177634.aspx)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Grasping the basic concept of type provider is quite hard because you have to
+    understand the internal works on how the type is provided and also how the type
+    is constructed. It is easier to understand the concept by simultaneously looking
+    at the documentation and also trying the samples of type providers.
+  prefs: []
+  type: TYPE_NORMAL
+- en: It is also strongly recommended for all of us that in order to use the samples
+    of type providers, we should use the built-in type provider in F#, `FSharp.Data.TypeProvider`.
+    This is also very useful because this built-in type provider is supported by Microsoft.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The disadvantages of erased type provider are as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The returning type provider may be resolved as an object. This is intentional
+    because of the erased nature of type provided.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The assembly generated from an erased type provider is available in the F# project
+    environment. This means that you cannot reference the erased type provider to
+    other non-F# projects such as C#/VB projects, unless you combine the property
+    of the erased type to have generative properties using normal CLR objects instead
+    of F# record type.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: A combination of erased and generative type providers is quite common in order
+    to have an implementation of mixing the best advantages of both the strategies.
+    We shall see that this is relevant in the next section of implementing our own
+    custom type provider, later in this chapter.
+  prefs: []
+  type: TYPE_NORMAL
+- en: A good sample of F# erased type provider implementation is the `FSharp.Extras`
+    library provided by Forkmann.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The latest version of the library does not have the original type provider
+    version included, but it is still there in the GitHub repo under the branch name
+    of `VS2012`. This `VS2012` branch''s library has type provider supports for the
+    following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Regex (the regex model is using .NET BCL regex)
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: XML
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Excel
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Registry
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: JSON
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: We have grasped the reasoning behind erased type providers; let's visit the
+    reasoning behind generative type providers.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Generative type providers are more powerful and this greater power comes with
+    its own expenses: it requires more works to construct and it''s also stricter
+    than the erased type provider.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Now let's see the existing type provider (built-in) that F# has.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Sample usage of built-in type provider in F#
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Let's try the existing F# type provider and put it in action.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following is the list of existing F# type provider supports in F# 4.0 `FSharp.Data.TypeProviders`
+    (with the type that serves) :'
+  prefs: []
+  type: TYPE_NORMAL
+- en: SQL Server database (`SqlDataConnection`)
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Entity Framework (`SqlEntityConnection`)
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: OData (`ODataService`)
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: WSDL service (`WsdlService`)
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: EDMX or the Entity Data Model design file (`EdmxFile`)
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Of all the built-in type provider supports, the easiest one to use is the SQL
+    Server database support, using `SqlDataConnection`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Quick sample of using SqlDataConnection type provider
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: We are now going to use F# SQL Server database type provider using `SqlDataConnection`
+    by referencing F# type provider's DLL assembly, `FSharp.Data.TypeProviders`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: The name of the SQL Server type provider is mentioned as SQL database provider,
+    and this is misleading. This type provider can only be used for SQL Server database
+    and not for other SQL-compliant databases such as Oracle, IBM DB2\. Throughout
+    the rest of this book, existing F# type providers for SQL will always be mentioned
+    as SQL Server database type providers for the sake of clarity.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following are the requirements before using `FSharp.Data.TypeProviders.SqlDataConnection`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Ensure that we have SQL Server 2008 R2 (or later) installed. We need this because
+    we are going to access SQL Server database data. It is recommended to install
+    the instance on your machine.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Ensure that .NET 4.6 is installed correctly. This is important because the `FSharp.Data.TypeProviders`
+    assembly in F# 4.0 depends on .NET 4.5 and above.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Do not modify the F# target compiler without checking the .NET Framework target
+    version. F# 4.0 in Visual Studio 2015 is recommended to work with .NET 4.6, not
+    .NET 4.5.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Point 3 is quite subtle but it is extremely important: `FSharp.Data.TypeProviders`,
+    F# tooling, F# compiler infrastructure, .NET Framework version in Visual Studio
+    2015 have a tight coupling. For example, `FSharp.Data.TypeProviders` has support
+    for .NET 4.5 or later, but all of the F# projects in Visual Studio 2015 by default
+    have a target for .NET 4.6 and so does the compiler of F# 4.0.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Although `FSharp.Data.TypeProviders` can be used in F# 3.0 projects in Visual
+    Studio 2013, backporting `FSharp.Data.TypeProviders` in Visual Studio 2015 for
+    use in Visual Studio 2013 might yield compatibility issues when compiling.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The F# 4.0 compiler itself might yield different warnings compared to F# 3.0
+    compiler. Using 4.0 version is highly recommended because it has bug fixes, especially
+    bug fixes on very long time outstanding since version 2.0.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Consult the F# 4.0 release notes at GitHub at [https://github.com/Microsoft/visualfsharp/blob/master/CHANGELOG.md](https://github.com/Microsoft/visualfsharp/blob/master/CHANGELOG.md).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'To quickly get started, we need a sample database to be deployed on SQL Server.
+    We can use the popular Northwind sample database that was originally created for
+    SQL Server 2000\. Download the SQL Server 2000 sample database installer from
+    this official Microsoft''s download link:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[https://www.microsoft.com/en-us/download/details.aspx?id=23654](https://www.microsoft.com/en-us/download/details.aspx?id=23654)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Install the installer. Then, go to the installation path of the installer and
+    open the file, `instnwnd.sql` in the SQL Server Management Studio and execute
+    it by running the script.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'If the execution of database creation succeeds, then the Northwind database
+    will be available on the left of Management Studio''s **Object Explorer**, as
+    shown in the following screenshot:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Quick sample of using SqlDataConnection type provider](img/image00311.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'These are the steps required in Visual Studio:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Create a new F# class library project or console project. Do not create another
+    type of F# project such as Silverlight or even Android, because it is not compatible
+    with F# type provider target of .NET Framework 4.6.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Add references to `System.Data`, `System.Data.Linq`, and `System.Linq`. The
+    physical DLL assembly filename for `System.Linq` is `System.Core.dll`, and the
+    `System.Data` object's filename is `System.Data.dll`. `System.Data.Linq` is available
+    in `System.Data.Linq.dll`.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Add references to `FSharp.Data.TypeProviders`. If you want to focus on F# interactive
+    (scripting), then register the DLL manually using the `#r` directive.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Ensure that for built-in `System.Data`, `System`, and `Linq`, `System.Data.Linq`
+    is properly referenced (as `System.Data.dll` and `System.Core.dll`).
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'To ensure correct references, adding the references of `System.Core`, `System.Data`,
+    `System.Data.Linq` is available in the **Framework** section under **Assemblies**:'
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: '![Quick sample of using SqlDataConnection type provider](img/image00312.jpeg)'
+  prefs:
+  - PREF_IND
+  type: TYPE_IMG
+- en: 'And adding reference to  `FSharp.Data.TypeProviders` is available in the **Extensions**
+    section under **Assemblies**:'
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: '![Quick sample of using SqlDataConnection type provider](img/image00313.jpeg)'
+  prefs:
+  - PREF_IND
+  type: TYPE_IMG
+- en: This is necessary because the F# built-in type provider assembly is not a part
+    of .NET Framework 4.6 runtime distribution.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Create a new F# source code file and name it `SampleFSharpData`. By default,
+    F# will treat this as a new file, which has a module declaration with the same
+    name.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Type the following code after the module declaration:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE0]'
+  prefs: []
+  type: TYPE_PRE
+- en: After the type declaration of `NorthwindSchema`, ensure that you have specified
+    the connection string for the `SqlDataConnection`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: This `SqlDataConnection` is not related to `SqlConnection`, which is a part
+    of ADO.NET's `System.Data.SqlClient` namespace. `SqlDataConnection` is a part
+    of F# built-in type provider.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In order to quickly see the type provider in action, build or rebuild the project.
+    Type this on the new line:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE1]'
+  prefs: []
+  type: TYPE_PRE
+- en: At the time of typing *dot* after `nwdb`, Visual Studio will display the properties
+    and methods of `nwdb`. The properties are actually the names of tables of the
+    connected database, the Northwind.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'This is the display of Visual Studio Intellisense, displaying the properties:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Quick sample of using SqlDataConnection type provider](img/image00314.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'Now, let''s continue to harness the SQL Server type provider by querying customer
+    data. Change the code into this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE2]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Let''s call the `displayAllCustomerName` function. On the main `EntryPoint`,
+    modify `EntryPoint` with the following code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE3]'
+  prefs: []
+  type: TYPE_PRE
+- en: In the code of `customerNameData`, it contains an evaluation result of a LINQ
+    query computation expression.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'This LINQ query computation is essentially the same computation implementation
+    of LINQ in F#. This query computation began with the release of F# 3.0 in Visual
+    Studio 2012\. For more information about F# LINQ query computation, consult the
+    following link:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[https://docs.microsoft.com/en-us/dotnet/articles/fsharp/language-reference/query-expressions](https://docs.microsoft.com/en-us/dotnet/articles/fsharp/language-reference/query-expressions)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let''s rebuild the project to ensure that re-references are correct and the
+    dependencies are checked again. Run the code without debugging, and we will have
+    a display of all the customer names:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Quick sample of using SqlDataConnection type provider](img/image00315.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'We can also do additional queries such as adding the `WHERE` and `ORDER BY`
+    clauses by translating them into LINQ in F#. For example:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE4]'
+  prefs: []
+  type: TYPE_PRE
+- en: The `WHERE` clause is implemented as `where` and `ORDER BY` is implemented as
+    `sortBy`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Now let's use our little sample in another project with a different language,
+    such as C#. This sample is also very simple but it is quite powerful because we
+    will use our library that uses F# type providers with C#, although we cannot see
+    the Intellisense provided by F# Type Provider compilation addition directly.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We need to perform the following steps before we use the F# sample type provider''s
+    code with C#:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Create a C# console project.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Add a reference of the previous F# class library project that we created with
+    the `SampleFSharpData` module.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Add a reference of `System.Data.Linq` assembly.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Rebuild the project. This is important as you need to ensure that the added
+    reference works well.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'In the `main` method of `Program.cs`, add the calls to the `displayCustomerNameStartsWith`
+    method. The `main` method should be coded as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE5]'
+  prefs: []
+  type: TYPE_PRE
+- en: Run it, and we will have the same result as the previous F# project.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'To check the inferred property of `NorthwindSchema` instances of `nwdb`, we
+    can use the following code to test:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE6]'
+  prefs: []
+  type: TYPE_PRE
+- en: Now, we can see and prove that the F# type provider usages can be used in other
+    managed programming languages as well, although it cannot be used directly. This
+    interoperability sample is also a proof of point 5 of advantages of F# type provider.
+  prefs: []
+  type: TYPE_NORMAL
+- en: It is also important to understand the implementation of `SqlDataConnection`
+    because `SqlDataConnection` is a sample of a generative type provider because
+    the generated type can be used with the full metadata information available (properties
+    and methods).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'For more information about using `FSharp.Data.TypeProviders.SqlDataConnection`,
+    visit this MSDN Library:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[https://msdn.microsoft.com/en-us/visualfsharpdocs/conceptual/sqldataconnection-type-provider-%5bfsharp%5d](https://msdn.microsoft.com/en-us/visualfsharpdocs/conceptual/sqldataconnection-type-provider-%5bfsharp%5d)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`SqlDataConnection` itself is open source and is available with the other `FSharp.Data.TypeProviders`
+    features. The GitHub repository of `FSharp.Data.TypeProviders` is available at
+    [https://github.com/fsprojects/FSharp.Data.TypeProviders](https://github.com/fsprojects/FSharp.Data.TypeProviders).'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Now let's go deeper into type providers by implementing our own type provider
+    in various scenarios in the next section.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Implementing your own type provider
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: We already have enough knowledge on what a type provider is, the building blocks,
+    and the nature of type providers, also understanding the nature of type provider
+    implementations, including the implementation strategies, as we went deeper.
+  prefs: []
+  type: TYPE_NORMAL
+- en: To ease the experience and our type provider building mindset, a real experience
+    of quickly using it from existing samples has proven to be very useful. We have
+    increased our intuition on how type provider works using samples from F# 4.0 built-in
+    type provider features, `FSharp.Data.TypeProvider`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Implementing your own type provider again is quite a bit tedious, especially
+    when we are dealing with generative type providers as our choice of strategy.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following are the common steps of implementing your own type provider:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Declare your type provider. The type provider must be `public`.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Mark your type provider's type with `TypeProviderAttribute`. You can simply
+    use the abbreviated `TypeProvider`. This attribute is available in `Microsoft.FSharp.Core.CompilerServices`.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Implement the `ITypeProvider` interface. This interface is available in the
+    `Microsoft.FSharp.Core.CompilerServices` namespace.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Implement the `IProvidedNamespace` interface. This interface is available in
+    the `Microsoft.FSharp.Core.CompilerServices` namespace.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Implement your own code to handle a static parameter for the type provider.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Implement your own code to provide types, constructors, methods, properties,
+    and fields, based on the static parameter used.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: The `TypeProviderAttribute` provides hints for F# compiler to look for the necessary
+    class that is intended as a type provider.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The `ITypeProvider` interface is essential and important because it provides
+    the F# compiler the main entry point of the type provider implementation after
+    having a hint of a type provider marked by `TypeProviderAttribute`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Here are the `ITypeProvider` members and the added description (for clarification):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '| **Abstract method** | **Quick remark** |'
+  prefs: []
+  type: TYPE_TB
+- en: '| `ApplyStaticArguments` | Apply static parameters of this type provider to
+    a provided type that accepts static arguments. |'
+  prefs: []
+  type: TYPE_TB
+- en: '| `Invalidate` | An event that is triggered when a type resolution semantic
+    changes as part of initial type resolution of the provided type. It has the `IEvent`
+    type. |'
+  prefs: []
+  type: TYPE_TB
+- en: '| `add_invalidate` | Add an event handler of `Invalidate`. It has the same
+    semantic as the `+=` syntax of C# event handler addition. |'
+  prefs: []
+  type: TYPE_TB
+- en: '| `remove_invalidate` | Remove an event handler of `Invalidate`. It has the
+    same semantic as `-=` |'
+  prefs: []
+  type: TYPE_TB
+- en: '| `GetInvokerExpression` | Called by the compiler to ask for an expression
+    tree to replace the given `System.Reflection.MethodBase` with. This is also important
+    as `GetInvokerExpression` will be used as our entry point to provide reflection
+    information of the methods that we are going to generate as part of the type that
+    will be provided. |'
+  prefs: []
+  type: TYPE_TB
+- en: '| `GetGeneratedAssemblyContents` | Get the physical contents of the given logical
+    assembly. |'
+  prefs: []
+  type: TYPE_TB
+- en: '| `GetNamespaces` | Return the namespace name that this type provider injects
+    types into. This will be the namespace for all types provided. This is why it
+    returns an array of `IProvidedNamespace`. |'
+  prefs: []
+  type: TYPE_TB
+- en: '| `GetStaticParameters` | Get all static parameters for this type provider.
+    |'
+  prefs: []
+  type: TYPE_TB
+- en: 'To understand what the context of static parameters in type provider is, let''s
+    go back to the sample of using `SqlDataConnection`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE7]'
+  prefs: []
+  type: TYPE_PRE
+- en: The string parameter in the `< >` brackets is the static parameter of the `SqlDataConnection`
+    type provider. It is required in the case of `SqlDataConnection` because we need
+    to apply the database connection string immediately when we are instantiating
+    the `SqlDataConnection` type provider.
+  prefs: []
+  type: TYPE_NORMAL
+- en: An invalidate event will be used by F# to trigger type resolution validation,
+    and we can add many event handlers as needed.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: '*Warning*: *It is highly recommended to add only F# event handlers within the
+    F# syntax and semantics instead of C#/VB event handlers*.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: This is crucial because F# event handlers support implicit currying by default.
+    Otherwise, undesirable results will occur, including unexpected memory leaks!
+  prefs: []
+  type: TYPE_NORMAL
+- en: The implementation of code to provide types, constructors, methods, properties,
+    and fields is tedious, not just implementing all members of `ITypeProvider` and
+    `IProvidedNamespace`. We have to dive deeper into the inner workings of API in
+    the .NET namespaces of `System.Reflection` and `System.Reflection.Emit`. This
+    is crucial and important because types, constructors, methods, properties, and
+    fields are all related to the reflection.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Fortunately, Microsoft and F# Foundation have provided a starter pack library
+    to ease the creation of type providers from the start. The name of the NuGet package
+    library is `FSharp.TypeProviders.StarterPack`, and we can simply use this library
+    by adding it from NuGet.
+  prefs: []
+  type: TYPE_NORMAL
+- en: To ensure the validity of the starter pack, use the [http://www.nuget.org](http://www.nuget.org)
+    feed because this is the official NuGet repository that contains the commonly
+    used .NET NuGet packages.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'To use this NuGet, add this NuGet package on your project and accept the license
+    agreement. If you have installed it successfully, Visual Studio will display the
+    NuGet package under the **Installed** tab, as shown in the following screenshot:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Implementing your own type provider](img/image00316.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Now, let's dig deeper into building a type itself by looking at the internal
+    working of this starter pack.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Building the type's building blocks
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: A type or a class in C#/VB is basically a blueprint of any object instance.
+    It contains definitions of methods, properties, constructors, and other metadata
+    of a class, such as the attributes applied on the type and its properties, methods,
+    and constructors.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The .NET BCL provides us reflection API in the `System.Reflection` and `System.Reflection.Emit`
+    namespaces. We can create the type's building blocks by lining up the calls to
+    reflection APIs, but these calls to reflection API must have enough knowledge
+    not just of ordinary methods/properties but also of the F# delegate, `FSharpFunc`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Although the semantics are similar because of implementation in invoking the
+    `Delegate` class of .NET BCL, the actual class used is different. Usually, to
+    maintain high interoperability with other managed languages, we should use .NET's
+    `Func` and `Action` instead of `FSharpFunc`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: As a common rule of thumb, *it is highly recommended to use Func and Action
+    instead of F# FSharpFunc to provide a high degree of compatibility for the user
+    of the type provider*. Having a high compatibility bar is important; otherwise,
+    the type provider used will always need conversions from `FSharpFunc` to ordinary
+    `Func` and `Action`, and this conversion will add overhead in using the resulting
+    type provided.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'By looking and examining the type provider starter pack, we see that it has
+    organized the code into the following three files:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`ProvidedTypes.fsi`: This file contains the type and function declarations'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`ProvidedTypes.fs`: This file contains code implementations'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`DebugProvidedTypes.fs`: This file contains helpers to simulate the running
+    and debugging of type providers'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: We can further ease the development of our custom type provider by adding support
+    for cross-targeting erased type provider or broader .NET **Portable Class Library**
+    (**PCL**), while at the same time we focus on having a single entry of Factory
+    method (based on Factory design pattern) of `ProvidedTypesContext.Create()`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'To add support for this cross-targeting erased type provider, we add these
+    three files from the GitHub repo:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`AssemblyReader.fs`: This file acts as a façade for reading .NET assemblies,
+    including .NET PCL assemblies'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`AssemblyReaderReflection.fs`: This file act as a library of helper functions
+    to deal with assembly reflection'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`ProvidedTypesContext.fs`: This file contains the entry of Factory method of
+    the type provider, including the starting point of the `ProvidedTypesContext.Create()`
+    method'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: After adding the preceding prerequisite files, ensure that `Program.fs` is ordered
+    at the last file in the project.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'This neat library provides the basic blocks: type provider base class, reflection
+    metadata type helpers, and helpers to interact with type provider strategy. This
+    library of classes of functions is also used as the infrastructure of how we generate
+    type metadata because we need to prepare the necessary metadata generation infrastructure
+    before we can implement a type generator. This infrastructure planning is crucial
+    because a type is constructed with building blocks of assembly, parameters, methods,
+    constructors, and properties.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: At the time of writing this book, there were subtle but critical differences
+    on the files of `FSharp.TypeProviders.StarterPack` distribution in the NuGet package
+    and the current GitHub repo. If we only follow the NuGet package files, the current
+    NuGet library requires us to manually wire the assembly reflection. The sample
+    source code that complements this chapter is already correct to include the NuGet
+    and the latest release on GitHub. It is strongly recommended to always use the
+    prerequisite files from the source code, compared to using the files from the
+    NuGet distribution.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Building type metadata infrastructure
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: Let's look at the type and function declarations first by focusing on the type
+    provider base class. It is quite efficient because it has the implementations
+    of `ITypeProvider` and `IProviderNamespace` for us to use.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The class name is `TypeProviderForNamespaces`. The type has checking for custom
+    attributes as compiler directive. This is a must have because a type might have
+    a custom attribute that may interfere with the F# compiler when it tries to process
+    the type provider's type resolution.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let''s see the signature definition file (FSI) of `TypeProviderForNamespaces`
+    (I have omitted the `FX_NO_LOCAL_FILESYSTEM` compiler constant check):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE8]'
+  prefs: []
+  type: TYPE_PRE
+- en: Let's take a look inside the `TypeProviderForNamespaces.fs` file implementation
+    (based on the signature defined in the preceding FSI signature).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We now visit the constructor implementation. The constructor signature is marked
+    in the FSI by the notion of these `new` functions:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE9]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'These constructor definitions are implemented as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE10]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The rest of the implementation code is strictly based on the signature convention.
+    For example, the implementation of `Invalidate` is matched with the following
+    signature:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE11]'
+  prefs: []
+  type: TYPE_PRE
+- en: '`The Invalidate` is compliant with the signature of `unit -> unit`.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Now, let's discuss the details of the implementation of the `ITypeProvider`
+    interface in `TypeProviderForNamespaces`. The F# language specification requires
+    us to declare an interface implementation explicitly, and the implementation of
+    interfaces used must be correctly indented.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following code denotes an implementation of the `ITypeProvider` interface:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE12]'
+  prefs: []
+  type: TYPE_PRE
+- en: The interesting part of the implementation of the `ITypeProvider` interface
+    is the implementation of the `GetInvokerExpression` method. This method is implemented
+    to traverse recursively (with a mutual recursive mechanism) to get the expression
+    (as an expression tree of Abstract Syntax Tree) from the method that invoke it.
+    Although the recursive is not required, using recursive in the implementation
+    of this method is better.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following code is an implementation of `GetInvokerExpression`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE13]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The mutual recursive implementation of `GetInvokerExpression` is split into
+    the following two parts:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The first part is for the recognition of the wrapped objects, such as `ProvidedMethod`
+    and `ProvidedConstructor.`
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The second part is for translating the expression from the first part into an
+    actual invocation of the method or constructor.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: For the first part, recursive is needed because the `methodBase` parameter at
+    first is typed as `ProvidedMethod` or `ProvidedContructor`, then it will invoke
+    the underlying method or constructor with the parameters passed by `parameters`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: This is important, and it is efficient because we do not have to loop through
+    all the types of method implementation iteratively, and this recursive implementation
+    means that it will give the desired method invoker information with the detailed
+    granularity (either constructor, method, or lambda) as needed, without adding
+    a break in the imperative `while` or `for` loop.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Then, let's look at the reflection metadata helper class's signature of the
+    provided assembly, parameter, static parameter, constructor, and property in `ProvidedTypes.fsi`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Implementing assembly to provide base assembly
+  prefs:
+  - PREF_H4
+  type: TYPE_NORMAL
+- en: 'First, we need to define the assembly. This is crucial as it is the first point
+    we have to pay to attention because all of our types generated by type providers
+    must have an assembly as the providers'' host. The declaration signature to handle
+    assembly generation is implemented in `ProvidedAssembly`. The following is the
+    signature of `ProvidedAssembly`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE14]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The implementation of `ProvidedAssembly` is as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE15]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'For more information on what is a .NET assembly, visit:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[https://docs.microsoft.com/en-us/dotnet/articles/standard/assembly-format](https://docs.microsoft.com/en-us/dotnet/articles/standard/assembly-format)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Implementing parameters for methods and constructors
+  prefs:
+  - PREF_H4
+  type: TYPE_NORMAL
+- en: 'The next step after handling the assembly is to examine the implementation
+    of `ProvidedParameter` (some comments removed):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE16]'
+  prefs: []
+  type: TYPE_PRE
+- en: We discussed the parameter first because the parameter resolution has to be
+    defined carefully, since the parameter is a part of the method and constructor.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Implementing generated constructor
+  prefs:
+  - PREF_H4
+  type: TYPE_NORMAL
+- en: To have constructor support for our type provider, we must handle the construction
+    of the reflection type of `ConstructorInfo`. This handling is done by `ProvidedConstructor`,
+    which is a wrapper for `ConstructorInfo` and also extends `ConstructorInfo`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The following code is the implementation of `ProvidedConstructor:`
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE17]'
+  prefs: []
+  type: TYPE_PRE
+- en: Implementing generated methods
+  prefs:
+  - PREF_H4
+  type: TYPE_NORMAL
+- en: 'Now, we can use the same constructor handling technique to implement the handling
+    of a method implemented as `ProvidedMethod`. The following code is the signature
+    of `ProvidedMethod` implementation:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE18]'
+  prefs: []
+  type: TYPE_PRE
+- en: Implementing generated properties
+  prefs:
+  - PREF_H4
+  type: TYPE_NORMAL
+- en: One of the natures of a type/class is the availability of properties (or attributes
+    in the realm of OOP). Therefore, we need to handle the generation of properties
+    as well, and the handling of properties is implemented in the `ProvidedProperty`
+    class. This class extends `PropertyInfo`, and it also has additional functionalities
+    that are quite similar to `ProvidedMethod`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following code is the implementation of `ProvidedProperty`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE19]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'In the implementation of `ProvidedProperty`, we must handle all the characteristic
+    traits and semantics of a property:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Property setter.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Property getter.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Definition location of the property: This is very important, because the definition
+    location of the property has the information of the type the property belongs
+    to.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'The visibility of a property and its setter and getter methods are handled
+    further in the following override methods of `ProvidedProperty` in the `ProvidedTypes.fs`
+    file:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE20]'
+  prefs: []
+  type: TYPE_PRE
+- en: The methods, `hasGetter()` and `hasSetter()`, actually act as mini helper functions.
+    These functions are implemented to check for the availability of the getter and
+    setter in the property.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Again, the `ProvidedTypes.fsi` signature file is important, because it will
+    give more meaningful information later when we are designing class libraries for
+    others to use.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'For more information about this FSI''s signature file, visit:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[https://docs.microsoft.com/en-us/dotnet/articles/fsharp/language-reference/signatures](https://docs.microsoft.com/en-us/dotnet/articles/fsharp/language-reference/signatures)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: We shall describe the significance of F# FSI more in [Chapter 7](fsp-hiperf_cu07.html#aid-1ENBI1
+    "Chapter 7. Language Features and Constructs Optimization"), *Language Features
+    and Constructs Optimization*.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Now, let's look at the implementation of the method provider, `ProvidedMethod`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Basically, the `ProvidedMethod` class extends the `MethodInfo` class. Therefore,
+    all of the operations and properties of `MethodInfo` are also available in `ProviderMethod`.
+    The additional functionalities of `ProviderMethod` are implemented with the following
+    design considerations:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Handling of XML comment documentation of the method: This is implemented in
+    the `AddXmlDoc`, `AddXmlDocDelayed`, and `AddXmlDocComputed` methods.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Handling of special method attribute, the `ObsoleteAttribute`: This is not
+    just a very useful feature, but it is also a necessary feature to warn the consumer
+    of the method that the method should not be used anymore. This obsolete method
+    handling is implemented in `AddObsoleteAttribute`.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Handling the detection of `static` modifier on the method declaration: This
+    is quite important, because the generation of a static method is different from
+    a normal method and the handling should be explicit. The static detection is implemented
+    in `IsStaticMethod`.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: If we look back at the implementation of `ProvidedProperty` and `ProvidedConstructor`,
+    the previous design considerations are also applied to `ProvidedProperty` and
+    `ProvidedConstructor`, including the handling of the static modifier of a constructor,
+    although F# does not support static constructors as part of F# language constructs
+    specification directly.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`ObsoleteAttribute` can also be tuned further to enforce compile errors when
+    the method is used. This attribute is useful and also strongly recommended to
+    mark a feature that should not be used anymore, especially if the method has bugs.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: For more information on the detailed usage of `ObsoleteAttribute`, visit MSDN
+    Library at [https://msdn.microsoft.com/en-us/library/system.obsoleteattribute(v=vs.110).aspx](https://msdn.microsoft.com/en-us/library/system.obsoleteattribute(v=vs.110).aspx).
+  prefs: []
+  type: TYPE_NORMAL
+- en: We are not going to dig deeper into the full implementation of this `ProviderMethod`
+    type. We can add optimization to some methods. For example, we can optimize the
+    `GetInvokeCodeInternal` method, a part of `ProviderMethod` methods operations.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following is the original implementation of `GetInvokeCodeInternal`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE21]'
+  prefs: []
+  type: TYPE_PRE
+- en: We can further optimize the preceding code of `GetInvokeCodeInternal` to use
+    PLINQ instead of non-parallel mapping of F#'s `List.map`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'To use PLINQ in our code, we must add a reference to `System.Linq` to tell
+    the F# compiler to recognize classes within `System.Linq` namespace. We can insert
+    the import of `System.Linq` namespace in the beginning of the open namespace declaration,
+    so the namespace declarations in `ProvidedTypes.fs` file become like the following
+    code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE22]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'We can now use parallel support in PLINQ at our disposal. To optimize the mapping
+    using PLINQ, change the method body code of `GetInvokeCodeInternal` to the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE23]'
+  prefs: []
+  type: TYPE_PRE
+- en: We have optimized the method provider to use PLINQ, to make the mapping of parameter
+    to parameter name run faster because we do not care for the order of the parameter
+    names. The call of `AsParallel` is actually an extension method. This extension
+    method belongs to the `ParallelQuery` class.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The conversion of parameters (as F# list) into a sequence will add a small overhead
+    but this overhead is highly compensated when we change the original map of `List.map`
+    to use the PLINQ `Select` query because the `Select` method has the same semantic
+    as the map in `List` and now the mapping is executed in parallel.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'For more information about the `ParallelQuery` class, visit: [https://msdn.microsoft.com/en-us/library/system.linq.parallelquery(v=vs.110).aspx](https://msdn.microsoft.com/en-us/library/system.linq.parallelquery(v=vs.110).aspx).'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'For the generic parameterized version of `ParallelQuery`, visit:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[https://msdn.microsoft.com/en-us/library/dd383736(v=vs.110).aspx](https://msdn.microsoft.com/en-us/library/dd383736(v=vs.110).aspx)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Although the generic type is not specified, the `ParallelQuery` class we used
+    when calling the preceding `AsParallel` is inferred as calling a generic version
+    of `ParallelQuery.AsParallel`. The type inference plays heavy lifting of the necessary
+    flow of type information here.
+  prefs: []
+  type: TYPE_NORMAL
+- en: It is highly recommended to always start from having the implementation of infrastructure
+    of the type provider first, starting from preparing the assembly, parameters,
+    methods, constructors, and properties, including other CLR type metadata information,
+    such as adding supports for attributes and debug symbols.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The heavy lifting for reflection should be done carefully. In the next section,
+    we can start implementing the basic custom type provider with minimum metadata
+    supports.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Basic minimal implementation of type provider
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: Now, let's create a very simple type provider after we have done implementing
+    all the necessary infrastructure of type metadata supports.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The easiest one is to create an erased type provider as a fundamental sample.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let''s create this sample named `BasicProvider`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE24]'
+  prefs: []
+  type: TYPE_PRE
+- en: Let's dive deeper into `BasicProvider`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following are the traits and reflection metadata of `BasicProvider`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`BasicProvider` type declaration has `TypeProviderAttribute` mark, as identified
+    by using the abbreviated name of just `TypeProvider`.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`BasicProvider` inherits from `TypeProviderNamespaces`. This class is available
+    in the starter pack''s helper of `ProvidedType.fs` file.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The provided type has one property called `MyProperty` typed as `String`, and
+    it has a static modifier. This means that this is a static property. We can also
+    set this property to not static by setting `IsStatic` to `false`.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The attribute's assembly scope declaration of `TypeProviderAssembly` means that
+    this type's assembly is a part of `TypeProviderAssembly` and so is the project.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: All these traits are matched with the requirements of the type provider implementation
+    that we described in the previous section, *Minimum requirements of type providers*.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We have implemented a very simple custom type provider. It is quite simple in
+    the sense that it has a basic support for namespace, assembly, public properties,
+    and public methods.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Common pitfalls in implementing type provider
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: We now have enough knowledge of type provider, not just the concept of using
+    a sample type provider and implementing a custom type provider but also that there
+    might be pitfalls as well. In this section, the common pitfalls in type providers
+    are wrapped as a simplified list with a simple explanation as well.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Common pitfalls in implementing type providers are quite subtle but these are
+    important:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Type provider strategy has to be planned first. The planning must also include
+    the infrastructure to ease the metadata generation, whether it employs erased
+    or generative strategy. *Do not* always assume that we can always provide generative
+    type providers instantly. Failing to provide type resolution with the namespace
+    will yield undesirable results, including erased type metadata.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Reflection should use lazy implementation instead of an eager one. This lazy
+    evaluation should not be combined with asynchronous reflection because cross-thread
+    exception will occur and it can also lead to a deadlock as there is no guarantee
+    that the reflection will return a CLR type that is fully CLS-compliant, from the
+    type to the members (properties and methods).
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The use of any kind of TPL or PLINQ is encouraged when we are processing to
+    give results as properties and members for each type provided, especially if we
+    have to map a type to other types, such as the names of the properties.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The implementation of type provider is not recommended for non CLI-compliant
+    type, such as COM+ related types or types that are generated via `TLBIMP` of .NET
+    SDK. An exception of cross-thread or even invalid object reference might occur,
+    although the type generated may not be null.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '*Do not* use TPL/PLINQ when we are processing delegates. It might yield a memory
+    leak because the delegate resolution is best handled as synchronous. This is quite
+    subtle but important because there is no guarantee that the delegate is either
+    unicast (normal delegate) or multicast.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: We should avoid F# units of measure implementation when a type with unit of
+    measure is used as a type of the properties and parameters of the generated methods.
+    Because in F#, any type that has *unit of measure is always erased at runtime*.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The last point about the use of unit of measurement is quite subtle because
+    many F# developers tend to forget that the F# unit of measurement is an erased
+    generic type.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Summary
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: We have the knowledge of type providers and insights of the internal working,
+    while at the same time optimizing and avoiding the pitfalls of type provider implementations.
+    We now have enough knowledge of the strategy behind choosing the erased and generative
+    type providers at our disposal. It is quite important that we can optimize all
+    of the internal language constructs, and not just know the functional programming
+    style.
+  prefs: []
+  type: TYPE_NORMAL
+- en: This is why we will now visit the optimization of the language syntaxes and
+    semantics in [Chapter 7](fsp-hiperf_cu07.html#aid-1ENBI1 "Chapter 7. Language
+    Features and Constructs Optimization"), *Language Features and Constructs Optimization*.
+  prefs: []
+  type: TYPE_NORMAL

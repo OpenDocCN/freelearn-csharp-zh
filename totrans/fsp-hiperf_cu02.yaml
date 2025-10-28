@@ -1,0 +1,1606 @@
+- en: Chapter 2. Performance Measurement
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Performance measurement is often subject to many debates, but we should approach
+    the ways of solving performance problems as straightforwardly as possible while
+    maintaining objective processes. The results must be as objective as they can.
+    To correctly define that a performance optimization is needed or not, we must
+    be able to measure the running code objectively. To ensure the objectiveness of
+    the performance measurement, the result must be visible as quantitative (in numbers)
+    and qualitative by analyzing how the code behaves when it runs, how fast it runs,
+    and how big the code is in memory.
+  prefs: []
+  type: TYPE_NORMAL
+- en: As a rule of thumb, it is easier to analyze quantitatively as data can be seen
+    and compared more directly than when analyzed qualitatively. Understanding how
+    to measure and how to interpret the measurement result can be used as a foundation
+    for deducing the cause of any performance bottlenecks and can be further used
+    in combination with qualitative analytics, such as deciding the best language
+    construct and choosing the best strategy when dealing with concurrencies.
+  prefs: []
+  type: TYPE_NORMAL
+- en: There are many ways to measure performance quantitatively, and we can use the
+    existing tools in Visual Studio and in the .NET SDK/runtime. Understanding data
+    qualitatively means that we have to understand the nature of the running code
+    of F#, from the way it compiles to the way the result of the compilation works,
+    which we can use to then reason the way the code runs.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: A basic understanding of the .NET SDK tool is recommended (including how to
+    install it with Visual Studio) although this chapter will also describe the tools
+    inside Visual Studio since Visual Studio 2015\. Please ensure that the installation
+    of .NET and Visual Studio is correct to ensure that the journey to measuring performance
+    described in this chapter is a smooth one.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'This chapter will cover the introduction to performance measurement, tooling,
+    and the approaches to quantitative measurement with the following topics:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Introduction to the nature of F# code compilation, including IL assembly generated
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Using CLR Profiler 4.5
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Ways to measure F# code performance using tools, libraries including timers,
+    API in .NET, and Visual Studio's unit test to measure performance
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Collective time data gathering in unit tests
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Introduction to the nature of F# code compilation
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Before we measure .NET, we need to understand the nature of F# code and the
+    nature of compiling the F# code. Of course, we can just analyze and look at the
+    source code. We can also try to search for any patterns of non-performing code
+    of known bottlenecks, which will be explained in [Chapter 3](fsp-hiperf_cu03.html#aid-NQU22
+    "Chapter 3. Optimizing Data Structures"),*Optimizing Data Structures* and [Chapter
+    7](fsp-hiperf_cu07.html#aid-1ENBI1 "Chapter 7. Language Features and Constructs
+    Optimization"), *Language Features and Constructs Optimization*.
+  prefs: []
+  type: TYPE_NORMAL
+- en: General overview of F# compiler processes and results
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: All of the code in F# is compiled into byte codes of the IL assembly (as it's
+    also an assembly language) either by the F# compiler or by using F# in interactive
+    mode (by using FSI). This IL is then run in either **Debug** mode as Just In Time
+    (JIT) code is further optimized by compiling it in **Release** mode. Running it
+    in Release mode will yield compiled code to be optimized for .NET native by the
+    Ahead Of Time (AOT) method.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'For more information about .NET native, here is the official explanation in
+    the MSDN Library:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[https://msdn.microsoft.com/en-us/library/dn584397(v=vs.110).aspx](https://msdn.microsoft.com/en-us/library/dn584397(v=vs.110).aspx)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The IL is guaranteed to work well with other ILs as it has to conform to IL
+    compliance before being enabled to run on top of .NET runtime. Therefore, running
+    codes written in F# on .NET is essentially the same as running C#/VB codes on
+    .NET. Both of them are coded in .NET IL. Therefore, any programming language compiler
+    that runs on top of .NET has to support compiling into (sometimes called generating)
+    .NET IL.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The IL is executed on top of .NET runtime. The .NET runtime itself is one of
+    the implementations of **Common Language Runtime** (**CLR**). This CLR defines
+    the environment to run any IL assembly, and it also provides isolation and virtualization
+    as well. This concept is known as a *managed environment*. Although it's not tightly
+    tied with an underlying operating system (OS), it can provide an interop service
+    with the underlying OS. In .NET runtime, the call to the Windows API is provided
+    as a Platform Invoke or simply called P/Invoke.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'This is the latest official description of .NET CLR on the MSDN Library: [https://msdn.microsoft.com/en-us/library/8bs2ecf4(v=vs.110).aspx](https://msdn.microsoft.com/en-us/library/8bs2ecf4(v=vs.110).aspx).'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The .NET IL (Intermediate Language) is basically a .NET specific assembly that
+    is part of the **Common Language Infrastructure** (**CLI**) implementation standard.
+    The CLI defines rules, foundations, processes, and IL instruction sets (including
+    the byte codes). This CLI serves as an infrastructure for all languages on top
+    of .NET runtime (or other CLR compliants such as Mono). Microsoft had submitted
+    an initial version of the CLI standard in the beginning of 2001, and the first
+    edition of the CLI standard was released on December 2001\. The CLI standard is
+    always revised and synchronized with the release of .NET runtime rather than with
+    the framework version. For example, the latest edition of CLI is now sixth edition
+    and it conforms with .NET 4.0 CLR.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'This is the official source of information about the IL and CLI standards in
+    ECMA:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[http://www.ecma-international.org/publications/standards/Ecma-335.htm](http://www.ecma-international.org/publications/standards/Ecma-335.htm)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The CLI standard is also implemented in Mono, not just in .NET CLR. The .NET
+    CLR itself defines the corresponding related version of the .NET Framework, and
+    as there are different versions of .NET CLR and the .NET Framework, this is often
+    overlooked.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: The releases of .NET Framework versions are not the same as the releases of
+    .NET runtime. For example, .NET Framework 3.5 (often called .NET 3.5) uses the
+    runtime of .NET 2.0 runtime, whereas .NET 4.5 and .NET 4.6 use .NET 4.0 runtime.
+    We should pay attention to this if we really want to understand the underlying
+    foundation of .NET runtime/CLR.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Although most developers don't often care about IL, it may be useful to show
+    you how the code is executed. This takes place at a very low level of the compiled
+    code. It is easier to start from the source code before it's compiled, therefore
+    it is recommended to start with the simple one rather than the code itself at
+    a higher level.
+  prefs: []
+  type: TYPE_NORMAL
+- en: It is also a best practice to always start from high level thinking first and
+    to then go deeper to the lower level, as in IL.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![General overview of F# compiler processes and results](img/image00258.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: From the perspective of F# code, the highest level is the source code. The source
+    code can be quickly checked for correctness by compiling it or by sending it to
+    FSI. This is considered an important step as we can rely on the compiler when
+    performing syntax and grammar checks. The language design of F# is more abstract
+    than the source code, and it is used as our foundation for checking for correctness.
+    This correctness checking is performed by the parser in the compiler. It is more
+    abstract than the source code that has already been compiled successfully.
+  prefs: []
+  type: TYPE_NORMAL
+- en: This is a common practice, and it is also understandable from a language design
+    perspective; we cannot directly analyze it as it is not easy to apply optimization.
+  prefs: []
+  type: TYPE_NORMAL
+- en: From the compiler side, the compiler interprets and compiles the code by steps
+    in phases, from lexing to parsing the resultant compiled code as IL.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In general, F# compiles the code in the following steps:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![General overview of F# compiler processes and results](img/image00259.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'We will only focus on the behavior of the code as related in the phases from
+    **Lexing** to **Type checking** and the result of the IL (related to the **IL
+    Emit** phase). The **Code generation** phase heavily depends on the previous phases,
+    and it will only produce abstract IL code before going to the next phase: the
+    **IL Emit** phase.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: At the time of the current release of F# 4.0, the steps are focused on the phases
+    of the F# 4.0 compiler. The compiler is open source, and although we could dive
+    deep into the work of the compiler itself, a deeper understanding of all the elements
+    of the F# language specifications are beyond the scope of this book. From the
+    perspective of performance optimization, we shall focus only on the code constructs,
+    IL emitted, and instrumentations. We are not going to touch any further on the
+    internal detail of how the F# compiler works.
+  prefs: []
+  type: TYPE_NORMAL
+- en: If you want to know more, the previous steps are part of an open contribution
+    process that is part of F# Foundation's missions because the F# Foundation always
+    encourages open contributions to the F# compiler, language design standards, and
+    other elements related to the F# Foundation architecture. This group is called
+    the F# Core Engineering group.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The homepage of F# Core Engineering is at [https://fsharp.github.io/](https://fsharp.github.io/).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'These compilation steps are described in detail in the F# Foundation''s F#
+    Core Engineering group''s F# compiler guide section on their GitHub page:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[https://fsharp.github.io/2015/09/29/fsharp-compiler-guide.html](https://fsharp.github.io/2015/09/29/fsharp-compiler-guide.html)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: A quick overview of IL in F#
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Let's start with the IL emitted by the F# compiler. Although the declared compatibility
+    is as simple as it sounds, F# has a richer and more unique IL emitted than its
+    C#/VB counterpart, but there are features in C#/VB that, currently, F# has no
+    support for in the language yet. From .NET Core's perspective, the IL of F# and
+    C#/VB are being developed at the same time.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'This table summarizes the overall differences:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '| **Feature** | **F#** | **C#/VB** |'
+  prefs: []
+  type: TYPE_TB
+- en: '| Tailcall recursion (the `.tail` IL) | Yes. By default, F# will optimize simple
+    recursion by translating it into a loop. | No. By default, tailcall recursion
+    is not enabled in the Debug mode. But when enabled, IL emitted is not guaranteed
+    to have tailcall IL. |'
+  prefs: []
+  type: TYPE_TB
+- en: '| Covariance/contravariance | Not available. Support is under review. | Yes.
+    |'
+  prefs: []
+  type: TYPE_TB
+- en: '| Platform Invoke (P/Invoke) | Yes. | Yes. |'
+  prefs: []
+  type: TYPE_TB
+- en: '| COM objects | Partial. Because some COM objects can''t be used as dynamic,
+    they must be declared as `Type.Missing`, especially when writing code that interops
+    with Office COM. This is as expected because F# has no direct support for late
+    bounds. | Yes. Supports COM object as late bound by marking it as dynamic typed.
+    |'
+  prefs: []
+  type: TYPE_TB
+- en: '| No PIA project and compile support | Not available. No definite plan in near
+    future. | Yes. Not compatible with .NET Core by design because No PIA is only
+    available on Windows. |'
+  prefs: []
+  type: TYPE_TB
+- en: '| .NET Core IL (for .NET Core, CoreCLR, and CoreFX) for cross platform support
+    | The .NET Core is not yet released, but the development is keeping up with both
+    languages. | Same state as F#. The overall source code of .NET CoreCLR is mostly
+    written in C#. |'
+  prefs: []
+  type: TYPE_TB
+- en: For more information about the progress of .NET CoreCLR, have a look at the
+    official open source repository of .NET CoreCLR at [https://github.com/dotnet/coreclr](https://github.com/dotnet/coreclr).
+  prefs: []
+  type: TYPE_NORMAL
+- en: Now, let's dive into the IL and the generated byte codes.
+  prefs: []
+  type: TYPE_NORMAL
+- en: IL tooling in .NET
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Visual Studio comes with .NET SDK by default, and we can use the whole tooling
+    available in .NET SDK in conjunction with the IDE experience inside Visual Studio.
+    This includes everything from compiling to checking the IL generated.
+  prefs: []
+  type: TYPE_NORMAL
+- en: To quickly see the IL, we can use the existing tools in .NET that relate to
+    the IL emitter and disassembler, ILASM, and ILDASM.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '.NET itself, in particular .NET SDK, has many tools available for developers
+    to perform development tasks, including ILDASM and ILASM. For more information
+    about .NET tools in Visual Studio 2015, consult this MSDN Library:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[https://msdn.microsoft.com/en-us/library/d9kh6s92(v=vs.110).aspx](https://github.com/dotnet/coreclr)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: These concepts of using ILASM to assemble IL assembly into machine code and
+    ILDASM to disassemble are almost similar in terms of other assembler ecosystems.
+    For example, the ILASM is conceptually equal to the Microsoft Macro Assembler
+    compiler, known as MASM. It compiles Intel's processors (and its compatible) assembly
+    language into byte codes that truly translate into code that the runtime can execute.
+    ILASM takes the IL assembly and compiles it into a Windows PE (Portable Executable)
+    file that can be in the form of EXE or DLL. ILDASM disassembles the byte code
+    into the IL assembly code.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Unfortunately, there is no direct way to generate F# code into IL assembly
+    code. In fact, the F# compiler compiles F# source codes into Window PE executable
+    machine code as its final result. This is also true when compiling C#/VB source
+    codes. We can see and check the generated assembly code by looking at the result
+    of the disassembly first. We shall start with the easiest one: disassembly using
+    ILDASM.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Using ILDASM and ILASM to understand low-level IL assembly
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'To illustrate the simplest sample to disassemble simple code, let''s create
+    an F# console project in Visual Studio 2015 and name the project as `FSConsole01`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Using ILDASM and ILASM to understand low-level IL assembly](img/image00260.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'A file will be opened in the Visual Studio editor, named `Program.fs`, which contains
+    basic entry point of the F# console project. Replace the line 6 with this code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE0]'
+  prefs: []
+  type: TYPE_PRE
+- en: Then, build the project. We can directly build and run it by pressing *F5*,
+    but the console will pop out and close instantly.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The recommended way to build is to use the key combination of *Ctrl* + *F5*
+    to instruct Visual Studio to run the code without debugging. This action will
+    also pause after the code has finished running in the console:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Using ILDASM and ILASM to understand low-level IL assembly](img/image00261.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Press any key or close the window.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let''s examine the IL by disassembling the executable using ILDASM. Search
+    for Visual Studio''s **Developer Command Prompt for Visual Studio 2015** and select
+    it:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Using ILDASM and ILASM to understand low-level IL assembly](img/image00262.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: A window that shows the Command Prompt will appear. The window has a title bar
+    of **Developer Command Prompt for VS 2015**. It is basically a Command Prompt
+    (it is an instance of a Windows `CMD` Command Prompt) that has its environment
+    variables set (including system's `PATH` environment variable).
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'NOTE: **Developer Command Prompt for VS 2015** is not available in the Visual
+    Studio 2015 Express Edition installation. It is available in the Visual Studio
+    2015 Community Edition and above.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'For more information about this developer Command Prompt, consult the MSDN
+    Library:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[https://msdn.microsoft.com/en-us/library/ms229859(v=vs.110).aspx](https://msdn.microsoft.com/en-us/library/ms229859(v=vs.110).aspx)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In the command prompt, type `ILDASM` and then press *Enter*. An **ILDASM**
+    window will show the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Using ILDASM and ILASM to understand low-level IL assembly](img/image00263.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'To start disassembling `FSConsole01`, perform the following steps:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: From the main menu, open the **File** menu.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Select **Open** and then go to the folder that stores `FSConsole01`.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Select the subfolder `bin`, the `Debug` subfolder.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Open `FSConsole01.exe`.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Let''s resize a little bit so that now ILDASM will display the content of the
+    EXE file as organized into metadata that contains IL:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Using ILDASM and ILASM to understand low-level IL assembly](img/image00264.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'The ILDASM of `FSConsole01.exe` has three nodes:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The **MANIFEST** node is a manifest of runtime information that contains the
+    .NET runtime assembly it targets.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**<StartupCode$FSConsole01>** contains the necessary metadata of the `AssemblyInfo`,
+    the main class of Program, and other assembly attributes.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Program** contains the actual IL of the F# source code compiled into IL assembly,
+    related to the `<EntryPoint>` attribute.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Now let''s expand the Program node and select the **main : int32(string[])**
+    node:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Using ILDASM and ILASM to understand low-level IL assembly](img/image00265.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'To further explore the source code, double-click the **main** node. ILDASM
+    will display a new window that contains the IL assembly of `main`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Using ILDASM and ILASM to understand low-level IL assembly](img/image00266.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'Let''s look again at the source code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE1]'
+  prefs: []
+  type: TYPE_PRE
+- en: Now we will dive into the translation of IL.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The `let main argv` function declaration is translated into the following IL:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE2]'
+  prefs: []
+  type: TYPE_PRE
+- en: This is crucial and it's quite similar to the main console of C#/VB as it's
+    also generated as a method that uses the `public static` modifier. In F#, the
+    `main` method has `int32` as its return value instead of `void` in C# (Sub in
+    VB).
+  prefs: []
+  type: TYPE_NORMAL
+- en: The `EntryPoint` attribute is translated as `.entrypoint` combined with the
+    instantiation of the `EntryPoint` attribute inside the method.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The `"Hello F# world"` string is loaded into memory as indicated by the `ldstr`
+    IL assembly command. Then, the next line prepares the call to F# `PrintfFormatLine`
+    (as compiled from the translation of the abbreviated name of `printf`) by calling
+    the `static` constructor of `Microsoft.FSharp.Core.PrintfFormat` and then calling
+    the `PrintFormatLine`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: This is the behavior of any call to the static method, and it is related to
+    .NET CLR, not the convention or the IL result from F#. When calling any static
+    method for the first time, the static constructor of the class that has the static
+    method (if this constructor is available) is always called first. It behaves the
+    same as in C# and VB.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Now let''s examine the IL emitted by the recursive function in F# even further.
+    Let''s add the recursive factorial function. To make it more interesting, we are
+    using pattern matching to match the conditions of the recursive calls. Add the
+    following code before the main entry point:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE3]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Run ILDASM and open the compiled `FSConsole01` executable. Navigate to the
+    `fact` node and then double-click the node. We will see that the IL is translated
+    into a loop in the IL assembly:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Using ILDASM and ILASM to understand low-level IL assembly](img/image00267.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'There are three branch instructions: `br.false` and two `br.s` instructions.
+    These three correspond to the match branches in the code.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: In this sample recursive function of factorial, the recursive construct is optimized
+    as a loop in the IL emitted. The usage of a loop also implies that the stack overflow
+    will not happen as the code is not performing recursion; therefore, there is no
+    need to store the function entry in the stack as with most recursive functions
+    in other languages such as C# and VB. It is intrinsically faster and more efficient
+    than using a stack frame to store the recursion returning point.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: The choice of optimization from a recursive into a loop is what separates F#
+    from C#/VB. It is faster to have a loop than to use recursion that requires stack
+    frames because stack frame usage adds more overhead of pushing and popping values
+    in stack manipulations.
+  prefs: []
+  type: TYPE_NORMAL
+- en: A deeper discussion on recursive function and tail calls is available in [Chapter
+    7](fsp-hiperf_cu07.html#aid-1ENBI1 "Chapter 7. Language Features and Constructs
+    Optimization"), *Language Features and Constructs Optimization*.
+  prefs: []
+  type: TYPE_NORMAL
+- en: For more information on IL assembly instructions, consult the ECMA 335 standard.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We now have IL assemblies available to use. The output produced by ILDASM can
+    be used to be the foundation of understanding IL deeper, but we need to be able
+    to produce the whole IL assembly of the executable.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Using the existing `FSConsole01`, we are going to transform the compiled EXE
+    to a text file that contains the IL assembly.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Open the **Developer Command Prompt for Visual Studio 2015** and change the
+    folder to the `bindebug` subfolder of your `FSConsole01` project. Then, type the
+    following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE4]'
+  prefs: []
+  type: TYPE_PRE
+- en: The `/OUT` parameter means that we are not going to display ILDASM UI because
+    we are going to dump the IL into a file to contain the IL assembly code as a result
+    of the disassembler of ILDASM. It is a recommended best practice to name the extension
+    of the file as *IL* because it is a source code of .NET IL assembly code, although
+    .NET will not register IL as a filename extension on Windows.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We now have `FSConsole.IL`. Open the `FSConsole.IL` using Notepad:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Using ILDASM and ILASM to understand low-level IL assembly](img/image00268.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'Press *Ctrl* + *F* and search for `Program` and then we see that the F# compiler
+    emitted the class declaration of Program as `public abstract`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE5]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'This is also a form of optimization by the F# compiler because the `Program`
+    class as the entrypoint *doesn''t have to be a concrete class*. This is different
+    from C# as the default compile result is a concrete class. For example:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE6]'
+  prefs: []
+  type: TYPE_PRE
+- en: However, we can modify the corresponding C#'s `Program` class to have a similar
+    abstract class explicitly in the code before building and compiling it again.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Let's directly modify the IL assembly code and compile it back to an executable
+    using ILASM.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Search for this line of code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE7]'
+  prefs: []
+  type: TYPE_PRE
+- en: Change the `Hello F# world` to `Hello world!` and then save the IL using a different
+    name, for example, `FSConsole01a.IL`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Then, go back to the developer''s Command Prompt and type this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE8]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Then, execute `FSConsole01a.exe` on the Command Prompt; it should now display
+    `Hello world!`, as shown here:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Using ILDASM and ILASM to understand low-level IL assembly](img/image00269.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'Now, we can have qualitative optimization based on IL! We also have learned
+    this example of recursion as loop-one good example use case of IL analyzing. This
+    IL use of a loop instead of recursion using a stack is also proof of optimization:
+    F# is already one step ahead of other languages (especially non-functional languages)
+    in terms of handling basic recursive functions.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: We have grabbed the basic understanding of the F# compiler and IL. Now that
+    we understood the underlying IL assembly generated by F#, we can profile it using
+    the CLR Profiler, a profiler tool from Microsoft.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Using CLR Profiler 4.5
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: CLR Profiler is a profiler tool used to profile any compiled PE of .NET. It
+    is free and open source, although it is not available by default in the current
+    installation of .NET and Visual Studio 2015.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'A profiler is basically a helper tool to analyze the elements of a running
+    program that relates to performances, such as:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Memory consumptions
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Execution time allocations in terms of classes and modules into smaller elements
+    such as functions and subroutines
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Examining garbage collections (if the platform has support for garbage collection)
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Based on the previous definitions, the CLR Profiler is simply a profiler to
+    examine (or *to profile*) any application that runs on top of .NET CLR.
+  prefs: []
+  type: TYPE_NORMAL
+- en: There are profilers toolings for .NET, not just CLR Profiler, out there, unfortunately
+    not all the toolings are free. Fortunately, CLR Profiler has complete features
+    to profile .NET application, and it is also free and open source. We can also
+    build our own profiler based on the existing CLR Profiler.
+  prefs: []
+  type: TYPE_NORMAL
+- en: A quick overview of CLR Profiler
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: CLR Profiler has been developed since .NET 1.1, although it is not supported
+    anymore. The latest CLR Profiler is available for .NET 4.5, and it can only be
+    used effectively for profiling any .NET 4.0 CLR-based application, including .NET
+    4.0 to .NET 4.6 applications. The next version of .NET may or may not be compatible.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'CLR Profiler has been developed since .NET 1.1, and it is always released to
+    match with the .NET runtime releases. For example, CLR Profiler version 2.0 supports
+    .NET 2.0 runtime. This version 2.0 release supports .NET generics that were introduced
+    in .NET 2.0 runtime. The version 3.5 supports .NET 2.0 SP1 runtime that was released
+    with .NET Framework 3.5 and so do the next versions, as illustrated:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![A quick overview of CLR Profiler](img/image00270.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: There were some maintenance releases of CLR Profiler between the themed releases
+    from version 2.0 to version 4 that were in sync with .NET runtime, but these maintenance
+    releases were mostly bug fixes that addressed minor test cases involving profiling
+    Platform interop with Win32 API and COM. After the release of CLR Profiler 4,
+    the maintenance releases are not available, particularly, because the source code
+    of CLR Profiler is also open sourced.
+  prefs: []
+  type: TYPE_NORMAL
+- en: An initial version of CLR Profiler, until version 2.0, was developed within
+    a closed-source model, and it was then opened as open source. The repository of
+    the CLR Profiler was located at CodePlex until now.
+  prefs: []
+  type: TYPE_NORMAL
+- en: It was maintained originally by the CLR team, and was then lead by David Broman
+    until now. The most interesting fact is that the CLR Profiler is written entirely
+    in C++, using a mix of native Win32 C++ with managed C++. It can hook into the
+    running code of the application to be profiled by first loading and examining
+    the IL and then injecting some hooks as IL to monitor the execution.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'To catch up with the development of CLR Profiler on CodePlex, have a look at
+    this landing page:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[http://clrprofiler.codeplex.com/](http://clrprofiler.codeplex.com/)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: David Broman, Microsoft's original developer of CLR Profiler, has a blog on
+    MSDN as well. His blog is available at [https://blogs.msdn.microsoft.com/davbr/](https://blogs.msdn.microsoft.com/davbr/).
+  prefs: []
+  type: TYPE_NORMAL
+- en: A quick walkthrough of CLR Profiler in action
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: On the download page of CLR Profiler, choose binaries. Since we are going to
+    use CLR Profiler to profile our running code, we are going to use the compiled
+    CLR Profiler instead of building and compiling it from the CLR Profiler source
+    code.
+  prefs: []
+  type: TYPE_NORMAL
+- en: After we have downloaded the CLR Profiler 4.5 binaries as a ZIP file, unzip
+    it to any folder. It's recommended not to use a deep folder with nested folders
+    because it may not be searchable, unless we put the folder into `PATH` environment
+    variable.
+  prefs: []
+  type: TYPE_NORMAL
+- en: This CLR Profiler can be used to profile 32-bit and 64-bit CLR executables and
+    CLR DLL. There are two binaries for the 32-bit and 64-bit versions, respectively.
+    For the most common case and best practices, we should use the 32-bit CLR Profiler
+    to profile 32-bit CLR executables and DLL.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Before we use CLR Profiler to profile our executable, these are some limitations
+    and warnings about the known consequences of running CLR Profiler to mention:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: CLR Profiler is an intrusive tool; seeing a 10 to 100x slowdown in the application
+    being profiled is not unusual. Therefore, it is not the right tool to find out
+    where time is spent-use other profilers for that.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Log files can be huge. By default, every allocation and every call is logged,
+    which can consume gigabytes of disk space. However, allocation and call logging
+    can be turned on and off selectively, either by the application or in the CLR
+    Profiler UI.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: CLR Profiler cannot *attach* to an application that is already running.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: CLR Profiler might get caught and be considered harmful by some antivirus programs
+    such as Trend Micro, ESET, and even the older versions of Symantec and Kaspersky.
+    These antiviruses might have treated CLR Profiler as harmful malware or security
+    exploit software. This is truly a false alarm. CLR Profiler must be listed as
+    *white list* for these antivirus programs. Also, update your antivirus detection
+    data.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Now, let's examine our current `FSConsole01` project. Open the solution that
+    contains your `FSConsole01` project and build it. To ensure that Visual Studio
+    will not interfere with CLR Profiler, close the solution and close Visual Studio.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Go to the folder that you downloaded and extract the CLR Profiler. You shall
+    see two subfolders and one file: subfolders named `32`, `64`, and a Word document
+    file named `CLRProfiler.doc`. The DOC file is actually a complete documentation
+    of how to use CLR Profiler. Open the subfolder of `32` and then execute the `CLRProfiler.exe`
+    file by opening or by double-clicking it.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'A Command Prompt and CLR Profiler UI is shown:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![A quick walkthrough of CLR Profiler in action](img/image00271.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'Ignore the Command Prompt, but do not close it, as it will also close CLR Profiler.
+    Before you start profiling, check the **Allocations** and **Calls** under the
+    **Profile** frame:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![A quick walkthrough of CLR Profiler in action](img/image00272.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Also ensure that the checkbox of **Profiling active** is always checked.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'This is the reason given in the CLR Profiler documentation as to why **Profiling
+    active** is checked:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '*The Profiling active check box lets you turn profiling on and off selectively.
+    You can do that either to save time (for example during application startup),
+    or to profile selectively. For example, if you wanted to see what happens in your
+    Windows Forms application when a certain button gets clicked, you would clear
+    this box, start your application, then check the box, click your button, and then
+    clear the box again. Another usage would be to turn this off when starting to
+    profile your ASP.NET application, load a specific page, and then turn it on to
+    see what gets allocated in the steady state for that specific page.*'
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: Our `FSConsole01` is a console application, and it is also a desktop application
+    by nature although it is running as a console application. Therefore, we need
+    to ensure that this checkbox of **Profiling active** is checked.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Click the **Start Desktop App...** button and open `FSConsole01.exe` in the
+    `bindebug` folder.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Then, CLR Profiler will show a UI that acts as container of profiling summary:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![A quick walkthrough of CLR Profiler in action](img/image00273.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: This summary is very important, as it is the starting point before starting
+    to analyze the graphical data generated by CLR Profiler. The data summaries are
+    grouped into sections.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The important sections of the summary are explained here:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The section labeled **Garbage Collection Statistics** gives statistics about
+    the garbage collections that happen during the program run. The garbage collector
+    in the .NET CLR is generational, which means that many garbage collections only
+    consider the newest objects on the heap. These are referred to as generation 0
+    collections and are quite fast. **Gen 1 collections** consider a bigger portion
+    of the heap and are thus a bit slower, while **Gen 2 collections** (also referred
+    to as *full collections*) consider the complete heap and can take a significant
+    amount of time if the heap is large. Thus, you want to see a relatively small
+    number of **Gen 2 collections** compared to **Gen 1 collections** and **Gen 0
+    collections**. Finally, **Induced collections** are the collections triggered
+    outside of the garbage collector, for example, by calling `GC.Collect` from the
+    application. The view reachable via the **Time Line** button will be explained
+    in detail in a short while.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The section **Garbage Collector Generation Sizes** gives the sizes of the various
+    garbage collector generations. One additional twist is that there is a special
+    area for large objects called **Large Object Heap bytes**. Note that these numbers
+    are averages over the program run, which may not reflect the situation at the
+    end of the run.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The section **GC Handle Statistics** lists how many GC handles have been created,
+    destroyed, and how many are surviving at the end of the program run. If the last
+    number is particularly large, you may have a GC handle leak, which you can investigate
+    by clicking on the **Allocation Graph** button next to the number.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: So, why do we focus mainly on garbage collectors (GC)? Because analyzing GCs
+    is very useful for analyzing memory usages when running .NET applications. Examining
+    GCs using CLR Profiler is also helpful when identifying memory leaks before, at,
+    or after garbage collection.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Garbage collections in .NET happen on the heap, and they are available after
+    GC has started. GC manages and stores objects used in the running program in the
+    heap, and this is why it is called a **managed heap**.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The terms gen 0 and gen 1 are the generations of how it handles long-lived and
+    short-lived objects.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'There are three generations, as mentioned in the MSDN Library:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**Generation 0**: This is the youngest generation and contains short-lived
+    objects. An example of a short-lived object is a temporary variable. Garbage collection
+    occurs most frequently in this generation. Newly allocated objects form a new
+    generation of objects and are implicitly generation 0 collections, unless they
+    are large objects, in which case they go on the large object heap in a generation
+    2 collection. Most objects are reclaimed for garbage collection in generation
+    0 and do not survive to the next generation. This generation is also called gen
+    0 or simply Gen0.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Generation 1**: This generation contains short-lived objects and serves as
+    a buffer between short-lived objects and long-lived objects. This generation is
+    also called gen 1 or simply Gen1.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Generation 2**: This generation contains long-lived objects. An example of
+    a long-lived object is an object in a server application that contains static
+    data that is live for the duration of the process.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: If there are many objects that are characterized as long-lived objects during
+    the runtime of an application, GC overheads will always occur at the finalization
+    of the garbage collecting. This stage of finalization means that many long-lived
+    objects are often called as having a condition of high cost object finalizations.
+    Analyzing the GC using CLR Profiler will provide us with data on when and where
+    GC overheads occur, especially when GC has many objects to handle (this will be
+    shown as handles in CLR Profiler).
+  prefs: []
+  type: TYPE_NORMAL
+- en: We can reduce the cost of finalization by using objects that implement the `IDisposable`
+    interface correctly.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'This tip is explained in detail in the following MSDN article by Rico Mariani,
+    one of the architects of .NET BCL: [https://msdn.microsoft.com/en-us/library/ms973837.aspx](https://msdn.microsoft.com/en-us/library/ms973837.aspx).'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In this article, it is recommended to use `IDisposable` interface for the following
+    reason:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '*In many cases it is possible for objects that would otherwise always need
+    to be finalized to avoid that cost by implementing the IDisposable interface.
+    This interface provides an alternative method for reclaiming resources whose lifetime
+    is well known to the programmer, and that actually happens quite a bit. Of course
+    it''s better still if your objects simply use only memory and therefore require
+    no finalization or disposing at all; but if finalization is necessary and there
+    are many cases where explicit management of your objects is easy and practical,
+    then implementing the IDisposable interface is a great way to avoid, or at least
+    reduce, finalization costs.*'
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: 'The `IDisposable` interface has only one method: the `Dispose` method. It is
+    crucial if we want to implement `IDisposable`, particularly, if the class that
+    implements `IDisposable` is available to inherit (not marked with `SealedAttribute`
+    in F#). Its detail implementation must obey the rules in the MSDN documentation:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: It should provide one `public`, non-virtual `Dispose()` method and a `protected
+    virtual Dispose(Boolean disposing)` method
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The `Dispose()` method must call `Dispose(true)` and should suppress finalization
+    for performance
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The base type should not include any finalizers
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Unfortunately, there is no `protected` and `virtual` modifier support in F#;
+    therefore, we could only use the F# default modifier on the `Dispose` method.
+  prefs: []
+  type: TYPE_NORMAL
+- en: It is quite easy in F# to ensure that the `Dispose` method is always called
+    after we are done using the object by using F# syntactic sugar of `use` or `using`
+    keywords, which translate to always call for disposal after the object is no longer
+    in use. It is quite similar to the syntactic `using` in C# and VB. More details
+    on this can be found in [Chapter 7](fsp-hiperf_cu07.html#aid-1ENBI1 "Chapter 7. Language
+    Features and Constructs Optimization"), *Language Features and Constructs Optimization*.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'For a starting point to understand more on .NET Garbage Collector, visit the
+    MSDN Library article titled *Fundamentals of Garbage Collection*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[https://msdn.microsoft.com/en-us/library/ee787088(v=vs.110).aspx](https://msdn.microsoft.com/en-us/library/ee787088(v=vs.110).aspx)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Let's see a sample data of GC handles. In order to have this data presented
+    to us, let's go back and focus our attention on the CLR Profiler's summary window.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Click the **Allocation Graph** button under **GC Handle Statistics** to see
+    and check **GC handle allocations**:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![A quick walkthrough of CLR Profiler in action](img/image00274.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: In the graph, there are some lines and rectangular bars that flow from the leftmost
+    rectangle. These represent the flow of how many handles the GC has. The thicker
+    lines represent the biggest number of handles. These handles are further described
+    in detail as thinner handles that comes from thicker rectangles. In the following
+    text, the rectangular bar represents the program elements.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We can also drill down further by double-clicking the element that we want to
+    examine.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let''s examine the `Program::main` element:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![A quick walkthrough of CLR Profiler in action](img/image00275.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'Double-click the rectangular bar above the `Program::main`. A new graph window
+    will appear, and it will only display the handles from `Program::main`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![A quick walkthrough of CLR Profiler in action](img/image00276.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Hover the mouse over the rectangle that is labeled `ExtraTopLevelOperators::PrintFormatLine`,
+    and a tooltip will show you that this object comes from `FSharp.Core.dll`. This
+    tooltip hint is also important if we use references and not just F# core libraries
+    and .NET BCL. We could pinpoint which part of an object holds many handles, drill
+    down into the object, and then hover on it to see which object refers to which
+    DLL library or executable.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We have used CLR Profiler to profile an F# console application. Combined with
+    the knowledge of IL assembly language, CLR Profiler and ILDASM/ILASM provides
+    us with a qualitative point of view for analyzing potential bottlenecks or even
+    opportunities for further optimizations of our code.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Again, it's harder to analyze qualitative data than quantitative, but we can
+    set the qualitative knowledge to further understand quantitative measurement because
+    understanding qualitative data at initial preparation of performance measurement
+    gives us reasoning capability when we analyze our running code using simpler quantitative
+    ways.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Ways to measure performance quantitatively
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: There are many ways to measure performances of any running .NET code on top
+    of CLR, including F#. So, any tool used to measure F# code is essentially usable
+    for other programming languages on .NET CLR as well.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Again, the easiest way to objectively measure performance is by using quantitative
+    measurements. The following are some common ways of measuring running codes:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Using .NET timers
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Using native Win32 timer
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Using Visual Studio Diagnostic
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Running functions inside unit tests
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The previous numbers are ordered from the subtlest and difficult to the quickest
+    way of having statistical timing as performance measurements.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Using .NET timers
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: There are many timer classes in the .NET Framework but not all of them have
+    a general purpose from the perspective of implementation details and in the context
+    of execution environments.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In the context of execution environments, .NET timers are divided as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: UI timers (timers that are run on an UI thread)
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Non-UI timer (timers that are run on the common CPU thread)
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: All UI timers are not always synchronized with a non-UI thread, so they are
+    not guaranteed to have high precision. An example of this is when using `System.Windows.Forms.Timer`,
+    while at the same time having a background thread run. In the internal implementation
+    of `System.Windows.Forms.Timer`, this object uses the `Win32 WM_TIMER` message
+    and processes it in a message loop.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In addition, the behavior of `System.Windows.Forms.Timer` is synchronous relative
+    to the other UI thread, and therefore the UI thread processes this message loop
+    of `WM_TIMER` as long as it is not processing other Windows messages that come
+    in the middle.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Therefore, an elapsed event of this timer may slip as the timer has no lock
+    on the current UI thread of Windows message loops, especially when there are blocking
+    threads running, such as when downloading from the Internet or printing to a printer.
+  prefs: []
+  type: TYPE_NORMAL
+- en: For the sake of objective measurement and also calculating with as high precision
+    as possible, we are not going to use UI timers and will instead focus on non-UI
+    timers.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following non-UI timers are available:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`System.Timers.Timer`'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`System.Threading.Timer`'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`System.Diagnostic.Stopwatch`'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The `System.Timers.Timer` is a special case of timers. It may run indirectly
+    on a UI thread, not just on a system worker thread. `System.Threading.Timer` always
+    runs on a worker thread, and we cannot mix worker threads and UI threads easily.
+    This condition is raised because the nature of `System.Threading.Timer` is asynchronous.
+    But this is also a nice feature to use as it will not lock the running UI thread,
+    since the thread has to be explicitly treated or handled in a different manner.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Using `System.Timer.Timer` is easier to use than `System.Threading.Timer` as
+    it uses an event model instead of forcing to use callbacks. It's also easier to
+    understand because we can control the number of ticks for triggering the elapsed
+    event.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Let's create a separate project to test the timer of `System.Timers.Timer` to
+    measure our function.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Create a new F# console project and name it `FSTimer01`. A window editor that
+    shows the opened `Program.fs` is now open.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Change the code of `Program.cs` as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE9]'
+  prefs: []
+  type: TYPE_PRE
+- en: Run the code by means of running without debugging, and the time elapsed will
+    kick for every 1 millisecond.
+  prefs: []
+  type: TYPE_NORMAL
+- en: On my machine, it shows `time elapsed for 6`, meaning the code takes roughly
+    about 6 milliseconds to execute. Again, this may vary on different machines with
+    different configurations.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The previous sample code is not quite accurate in terms of precision because
+    it relies heavily on the elapsed event when it triggered. There might be something
+    that comes before and after the timer has elapsed, and this might block the current
+    thread before the elapsed event and even after the elapsed event is triggered.
+    To use `System.Timers.Timer` more accurately, we should not use timer mixed with
+    another blocking thread, such as I/O, or another thread that might change the
+    system state, such as querying or updating operating system settings.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'For more details of comparison on these timers (other than Stopwatch), we can
+    see the timers in action in this archived article in MSDN Magazine February 2004
+    edition (in CHM format):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[http://download.microsoft.com/download/3/a/7/3a7fa450-1f33-41f7-9e6d-3aa95b5a6aea/MSDNMagazineFebruary2004en-us.chm](http://download.microsoft.com/download/3/a/7/3a7fa450-1f33-41f7-9e6d-3aa95b5a6aea/MSDNMagazineFebruary2004en-us.chm)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Next, we use `System.Diagnostic.Stopwatch`, which is often called Stopwatch.
+    Although this timer is quite similar to `System.Timers.Timer`, Stopwatch has its
+    own algorithm flow, and it is clever enough to use a performance counter, as defined
+    in the MSDN Library:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '*The Stopwatch measures elapsed time by counting timer ticks in the underlying
+    timer mechanism. If the installed hardware and operating system support a high-resolution
+    performance counter, then the Stopwatch class uses that counter to measure elapsed
+    time. Otherwise, the Stopwatch class uses the system timer to measure elapsed
+    time.*'
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: A high resolution performance counter is obtained by calling the native (unmanaged)
+    Win32 API of `QueryPerformanceCounter`. But this Win32 API should not be used
+    directly as it may require some privileges. particularly elevated privileges.
+    To safely determine that we have a high resolution performance counter available,
+    we should use the properties of Stopwatch, `Frequency` and `IsHighResolution`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'For more information about `System.Diagnostics.Stopwatch`, have a look at the
+    official MSDN documentation:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[https://msdn.microsoft.com/en-us/library/system.diagnostics.stopwatch(v=vs.110).aspx](https://msdn.microsoft.com/en-us/library/system.diagnostics.stopwatch(v=vs.110).aspx)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: It is quite easy to use Stopwatch as we do not need to pay attention to any
+    time-elapsed event, because there is no specific elapsed event to handle manually.
+    Stopwatch also uses .NET `TimeSpan` to measure how much time has passed from beginning
+    to end.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Using the solution as a timer beforehand, we can test Stopwatch by creating
+    a new project on top of the current solution.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Create a new console project called `FSTimer02`. A default `Program.fs` editor
+    appears, so then copy the codes from the previous `Program.fs` that has the `System.Timers.Timer`
+    example, as we are reusing the `fact` function.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Change the function body into the following code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE10]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'This time it will show the time duration at a point after the execution of
+    `Stopwatch.Start` until the point before `Stopwatch.Stop` is executed. The number
+    of milliseconds of the `ElapsedMilliseconds` property is actually the same result
+    of `Elapsed` as `TimeSpan`. Both properties call the same `private` method of
+    Stopwatch: the `GetElapsedDateTimeTicks` method.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Set the `FSTimer02` project as a startup project and then run it. The time shown
+    has a tendency to be higher than the time shown by `System.Timers.Timer`. This
+    is as expected because Stopwatch queries to the system performance counter first
+    and then tries to decide whether a performance counter with a higher resolution
+    is available. If it is available, it will try to use it; otherwise, it will use
+    the existing system CPU ticks.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We have experienced how to use .NET timers to measure the duration of the running
+    code. The data available is very useful for comparison, especially when testing
+    different functions, language constructs, and when performing optimizations on
+    inline functions.
+  prefs: []
+  type: TYPE_NORMAL
+- en: But using these timers is not always the best practice, as they may be subject
+    to the Windows' thread scheduler, and other running background Windows processes
+    with the most administrative privileges may interfere, although, it is somehow
+    possible.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Running functions inside unit tests
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: One of the most common ways to measure is by running and testing our code inside
+    a unit test. It is recommended because you are forced to think about all of the
+    possible scenarios for errors or exceptions that might occur, not just successful
+    scenarios. Here, the term *scenario* means considering various inputs to be tested
+    (including having incorrect or undesirable inputs) that are taken as parameters.
+  prefs: []
+  type: TYPE_NORMAL
+- en: A quick introduction to unit tests
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: There are many definitions of a unit test, but a unit test is simply a test
+    that focuses on testing the smallest testable part of a program; this might be
+    a simple function or a complex function that has calls to other functions. To
+    cover the objectivity of the unit test, the test must also cover any scenario
+    of having various inputs to test the results and the possibility of exceptions
+    that may occur.
+  prefs: []
+  type: TYPE_NORMAL
+- en: It is known that unit tests are closely related to **Test-Driven Development**
+    (**TDD**), where developers focus on possible scenarios that may produce different
+    results or even errors as exceptions. By thinking of the possible scenarios upfront,
+    the chance of having bugs in the implementation is minimized or even close to
+    zero. You can also identify the failing scenarios, particularly when you consider
+    an invalid input for certain functions that contain any operation with potential
+    exceptions, such as division operations, square roots, or even out of memory situations.
+    This is why unit test is one of the examples of TDD in action, as testing scenarios
+    are being thought out before the implementation of the function.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Unit test support in Visual Studio
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: There are many unit test frameworks in .NET ecosystems, the most popular and
+    widely used being xUnit and NUnit. These two have their own integration with Visual
+    Studio through a test runner UI. Visual Studio itself has built-in support for
+    unit tests; it is a Microsoft Test Framework often called **MS Test**. MS Test
+    provides tooling, classes, and attributes for use to support unit tests, and in
+    conjunction with Visual Studio, the unit test has its own test runner UI support
+    as well.
+  prefs: []
+  type: TYPE_NORMAL
+- en: All of the test frameworks, such as MS Test, xUnit, and NUnit, have integration
+    support as part of the Visual Studio SDK. This extension of test runners inside
+    Visual Studio has been available since Visual Studio 2010\. The extensibility
+    is done to extend the base test runner, and the available tests are displayed
+    at Visual Studio **Test Explorer**. The Visual Studio test runner extensibility
+    runs on .NET 4 CLR, so it is language agnostic. We could also create our own extensions
+    in F#, not just by using C# and VB.
+  prefs: []
+  type: TYPE_NORMAL
+- en: For documentation on the Visual Studio Testing Tool API, please visit MSDN at
+    [https://msdn.microsoft.com/en-us/library/dd465178(v=vs.120).aspx](https://msdn.microsoft.com/en-us/library/dd465178(v=vs.120).aspx).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'For more information about the Visual Studio test runner, this is the official
+    starting documentation of Visual Studio SDK:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[https://msdn.microsoft.com/en-us/library/bb166441.aspx](https://msdn.microsoft.com/en-us/library/bb166441.aspx)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Unfortunately, F# in Visual Studio has no inherent or template support in the
+    form of a unit test project template, unlike C# and VB. However, we can still
+    leverage MS Test by using the open source library of FsUnit for MS Test. The best
+    part of this FsUnit for the MS Test library is how easy it is to install as a
+    NuGet package.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: It is recommended to use F# code files (`.fs`), instead of F# scripting, to
+    implement and run F# unit tests. Running a unit test in script mode will yield
+    undesirable results, including runtime exceptions, as the Visual Studio test runner
+    is not meant to run integrated with F# FSI.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Using FSIUnit is better than using xUnit, NUnit, or MS Test directly because
+    FsUnit is created with the functional programming style at the beginning instead
+    of using the common `Assert` method to test the result of a function.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Let's set up FsUnit and use it to implement a unit test in F#.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Using FsUnit to implement a unit test in F#
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: FsUnit itself has support not just for MS Test but also for xUnit and NUnit.
+    FsUnit is part of many F# open source projects under the governance umbrella of
+    the F# Software Foundation (FSSF). All of the F# open source projects have a landing
+    page at this GitHub page, [http://fsprojects.github.io/](http://fsprojects.github.io/).
+  prefs: []
+  type: TYPE_NORMAL
+- en: For more information about FsUnit, visit the official landing page at [https://fsprojects.github.io/FsUnit/index.html](https://fsprojects.github.io/FsUnit/index.html).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let''s import FsUnit for the MS Test NuGet package. First, right-click the
+    project name of `FSConsole01`, then choose the **Manage NuGet packages..** menu
+    item. Then, a tab of **NuGet Package Manager** for the  `FSConsole01` project
+    appears as shown in the following screenshot:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Using FsUnit to implement a unit test in F#](img/image00277.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'Let''s do the following steps to add FsUnit NuGet package into our sample project:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: In the search text box, type FsUnit and press *Enter*. A list of FsUnit related
+    NuGet packages is shown:![Using FsUnit to implement a unit test in F#](img/image00278.jpeg)
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Scroll down and choose **FSUnit30Unit.MSTest**:![Using FsUnit to implement a
+    unit test in F#](img/image00279.jpeg)
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Then, click the **Install** button to download and install this package. Note
+    that the **Package source** is pointing to **nuget.org**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Note
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: Throughout the rest of this book, we use NuGet packages to enrich our base experience
+    of coding in F#. The NuGet source itself is not just from **nuget.org**; there
+    are many other NuGet package sources. These NuGet package sources are often called
+    NuGet feeds as these sources are displayed in actual RSS feeds before being listed
+    in the Visual Studio NuGet package manager.
+  prefs: []
+  type: TYPE_NORMAL
+- en: For more information on NuGet, including how to host and to create your own
+    NuGet packages, visit the NuGet official website at [https://www.nuget.org/](https://www.nuget.org/).
+  prefs: []
+  type: TYPE_NORMAL
+- en: The download and installation process is always projected at the **Output**
+    window of the NuGet package manager.
+  prefs: []
+  type: TYPE_NORMAL
+- en: If the package already exists (hence, installed), then NuGet will check the
+    existing version of the NuGet package. If the version is older, by default it
+    will try to update the existing version and install the newer version.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The successful NuGet installation is shown in the **Output** window of **Package
+    Manager** as **Finished**:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Using FsUnit to implement a unit test in F#](img/image00280.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: We can now be sure that `FS30Unit.MsTest` is available to use to perform a unit
+    test in F#. However, the main MS Test framework is not yet installed. We have
+    to add this library manually.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The name of the MS Test framework library is `Microsoft.VisualStudio.QualityTools.UnitTestFramework`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: This library is available as an extension library in the .NET project. It is
+    also in the existing .NET **global assembly cache** (**GAC**) in Windows, installed
+    by default by Visual Studio 2015 Community Edition and above.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In previous versions of Visual Studio before Visual Studio 2010, the name of
+    the library was different, and it was named `Microsoft.VisualStudio.TestTools.UnitTesting`.
+    The change of the name reflects that the Visual Studio Unit Test Framework has
+    been part of Microsoft Visual's Studio Quality Tools since the release of Visual
+    Studio 2010, including Microsoft Coded UI Test, Web Test, and Windows Store Test.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The documentation of the classes and attributes of Visual Studio Unit Test Framework
+    in Visual Studio 2015 is available at [https://msdn.microsoft.com/en-us/library/microsoft.visualstudio.testtools.unittesting(v=vs.140).aspx](https://msdn.microsoft.com/en-us/library/microsoft.visualstudio.testtools.unittesting(v=vs.140).aspx).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Add this `Microsoft.VisualStudio.QualityTools.UnitTestFramework` by adding
+    references to the project, and then choose the **Extensions** tab:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Using FsUnit to implement a unit test in F#](img/image00281.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Now that we have that set up, and it is available for use, we can now code the
+    unit test. We can also combine our entrypoint for the F# console with the factorial
+    function and the unit test. It is also recommended to separate the factorial function
+    from the main module that has an entrypoint as the concern of the module that
+    has the entrypoint is actually different from the factorial function.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Always pay attention to the indentation inside the modules, types, and the functions.
+    F# always relies on the indentation to mark wrong indentation as that will always
+    result in compiling errors.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'This is the official guideline on code indentation in F#:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[https://msdn.microsoft.com/en-us/visualfsharpdocs/conceptual/code-formatting-guidelines-%5Bfsharp%5D](https://msdn.microsoft.com/en-us/visualfsharpdocs/conceptual/code-formatting-guidelines-%5Bfsharp%5D)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: First, we have to set multiple module files to be compiled correctly for this
+    console project. The entrypoint of `Program.fs` needs to be modified to be included
+    in an explicit module under the namespace, `FSConsole01`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In `Program.fs` in the code window, type the following code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE11]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Build it, and an error warning will show the following message:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE12]'
+  prefs: []
+  type: TYPE_PRE
+- en: Ignore this error for now, as we will fix this later.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Let's move our factorial function into the unit test.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Create a new F# source file and name it `FSConsoleUnitTest`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Type the following in the code window:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE13]'
+  prefs: []
+  type: TYPE_PRE
+- en: The code in the `FSConsoleUnitTest` module shows that we now have a class of
+    `FactTest` and the method to be our unit test.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The `TestClass` attribute on `FactTest` means that this class will be used by
+    the test runner as the starting class to hold the unit test. The `TestMethod`
+    attribute on `FactTest01` means that this method is our unit test under the `FactTest`
+    class.
+  prefs: []
+  type: TYPE_NORMAL
+- en: This is a common convention as the class to be used for a unit test cannot be
+    a static class. The nature of a unit test is instantiating the class that has
+    the attribute of `TestClass` before running the tests inside the methods with
+    the `TestMethod` attribute.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'For more information on creating, running, and debugging unit tests using MS
+    Test (and also for other test frameworks) in Visual Studio 2015, visit this MSDN
+    Library:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[https://msdn.microsoft.com/library/dd264975](https://msdn.microsoft.com/library/dd264975)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let''s fix the previous error by reordering `Program.fs` to be the last order
+    of the file order. We do this by right-clicking `Program.fs` and moving down `Program.fs`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Using FsUnit to implement a unit test in F#](img/image00282.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Ensure that `Program.fs` is the last file.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: Note that file ordering in F# is very important.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Build the project. Then, display the **Test Explorer** window if it's not open.
+    On the General collection default setting, the **Test Explorer** menu item is
+    available under the main menu **Test**.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The `FactTest01` test will be shown in the **Test Explorer** as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Using FsUnit to implement a unit test in F#](img/image00283.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'Let''s run the test by clicking **Run All** on the **Test Explorer**. **Test
+    Explorer** will display the number of milliseconds it takes to run the unit test
+    on the right of the test method name:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Using FsUnit to implement a unit test in F#](img/image00284.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: The number of milliseconds may vary depending on different hardware, because
+    it is influenced by the speed of the CPU and the number of CPU cores. The function
+    we have tested is a simple function, but we can have a function that has parallel
+    calls by utilizing .NET Task Parallel Library (TPL). The consequences of the usage
+    of .NET TPL are that numbers can vary greatly across different systems with different
+    configurations, such as the operating system used (in this context, the Windows
+    version and edition) and different CPU specifications.
+  prefs: []
+  type: TYPE_NORMAL
+- en: For example, testing using a machine that has a 4th generation core i7 2.4 Ghz
+    CPU might be a little bit faster than a machine that has a 6th generation core
+    i5 2.2 Ghz CPU. The number of cores may have some influence as well, as the number
+    of cores in a modern CPU is always increasing.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In our code, there is no direct use of MS Test's Assert at all. This is actually
+    available under the cover of FsUnit. We can look at FsUnit source codes in the
+    GitHub repository of FsUnit, in particular, FsUnit code to support MS Test. All
+    the code related to MS Test is under the folder named `FsUnit.MsTestUnit`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: To recap again, FsUnit has support for the NUnit and xUnit test frameworks,
+    and both of them use the same context of implementing `Assert` methods under the
+    cover of a functional FsUnit. You may use test frameworks other than MS Test,
+    as long as they are supported by FsUnit. It is recommended to participate with
+    or contribute to FsUnit as this project is encouraging contributors to support
+    other test frameworks such as MbUnit.
+  prefs: []
+  type: TYPE_NORMAL
+- en: At the time of writing, FsUnit supports both F# 3.1 and F# 4.0\. But it is recommended
+    to use FsUnit with F# 4.0 because this will provide you with the highest compatibility
+    with the .NET 4.5 and .NET 4.6 frameworks. In addition, F# 4.0 is the closest
+    work in progress to the future release of F#, which will provide support for .NET
+    Core.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The FsUnit GitHub repository is available at [https://github.com/fsprojects/FsUnit](https://github.com/fsprojects/FsUnit).
+  prefs: []
+  type: TYPE_NORMAL
+- en: Summary
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: You learned that you can measure performance quantitatively and qualitatively.
+    Although it is easier to have quantitative measurement than qualitative measurement,
+    it is quite straightforward and common to have quantified data as a foundation
+    to have qualitative analysis.
+  prefs: []
+  type: TYPE_NORMAL
+- en: With the help of .NET tooling ecosystem and libraries available at our disposal,
+    we can ensure the objectiveness of our performance measurement. It is also recommended
+    to have a basic understanding of .NET CLR memory management as our foundation
+    to have performance measurement from the perspective of qualitative analysis.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We will start exploring the aspects of performance optimizations with the knowledge
+    and concept in this chapter, starting from F# data structures in [Chapter 3](fsp-hiperf_cu03.html#aid-NQU22
+    "Chapter 3. Optimizing Data Structures"), *Optimizing Data Structures*.
+  prefs: []
+  type: TYPE_NORMAL

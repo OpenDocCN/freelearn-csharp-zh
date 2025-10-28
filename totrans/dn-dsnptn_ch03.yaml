@@ -1,0 +1,476 @@
+- en: Chapter 3. A Logging Library
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In this chapter, we will try to create a **logging library** that will enable
+    an application developer to log information to a media (file, network, or database)
+    during program execution. This would be a critical library that the developer
+    would be able to use for audit trail (domain pre-requisite) and code instrumentation
+    (from a debugging and verification stand-point). We will design and implement
+    this library from scratch, and make it available as an API to the end developer
+    for consumption.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'During the course of this chapter, as a reader, you will learn to leverage
+    strategy pattern, factory method pattern, template pattern, singleton and prototype
+    patterns to do the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Writing data to a file stream
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Creating a simple **Data Access Layer** (**DAL**) using ADO.NET
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Writing data to an SQLite database
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Writing data to a network stream using the System.Net API
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Handling concurrency
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Threads
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Requirements for the library
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'Before we embark on writing the library, let us scribble down a preliminary
+    requirement statement as shown next:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The logging library should provide a unified interface to handle log entries
+    which are supposed to be persisted in a media (file, remote node, or a database)
+    and target media should be determined during runtime from a configuration file.
+    The API should be target-independent and there should be provision to add new
+    log targets without changing the application logic.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Solutions approach
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'Before we write the code to implement our library (a Windows assembly), let
+    us enumerate the requirements to get the big picture:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The data should be written to multiple streams
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: File, network, and DB
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The developer API should be target-agnostic
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The library should maintain its object lifetime
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The library should provide facility for adding new log targets
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The library should be able to handle concurrent writes to log targets
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Writing content to a media
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'To manage the complexity of code isolation, let''s declare a C# interface which
+    will manage the idiosyncrasies of multiple log targets:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE0]'
+  prefs: []
+  type: TYPE_PRE
+- en: The basic idea here, is that the concrete classes which implement the interface
+    should provide an implementation of this method that writes the log to the respective
+    media. But on closer inspection, we find that it is better to write a base class
+    implementation of this method and its associated semantics in an abstract class.
+    The base class implementation can add a log entry to a queue (that would give
+    concurrency support), flush the queue, and persist to target the media when a
+    threshold (configured) is reached. A method will be marked as abstract which will
+    provide a mechanism for concrete classes to write entries for the respective media.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Since our library is supposed to work in a multi-threaded environment, we need
+    to handle concurrency in a neat manner. While writing to a file or network, we
+    need to be careful that only one thread gets access to the file or socket handle.
+    We will leverage the .NET `async`/`await` declarative programming model to manage
+    background processing tasks. **Model-view-controller** (**MVC**) is the most dominant
+    paradigm for structuring applications.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Template method pattern and content writers
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: In the first stage, we plan to flush the log contents to the file, network,
+    and database targets. The bulk of our logic is common for all content writers.
+    To aid separation of concerns and avoid duplication of code, it is best to let
+    the concrete content writer classes manage their target media. Base implementation
+    will take care of concurrency and queue management.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: To make the code simple, we will leverage the `ConcurrentQueue` class (data
+    structure introduced with .NET framework version 4) available with the `Systems.Collections.Concurrent`
+    package. In the interest of clarity, we've left out the exception handling code.
+    Please note that the `AggregateException` class should be leveraged for handling
+    exceptions in concurrent execution scenarios.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'This class will make sure that only one thread gets to write to the queue at
+    any point of time. We will implement an asynchronous `Flush` method using **Task
+    Parallel Library** (**TPL**). This routine will retrieve data from the queue,
+    and delegate the task of persistence (in the media of choice) to the respective
+    concrete classes via an abstract method (`WriteToMedia`):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE1]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Once the contents of the queue reach a threshold level, a thread will acquire
+    the lock for flushing the data. In our case, we will initiate flushing beyond
+    10 items in queue:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE2]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The concrete classes derived from `BaseContentWriter` will implement the following
+    method to handle the specificities:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE3]'
+  prefs: []
+  type: TYPE_PRE
+- en: Note
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: This is an instance of a template method pattern. The template method pattern
+    is a behavioral design pattern where the bulk of logic resides in the base class,
+    and certain steps of a process are implemented by concrete classes. In `BaseContentWriter`,
+    we have the logic for adding elements to and retrieving elements from a concurrent
+    queue. Persistence is taken care of by the sub-classes that implement our template
+    method (`WriteToMedia`).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following UML class diagram represents the realizations, dependencies,
+    and associations between the various classes. Do observe the annotation that clearly
+    outlines the template method pattern in action:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Template method pattern and content writers](img/B05691_03_01.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Writing a log entry to a file stream
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'We will use file streams to write a file. We implement the actual file handling
+    logic in the `WriteToMedia` template method:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE4]'
+  prefs: []
+  type: TYPE_PRE
+- en: Writing a log entry to a database
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Some familiarity with ADO.NET is necessary to understand the nitty-gritties
+    of this section. To make the matter simple, we have chosen SQLite as our database
+    of choice to persist the log entries. One can choose MySQL, SQL Server, or Oracle.
+    Because of the ADO.NET library, the code will be more or less the same for every
+    RDBMS offering. We have created a class, `SQLAccess`, which wraps a subset of
+    the ADO.NET calls to provide a simple interface for SQLite. The class encapsulates
+    and leverages the ADO.NET provider for SQLite to provide an interaction with the
+    SQLite database engine (x86/x64). In case this assembly (`System.Data.SQLite`)
+    is not available locally, please use nuget to install it via the Package Manager
+    Console as `PM> Install-Package System.Data.SQLite`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE5]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The `Open` method given next instantiates the connection object, and invokes
+    the `Open` method of the ADO.NET connection object. If we require transaction
+    support, we need to instantiate a transaction context (`SQLiteTransaction`) object:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE6]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'To insert a value or set of values to a database, we instantiate a command
+    object by giving a connection object and a string (containing the SQL statement).
+    ADO.NET has the `ExecuteNonQuery` method to execute the query:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE7]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'We close the connection once we have finished inserting records to the database:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE8]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Once we have a class which will help us persist data to a relational database,
+    writing the template method (`WriteToMedia`) becomes easy. The whole code listing
+    is given as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE9]'
+  prefs: []
+  type: TYPE_PRE
+- en: Writing a log entry to a network stream
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'We will use the `TCPListener` class under the `System.Net` namespace for writing
+    data to a network stream. For the current implementation, we have hard-coded the
+    domain name (localhost:`127.0.0.1`) and port (`4500`). We can read these values
+    from a configuration file. As usual, the whole action happens within the `WriteToMedia`
+    template method. At the end of the chapter, we have given a simple implementation
+    of a log server for the sake of completeness. The log server receives the entries
+    we write, and prints it to its console:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE10]'
+  prefs: []
+  type: TYPE_PRE
+- en: We have now implemented content writers for file, DB (using ADO.NET), and network
+    streams. With this under our belt, we need to provide an interface for applications
+    to consume these content writers. Depending on the logging strategy chosen by
+    the application, the appropriate content writers are to be connected to the log
+    data streams. This warrants another set of interfaces.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Logging strategy atop the strategy pattern
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: We will use the GoF strategy pattern to implement the interface for the logging
+    library.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: We can treat the logging of data to different streams as algorithms, and strategy
+    pattern is meant to parameterize the algorithm to be executed.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'By having concrete classes for network, file, and DB strategies, we are able
+    to swap the implementation logic:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE11]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'To test the code, we will write a `NullLogStrategy` class, which prints the
+    log entry to the console. Since we have written the logic for scheduling the execution
+    of the code, our implementation will be much simpler. We implement the template
+    method (`DoLog`) through which we write the log entry in the console:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE12]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Since we have taken pains to create the `ContentWriter` classes, our implementation
+    of strategy classes is just a matter of implementing the `DoLog` template method,
+    and delegating the actual work to the respective content writers:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE13]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The following image illustrates the strategy pattern in action:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Logging strategy atop the strategy pattern](img/B05691_03_02.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: The factory method pattern for instantiation
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Now, we should take care of the instantiation of the right object based on the
+    parameter received (often retrieved  from a  configuration file )  to identify
+    the strategy.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: We will use the GoF factory method pattern to instantiate the `LogStrategy`
+    object. By checking the `loggertype` parameter, the appropriate concrete class
+    will be instantiated.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE14]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The application developer can also control the logging strategy through a configuration
+    entry. The process of instantiating the `LogStrategy` class is given as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE15]'
+  prefs: []
+  type: TYPE_PRE
+- en: Writing a generic factory method implementation
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'As discussed in the previous chapter, writing system logic without impacting
+    the application warrants a mechanism - that of loading a class on the fly. We
+    will tweak the factory method (`LogFactory`) implementation to make the system
+    generic. We will use an XML file to provide the metadata that the factory method
+    would use to create the respective log handler (`LogStrategy`) for the requested
+    strategy (by the consumer). The sample XML file (`LogStrategy.xml`) is given as
+    follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE16]'
+  prefs: []
+  type: TYPE_PRE
+- en: The contents of the XML file can be read very easily using LINQ to XML.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Factory method, singleton, and prototype pattern for dynamic class loading
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: The .NET Reflection API helps us to load a class dynamically and instantiate
+    an object . There is option for cloning an existing object to create a new one.
+    We will use both strategies, for  instantiation of objects.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: The factory method (from the GoF catalog) is a pattern which solves the creation
+    of objects through a static method exposed solely for this purpose. The object
+    we create will be based on a particular class or derived class. The consumer of
+    the `Factory` class can also indicate whether it requires a singleton or a prototype.
+    The default behavior of the factory method is to create a singleton, and it will
+    return the same instance whenever a call is made to the factory (`Get`) method.
+    If the prototype option is given, a clone of the object will be created and returned.
+    This is a good example that demonstrates how these three patterns compose and
+    work in harmony to give you this desired outcome. Also note the adept usage of
+    the dictionary object to achieve singletons. The constructs for creating an **object
+    pool** is already present in this implementation. That would be a good exercise
+    for any interested reader to uncover and implement.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The consumer of the `ObjectFactory` class would indicate whether it wants a
+    reference to the object available in the cache or a clone of the object. We can
+    clone an object using binary serialization. By writing an extension method leveraging
+    generics, we can create an all-purpose clone routine. The following code snippet
+    achieves that:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE17]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'However, please note a cloneable interface could be leveraged in case you need
+    custom cloning procedures. Now the implementation of `Get` becomes a straightforward
+    affair; the following is a full listing of the `Get` method:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE18]'
+  prefs: []
+  type: TYPE_PRE
+- en: We will be using the preceding class and different configuration files for all
+    examples going forward. This will simplify our code, and we would have a terse
+    listing.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Refactoring the code with the generic factory method
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Using `ObjectFactory`, our strategy instantiation becomes much cleaner. If
+    we cannot locate a proper implementation of strategy by dictionary lookup (within
+    the factory store), we will instantiate a `NullStrategy` object (fallback option):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE19]'
+  prefs: []
+  type: TYPE_PRE
+- en: A log server for network logging
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'An implementation of a server application that can handle incoming streams
+    of data from a remote application is given next. Here we are using System.Net''s
+    `TCPListener` class to listen to the incoming connection. Once we receive a connection
+    from the remote process, we will kick-start a thread to handle the log data from
+    that connection. This implementation is given here for the sake of completeness:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE20]'
+  prefs: []
+  type: TYPE_PRE
+- en: A simple client program to test the library
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: A simple test harness for the logging library is given next. The program accepts
+    a command-line parameter, which is the log target (NET | FILE | DB). We create
+    the appropriate logging strategy classes using the factory method pattern.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE21]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The following UML diagram illustrates the key set of patterns in action for
+    the logging API:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![A simple client program to test the library](img/B05691_03_03-1.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Summary
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In this chapter, we covered more ground to gain a good understanding on some
+    of the design patterns. We created a logging library which can log information
+    from multiple threads and handle different targets like file, database, and remote
+    servers. We used strategy pattern to swap the various logger implementations based
+    on a configuration file. Once again, the template method pattern helped us to
+    create an extensible solution for accommodating new log targets. All we needed
+    to do was to override the base implementation with the specifics of the new log
+    targets, as log information processing is handled by the base implementation.
+    We extended our factory method pattern to handle arbitrary objects based on configuration
+    files. We also learned to leverage dictionary objects for generating singletons
+    and prototypes. In the next chapter, we will write a data access layer which can
+    help an application target multiple databases. In the process, you will learn
+    about adapter pattern, factory methods, and so on.
+  prefs: []
+  type: TYPE_NORMAL

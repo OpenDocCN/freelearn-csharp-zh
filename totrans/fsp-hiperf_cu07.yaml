@@ -1,0 +1,1767 @@
+- en: Chapter 7. Language Features and Constructs Optimization
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'When we code, it happens quite often that we are sunk into optimization details.
+    We often have to focus on dealing with concurrency, performance/benchmark measurements,
+    and profiling other elements such as memory consumptions. This focus on concurrency
+    and performance/benchmark measurements is, of course, a big and important element
+    of our code, especially concurrency. This topic has been described extensively
+    in the previous two chapters: [Chapter 4](fsp-hiperf_cu04.html#aid-11C3M2 "Chapter 4. Introduction
+    to Concurrency in F#"), *Introduction to Concurrency * *in F#* and [Chapter 5](fsp-hiperf_cu05.html#aid-164MG2
+    "Chapter 5. Advanced Concurrency Support in F#"), *Advanced Concurrency Support
+    in F#*.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: There are other elements in F# to be recognized as optimization opportunities,
+    the language constructs that are commonly used in code and also advanced language
+    constructs such as computation workflow. Language constructs, including the combination
+    of semantics and syntax, are crucial too because we are directly dealing with
+    them as we code. This chapter is dedicated to identifying performance optimizations
+    in language features, focusing on language constructs.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Many F# language constructs are mostly trivial and they are already optimized,
+    unless those constructs often require special care because of the subtlety of
+    the implementation detail and also correctness, in the sense of having predictable
+    results. Trivial constructs such as asynchronous workflow, list comprehension
+    of `head::tail`, and list splicing are fully optimized, and often, to optimize
+    further, we have to interop with other .NET libraries such as .NET TPL, in conjunction
+    with F# asynchronous workflow, or dive further into the source code of F list.
+  prefs: []
+  type: TYPE_NORMAL
+- en: When we are using F# collections, it's better to optimize on usage instead of
+    optimizing the internal semantic implementations (the internal source code) as
+    we already discussed in [Chapter 3](fsp-hiperf_cu03.html#aid-NQU22 "Chapter 3. Optimizing
+    Data Structures"), *Optimizing Data Structures*.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'This chapter focuses on subtle language constructs. We will now discuss these
+    topics in optimizing language features and constructs:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Overview of F# language features and constructs optimizations
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Optimizing common F# language constructs
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Optimizing inline functions
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Identifying tail call in recursive constructs
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Overview of language features and constructs optimization
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: F# as a functional programming language has lots of language features. These
+    language features also define the unique traits of F# itself, differentiating
+    from other languages such as C#/VB.NET.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'For example, the following are the F# language features related to functional
+    programming:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Pattern matching
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Active pattern
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Type inference (including type inference generalization)
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Inline function (also called function inlining)
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Discriminated union
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Discriminated union is a language feature and it is also a type that is unique
+    to F# implementation, although it is compatible with C#/VB.NET. The best practices
+    of using discriminated union are already discussed in [Chapter 3](fsp-hiperf_cu03.html#aid-NQU22
+    "Chapter 3. Optimizing Data Structures"), *Optimizing Data Structures*.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'By a simple definition, a language feature has the following elements:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Syntax, the keyword and the usage
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Constructs, the overall unification of syntax and the contextual usage, especially
+    when used within other language elements
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Semantics, the actual context and meaning of the code that has the constructs
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: We all know what syntax is. But constructs are quite subtle. The term *constructs*
+    comes from the fact that syntaxes with identifiers and arguments forms a composite
+    code that is heavily related to the syntaxes.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'For example, let''s examine the `if` syntax:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE0]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'When we describe the syntax, it is by using an abstract concept such as `boolean-expression`
+    or just an expression. We have highlighted the keywords for you: `if`, `then,
+    else.`'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Before we are going to use `if`, we have to understand the semantics of `if`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following information are the semantics of `if`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Within the `boolean-expression`, the expression has to be an expression that
+    always evaluates to either true or false as this is also the nature of a Boolean
+    type. It can be a direct value of Boolean itself, such as true or false, or it
+    can be in the form of a symbol variable or as a function that evaluates to Boolean
+    result.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The expression after `then` means evaluate and execute the expression after
+    the `then` keyword.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The `else` keyword means to optionally evaluate and execute the expression if
+    the `boolean-expression` is evaluated to be false.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'The constructs of `if` as a sample is quite trivial, we just give a sample
+    usage of `if` here:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE1]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The sample code means that the `if` construct uses the `if..then` construct,
+    instead of the full `if..then..else` construct, as illustrated in this fugure:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Overview of language features and constructs optimization](img/image00317.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Therefore, when we discuss constructs, it is often better to express it with
+    a sample code, rather than using the abstract form of syntax usage and description.
+  prefs: []
+  type: TYPE_NORMAL
+- en: If we look up and check F# documentation in MSDN Library, the syntax usage is
+    defined using the common **Backus-Naur Form** (**BNF**) notation. This BNF notation
+    is a notation to represent syntax definition and usage, originally taken from
+    compiler theory in the realm of computer science discipline.
+  prefs: []
+  type: TYPE_NORMAL
+- en: There are simplified and full notations of BNF, but for the sake of simplicity
+    and to avoid confusion, we shall use simplified BNF. The simplified form is also
+    commonly used in MSDN Library when describing programming language syntaxes, including
+    those in F#, C#, VB, C++, JavaScript.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: Some programming books use full BNF notation to describe syntax. It is also
+    valid, but it is also quite confusing at the same time for people who are not
+    from a computer science background. Throughout this book, we will describe syntax
+    using the simplest form of BNF notation instead of the full BNF.
+  prefs: []
+  type: TYPE_NORMAL
+- en: It is also quite common to use the angled brackets, `[ .. ]`, to denote optional
+    syntax. In the context of our `if` syntax, the `else` keyword with the expression
+    is also optional.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'For more information on the overview of BNF notation, its variants, and the
+    grammar of the syntax, check out this comprehensive article:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[http://matt.might.net/articles/grammars-bnf-ebnf/](http://matt.might.net/articles/grammars-bnf-ebnf/)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Optimizing common F# language constructs
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: When we are optimizing F# language constructs, the best way to start optimizing
+    is to identify the most commonly used F# language constructs. This is quite subtle,
+    but important, because commonly used F# language constructs are easier to understand
+    and learn first rather than the rarely used or more advanced ones. However, we
+    shall focus on the constructs that often have subtle performance impacts and recommended
+    correctness to enforce predictable behaviors.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Predictable behaviors in the context of a running code means having predictable
+    results on the entire flow of code, including when dealing with branches, switching
+    execution contexts such as async and parallelisms, and having awareness on exceptions.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let''s visit the most commonly used F# constructs: active pattern, pattern
+    matching, and delegate or function lambda in F#.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Best practices of interoperability of F# delegate with .NET delegate
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Delegate in F#, as we have seen, is very useful and unique but at the same time
+    it maintains the high compatibility bar with the .NET delegate.
+  prefs: []
+  type: TYPE_NORMAL
+- en: As a matter of fact, the internal and actual implementation of F# delegates
+    actually derives from the .NET Delegate class. This is important as F# has to
+    be compatible with and maintain the underlying .NET CLR, and on the higher layer,
+    compatible with .NET Base Class Library (BCL) that is defined in the `mscorlib.dll`
+    and `System.dll` assemblies.
+  prefs: []
+  type: TYPE_NORMAL
+- en: For normal functions implemented in F#, it should have planning in the future
+    to define whether it will be compatible with C#/VB or is just available to be
+    called from external F# compiled assemblies, or it is only used within its own
+    compiled assembly.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The best practice rules with the related scenarios from the F# side are:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: For functions that are planned to be called within their own assembly and do
+    not have any direct use or reference to .NET delegate (for example, LINQ expression
+    tree), always use F# delegates. This is faster than always mixing with the .NET
+    delegate, although the function is always used within the assembly scope.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: For a function that is planned to be available to be called from external assembly
+    that is also implementing the whole F# compiled code and does not have any direct
+    use or reference to a .NET delegate (for example, LINQ expression tree), always
+    use F# delegates. It is still faster than .NET delegates.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: For a function that is planned to be available to be called from any .NET delegate
+    and does not have any direct use or reference to a .NET delegate (for example,
+    LINQ expression tree), special care has to be taken into account, such as interoperability
+    when the .NET delegate is calling the F# delegate.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: For a function that is planned to be available to be called from any .NET delegate
+    and also has calls to .NET delegate, use the .NET delegate model instead of F#
+    delegate. This usage of .NET delegate is slightly slower than F# delegate, but
+    the overall performance is compensated when the function is called many times
+    from .NET delegate, while at the same time achieving the highest compatibility
+    with .NET delegate and other managed languages, such as C#/VB.NET/managed C++.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Currently, there is no other known scenario for delegate interoperability other
+    than the rules just mentioned. As long as we are aware about F# and other managed
+    languages' feature parity, we are always guaranteed to have a high predictability.
+    A best sample for this parity is the lambda function feature. This feature is
+    available on both F# and most other managed languages such as C#/VB and IronPython.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Unfortunately, managed C++ has this full support for language lambda feature
+    parity only since the release of Visual Studio 2013\. It is good to know that
+    Microsoft has provided extensive documentation on using this feature on managed
+    C++.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'For more information about lambda in C++, visit:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[https://msdn.microsoft.com/en-us/library/dd293608.aspx](https://msdn.microsoft.com/en-us/library/dd293608.aspx)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'However, when doing interoperability with .NET delegate, avoid the following
+    pitfalls:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Calling or mixing .NET delegates with normal asynchronous workflow. This will
+    yield unpredictable behaviors because a .NET delegate is best suited within the
+    Task Asynchrony Programming model of .NET Task asynchrony. F# has its own asynchrony
+    without the need for using the same context switching model of .NET Task asynchrony.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Calling F# delegate/function that has implementation of asynchronous workflow
+    from normal .NET method. This is fine, as long as the .NET method is not treated
+    as asynchronous. But if the calling .NET method is implemented asynchronously,
+    unpredictable behavior will always occur, and it might lead to race condition
+    in the context switching.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '*Do not* mix F# delegate within .NET unsafe methods. Unless we must have an
+    unsafe implementation to a known Windows API, it is highly recommended to avoid
+    this practice.'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Let's do the real work of these delegates interoperability in the next section.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Passing a .NET delegate as an F# function
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: Let's start passing an F# function from C#, and this fits with scenario 4 for
+    any function that is going to be called from C#.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'For example, suppose we implement a function to get the row index of data from
+    an `IEnumerable`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE2]'
+  prefs: []
+  type: TYPE_PRE
+- en: In our C# project, first add a reference to the assembly that has the implementation
+    of `GetRowIndex`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Then, we can import the namespace and use the F# function directly within C#
+    using this sample:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE3]'
+  prefs: []
+  type: TYPE_PRE
+- en: The preceding code will get all of the running process of our machine, then
+    search for a process named `explorer.exe`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: When we pass a C#/VB delegate, it is actually a .NET delegate. But the lambda
+    will evaluate as a different lambda that F# has; therefore, we have to convert
+    our lambda expression parameter to `FSharpFunc` (F# lambda) before passing it.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`FuncConvert` is available in the `FSharp.Core` assembly under the namespace
+    of `Microsoft.FSharp.Core.FuncConvert`. This helper class has enough converter
+    methods that support all forms of .NET `Func`, as indicated by the signature symbol
+    of `FuncConvert`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE4]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'For more information about F# `FuncConvert`, visit MSDN:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[https://msdn.microsoft.com/en-us/visualfsharpdocs/conceptual/core.funcconvert-class-%5Bfsharp%5D](https://msdn.microsoft.com/en-us/visualfsharpdocs/conceptual/core.funcconvert-class-%5Bfsharp%5D)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Calling .NET delegate within F#
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: Now, what about calling a common .NET delegate, such as `Func<'T,'U>`, in our
+    F# code?
+  prefs: []
+  type: TYPE_NORMAL
+- en: It is quite simple and straightforward, and it is also simpler than passing
+    a .NET delegate as an F# delegate.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'For example, we could call LINQ and pass the delegate parameter:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE5]'
+  prefs: []
+  type: TYPE_PRE
+- en: In the preceding code, the `Func` delegate is instantiated first, then the constructor
+    is filled with the number of parameters and the correct type annotation, whether
+    it is generic or not.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Best practices in pattern matching and active pattern
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Pattern matching is one of the most commonly used language features/constructs.
+    It is both a language feature and a language construct with syntax.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The starting syntax for pattern matching is as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE6]'
+  prefs: []
+  type: TYPE_PRE
+- en: The keyword `match` means to match the expression with the pattern below the
+    `match` keyword. It is highly required for the patterns to be matched in order
+    to have the same indentation as the `match` declaration.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Not all kinds of functional language patterns are supported, and this is already
+    defined in F# 4.0 language specification. The full specification of F# 4.0 predefined/supported
+    patterns of pattern matching is documented at:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[https://docs.microsoft.com/en-us/dotnet/articles/fsharp/language-reference/pattern-matching](https://docs.microsoft.com/en-us/dotnet/articles/fsharp/language-reference/pattern-matching)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The easiest pattern to use is the constant pattern. The constant value means
+    that the expression will be inferred as a type of the constant pattern as long
+    as the pattern is consistently defining all the patterns and uses the same type
+    of constant.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'For example, let''s write a code to convert *ABC* grade to the commentary report.
+    Using pattern matching, this is the code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE7]'
+  prefs: []
+  type: TYPE_PRE
+- en: The grade parameter is inferred by the mostly used types of the constant patterns,
+    typed as string. This pattern matching usage is common, and it is also easier
+    to understand and easier to reason than using different types as constants. These
+    common pattern matching uses of constants are also faster to compile because the
+    type used as constants value.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'To test on the type of grade parameter and the return type, we can use F# interactive.
+    Simply highlight the code of `SimpleGradePattern` and press *Alt* + *Enter*. Then
+    the type will be inferred as `string -> string`, as illustrated in the following
+    screenshot:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Best practices in pattern matching and active pattern](img/image00318.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: This inferred type is a proof that type inference flows nicely in a consistent
+    way, as indicated by the use of string constants. The use of `_` in the last pattern
+    specifies that we should take care of the other patterns not mentioned, regardless
+    of the content of the grade parameter. Omitting this will result in compile error
+    because F# compiler always checks for all possible conditions in pattern matching
+    and requires that all possible conditions in pattern matching must be handled.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Comparing constant pattern matching with if constructs
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: Some developers, especially when dealing with pattern matching, always compare
+    pattern matching with a similar common language construct, the `if` construct.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The `if` condition construct is also supported in F#. It has an additional syntactic
+    sugar, the `elif` keyword, to define that an else is immediately followed by the
+    `if` construct. This `elif` keyword is the same as having the `else if` syntax.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The use of `if` is common in non-functional programming languages, especially
+    in OOP languages such as C#/VB.NET/C++, because it implicitly enforces imperative
+    as is usually found in OOP languages as well.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The `if` syntax in F# is defined as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE8]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The following explains the syntax and semantics of the `if` constructs:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The keywords `if` and `then` are required because they define the condition
+    to evaluate and also what to do if the condition is evaluated as true.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`boolean-expression` means that the expression is an expression that will result
+    as Boolean, either true or false. This is required, and `boolean-expression` has
+    to comply with the F# language specification for `boolean-expression`.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The `else` construct is optional, and it does not have to be in the same line.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'The official documentation of F# `if` specification is available at:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[https://docs.microsoft.com/en-us/dotnet/articles/fsharp/language-reference/conditional-expressions-if-then-else](https://docs.microsoft.com/en-us/dotnet/articles/fsharp/language-reference/conditional-expressions-if-then-else).'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Now, let's go back to our grade pattern. We are now going to convert our grade
+    to use `if` instead of using pattern matching.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The code to convert our grade has to be written well to capture all of the
+    semantics of `SimpleGradePattern`. There are many ways to write the code using
+    `if`, but we are going to leverage `elif` in F#. This is the code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE9]'
+  prefs: []
+  type: TYPE_PRE
+- en: To make the comparison more interesting, let's add more functions to test and
+    to sample these constructs, comparing `if` with pattern matching.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'First, we will use the `Stopwatch` object from .NET BCL of `System.Diagnostics`,
+    by importing the namespace first, with the `System` namespace as well:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE10]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Now, we will write a function to test the one pass running of `SimpleGradePattern`
+    and `SimpleGradeNoPattern`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE11]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The preceding code has the following notable elements of semantics and flows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The use of stopwatch `swtimer` as mutable. This is important because `swtimer`
+    will be used and changed many times inside the scope of our `GradeBenchmarkTest`
+    function.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The stopwatch needs to be reset every time it is stopped and is going to be
+    used again because we need to ensure that the timespan result at the initial start
+    is reset to 0.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The result of the stopwatch will be available after it is stopped, and it is
+    stored in the `Elapsed` property, typed as `TimeSpan`.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The use of `5000000` times iteration using `for..to` loop. The number of iterations
+    is important because the nature of today's processor is so fast, and most sampling
+    ends in milliseconds. Less than 1,000,000 sampling will yield less than 10 ms,
+    and it will be hard to differentiate between pattern matching and `if` usage.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: We are using the same parameter of `B` to ensure that the code will evaluate
+    as semantically the same (from the perspective of parameter and result).
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: We are returning the milliseconds result as `Tuple`, which has two fields to
+    contain `timerSimpleGradePattern` and `timerSimpleGradeNoPattern` results. The
+    direct use of .NET Tuple instead of F# Tuple is chosen because this will ensure
+    that the returning result will be used easily by the calling function.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The `Elapsed` property is using `TimeSpan` because it is used to store *the
+    duration of time spanned*. This is important because `TimeSpan` can have a resolution
+    from hours to milliseconds.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'For more information on `TimeSpan`, consult the following page:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[https://msdn.microsoft.com/en-us/library/system.timespan(v=vs.110).aspx](https://msdn.microsoft.com/en-us/library/system.timespan(v=vs.110).aspx)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Now, we need further samples to get the average execution time of both constant
+    pattern matching and `if` usage. To simplify calculating the average, we shall
+    call `GradeBenchmarkTest` within a frequency value as defined by function parameter.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following code tests the statistical sampling of the benchmark:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE12]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Let''s run it by putting the benchmark to test by putting `GradeBenchmarkSamplingTest`
+    with a high enough frequency sampling:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE13]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'To minimize friction with debugging, run without debugging by pressing *Ctrl*
+    + *F5* and this is one of the sample displays:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Comparing constant pattern matching with if constructs](img/image00319.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'On my machine, under the configuration of core i7 4^(th) generation with 16
+    GB of RAM, the `SimpleGradePattern` function (with constant pattern matching)
+    is outperforming `SimpleGradeNoPattern` by a narrow margin results:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '| `Sampling` | `SimpleGradePattern` | `SimpleGradeNoPattern` |'
+  prefs: []
+  type: TYPE_TB
+- en: '| 1 | 96 ms | 97 ms |'
+  prefs: []
+  type: TYPE_TB
+- en: '| 2 | 97 ms | 97 ms |'
+  prefs: []
+  type: TYPE_TB
+- en: '| 3 | 98 ms | 99 ms |'
+  prefs: []
+  type: TYPE_TB
+- en: '| 4 | 96 ms | 98 ms |'
+  prefs: []
+  type: TYPE_TB
+- en: '| 5 | 97 ms | 100 ms |'
+  prefs: []
+  type: TYPE_TB
+- en: '| 6 | 96 ms | 99 ms |'
+  prefs: []
+  type: TYPE_TB
+- en: '| 7 | 97 ms | 100 ms |'
+  prefs: []
+  type: TYPE_TB
+- en: The results on your own machine may vary, but this result highly depends on
+    the specifications of your machine, including CPU and RAM.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In order to successfully execute and sample timing sensitive benchmark, it
+    is highly recommended to have the following preconditions:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Windows Update is turned off. On Windows 10, the best way to do this is to disconnect
+    all your networks as Windows 10 will always try to update every time you are connected
+    to any internet/network.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: We should always run the benchmarked code without debugging. This will give
+    more accurate results because the Visual Studio debugger will not be loaded, and
+    the execution will be faster.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Turn off any Windows notifications. There are overheads when you have many notifications
+    running in background, and this may affect one or two cores on your system.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: On an average, `SimpleGradePattern` is 1 to 3 ms faster than `SimpleGradeNoPattern`.
+    If you run this again, results may vary but in the overall condition, using pattern
+    matching is better than using `if`. To understand why, we shall dive deeper into
+    the resulting IL.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let''s dive into the IL of `SimpleGradePattern`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE14]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The IL code in `SimpleGradePattern` is divided into two sections: the first
+    section handles the conditions and the second section (after `br.s` in the line
+    segment `IL_004e`) handles the return value as the destination of branches before
+    `IL_004e`.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let''s dive into the IL of `SimpleGradeNoPattern`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE15]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'After reading the IL of `SimpleGradeNoPattern`, we come to the following conclusions:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: All of the conditions of `A` to `E` (including `undefined`) are stored onto
+    heap. This is normal and this is the nature of string, it being a reference type.
+    Storing onto heap is indicated by the instruction of `ldstr`.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: All of the patterns in the pattern matching results need a storage. The storage
+    is prepared using `stloc`. This IL instruction will prepare stack storage, then
+    all the condition results (the Boolean result) of `A` to `E` are stored onto the
+    same stack. There is a stack allocation overhead at the first initialization,
+    but this is compensated by using stack to load the value after the stack is allocated
+    by calling `ldloc`.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: In the code that uses `if`, the conditions result of `A` to `E` are loaded onto
+    heap. This is needed for `if` because it needs a different location for each `if`,
+    and it's faster to allocate the heap at the initial declaration in `if` because
+    it will avoid stack allocation overhead. Then, the flow branches to the next instructions.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: String in both the codes is evaluated using calls to the `System.String.Equals()`
+    method. However, the interesting fact is the use of `call` in `SimpleGradePattern`
+    instead of `callvirt`. This is subtle but different; `call` is used to call a
+    static method of `String.Equals()`, while `callvirt` requires instantiation of
+    string before calling `String.Equals()`. A static call is always faster to execute
+    than method instance calls.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: This narrow result of benchmark clearly shows and proves that using constant
+    pattern matching is faster than the sequences of `if`, although it shows a small
+    amount of difference in milliseconds.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We can safely conclude that it is common best practice to use pattern matching
+    instead of `if` constructs for patterns that have the same data type and the patterns
+    used are easily evaluated.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The results will be more apparent if the patterns used have many patterns,
+    for example:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 52 patterns of poker cards
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 7 days of a week
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 12 months of a year
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: And the semantic of pattern matching always enforces correctness by always enforcing
+    us to evaluate all the possible outcomes. For example, in `SimpleGradePattern`
+    there can be input outside `A` to `E`, and we can consider outside of these inputs
+    as undefined or invalid. If we do not provide this information to satisfy the
+    outside predefined conditions, we will have a compile error, and the code will
+    not run even on F# interactive mode.
+  prefs: []
+  type: TYPE_NORMAL
+- en: If we use too many patterns to be matched, then the code execution will be slower
+    to compile and execute because F# compiler will try to parse the patterns used
+    and search for unused/unidentified patterns; then, the IL code generated will
+    add more overhead on branching, and branches with too many fall downs are not
+    effective because later conditions will always be evaluated longer before the
+    first conditions.
+  prefs: []
+  type: TYPE_NORMAL
+- en: To relate to our example code of `SampleGradePattern`, the `E` condition is
+    always treated to be evaluated after `A` to `D`. Therefore, too many patterns
+    (especially above 10 patterns) will not be efficient, and later conditions, especially
+    patterns nearing the end, will always be evaluated longer after previous conditions
+    are evaluated.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'To mitigate the slow execution problems of many patterns to be matched, it
+    is better to refactor it and then we could use one of these:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: A dictionary of key and value. The key will have to be treated like a unique
+    primary key, and the value can be anything as long as it has relations to its
+    key. This value can then be extended to be typed as delegates or F# functions
+    to be executed when we search for a key that has values as actions to be executed.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: A list of data typed as `KeyValue` pairs and this F# list is more efficient
+    than the .NET dictionary because it will be stored as a linked list, with immutability
+    coming by default and known recursive support by `head::tail`.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Note
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: At the time of writing this book, .NET 4.6.1 does not have support for built-in
+    read-only dictionary. Although we can use read-only collections that are parts
+    of Microsoft's NuGet of `Immutable.Collections`, it is better to use F# list because
+    of the nature of immutability, and it's faster to access than a .NET list as linked
+    list. It is faster to access because the linked list implementation of F# list
+    is faster than a normal .NET list in nature and it has support for recursive access
+    within head and tails.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Best practices in using active patterns
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: Active pattern is one of the language constructs in F# that is very useful.
+    It is often used in pattern matching and embedded within `if` constructs.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'There are only two kinds of active patterns in F#: complete active pattern
+    and partial active pattern. A complete active pattern is an active pattern that
+    contains more than one identifier whereas a partial active pattern only has one
+    identifier and the `_` identifier to denote the rest of the conditions, much similar
+    to the use of `_` in pattern matching.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The syntax for active pattern is as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE16]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'For example, we can define an active pattern to contain even and odd number
+    as pattern of *even* and *odd* like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE17]'
+  prefs: []
+  type: TYPE_PRE
+- en: The operator `%` in F# means modulo, so the condition checks if modulo 2 equals
+    0 or not. If it equals 0 then it will be resolved as `Even`, otherwise (else)
+    `Odd`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We can then harness active patterns within pattern matching, for example:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE18]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Now within our entry point of main, we can test with the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE19]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Run the code without debugging, and this is the result:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Best practices in using active patterns](img/image00320.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'How does the pattern translate into raw IL? Let''s dive into IL. Looking at
+    the layout of the resulting output of IL Disassembler (ILDASM), we see this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Best practices in using active patterns](img/image00321.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'Based on the preceding picture, we can see the following interesting parts:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The module that holds our code, `ActivePatterns`, is defined as `public static
+    class`.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: The active pattern is defined as a method. The method references to a class
+    of `Microsoft.FSharp.Core.FSharpChoice` with two generic type parameters (indicated
+    by `'2`)
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: The function that performs the test-the `TestEvenNumber`.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Let''s dump the IL of `Even|Odd`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE20]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Now, let''s examine `TestEvenNumber`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE21]'
+  prefs: []
+  type: TYPE_PRE
+- en: Yes, the `Even|Odd` class is defined based on registering the `Even` and `Odd`
+    passed as parameters for `FSharpChoice` class. In F# code, this class is called
+    `Core.Choice<'T1,'T2>` because it has two generic parameterized types, and it
+    is documented as a helper class to define active patterns.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We can deduce that there is a limit to the number of active patterns defined.
+    The limit of the number of patterns is 7, as defined by active pattern documentation:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '*There can be up to seven partitions in an active pattern definition.*'
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: 'The documentation for active pattern is available at:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[https://docs.microsoft.com/en-us/dotnet/articles/fsharp/language-reference/active-patterns](https://docs.microsoft.com/en-us/dotnet/articles/fsharp/language-reference/active-patterns)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: F# `Choice` is powerful because it is used heavily in active patterns to effectively
+    express our patterns as choices, which are then passed to `Choice1of2` and `Choice2of2`
+    to be processed as the result of a choice. The kind of `Choice` class used depends
+    on how many patterns we have as active patterns.
+  prefs: []
+  type: TYPE_NORMAL
+- en: For example, three patterns used means that it will be translated into calls
+    to the `Choice<'T1,'T2,'T3>` class, which then calls `Choice1of3`, `Choice2of3`,
+    and `Choice2of3` as needed.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Interestingly enough, all F# `Choice` classes are declared as discriminated
+    unions. For example, F# `Choice<''T1,''T2>` is declared as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE22]'
+  prefs: []
+  type: TYPE_PRE
+- en: This means that `Choice` can also have the benefit of discriminated unions without
+    having to redefine inner classes that go intermingled with generics embedded.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The most commonly used active patterns are patterns of two and three. This includes
+    the implicit leverage of `Core.Choice<'T1,'T2>` and `Core.Choice<'T1,'T2,'T3>`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'For more information about `Core.Choice<''T1,''T2>` and `Core.Choice<''T1,''T2,''T3>`,
+    visit the following links:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[https://msdn.microsoft.com/en-us/visualfsharpdocs/conceptual/core.choice%5b''t1,''t2%5d-union-%5bfsharp%5d](https://msdn.microsoft.com/en-us/visualfsharpdocs/conceptual/core.choice%5b''t1,''t2%5d-union-%5bfsharp%5d)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[https://msdn.microsoft.com/en-us/visualfsharpdocs/conceptual/core.choice%5b''t1,''t2,''t3%5d-union-%5bfsharp%5d](https://msdn.microsoft.com/en-us/visualfsharpdocs/conceptual/core.choice%5b''t1,''t2,''t3%5d-union-%5bfsharp%5d)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: For the sake of correctness, the use of active patterns combined with pattern
+    matching is recommended as long as the active pattern used is simple enough and
+    the nature of the active pattern is a complete active pattern.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The use of partial active patterns is not recommended because:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The rest of the unevaluated conditions will always be a fallback. This fallback
+    of all unevaluated conditions might imply an uncaught error or exception, and
+    this is not a good practice. All the conditions should be carefully thought and
+    then handled as this will provide clear reasoning.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Because of the nature of unevaluated conditions, any exceptions that may happen
+    might be uncaught after the pattern is passed to the code that uses the active
+    pattern. This uncaught exception is harder to resolve because our code is not
+    in the correct context of where the exception should be caught.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Considerations in catching exceptions in active patterns
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: Uncaught exceptions in active pattern, no matter how subtle it is, are always
+    expensive. The call stack preparations and the state will always lead to undesirable
+    effects such as losing the previous states, including not evaluating the rest
+    of the active patterns we have. Losing the previous states, especially losing
+    the current execution state before the exception happened always leads us to execution
+    termination, unless the exception is caught.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Catching an exception itself is expensive, but having an uncaught exception
+    is more dangerous as it will always force our code to be halted/terminated. Propagating
+    and then displaying the exception information (including stack traces) is common
+    in many software applications that have GUI, in order to give user the information
+    of what exception is caught.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In .NET BCL, the stack traces are represented in the `StackFrame` class. It
+    will by default be always instantiated when we catch any exception. This is one
+    of the many reasons *why catching exceptions is expensive*, because it will implicitly
+    instantiate `StackFrame`, building information based on the current stack and
+    call site and then hooking up the information. Hooking up the call site and the
+    `StackFrame` itself takes some CPU overhead as it goes back and forth to the hooking
+    up pointers and v-table of call stacks.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The `StackFrame` class is available under the `System.Diagnostics` namespace
+    within the assembly of `mscorlib.dll`. For more information about .NET `StackFrame`,
+    visit:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[https://msdn.microsoft.com/en-us/library/system.diagnostics.stackframe(v=vs.110).aspx](https://msdn.microsoft.com/en-us/library/system.diagnostics.stackframe(v=vs.110).aspx)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Now, let''s turn our focus to optimizing one of the subtle language constructs
+    of F#: inline functions.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Optimizing inline functions
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: F# has features of inline functions since F# 1.9, although the previous version
+    already had it as experimental.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The definition of inline function is quite non-trivial: an inline function
+    is a function that is *integrated* into the calling code. The word integrated
+    must have a clear context; what kind of integration? It is integrated in the sense
+    that the type is not generalized, but it is compiled accordingly when the inline
+    function is used within other functions. The inline function body is embedded
+    directly. This function embedding will be discussed in detail in the next section.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Before we discuss in-depth about inline functions, let's first examine the background
+    of the importance and relevance of inline functions in the next section.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Background overview of inline functions and related type inferences
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: To understand this integration, we must know the background of how functions
+    and arguments are evaluated first, especially if the arguments have no type annotation
+    at all. When an F# function declaration has type annotations, the mechanism is
+    simpler because the compiler will not perform any automatic generalization strategy
+    at all. The evaluation of functions and its arguments are part of type inference
+    mechanisms in F#, including automatic generalizations and inline functions.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Automatic generalization strategy is unique in F#, it is powerful but at the
+    same time will put the burden of type inference on the compiler.
+  prefs: []
+  type: TYPE_NORMAL
+- en: When there are type annotations applied in the function argument's declaration,
+    heavy automatic generalization will not always occur. If the type annotation itself
+    contains a normal generic type annotation such as `` `T ``, then the generalization
+    is done partially because of the availability of existing type annotations in
+    the declarations.
+  prefs: []
+  type: TYPE_NORMAL
+- en: F# has further optimizations to use instead of having normal generic generalizations
+    (including automatic generalizations) using inline functions. This inline function
+    feature is a well-known and powerful feature of F#, although it is rarely used.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Overview of F# type inference mechanism of generic type inference
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'The most known aspect when writing a function declaration is writing the parameters
+    without any type annotation at all. F# compiler infers the type using the following
+    algorithm:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: If the function body contains expressions that employ common arithmetic operators
+    such as additions and multiplications, the type will be inferred as `Int32` by
+    default. Any calculation that involves a rational number (for example, 2.5) will
+    perform a type inference resulting as `Double`.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: If the function body contains more complex statements such as `if` and `try...with`,
+    the type inference will perform an *automatic generalization*. The resulting signature
+    will be similar to a C#/VB method that has generic types as parameters.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Overview of automatic generalization in F#
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: '**Automatic generalization** means that type inference will resolve as generic
+    when it cannot further infer as concrete types. In F#, automatic generalizations
+    mostly happen when the type inference cannot be inferred further not just by the
+    content of the function body. When a more complex construct such as `if` is used,
+    the generalization will try to infer generic type, and it has more complex algorithms
+    to prevent more generalization from using too many generic types.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Compiling a function that resolves as generalized parameters will generate IL
+    for generic types, and the number of generic types is determined by the function
+    body itself.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Let's examine automatic generalization samples from the simplest one.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following code has `if` in the function body:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE23]'
+  prefs: []
+  type: TYPE_PRE
+- en: The type of `a` and `b` will be generalized and inferred to be typed as `'a`,
+    because it assumes that `a` and `b` must have the same type due to the existence
+    of `>` parameter in the function body.
+  prefs: []
+  type: TYPE_NORMAL
+- en: This simple sample proves that automatic generalizations depend on the signature
+    declaration and the function body.
+  prefs: []
+  type: TYPE_NORMAL
+- en: For functions with type annotations that use normal generic type annotations,
+    F# will try to check for the existence of a simple arithmetic expression and will
+    infer it as long as the arithmetic expression does not contain another recursive
+    call.
+  prefs: []
+  type: TYPE_NORMAL
+- en: However, using generalization in a generic type will have its own disadvantages
+    because generic type resolution is resolved at compile time but the user of the
+    function might have a different use of concrete type, and this will add overheads
+    in the compilation time and also small overheads when it is run. The runtime will
+    always try to keep the original generalized type as is, and there is a chance
+    that some type will be bound using late binding strategy instead of early binding.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'For example, the `greaterThan` function might be called with different concrete
+    types as long as the type inferred implements the `>` operator:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE24]'
+  prefs: []
+  type: TYPE_PRE
+- en: The late binding of type resolution will always add overhead to the overall
+    performance, although it rarely occurs.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: Do not mix late binding with dynamic typing. Late binding is different from
+    dynamic typing; in dynamic binding, type resolution is done at runtime instead
+    of compile time. Therefore, in dynamic typing languages, type resolution always
+    happens at runtime, and it is mostly done using techniques such as combination
+    of dynamic type resolution and call site caching.
+  prefs: []
+  type: TYPE_NORMAL
+- en: To minimize the overheads of type binding at runtime (although the type resolution
+    is done at compile time), F# has other features to replace the type of the parameter
+    as a concrete type when the function is called by another function that has a
+    concrete type resolved. This is called inline function, and it is described in
+    the next section.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Best practices in implementing inline functions
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: F# supports *statically typed parameters*, not just normal parameters. The term,
+    *static type parameters,* means that the type parameters are replaced with the
+    concrete types at compile time instead of runtime.
+  prefs: []
+  type: TYPE_NORMAL
+- en: This means an increased performance because the type is already filled in and
+    there is no further generic type translation at runtime. It also increases correctness
+    and predictability because the type is already inferred at compile time, minimizing
+    the overhead of normal generic type materialization into a concrete type and at
+    the same time providing a guarantee to be strongly typed at runtime.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'There is a caveat: once we have declared the generic type parameter to be statically
+    typed, we cannot mix with the normal generic type.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The syntax for this statically typed parameter uses a caret, the `^` symbol
+    instead of the normal apostrophe `''` symbol. Take for example the following function
+    signature:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE25]'
+  prefs: []
+  type: TYPE_PRE
+- en: The statically typed parameter can be used only in conjunction with inline functions
+    and methods.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In function/member declaration, a statically typed parameter is for all generic
+    types used, so again there is no mixing with normal/common generics. For example:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE26]'
+  prefs: []
+  type: TYPE_PRE
+- en: The `static` type flows into all usage, including at the declaration of the
+    interface implementation used, the signature of the discriminated union, and the
+    declaration of type constraints.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let''s start exploring inline functions. In this sample, we create a multiplication
+    inline function:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE27]'
+  prefs: []
+  type: TYPE_PRE
+- en: In the preceding code, we have an inline `inlinemul` function that takes `a`
+    and `b` as parameters.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The inline functions can be implemented in defining custom operators:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE28]'
+  prefs: []
+  type: TYPE_PRE
+- en: In the preceding code, we have the `^*` operator that takes `a` and `b` as parameters.
+    The resulting semantic of sample `mul` and `^*` operator is the same, and it is
+    also the same from the perspective of IL implementation.
+  prefs: []
+  type: TYPE_NORMAL
+- en: First, we need to verify the signature based on the documentation. To check
+    the signature of the previous `inlinemul` function, we can use F# interactive.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'After evaluating both `mul` and `^*` operator, we have the following signatures
+    in **F# Interactive**:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Best practices in implementing inline functions](img/image00322.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: All generic type parameters are declared with a caret prefix instead of using
+    the common normal apostrophe/single quote, `'`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let''s extract and examine the declaration of `inlinemul` (with line number
+    added for clarity):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE29]'
+  prefs: []
+  type: TYPE_PRE
+- en: Reading the inline function declaration might not be quite trivial, but it is
+    quite straightforward to understand because it has predefined semantics within
+    some syntaxes.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following explains the semantics:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Line 1 defines an inline function declaration definition.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Line 2 defines function arguments signature that has a signature of `^a -> ^b
+    -> ^c`. It has type definitions to the effect that parameters `a`, `b`, and `c`
+    are generic type parameters that are statically typed.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Line 3 defines constraints (using `when` keyword) for `^a` or `^b` to the effect
+    that it must have a static member of the `*` operator implemented within the `^a`
+    or `^b`. It means that `^a` or `^b` must have implementations of the `*` operator
+    which has arguments of `a` and `b`.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Now that we have grabbed the contextual meaning of the inline function semantics,
+    it is easier to see that type inference also plays an important role inferring
+    the operation of the function, going deeper into explicitly adding constraints
+    to define that the operator must be implemented in the generic type.
+  prefs: []
+  type: TYPE_NORMAL
+- en: This constraint gives the meaning and reasoning why it is called statically
+    typed parameter.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: C# has comparable generic constraints keyword that are similar to F#'s `when`
+    keyword, the generic constraint limiting of `where` keyword. This `where` keyword
+    in the generic type constraint declaration/definition is different from the `where`
+    keyword in LINQ because the `where` keyword in LINQ is actually translated into
+    call to `Enumerable.Where` or `Queryable.Where`, depending on which LINQ provider
+    is used.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Based on the definition of inline functions, the type will be made available
+    at compile time: therefore, the type resolution is done at compile time. This
+    will add some overhead, especially if the inline function contains complex operations.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let''s see these inline functions used by other functions, by creating quick
+    symbolic properties to test them:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE30]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Let''s put these inline functions and the test functions inside a module, called
+    `InlineFunctions`. Now, let''s see the generated IL of the `InlineFunctions` module
+    by using ILDASM:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Best practices in implementing inline functions](img/image00323.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'The compiled inline functions are compiled under the following names:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The `inlinemul` function is compiled as `inlinemul: !!c <a,b,c>(!!a a, !!b
+    b)`'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'The inline `^*` operator is compiled as `op_HatMultiply: !!c <a,b,c>(!!a a,
+    !!b b)`'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Let''s look at the IL of `inlinemul`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE31]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The preceding IL is explained as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The overall semantic of `inlinemul` and `op_HatMultiply` are basically the same
+    because the body is using the same generated IL from the same expression of `a
+    * b`.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Operator `^*` is compiled into IL as the `op_HatMultiply` function method.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: The compiled prefix of `!!` in the parameter declaration means it is defined
+    as compiled IL from statically typed parameter. It is unique in F# generated IL,
+    and this might change in the future because it is considered as an implementation
+    detail of how F# treats the statically typed parameters to be compiled into IL.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: The parameters of `a` and `b` are allocated and stored onto the stack, which
+    is then passed as a parameter to `LanguagePrimitives.MultiplyDynamic` because
+    we are using multiplication in the function body.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'The returning result is also marked as statically typed generics, compiled
+    with the same `!!` prefix. Again, this is the implementation detail of emitted
+    IL from F# compiler and this might change. But the same rule of thumb is applied
+    in the IL: the compiler generates different IL for statically typed parameters
+    and common generic type parameters.'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Now, let''s explore the IL of `inlinemul` usage, the `MulIntTest` property:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE32]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'We now see other proofs that F# type inference is powerful because this symbolic
+    property is translated into a property with only a getter, as defined with `.get`
+    getter declaration. This getter calls the `get_MulIntTest` method. The `get_MulIntTest`
+    method is defined in the following IL:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE33]'
+  prefs: []
+  type: TYPE_PRE
+- en: This `ldsfld` instruction means that the code pushes the value of `MulIntTest@9`
+    result onto the stack. Because of the fact that all operations are compiled into
+    IL instructions that utilize the stack, the performance is quite fast.
+  prefs: []
+  type: TYPE_NORMAL
+- en: However, if the implementation body of an inline function is more complex (more
+    than one operator is involved), then all calls to the inline function will have
+    large overheads of multiple calls to respective dynamic operators, which then
+    has many indirections of having to specify the type information for the call site
+    (the function that calls the inline function or inline operator). These overheads
+    of stack allocations of type translations and call site stack frame allocations
+    will decrease performance at the initial run.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We can also safely conclude that inline functions are best for functions that
+    focus on simple generic types that incorporate simple arithmetic, although inline
+    functions can speed up recursive operations, for example when dealing with operations
+    that have a recursive nature of iterating head and tail of F# native list, a linked
+    list.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Now that we understand the IL generated and the gory details of how the statically
+    typed parameter works with inline functions, we now understand the integrated
+    part of the inline function with the call site.
+  prefs: []
+  type: TYPE_NORMAL
+- en: It is integrated in a sense that each usage of our inline functions will translate
+    the type parameter from the call site, and each call site can have its own type,
+    regardless of whether it is different or the same.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Identifying tail call in recursive constructs
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: One of the characteristics of a functional programming language is the common
+    use of recursive constructs in many of the implementation of the functions; F#
+    compiler itself is also a good sample of code that has many implementations of
+    recursive constructs.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Functional programming languages always prefer to have recursive constructs
+    instead of having loops or iterative constructs because recursive is better to
+    use in the most complex calculations or in any operation that requires the ability
+    to perform the same operation when the problem solving or calculation is broken
+    into smaller problems.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Having recursive calls is quite common in F#, and it is recommended to optimize
+    further to have tail call optimization, although the optimization may not be applied
+    to all the cases.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Overview of recursion in functional programming
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: The use of recursion is more apparent in dealing with problems that require
+    resolving problems into smaller problems with the same algorithm. This is why,
+    in many cases, using iterations such as loop is not preferred because a loop will
+    add more complexity in the form of exponential steps instead of relying on a return
+    mechanism after resolving smaller problems.
+  prefs: []
+  type: TYPE_NORMAL
+- en: For example, we can write a factorial function to be implemented using a loop,
+    but then this loop becomes more complex to write because the number of loops might
+    be large, and there will be overhead in the initial memory allocations instead
+    of going deeper into performing the calculation recursively. Going deeper into
+    performing the calculation or doing some processes requires a returning point
+    to remember if the calculation is done and if the calculation is called by a previous
+    calculation.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The consequences of this returning nature after finishing the final smallest
+    problem require us to have a stack to store the locations and the state of the
+    calculation. When the calculation takes long or deep levels of recursions, most
+    codes will throw `StackOverflowException` because the stack allocation is exhausted.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'F# has support for common recursive functions by marking it with the `rec`
+    keyword as a requirement to indicate an explicit recursive function only if the
+    function body contains a call to itself. This is the easiest concept of recursion:
+    *a function that calls itself*. It is the most common because most of us get used
+    to the idea of recursive in recursive functions, which is a function that calls
+    itself.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'However, in terms of a functional programming language, the traits of recursive
+    constructs are broader:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: A function that calls itself. This concept of a function that calls itself is
+    the most common and also the easiest construct to understand. It is also by definition
+    quite self-explanatory. This construct is also widely used not just in functional
+    programming languages but also in non-functional programming languages, such as
+    C#, VB, and C++.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: A function that has a function as an argument, and then the function body contains
+    a call to the function that is defined as an argument of the calling function.
+    This trait might be confusing at first, but it is quite trivial when we see the
+    examples later.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: A function that contains flow branches that always end up with function calls
+    to itself. This is quite similar to a function that takes a function as its parameter
+    that contains a call to a function as its argument. In the end, both of the last
+    expressions evaluated are functions, not constants or statements.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: An example of point 1 is the most common, and it is also the most understood
+    form of recursion.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'For example, consider the following code for a factorial function:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE34]'
+  prefs: []
+  type: TYPE_PRE
+- en: In this factorial function, we implement the branching using pattern matching,
+    and this is useful and more correct because all the conditions of possible values
+    of `n` are checked.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Point 2 and point 3 require a deeper understanding of the nature of a curried
+    function and how recursion does not stop at only one case of when a function calls
+    itself, but also naturally has further optimizations that can be compiled as a
+    loop or any other optimization such as a tail call optimization.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: The factorial function is one of the best examples to have the deciding factor
+    of recursion. It is better to understand factorials as recursive instead of iterative.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'If we call a factorial with a very large number, such as 50,000, the stack
+    allocation will be quickly exhausted, and therefore there will be no more stack
+    available for us. The function will throw `StackOverflowException` to inform that
+    it is running out of stack and the stack that contains the returning state is
+    full. In order to avoid or handle this exception, we can do one of these:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: We change the implementation to use a loop instead, but this is not feasible
+    for all cases of recursion by nature.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: We can rely on compiler optimization because F# compiler will do its own optimization
+    by translating common recursive functions into loop with IL optimization.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: We can use tail call optimization by implementing recursive with a specific
+    pattern.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The last point, using tail call, is the most efficient optimization but it requires
+    more understanding to implement it.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Tail call recursion in F# and .NET CLR
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: It is also common in many functional programming languages to have a tail call
+    optimization in recursive constructs. Tail call recursion means that any recursion
+    is optimized not to use stack instead of optimizing it to have a tail call.
+  prefs: []
+  type: TYPE_NORMAL
+- en: F# supports both common recursion and tail call optimized recursion; tail call
+    support is also available in .NET CLR.
+  prefs: []
+  type: TYPE_NORMAL
+- en: What is tail call? A tail call means a function that has a call within a function
+    whose result is immediately used as the output of the function. It is then a call
+    that has a tail in its call to a function, usually as the last result of a calculation.
+    The position is usually at the last position to mark the call; this is why it
+    is called a tail call.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The definitive and full explanation of a tail call in F# is explained in this
+    MSDN blog from the Visual F# team:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[https://blogs.msdn.microsoft.com/fsharpteam/2011/07/08/tail-calls-in-f/](https://blogs.msdn.microsoft.com/fsharpteam/2011/07/08/tail-calls-in-f/)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Identifying tail call optimized implementation
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: According to the MSDN blog, tail call is a call in tail position implemented
+    recursively because the last expression is a function, not a composite expression,
+    such as an addition between numbers.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'A common sample of an expression that contains composite expression is the
+    following function:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE35]'
+  prefs: []
+  type: TYPE_PRE
+- en: The code tells us that the call to `sumList` is followed with a `+` operator;
+    therefore, it is obvious that this calculation is not a simple call to only a
+    function. Therefore, it is not implemented to have a tail call.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'To prove that `sumList` does not have a tail call, let''s look at the IL:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE36]'
+  prefs: []
+  type: TYPE_PRE
+- en: There is no tail call IL in the compiled `sumList` function. Although it is
+    recursive in the code, `sumList` is compiled to use an iterative loop, as indicated
+    by the `br.s` instruction at line `IL_000b` to call the `FSharpList,get_TailOrNull`
+    function.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Let's try to implement the tail call function.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The tail call optimization is not available by default; we have to turn it
+    on based on the project scope, not on the solution scope. To turn on tail call
+    optimization, open the project''s properties and select the **Build** tab. This
+    tab contains all the properties of the F# project, including the runtime target
+    of 32-bit and 64-bit. Set the checkbox of **Generate tail calls** as illustrated
+    in the following screenshot:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Identifying tail call optimized implementation](img/image00324.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'Let''s examine the simplest function that has an argument that is typed as
+    a function, then the main function body calls the function of the argument:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE37]'
+  prefs: []
+  type: TYPE_PRE
+- en: This function is implemented to have tail call support because it minimizes
+    stack allocation, while the recursion still applies. This is possible because
+    it fits the pattern to have tail call as the last expression in a function.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let''s check the IL of `apply`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE38]'
+  prefs: []
+  type: TYPE_PRE
+- en: Now, we have a tail call optimization, as indicated in line `IL_0003` that contains
+    the `tail.` instruction.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Now let''s apply tail call optimization to calculate the factorial. Let''s
+    create a new function of the factorial that contains a recursive inner function.
+    This inner function has recursive calls to the inner function itself:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE39]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'And this is the IL of `accFactorial`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE40]'
+  prefs: []
+  type: TYPE_PRE
+- en: We now have a tail call recursion in our function. In the next section, we will
+    discuss the advantages of having tail call optimization.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Advantages of having tail call recursive implementation
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Having tail call is a common technique in functional programming languages.
+    Fortunately, F# is not just a single part of this tail call because tail call
+    is also supported at the .NET runtime level, in a sense that the .NET CLR has
+    IL support for tail call.
+  prefs: []
+  type: TYPE_NORMAL
+- en: It is a very useful and powerful feature of F# because of the tight coupling
+    of F# compiler and the generated IL on .NET; therefore, optimization is available
+    in the compiled phase and in the runtime.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let''s compare the stack trace of our initial (unoptimized) factorial function
+    with the optimized tail call factorial function:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Advantages of having tail call recursive implementation](img/image00325.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'Let''s look at `accFactorial`''s stack trace. Our tail call optimized function''s
+    stack trace shows that it has only one stack trace of `accFactorial`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Advantages of having tail call recursive implementation](img/image00326.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: It proves that tail call optimization is very efficient because we only have
+    one stack allocation. This is also faster than having no tail call optimization
+    because there is minimal stack allocation overhead or is close to only having
+    stack allocation once.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Although F#'s tail call optimization is a powerful optimization, its implementation
+    is limited to specific cases, as described in the next section.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Limitations of tail call recursion in F#
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: There are limitations on how tail call is implemented, especially for F#-specific
+    cases. Not all kinds of function can have tail call optimizations, mostly because
+    of the nature of tail call itself.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following are the limitations and restrictions of tail call optimization
+    in F#:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Tail call optimizations will not be implemented on functions that return `Unit`
+    (or `void` in C#/VB). This is important and natural because tail call relies on
+    the returning the result from the last result of recursive function as a position
+    to have tail call. The compiler will confuse the IL emission because F# has `Unit`,
+    other languages such as C# that has `void`. Also all functions that return `void`
+    are not compatible with F# functions that return `Unit`.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Tail call cannot be implemented within `try...with` constructs. It is also recommended
+    that the exception handling should not be included in the body of the recursive
+    function.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Tail call cannot be used to optimize calls to unsafe functions. Forcing to mix
+    tail call with native unmanaged calls will yield unpredictable behavior and results.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: The limitations just listed are simply not restrictions for all recursive cases
+    specially exception handling.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Summary
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: We have enough knowledge to optimize common and subtle F# language constructs-from
+    pattern matching combined with active pattern to the subtle F# features, such
+    as inline functions, tail call recursion optimizations, and tail call identification.
+    These constructs are features that make F# competitively unique in the .NET ecosystem.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Pattern matching and active patterns can be optimized without sacrificing correctness
+    and functional style. We are now able to enforce type strictness by using statically
+    typed generic parameters in conjunction with inline functions. Having tail calls
+    in recursion optimization in F# is not only more efficient but also gives us a
+    good exercise of optimizing at code level by identifying tail call semantics.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Now, it''s time to optimize F# complex features and constructs that deserve
+    a separate chapter: [Chapter 8](fsp-hiperf_cu08.html#aid-1JFUC2 "Chapter 8. Optimizing
+    Computation Expressions"), *Optimizing Computation Expressions*.'
+  prefs: []
+  type: TYPE_NORMAL

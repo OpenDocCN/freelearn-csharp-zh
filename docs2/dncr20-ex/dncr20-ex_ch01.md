@@ -1,4 +1,4 @@
-# 入门
+# 第一章：入门
 
 在本章中，我们将学习用于在 Windows 和 Linux 操作系统上执行.NET Core 2.0 开发任务的工具。我们还将学习如何使用 VirtualBox 和 Hyper-V 设置 Linux 和虚拟化。本章将涵盖如何为 Windows 和 Linux（Ubuntu）安装.NET Core 2.0 和工具。我们将了解 Ubuntu 的**虚拟机**（**VM**）设置，并创建您的第一个简单的.NET Core 2.0 运行应用程序代码。我们将配置 VM 以管理您的第一个应用程序。本章的目的是让您对所需的工具有一个大致的了解，以及如何为 Windows 和 Linux 安装.NET Core 2.0 SDK，并为您提供基本的 F#理解。
 

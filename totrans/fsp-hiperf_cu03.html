@@ -1,0 +1,724 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN"
+  "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" style="font-size:1.200rem;">
+<head><title>Chapter&#160;3.&#160;Optimizing Data Structures</title>
+<link rel="stylesheet" href="../Styles/style0001.css" type="text/css"/>
+<meta name="generator" content="DocBook XSL Stylesheets V1.75.2"/>
+</head>
+<body id="page">
+<div class="chapter" title="Chapter&#160;3.&#160;Optimizing Data Structures"><div class="titlepage" id="aid-NQU22"><div><div><h1 class="title"><a id="ch03"></a>Chapter&#160;3.&#160;Optimizing Data Structures</h1>
+</div>
+</div>
+</div>
+<p>It is common in many applications to leverage all kind of objects that are used as data. The types of data can be primitive, object reference, and collection types. F# itself has its own unique types, especially collection types.</p>
+<p>These types, especially when doing many computing-intensive operations, are crucial. Optimizations need not only relate to the location of the value of data stored according to the types, but also how we access them can have a big impact on overall performance.</p>
+<p>The deciding factors determining the best types to use, besides the memory locations, can vary. This is why it is quite hard to measure qualitatively. Measuring quantitatively can be tricky, although the statistical numbers may be informative.</p>
+<p>We shall use the knowledge gained in <a class="link" title="Chapter&#160;2.&#160;Performance Measurement" href="fsp-hiperf_cu02.html#aid-K0RQ2">Chapter 2</a>, <span class="emphasis"><em>Performance Measurement</em></span> relating to the qualitative understanding of the internals of running F# code (the IL, tooling, and the GC) and have quantitative measures (the execution durations using timers and unit tests) as a gentle requirement for this chapter and the rest of this book.</p>
+<p>The knowledge of IL assembly and the fundamentals of .NET GC will help us to understand the internal working of .NET and F#'s unique data structures. Then we can optimize them by deciding the best use cases and the best types to choose for our specific needs.</p>
+<div class="note" title="Note"><h3 class="title"><a id="note23"></a>Note</h3>
+<p>A basic knowledge of .NET 4 BCL types and collections (including those that shipped out of band/OOB, such as immutable collections) is needed. There should be no easy way of thinking or taking shortcuts when using a type/collection for all cases, for example, using .NET advanced collection such as <code class="literal">BindingList&lt;T&gt;</code> explicitly for all collections that are only meant to be read and forwarded instead of <code class="literal">IEnumerable&lt;T&gt;</code> or <code class="literal">List&lt;T&gt;</code>.</p>
+</div>
+<p>This chapter provides an overview of the available types in F# and the best practices to choose, use, and optimize. The data structure optimization is covered in the following topics:</p>
+<div class="itemizedlist"><ul class="itemizedlist"><li class="listitem">Overview of the types to store specific data in F# and their best usages (including structs, classes, and records)</li>
+<li class="listitem">Best practices in using F# collections, with a comparison to .NET collections</li>
+<li class="listitem">Best practices in choosing an evaluation strategy (lazy or eager)</li>
+</ul>
+</div>
+<div class="section" title="Overview and best practices of types in F#"><div class="titlepage"><div><div><h1 class="title"><a id="ch03lvl1sec17"></a>Overview and best practices of types in F#</h1>
+</div>
+</div>
+</div>
+<p>To store a value as data, every value needs to have a type, especially for static typed languages such as F#, C#, and VB. Many modern programming languages after the year 2000 put emphasis on types as the type of value of the data, instead of using the simple term of <span class="emphasis"><em>data structure</em></span>. The types here also mean the types that are not just concrete types, but also generic types when used in conjunction with concrete types.</p>
+<div class="section" title="Static typing versus dynamic typing"><div class="titlepage"><div><div><h2 class="title"><a id="ch03lvl2sec21"></a>Static typing versus dynamic typing</h2>
+</div>
+</div>
+</div>
+<p>F# by default has no built-in support for defining and optimizing types to store data as dynamic types on top of <span class="strong"><strong>Dynamic Language Runtime</strong></span> (<span class="strong"><strong>DLR</strong></span>). This dynamic type support is available in the form of a library from the F# FSSF open source project communities, the <span class="emphasis"><em>FSharp.Interop.Dynamic</em></span>. This is available at&#160;<a class="ulink" href="https://github.com/fsprojects/FSharp.Interop.Dynamic">https://github.com/fsprojects/FSharp.Interop.Dynamic</a>.</p>
+<p>This library is also available as a NuGet package as well.</p>
+<p>DLR is basically an extension that runs on top of CLR to provide an infrastructure for dynamically typed languages such as Python, Ruby, and JavaScript that have no restriction on type definition. This means that any type is typed as dynamic in the beginning at the compile time, and the type resolution is resolved at the runtime.</p>
+<p>The impact of this dynamic type resolution has decreased performance at the initial runtime, as the type has to be resolved at runtime instead of compile time. Therefore, the use of dynamic types is not recommended, although F# can support dynamic type interoperability by having interop with DLR as demonstrated by <span class="emphasis"><em>FSharp.Interop.Dynamic</em></span> library..</p>
+<div class="note" title="Note"><h3 class="title"><a id="note24"></a>Note</h3>
+<p>Since .NET Framework 4.0 (and CLR 4.0), DLR is included in the framework, and not as a separate download anymore. The original DLR repository is hosted in CodePlex, but the rest of the DLR development in .NET 4.0 is continued in Microsoft's .NET GitHub repo of .NET CLR.</p>
+</div>
+<p>For more information about DLR, visit the following landing page of MSDN at&#160;<a class="ulink" href="https://msdn.microsoft.com/en-us/library/dd233052(v=vs.110).aspx">https://msdn.microsoft.com/en-us/library/dd233052(v=vs.110).aspx</a>.</p>
+<p>In functional programming languages, it is also implicitly required to have static typing because it's also part of the requirements of having a type inference feature. Having type inference is very crucial, as functional programming needs to be as concise and as close as possible to mathematical function syntaxes.</p>
+<p>The use of dynamic type is against the common best practices of functional programming languages. Types are inferred statically and therefore resolved at compile time. Inferring type statically also gives us the ability to compose functions and values intuitively without worrying about casting and boxing at runtime. The nature of easily composing functions (operations in OOP) is one of the <span class="emphasis"><em>main traits</em></span> (or required features) of functional programming languages.</p>
+<p>Static typing has these following advantages over dynamic typing:</p>
+<div class="itemizedlist"><ul class="itemizedlist"><li class="listitem">Type resolutions are solved at compile time. All of the inconsistencies of invalid value assignments or casts always give compile errors. A compile error is easier to fix than a runtime error.</li>
+<li class="listitem">Because of the type resolution at the compile time, the compile time is slower than the compile time of the dynamic type. Because the type resolution may add overheads when compiling, a slower performance is to be expected. Because the type resolution itself is in action, this is closely related to the F# compile phases of lexing and parsing. The compiler can perform more optimization by having incremental compilation as the background process under the infrastructure of Visual Studio tooling.</li>
+<li class="listitem">Static type is also more reasonable to reason about the code, since all of the variables and functions have types that flow nicely.</li>
+<li class="listitem">Having the knowledge of static type gives innovative and useful features such as code completion when accessing F# modules and functions, including the function parameter's type resolutions and XML summary documentation.</li>
+</ul>
+</div>
+<p>The term <span class="emphasis"><em>code completion</em></span> is also called statement completion in Microsoft's MSDN Library. It means that when we code in the IDE, the language service will provide richer information about the type and its members (properties, function/methods, and events) and display it to us.</p>
+<p>Visual Studio since Visual Studio 5.0 has a robust feature called <span class="strong"><strong>Intellisense</strong></span> that shows automatically the information about the type as we type <code class="literal">.</code> (dot) after the variable name.</p>
+<p>This picture of F# code being edited shows Intellisense in action:</p>
+<p>
+</p>
+<div class="mediaobject"><img src="../Images/image00285.jpeg" alt="Static typing versus dynamic typing"/></div>
+<p style="clear:both; height: 1em;"> </p>
+<p>
+</p>
+<p>Intellisense is active by default, and it is highly recommended to keep the setting as active. It adds little overhead on loading type information in the background as the compiler runs in the background, but it definitely increases productivity.</p>
+<div class="note" title="Note"><h3 class="title"><a id="note25"></a>Note</h3>
+<p>Although called statement completion by Microsoft, its use is not just for the code's statement completion. It is used in a broader sense in statements, class/module members including functions/methods, and public/protected/internal properties. Intellisense is also helpful in decreasing compiler errors because the full metadata becomes available at the frontend, minimizing compiler errors because of incorrect type names or syntax errors.</p>
+</div>
+<p>The technique of having type resolution at compile time is often called <span class="strong"><strong>early bound</strong></span>, compared to the <span class="strong"><strong>late bound</strong></span> nature of dynamic typing solved at runtime.</p>
+<p>This is related to one of the main traits of functional programming: function and data are the same first-class citizens of the functional programming language itself. To maintain this inseparable concept as a function and data, type inference must flow nicely. And type inference explicitly requires that the type must have a definition and must have strong type support as well.</p>
+<p>For more details about the traits of functional programming languages, we can check out F#'s documentation from MSDN. MSDN has simple but concise definitions of the required features of functional programming in F#:</p>
+<p>
+<a class="ulink" href="https://msdn.microsoft.com/en-us/visualfsharpdocs/conceptual/functions-as-first-class-values-%5bfsharp%5d">https://msdn.microsoft.com/en-us/visualfsharpdocs/conceptual/functions-as-first-class-values-%5bfsharp%5d</a>
+</p>
+<p>Therefore, we will not discuss further the dynamic type support in F# because it's not recommended in the sense of the functional programming perspective and the performance at runtime. Throughout the rest of this book, we will only focus on the static typing of F#.</p>
+</div>
+</div>
+</div>
+
+
+<div class="section" title="Quick introduction to types in F#" id="aid-OPEK1"><div class="titlepage"><div><div><h1 class="title"><a id="ch03lvl1sec18"></a>Quick introduction to types in F#</h1>
+</div>
+</div>
+</div>
+<p>Types in F# are basically categorized as two types: types in .NET BCL and types that are only available in F#. Although there are types specific to F#, these F# types can be used in C#/VB because basically all F# types are implemented on top of .NET CLR.</p>
+<p>Based on .NET CLI standard partition I section I.8.2 about value types and reference types, the documentation is divided into two kinds of types:</p>
+<div class="itemizedlist"><ul class="itemizedlist"><li class="listitem"><span class="strong"><strong>Value type</strong></span>: The values described by a value type are self-contained (each can be understood without reference to other values). It is using one of the basic, built-in data types or a user-defined structure. The exception of this built-in type is a string; it is reference type. In F#/C#/VB, this value type is also known as a structure or struct.</li>
+<li class="listitem"><span class="strong"><strong>Reference type</strong></span>: The value denotes the location of another value. The location is actually a pointer to a location of a value.</li>
+</ul>
+</div>
+<p>There are four kinds of reference type:</p>
+<div class="itemizedlist"><ul class="itemizedlist"><li class="listitem">An object type is a reference type of a self-describing value. Some object types (for example, abstract classes) are only a partial description of a value.</li>
+<li class="listitem">An interface type is always a partial description of a value, potentially supported by many object types.</li>
+<li class="listitem">A pointer type is a compile-time description of a value whose representation is a machine address of a location. Pointers are divided into managed and unmanaged.</li>
+<li class="listitem">Built-in reference types.</li>
+</ul>
+</div>
+<p>There is also support for generic parameterized types built in the fabric of CIL/CLR. The notation of a generic type in CIL/CLR is also enriched with covariance/contravariance support. It is mandatory for all of static programming languages run on top of CIL/CLR to have at least support for basic generic type, although covariance/contravariance may not be supported at language level.</p>
+<p>By further looking at the CLS rule of CIL/CLR, we shall see that covariance/contravariance support is not mandatory. For further information, we can check the CLS rule starting at section I.7.3 of CIL/CLR ECMA-335 standard.</p>
+</div>
+
+
+<div class="section" title="Quick overview of generic type support in F#" id="aid-PNV61"><div class="titlepage"><div><div><h1 class="title"><a id="ch03lvl1sec19"></a>Quick overview of generic type support in F#</h1>
+</div>
+</div>
+</div>
+<p>F# has generic type as the parameterized type support, just as in C#/VB, and all have the same concept and similar semantics, although F# goes further by allowing type generalizations.</p>
+<p>For example, in F#, to declare a type that has a generic type parameter in use:</p>
+<pre class="programlisting">List&lt;'t&gt; 
+</pre>
+<p>If the parameter is used in code, the parameter of the generic type must be filled in, such as in this example:</p>
+<pre class="programlisting">List&lt;int&gt; 
+</pre>
+<p>In our last example, the generic type becomes specialized as <code class="literal">int</code>. The <code class="literal">List</code> is a sample of a concrete type that has a generic type as the type parameter. This concept is also similar to the semantics in C#/VB.</p>
+<div class="note" title="Note"><h3 class="title"><a id="note26"></a>Note</h3>
+<p>Throughout this book, the types in F# that support the generic type such as F# <code class="literal">List</code>, <code class="literal">Map</code>, <code class="literal">Set</code>, and <code class="literal">Array</code> will use the same notation as F# types in the MSDN Library, although the complete compilation name may differ. For example, F# <code class="literal">Map</code> type is known as <code class="literal">FSharpMap</code> from outside of F#'s scope (when used in other languages such as C#/VB).</p>
+</div>
+<p>There is also a unique way in F# to treat generics: the statically resolved generic. According to the F# documentation in the MSDN Library:</p>
+<div class="blockquote"><blockquote class="blockquote"><p>
+<span class="emphasis"><em>"Statically resolved generic is a type parameter that is replaced with an actual type at compile time instead of at run time. They are preceded by a caret (^) symbol."</em></span>
+</p>
+</blockquote>
+</div>
+<p>Using a statically resolved generic type parameter is more efficient than the normal generic type, but there is one caveat: it cannot be used on functions or methods that are not inline. It is also orthogonal at the normal generic type: normal generic type cannot be used on inline functions. The usage of statically resolved generics is discussed further in <a class="link" title="Chapter&#160;7.&#160;Language Features and Constructs Optimization" href="fsp-hiperf_cu07.html#aid-1ENBI1">Chapter 7</a>, <span class="emphasis"><em>Language Features and Constructs Optimizations</em></span>.</p>
+<p>For official information on the F# statically resolved type, please consult the MSDN Library:</p>
+<p>
+<a class="ulink" href="https://msdn.microsoft.com/en-us/visualfsharpdocs/conceptual/statically-resolved-type-parameters-%5Bfsharp%5D">https://msdn.microsoft.com/en-us/visualfsharpdocs/conceptual/statically-resolved-type-parameters-%5Bfsharp%5D</a>
+</p>
+<p>F# can use the available types in .NET and the types specific to F#. F# has its own types because F# has supports for functional programming related types, including DU.</p>
+<p>The documentation of types in F# is available from MSDN at the following URL:</p>
+<p>
+<a class="ulink" href="https://msdn.microsoft.com/en-us/visualfsharpdocs/conceptual/fsharp-types">https://msdn.microsoft.com/en-us/visualfsharpdocs/conceptual/fsharp-types</a>
+</p>
+<p>The basic summary and syntaxes of F# types are also available at the MSDN Library. We are now focusing on the type itself as the data structure.</p>
+<p>These are the types in F#:</p>
+<div class="itemizedlist"><ul class="itemizedlist"><li class="listitem"><span class="strong"><strong>Primitive types</strong></span>: These are the same as .NET primitive types such as <code class="literal">Int32</code>, <code class="literal">Boolean</code>, <code class="literal">Single</code>, <code class="literal">Double</code>.</li>
+<li class="listitem"><span class="strong"><strong>Unit type</strong></span>: This is equal to <code class="literal">void</code> in C# and <code class="literal">Nothing</code> in Visual Basic</li>
+<li class="listitem"><span class="strong"><strong>Options</strong></span>: These are special types in F# that describe a type that may contain a value or empty.</li>
+<li class="listitem"><span class="strong"><strong>Structures</strong></span>: These are the same concept and semantics as <code class="literal">struct</code> in C#/VB.</li>
+<li class="listitem"><span class="strong"><strong>Classes</strong></span>: These are the same concept as <code class="literal">class</code> in C#/VB.</li>
+<li class="listitem"><span class="strong"><strong>Records</strong></span>: These are unique in F#.</li>
+<li class="listitem"><span class="strong"><strong>Discriminated unions</strong></span>: These are unique in F#.</li>
+<li class="listitem"><span class="strong"><strong>F# collections</strong></span>: such as <code class="literal">Array</code>, <code class="literal">List</code>, and <code class="literal">Sequence.</code> All of F# collections are immutable by default, but the implementations of these collections are different in semantics from the BCL in .NET as used in C#/VB.</li>
+<li class="listitem"><span class="strong"><strong>Functions</strong></span>: These are specific to the F# function. The F# function is also implemented as <code class="literal">FSharpFunc</code> delegate.</li>
+<li class="listitem"><span class="strong"><strong>Delegates</strong></span>:&#160;These delegates support include F#'s own delegates and .NET delegates. F# delegates have the same concept as delegate in .NET, but the semantic is implemented differently due to F# particular <code class="literal">FSharpFunc</code> implementation.</li>
+<li class="listitem"><span class="strong"><strong>Attributes</strong></span>: These are the same as attributes in .NET BCL, therefore they are the same as attributes in C#/VB.</li>
+</ul>
+</div>
+<p>Throughout this chapter, we will focus on types that are specific to F#, such as options, structures (because of the difference in semantics), records, discriminated unions, F#'s specific collections, and functions. Class will be discussed as well because it's also a F# OOP feature but we are going to focus on the semantic differences and the way F# treats classes.</p>
+<p>Discriminated union (DU) is one of F#'s unique types and a feature that is also part of the functional programming language's commonly used types. It is also available in Haskell and Scala, among others.</p>
+<div class="note" title="Note"><h3 class="title"><a id="note27"></a>Note</h3>
+<p>DU&#160;is one of the unique feature of types in a functional programming language. In fact, DU is quite similar in Haskell's algebraic data types, although Haskell's algebraic data types are richer than F#'s DU. Scala uses combinations of traits and case classes and is more verbose. But the concept is the same in Scala.</p>
+</div>
+<div class="section" title="Overall runtime strategy of handling data types"><div class="titlepage"><div><div><h2 class="title"><a id="ch03lvl2sec22"></a>Overall runtime strategy of handling data types</h2>
+</div>
+</div>
+</div>
+<p>Before diving further into the optimization of types to store specific data structures, we need to know the basic understanding of how the F# types are implemented in the resulting (compiled) generated code. The compiler may handle different types differently, although there could be compiler-specific optimizations later on.</p>
+</div>
+</div>
+
+
+<div class="section" title="Introduction to memory storage allocation"><div class="titlepage" id="aid-QMFO2"><div><div><h1 class="title"><a id="ch03lvl1sec20"></a>Introduction to memory storage allocation</h1>
+</div>
+</div>
+</div>
+<p>The type of storage in memory to store the data value according to the CLI standard specification basically falls into these three storage categories (from fastest to slowest):</p>
+<div class="itemizedlist"><ul class="itemizedlist"><li class="listitem">Register</li>
+<li class="listitem">Stack</li>
+<li class="listitem">Heap</li>
+</ul>
+</div>
+<div class="section" title="Register"><div class="titlepage"><div><div><h2 class="title"><a id="ch03lvl2sec23"></a>Register</h2>
+</div>
+</div>
+</div>
+<p>Register is the fastest to access, because it does not have memory allocation overheads compared to stack and heap. The concept of register is similar to the processor's register. This register is not the same as stack and heap; it is related to how the value is stored in the code. Usage of register in CLR is translated into any of the processor's registers, and depends on the platform used. For example, when running on x86/x64 processors, Intel's general purpose register of EAX, EBX, ECX, EDX will be used.</p>
+</div>
+<div class="section" title="Stack"><div class="titlepage"><div><div><h2 class="title"><a id="ch03lvl2sec24"></a>Stack</h2>
+</div>
+</div>
+</div>
+<p>The nature of stack is <span class="strong"><strong>LIFO</strong></span>, abbreviated from <span class="strong"><strong>last in first out</strong></span>. It means that data is stored not in a first come, first served basis, but the last one stored is the first one that can be read, as data is stored from the bottom to the highest layer of stacked fixed locations. This is why it is simply called stack. The analogy can be seen when we wash dishes:</p>
+<div class="itemizedlist"><ul class="itemizedlist"><li class="listitem">The first dish is the first stack on the lowest stack.</li>
+<li class="listitem">The second dish is put onto the first stack.</li>
+<li class="listitem">The next one is put on the second stack, and this process is the same for the following dishes.</li>
+<li class="listitem">To wash the dishes, we have to take the highest stack on the top of the stack first before we go to the first one. So the last stack is the first one to be washed because the last stack is located at the highest layer. This mechanism is the main reason why it is called LIFO.</li>
+</ul>
+</div>
+<p>In the world of computer science, the act of storing or putting the data onto a stack is called <span class="emphasis"><em>push</em></span>, and the act of taking the data out from a stack is called <span class="emphasis"><em>pop</em></span>.</p>
+<p>The terms push and pop on stack are also the same concept in .NET CLR, and they are quite similar in semantics although the implementation detail is <span class="emphasis"><em>virtualized</em></span> by the .NET CLR. The actual machine assembly code after AOT or JIT in the Debug mode is translated into the related processor's <code class="literal">PUSH</code> and <code class="literal">POP</code> instructions. In the context of .NET CLR on the x86 (32-bit) or x64 (64-bit) platform, these <code class="literal">PUSH</code> and <code class="literal">POP</code> instructions will be translated into a one or more calls to machine assembly of <code class="literal">PUSH</code> and <code class="literal">POP</code>.</p>
+<p>The virtualization of data and the operations are important, as .NET CLR has its own isolations to help to prevent intentional manual memory allocation of pointers, subroutines, and data to be mixed. It is quite common for the virtualization to have its own mechanism of disposing unused objects (for example, out of scope when a method/function has finished executing) or an object that is explicitly disposed. Modern virtualization often has its own garbage collector for these unused/disposed objects. The isolations, garbage collections, and the sequence of garbage collections (Gen-0, Gen-1, Gen-2) are actually part of the .NET CLR memory management, and this is called <span class="emphasis"><em>managed memory management</em></span>. This is the reason why the code running on top of CLR is called managed code.</p>
+<div class="note" title="Note"><h3 class="title"><a id="note28"></a>Note</h3>
+<p>The concept of virtualization in CLR is quite similar to the concept of virtualization in <span class="emphasis"><em>Java Virtual Machine</em></span> (JVM). The concept of having garbage collection is also part of the virtualized environment nature of CLR and JVM.</p>
+</div>
+<p>Details on the raw flow of machine assembly of <code class="literal">PUSH</code> and <code class="literal">POP</code> are out of the scope of this book, as we are not dealing with machine assembly instructions directly. For more information on assembly language, please consult Intel's landing page of the software developer manual on Intel processors at&#160;<a class="ulink" href="http://www.intel.com/content/www/us/en/processors/architectures-software-developer-manuals.html">http://www.intel.com/content/www/us/en/processors/architectures-software-developer-manuals.html</a>.</p>
+<p>The following diagram illustrates storing or pushing data:</p>
+<p>
+</p>
+<div class="mediaobject"><img src="../Images/image00286.jpeg" alt="Stack"/></div>
+<p style="clear:both; height: 1em;"> </p>
+<p>
+</p>
+<p>Getting out or popping data from stack is done by accessing the last of the data pushed. The operation goes from top (the last pushed) to bottom.</p>
+<p>The advantages of using stack are as follows:</p>
+<div class="itemizedlist"><ul class="itemizedlist"><li class="listitem">Stacks are fast to store, the act of pushing data onto stack is just adding data consecutively. It does not require a pointer allocation.</li>
+<li class="listitem">There is no fragmentation, because the order of filling stack is always contiguous.</li>
+</ul>
+</div>
+<p>These are the disadvantages:</p>
+<div class="itemizedlist"><ul class="itemizedlist"><li class="listitem">Stacks take a predefined length of the number of data stored and cannot be allocated dynamically. This is intentional, as stack is allocated up front and it is also bound to the limits imposed by the processor and the size of memory (RAM).</li>
+<li class="listitem">Each stack has a predefined length for each slot of data. Therefore, stack is not ideally suited for variable lengths of data such as strings.</li>
+<li class="listitem">Stacks are often quickly exhausted as most stack size is limited and always less than the allocated heap. For example, stack is often used to store the initial pointer of recursive function calls, which is why every recursive call means pushing a pointer of the location of the initial call. After a function finishes its operations, it pops the last pointer to go to the caller. If the recursive calls are too deep, the stack is exhausted and this condition is often called <span class="emphasis"><em>stack overflow</em></span>.</li>
+</ul>
+</div>
+<p>The stack overflow is usually thrown as a <code class="literal">System.StackOverflowException</code>. Starting with .NET Framework 2.0, we can't catch <code class="literal">StackOverflowException</code> directly as this is not allowed. The CLR/CIL 2.0 also implies this as well. For more information, please consult the <code class="literal">StackOverflowException</code> documentation at MSDN Library:</p>
+<p>
+<a class="ulink" href="https://msdn.microsoft.com/en-us/library/system.stackoverflowexception(v=vs.110).aspx">https://msdn.microsoft.com/en-us/library/system.stackoverflowexception(v=vs.110).aspx</a>
+</p>
+<p>For the case of recursive function calls, F# has optimized most recursive function calls by translating them into a loop in the IL. This loop optimization guarantees that the function will not take lots of stack allocations and therefore prevents stack overflow caused by deeply nested recursive function calls.</p>
+<p>To allocate storage dynamically, the only way is to use heap.</p>
+<div class="note" title="Note"><h3 class="title"><a id="note29"></a>Note</h3>
+<p>The term heap is not to be confused with <span class="emphasis"><em>heap as data structure</em></span>. Heap in a data structure is rarely used, as it's actually a specialized tree.</p>
+</div>
+</div>
+<div class="section" title="Heap"><div class="titlepage"><div><div><h2 class="title"><a id="ch03lvl2sec25"></a>Heap</h2>
+</div>
+</div>
+</div>
+<p>Heap is simply a pool of large memory; usually it's in a form of virtual memory space. It can be allocated and deallocated dynamically on demand. The term allocate means the act of reserving a portion of memory. The term deallocate means freeing the resource (portion of memory) that was previously allocated.</p>
+<p>Heap is used to allocate memory for storing these kind of variables:</p>
+<div class="itemizedlist"><ul class="itemizedlist"><li class="listitem">Reference types</li>
+<li class="listitem">Unsafe methods</li>
+<li class="listitem">Weak reference methods</li>
+<li class="listitem">Reference unsafe pointers and managed pointers</li>
+</ul>
+</div>
+</div>
+<div class="section" title="Best practices of types for storing and accessing data"><div class="titlepage"><div><div><h2 class="title"><a id="ch03lvl2sec26"></a>Best practices of types for storing and accessing data</h2>
+</div>
+</div>
+</div>
+<p>When discussing best practices of types to use to store data, we must consider these conditions:</p>
+<div class="itemizedlist"><ul class="itemizedlist"><li class="listitem">The form of the value of the data. We can simply define this as the form of the data, or the semantics of the data value as the type of the value. The precision of the data is also part of the form of the data.</li>
+<li class="listitem">The use of the data is manipulated in the code. Is the data manipulated inside a function lambda or not as part of a function lambda? It is also important as this is implementation-specific in F# and .NET CLR.</li>
+<li class="listitem">The nature of the lifetime of the data. This later will define where and how the data is stored in the memory, and we will discuss this in detail.</li>
+<li class="listitem">The final decision regarding implementation in the generated IL may vary as well. This is compiler-specific but it is still closely related to the first point about the form and the second point about the lifetime of the data.</li>
+</ul>
+</div>
+<p>Let's discuss each of the previous points and the relations between them.</p>
+<p>The easiest one to understand is the form of the value of the data. To understand more about the form of the value, it is common to approach the form as the type of the value. For example, the numeric value, the <code class="literal">Boolean</code> value, and the <code class="literal">String</code> value. A type must be attached to each value, as this is a basic requirement of a static typed language such as F#.</p>
+<p>CLR itself implies that all values <span class="emphasis"><em>must</em></span> have defined types, because there are explicit type declarations in the IL which must be easily seen. The types are usually declared in the return type of the method, the method parameter signatures, and the <code class="literal">.locals</code> section in the IL.</p>
+<p>Let's look at some sample cases of these in the generated IL from F# compiler.</p>
+<p>For example, the <code class="literal">fact</code> function in the FSConsole01 in <a class="link" title="Chapter&#160;2.&#160;Performance Measurement" href="fsp-hiperf_cu02.html#aid-K0RQ2">Chapter 2</a>, <span class="emphasis"><em>Performance Measurement</em></span> has these type declarations for return type, parameter, and each variable used in the function body:</p>
+<pre class="programlisting">.method public static int32  fact(int32 x) cil managed 
+{ 
+  // Code size       44 (0x2c) 
+  .maxstack  5 
+<span class="strong"><strong>  .locals init ([0] int32 V_0,
+</strong></span>
+<span class="strong"><strong>           [1] int32 a,
+</strong></span>
+<span class="strong"><strong>           [2] int32 V_2)</strong></span>
+</pre>
+<p>The variables are given a local name as <code class="literal">v_0</code>, <code class="literal">a</code>, and <code class="literal">v_2</code> respectively.</p>
+<p>In this IL, the <code class="literal">.maxstack</code> directive defines how much the stack is allocated. The stack is allocated to use five slots of stack to store five values for this function to operate.</p>
+<p>There are the stack operations beginning with <code class="literal">IL_0001</code> to <code class="literal">IL_0004</code> line segment:</p>
+<pre class="programlisting">  IL_0001:  ldarg.0 
+  IL_0002:  stloc.0 
+  IL_0003:  ldloc.0 
+  IL_0004:  ldc.i4.1 
+</pre>
+<p>The operations for those four lines of IL are:</p>
+<div class="orderedlist"><ol class="orderedlist arabic"><li class="listitem">The IL <code class="literal">ldarg.0</code> means load argument with index <code class="literal">0</code> (the first argument/parameter of the fact function) onto stack. This means pushing the value of the parameter onto stack.</li>
+<li class="listitem">The IL <code class="literal">stloc.0</code> means the pops value from stack to the local variable. The popped value is the value from the previous IL, the <code class="literal">ldarg.0</code> instruction.</li>
+<li class="listitem">The IL <code class="literal">ldloc.0</code> means load the local variable onto stack. This means pushing the value of the local variable to stack. The local variable is the index <code class="literal">0</code>, the first local variable declared in the <code class="literal">.locals</code> section.</li>
+<li class="listitem">The IL <code class="literal">ldc.i4.1</code> means push value <code class="literal">1</code> onto stack with the type as <code class="literal">Int32</code>. All of the IL of <code class="literal">ldc.x</code> means pushing a numerical constant with the desired type, whereas the <code class="literal">i4</code> means <code class="literal">Int32</code>.</li>
+</ol>
+<div style="height:10px; width: 1px"></div>
+</div>
+<p>For more information about these ILs, please consult partition III of ECMA-335 about the CIL standard. The availability of <code class="literal">ldc.i4.1</code> IL also means that the value must have the type declared explicitly. This is further proof that .NET CLR implies static typed, even at the IL level.</p>
+<p>There are two kinds of types that are used in F# from the perspective of programming language features: primitive types and non-primitive types.</p>
+<p>Primitive types are types that are available built-in as language features, and they are often types that are the easiest to construct (initialize) and manipulate. To maintain a higher compatibility with CLR and .NET BCL, the primitive types of F# support all of the primitive types in .NET BCL with the additional F# unique primitive type, <code class="literal">unit</code>.</p>
+<p>The priority order of feature support from the base to the top on F# is:</p>
+<div class="orderedlist"><ol class="orderedlist arabic"><li class="listitem">.NET CLR (runtime) support</li>
+<li class="listitem">.NET BCL support (including <code class="literal">BigInteger</code>, as this is not explicitly supported in CLR)</li>
+<li class="listitem">F# unique types</li>
+</ol>
+<div style="height:10px; width: 1px"></div>
+</div>
+<p>CLR type support must come first, as all of the primitive types must support CLR types first, especially all of the value types in CLR. This mandatory requirement is also part of official F# 4.0 Language Specification.</p>
+<p>For an official list of F# primitive types, visit the MSDN Library at&#160;<a class="ulink" href="https://msdn.microsoft.com/en-us/visualfsharpdocs/conceptual/primitive-types-%5bfsharp%5d">https://msdn.microsoft.com/en-us/visualfsharpdocs/conceptual/primitive-types-%5bfsharp%5d</a>.</p>
+<p>Let's start by using the .NET original type name instead of using F# keyword, as it's also easier to understand based on the list of primitive types. For example, it's easier to use <code class="literal">Int32</code> as F# int because we might misunderstand <span class="emphasis"><em>int</em></span> as <code class="literal">Int16</code> instead of <code class="literal">Int32</code>. This is quite common in programming languages, because of different implementations of how a language specification defines basic integer length. Fortunately, F# int is the same as C# <code class="literal">int</code> and VB Integer, as they both have the same length of 32 bits (4 bytes). But this symmetry might not be the same for C++ and other languages, although they may have support running on .NET CLR.</p>
+<p>If the value is a primitive type that has fixed length and it is also directly related to IL types such as <code class="literal">Char</code>, <code class="literal">SByte</code>, <code class="literal">Int16</code>, <code class="literal">Int32</code>, <code class="literal">Int64</code>, <code class="literal">Boolean</code>, <code class="literal">Single</code>, <code class="literal">Double</code>, or even an unsigned numeric such as <code class="literal">Byte</code>, <code class="literal">UInt32</code>, then the compiler will mostly store this on stack. <code class="literal">Char</code>, although it's not a numeric, is stored as a numeric.</p>
+<p>String does not have a fixed length, and it is also a composite type, because it is not a type that is standalone (it is not a type that contains other types). It is a type that contains other types as a collection. This is obvious because the declaration of <code class="literal">String</code> class in .NET BCL implements an object that implements <code class="literal">IEnumerable&lt;Char&gt;.</code> Therefore, string is composed as collection of <code class="literal">Char</code>.</p>
+<p>Because of the nature of a collection, the length may vary. It is also quite normal to assume that a string literal will always vary in length. Therefore, string is treated differently from other primitive types.</p>
+<p>To push a string constant value onto stack, the IL instruction is <code class="literal">ldstr</code>. To illustrate this, let's revisit our <code class="literal">FSConsole01</code> project. It has as its entry point the <code class="literal">main</code> method. Let's see the IL of <code class="literal">main</code>: (<code class="literal">IL_0006</code> and <code class="literal">IL_000b</code> are omitted):</p>
+<pre class="programlisting">.method public static int32  main(string[] argv) cil managed 
+{ 
+  .entrypoint 
+  .custom instance void [FSharp.Core]Microsoft.FSharp.Core.EntryPointAttribute::.ctor() = ( 01 00 00 00 )  
+  // Code size       19 (0x13) 
+  .maxstack  8 
+  IL_0000:  nop 
+  <span class="strong"><strong>IL_0001:  ldstr      "Hello F# world"</strong></span>
+<span class="strong"><strong>...</strong></span> 
+  IL_0010:  pop 
+  IL_0011:  ldc.i4.0 
+  IL_0012:  ret 
+} // end of method Program::main 
+</pre>
+<p>The <code class="literal">Hello F# world</code> string is treated as a string constant value, and it is pushed by <code class="literal">ldstr</code> at the beginning. At the end of <code class="literal">main</code>, before returning <code class="literal">0</code> as the successful running code, it removes the string value from stack using the <code class="literal">pop</code> IL.</p>
+<p>This shows that string has its representative in CIL as well. It is typed as <code class="literal">string</code>, mapped to <code class="literal">System.String</code> in .NET BCL.</p>
+<p>For more information, please see partition I section I.8.2.2 of the CIL standard (ECMA-335) to check all of the CIL types of .NET BCL primitive type mappings.</p>
+<p>Any primitive types, by default are stored in the memory using stack as its container storage. It is a bad practice to always assume that all of the uses of value typed will always be stored on stack, especially when the code that uses the data is implemented.</p>
+<p>This is subjective to the internal implementation of F# compiler, but this technique is quite common in C#/VB compiler as well. F# has to conform to Common Language Specification rules as governed by the CIL standard, not just C#/VB. Therefore, it is intuitive by default in the normal code (without any closure that is common in lambda functions) that all of the primitive types of CIL will be stored onto stack.</p>
+<p>Any constant string value is always pushed on stack, as shown in the sample <code class="literal">main</code> method.</p>
+<p>Other than that, string can be stored in stack or heap, depending on the actual implementation of the code and the use of data manipulated in the code. Any variable used in the code can be implemented differently, according to the code. The storage location depends on the location of the closure as well.</p>
+<p>A <span class="emphasis"><em>closure</em></span> is simply a technique to capture a variable that is scoped outside a lambda function. Closure is a very useful feature in many programming languages, although it is mostly used when we use lambda functions. The way closure works in F# is the same as in C#/VB.</p>
+<p>F# can be used to treat the function scoped variable to be the reference type for the inner function, although the type of the variable is the struct/value type. This is also a rule of the restriction of the F#: variable used for the closure that is going to be mutated/changed; it must have a reference type on its value, whether the type of the variable is a struct or not.</p>
+<p>For example consider:</p>
+<pre class="programlisting">let Counter = 
+    <span class="strong"><strong>let count = ref 0</strong></span> 
+    // *Return a function that carries the current context* (ie. "count", on  
+    // the heap). Each time it is called, it will reference, and increment,  
+    // the same location 
+    (fun () -&gt; incr count; !count) 
+</pre>
+<p>The line that declares the <code class="literal">count</code> variable uses the <code class="literal">ref</code> keyword to define that it is not just a passing value; it is also passing references as well.</p>
+<p>The use of immutable data captured as closure&#160;will be stored on stack, but this is actually an implementation detail of F# compiler.</p>
+<p>The point regarding the lifetime of the data concerns how long the data in a variable is used throughout the flow of the code. It is also related to closure implementation.</p>
+<p>To fully recap and understand the relations of the form of the data and the lifetime of the data, these are the rules of treating the data based on the lifetime of the data used:</p>
+<div class="itemizedlist"><ul class="itemizedlist"><li class="listitem">If the data is used many times as a closure but it is immutable, this can be defined as having a short lifetime. The data is stored on stack.</li>
+<li class="listitem">The string constant value is always considered as short-lived data. Therefore, it is stored on stack and this is also the main implementation detail of the CIL/CLR <code class="literal">ldstr</code> instruction.</li>
+<li class="listitem">All of the mutable/immutable variables that are scoped locally in a function/method that are not used as a closure will always be stored on stack, because this function/method scoped variable is defined to be short-lived. It is only used within the scope of the function/method.</li>
+<li class="listitem">All the value type (struct) is by default stored on stack. There are some special cases that the value type will be stored on stack. When the value type is referenced within <code class="literal">System.WeakReference&lt;T&gt;</code>, the value will be stored on heap along with the <code class="literal">System.WeakReference&lt;T&gt;</code> container. Also the use of <code class="literal">ref</code> when assigning the function scoped variable will mostly put the value on heap.</li>
+<li class="listitem">If the data as closure is intended as a mutable reference type, it will be stored on heap.</li>
+<li class="listitem">If the data is part of public properties of a class/record, the data is stored on the heap of the container class/record. For example, a <code class="literal">public</code> property member of a class is stored on heap.</li>
+<li class="listitem">Long-lived data is always stored on heap.</li>
+</ul>
+</div>
+<div class="note" title="Note"><h3 class="title"><a id="note30"></a>Note</h3>
+<p>
+<code class="literal">WeakReference</code> is useful because we can use it to enforce GC not to do garbage collection on the data upon which the type is parameterized. The data is contained in this <code class="literal">WeakReference</code>. Any other type of reference will always be garbage collected at any Gen-0 or Gen-1 phase.</p>
+</div>
+<p>For more information about <code class="literal">WeakReference</code> usage, consult the MSDN Library at&#160;<a class="ulink" href="https://msdn.microsoft.com/en-us/library/gg712738(v=vs.110).aspx">https://msdn.microsoft.com/en-us/library/gg712738(v=vs.110).aspx</a>.</p>
+<p>Based on the rules, it is recommended to use immutable closure instead of mutable, especially when it is marked to be a reference type.</p>
+<div class="note" title="Note"><h3 class="title"><a id="note31"></a>Note</h3>
+<p>The most common best practice still holds: allocating stack is faster than allocating data on heap. It is quite obvious that the immutable closure is recommended and better than reference typed closure.</p>
+</div>
+<p>To simply recap, the choice is often choosing between struct and class (including record, DU) in F#. All of record, DU&#160;are implemented as classes in the IL, and therefore they are basically specialized types of classes.</p>
+<p>The strategy is as follows:</p>
+<div class="itemizedlist"><ul class="itemizedlist"><li class="listitem">Always know the difference of value type and reference type. But never assume that the value type is always stored on stack.</li>
+<li class="listitem">Prefer value types instead of classes.</li>
+<li class="listitem">Use object pool to contain the most used types and put them in a collection. This will prevent GC from always automatically performing garbage collection each time the variable is used. But this strategy is not recommended if the variable used is mostly short-lived and the intention is mostly for a quick calculation that is repeated in parallel.</li>
+<li class="listitem">Run garbage collection when the code is running idly after processing inputs or after ending all of the long running processes. This will increase the efficiency of garbage collection to minimize overheads instead of doing GC when the code is busy doing computations or even side-effect computations. Although the overhead of Gen-0, Gen-1 may impact the memory deallocation and allocation process, having garbage collection run on idle times will minimize overheads when the collection happens on heavy computations (especially when performing recursive operations in parallel).</li>
+<li class="listitem">Use <code class="literal">WeakReference</code> for an object that has a tendency to be long lived but used frequently to decrease the GC overhead.</li>
+<li class="listitem">Use an immutable value when capturing the value inside a function lambda. Immutable values when captured in lambda are always stored on stack.</li>
+</ul>
+</div>
+<p>The distinction details of the value type and the reference type, and how they behave in memory, especially in the stages of garbage collection, are described in detail in the CIL/CLR ECMA-335 standard.</p>
+<p>Actually, these F# rules are also applied for C#/VB. Eric Lippert (former developer of the C# compiler) has discussed this in a detailed explanation on his MSDN blog:</p>
+<p>
+<a class="ulink" href="https://blogs.msdn.microsoft.com/ericlippert/2010/09/30/the-truth-about-value-types/">https://blogs.msdn.microsoft.com/ericlippert/2010/09/30/the-truth-about-value-types/</a>
+</p>
+<p>Again, although this is mostly hidden from us as F# developers, these implementation details will help us to understand and avoid misconceptions.</p>
+<p>The current discussion has different semantics depending on whether or not a collection of data is used in the implementation.</p>
+</div>
+</div>
+
+
+<div class="section" title="Best practices in using F# collections"><div class="titlepage" id="aid-RL0A2"><div><div><h1 class="title"><a id="ch03lvl1sec21"></a>Best practices in using F# collections</h1>
+</div>
+</div>
+</div>
+<p>The F# types are mostly describing types that are not collection types. F# has its own unique collection types as well.</p>
+<p>The F# collection features are mostly implemented as modules, with the namespace of <code class="literal">Microsoft.FSharp.Collections</code>. The following are the F# collection modules:</p>
+<div class="itemizedlist"><ul class="itemizedlist"><li class="listitem">Module <code class="literal">Array</code>: Basic operations on arrays</li>
+<li class="listitem">Module <code class="literal">Array2D</code>: Basic operations on two-dimensional arrays</li>
+<li class="listitem">Module <code class="literal">Array3D</code>: Basic operations on rank 3 arrays</li>
+<li class="listitem">Module <code class="literal">Array4D</code>: Basic operations on rank 4 arrays</li>
+<li class="listitem">Module <code class="literal">ComparisonIdentity</code>: Common notions of comparison identity used with sorted data structures</li>
+<li class="listitem">Module <code class="literal">HashIdentity</code>: Common notions of value identity used with hash tables</li>
+<li class="listitem">Module <code class="literal">List</code>: Basic operations on lists</li>
+<li class="listitem">Module <code class="literal">Map</code>: Functional programming operators related to the <code class="literal">Map</code> type</li>
+<li class="listitem">Module <code class="literal">Seq</code>: Basic operations on enumerable collections</li>
+<li class="listitem">Module <code class="literal">Set</code>: Functional programming operators related to the <code class="literal">Set</code> type</li>
+</ul>
+</div>
+<p>
+<code class="literal">List</code>, <code class="literal">Map</code>, and <code class="literal">Set</code> are unique to F#.</p>
+<p>For more information about F# collections, please consult the MSDN Library at: <a class="ulink" href="https://msdn.microsoft.com/en-us/visualfsharpdocs/conceptual/fsharp-collection-types">https://msdn.microsoft.com/en-us/visualfsharpdocs/conceptual/fsharp-collection-types</a>.</p>
+<p>The page shows the list of types and also the computation complexity or algorithmic speed (<span class="emphasis"><em>big O notation</em></span>) of each function of the collection. It is recommended that you should pay close attention to the number of computation complexities of each function and use them carefully.</p>
+<div class="note" title="Note"><h3 class="title"><a id="note32"></a>Note</h3>
+<p>
+<span class="emphasis"><em>Big O notation</em></span> is originally coming from the realm of basic computer science. It is almost non-trivial in the programming world. But it's crucial to understanding the abstract performance in the terms of computation complexity, as it is always having has a direct relation on the overall performance. Simpler computation complexity such as <span class="emphasis"><em>O(1)</em></span> or <span class="emphasis"><em>O(log n)</em></span> is always better than <span class="emphasis"><em>O(n)</em></span>.</p>
+</div>
+<p>For example consider:</p>
+<p>The function <code class="literal">tryPick</code> in <code class="literal">Array</code>, <code class="literal">List</code>, and <code class="literal">Seq</code> is <span class="emphasis"><em>O(n)</em></span> and in <code class="literal">Map</code> it is <span class="emphasis"><em>O(log N)</em></span>. This means the <code class="literal">tryPick</code> in <code class="literal">Map</code> is faster when the number of elements are very large, such as more than <code class="literal">1000</code>:</p>
+<pre class="programlisting">O(log 1000) = 3 
+</pre>
+<p>Whereas <span class="emphasis"><em>O(n)</em></span> for <code class="literal">1000</code> elements means:</p>
+<pre class="programlisting">O(1000) = 1000 
+</pre>
+<p>Some concrete operations are often quite trivial to spot or to deduce quickly; for example, loops that run a definite n number of times are always at least <span class="emphasis"><em>O(n)</em></span>.</p>
+<p>There's no simple way to reduce running times further, unless the loop is executed within a parallel flow of a parallel loop. Parallelism is actually also one way to have optimization as part of the concurrency support/features of F#. We will discuss concurrency further in <a class="link" title="Chapter&#160;4.&#160;Introduction to Concurrency in F#" href="fsp-hiperf_cu04.html#aid-11C3M2">Chapter 4</a>, <span class="emphasis"><em>Introduction to Concurrency in F#</em></span> and <a class="link" title="Chapter&#160;5.&#160;Advanced Concurrency Support in F#" href="fsp-hiperf_cu05.html#aid-164MG2">Chapter 5</a>, <span class="emphasis"><em>Advanced Concurrency Support in F#</em></span>.</p>
+<p>For more information about big O, please refer to the MIT computer science course overview at&#160;<a class="ulink" href="http://web.mit.edu/16.070/www/lecture/big_o.pdf">http://web.mit.edu/16.070/www/lecture/big_o.pdf</a>.</p>
+<p>The complexity scales value in terms of big O is better in <code class="literal">Map</code> than in <code class="literal">Array</code>, <code class="literal">List</code>, and <code class="literal">Seq</code>.</p>
+<p>The big O notation may break or may not be valid anymore when the code runs in parallel because there's no exact guarantee of the number of executions that actually happen when the code runs in parallel.</p>
+<div class="note" title="Note"><h3 class="title"><a id="note33"></a>Note</h3>
+<p>Starting from this chapter, we will enrich our perspective on measuring performance by the quantitative and qualitative methods we learned in <a class="link" title="Chapter&#160;2.&#160;Performance Measurement" href="fsp-hiperf_cu02.html#aid-K0RQ2">Chapter 2</a>, <span class="emphasis"><em>Performance Measurement</em></span> combined with the necessary big O notation, to understand performance optimization in the perspective of computation complexity. The use of big O should come after having quantitative and qualitative measurements first, as big O often shows no real quantitative data when measuring concurrency in action.</p>
+</div>
+<p>But the use of <code class="literal">Map</code> is not always the best option for all cases. <code class="literal">Map</code> behaves like the .NET <code class="literal">Dictionary</code>, as it stores elements that have pairs of keys and values in it. The semantics of <code class="literal">Map</code> are different from <code class="literal">Dictionary</code>, as will be explained later.</p>
+<p>These are the conceptual mappings of the F# collection to .NET BCL:</p>
+<div class="informaltable"><table border="1"><colgroup><col/>
+<col/>
+<col/>
+</colgroup>
+<tbody><tr><td>
+<p>
+<span class="strong"><strong>F#</strong></span>
+</p>
+</td>
+<td>
+<p>
+<span class="strong"><strong>.NET BCL</strong></span>
+</p>
+</td>
+<td>
+<p>
+<span class="strong"><strong>Notes</strong></span>
+</p>
+</td>
+</tr>
+<tr><td>
+<p>
+<code class="literal">Seq</code> (sequence)</p>
+</td>
+<td>
+<p>
+<code class="literal">IEnumerable&lt;T&gt;</code>
+</p>
+</td>
+<td>
+<p>F# <code class="literal">Seq</code> is an alias of <code class="literal">IEnumerable&lt;'T&gt;</code>. Therefore it is also valid and safe to use <code class="literal">Seq</code> for all operations that leverage <code class="literal">IEnumerable</code> and <code class="literal">IEnumerable&lt;'T&gt;, </code>and they are eagerly evaluated by default.</p>
+</td>
+</tr>
+<tr><td>
+<p>
+<code class="literal">List</code>
+</p>
+</td>
+<td>
+<p>
+<code class="literal">List&lt;T&gt;</code>
+</p>
+</td>
+<td>
+<p>
+</p>
+<p>F# <code class="literal">List</code> is implemented as single linked list. To have only immutability parity, .NET BCL has <code class="literal">ReadOnlyCollection&lt;T&gt;</code> type that is equal to the immutability feature.</p>
+<p>
+</p>
+<p>F# <code class="literal">List</code> is also thread safe. The equivalent of <code class="literal">List&lt;T&gt;</code> that has a thread safe feature in .NET BCL is the <code class="literal">SynchronizedCollection&lt;T&gt;</code> in the System.Collections.Generic namespace, and this collection is not immutable.</p>
+<p>
+</p>
+<p>So currently there is no equivalent type of F# <code class="literal">List</code> in .NET 4/4.5.4.6.1 BCL that is both immutable and thread safe.</p>
+<p>
+</p>
+</td>
+</tr>
+<tr><td>
+<p>
+<code class="literal">Array</code>
+</p>
+</td>
+<td>
+<p>Implicitly implemented as implementation of <code class="literal">IEnumerable&lt;T&gt;</code> but it is restricted to being a single variant, not a covariant.</p>
+</td>
+<td>
+<p>F# <code class="literal">Array</code> is a single variant. Both the F# <code class="literal">Array</code> and .NET BCL <code class="literal">Array</code> have a fixed length.</p>
+</td>
+</tr>
+<tr><td>
+<p>
+<code class="literal">Map</code>
+</p>
+</td>
+<td>
+<p>
+<code class="literal">Dictionary&lt;TKey,TValue&gt;</code>
+</p>
+</td>
+<td>
+<p>
+</p>
+<p>Both <code class="literal">Map</code> and <code class="literal">Dictionary&lt;TKey,TValue&gt;</code> implement the <code class="literal">IDictionary&lt;TKey,TValue&gt;</code> interface. Therefore, in the conceptual perspective, it is the same but not in the semantic perspective.</p>
+<p>
+</p>
+<p>F# <code class="literal">Map</code> is just immutable by default.</p>
+<p>
+</p>
+</td>
+</tr>
+<tr><td>
+<p>
+<code class="literal">Set</code>
+</p>
+</td>
+<td>
+<p>No equal type.</p>
+</td>
+<td>
+<p>There's no equal type of <code class="literal">Set</code> in .NET BCL. The <code class="literal">Set</code> is actually a container of items but the item in the elements of the set must be unique.</p>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>For more information about the .NET BCL collection types, please consult the starting page of <code class="literal">System.Collections</code> at&#160;<a class="ulink" href="https://msdn.microsoft.com/en-us/library/mt481475(v=vs.110).aspx">https://msdn.microsoft.com/en-us/library/mt481475(v=vs.110).aspx</a>.</p>
+<p>The F# sequence can create an infinite collection by initializing <code class="literal">Seq</code> using the <code class="literal">seq.initInfinite</code> function. A sequence will always be evaluated lazily. The consequence of this is the efficiency: the operation is applied as necessary to regenerate the elements of the sequence.</p>
+<p>There is no compiler or runtime trick for this infinite sequence. The F# infinite sequence is also available for use in C#/VB.</p>
+</div>
+
+
+<div class="section" title="Comparing F# List to .NET List&lt;T&gt;" id="aid-SJGS1"><div class="titlepage"><div><div><h1 class="title"><a id="ch03lvl1sec22"></a>Comparing F# List to .NET List&lt;T&gt;</h1>
+</div>
+</div>
+</div>
+<p>The<code class="literal"> List</code> is similar to .NET <code class="literal">List</code>, because they both have indexes and the same methods as well, although the semantics are different.</p>
+<p>The <code class="literal">List</code> is implemented as a single linked list, not as the <code class="literal">List&lt;T&gt;</code> in .NET BCL. This linked list implementation is faster than <code class="literal">List&lt;T&gt;</code>. The <code class="literal">List</code> can be stored recursively by easily using F# <code class="literal">head::tail</code> syntax.</p>
+<p>A single linked list means that each element of the list contains a portion of property that points to the next element of the list, as illustrated here:</p>
+<p>
+</p>
+<div class="mediaobject"><img src="../Images/image00287.jpeg" alt="Comparing F# List to .NET List&lt;T&gt;"/></div>
+<p style="clear:both; height: 1em;"> </p>
+<p>
+</p>
+<p>F# <code class="literal">List</code> is efficient and faster than <code class="literal">List&lt;T&gt;</code> in a sense that a single linked list always guarantees that any operations that access only the head of the list are <span class="emphasis"><em>O(1)</em></span>, and element access is <span class="emphasis"><em>O(n)</em></span>. It is ordered that each element can have a pointer to the next element.</p>
+<p>The apparent advantages of F# <code class="literal">List</code> over .NET <code class="literal">List&lt;T&gt;</code> are as follows:</p>
+<div class="itemizedlist"><ul class="itemizedlist"><li class="listitem">F# <code class="literal">List</code> is immutable. It can be considered as a persistent data structure when combining with <code class="literal">List</code>.</li>
+<li class="listitem">The nature of a linked list of the F# <code class="literal">List</code> means that it is efficient when combining lists using concatenation, as explained later.</li>
+<li class="listitem">It has efficient access to the recursive nature of <code class="literal">head::tail</code>, which can then be used in recursive functions. This is common in functional programming languages, as the recursive nature is deeply implemented not just on functions, but on data structures as well.</li>
+</ul>
+</div>
+<p>For an example of a recursive <code class="literal">head::tail</code> in a recursive function, let's look at the following sample code from F# MSDN of the F# <code class="literal">List</code> documentation:</p>
+<pre class="programlisting">let rec sum list = 
+   match list with 
+   | head :: tail -&gt; head + sum tail 
+   | [] -&gt; 0 
+</pre>
+<div class="note" title="Note"><h3 class="title"><a id="note34"></a>Note</h3>
+<p>The <code class="literal">sum</code> function will call the <code class="literal">sum</code> function again with the parameter of the rest of the elements (<code class="literal">tail</code>) after the first element (<code class="literal">head</code>).
+The recursive nature of <code class="literal">head::tail</code> will continue automatically on the next recursive call as the next <code class="literal">head::tail</code> will contain the list of the resulting previous <code class="literal">head::tail</code>.</p>
+<p>The <code class="literal">head::tail</code> syntax in the previous code sample can be leveraged to recursively access the head and the rest of data on the tail. There is no comparable feature for this in C#/VB. If there is any, the implementation would be less efficient when <code class="literal">List&lt;T&gt;</code> is used.</p>
+</div>
+<p>As linked lists, concatenating F# <code class="literal">List</code>s are also faster than concatenating a .NET <code class="literal">List&lt;T&gt;</code>. Concatenating between two or more <code class="literal">List</code> items is done in the following way:</p>
+<div class="orderedlist"><ol class="orderedlist arabic"><li class="listitem">Create a new <code class="literal">List</code> that has the total capacity of all <code class="literal">List</code> items.</li>
+<li class="listitem">Copy the source <code class="literal">List</code> structurally (not referentially).</li>
+<li class="listitem">The tail link of the source is linked to the head of the destination list, and the rest of the destination lists are copied structurally.</li>
+<li class="listitem">The process is repeated until all the participant lists have been copied and linked.</li>
+<li class="listitem">The operations do not (visibly) update the structure in place, but instead always yield a new updated structure.</li>
+</ol>
+<div style="height:10px; width: 1px"></div>
+</div>
+<p>F# has a convenient operator to concatenate <code class="literal">List</code>, using the <code class="literal">@</code> operator.</p>
+<p>For example consider:</p>
+<pre class="programlisting">let list3 = list1 @ list2  
+</pre>
+<p>The <code class="literal">list3</code> will contain the concatenation of <code class="literal">list1</code> and <code class="literal">list2</code>.
+</p>
+</div>
+
+
+<div class="section" title="Comparing F# Map to Dictionary&lt;TKey,TValue&gt;" id="aid-TI1E1"><div class="titlepage"><div><div><h1 class="title"><a id="ch03lvl1sec23"></a>Comparing F# Map to Dictionary&lt;TKey,TValue&gt;</h1>
+</div>
+</div>
+</div>
+<p>F# <code class="literal">Map</code> is equal to .NET BCL <code class="literal">Dictionary&lt;TKey,TValue&gt;</code> conceptually because they both implement .NET <code class="literal">IDictionary&lt;TKey,TValue&gt;</code>. But F# <code class="literal">Map</code> is semantically different from <code class="literal">Dictionary&lt;TKey,TValue&gt;</code>.</p>
+<div class="note" title="Note"><h3 class="title"><a id="note35"></a>Note</h3>
+<p>Please do not confuse F# <code class="literal">Map</code> as type with F# <code class="literal">Map</code> as a module. F# <code class="literal">Map</code> as a module is called <code class="literal">Map</code>. From outside, it is called by referencing to the namespace of <code class="literal">FSharp.Collection.Map</code> module. The F# <code class="literal">Map</code> as a type is available from outside F#. The name is called <code class="literal">FSharpMap</code>.</p>
+</div>
+<p>From the performance perspective, it is still faster because of its immutability behavior.</p>
+<p>From the correctness perspective, F# <code class="literal">Map</code> is enforcing us to be more correct because of the constrained key and value of the generic type parameter.</p>
+<p>Let's look at the type definition signature of F# <code class="literal">Map</code>:</p>
+<pre class="programlisting">type Map&lt;[&lt;EqualityConditionalOn&gt;]''Key, [&lt;EqualityConditionalOn;ComparisonConditionalOn&gt;]'Value when 'Key : comparison &gt;(comparer: IComparer&lt;''Key&gt;, tree: MapTree&lt;'Key,'Value&gt;) 
+</pre>
+<p>It is actually translated into this:</p>
+<div class="itemizedlist"><ul class="itemizedlist"><li class="listitem"><code class="literal">Map</code> has two generic type parameters: <code class="literal">Key</code> and <code class="literal">Value</code></li>
+<li class="listitem"><code class="literal">Key</code> is marked with <code class="literal">EqualityConditionalOnAttribute</code></li>
+<li class="listitem"><code class="literal">Key</code> is constrained to be derived from the comparison</li>
+<li class="listitem">Value is marked with <code class="literal">EqualityConditionalOnAttribute</code> and <code class="literal">ComparisonConditionalOnAttribute</code></li>
+</ul>
+</div>
+<div class="note" title="Note"><h3 class="title"><a id="note36"></a>Note</h3>
+<p>The <code class="literal">ComparisonConditionalOnAttribute</code> means that the generic parameter type satisfies the generic comparison constraint if and only if the type satisfies this constraint.</p>
+<p>The <code class="literal">EqualityConditionalOnAttribute</code> means the generic parameter type satisfies the F# equality constraint only if a generic argument also satisfies this constraint.</p>
+<p><code class="literal">Map</code> has the default constructor that accepts parameter of the comparer and the tree is the base collection for bespoke comparison.</p>
+<p>The comparer parameter is constrained implementing <code class="literal">IComparer</code>. Although F# has no support for covariance/contravariance, implementing <code class="literal">IComparer</code> for the comparer parameter means that it is also implicitly covariant. This is quite obvious because <code class="literal">IComparer</code> has the signature of <code class="literal">IComparer&lt;in T&gt;</code>.</p>
+</div>
+<p>These additional attributes might add a little overhead when doing comparisons and equality checks, but are necessary because of these correctness rules:</p>
+<div class="itemizedlist"><ul class="itemizedlist"><li class="listitem">The <code class="literal">Key</code> must be able to be checked for equality, because the key must be unique.</li>
+<li class="listitem">The <code class="literal">Value</code> must be able to be checked for equality and comparison. This is also important, as the value must be able to be sorted later (having a sorting operation is optional).</li>
+</ul>
+</div>
+<p>The deciding considerations in choosing <code class="literal">Map</code> or <code class="literal">Dictionary</code> are:</p>
+<div class="itemizedlist"><ul class="itemizedlist"><li class="listitem">If you just want to have a collection that has keys and values but needs immutability, use <code class="literal">Map</code>. The net effect of checking the equality of the values is not bigger than the usefulness of immutability.</li>
+<li class="listitem">If you just want to have a collection that has keys and values without worrying about the order of the values and need immutability, use <code class="literal">Map</code>.</li>
+<li class="listitem">If you just want to have an immutable implementation of <code class="literal">Dictionary</code> with sorted <code class="literal">Keys</code>, use <code class="literal">Map</code> with <code class="literal">Keys</code> that have been sorted by sorting the map's keys.</li>
+<li class="listitem">If you need a mutable <code class="literal">Dictionary</code>, use <code class="literal">Dictionary&lt;TKey,TValue&gt;</code> instead of <code class="literal">Map</code>. It is better to use <code class="literal">Dictionary&lt;TKey,TValue&gt;</code> directly for mutable purposes than marking a <code class="literal">Map</code> instance as <span class="emphasis"><em>mutable</em></span>. Marking a <code class="literal">Map</code> instance value as mutable means we are using <code class="literal">Map</code> but treating it as mutable. This simple hack may break interoperability with other languages such as C#/VB, because <code class="literal">Map</code> is supposed to be kept as immutable but the integrity is broken as mutable. The intention of correctness is also broken.</li>
+<li class="listitem">If you want to have a mutable <code class="literal">Dictionary</code> sorted by keys, use <code class="literal">SortedDictionary</code> instead. It is thread safe, unless you inherit <code class="literal">SortedDictionary</code> and implement your own sorted <code class="literal">Dictionary</code> because there is no further guarantee that on your own custom sorted dictionary, the thread safety will not be violated or overridden. Furthermore, referential transparency is not guaranteed to be the same or not broken.</li>
+</ul>
+</div>
+<p>By considering these scenarios, we should use F# <code class="literal">Map</code> as the main consideration. Marking <code class="literal">Map</code> as mutable to cheat on the mutability is not recommended. This applies also to the other collection types such as F#'s <code class="literal">List</code> and <code class="literal">Set</code>.</p>
+</div>
+
+
+<div class="section" title="Choosing a value evaluation strategy"><div class="titlepage" id="aid-UGI02"><div><div><h1 class="title"><a id="ch03lvl1sec24"></a>Choosing a value evaluation strategy</h1>
+</div>
+</div>
+</div>
+<p>We know that F# collections have support for lazy evaluation, not just eager evaluation. Almost all of F# collections are lazy, except the operations that require modifications on the order of the elements. The collections in F# that do not have a lazy feature are F# <code class="literal">Array</code> and <code class="literal">Set</code>, as the semantics are similar to the .NET BCL array.</p>
+<p>Collection modules on F# are not all lazily evaluated. The same behavior is applied on these modules: <code class="literal">Array</code>, <code class="literal">List</code>, and <code class="literal">Sequence</code>. The F# developer team is working hard to end the feature disparity by making relevant functions to be available for all modules.</p>
+<p>For a more complete list of F#'s progress on narrowing feature disparity (focusing on what's new in F# releases) visit:&#160;</p>
+<p>
+<a class="ulink" href="https://msdn.microsoft.com/en-us/visualfsharpdocs/conceptual/whats-new-in-visual-fsharp">https://msdn.microsoft.com/en-us/visualfsharpdocs/conceptual/whats-new-in-visual-fsharp</a>
+</p>
+<p>For example, <code class="literal">map</code> and <code class="literal">filter</code> do not require modification of the order of the elements; sort (<code class="literal">orderby</code> in LINQ) and <code class="literal">groupby</code> require modifications.</p>
+<p>The real reasons why we could deduce that all of the operations of the functions that modify or reorder the content of a collection make it lazy is almost impossible because of the way these operations work, especially when considering operations that relate to category theory and relational algebra, subjects borrowed from the realm of mathematics. All of the function implementation of map, filter, fold, and unfold are actually based on relational algebra.</p>
+<div class="note" title="Note"><h3 class="title"><a id="note37"></a>Note</h3>
+<p>Category theory deals with how the function compositions work, especially when the chaining of functions has to be composable. Relational algebra deals with operations of map, reduce, filter, fold, and unfold on a collection of elements. Relational algebra and category theory are the foundations of how F# collection operations work, and they are quite commonly known in other functional programming languages as basic features.</p>
+</div>
+<p>The topics of category theory and relational algebra are beyond the scope of this book, although it is recommended to understand the basics of these mathematical disciplines.</p>
+<p>To learn more about relational algebra, please check one of this sample course from MIT:</p>
+<p>
+<a class="ulink" href="http://ocw.mit.edu/courses/electrical-engineering-and-computer-science/6-830-database-systems-fall-2010/">http://ocw.mit.edu/courses/electrical-engineering-and-computer-science/6-830-database-systems-fall-2010/</a>
+</p>
+<p>Category theory is the foundation knowledge of functional constructs composition such as Monad and Monoid, and it is also the base theory behind lambda calculus and higher order functions. Lambda calculus and higher order functions are part of the common functional programming features.</p>
+<p>The terms lazy or eager evaluation are based on the evaluation strategies of the programming language.</p>
+<p>Lazy evaluation means expressions are only evaluated once and then only if the evaluation is actually needed. It is also called on-demand evaluation or deferred execution (the operation is deferred to be executed later).</p>
+<p>Eager evaluation means expressions are evaluated as soon as the computation expression is bound to a variable. F# by default is using eager evaluation for any variable assignment, unless the assignment has explicit lazy expressions.</p>
+<p>As a consequence of having lazy evaluation, the type must be aligned and well defined before being lazily evaluated. Otherwise, type casting or invalid argument exceptions may occur. This is one of the main reasons why static typing is mandatory in functional programming languages such as F#.</p>
+<p>In F#, lazy evaluation can be applied on a type and can also be implemented as functions on collections such as <code class="literal">Seq</code> and <code class="literal">List</code>.</p>
+<p>On collection, the resulting collection from the operations that have lazy evaluation are executed when the collection is going to be read in iteration, including evaluating <code class="literal">head::tail</code>.</p>
+<p>When applied on a type, F# has a <code class="literal">lazy</code> keyword to denote lazy computation to enclose the operation to be lazy. The result is a variable that has an operation to be executed and evaluated later when the evaluation to read is needed.</p>
+<p>This is an example of lazy computation in action when used as standalone type (not a collection):</p>
+<pre class="programlisting">let x = 10 
+let result = lazy (x + 10) 
+printfn "%d" (result.Force()) 
+do() 
+</pre>
+<p>If we put a debugger breakpoint on the second line, the result is not yet having a value and stepping over the line will not execute the <code class="literal">x + 10</code> operation. After stepping over line 3, the result will have a value. This will ensure on-demand execution or computation.</p>
+<p>By default, when operating on a type, F# will always do eager evaluation unless a lazy computation is applied. Using a lazy&#160;evaluation on all of operations or expressions will increase stack allocation overheads, and these overheads will exhaust stacks as well.</p>
+<p>It is recommended to only apply lazy computation on a type if the expression is reused at in many methods, because applying lazy means the operation within the lazy computation will only be executed once and then the result will be used many times.</p>
+<p>For more information about lazy computation on types, visit the following MSDN documentation:</p>
+<p>
+<a class="ulink" href="https://msdn.microsoft.com/en-us/visualfsharpdocs/conceptual/lazy-computations-%5Bfsharp%5D">https://msdn.microsoft.com/en-us/visualfsharpdocs/conceptual/lazy-computations-%5Bfsharp%5D</a>
+</p>
+<p>There is also a language construct that implements lazy evaluation implicitly as a state machine: using <code class="literal">yield</code> as an iterator efficiently on a F# <code class="literal">Sequence</code>.</p>
+<p>For example consider:</p>
+<pre class="programlisting">seq { for i in 1 .. 10 do yield i * i } 
+</pre>
+<p>Another sample that saves <code class="literal">yield</code> into a variable is:</p>
+<pre class="programlisting">let multiplicationTable = 
+  seq { for i in 1..9 do  
+            for j in 1..9 do  
+               yield (i, j, i*j) } 
+</pre>
+<p>Internally, <code class="literal">yield</code> is implemented as a state machine, which lazily computes the operation if the sequence is read or iterated. The F# <code class="literal">yield</code> is similar to the C#/VB <code class="literal">yield</code> although the actual semantics are different. It is similar in terms of the state machine based on a common design pattern of iterator.</p>
+<p>For more internal details of how an iterator works, check Microsoft's developer blog entry written by Raymond Chen:</p>
+<p>
+<a class="ulink" href="https://blogs.msdn.microsoft.com/oldnewthing/20080812-00/?p=21273">https://blogs.msdn.microsoft.com/oldnewthing/20080812-00/?p=21273</a>
+</p>
+<p>His blog has a series to describe iterators from an abstract as syntactic sugar to the raw implementation, although he describes the yield iterator from the perspective of the C# yield iterator specific implementation.</p>
+<p>The use of yield in F# is actually a syntactic sugar that translates into a complex state machine as described in Raymond Chen's article. We should not worry about the implementation detail of this yield, because next releases of F# may change the implementation details of yield.</p>
+<div class="note" title="Note"><h3 class="title"><a id="note38"></a>Note</h3>
+<p>The yield and lazy are sample features of F# that hide the implementation details of the complex machinery of state machine. This will let us focus on what we are going to have as the result, instead of worrying about how we compute the result. This is often called a declarative instead of purely imperative. The declarative aspect of F# does not stop here; many concurrency constructs such as the async computation are declarative as well.</p>
+</div>
+<p>Most performance characteristics of lazy evaluation are better than eager evaluation, especially when the expression captured and evaluated lazily is used many times. The total net effect of using a lazy expression is noticeable, because of the execution on demand.</p>
+<p>From the perspective of the F# unique approach as a functional programming language is not pure. F# is not doing all the aspects of language constructs lazily. For example, not all operations of <code class="literal">Seq</code> implement lazy evaluation. If we compare F# to other pure functional programming languages such as Haskell, Haskell has emphasized lazy evaluation on almost all cases, including comprehensive type resolutions, collection iterators, and even encapsulating side effects such as I/O lazily.</p>
+<p>There are some disadvantages of having all expressions and functions to be lazy:</p>
+<div class="itemizedlist"><ul class="itemizedlist"><li class="listitem">Compile times will always slower than eager evaluation.</li>
+<li class="listitem">If all operations are having lazy evaluation implemented, all of the complex state machines must be implemented for each case for all operations. This will result in a long compile time, including translating to state machines at the IL level.</li>
+<li class="listitem">There is no guarantee that having all expressions and functions as lazily evaluated will not exhaust stack.</li>
+</ul>
+</div>
+<p>The detail of the possibility of scenarios for lazy evaluations is described in the next section.</p>
+</div>
+
+
+<div class="section" title="Scenarios involving evaluation strategy and memory allocations" id="aid-VF2I1"><div class="titlepage"><div><div><h1 class="title"><a id="ch03lvl1sec25"></a>Scenarios involving evaluation strategy and memory allocations</h1>
+</div>
+</div>
+</div>
+<p>Lazy evaluation always consumes stack to allocate the metadata, the pointer to the expression. The expression evaluated may also be stored on stack if the expression is simple and no reference type (for example, usage of string or having a value captured in <code class="literal">WeakReference</code>) is used.</p>
+<p>We must consider these scenarios:</p>
+<div class="itemizedlist"><ul class="itemizedlist"><li class="listitem">Always use lazy evaluation whenever possible when doing operations on collections, especially when using a collection that only does forward-only features such as <code class="literal">Sequence</code> or <code class="literal">IEnumerable</code>, including <code class="literal">IEnumerable&lt;T&gt;</code> as well.</li>
+<li class="listitem">For more complex recursive expressions or computation, lazy evaluation will consume stack rapidly, especially when combining complex lazy evaluation within recursive functions. Eager evaluation is preferred for this scenario, as the result of recursive functions always stored on stack as a stack frame with the last pointer of the previous same function call. If the lazy operation inside a recursive function is guaranteed to be simple and only calculating value types, then we can use lazy evaluation quite safely without consuming too much stack.</li>
+<li class="listitem">When the lazy operation involves a reference type, an overhead of going back and forth between allocating stack and heap will always occur and this will result in having poor performance in terms of memory consumptions and time consumed during roundtrips of memory allocation between stack and heap. GC overhead will always occur during this heavy round trip, because GC cannot be guaranteed to collect at the right time after a recursive call function is finished and returned to its previous recursive function call. At first, stack will always be garbage collected first but mixed stack and heap will make GC slower to collect as stack needs to detach any references to heap allocation before being popped and garbage collected.</li>
+<li class="listitem">If our function is used in parallel, any atomic expression inside the function should be implemented lazily, as this is more efficient especially when the function will be running many times. Unless the function is implemented as a recursive function that has lazy operations in parallel it is also consuming stack quite rapidly, as described in the second scenario.</li>
+<li class="listitem">Avoid side effects whenever possible. If the lazy evaluation or yield expression contains side effects such as I/O, an exception may occur and this is expensive in terms of stack trace and stack frame allocation overhead. CPU bound calculation is a side effect but this kind of side effect can be ignored, as long as it is combined with other concurrency techniques such as parallelism.</li>
+<li class="listitem">It is recommended to avoid lazy evaluation on UI threads. F# and CIL/CLR do not allow cross-threads.</li>
+<li class="listitem">Having implementation of async computation workflow inside of a function that has lazy evaluation is fine, but we should avoid mixing lazy evaluation with side effects based on the fifth point, as usually async may deal with async I/O operations. Therefore, the use of eager evaluation when dealing with side effects within async computation is recommended. This scenario is one of the subtle scenarios that is often not observed well or is badly ignored.</li>
+<li class="listitem">Always pay attention to side effects that may occur, even any subtle side effects such as having calls to Windows API invocation. Not just exception needs to be handled, but there are some dangers of thread blockings or even deadlock when side effect computation is in effect.</li>
+<li class="listitem">Lazy evaluation inside a computation workflow or quotation has to be treated carefully. There is a possibility that lazy evaluation might decrease performance of certain computation workflows such as async, as async itself is a complex state machine.</li>
+<li class="listitem">Any cancellation being handled during async computation that has lazy evaluation is fine, because a cancellation handles a side effect computation of the context switching of an asynchronous operation in a graceful manner as recommended by common pattern in .NET TPL.</li>
+<li class="listitem">Do not perform synchronized lock within a lazy computation, as the execution context may behave unexpected side effects. A chance of deadlock may occur if the lazy computation contains a lock that locks a complex object. Lock is also not recommended within normal running F# code.</li>
+</ul>
+</div>
+<p>These scenarios may not cover all of the cases of choosing evaluation strategy, but they are quite common in implementing functions that combine lazy and eager evaluations. Therefore, lazy evaluation is not a single bullet for all kinds of performance optimizations in the value evaluation strategy.</p>
+<p>More detailed scenarios that may cause unexpected behavior or unexpected results when dealing with concurrency, are discussed in <a class="link" title="Chapter&#160;4.&#160;Introduction to Concurrency in F#" href="fsp-hiperf_cu04.html#aid-11C3M2">Chapter 4</a>, <span class="emphasis"><em>Introduction to Concurrency in F#.</em></span>
+</p>
+</div>
+
+
+<div class="section" title="Summary" id="aid-10DJ41"><div class="titlepage"><div><div><h1 class="title"><a id="ch03lvl1sec26"></a>Summary</h1>
+</div>
+</div>
+</div>
+<p>Data structures are not just a crucial feature of any programming language, they play very important part in our codes, regardless whatever programming language we use. Understanding data structures in .NET are also the foundation of any programming language that runs on .NET CLR, including F# data structures.</p>
+<p>We now not just have enough understanding of F# data structures, but we can leverage F# data structures by applying and combining with best practices. The best practices that we have covered in this chapter are not just best practices of using the existing F# data structures, but we also have best practices of optimizing the data structures.</p>
+<p>This data structure optimization understanding can be brought into deeper understanding of concurrency in F# in&#160;<a class="link" title="Chapter&#160;4.&#160;Introduction to Concurrency in F#" href="fsp-hiperf_cu04.html#aid-11C3M2">Chapter 4</a>, <span class="emphasis"><em>Introduction to concurrency in F#</em></span>.</p>
+</div>
+</body>
+</html>

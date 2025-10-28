@@ -1,0 +1,1106 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN"
+  "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" style="font-size:1.200rem;">
+<head><title>Chapter&#160;7.&#160;Language Features and Constructs Optimization</title>
+<link rel="stylesheet" href="../Styles/style0001.css" type="text/css"/>
+<meta name="generator" content="DocBook XSL Stylesheets V1.75.2"/>
+</head>
+<body id="page">
+<div class="chapter" title="Chapter&#160;7.&#160;Language Features and Constructs Optimization" id="aid-1ENBI1"><div class="titlepage"><div><div><h1 class="title"><a id="ch07"></a>Chapter&#160;7.&#160;Language Features and Constructs Optimization</h1>
+</div>
+</div>
+</div>
+<p>When we code, it happens quite often that we are sunk into optimization details. We often have to focus on dealing with concurrency, performance/benchmark measurements, and profiling other elements such as memory consumptions. This focus on concurrency and performance/benchmark measurements is, of course, a big and important element of our code, especially concurrency. This topic has been described extensively in the previous two chapters: <a class="link" title="Chapter&#160;4.&#160;Introduction to Concurrency in F#" href="fsp-hiperf_cu04.html#aid-11C3M2">Chapter 4</a>, <span class="emphasis"><em>Introduction to Concurrency&#160;</em></span>
+<span class="emphasis"><em>in F#</em></span> and <a class="link" title="Chapter&#160;5.&#160;Advanced Concurrency Support in F#" href="fsp-hiperf_cu05.html#aid-164MG2">Chapter 5</a>, <span class="emphasis"><em>Advanced Concurrency Support in F#</em></span>.</p>
+<p>There are other elements in F# to be recognized as optimization opportunities, the language constructs that are commonly used in code and also advanced language constructs such as computation workflow. Language constructs, including the combination of semantics and syntax, are crucial too because we are directly dealing with them as we code. This chapter is dedicated to identifying performance optimizations in language features, focusing on language constructs.</p>
+<p>Many F# language constructs are mostly trivial and they are already optimized, unless those constructs often require special care because of the subtlety of the implementation detail and also correctness, in the sense of having predictable results. Trivial constructs such as asynchronous workflow, list comprehension of <code class="literal">head::tail</code>, and list splicing are fully optimized, and often, to optimize further, we have to interop with other .NET libraries such as .NET TPL, in conjunction with F# asynchronous workflow, or dive further into the source code of F list.</p>
+<p>When we are using F# collections, it's better to optimize on usage instead of optimizing the internal semantic implementations (the internal source code) as we already discussed in <a class="link" title="Chapter&#160;3.&#160;Optimizing Data Structures" href="fsp-hiperf_cu03.html#aid-NQU22">Chapter 3</a>, <span class="emphasis"><em>Optimizing Data Structures</em></span>.</p>
+<p>This chapter focuses on subtle language constructs. We will now discuss these topics in optimizing language features and constructs:</p>
+<div class="itemizedlist"><ul class="itemizedlist"><li class="listitem">Overview of F# language features and constructs optimizations</li>
+<li class="listitem">Optimizing common F# language constructs</li>
+<li class="listitem">Optimizing inline functions</li>
+<li class="listitem">Identifying tail call in recursive constructs</li>
+</ul>
+</div>
+<div class="section" title="Overview of language features and constructs optimization"><div class="titlepage"><div><div><h1 class="title"><a id="ch07lvl1sec41"></a>Overview of language features and constructs optimization</h1>
+</div>
+</div>
+</div>
+<p>F# as a functional programming language has lots of language features. These language features also define the unique traits of F# itself, differentiating from other languages such as C#/VB.NET.</p>
+<p>For example, the following are the F# language features related to functional programming:</p>
+<div class="itemizedlist"><ul class="itemizedlist"><li class="listitem">Pattern matching</li>
+<li class="listitem">Active pattern</li>
+<li class="listitem">Type inference (including type inference generalization)</li>
+<li class="listitem">Inline function (also called function inlining)</li>
+<li class="listitem">Discriminated union</li>
+</ul>
+</div>
+<p>Discriminated union is a language feature and it is also a type that is unique to F# implementation, although it is compatible with C#/VB.NET. The best practices of using discriminated union are already discussed in <a class="link" title="Chapter&#160;3.&#160;Optimizing Data Structures" href="fsp-hiperf_cu03.html#aid-NQU22">Chapter 3</a>, <span class="emphasis"><em>Optimizing Data Structures</em></span>.</p>
+<p>By a simple definition, a language feature has the following elements:</p>
+<div class="itemizedlist"><ul class="itemizedlist"><li class="listitem">Syntax, the keyword and the usage</li>
+<li class="listitem">Constructs, the overall unification of syntax and the contextual usage, especially when used within other language elements</li>
+<li class="listitem">Semantics, the actual context and meaning of the code that has the constructs</li>
+</ul>
+</div>
+<p>We all know what syntax is. But constructs are quite subtle. The term <span class="emphasis"><em>constructs</em></span> comes from the fact that syntaxes with identifiers and arguments forms a composite code that is heavily related to the syntaxes.</p>
+<p>For example, let's examine the <code class="literal">if</code> syntax:</p>
+<pre class="programlisting"><span class="strong"><strong>if</strong></span> boolean-expression <span class="strong"><strong>then</strong></span> expression1 [ <span class="strong"><strong>else</strong></span> expression2 ] 
+</pre>
+<p>When we describe the syntax, it is by using an abstract concept such as <code class="literal">boolean-expression</code> or just an expression. We have highlighted the keywords for you: <code class="literal">if</code>, <code class="literal">then, else.</code>
+</p>
+<p>Before we are going to use <code class="literal">if</code>, we have to understand the semantics of <code class="literal">if</code>.</p>
+<p>The following information are the semantics of <code class="literal">if</code>:</p>
+<div class="itemizedlist"><ul class="itemizedlist"><li class="listitem">Within the <code class="literal">boolean-expression</code>, the expression has to be an expression that always evaluates to either true or false as this is also the nature of a Boolean type. It can be a direct value of Boolean itself, such as true or false, or it can be in the form of a symbol variable or as a function that evaluates to Boolean result.</li>
+<li class="listitem">The expression after <code class="literal">then</code> means evaluate and execute the expression after the <code class="literal">then</code> keyword.</li>
+<li class="listitem">The <code class="literal">else</code> keyword means to optionally evaluate and execute the expression if the <code class="literal">boolean-expression</code> is evaluated to be false.</li>
+</ul>
+</div>
+<p>The constructs of <code class="literal">if</code> as a sample is quite trivial, we just give a sample usage of <code class="literal">if</code> here:</p>
+<pre class="programlisting">if grade.Equals("A") then "Excellent" 
+</pre>
+<p>The sample code means that the <code class="literal">if</code> construct uses the <code class="literal">if..then</code> construct, instead of the full <code class="literal">if..then..else</code> construct, as illustrated in this fugure:</p>
+<p>
+</p>
+<div class="mediaobject"><img src="../Images/image00317.jpeg" alt="Overview of language features and constructs optimization"/></div>
+<p style="clear:both; height: 1em;"> </p>
+<p>
+</p>
+<p>Therefore, when we discuss constructs, it is often better to express it with a sample code, rather than using the abstract form of syntax usage and description.</p>
+<p>If we look up and check F# documentation in MSDN Library, the syntax usage is defined using the common <span class="strong"><strong>Backus-Naur Form</strong></span> (<span class="strong"><strong>BNF</strong></span>) notation. This BNF notation is a notation to represent syntax definition and usage, originally taken from compiler theory in the realm of computer science discipline.</p>
+<p>There are simplified and full notations of BNF, but for the sake of simplicity and to avoid confusion, we shall use simplified BNF. The simplified form is also commonly used in MSDN Library when describing programming language syntaxes, including those in F#, C#, VB, C++, JavaScript.
+</p>
+<div class="note" title="Note"><h3 class="title"><a id="note69"></a>Note</h3>
+<p>Some programming books use full BNF notation to describe syntax. It is also valid, but it is also quite confusing at the same time for people who are not from a computer science background. Throughout this book, we will describe syntax using the simplest form of BNF notation instead of the full BNF.</p>
+</div>
+<p>It is also quite common to use the angled brackets, <code class="literal">[ .. ]</code>, to denote optional syntax. In the context of our <code class="literal">if</code> syntax, the <code class="literal">else</code> keyword with the expression is also optional.</p>
+<p>For more information on the overview of BNF notation, its variants, and the grammar of the syntax, check out this comprehensive article:&#160;</p>
+<p>
+
+<a class="ulink" href="http://matt.might.net/articles/grammars-bnf-ebnf/">http://matt.might.net/articles/grammars-bnf-ebnf/</a>
+
+</p>
+</div>
+</div>
+
+
+<div class="section" title="Optimizing common F# language constructs"><div class="titlepage" id="aid-1FLS42"><div><div><h1 class="title"><a id="ch07lvl1sec42"></a>Optimizing common F# language constructs</h1>
+</div>
+</div>
+</div>
+<p>When we are optimizing F# language constructs, the best way to start optimizing is to identify the most commonly used F# language constructs. This is quite subtle, but important, because commonly used F# language constructs are easier to understand and learn first rather than the rarely used or more advanced ones. However, we shall focus on the constructs that often have subtle performance impacts and recommended correctness to enforce predictable behaviors.</p>
+<p>Predictable behaviors in the context of a running code means having predictable results on the entire flow of code, including when dealing with branches, switching execution contexts such as async and parallelisms, and having awareness on exceptions.</p>
+<p>Let's visit the most commonly used F# constructs: active pattern, pattern matching, and delegate or function lambda in F#.</p>
+<div class="section" title="Best practices of interoperability of F# delegate with .NET delegate"><div class="titlepage"><div><div><h2 class="title"><a id="ch07lvl2sec52"></a>Best practices of interoperability of F# delegate with .NET delegate</h2>
+</div>
+</div>
+</div>
+<p>Delegate in F#, as we have seen, is very useful and unique but at the same time it maintains the high compatibility bar with the .NET delegate.</p>
+<p>As a matter of fact, the internal and actual implementation of F# delegates actually derives from the .NET Delegate class. This is important as F# has to be compatible with and maintain the underlying .NET CLR, and on the higher layer, compatible with .NET Base Class Library (BCL) that is defined in the <code class="literal">mscorlib.dll</code> and <code class="literal">System.dll</code> assemblies.</p>
+<p>For normal functions implemented in F#, it should have planning in the future to define whether it will be compatible with C#/VB or is just available to be called from external F# compiled assemblies, or it is only used within its own compiled assembly.</p>
+<p>The best practice rules with the related scenarios from the F# side are:</p>
+<div class="orderedlist"><ol class="orderedlist arabic"><li class="listitem">For functions that are planned to be called within their own assembly and do not have any direct use or reference to .NET delegate (for example, LINQ expression tree), always use F# delegates. This is faster than always mixing with the .NET delegate, although the function is always used within the assembly scope.</li>
+<li class="listitem">For a function that is planned to be available to be called from external assembly that is also implementing the whole F# compiled code and does not have any direct use or reference to a .NET delegate (for example, LINQ expression tree), always use F# delegates. It is still faster than .NET delegates.</li>
+<li class="listitem">For a function that is planned to be available to be called from any .NET delegate and does not have any direct use or reference to a .NET delegate (for example, LINQ expression tree), special care has to be taken into account, such as interoperability when the .NET delegate is calling the F# delegate.</li>
+<li class="listitem">For a function that is planned to be available to be called from any .NET delegate and also has calls to .NET delegate, use the .NET delegate model instead of F# delegate. This usage of .NET delegate is slightly slower than F# delegate, but the overall performance is compensated when the function is called many times from .NET delegate, while at the same time achieving the highest compatibility with .NET delegate and other managed languages, such as C#/VB.NET/managed C++.</li>
+</ol>
+<div style="height:10px; width: 1px"></div>
+</div>
+<p>Currently, there is no other known scenario for delegate interoperability other than the rules just mentioned. As long as we are aware about F# and other managed languages' feature parity, we are always guaranteed to have a high predictability. A best sample for this parity is the lambda function feature. This feature is available on both F# and most other managed languages such as C#/VB and IronPython.</p>
+<p>Unfortunately, managed C++ has this full support for language lambda feature parity only since the release of Visual Studio 2013. It is good to know that Microsoft has provided extensive documentation on using this feature on managed C++.</p>
+<p>For more information about lambda in C++, visit:</p>
+<p>
+<a class="ulink" href="https://msdn.microsoft.com/en-us/library/dd293608.aspx">https://msdn.microsoft.com/en-us/library/dd293608.aspx</a>
+</p>
+<p>However, when doing interoperability with .NET delegate, avoid the following pitfalls:</p>
+<div class="orderedlist"><ol class="orderedlist arabic"><li class="listitem">Calling or mixing .NET delegates with normal asynchronous workflow. This will yield unpredictable behaviors because a .NET delegate is best suited within the Task Asynchrony Programming model of .NET Task asynchrony. F# has its own asynchrony without the need for using the same context switching model of .NET Task asynchrony.</li>
+<li class="listitem">Calling F# delegate/function that has implementation of asynchronous workflow from normal .NET method. This is fine, as long as the .NET method is not treated as asynchronous. But if the calling .NET method is implemented asynchronously, unpredictable behavior will always occur, and it might lead to race condition in the context switching.</li>
+<li class="listitem"><span class="emphasis"><em>Do not</em></span> mix F# delegate within .NET unsafe methods. Unless we must have an unsafe implementation to a known Windows API, it is highly recommended to avoid this practice.</li>
+</ol>
+<div style="height:10px; width: 1px"></div>
+</div>
+<p>Let's do the real work of these delegates interoperability in the next section.</p>
+<div class="section" title="Passing a .NET delegate as an F# function"><div class="titlepage"><div><div><h3 class="title"><a id="ch07lvl3sec13"></a>Passing a .NET delegate as an F# function</h3>
+</div>
+</div>
+</div>
+<p>Let's start passing an F# function from C#, and this fits with scenario 4 for any function that is going to be called from C#.</p>
+<p>For example, suppose we implement a function to get the row index of data from an <code class="literal">IEnumerable</code>:</p>
+<pre class="programlisting">open System.Collections.Generic 
+ 
+/// &lt;summary&gt;Get row index within a collection&lt;/summary&gt; 
+let GetRowIndex (datasource: IEnumerable&lt;'t&gt;) (functionToFind: 't -&gt; bool) : int = 
+    let paramcheck = datasource &lt;&gt; null 
+    match paramcheck with 
+    | true -&gt; Seq.findIndex functionToFind datasource 
+    | _ -&gt; -1 
+</pre>
+<p>In our C# project, first add a reference to the assembly that has the implementation of <code class="literal">GetRowIndex</code>.</p>
+<p>Then, we can import the namespace and use the F# function directly within C# using this sample:</p>
+<pre class="programlisting">using Microsoft.FSharp.Core; 
+using System.Diagnostics; 
+ 
+namespace Chapter7.DelegateInteropCSharp 
+{ 
+    class Program 
+    { 
+        static void Main(string[] args) 
+        { 
+            var proclist = Process.GetProcesses(); 
+            int index_devenv = FuncInterop.GetRowIndex(proclist, FuncConvert.ToFSharpFunc((Process p) =&gt; p.ProcessName.Equals("explorer.exe"))); 
+        } 
+    } 
+} 
+</pre>
+<p>The preceding code will get all of the running process of our machine, then search for a process named <code class="literal">explorer.exe</code>.</p>
+<p>When we pass a C#/VB delegate, it is actually a .NET delegate. But the lambda will evaluate as a different lambda that F# has; therefore, we have to convert our lambda expression parameter to <code class="literal">FSharpFunc</code> (F# lambda) before passing it.</p>
+<p>
+<code class="literal">FuncConvert</code> is available in the <code class="literal">FSharp.Core</code> assembly under the namespace of <code class="literal">Microsoft.FSharp.Core.FuncConvert</code>. This helper class has enough converter methods that support all forms of .NET <code class="literal">Func</code>, as indicated by the signature symbol of <code class="literal">FuncConvert</code>:</p>
+<pre class="programlisting">[&lt;AbstractClass&gt;] 
+[&lt;Sealed&gt;] 
+type FuncConvert = 
+class 
+static member FuncFromTupled : ('T1 * 'T2 * 'T3 * 'T4 * 'T5 -&gt; 'U) -&gt; 'T1 -&gt; 'T2 -&gt; 'T3 -&gt; 'T4 -&gt; 'T5 -&gt; 'U 
+static member FuncFromTupled : ('T1 * 'T2 * 'T3 * 'T4 -&gt; 'U) -&gt; 'T1 -&gt; 'T2 -&gt; 'T3 -&gt; 'T4 -&gt; 'U 
+static member FuncFromTupled : ('T1 * 'T2 * 'T3 -&gt; 'U) -&gt; 'T1 -&gt; 'T2 -&gt; 'T3 -&gt; 'U 
+static member FuncFromTupled : ('T1 * 'T2 -&gt; 'U) -&gt; 'T1 -&gt; 'T2 -&gt; 'U 
+static member ToFSharpFunc : Converter&lt;'T,'U&gt; -&gt; 'T -&gt; 'U 
+static member ToFSharpFunc : Action&lt;'T&gt; -&gt; 'T -&gt; unit 
+end 
+</pre>
+<p>For more information about F# <code class="literal">FuncConvert</code>, visit MSDN:&#160;</p>
+<p>
+
+<a class="ulink" href="https://msdn.microsoft.com/en-us/visualfsharpdocs/conceptual/core.funcconvert-class-%5Bfsharp%5D">https://msdn.microsoft.com/en-us/visualfsharpdocs/conceptual/core.funcconvert-class-%5Bfsharp%5D</a>
+
+</p>
+</div>
+<div class="section" title="Calling .NET delegate within F#"><div class="titlepage"><div><div><h3 class="title"><a id="ch07lvl3sec14"></a>Calling .NET delegate within F#</h3>
+</div>
+</div>
+</div>
+<p>Now, what about calling a common .NET delegate, such as <code class="literal">Func&lt;'T,'U&gt;</code>, in our F# code?</p>
+<p>It is quite simple and straightforward, and it is also simpler than passing a .NET delegate as an F# delegate.</p>
+<p>For example, we could call LINQ and pass the delegate parameter:</p>
+<pre class="programlisting">open System.Collections.Generic 
+open System.Linq 
+open System.Diagnostics 
+open System 
+ 
+let GetLargeProcesses() = 
+    Process.GetProcesses().Where(new Func&lt;Process,bool&gt;(fun proc -&gt; proc.WorkingSet64 &gt; (8L * 1024L * 1024L))).ToList() 
+</pre>
+<p>In the preceding code, the <code class="literal">Func</code> delegate is instantiated first, then the constructor is filled with the number of parameters and the correct type annotation, whether it is generic or not.</p>
+</div>
+</div>
+<div class="section" title="Best practices in pattern matching and active pattern"><div class="titlepage"><div><div><h2 class="title"><a id="ch07lvl2sec53"></a>Best practices in pattern matching and active pattern</h2>
+</div>
+</div>
+</div>
+<p>Pattern matching is one of the most commonly used language features/constructs. It is both a language feature and a language construct with syntax.</p>
+<p>The starting syntax for pattern matching is as follows:</p>
+<pre class="programlisting">match expression with 
+| pattern [ when condition ] -&gt; result-expression 
+</pre>
+<p>The keyword <code class="literal">match</code> means to match the expression with the pattern below the <code class="literal">match</code> keyword. It is highly required for the patterns to be matched in order to have the same indentation as the <code class="literal">match</code> declaration.</p>
+<p>Not all kinds of functional language patterns are supported, and this is already defined in F# 4.0 language specification. The full specification of F# 4.0 predefined/supported patterns of pattern matching is documented at:</p>
+<p>
+
+<a class="ulink" href="https://docs.microsoft.com/en-us/dotnet/articles/fsharp/language-reference/pattern-matching">https://docs.microsoft.com/en-us/dotnet/articles/fsharp/language-reference/pattern-matching</a>
+
+</p>
+<p>The easiest pattern to use is the constant pattern. The constant value means that the expression will be inferred as a type of the constant pattern as long as the pattern is consistently defining all the patterns and uses the same type of constant.</p>
+<p>For example, let's write a code to convert <span class="emphasis"><em>ABC</em></span> grade to the commentary report. Using pattern matching, this is the code:</p>
+<pre class="programlisting">let SimpleGradePattern grade = 
+    match grade with 
+    | "A" -&gt; "Excellent" 
+    | "B" -&gt; "Very good" 
+    | "C" -&gt; "Good" 
+    | "D" -&gt; "Bad" 
+    | "E" -&gt; "Very Bad" 
+    | _ -&gt; "undefined" 
+</pre>
+<p>The grade parameter is inferred by the mostly used types of the constant patterns, typed as string. This pattern matching usage is common, and it is also easier to understand and easier to reason than using different types as constants. These common pattern matching uses of constants are also faster to compile because the type used as constants value.</p>
+<p>To test on the type of grade parameter and the return type, we can use F# interactive. Simply highlight the code of <code class="literal">SimpleGradePattern</code> and press <span class="emphasis"><em>Alt</em></span> + <span class="emphasis"><em>Enter</em></span>. Then the type will be inferred as <code class="literal">string -&gt; string</code>, as illustrated in the following screenshot:</p>
+<p>
+</p>
+<div class="mediaobject"><img src="../Images/image00318.jpeg" alt="Best practices in pattern matching and active pattern"/></div>
+<p style="clear:both; height: 1em;"> </p>
+<p>
+</p>
+<p>This inferred type is a proof that type inference flows nicely in a consistent way, as indicated by the use of string constants. The use of <code class="literal">_</code> in the last pattern specifies&#160;that we should take care of the other patterns not mentioned, regardless of the content of the grade parameter. Omitting this will result in compile error because F# compiler always checks for all possible conditions in pattern matching and requires that all possible conditions in pattern matching must be handled.</p>
+<div class="section" title="Comparing constant pattern matching with if constructs"><div class="titlepage"><div><div><h3 class="title"><a id="ch07lvl3sec15"></a>Comparing constant pattern matching with if constructs</h3>
+</div>
+</div>
+</div>
+<p>Some developers, especially when dealing with pattern matching, always compare pattern matching with a similar common language construct, the <code class="literal">if</code> construct.</p>
+<p>The <code class="literal">if</code> condition construct is also supported in F#. It has an additional syntactic sugar, the <code class="literal">elif</code> keyword, to define that an else is immediately followed by the <code class="literal">if</code> construct. This <code class="literal">elif</code> keyword is the same as having the <code class="literal">else if</code> syntax.</p>
+<p>The use of <code class="literal">if</code> is common in non-functional programming languages, especially in OOP languages such as C#/VB.NET/C++, because it implicitly enforces imperative as is usually found in OOP languages as well.</p>
+<p>The <code class="literal">if</code> syntax in F# is defined as follows:</p>
+<pre class="programlisting">if boolean-expression then expression1 [ else expression2 ] 
+</pre>
+<p>The following explains the&#160;syntax and semantics of the <code class="literal">if</code> constructs:</p>
+<div class="itemizedlist"><ul class="itemizedlist"><li class="listitem">The keywords <code class="literal">if</code> and <code class="literal">then</code> are required because they define the condition to evaluate and also what to do if the condition is evaluated as true.</li>
+<li class="listitem"><code class="literal">boolean-expression</code> means that the expression is an expression that will result as Boolean, either true or false. This is required, and <code class="literal">boolean-expression</code> has to comply with the F# language specification for <code class="literal">boolean-expression</code>.</li>
+<li class="listitem">The <code class="literal">else</code> construct is optional, and it does not have to be in the same line.</li>
+</ul>
+</div>
+<p>The official documentation of F# <code class="literal">if</code> specification is available at:</p>
+<p>
+
+<a class="ulink" href="https://docs.microsoft.com/en-us/dotnet/articles/fsharp/language-reference/conditional-expressions-if-then-else">https://docs.microsoft.com/en-us/dotnet/articles/fsharp/language-reference/conditional-expressions-if-then-else</a>.
+</p>
+<p>Now, let's go back to our grade pattern. We are now going to convert our grade to use <code class="literal">if</code> instead of using pattern matching.</p>
+<p>The code to convert our grade has to be written well to capture all of the semantics of <code class="literal">SimpleGradePattern</code>. There are many ways to write the code using <code class="literal">if</code>, but we are going to leverage <code class="literal">elif</code> in F#. This is the code:</p>
+<pre class="programlisting">let SimpleGradeNoPattern (grade:String) = 
+    if grade.Equals("A") then "Excellent" 
+    elif grade.Equals("B") then "Very Good" 
+    elif grade.Equals("C") then "Good" 
+    elif grade.Equals("D") then "Bad" 
+    elif grade.Equals("E") then "Very Bad" 
+    else "undefined" 
+</pre>
+<p>To make the comparison more interesting, let's add more functions to test and to sample these constructs, comparing <code class="literal">if</code> with pattern matching.</p>
+<p>First, we will use the <code class="literal">Stopwatch</code> object from .NET BCL of <code class="literal">System.Diagnostics</code>, by importing the namespace first, with the <code class="literal">System</code> namespace as well:</p>
+<pre class="programlisting">open System 
+open System.Diagnostics 
+</pre>
+<p>Now, we will write a function to test the one pass running of <code class="literal">SimpleGradePattern</code> and <code class="literal">SimpleGradeNoPattern</code>:</p>
+<pre class="programlisting">let GradeBenchmarkTest() = 
+    let mutable swtimer = new Stopwatch() 
+    swtimer.Reset()  
+    swtimer.Start() 
+    for i = 1 to 5000000 do 
+        SimpleGradePattern "B" |&gt; ignore 
+    swtimer.Stop() 
+    let timerSimpleGradePattern = swtimer.Elapsed 
+    swtimer.Reset() 
+    swtimer.Start() 
+    for i = 1 to 5000000 do 
+        SimpleGradeNoPattern "B" |&gt; ignore 
+    swtimer.Stop() 
+    let timerSimpleGradeNoPattern = swtimer.Elapsed 
+    //Console.WriteLine("Elapsed SimpleGradePattern "B" =" + timerSimpleGradePattern.Milliseconds.ToString()+" ms") |&gt; ignore 
+    //Console.WriteLine("Elapsed SimpleGradeNoPattern "B" =" + timerSimpleGradeNoPattern.Milliseconds.ToString()+" ms") |&gt; ignore 
+    new Tuple&lt;Int32,Int32&gt;(timerSimpleGradePattern.Milliseconds,timerSimpleGradeNoPattern.Milliseconds) 
+</pre>
+<p>The preceding code has the following notable elements of semantics and flows:</p>
+<div class="itemizedlist"><ul class="itemizedlist"><li class="listitem">The use of stopwatch <code class="literal">swtimer</code> as mutable. This is important because <code class="literal">swtimer</code> will be used and changed many times inside the scope of our <code class="literal">GradeBenchmarkTest</code> function.</li>
+<li class="listitem">The stopwatch needs to be reset every time it is stopped and is going to be used again because we need to ensure that the timespan result at the initial start is reset to 0.</li>
+<li class="listitem">The result of the stopwatch will be available after it is stopped, and it is stored in the <code class="literal">Elapsed</code> property, typed as <code class="literal">TimeSpan</code>.</li>
+<li class="listitem">The use of <code class="literal">5000000</code> times iteration using <code class="literal">for..to</code> loop. The number of iterations is important because the nature of today's processor is so fast, and most sampling ends in milliseconds. Less than 1,000,000 sampling will yield less than 10 ms, and it will be hard to differentiate between pattern matching and <code class="literal">if</code> usage.</li>
+<li class="listitem">We are using the same parameter of <code class="literal">B</code> to ensure that the code will evaluate as semantically the same (from the perspective of parameter and result).</li>
+<li class="listitem">We are returning the milliseconds result as <code class="literal">Tuple</code>, which has two fields to contain <code class="literal">timerSimpleGradePattern</code> and <code class="literal">timerSimpleGradeNoPattern</code> results. The direct use of .NET Tuple instead of F# Tuple is chosen because this will ensure that the returning result will be used easily by the calling function.</li>
+</ul>
+</div>
+<p>The <code class="literal">Elapsed</code> property is using <code class="literal">TimeSpan</code> because it is used to store <span class="emphasis"><em>the duration of time spanned</em></span>. This is important because <code class="literal">TimeSpan</code> can have a resolution from hours to milliseconds.</p>
+<p>For more information on <code class="literal">TimeSpan</code>, consult the following page:&#160;</p>
+<p>
+
+<a class="ulink" href="https://msdn.microsoft.com/en-us/library/system.timespan(v=vs.110).aspx">https://msdn.microsoft.com/en-us/library/system.timespan(v=vs.110).aspx</a>
+
+</p>
+<p>Now, we need further samples to get the average execution time of both constant pattern matching and <code class="literal">if</code> usage. To simplify calculating the average, we shall call <code class="literal">GradeBenchmarkTest</code> within a frequency value as defined by function parameter.</p>
+<p>The following code tests the statistical sampling of the benchmark:</p>
+<pre class="programlisting">let GradeBenchmarkSamplingTest (freq:Int32) : unit = 
+    let mutable TotalPatternMatch : Int32 = 0 
+    let mutable TotalNoPatternMatch : Int32 = 0 
+    for i = 1 to freq do 
+        //Console.WriteLine("Sampling "+i.ToString()+" of "+freq.ToString()) 
+        let result = GradeBenchmarkTest() 
+        TotalPatternMatch &lt;- TotalPatternMatch + result.Item1 
+        TotalNoPatternMatch &lt;- TotalNoPatternMatch + result.Item2 
+    let AveragePatternMatch = TotalPatternMatch / freq 
+    let AverageNoPatternMatch = TotalNoPatternMatch / freq 
+    Console.WriteLine("Average Pattern match result for "+freq.ToString()+" times = "+AveragePatternMatch.ToString()+"ms") 
+    Console.WriteLine("Average No Pattern match result for "+freq.ToString()+" times = "+AverageNoPatternMatch.ToString()+"ms") 
+    () 
+</pre>
+<p>Let's run it by putting the benchmark to test by putting <code class="literal">GradeBenchmarkSamplingTest</code> with a high enough frequency sampling:</p>
+<pre class="programlisting">[&lt;EntryPoint&gt;] 
+let main argv =  
+    //printfn "%A" argv 
+    PatternMatching.SimpleGradePattern "B" |&gt; ignore 
+    Console.WriteLine("Pattern Matching test") 
+    PatternMatching.GradeBenchmarkSamplingTest 30 
+    0 // return an integer exit code 
+</pre>
+<p>To minimize friction with debugging, run without debugging by pressing <span class="emphasis"><em>Ctrl</em></span> + <span class="emphasis"><em>F5</em></span> and this is one of the sample displays:</p>
+<p>
+</p>
+<div class="mediaobject"><img src="../Images/image00319.jpeg" alt="Comparing constant pattern matching with if constructs"/></div>
+<p style="clear:both; height: 1em;"> </p>
+<p>
+</p>
+<p>On my machine, under the configuration of core i7 4<sup>th</sup> generation with 16 GB of RAM, the <code class="literal">SimpleGradePattern</code> function (with constant pattern matching) is outperforming <code class="literal">SimpleGradeNoPattern</code> by a narrow margin results:</p>
+<div class="informaltable"><table border="1"><colgroup><col/>
+<col/>
+<col/>
+</colgroup>
+<tbody><tr><td>
+<p>
+<code class="literal">Sampling</code>
+</p>
+</td>
+<td>
+<p>
+<code class="literal">SimpleGradePattern</code>
+</p>
+</td>
+<td>
+<p>
+<code class="literal">SimpleGradeNoPattern</code>
+</p>
+</td>
+</tr>
+<tr><td>
+<p>1</p>
+</td>
+<td>
+<p>96 ms</p>
+</td>
+<td>
+<p>97 ms</p>
+</td>
+</tr>
+<tr><td>
+<p>2</p>
+</td>
+<td>
+<p>97 ms</p>
+</td>
+<td>
+<p>97 ms</p>
+</td>
+</tr>
+<tr><td>
+<p>3</p>
+</td>
+<td>
+<p>98 ms</p>
+</td>
+<td>
+<p>99 ms</p>
+</td>
+</tr>
+<tr><td>
+<p>4</p>
+</td>
+<td>
+<p>96 ms</p>
+</td>
+<td>
+<p>98 ms</p>
+</td>
+</tr>
+<tr><td>
+<p>5</p>
+</td>
+<td>
+<p>97 ms</p>
+</td>
+<td>
+<p>100 ms</p>
+</td>
+</tr>
+<tr><td>
+<p>6</p>
+</td>
+<td>
+<p>96 ms</p>
+</td>
+<td>
+<p>99 ms</p>
+</td>
+</tr>
+<tr><td>
+<p>7</p>
+</td>
+<td>
+<p>97 ms</p>
+</td>
+<td>
+<p>100 ms</p>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>The results on your own machine may vary, but this result highly depends on the specifications of your machine, including CPU and RAM.</p>
+<p>In order to successfully execute and sample timing sensitive benchmark, it is highly recommended to have the following preconditions:</p>
+<div class="orderedlist"><ol class="orderedlist arabic"><li class="listitem">Windows Update is turned off. On Windows 10, the best way to do this is to disconnect all your networks as Windows 10 will always try to update every time you are connected to any internet/network.</li>
+<li class="listitem">We should always run the benchmarked code without debugging. This will give more accurate results because the Visual Studio debugger will not be loaded, and the execution will be faster.</li>
+<li class="listitem">Turn off any Windows notifications. There are overheads when you have many notifications running in background, and this may affect one or two cores on your system.</li>
+</ol>
+<div style="height:10px; width: 1px"></div>
+</div>
+<p>On an average, <code class="literal">SimpleGradePattern</code> is 1 to 3 ms faster than <code class="literal">SimpleGradeNoPattern</code>. If you run this again, results may vary but in the overall condition, using pattern matching is better than using <code class="literal">if</code>. To understand why, we shall dive deeper into the resulting IL.</p>
+<p>Let's dive into the IL of <code class="literal">SimpleGradePattern</code>:</p>
+<pre class="programlisting">.method public static string  SimpleGradePattern(string grade) cil managed 
+{ 
+  // Code size       116 (0x74) 
+  .maxstack  4 
+  .locals init ([0] string V_0) 
+  IL_0000:  nop 
+  IL_0001:  ldarg.0 
+  IL_0002:  stloc.0 
+  IL_0003:  ldloc.0 
+  IL_0004:  ldstr      "A" 
+  IL_0009:  call       bool [mscorlib]System.String::Equals(string, 
+                                                            string) 
+  IL_000e:  brfalse.s  IL_0012 
+  IL_0010:  br.s       IL_0050 
+  IL_0012:  ldloc.0 
+  IL_0013:  ldstr      "B" 
+  IL_0018:  call       bool [mscorlib]System.String::Equals(string, 
+                                                            string) 
+  IL_001d:  brfalse.s  IL_0021 
+  IL_001f:  br.s       IL_0056 
+  IL_0021:  ldloc.0 
+  IL_0022:  ldstr      "C" 
+  IL_0027:  call       bool [mscorlib]System.String::Equals(string, 
+                                                            string) 
+  IL_002c:  brfalse.s  IL_0030 
+  IL_002e:  br.s       IL_005c 
+  IL_0030:  ldloc.0 
+  IL_0031:  ldstr      "D" 
+  IL_0036:  call       bool [mscorlib]System.String::Equals(string, 
+                                                            string) 
+  IL_003b:  brfalse.s  IL_003f 
+  IL_003d:  br.s       IL_0062 
+  IL_003f:  ldloc.0 
+  IL_0040:  ldstr      "E" 
+  IL_0045:  call       bool [mscorlib]System.String::Equals(string, 
+                                                            string) 
+  IL_004a:  brfalse.s  IL_004e 
+  IL_004c:  br.s       IL_0068 
+  IL_004e:  br.s       IL_006e 
+  IL_0050:  ldstr      "Excellent" 
+  IL_0055:  ret 
+  IL_0056:  ldstr      "Very good" 
+  IL_005b:  ret 
+  IL_005c:  ldstr      "Good" 
+  IL_0061:  ret 
+  IL_0062:  ldstr      "Bad" 
+  IL_0067:  ret 
+  IL_0068:  ldstr      "Very Bad" 
+  IL_006d:  ret 
+  IL_006e:  ldstr      "undefined" 
+  IL_0073:  ret 
+} // end of method PatternMatching::SimpleGradePattern 
+</pre>
+<p>The IL code in <code class="literal">SimpleGradePattern</code> is divided into two sections: the first section handles the conditions and the second section (after <code class="literal">br.s</code> in the line segment <code class="literal">IL_004e</code>) handles the return value as the destination of branches before <code class="literal">IL_004e</code>.</p>
+<p>Let's dive into the IL of <code class="literal">SimpleGradeNoPattern</code>:</p>
+<pre class="programlisting">.method public static string  SimpleGradeNoPattern(string grade) cil managed 
+{ 
+  // Code size       122 (0x7a) 
+  .maxstack  4 
+  IL_0000:  nop 
+  IL_0001:  ldarg.0 
+  IL_0002:  ldstr      "A" 
+  IL_0007:  callvirt   instance bool [mscorlib]System.String::Equals(string) 
+  IL_000c:  brfalse.s  IL_0010 
+  IL_000e:  br.s       IL_0012 
+  IL_0010:  br.s       IL_0018 
+  IL_0012:  ldstr      "Excellent" 
+  IL_0017:  ret 
+  IL_0018:  ldarg.0 
+  IL_0019:  ldstr      "B" 
+  IL_001e:  callvirt   instance bool [mscorlib]System.String::Equals(string) 
+  IL_0023:  brfalse.s  IL_0027 
+  IL_0025:  br.s       IL_0029 
+  IL_0027:  br.s       IL_002f 
+  IL_0029:  ldstr      "Very Good" 
+  IL_002e:  ret 
+  IL_002f:  ldarg.0 
+  IL_0030:  ldstr      "C" 
+  IL_0035:  callvirt   instance bool [mscorlib]System.String::Equals(string) 
+  IL_003a:  brfalse.s  IL_003e 
+  IL_003c:  br.s       IL_0040 
+  IL_003e:  br.s       IL_0046 
+  IL_0040:  ldstr      "Good" 
+  IL_0045:  ret 
+  IL_0046:  ldarg.0 
+  IL_0047:  ldstr      "D" 
+  IL_004c:  callvirt   instance bool [mscorlib]System.String::Equals(string) 
+  IL_0051:  brfalse.s  IL_0055 
+  IL_0053:  br.s       IL_0057 
+  IL_0055:  br.s       IL_005d 
+  IL_0057:  ldstr      "Bad" 
+  IL_005c:  ret 
+  IL_005d:  ldarg.0 
+  IL_005e:  ldstr      "E" 
+  IL_0063:  callvirt   instance bool [mscorlib]System.String::Equals(string) 
+  IL_0068:  brfalse.s  IL_006c 
+  IL_006a:  br.s       IL_006e 
+  IL_006c:  br.s       IL_0074 
+  IL_006e:  ldstr      "Very Bad" 
+  IL_0073:  ret 
+  IL_0074:  ldstr      "undefined" 
+  IL_0079:  ret 
+} // end of method PatternMatching::SimpleGradeNoPattern 
+</pre>
+<p>After reading the IL of <code class="literal">SimpleGradeNoPattern</code>, we come to the following conclusions:</p>
+<div class="orderedlist"><ol class="orderedlist arabic"><li class="listitem">All of the conditions of <code class="literal">A</code> to <code class="literal">E</code> (including <code class="literal">undefined</code>) are stored onto heap. This is normal and this is the nature of string, it being a reference type. Storing onto heap is indicated by the instruction of <code class="literal">ldstr</code>.</li>
+<li class="listitem">All of the patterns in the pattern matching results need a storage. The storage is prepared using <code class="literal">stloc</code>. This IL instruction will prepare stack storage, then all the condition results (the Boolean result) of <code class="literal">A</code> to <code class="literal">E</code> are stored onto the same stack. There is a stack allocation overhead at the first initialization, but this is compensated by using stack to load the value after the stack is allocated by calling <code class="literal">ldloc</code>.</li>
+<li class="listitem">In the code that uses <code class="literal">if</code>, the conditions result of <code class="literal">A</code> to <code class="literal">E</code> are loaded onto heap. This is needed for <code class="literal">if</code> because it needs a different location for each <code class="literal">if</code>, and it's faster to allocate the heap at the initial declaration in <code class="literal">if</code> because it will avoid stack allocation overhead. Then, the flow branches to the next instructions.</li>
+<li class="listitem">String in both the codes is evaluated using calls to the <code class="literal">System.String.Equals()</code> method. However, the interesting fact is the use of <code class="literal">call</code> in <code class="literal">SimpleGradePattern</code> instead of <code class="literal">callvirt</code>. This is subtle but different; <code class="literal">call</code> is used to call a static method of <code class="literal">String.Equals()</code>, while <code class="literal">callvirt</code> requires instantiation of string before calling <code class="literal">String.Equals()</code>. A static call is always faster to execute than method instance calls.</li>
+</ol>
+<div style="height:10px; width: 1px"></div>
+</div>
+<p>This narrow result of benchmark clearly shows and proves that using constant pattern matching is faster than the sequences of <code class="literal">if</code>, although it shows a small amount of difference in milliseconds.</p>
+<p>We can safely conclude that it is common best practice to use pattern matching instead of <code class="literal">if</code> constructs for patterns that have the same data type and the patterns used are easily evaluated.</p>
+<p>The results will be more apparent if the patterns used have many patterns, for example:</p>
+<div class="itemizedlist"><ul class="itemizedlist"><li class="listitem">52 patterns of poker cards</li>
+<li class="listitem">7 days of a week</li>
+<li class="listitem">12 months of a year</li>
+</ul>
+</div>
+<p>And the semantic of pattern matching always enforces correctness by always enforcing us to evaluate all the possible outcomes. For example, in <code class="literal">SimpleGradePattern</code> there can be input outside <code class="literal">A</code> to <code class="literal">E</code>, and we can consider outside of these inputs as undefined or invalid. If we do not provide this information to satisfy the outside predefined conditions, we will have a compile error, and the code will not run even on F# interactive mode.</p>
+<p>If we use too many patterns to be matched, then the code execution will be slower to compile and execute because F# compiler will try to parse the patterns used and search for unused/unidentified patterns; then, the IL code generated will add more overhead on branching, and branches with too many fall downs are not effective because later conditions will always be evaluated longer before the first conditions.</p>
+<p>To relate to our example code of <code class="literal">SampleGradePattern</code>, the <code class="literal">E</code> condition is always treated to be evaluated after <code class="literal">A</code> to <code class="literal">D</code>. Therefore, too many patterns (especially above 10 patterns) will not be efficient, and later conditions, especially patterns nearing the end, will always be evaluated longer after previous conditions are evaluated.</p>
+<p>To mitigate the slow execution problems of many patterns to be matched, it is better to refactor it and then we could use one of these:</p>
+<div class="orderedlist"><ol class="orderedlist arabic"><li class="listitem">A dictionary of key and value. The key will have to be treated like a unique primary key, and the value can be anything as long as it has relations to its key. This value can then be extended to be typed as delegates or F# functions to be executed when we search for a key that has values as actions to be executed.</li>
+<li class="listitem">A list of data typed as <code class="literal">KeyValue</code> pairs and this F# list is more efficient than the .NET dictionary because it will be stored as a linked list, with immutability coming by default and known recursive support by <code class="literal">head::tail</code>.</li>
+</ol>
+<div style="height:10px; width: 1px"></div>
+</div>
+<div class="note" title="Note"><h3 class="title"><a id="note70"></a>Note</h3>
+<p>At the time of writing this book, .NET 4.6.1 does not have support for built-in read-only dictionary. Although we can use read-only collections that are parts of Microsoft's NuGet of <code class="literal">Immutable.Collections</code>, it is better to use F# list because of the nature of immutability, and it's faster to access than a .NET list as linked list. It is faster to access because the linked list implementation of F# list is faster than a normal .NET list in nature and it has support for recursive access within head and tails.</p>
+</div>
+</div>
+<div class="section" title="Best practices in using active patterns"><div class="titlepage"><div><div><h3 class="title"><a id="ch07lvl3sec16"></a>Best practices in using active patterns</h3>
+</div>
+</div>
+</div>
+<p>Active pattern is one of the language constructs in F# that is very useful. It is often used in pattern matching and embedded within <code class="literal">if</code> constructs.</p>
+<p>There are only two kinds of active patterns in F#: complete active pattern and partial active pattern. A complete active pattern is an active pattern that contains more than one identifier whereas a partial active pattern only has one identifier and the <code class="literal">_</code> identifier to denote the rest of the conditions, much similar to the use of <code class="literal">_</code> in pattern matching.</p>
+<p>The syntax for active pattern is as follows:</p>
+<pre class="programlisting">// Complete active pattern definition. 
+let (|identifer1|identifier2|...|) [ arguments ] = expression 
+// Partial active pattern definition. 
+let (|identifier|_|) [ arguments ] = expression 
+</pre>
+<p>For example, we can define an active pattern to contain even and odd number as pattern of <span class="emphasis"><em>even</em></span> and <span class="emphasis"><em>odd</em></span> like this:</p>
+<pre class="programlisting">let (|Even|Odd|) anumber = if anumber % 2 = 0 then Even else Odd 
+</pre>
+<p>The operator <code class="literal">%</code> in F# means modulo, so the condition checks if modulo 2 equals 0 or not. If it equals 0 then it will be resolved as <code class="literal">Even</code>, otherwise (else) <code class="literal">Odd</code>.</p>
+<p>We can then harness active patterns within pattern matching, for example:</p>
+<pre class="programlisting">let TestEvenNumber anumber = 
+    match anumber with 
+    | Odd -&gt; "Odd number" 
+    | Even -&gt; "Even number"  
+</pre>
+<p>Now within our entry point of main, we can test with the following:</p>
+<pre class="programlisting">    Console.WriteLine(ActivePatterns.TestEvenNumber 5) 
+    Console.WriteLine(ActivePatterns.TestEvenNumber 6) 
+</pre>
+<p>Run the code without debugging, and this is the result:</p>
+<p>
+</p>
+<div class="mediaobject"><img src="../Images/image00320.jpeg" alt="Best practices in using active patterns"/></div>
+<p style="clear:both; height: 1em;"> </p>
+<p>
+</p>
+<p>How does the pattern translate into raw IL? Let's dive into IL. Looking at the layout of the resulting output of IL Disassembler (ILDASM), we see this:</p>
+<p>
+</p>
+<div class="mediaobject"><img src="../Images/image00321.jpeg" alt="Best practices in using active patterns"/></div>
+<p style="clear:both; height: 1em;"> </p>
+<p>
+</p>
+<p>Based on the preceding picture, we can see the following interesting parts:</p>
+<div class="orderedlist"><ol class="orderedlist arabic"><li class="listitem">The module that holds our code, <code class="literal">ActivePatterns</code>, is defined as <code class="literal">public static class</code>.</li>
+<li class="listitem">The active pattern is defined as a method. The method references to a class of <code class="literal">Microsoft.FSharp.Core.FSharpChoice</code> with two generic type parameters (indicated by <code class="literal">'2</code>)</li>
+<li class="listitem">The function that performs the test-the <code class="literal">TestEvenNumber</code>.</li>
+</ol>
+<div style="height:10px; width: 1px"></div>
+</div>
+<p>Let's dump the IL of <code class="literal">Even|Odd</code>:</p>
+<pre class="programlisting">.method public specialname static class [FSharp.Core]Microsoft.FSharp.Core.FSharpChoice`2&lt;class [FSharp.Core]Microsoft.FSharp.Core.Unit,class [FSharp.Core]Microsoft.FSharp.Core.Unit&gt; 
+        '|Even|Odd|'(int32 anumber) cil managed 
+{ 
+  // Code size       24 (0x18) 
+  .maxstack  8 
+  IL_0000:  nop 
+  IL_0001:  ldarg.0 
+  IL_0002:  ldc.i4.2 
+  IL_0003:  rem 
+  IL_0004:  brtrue.s   IL_0008 
+  IL_0006:  br.s       IL_000a 
+  IL_0008:  br.s       IL_0011 
+  IL_000a:  ldnull 
+  IL_000b:  call       class [FSharp.Core]Microsoft.FSharp.Core.FSharpChoice`2&lt;!0,!1&gt; class [FSharp.Core]Microsoft.FSharp.Core.FSharpChoice`2&lt;class [FSharp.Core]Microsoft.FSharp.Core.Unit,class [FSharp.Core]Microsoft.FSharp.Core.Unit&gt;::NewChoice1Of2(!0) 
+  IL_0010:  ret 
+  IL_0011:  ldnull 
+  IL_0012:  call       class [FSharp.Core]Microsoft.FSharp.Core.FSharpChoice`2&lt;!0,!1&gt; class [FSharp.Core]Microsoft.FSharp.Core.FSharpChoice`2&lt;class [FSharp.Core]Microsoft.FSharp.Core.Unit,class [FSharp.Core]Microsoft.FSharp.Core.Unit&gt;::NewChoice2Of2(!1) 
+  IL_0017:  ret 
+} // end of method ActivePatterns::'|Even|Odd|' 
+</pre>
+<p>Now, let's examine <code class="literal">TestEvenNumber</code>:</p>
+<pre class="programlisting">.method public static string  TestEvenNumber(int32 anumber) cil managed 
+{ 
+  // Code size       32 (0x20) 
+  .maxstack  3 
+  .locals init ([0] int32 V_0, 
+           [1] class [FSharp.Core]Microsoft.FSharp.Core.FSharpChoice`2&lt;class [FSharp.Core]Microsoft.FSharp.Core.Unit,class [FSharp.Core]Microsoft.FSharp.Core.Unit&gt; V_1) 
+  IL_0000:  nop 
+  IL_0001:  ldarg.0 
+  IL_0002:  stloc.0 
+  IL_0003:  ldloc.0 
+  IL_0004:  call       class [FSharp.Core]Microsoft.FSharp.Core.FSharpChoice`2&lt;class [FSharp.Core]Microsoft.FSharp.Core.Unit,class [FSharp.Core]Microsoft.FSharp.Core.Unit&gt; ActivePatterns::'|Even|Odd|'(int32) 
+  IL_0009:  stloc.1 
+  IL_000a:  ldloc.1 
+  IL_000b:  isinst     class [FSharp.Core]Microsoft.FSharp.Core.FSharpChoice`2/Choice1Of2&lt;class [FSharp.Core]Microsoft.FSharp.Core.Unit,class [FSharp.Core]Microsoft.FSharp.Core.Unit&gt; 
+  IL_0010:  brfalse.s  IL_0014 
+  IL_0012:  br.s       IL_001a 
+  IL_0014:  ldstr      "Odd number" 
+  IL_0019:  ret 
+  IL_001a:  ldstr      "Even number" 
+  IL_001f:  ret 
+} // end of method ActivePatterns::TestEvenNumber 
+</pre>
+<p>Yes, the <code class="literal">Even|Odd</code> class is defined based on registering the <code class="literal">Even</code> and <code class="literal">Odd</code> passed as parameters for <code class="literal">FSharpChoice</code> class. In F# code, this class is called <code class="literal">Core.Choice&lt;'T1,'T2&gt;</code> because it has two generic parameterized types, and it is documented as a helper class to define active patterns.</p>
+<p>We can deduce that there is a limit to the number of active patterns defined. The limit of the number of patterns is 7, as defined by active pattern documentation:</p>
+<div class="blockquote"><blockquote class="blockquote"><p>
+<span class="emphasis"><em>There can be up to seven partitions in an active pattern definition.</em></span>
+</p>
+</blockquote>
+</div>
+<p>The documentation for active pattern is available at:&#160;</p>
+<p>
+
+<a class="ulink" href="https://docs.microsoft.com/en-us/dotnet/articles/fsharp/language-reference/active-patterns">https://docs.microsoft.com/en-us/dotnet/articles/fsharp/language-reference/active-patterns</a>
+
+</p>
+<p>F# <code class="literal">Choice</code> is powerful because it is used heavily in active patterns to effectively express our patterns as choices, which are then passed to <code class="literal">Choice1of2</code> and <code class="literal">Choice2of2</code> to be processed as the result of a choice. The kind of <code class="literal">Choice</code> class used depends on how many patterns we have as active patterns.</p>
+<p>For example, three patterns used means that it will be translated into calls to the <code class="literal">Choice&lt;'T1,'T2,'T3&gt;</code> class, which then calls <code class="literal">Choice1of3</code>, <code class="literal">Choice2of3</code>, and <code class="literal">Choice2of3</code> as needed.</p>
+<p>Interestingly enough, all F# <code class="literal">Choice</code> classes are declared as discriminated unions. For example, F# <code class="literal">Choice&lt;'T1,'T2&gt;</code> is declared as follows:</p>
+<pre class="programlisting">[&lt;StructuralEquality&gt;] 
+[&lt;StructuralComparison&gt;] 
+type Choice&lt;'T1,'T2&gt; = 
+| Choice1Of2 of 'T1 
+| Choice2Of2 of 'T2 
+with 
+interface IStructuralEquatable 
+interface IComparable 
+interface IComparable 
+interface IStructuralComparable 
+end 
+</pre>
+<p>This means that <code class="literal">Choice</code> can also have the benefit of discriminated unions without having to redefine inner classes that go intermingled with generics embedded.</p>
+<p>The most commonly used active patterns are patterns of two and three. This includes the implicit leverage of <code class="literal">Core.Choice&lt;'T1,'T2&gt;</code> and <code class="literal">Core.Choice&lt;'T1,'T2,'T3&gt;</code>.</p>
+<p>For more information about <code class="literal">Core.Choice&lt;'T1,'T2&gt;</code> and <code class="literal">Core.Choice&lt;'T1,'T2,'T3&gt;</code>, visit the following links:</p>
+<div class="itemizedlist"><ul class="itemizedlist"><li class="listitem"><a class="ulink" href="https://msdn.microsoft.com/en-us/visualfsharpdocs/conceptual/core.choice%5b't1,'t2%5d-union-%5bfsharp%5d">https://msdn.microsoft.com/en-us/visualfsharpdocs/conceptual/core.choice%5b't1,'t2%5d-union-%5bfsharp%5d</a></li>
+<li class="listitem"><a class="ulink" href="https://msdn.microsoft.com/en-us/visualfsharpdocs/conceptual/core.choice%5b't1,'t2,'t3%5d-union-%5bfsharp%5d">https://msdn.microsoft.com/en-us/visualfsharpdocs/conceptual/core.choice%5b't1,'t2,'t3%5d-union-%5bfsharp%5d</a></li>
+</ul>
+</div>
+<p>For the sake of correctness, the use of active patterns combined with pattern matching is recommended as long as the active pattern used is simple enough and the nature of the active pattern is a complete active pattern.</p>
+<p>The use of partial active patterns is not recommended because:</p>
+<div class="itemizedlist"><ul class="itemizedlist"><li class="listitem">The rest of the unevaluated conditions will always be a fallback. This fallback of all unevaluated conditions might imply an uncaught error or exception, and this is not a good practice. All the conditions should be carefully thought and then handled as this will provide clear reasoning.</li>
+<li class="listitem">Because of the nature of unevaluated conditions, any exceptions that may happen might be uncaught after the pattern is passed to the code that uses the active pattern. This uncaught exception is harder to resolve because our code is not in the correct context of where the exception should be caught.</li>
+</ul>
+</div>
+</div>
+<div class="section" title="Considerations in catching exceptions in active patterns"><div class="titlepage"><div><div><h3 class="title"><a id="ch07lvl3sec17"></a>Considerations in catching exceptions in active patterns</h3>
+</div>
+</div>
+</div>
+<p>Uncaught exceptions in active pattern, no matter how subtle it is, are always expensive. The call stack preparations and the state will always lead to undesirable effects such as losing the previous states, including not evaluating the rest of the active patterns we have. Losing the previous states, especially losing the current execution state before the exception happened always leads us to execution termination, unless the exception is caught.</p>
+<p>Catching an exception itself is expensive, but having an uncaught exception is more dangerous as it will always force our code to be halted/terminated. Propagating and then displaying the exception information (including stack traces) is common in many software applications that have GUI, in order to give user the information of what exception is caught.</p>
+<p>In .NET BCL, the stack traces are represented in the <code class="literal">StackFrame</code> class. It will by default be always instantiated when we catch any exception. This is one of the many reasons <span class="emphasis"><em>why catching exceptions is expensive</em></span>, because it will implicitly instantiate <code class="literal">StackFrame</code>, building information based on the current stack and call site and then hooking up the information. Hooking up the call site and the <code class="literal">StackFrame</code> itself takes some CPU overhead as it goes back and forth to the hooking up pointers and v-table of call stacks.</p>
+<p>The <code class="literal">StackFrame</code> class is available under the <code class="literal">System.Diagnostics</code> namespace within the assembly of <code class="literal">mscorlib.dll</code>. For more information about .NET <code class="literal">StackFrame</code>, visit:</p>
+<p>
+<a class="ulink" href="https://msdn.microsoft.com/en-us/library/system.diagnostics.stackframe(v=vs.110).aspx">https://msdn.microsoft.com/en-us/library/system.diagnostics.stackframe(v=vs.110).aspx</a>
+</p>
+<p>Now, let's turn our focus to optimizing one of the subtle language constructs of F#: inline functions.</p>
+</div>
+</div>
+</div>
+
+
+<div class="section" title="Optimizing inline functions"><div class="titlepage" id="aid-1GKCM2"><div><div><h1 class="title"><a id="ch07lvl1sec43"></a>Optimizing inline functions</h1>
+</div>
+</div>
+</div>
+<p>F# has features of inline functions since F# 1.9, although the previous version already had it as experimental.</p>
+<p>The definition of inline function is quite non-trivial: an inline function is a function that is <span class="emphasis"><em>integrated</em></span> into the calling code. The word integrated must have a clear context; what kind of integration? It is integrated in the sense that the type is not generalized, but it is compiled accordingly when the inline function is used within other functions. The inline function body is embedded directly. This function embedding will be discussed in detail in the next section.</p>
+<p>Before we discuss in-depth about inline functions, let's first examine the background of the importance and relevance of inline functions in the next section.
+</p>
+<div class="section" title="Background overview of inline functions and related type inferences"><div class="titlepage"><div><div><h2 class="title"><a id="ch07lvl2sec54"></a>Background overview of inline functions and related type inferences</h2>
+</div>
+</div>
+</div>
+<p>To understand this integration, we must know the background of how functions and arguments are evaluated first, especially if the arguments have no type annotation at all. When an F# function declaration has type annotations, the mechanism is simpler because the compiler will not perform any automatic generalization strategy at all. The evaluation of functions and its arguments are part of type inference mechanisms in F#, including automatic generalizations and inline functions.</p>
+<p>Automatic generalization strategy is unique in F#, it is powerful but at the same time will put the burden of type inference on the compiler.</p>
+<p>When there are type annotations applied in the function argument's declaration, heavy automatic generalization will not always occur. If the type annotation itself contains a normal generic type annotation such as <code class="literal">`T</code>, then the generalization is done partially because of the availability of existing type annotations in the declarations.</p>
+<p>F# has further optimizations to use instead of having normal generic generalizations (including automatic generalizations) using inline functions. This inline function feature is a well-known and powerful feature of F#, although it is rarely used.</p>
+</div>
+<div class="section" title="Overview of F# type inference mechanism of generic type inference"><div class="titlepage"><div><div><h2 class="title"><a id="ch07lvl2sec55"></a>Overview of F# type inference mechanism of generic type inference</h2>
+</div>
+</div>
+</div>
+<p>The most known aspect when writing a function declaration is writing the parameters without any type annotation at all. F# compiler infers the type using the following algorithm:</p>
+<div class="itemizedlist"><ul class="itemizedlist"><li class="listitem">If the function body contains expressions that employ common arithmetic operators such as additions and multiplications, the type will be inferred as <code class="literal">Int32</code> by default. Any calculation that involves a rational number (for example, 2.5) will perform a type inference resulting as <code class="literal">Double</code>.</li>
+<li class="listitem">If the function body contains more complex statements such as <code class="literal">if</code> and <code class="literal">try...with</code>, the type inference will perform an <span class="emphasis"><em>automatic generalization</em></span>. The resulting signature will be similar to a C#/VB method that has generic types as parameters.</li>
+</ul>
+</div>
+<div class="section" title="Overview of automatic generalization in F#"><div class="titlepage"><div><div><h3 class="title"><a id="ch07lvl3sec18"></a>Overview of automatic generalization in F#</h3>
+</div>
+</div>
+</div>
+<p>
+<span class="strong"><strong>Automatic generalization</strong></span> means that type inference will resolve as generic when it cannot further infer as concrete types. In F#, automatic generalizations mostly happen when the type inference cannot be inferred further not just by the content of the function body. When a more complex construct such as <code class="literal">if</code> is used, the generalization will try to infer generic type, and it has more complex algorithms to prevent more generalization from using too many generic types.</p>
+<p>Compiling a function that resolves as generalized parameters will generate IL for generic types, and the number of generic types is determined by the function body itself.</p>
+<p>Let's examine automatic generalization samples from the simplest one.</p>
+<p>The following code has <code class="literal">if</code> in the function body:</p>
+<pre class="programlisting">let greaterThan a b = if a &gt; b then a else b 
+</pre>
+<p>The type of <code class="literal">a</code> and <code class="literal">b</code> will be generalized and inferred to be typed as <code class="literal">'a</code>, because it assumes that <code class="literal">a</code> and <code class="literal">b</code> must have the same type due to the existence of <code class="literal">&gt;</code> parameter in the function body.</p>
+<p>This simple sample proves that automatic generalizations depend on the signature declaration and the function body.</p>
+<p>For functions with type annotations that use normal generic type annotations, F# will try to check for the existence of a simple arithmetic expression and will infer it as long as the arithmetic expression does not contain another recursive call.</p>
+<p>However, using generalization in a generic type will have its own disadvantages because generic type resolution is resolved at compile time but the user of the function might have a different use of concrete type, and this will add overheads in the compilation time and also small overheads when it is run. The runtime will always try to keep the original generalized type as is, and there is a chance that some type will be bound using late binding strategy instead of early binding.</p>
+<p>For example, the <code class="literal">greaterThan</code> function might be called with different concrete types as long as the type inferred implements the <code class="literal">&gt;</code> operator:</p>
+<pre class="programlisting">let intCompare = greaterThan 5 2 
+let strCompare = greaterThan "you" "me" 
+</pre>
+<p>The late binding of type resolution will always add overhead to the overall performance, although it rarely occurs.</p>
+<div class="note" title="Note"><h3 class="title"><a id="note71"></a>Note</h3>
+<p>Do not mix late binding with dynamic typing. Late binding is different from dynamic typing; in dynamic binding, type resolution is done at runtime instead of compile time. Therefore, in dynamic typing languages, type resolution always happens at runtime, and it is mostly done using techniques such as combination of dynamic type resolution and call site caching.</p>
+</div>
+<p>To minimize the overheads of type binding at runtime (although the type resolution is done at compile time), F# has other features to replace the type of the parameter as a concrete type when the function is called by another function that has a concrete type resolved. This is called inline function, and it is described in the next section.</p>
+</div>
+</div>
+<div class="section" title="Best practices in implementing inline functions"><div class="titlepage"><div><div><h2 class="title"><a id="ch07lvl2sec56"></a>Best practices in implementing inline functions</h2>
+</div>
+</div>
+</div>
+<p>F# supports&#160;<span class="emphasis"><em>statically typed parameters</em></span>, not just normal parameters. The term, <span class="emphasis"><em>static type parameters,</em></span> means that the type parameters are replaced with the concrete types at compile time instead of runtime.</p>
+<p>This means an increased performance because the type is already filled in and there is no further generic type translation at runtime. It also increases correctness and predictability because the type is already inferred at compile time, minimizing the overhead of normal generic type materialization into a concrete type and at the same time providing a guarantee to be strongly typed at runtime.</p>
+<p>There is a caveat: once we have declared the generic type parameter to be statically typed, we cannot mix with the normal generic type.</p>
+<p>The syntax for this statically typed parameter uses a caret, the <code class="literal">^</code> symbol instead of the normal apostrophe <code class="literal">'</code> symbol. Take for example the following function signature:</p>
+<pre class="programlisting">^T -&gt; ^U 
+</pre>
+<p>The statically typed parameter can be used only in conjunction with inline functions and methods.</p>
+<p>In function/member declaration, a statically typed parameter is for all generic types used, so again there is no mixing with normal/common generics. For example:</p>
+<pre class="programlisting">val inline NonStructural&lt; ^T &gt; : IComparer&lt; ^T &gt; when ^T : (static member ( &lt; ) : ^T * ^T    -&gt; bool) and ^T : (static member ( &gt; ) : ^T * ^T    -&gt; bool) 
+</pre>
+<p>The <code class="literal">static</code> type flows into all usage, including at the declaration of the interface implementation used, the signature of the discriminated union, and the declaration of type constraints.</p>
+<p>Let's start exploring inline functions. In this sample, we create a multiplication inline function:</p>
+<pre class="programlisting">let inline inlinemul a b = a * b 
+</pre>
+<p>In the preceding code, we have an inline <code class="literal">inlinemul</code> function that takes <code class="literal">a</code> and <code class="literal">b</code> as parameters.</p>
+<p>The inline functions can be implemented in defining custom operators:</p>
+<pre class="programlisting">let inline (^*) a b = a * b 
+</pre>
+<p>In the preceding code, we have the <code class="literal">^*</code> operator that takes <code class="literal">a</code> and <code class="literal">b</code> as parameters. The resulting semantic of sample <code class="literal">mul</code> and <code class="literal">^*</code> operator is the same, and it is also the same from the perspective of IL implementation.</p>
+<p>First, we need to verify the signature based on the documentation. To check the signature of the previous <code class="literal">inlinemul</code> function, we can use F# interactive.</p>
+<p>After evaluating both <code class="literal">mul</code> and <code class="literal">^*</code> operator, we have the following signatures in <span class="strong"><strong>F# Interactive</strong></span>:</p>
+<p>
+</p>
+<div class="mediaobject"><img src="../Images/image00322.jpeg" alt="Best practices in implementing inline functions"/></div>
+<p style="clear:both; height: 1em;"> </p>
+<p>
+</p>
+<p>All generic type parameters are declared with a caret prefix instead of using the common normal apostrophe/single quote, <code class="literal">'</code>.</p>
+<p>Let's extract and examine the declaration of <code class="literal">inlinemul</code> (with line number added for clarity):</p>
+<pre class="programlisting">01: val inline inlinemul : 
+02:  a: ^a -&gt; b: ^b -&gt;  ^c 
+03:    when ( ^a or  ^b) : (static member ( * ) :  ^a *  ^b -&gt;  ^c) 
+</pre>
+<p>Reading the inline function declaration might not be quite trivial, but it is quite straightforward to understand because it has predefined semantics within some syntaxes.</p>
+<p>The following explains&#160;the semantics:</p>
+<div class="orderedlist"><ol class="orderedlist arabic"><li class="listitem">Line 1 defines an inline function declaration definition.</li>
+<li class="listitem">Line 2 defines function arguments signature that has a signature of <code class="literal">^a -&gt; ^b -&gt; ^c</code>. It has type definitions to the effect that parameters&#160;<code class="literal">a</code>, <code class="literal">b</code>, and <code class="literal">c</code> are generic type parameters that are statically typed.</li>
+<li class="listitem">Line 3 defines constraints (using <code class="literal">when</code> keyword) for <code class="literal">^a</code> or <code class="literal">^b</code> to the effect that it must have a static member of the <code class="literal">*</code> operator implemented within the <code class="literal">^a</code> or <code class="literal">^b</code>. It means that <code class="literal">^a</code> or <code class="literal">^b</code> must have implementations of the <code class="literal">*</code> operator which has arguments of <code class="literal">a</code> and <code class="literal">b</code>.</li>
+</ol>
+<div style="height:10px; width: 1px"></div>
+</div>
+<p>Now that we have grabbed the contextual meaning of the inline function semantics, it is easier to see that type inference also plays an important role inferring the operation of the function, going deeper into explicitly adding constraints to define that the operator must be implemented in the generic type.</p>
+<p>This constraint gives the meaning and reasoning why it is called statically typed parameter.</p>
+<div class="note" title="Note"><h3 class="title"><a id="note72"></a>Note</h3>
+<p>C# has comparable generic constraints keyword that are similar to F#'s <code class="literal">when</code> keyword, the generic constraint limiting of <code class="literal">where</code> keyword.
+This <code class="literal">where</code> keyword in the generic type constraint declaration/definition is different from the <code class="literal">where</code> keyword in LINQ because the <code class="literal">where</code> keyword in LINQ is actually translated into call to <code class="literal">Enumerable.Where</code> or <code class="literal">Queryable.Where</code>, depending on which LINQ provider is used.</p>
+</div>
+<p>Based on the definition of inline functions, the type will be made available at compile time: therefore, the type resolution is done at compile time. This will add some overhead, especially if the inline function contains complex operations.</p>
+<p>Let's see these inline functions used by other functions, by creating quick symbolic properties to test them:</p>
+<pre class="programlisting">let MulDoubleTest = inlinemul 5.2 10.7 
+ 
+let MulIntTest = inlinemul 5 12 
+ 
+let InlineOpMultiplyTest = 6 ^* 10 
+</pre>
+<p>Let's put these inline functions and the test functions inside a module, called <code class="literal">InlineFunctions</code>. Now, let's see the generated IL of the <code class="literal">InlineFunctions</code> module by using ILDASM:</p>
+<p>
+</p>
+<div class="mediaobject"><img src="../Images/image00323.jpeg" alt="Best practices in implementing inline functions"/></div>
+<p style="clear:both; height: 1em;"> </p>
+<p>
+</p>
+<p>The compiled inline functions are compiled under the following names:</p>
+<div class="itemizedlist"><ul class="itemizedlist"><li class="listitem">The <code class="literal">inlinemul</code> function is compiled as <code class="literal">inlinemul: !!c &lt;a,b,c&gt;(!!a a, !!b b)</code></li>
+<li class="listitem">The inline <code class="literal">^*</code> operator is compiled as <code class="literal">op_HatMultiply: !!c &lt;a,b,c&gt;(!!a a, !!b b)</code></li>
+</ul>
+</div>
+<p>Let's look at the IL of <code class="literal">inlinemul</code>:</p>
+<pre class="programlisting">.method public static !!c  inlinemul&lt;a,b,c&gt;(!!a a, !!b b) cil managed 
+{ 
+  .custom instance void [FSharp.Core]Microsoft.FSharp.Core.CompilationArgumentCountsAttribute::.ctor(int32[]) = ( 01 00 02 00 00 00 01 00 00 00 01 00 00 00 00 00 )  
+  // Code size       13 (0xd) 
+  .maxstack  4 
+  .locals init ([0] !!a V_0, 
+           [1] !!b V_1) 
+  IL_0000:  nop 
+  IL_0001:  ldarg.0 
+  IL_0002:  stloc.0 
+  IL_0003:  ldarg.1 
+  IL_0004:  stloc.1 
+  IL_0005:  ldloc.0 
+  IL_0006:  ldloc.1 
+  IL_0007:  call       !!2 [FSharp.Core]Microsoft.FSharp.Core.LanguagePrimitives::MultiplyDynamic&lt;!!0,!!1,!!2&gt;(!!0,  !!1) 
+  IL_000c:  ret 
+} // end of method InlineFunctions::inlinemul 
+</pre>
+<p>The preceding IL is explained as follows:</p>
+<div class="orderedlist"><ol class="orderedlist arabic"><li class="listitem">The overall semantic of <code class="literal">inlinemul</code> and <code class="literal">op_HatMultiply</code>&#160;are basically the same because the body is using the same generated IL from the same expression of <code class="literal">a * b</code>.</li>
+<li class="listitem">Operator <code class="literal">^*</code> is compiled into IL as the <code class="literal">op_HatMultiply</code> function method.</li>
+<li class="listitem">The compiled prefix of <code class="literal">!!</code> in the parameter declaration means it is defined as compiled IL from statically typed parameter. It is unique in F# generated IL, and this might change in the future because it is considered as an implementation detail of how F# treats the statically typed parameters to be compiled into IL.</li>
+<li class="listitem">The parameters of <code class="literal">a</code> and <code class="literal">b</code> are allocated and stored onto the stack, which is then passed as a parameter to <code class="literal">LanguagePrimitives.MultiplyDynamic</code> because we are using multiplication in the function body.</li>
+<li class="listitem">The returning result is also marked as statically typed generics, compiled with the same <code class="literal">!!</code> prefix. Again, this is the implementation detail of emitted IL from F# compiler and this might change. But the same rule of thumb is applied in the IL: the compiler generates different IL for statically typed parameters and common generic type parameters.</li>
+</ol>
+<div style="height:10px; width: 1px"></div>
+</div>
+<p>Now, let's explore the IL of <code class="literal">inlinemul</code> usage, the <code class="literal">MulIntTest</code> property:</p>
+<pre class="programlisting">.property int32 MulIntTest() 
+{ 
+  .custom instance void [FSharp.Core]Microsoft.FSharp.Core.CompilationMappingAttribute::.ctor(valuetype [FSharp.Core]Microsoft.FSharp.Core.SourceConstructFlags) = ( 01 00 09 00 00 00 00 00 )  
+  .get int32 InlineFunctions::get_MulIntTest() 
+} // end of property InlineFunctions::MulIntTest 
+</pre>
+<p>We now see other proofs that F# type inference is powerful because this symbolic property is translated into a property with only a getter, as defined with <code class="literal">.get</code> getter declaration. This getter calls the <code class="literal">get_MulIntTest</code> method. The <code class="literal">get_MulIntTest</code> method is defined in the following IL:</p>
+<pre class="programlisting">.method public specialname static int32  get_MulIntTest() cil managed 
+{ 
+  // Code size       6 (0x6) 
+  .maxstack  8 
+  IL_0000:  ldsfld     int32 '&lt;StartupCode$Chapter7-LanguageConstructs&gt;'.$InlineFunctions::MulIntTest@9 
+  IL_0005:  ret 
+} // end of method InlineFunctions::get_MulIntTest 
+</pre>
+<p>This <code class="literal">ldsfld</code> instruction means that the code pushes the value of <code class="literal">MulIntTest@9</code> result onto the stack. Because of the fact that all operations are compiled into IL instructions that utilize the stack, the performance is quite fast.</p>
+<p>However, if the implementation body of an inline function is more complex (more than one operator is involved), then all calls to the inline function will have large overheads of multiple calls to respective dynamic operators, which then has many indirections of having to specify the type information for the call site (the function that calls the inline function or inline operator). These overheads of stack allocations of type translations and call site stack frame allocations will decrease performance at the initial run.</p>
+<p>We can also safely conclude that inline functions are best for functions that focus on simple generic types that incorporate simple arithmetic, although inline functions can speed up recursive operations, for example when dealing with operations that have a recursive nature of iterating head and tail of F# native list, a linked list.</p>
+<p>Now that we understand the IL generated and the gory details of how the statically typed parameter works with inline functions, we now understand the integrated part of the inline function with the call site.</p>
+<p>It is integrated in a sense that each usage of our inline functions will translate the type parameter from the call site, and each call site can have its own type, regardless of whether it is different or the same.</p>
+</div>
+</div>
+
+
+<div class="section" title="Identifying tail call in recursive constructs"><div class="titlepage" id="aid-1HIT82"><div><div><h1 class="title"><a id="ch07lvl1sec44"></a>Identifying tail call in recursive constructs</h1>
+</div>
+</div>
+</div>
+<p>One of the characteristics of a functional programming language is the common use of recursive constructs in many of the implementation of the functions; F# compiler itself is also a good sample of code that has many implementations of recursive constructs.</p>
+<p>Functional programming languages always prefer to have recursive constructs instead of having loops or iterative constructs because recursive is better to use in the most complex calculations or in any operation that requires the ability to perform the same operation when the problem solving or calculation is broken into smaller problems.</p>
+<p>Having recursive calls is quite common in F#, and it is recommended to optimize further to have tail call optimization, although the optimization may not be applied to all the cases.</p>
+<div class="section" title="Overview of recursion in functional programming"><div class="titlepage"><div><div><h2 class="title"><a id="ch07lvl2sec57"></a>Overview of recursion in functional programming</h2>
+</div>
+</div>
+</div>
+<p>The use of recursion is more apparent in dealing with problems that require resolving problems into smaller problems with the same algorithm. This is why, in many cases, using iterations such as loop is not preferred because a loop will add more complexity in the form of exponential steps instead of relying on a return mechanism after resolving smaller problems.</p>
+<p>For example, we can write a factorial function to be implemented using a loop, but then this loop becomes more complex to write because the number of loops might be large, and there will be overhead in the initial memory allocations instead of going deeper into performing the calculation recursively. Going deeper into performing the calculation or doing some processes requires a returning point to remember if the calculation is done and if the calculation is called by a previous calculation.</p>
+<p>The consequences of this returning nature after finishing the final smallest problem require us to have a stack to store the locations and the state of the calculation. When the calculation takes long or deep levels of recursions, most codes will throw <code class="literal">StackOverflowException</code> because the stack allocation is exhausted.</p>
+<p>F# has support for common recursive functions by marking it with the <code class="literal">rec</code> keyword as a requirement to indicate an explicit recursive function only if the function body contains a call to itself. This is the easiest concept of recursion: <span class="emphasis"><em>a function that calls itself</em></span>. It is the most common because most of us get used to the idea of recursive in recursive functions, which is a function that calls itself.</p>
+<p>However, in terms of a functional programming language, the traits of recursive constructs are broader:</p>
+<div class="orderedlist"><ol class="orderedlist arabic"><li class="listitem">A function that calls itself. This concept of a function that calls itself is the most common and also the easiest construct to understand. It is also by definition quite self-explanatory. This construct is also widely used not just in functional programming languages but also in non-functional programming languages, such as C#, VB, and C++.</li>
+<li class="listitem">A function that has a function as an argument, and then the function body contains a call to the function that is defined as an argument of the calling function. This trait might be confusing at first, but it is quite trivial when we see the examples later.</li>
+<li class="listitem">A function that contains flow branches that always end up with function calls to itself. This is quite similar to a function that takes a function as its parameter that contains a call to a function as its argument. In the end, both of the last expressions evaluated are functions, not constants or statements.</li>
+</ol>
+<div style="height:10px; width: 1px"></div>
+</div>
+<p>An example of point 1 is the most common, and it is also the most understood form of recursion.</p>
+<p>For example, consider the following code for a factorial function:</p>
+<pre class="programlisting">let rec factorial n =  
+    match n with 
+    | 0 | 1 -&gt; n 
+    | _ -&gt; n * factorial (n-1) 
+</pre>
+<p>In this factorial function, we implement the branching using pattern matching, and this is useful and more correct because all the conditions of possible values of <code class="literal">n</code> are checked.</p>
+<p>Point 2 and point 3 require a deeper understanding of the nature of a curried function and how recursion does not stop&#160;at only one case of when a function calls itself, but also naturally has further optimizations that can be compiled as a loop or any other optimization such as a tail call optimization.</p>
+<div class="note" title="Note"><h3 class="title"><a id="note73"></a>Note</h3>
+<p>The factorial function is one of the best examples to have the deciding factor of recursion. It is better to understand factorials as recursive instead of iterative.</p>
+</div>
+<p>If we call a factorial with a very large number, such as 50,000, the stack allocation will be quickly exhausted, and therefore there will be no more stack available for us. The function will throw <code class="literal">StackOverflowException</code> to inform that it is running out of stack and the stack that contains the returning state is full. In order to avoid or handle this exception, we can do one of these:</p>
+<div class="itemizedlist"><ul class="itemizedlist"><li class="listitem">We change the implementation to use a loop instead, but this is not feasible for all cases of recursion by nature.</li>
+<li class="listitem">We can rely on compiler optimization because F# compiler will do its own optimization by translating common recursive functions into loop with IL optimization.</li>
+<li class="listitem">We can use tail call optimization by implementing recursive with a specific pattern.</li>
+</ul>
+</div>
+<p>The last point, using tail call, is the most efficient optimization but it requires more understanding to implement it.</p>
+</div>
+<div class="section" title="Tail call recursion in F# and .NET CLR"><div class="titlepage"><div><div><h2 class="title"><a id="ch07lvl2sec58"></a>Tail call recursion in F# and .NET CLR</h2>
+</div>
+</div>
+</div>
+<p>It is also common in many functional programming languages to have a tail call optimization in recursive constructs. Tail call recursion means that any recursion is optimized not to use stack instead of optimizing it to have a tail call.</p>
+<p>F# supports both common recursion and tail call optimized recursion; tail call support is also available in .NET CLR.</p>
+<p>What is tail call? A tail call means a function that has a call within a function whose result is immediately used as the output of the function. It is then a call that has a tail in its call to a function, usually as the last result of a calculation. The position is usually at the last position to mark the call; this is why it is called a tail call.</p>
+<p>The definitive and full explanation of a tail call in F# is explained in this MSDN blog from the Visual F# team:</p>
+<p>
+<a class="ulink" href="https://blogs.msdn.microsoft.com/fsharpteam/2011/07/08/tail-calls-in-f/">https://blogs.msdn.microsoft.com/fsharpteam/2011/07/08/tail-calls-in-f/</a>
+</p>
+<div class="section" title="Identifying tail call optimized implementation"><div class="titlepage"><div><div><h3 class="title"><a id="ch07lvl3sec19"></a>Identifying tail call optimized implementation</h3>
+</div>
+</div>
+</div>
+<p>According to the MSDN blog, tail call is a call in tail position implemented recursively because the last expression is a function, not a composite expression, such as an addition between numbers.</p>
+<p>A common sample of an expression that contains composite expression is the following function:</p>
+<pre class="programlisting">/// Computes the sum of a list of integers using recursion. 
+let rec sumList xs = 
+    match xs with 
+    | []    -&gt; 0 
+    | y::ys -&gt; y + sumList ys 
+</pre>
+<p>The code tells us that the call to <code class="literal">sumList</code> is followed with a <code class="literal">+</code> operator; therefore, it is obvious that this calculation is not a simple call to only a function. Therefore, it is not implemented to have a tail call.</p>
+<p>To prove that <code class="literal">sumList</code> does not have a tail call, let's look at the IL:</p>
+<pre class="programlisting">.method public static int32  sumList(class [FSharp.Core]Microsoft.FSharp.Collections.FSharpList`1&lt;int32&gt; xs) cil managed 
+{ 
+  // Code size       40 (0x28) 
+  .maxstack  4 
+  .locals init ([0] class [FSharp.Core]Microsoft.FSharp.Collections.FSharpList`1&lt;int32&gt; V_0, 
+           [1] class [FSharp.Core]Microsoft.FSharp.Collections.FSharpList`1&lt;int32&gt; V_1, 
+           [2] class [FSharp.Core]Microsoft.FSharp.Collections.FSharpList`1&lt;int32&gt; ys, 
+           [3] int32 y) 
+  IL_0000:  nop 
+  IL_0001:  ldarg.0 
+  IL_0002:  stloc.0 
+  IL_0003:  ldloc.0 
+  IL_0004:  call       instance class [FSharp.Core]Microsoft.FSharp.Collections.FSharpList`1&lt;!0&gt; class [FSharp.Core]Microsoft.FSharp.Collections.FSharpList`1&lt;int32&gt;::get_TailOrNull() 
+  IL_0009:  brfalse.s  IL_000d 
+  IL_000b:  br.s       IL_000f 
+  IL_000d:  ldc.i4.0 
+  IL_000e:  ret 
+  IL_000f:  ldloc.0 
+  IL_0010:  stloc.1 
+  IL_0011:  ldloc.1 
+  IL_0012:  call       instance class [FSharp.Core]Microsoft.FSharp.Collections.FSharpList`1&lt;!0&gt; class [FSharp.Core]Microsoft.FSharp.Collections.FSharpList`1&lt;int32&gt;::get_TailOrNull() 
+  IL_0017:  stloc.2 
+  IL_0018:  ldloc.1 
+  IL_0019:  call       instance !0 class [FSharp.Core]Microsoft.FSharp.Collections.FSharpList`1&lt;int32&gt;::get_HeadOrDefault() 
+  IL_001e:  stloc.3 
+  IL_001f:  ldloc.3 
+  IL_0020:  ldloc.2 
+  IL_0021:  call       int32 TailcallSample::sumList(class [FSharp.Core]Microsoft.FSharp.Collections.FSharpList`1&lt;int32&gt;) 
+  IL_0026:  add 
+  IL_0027:  ret 
+} // end of method TailcallSample::sumList 
+</pre>
+<p>There is no tail call IL in the compiled <code class="literal">sumList</code> function. Although it is recursive in the code, <code class="literal">sumList</code> is compiled to use an iterative loop, as indicated by the <code class="literal">br.s</code> instruction at line <code class="literal">IL_000b</code> to call the <code class="literal">FSharpList,get_TailOrNull</code> function.</p>
+<p>Let's try to implement the tail call function.</p>
+<p>The tail call optimization is not available by default; we have to turn it on based on the project scope, not on the solution scope. To turn on tail call optimization, open the project's properties and select the <span class="strong"><strong>Build</strong></span> tab. This tab contains all the properties of the F# project, including the runtime target of 32-bit and 64-bit. Set the checkbox of <span class="strong"><strong>Generate tail calls</strong></span> as illustrated in the following screenshot:</p>
+<p>
+</p>
+<div class="mediaobject"><img src="../Images/image00324.jpeg" alt="Identifying tail call optimized implementation"/></div>
+<p style="clear:both; height: 1em;"> </p>
+<p>
+</p>
+<p>Let's examine the simplest function that has an argument that is typed as a function, then the main function body calls the function of the argument:</p>
+<pre class="programlisting">let apply f x = f x 
+</pre>
+<p>This function is implemented to have tail call support because it minimizes stack allocation, while the recursion still applies. This is possible because it fits the pattern to have tail call as the last expression in a function.</p>
+<p>Let's check the IL of <code class="literal">apply</code>:</p>
+<pre class="programlisting">method public static !!b  apply&lt;a,b&gt;(class [FSharp.Core]Microsoft.FSharp.Core.FSharpFunc`2&lt;!!a,!!b&gt; f, 
+                                      !!a x) cil managed 
+{ 
+  .custom instance void [FSharp.Core]Microsoft.FSharp.Core.CompilationArgumentCountsAttribute::.ctor(int32[]) = ( 01 00 02 00 00 00 01 00 00 00 01 00 00 00 00 00 )  
+  // Code size       11 (0xb) 
+  .maxstack  8 
+  IL_0000:  nop 
+  IL_0001:  ldarg.0 
+  IL_0002:  ldarg.1 
+  IL_0003:  tail. 
+  IL_0005:  callvirt   instance !1 class [FSharp.Core]Microsoft.FSharp.Core.FSharpFunc`2&lt;!!a,!!b&gt;::Invoke(!0) 
+  IL_000a:  ret 
+} // end of method TailcallSample::apply 
+</pre>
+<p>Now, we have a tail call optimization, as indicated in line <code class="literal">IL_0003</code> that contains the <code class="literal">tail.</code> instruction.</p>
+<p>Now let's apply tail call optimization to calculate the factorial. Let's create a new function of the factorial that contains a recursive inner function. This inner function has recursive calls to the inner function itself:</p>
+<pre class="programlisting">let accFactorial x = 
+    let rec TailCallRecursiveFactorial x acc = 
+        if x &lt;= 1 then acc 
+        else TailCallRecursiveFactorial (x - 1) (acc * x) 
+    TailCallRecursiveFactorial x 1 
+</pre>
+<p>And this is the IL of <code class="literal">accFactorial</code>:</p>
+<pre class="programlisting">.method public static int32  accFactorial(int32 x) cil managed 
+{ 
+  // Code size       18 (0x12) 
+  .maxstack  5 
+  .locals init ([0] class [FSharp.Core]Microsoft.FSharp.Core.FSharpFunc`2&lt;int32,class [FSharp.Core]Microsoft.FSharp.Core.FSharpFunc`2&lt;int32,int32&gt;&gt; TailCallRecursiveFactorial) 
+  IL_0000:  nop 
+  IL_0001:  newobj     instance void TailcallSample/TailCallRecursiveFactorial@24::.ctor() 
+  IL_0006:  stloc.0 
+  IL_0007:  ldloc.0 
+  IL_0008:  ldarg.0 
+  IL_0009:  ldc.i4.1 
+  IL_000a:  tail. 
+  IL_000c:  call       !!0 class [FSharp.Core]Microsoft.FSharp.Core.FSharpFunc`2&lt;int32,int32&gt;::InvokeFast&lt;int32&gt;(class [FSharp.Core]Microsoft.FSharp.Core.FSharpFunc`2&lt;!0,class [FSharp.Core]Microsoft.FSharp.Core.FSharpFunc`2&lt;!1,!!0&gt;&gt;, 
+                                                                                                                 !0, 
+                                                                                                                 !1) 
+  IL_0011:  ret 
+} // end of method TailcallSample::accFactorial 
+</pre>
+<p>We now have a tail call recursion in our function. In the next section, we will discuss the advantages of having tail call optimization.</p>
+</div>
+</div>
+<div class="section" title="Advantages of having tail call recursive implementation"><div class="titlepage"><div><div><h2 class="title"><a id="ch07lvl2sec59"></a>Advantages of having tail call recursive implementation</h2>
+</div>
+</div>
+</div>
+<p>Having tail call is a common technique in functional programming languages. Fortunately, F# is not just a single part of this tail call because tail call is also supported at the .NET runtime level, in a sense that the .NET CLR has IL support for tail call.</p>
+<p>It is a very useful and powerful feature of F# because of the tight coupling of F# compiler and the generated IL on .NET; therefore, optimization is available in the compiled phase and in the runtime.</p>
+<p>Let's compare the stack trace of our initial (unoptimized) factorial function with the optimized tail call factorial function:</p>
+<p>
+</p>
+<div class="mediaobject"><img src="../Images/image00325.jpeg" alt="Advantages of having tail call recursive implementation"/></div>
+<p style="clear:both; height: 1em;"> </p>
+<p>
+</p>
+<p>Let's look at <code class="literal">accFactorial</code>'s stack trace. Our tail call optimized function's stack trace shows that it has only one stack trace of <code class="literal">accFactorial</code>:</p>
+<p>
+</p>
+<div class="mediaobject"><img src="../Images/image00326.jpeg" alt="Advantages of having tail call recursive implementation"/></div>
+<p style="clear:both; height: 1em;"> </p>
+<p>
+</p>
+<p>It proves that tail call optimization is very efficient because we only have one stack allocation. This is also faster than having no tail call optimization because there is minimal stack allocation overhead or is close to only having stack allocation once.</p>
+<p>Although F#'s tail call optimization is a powerful optimization, its implementation is limited to specific cases, as described in the next section.</p>
+</div>
+<div class="section" title="Limitations of tail call recursion in F#"><div class="titlepage"><div><div><h2 class="title"><a id="ch07lvl2sec60"></a>Limitations of tail call recursion in F#</h2>
+</div>
+</div>
+</div>
+<p>There are limitations on how tail call is implemented, especially for F#-specific cases. Not all kinds of function can have tail call optimizations, mostly because of the nature of tail call itself.</p>
+<p>The following are the limitations and restrictions of tail call optimization in F#:</p>
+<div class="orderedlist"><ol class="orderedlist arabic"><li class="listitem">Tail call optimizations will not be implemented on functions that return <code class="literal">Unit</code> (or <code class="literal">void</code> in C#/VB). This is important and natural because tail call relies on the returning the result from the last result of recursive function as a position to have tail call. The compiler will confuse the IL emission because F# has <code class="literal">Unit</code>, other languages such as C# that has <code class="literal">void</code>. Also all functions that return <code class="literal">void</code> are not compatible with F# functions that return <code class="literal">Unit</code>.</li>
+<li class="listitem">Tail call cannot be implemented within <code class="literal">try...with</code> constructs. It is also recommended that the exception handling should not be included in the body of the recursive function.</li>
+<li class="listitem">Tail call cannot be used to optimize calls to unsafe functions. Forcing to mix tail call with native unmanaged calls will yield unpredictable behavior and results.</li>
+</ol>
+<div style="height:10px; width: 1px"></div>
+</div>
+<p>The limitations just listed are simply not restrictions for all recursive cases specially exception handling.
+</p>
+</div>
+</div>
+
+
+<div class="section" title="Summary" id="aid-1IHDQ1"><div class="titlepage"><div><div><h1 class="title"><a id="ch07lvl1sec45"></a>Summary</h1>
+</div>
+</div>
+</div>
+<p>We have enough knowledge to optimize common and subtle F# language constructs-from pattern matching combined with active pattern to the subtle F# features, such as inline functions, tail call recursion optimizations, and tail call identification. These constructs are features that make F# competitively unique in the .NET ecosystem.</p>
+<p>Pattern matching and active patterns can be optimized without sacrificing correctness and functional style. We are now able to enforce type strictness by using statically typed generic parameters in conjunction with inline functions. Having tail calls in recursion optimization in F# is not only more efficient but also gives us a good exercise of optimizing at code level by identifying tail call semantics.</p>
+<p>Now, it's time to optimize F# complex features and constructs that deserve a separate chapter: <a class="link" title="Chapter&#160;8.&#160;Optimizing Computation Expressions" href="fsp-hiperf_cu08.html#aid-1JFUC2">Chapter 8</a>, <span class="emphasis"><em>Optimizing Computation Expressions</em></span>.</p>
+</div>
+</body>
+</html>

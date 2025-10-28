@@ -1,0 +1,1009 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN"
+  "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" style="font-size:1.200rem;">
+<head><title>Chapter&#160;6.&#160;Optimizing Type Provider</title>
+<link rel="stylesheet" href="../Styles/style0001.css" type="text/css"/>
+<meta name="generator" content="DocBook XSL Stylesheets V1.75.2"/>
+</head>
+<body id="page">
+<div class="chapter" title="Chapter&#160;6.&#160;Optimizing Type Provider"><div class="titlepage" id="aid-19UOO2"><div><div><h1 class="title"><a id="ch06"></a>Chapter&#160;6.&#160;Optimizing Type Provider</h1>
+</div>
+</div>
+</div>
+<p>We now have a basic understanding of the basic and advanced concurrency features of F#. We also have enough tooling knowledge and hence, enough knowledge about tooling support in Visual Studio. Based on this knowledge, we can also enhance the performance optimizations when implementing and using other F# language features.</p>
+<p>In this chapter, we will focus on bringing the previous knowledge into optimizing type provider. Type provider is a unique feature of F#; it was introduced in F# 3.0.</p>
+<div class="note" title="Note"><h3 class="title"><a id="note61"></a>Note</h3>
+<p>Type provider was introduced in F# 3.0 release, at the same time as Visual Studio 2012 release. It is important to know that F# 3.0 is part of train releases of Visual Studio 2012, not Visual Studio 2013. Many external articles (including some blogs) outside the MSDN blogs and MSDN Library mistakenly assume that F# 3.0 has a type provider that comes with Visual Studio 2013. The release of F# that comes with Visual Studio 2013 is F# 3.1, not F# 3.0.</p>
+</div>
+<p>It is also important to first know what type provider is and the main goal or purposes of having or using it, before we optimize it. Knowing the concepts behind type provider will give us an insight of which part of optimizations are available for us when we use and implement type providers. This insight will also help us avoid pitfalls when dealing with type providers implementation in detail.</p>
+<p>We now discuss these topics of optimizing type provider:</p>
+<div class="itemizedlist"><ul class="itemizedlist"><li class="listitem">Overview of F# type provider</li>
+<li class="listitem">Best practices in implementing type provider</li>
+<li class="listitem">Optimizing generative type provider</li>
+<li class="listitem">Common pitfalls in type provider implementation</li>
+</ul>
+</div>
+<div class="section" title="Overview of F# type provider"><div class="titlepage"><div><div><h1 class="title"><a id="ch06lvl1sec36"></a>Overview of F# type provider</h1>
+</div>
+</div>
+</div>
+<p>Before we go deeper into optimizing F# type providers, let's have a conceptual introduction to what a type provider is.</p>
+<div class="note" title="Note"><h3 class="title"><a id="note62"></a>Note</h3>
+<p>From now on, F# type providers will be described as type providers, omitting the <span class="emphasis"><em>F#</em></span> prefix. It is also common just to use type providers because type provider is a unique feature of F#.</p>
+</div>
+<p>Basically, type provider is a type of generators. It generates types (classes) to be used in code specific to special purposes. Some of the classes remain available in the runtime; some of them don't (get erased).</p>
+<p>The type provider feature begins with F# 3.0 release, and it is the main theme of F# 3.0 release: solving the data manipulation problem. The specific <span class="emphasis"><em>problem</em></span> in data manipulation problem is how we handle the data's metadata information while focusing on the correctness of syntaxes and type safety. The type safety, in this sense, does not have to be strict or even strong, it is also available as erased typed as object.</p>
+<p>Using type provider implementations, we expect that when we use data, the information about the data itself (metadata) is available as we are using it. For example, having a type provider for SQL Server database will give us the table and the name of the column metadata to be available for us when we are using the type provider. This metadata information is available at development type immediately as the type provider is translating the schema information of SQL Server database metadata into types and properties available immediately.</p>
+<p>This is the starting point of F# type provider documentation on MSDN Library:&#160;</p>
+<p>
+
+<a class="ulink" href="https://docs.microsoft.com/en-us/dotnet/articles/fsharp/tutorials/type-providers/index">https://docs.microsoft.com/en-us/dotnet/articles/fsharp/tutorials/type-providers/index</a>
+
+</p>
+<p>In a simple definition, <span class="emphasis"><em>type provider is a combination of language and library features that describe the information to represent data, including the types and its properties</em></span>. This is also one of the unique selling points of type providers: the ability to present type metadata of a data into the language immediately.</p>
+<p>Type providers will provide the type resolution at compile time immediately, and this is different from the implementation of other code generators that perform type generations as well. This is also unique in F# compared to other managed programming languages on.NET such as C#/VB.</p>
+<p>In the long definition, type provider is a design-time component that provides a computed space of types. Therefore, Intellisense is available immediately. All of the types are strongly typed at design time, and it can be carried on at runtime if the generative type provider strategy is used instead of the erased strategy that treats all of the generated types as objects (<code class="literal">System.Object</code> in .NET BCL).</p>
+<p>Therefore, the following are the goals of type providers:</p>
+<div class="orderedlist"><ol class="orderedlist arabic"><li class="listitem">To provide more information on the data accessed from external source.</li>
+<li class="listitem">To provide more metadata information to be available immediately as part of the language, as type with its properties.</li>
+<li class="listitem">To make the type provided available as strongly typed in order to be used in the editor. This is possible because before the type provided is available in the editor, it is processed and compiled first; hence it is also available to be inferred.</li>
+<li class="listitem">To make the type provided to be explicitly available at compile time. This is crucial because a type provider must be available at compile time because the resulting type provided must be available immediately to be used when we type in the editor of Visual Studio, as related to point 3.</li>
+</ol>
+<div style="height:10px; width: 1px"></div>
+</div>
+<p>Point 3 is crucial because the type provider is doing its processing while in the editor as we type our code (as long as we compile our references and provide the type provider initialization first). This gives F# type provider strong and unique advantages.</p>
+<p>The following are the unique advantages of type providers:</p>
+<div class="orderedlist"><ol class="orderedlist arabic"><li class="listitem">Type resolved is immediately available in the editor when writing code (in the IDE editing session).</li>
+<li class="listitem">Since type resolved is immediately available in the editor, type inference is also available immediately, and this gives us the availability of Visual Studio's Intellisense of the resulting generated type (either using erased or generative). This is closely related to the third goal of type providers: the type provided is available strongly typed.</li>
+<li class="listitem">The type provided includes not just properties but also additional necessary methods as well.</li>
+<li class="listitem">There is no code generation when providing type generation.</li>
+<li class="listitem">The implemented type provider is compatible with other managed programming languages as well, although the implementation of a type provider itself cannot be done outside an F# project.</li>
+</ol>
+<div style="height:10px; width: 1px"></div>
+</div>
+<p>Point 2 is crucial because if the type resolved does not provide the properties and the methods correctly, and if the metadata provided does not match the intention of the type providers, the type provider is not a good type provider and the resulting type might not work as expected.</p>
+<p>Point 3 is important because of the fact that the resulting type provided is available immediately, not requiring us to rebuild the whole project (or related generated code's project).</p>
+<p>We may conclude that the F# type provider can be used to tame the sea of information into more meaningful data with the agreed schema and metadata directly into our experience of writing the code, and this is also often mentioned in the documentation of Microsoft's Visual F#, and it was introduced particularly from F# creator Don Syme in his Build 2011 conference presentation session of F# 3.0.</p>
+<p>For more information on Don Syme's Build 2011 F# 3.0 talk, this is the presentation's landing page on Channel 9:</p>
+<p>
+<a class="ulink" href="https://channel9.msdn.com/Events/Build/BUILD2011/SAC-904T">https://channel9.msdn.com/Events/Build/BUILD2011/SAC-904T</a>
+</p>
+<p>The following diagram illustrates an abstract picture of F# type provider:</p>
+<p>
+</p>
+<div class="mediaobject"><img src="../Images/image00309.jpeg" alt="Overview of F# type provider"/></div>
+<p style="clear:both; height: 1em;"> </p>
+<p>
+</p>
+<p>F# itself has type provider implementations built in since F# 3.0 under the <code class="literal">FSharp.Data.TypeProviders</code> namespace and the <code class="literal">FSharp.Data.TypeProviders.dll</code> assembly.</p>
+<div class="note" title="Note"><h3 class="title"><a id="note63"></a>Note</h3>
+<p>We must use the <code class="literal">Microsoft.FSharp.Data.TypeProviders</code> namespace if it is going to be used in outside F# projects, because the compiled name is <code class="literal">Microsoft.FSharp.Data.TypeProviders</code>. This namespace name is not related to the name of the <code class="literal">FSharp.Data.TypeProviders</code> as assembly.</p>
+</div>
+<p>There are other type providers as well, and most outside F# type providers are managed under the governance of F# Foundations as community projects. All of these community projects are hosted on GitHub and we all are encouraged to contribute as well.</p>
+<p>These are the ecosystems of F# type providers that we have in the first half of 2016:</p>
+<div class="itemizedlist"><ul class="itemizedlist"><li class="listitem">F# Data (for CSV, HTML, WorldBank)</li>
+<li class="listitem">F# Data Toolbox (for Twitter and SAS)</li>
+<li class="listitem">FSharp.Management (for WMI, Registry, Powershell, and Windows filesystem)</li>
+<li class="listitem">Azure Storage type provider</li>
+</ul>
+</div>
+<p>To keep up with the latest development of these community projects under F# Foundations, please visit: <a class="ulink" href="http://fsprojects.github.io/">http://fsprojects.github.io/</a>.</p>
+<p>We can conclude that there are some common scenarios where a type provider is the best fit:</p>
+<div class="itemizedlist"><ul class="itemizedlist"><li class="listitem">Accessing data from an external source in the form of a strong type JSON returned from web API. For example, World Bank data.</li>
+<li class="listitem">Accessing data from predefined schema. For example, well-defined XML and its derivatives, such as XML DataSet (XSD) and XSL.</li>
+<li class="listitem">Accessing data with predefined data format defined and documented. The way to access the data has a predefined protocol and its own query dialect. For example, returning data from Windows Management Instrumentation query (often called WMI query) using WMI protocol with its own query language, WQL.</li>
+</ul>
+</div>
+<p>Let's dive into the details of why the third advantage of type providers is important and comparison with other type generators as well.</p>
+<div class="section" title="Comparing the type provider with other type generators"><div class="titlepage"><div><div><h2 class="title"><a id="ch06lvl2sec46"></a>Comparing the type provider with other type generators</h2>
+</div>
+</div>
+</div>
+<p>F# type provider is not the only sample of advanced type generator. Type generators are commonly found in modern software platform ecosystems (including the tooling), such as .NET/Visual Studio, Java/Eclipse, and Mono/Xamarin Studio.</p>
+<p>Type generators in F# type providers do not employ a code generator as compared to other type generator models. They rely on the compiler and tooling infrastructure at compile time. The type provided is not just immediately available but is also flexible to outside changes by simply rebuilding the project.</p>
+<p>This is in contrast to many type generators that employ code generation strategy.</p>
+<p>The following diagram illustrates the abstract working of these two type generators:</p>
+<p>
+</p>
+<div class="mediaobject"><img src="../Images/image00310.jpeg" alt="Comparing the type provider with other type generators"/></div>
+<p style="clear:both; height: 1em;"> </p>
+<p>
+</p>
+<p>For example, Entity Framework 6 (using the database first and model first), <code class="literal">SqlMetal</code> in LINQ to SQL, <code class="literal">TLBIMP</code> to yield COM interop objects, and legacy web service reference (before Visual Studio 2010) are implemented using code generators.</p>
+<p>Entity Framework 6's first database and model heavily rely on code generators to ensure the availability of the types mapped as classes from the underlying database, and this is normal and is intended as is because the mapping between database and the mapped object is manual, including the constructions of constraint mappings.</p>
+<p>The design mode model uses a combination of EDMX and CSDL/SSDL files, which is completely generated as code, and we should not modify the CSDL file directly because it will always be overridden with the changes in EDMX file.</p>
+<p>The same fact also applies with the WSDL/ASMX of the legacy web service in the previous version of Visual Studio before VS 2010. The ASMX file generated is also employing code generations, and they have their own translations that map the C#/VB code to the SOAP header envelopes. The resulting mapping code of WSDL/ASMX is closely linked as tightly integrated, and we should not modify the ASMX directly as we usually focus on the code behind the <code class="literal">asmx.cs</code> or the <code class="literal">asmx.vb</code> file. The modifications on the references of the ASMX will always override the generated references of the WSDL file, and this is quite cumbersome and might be error-prone because the code generations of the web services depend on the project that has the original ASMX.</p>
+</div>
+<div class="section" title="Interoperability with other managed programming languages"><div class="titlepage"><div><div><h2 class="title"><a id="ch06lvl2sec47"></a>Interoperability with other managed programming languages</h2>
+</div>
+</div>
+</div>
+<p>The type provider is fully compatible with other managed programming languages that run on top of .NET CLR. Not just because it's implemented as managed language on top of CLR, but it is essentially the same CLR-compliant assembly.</p>
+<p>But there is a caveat: when the F# type provider is used in other managed languages directly, it will not yield the Intellisense feature. Why? Because the type provided by F# type provider is available based on the specific attribute of <code class="literal">[&lt;assembly:TypeProviderAssembly&gt;]</code>, and this attribute is handled by F# compiler in Visual Studio IDE when the project is rebuilt.</p>
+<p>This attribute in this assembly scope is important because this attribute is telling the F# compiler that <span class="emphasis"><em>the type provided by F# type provider is added at compile time</em></span>.</p>
+<p>It is important to know that only the F# compiler has the capability of adding additional type metadata as part of the resulting type provided using the attribute of <code class="literal">TypeProviderAssembly</code>. This means that we cannot use the F# type provider directly in other managed languages because their compilers must have the capability to identify the type provider-related assembly, and the whole compiler infrastructure has to match F# compiler infrastructure.</p>
+<p>We can simply add references by adding our F# code that use the type library as a library/assembly references to our C#/VB projects.
+</p>
+</div>
+</div>
+</div>
+
+
+<div class="section" title="Understanding the type provider building blocks"><div class="titlepage" id="aid-1AT9A2"><div><div><h1 class="title"><a id="ch06lvl1sec37"></a>Understanding the type provider building blocks</h1>
+</div>
+</div>
+</div>
+<p>A predefined data source that has very good established documentations and strong conventions such as SQL Server database and <span class="strong"><strong>Windows Management Instrumentation</strong></span> (<span class="strong"><strong>WMI</strong></span>) is one of the best samples to have type provider implementations because all of the necessary descriptions of the data and the way to access it is documented extensively in detail.</p>
+<p>For more information about WMI, consult the MSDN Library at</p>
+<p>
+<a class="ulink" href="https://msdn.microsoft.com/en-us/library/aa394572(v=vs.85).aspx">https://msdn.microsoft.com/en-us/library/aa394572(v=vs.85).aspx</a>
+</p>
+<p>Let's visit the minimum requirements of type provider implementation.</p>
+<div class="section" title="Minimum requirements of type providers"><div class="titlepage"><div><div><h2 class="title"><a id="ch06lvl2sec48"></a>Minimum requirements of type providers</h2>
+</div>
+</div>
+</div>
+<p>We have discussed the importance of certain restrictions on how a type provider should get the data. Now let's wrap the minimum requirements.</p>
+<p>A successful type provider is expected to have the following traits:</p>
+<div class="orderedlist"><ol class="orderedlist arabic"><li class="listitem">The type provided must not be statically coded, it should be able to adapt immediately based on the defined parameters. For example, a connection string of a database server, which is then used to provide configuration for the type provided by SQL tables and its columns.</li>
+<li class="listitem">Related to point 1, the parameter to be used as base configuration must be specified. Therefore, there is no default parameterless constructor for any type provider because the configuration must be specified.</li>
+<li class="listitem">The schema mapping or the type and property mapping must be defined to be strongly typed even though the resulting type provided does not have to be strongly typed.</li>
+<li class="listitem">The mapping has to be carefully designed not to add irrelevant type information because it will add overheads on type instantiation. However, for erased type providers, the mapping properties and methods might be optional.</li>
+<li class="listitem">The provided type is always a type that has a setter and getter, and it is therefore not a standard F# type; it is actually a class. Related to the preceding point, the properties of the classes should be as simple as possible, and the class should only contain properties, not properties and methods.</li>
+</ol>
+<div style="height:10px; width: 1px"></div>
+</div>
+<p>Point 2 is crucial and very important. Fortunately, F# requires us by default to always use type providers with a constructor that has a parameter to be supplied. The parameter itself cannot be <code class="literal">null</code>; otherwise, the type provider cannot produce a type with metadata successfully and will always yield a breaking exception and undesirable results.</p>
+<p>Point 3 of schema mapping defines how we implement the resulting type provided by a type provider. This is also defined as a general strategy for implementing type providers.</p>
+</div>
+<div class="section" title="Strategies of type provider implementation"><div class="titlepage"><div><div><h2 class="title"><a id="ch06lvl2sec49"></a>Strategies of type provider implementation</h2>
+</div>
+</div>
+</div>
+<p>The type provider implementation strategies fall into the following two conceptual strategies:</p>
+<div class="itemizedlist"><ul class="itemizedlist"><li class="listitem"><span class="strong"><strong>Generative type providers</strong></span>: The generated type provided is also available at runtime; therefore, the type metadata information of the type provided is always available at runtime. The assembly can be referenced by other assemblies because the type information metadata is kept. The reference is also fully compatible with other managed programming languages as well because the type metadata of the provided type is fully resolved and the assembly itself is fully available to use on top of the normal .NET CLR-compliant.</li>
+<li class="listitem"><span class="strong"><strong>Erased type providers</strong></span>: The generated type provided metadata is erased at runtime. This means the type provided metadata information is not available at runtime. The consequence of erased type provider is quite obvious: all generated types will always be typed as an object type at runtime. This is useful when generating type providers for semi-unstructured data and when the focus of resulting type provided metadata is less than the resulting data. This erased type strategy is also a recommended strategy to implement type providers for types that focus on the object's behaviors (the methods and the inherited methods) instead of the object's properties. Focusing on the object's behaviors means that we only care about what the object can do, instead of its properties and attributes.</li>
+</ul>
+</div>
+<p>These two strategies are also defined as how you implement a type provider because it must be chosen at first, as it will affect the returning type.</p>
+<p>All of the returning provided types result as assemblies. Erased type and generative type provider requires more work in the sense of implementations because they require more careful planning on how the generated type is returned.</p>
+<p>The next section will give us a deeper overview of choosing strategies.</p>
+<div class="section" title="Choosing strategies of type provider implementation"><div class="titlepage"><div><div><h3 class="title"><a id="ch06lvl3sec9"></a>Choosing strategies of type provider implementation</h3>
+</div>
+</div>
+</div>
+<p>Before we dive deeper and start planning the implementation of type providers, we should choose one of the two strategies. There is no strategy that has a combination of both of them because this will again define the resulting provided type.</p>
+<p>The high-level overview of the reason for choosing between erased and generative type provider is already provided by Microsoft in this MSDN Library:</p>
+<p>
+<a class="ulink" href="https://docs.microsoft.com/en-us/dotnet/articles/fsharp/tutorials/type-providers/creating-a-type-provider">https://docs.microsoft.com/en-us/dotnet/articles/fsharp/tutorials/type-providers/creating-a-type-provider</a>
+</p>
+<p>But unfortunately, the explanation on the reason for choosing the erased type provider is not quite clear. Check out the following definition:</p>
+<div class="blockquote"><blockquote class="blockquote"><p>
+<span class="emphasis"><em>When you are writing a provider for an information space that is so large and interconnected that it isn't technically feasible to generate real .NET types for the information space.</em></span>
+</p>
+</blockquote>
+</div>
+<p>This definition may look simple but it is not enough to quickly understand. The term <span class="emphasis"><em>so large</em></span> should be more explained in detail, along with <span class="emphasis"><em>interconnected</em></span>.</p>
+<p>Why? The definition might have ambiguous meanings/semantics. These are the ambiguous semantics:</p>
+<div class="itemizedlist"><ul class="itemizedlist"><li class="listitem">In what sense is the data <span class="emphasis"><em>so large</em></span>? The volume or the number of data?</li>
+<li class="listitem">What is the meaning of interconnected? Is it connected by the data itself or does the data come from multiple sources?</li>
+</ul>
+</div>
+<p>The term large data and interconnected will be explained as part of the detailed reasons why we decide to use erased type provider.</p>
+<p>Erased type provider is best for the following cases:</p>
+<div class="orderedlist"><ol class="orderedlist arabic"><li class="listitem">You don't care much about the format and the structure of the data returned. This also applies for unstructured data. Some common cases are if the metadata does not matter much and also if the data itself is unstructured. For example, having a type provider for Twitter feeds as it's mostly unstructured.</li>
+<li class="listitem">The volume of data is too large: you don't care about the type and the format of structure of the data because the volume of data to be mapped is so large, and it is not quite feasible or even efficient to try generating strong and strict type provided as the result. For example, the returning semi-structured data from World Bank or NASA Hubble images with metadata. This is a very huge dataset, and the volume for each data item for each row itself is already very large. From the perspective of NASA Hubble images, one image can have a size ranging from 100 MB to more than 500 MB, and one stream of data can be hundreds of images. In this case, it is also related to point 1 because most images are unstructured; therefore, it fits in point 1 and this point 2. This is also the same semantic in the term <span class="emphasis"><em>so large</em></span>; it is so large in terms of the volume of data, <span class="emphasis"><em>not in the number of data</em></span>.</li>
+<li class="listitem">You don't care about the format of the data because the format of the data itself often changes. This is common when getting data from querying social media. For example, querying data from Facebook using the Facebook API is quite challenging because Facebook keeps changing its API specifications almost once every year. Choosing a generative type provider is not fit for this because generative type provider implicitly requires us to have a tight coupling in the types and hence the assembly generated.</li>
+<li class="listitem">The data that you query contains heavy relations that links to themselves not just with normal JOIN clauses or SQL EQUI JOIN clauses but may also contain a recursive relation to itself. This scenario is common when we are defining a structure inside an unstructured data by examining the content of the data and extracting some part of it. For example, a tweet from a stream of Twitter may contain hashtags that might be linked, and the link might be loosely linked or it can be categorized into a higher category. This is the same as <span class="emphasis"><em>interconnected</em></span> as defined in the MSDN documentation in the type provider tutorial.</li>
+</ol>
+<div style="height:10px; width: 1px"></div>
+</div>
+<div class="note" title="Note"><h3 class="title"><a id="note64"></a>Note</h3>
+<p>When we define large datasets, we can argue about the size. But even in today's age of ubiquitous cheap large storage and high speed Internet (broadband), having to analyze data larger than 100 MB for each row is still very large and takes a lot of time to process even just to read it. This is crucial because the speed of storage can't keep up with the memory and CPU speed as the size of data to be read takes long time to process before it is put into memory. Also, type providers usually work best to handle data to be represented in the code and this will increase CPU time or I/O overheads because of the activities of querying large data and subsequently processing it into types with properties mapped from the data source.</p>
+</div>
+<p>For more definition on SQL&#160;EQUI JOIN clauses (including various SQL <code class="literal">LEFT</code>/<code class="literal">RIGHT JOIN</code>), visit MSDN Library at:</p>
+<p>
+<a class="ulink" href="https://msdn.microsoft.com/en-us/library/ms177634.aspx">https://msdn.microsoft.com/en-us/library/ms177634.aspx</a>
+</p>
+<p>Grasping the basic concept of type provider is quite hard because you have to understand the internal works on how the type is provided and also how the type is constructed. It is easier to understand the concept by simultaneously looking at the documentation and also trying the samples of type providers.</p>
+<p>It is also strongly recommended for all of us that in order to use the samples of type providers, we should use the built-in type provider in F#, <code class="literal">FSharp.Data.TypeProvider</code>. This is also very useful because this built-in type provider is supported by Microsoft.</p>
+<p>The disadvantages of erased type provider are as follows:</p>
+<div class="itemizedlist"><ul class="itemizedlist"><li class="listitem">The returning type provider may be resolved as an object. This is intentional because of the erased nature of type provided.</li>
+<li class="listitem">The assembly generated from an erased type provider is available in the F# project environment. This means that you cannot reference the erased type provider to other non-F# projects such as C#/VB projects, unless you combine the property of the erased type to have generative properties using normal CLR objects instead of F# record type.</li>
+</ul>
+</div>
+<p>A combination of erased and generative type providers is quite common in order to have an implementation of mixing the best advantages of both the strategies. We shall see that this is relevant in the next section of implementing our own custom type provider, later in this chapter.</p>
+<p>A good sample of F# erased type provider implementation is the <code class="literal">FSharp.Extras</code> library provided by Forkmann.</p>
+<p>The latest version of the library does not have the original type provider version included, but it is still there in the GitHub repo under the branch name of <code class="literal">VS2012</code>. This <code class="literal">VS2012</code> branch's library has type provider supports for the following:</p>
+<div class="itemizedlist"><ul class="itemizedlist"><li class="listitem">Regex (the regex model is using .NET BCL regex)</li>
+<li class="listitem">XML</li>
+<li class="listitem">Excel</li>
+<li class="listitem">Registry</li>
+<li class="listitem">JSON</li>
+</ul>
+</div>
+<p>We have grasped the reasoning behind erased type providers; let's visit the reasoning behind generative type providers.</p>
+<p>Generative type providers are more powerful and this greater power comes with its own expenses: it requires more works to construct and it's also stricter than the erased type provider.</p>
+<p>Now let's see the existing type provider (built-in) that F# has.</p>
+</div>
+</div>
+<div class="section" title="Sample usage of built-in type provider in F#"><div class="titlepage"><div><div><h2 class="title"><a id="ch06lvl2sec50"></a>Sample usage of built-in type provider in F#</h2>
+</div>
+</div>
+</div>
+<p>Let's try the existing F# type provider and put it in action.</p>
+<p>The following is the list of existing F# type provider supports in F# 4.0 <code class="literal">FSharp.Data.TypeProviders</code> (with the type that serves) :</p>
+<div class="itemizedlist"><ul class="itemizedlist"><li class="listitem">SQL Server database (<code class="literal">SqlDataConnection</code>)</li>
+<li class="listitem">Entity Framework (<code class="literal">SqlEntityConnection</code>)</li>
+<li class="listitem">OData (<code class="literal">ODataService</code>)</li>
+<li class="listitem">WSDL service (<code class="literal">WsdlService</code>)</li>
+<li class="listitem">EDMX or the Entity Data Model design file (<code class="literal">EdmxFile</code>)</li>
+</ul>
+</div>
+<p>Of all the built-in type provider supports, the easiest one to use is the SQL Server database support, using <code class="literal">SqlDataConnection</code>.</p>
+<div class="section" title="Quick sample of using SqlDataConnection type provider"><div class="titlepage"><div><div><h3 class="title"><a id="ch06lvl3sec10"></a>Quick sample of using SqlDataConnection type provider</h3>
+</div>
+</div>
+</div>
+<p>We are now going to use F# SQL Server database type provider using <code class="literal">SqlDataConnection</code> by referencing F# type provider's DLL assembly, <code class="literal">FSharp.Data.TypeProviders</code>.</p>
+<div class="note" title="Note"><h3 class="title"><a id="note65"></a>Note</h3>
+<p>The name of the SQL Server type provider is mentioned as SQL database provider, and this is misleading. This type provider can only be used for SQL Server database and not for other SQL-compliant databases such as Oracle, IBM DB2. Throughout the rest of this book, existing F# type providers for SQL will always be mentioned as SQL Server database type providers for the sake of clarity.</p>
+</div>
+<p>The following are the requirements before using <code class="literal">FSharp.Data.TypeProviders.SqlDataConnection</code>:</p>
+<div class="orderedlist"><ol class="orderedlist arabic"><li class="listitem">Ensure that we have SQL Server 2008 R2 (or later) installed. We need this because we are going to access SQL Server database data. It is recommended to install the instance on your machine.</li>
+<li class="listitem">Ensure that .NET 4.6 is installed correctly. This is important because the <code class="literal">FSharp.Data.TypeProviders</code> assembly in F# 4.0 depends on .NET 4.5 and above.</li>
+<li class="listitem">Do not modify the F# target compiler without checking the .NET Framework target version. F# 4.0 in Visual Studio 2015 is recommended to work with .NET 4.6, not .NET 4.5.</li>
+</ol>
+<div style="height:10px; width: 1px"></div>
+</div>
+<p>Point 3 is quite subtle but it is extremely important: <code class="literal">FSharp.Data.TypeProviders</code>, F# tooling, F# compiler infrastructure, .NET Framework version in Visual Studio 2015 have a tight coupling. For example, <code class="literal">FSharp.Data.TypeProviders</code> has support for .NET 4.5 or later, but all of the F# projects in Visual Studio 2015 by default have a target for .NET 4.6 and so does the compiler of F# 4.0.</p>
+<p>Although <code class="literal">FSharp.Data.TypeProviders</code> can be used in F# 3.0 projects in Visual Studio 2013, backporting <code class="literal">FSharp.Data.TypeProviders</code> in Visual Studio 2015 for use in Visual Studio 2013 might yield compatibility issues when compiling.</p>
+<p>The F# 4.0 compiler itself might yield different warnings compared to F# 3.0 compiler. Using 4.0 version is highly recommended because it has bug fixes, especially bug fixes on very long time outstanding since version 2.0.</p>
+<p>Consult the F# 4.0 release notes at GitHub at <a class="ulink" href="https://github.com/Microsoft/visualfsharp/blob/master/CHANGELOG.md">https://github.com/Microsoft/visualfsharp/blob/master/CHANGELOG.md</a>.</p>
+<p>To quickly get started, we need a sample database to be deployed on SQL Server. We can use the popular Northwind sample database that was originally created for SQL Server 2000. Download the SQL Server 2000 sample database installer from this official Microsoft's download link:</p>
+<p>
+<a class="ulink" href="https://www.microsoft.com/en-us/download/details.aspx?id=23654">https://www.microsoft.com/en-us/download/details.aspx?id=23654</a>
+</p>
+<p>Install the installer. Then, go to the installation path of the installer and open the file, <code class="literal">instnwnd.sql</code> in the SQL Server Management Studio and execute it by running the script.</p>
+<p>If the execution of database creation succeeds, then the Northwind database will be available on the left of Management Studio's <span class="strong"><strong>Object Explorer</strong></span>, as shown in the following screenshot:</p>
+<p>
+</p>
+<div class="mediaobject"><img src="../Images/image00311.jpeg" alt="Quick sample of using SqlDataConnection type provider"/></div>
+<p style="clear:both; height: 1em;"> </p>
+<p>
+</p>
+<p>These are the steps required in Visual Studio:</p>
+<div class="orderedlist"><ol class="orderedlist arabic"><li class="listitem">Create a new F# class library project or console project. Do not create another type of F# project such as Silverlight or even Android, because it is not compatible with F# type provider target of .NET Framework 4.6.</li>
+<li class="listitem">Add references to <code class="literal">System.Data</code>, <code class="literal">System.Data.Linq</code>, and <code class="literal">System.Linq</code>. The physical DLL assembly filename for <code class="literal">System.Linq</code> is <code class="literal">System.Core.dll</code>, and the <code class="literal">System.Data</code> object's filename is <code class="literal">System.Data.dll</code>. <code class="literal">System.Data.Linq</code> is available in <code class="literal">System.Data.Linq.dll</code>.</li>
+<li class="listitem">Add references to <code class="literal">FSharp.Data.TypeProviders</code>. If you want to focus on F# interactive (scripting), then register the DLL manually using the <code class="literal">#r</code> directive.</li>
+<li class="listitem">Ensure that for built-in <code class="literal">System.Data</code>, <code class="literal">System</code>, and <code class="literal">Linq</code>, <code class="literal">System.Data.Linq</code> is properly referenced (as <code class="literal">System.Data.dll</code> and <code class="literal">System.Core.dll</code>).<p>To ensure correct references, adding the references of <code class="literal">System.Core</code>, <code class="literal">System.Data</code>, <code class="literal">System.Data.Linq</code> is available in the <span class="strong"><strong>Framework</strong></span> section under <span class="strong"><strong>Assemblies</strong></span>:</p><p>
+</p><div class="mediaobject"><img src="../Images/image00312.jpeg" alt="Quick sample of using SqlDataConnection type provider"/></div><p style="clear:both; height: 1em;"> </p><p>
+</p><p>And adding reference to&#160; <code class="literal">FSharp.Data.TypeProviders</code> is available in the <span class="strong"><strong>Extensions</strong></span> section under <span class="strong"><strong>Assemblies</strong></span>:</p><p>
+</p><div class="mediaobject"><img src="../Images/image00313.jpeg" alt="Quick sample of using SqlDataConnection type provider"/></div><p style="clear:both; height: 1em;"> </p><p>
+</p></li>
+</ol>
+<div style="height:10px; width: 1px"></div>
+</div>
+<p>This is necessary because the F# built-in type provider assembly is not a part of .NET Framework 4.6 runtime distribution.</p>
+<p>Create a new F# source code file and name it <code class="literal">SampleFSharpData</code>. By default, F# will treat this as a new file, which has a module declaration with the same name.</p>
+<p>Type the following code after the module declaration:</p>
+<pre class="programlisting">open System 
+open System.Data 
+open System.Data.Linq 
+open Microsoft.FSharp.Data.TypeProviders 
+open Microsoft.FSharp.Linq 
+ 
+type NorthwindSchema = SqlDataConnection&lt;"Integrated Security=SSPI;Persist Security Info=False;Initial Catalog=Northwind;Data Source=localhost"&gt; 
+let nwdb = NorthwindShema.GetDataContext() 
+</pre>
+<p>After the type declaration of <code class="literal">NorthwindSchema</code>, ensure that you have specified the connection string for the <code class="literal">SqlDataConnection</code>.</p>
+<div class="note" title="Note"><h3 class="title"><a id="note66"></a>Note</h3>
+<p>This <code class="literal">SqlDataConnection</code> is not related to <code class="literal">SqlConnection</code>, which is a part of ADO.NET's <code class="literal">System.Data.SqlClient</code> namespace. <code class="literal">SqlDataConnection</code> is a part of F# built-in type provider.</p>
+</div>
+<p>In order to quickly see the type provider in action, build or rebuild the project. Type this on the new line:</p>
+<pre class="programlisting">let customer = nwdb.Customers 
+</pre>
+<p>At the time of typing <span class="emphasis"><em>dot</em></span> after <code class="literal">nwdb</code>, Visual Studio will display the properties and methods of <code class="literal">nwdb</code>. The properties are actually the names of tables of the connected database, the Northwind.</p>
+<p>This is the display of Visual Studio Intellisense, displaying the properties:</p>
+<p>
+</p>
+<div class="mediaobject"><img src="../Images/image00314.jpeg" alt="Quick sample of using SqlDataConnection type provider"/></div>
+<p style="clear:both; height: 1em;"> </p>
+<p>
+</p>
+<p>Now, let's continue to harness the SQL Server type provider by querying customer data. Change the code into this:</p>
+<pre class="programlisting">let customer = nwdb.Customers 
+let customerNameData =  
+    query { for c in customer do 
+            select c.ContactName } 
+ 
+let displayAllCustomerName () = 
+    for c in customerNameData do 
+        Console.WriteLine(c) 
+    () 
+</pre>
+<p>Let's call the <code class="literal">displayAllCustomerName</code> function. On the main <code class="literal">EntryPoint</code>, modify <code class="literal">EntryPoint</code> with the following code:</p>
+<pre class="programlisting">[&lt;EntryPoint&gt;] 
+let main argv =  
+    //printfn "%A" argv 
+    SampleFSharpData.displayAllCustomerName()  
+    0 // return an integer exit code 
+</pre>
+<p>In the code of <code class="literal">customerNameData</code>, it contains an evaluation result of a LINQ query computation expression.</p>
+<p>This LINQ query computation is essentially the same computation implementation of LINQ in F#. This query computation began with the release of F# 3.0 in Visual Studio 2012. For more information about F# LINQ query computation, consult the following link:</p>
+<p>
+<a class="ulink" href="https://docs.microsoft.com/en-us/dotnet/articles/fsharp/language-reference/query-expressions">https://docs.microsoft.com/en-us/dotnet/articles/fsharp/language-reference/query-expressions</a>
+</p>
+<p>Let's rebuild the project to ensure that re-references are correct and the dependencies are checked again. Run the code without debugging, and we will have a display of all the customer names:</p>
+<p>
+</p>
+<div class="mediaobject"><img src="../Images/image00315.jpeg" alt="Quick sample of using SqlDataConnection type provider"/></div>
+<p style="clear:both; height: 1em;"> </p>
+<p>
+</p>
+<p>We can also do additional queries such as adding the <code class="literal">WHERE</code> and <code class="literal">ORDER BY</code> clauses by translating them into LINQ in F#. For example:</p>
+<pre class="programlisting">let displayCustomerNameStartsWith prefix = 
+    let customerStartWith = 
+        query { for c in customer do  
+                where (c.ContactName.StartsWith(prefix)) 
+                sortBy c.ContactName 
+                select c.ContactName} 
+    for c in customerStartWith do 
+        Console.WriteLine(c) 
+    () 
+</pre>
+<p>The <code class="literal">WHERE</code> clause is implemented as <code class="literal">where</code> and <code class="literal">ORDER BY</code> is implemented as <code class="literal">sortBy</code>.</p>
+<p>Now let's use our little sample in another project with a different language, such as C#. This sample is also very simple but it is quite powerful because we will use our library that uses F# type providers with C#, although we cannot see the Intellisense provided by F# Type Provider compilation addition directly.</p>
+<p>We need to perform the following steps before we use the F# sample type provider's code with C#:</p>
+<div class="orderedlist"><ol class="orderedlist arabic"><li class="listitem">Create a C# console project.</li>
+<li class="listitem">Add a reference of the previous F# class library project that we created with the <code class="literal">SampleFSharpData</code> module.</li>
+<li class="listitem">Add a reference of <code class="literal">System.Data.Linq</code> assembly.</li>
+<li class="listitem">Rebuild the project. This is important as you need to ensure that the added reference works well.</li>
+</ol>
+<div style="height:10px; width: 1px"></div>
+</div>
+<p>In the <code class="literal">main</code> method of <code class="literal">Program.cs</code>, add the calls to the <code class="literal">displayCustomerNameStartsWith</code> method. The <code class="literal">main</code> method should be coded as follows:</p>
+<pre class="programlisting">    class Program 
+    { 
+        static void Main(string[] args) 
+        { 
+            SampleFSharpData.displayCsutomerNameStartsWith("Maria"); 
+        } 
+    } 
+</pre>
+<p>Run it, and we will have the same result as the previous F# project.</p>
+<p>To check the inferred property of <code class="literal">NorthwindSchema</code> instances of <code class="literal">nwdb</code>, we can use the following code to test:</p>
+<pre class="programlisting">        var customerData = from cust in SampleFSharpData.nwdb.Customers 
+                           orderby cust.ContactName 
+                           select cust; 
+        foreach (var item in customerData) 
+        { 
+            Console.WriteLine("Customer name = " + item.ContactName + "; Company =" + item.CompanyName); 
+        } 
+</pre>
+<p>Now, we can see and prove that the F# type provider usages can be used in other managed programming languages as well, although it cannot be used directly. This interoperability sample is also a proof of point 5 of advantages of F# type provider.</p>
+<p>It is also important to understand the implementation of <code class="literal">SqlDataConnection</code> because <code class="literal">SqlDataConnection</code> is a sample of a generative type provider because the generated type can be used with the full metadata information available (properties and methods).</p>
+<p>For more information about using <code class="literal">FSharp.Data.TypeProviders.SqlDataConnection</code>, visit this MSDN Library:</p>
+<p>
+<a class="ulink" href="https://msdn.microsoft.com/en-us/visualfsharpdocs/conceptual/sqldataconnection-type-provider-%5bfsharp%5d">https://msdn.microsoft.com/en-us/visualfsharpdocs/conceptual/sqldataconnection-type-provider-%5bfsharp%5d</a>
+</p>
+<p>
+<code class="literal">SqlDataConnection</code> itself is open source and is available with the other <code class="literal">FSharp.Data.TypeProviders</code> features. The GitHub repository of <code class="literal">FSharp.Data.TypeProviders</code> is available at <a class="ulink" href="https://github.com/fsprojects/FSharp.Data.TypeProviders">https://github.com/fsprojects/FSharp.Data.TypeProviders</a>.</p>
+<p>Now let's go deeper into type providers by implementing our own type provider in various scenarios in the next section.</p>
+</div>
+</div>
+</div>
+
+
+<div class="section" title="Implementing your own type provider"><div class="titlepage" id="aid-1BRPS2"><div><div><h1 class="title"><a id="ch06lvl1sec38"></a>Implementing your own type provider</h1>
+</div>
+</div>
+</div>
+<p>We already have enough knowledge on what a type provider is, the building blocks, and the nature of type providers, also understanding the nature of type provider implementations, including the implementation strategies, as we went deeper.</p>
+<p>To ease the experience and our type&#160;provider building mindset, a real experience of quickly using it from existing samples has proven to be very useful. We have increased our intuition on how type provider works using samples from F# 4.0 built-in type provider features, <code class="literal">FSharp.Data.TypeProvider</code>.</p>
+<p>Implementing your own type provider again is quite a bit tedious, especially when we are dealing with generative type providers as our choice of strategy.</p>
+<p>The following are the common steps of implementing your own type provider:</p>
+<div class="orderedlist"><ol class="orderedlist arabic"><li class="listitem">Declare your type provider. The type provider must be <code class="literal">public</code>.</li>
+<li class="listitem">Mark your type provider's type with <code class="literal">TypeProviderAttribute</code>. You can simply use the abbreviated <code class="literal">TypeProvider</code>. This attribute is available in <code class="literal">Microsoft.FSharp.Core.CompilerServices</code>.</li>
+<li class="listitem">Implement the <code class="literal">ITypeProvider</code> interface. This interface is available in the <code class="literal">Microsoft.FSharp.Core.CompilerServices</code> namespace.</li>
+<li class="listitem">Implement the <code class="literal">IProvidedNamespace</code> interface. This interface is available in the <code class="literal">Microsoft.FSharp.Core.CompilerServices</code> namespace.</li>
+<li class="listitem">Implement your own code to handle a static parameter for the type provider.</li>
+<li class="listitem">Implement your own code to provide types, constructors, methods, properties, and fields, based on the static parameter used.</li>
+</ol>
+<div style="height:10px; width: 1px"></div>
+</div>
+<p>The&#160;<code class="literal">TypeProviderAttribute</code> provides hints for F# compiler to look for the necessary class that is intended as a type provider.</p>
+<p>The <code class="literal">ITypeProvider</code> interface is essential and important because it provides the F# compiler the main entry point of the type provider implementation after having a hint of a type provider marked by <code class="literal">TypeProviderAttribute</code>.</p>
+<p>Here are the <code class="literal">ITypeProvider</code> members and the added description (for clarification):</p>
+<div class="informaltable"><table border="1"><colgroup><col/>
+<col/>
+</colgroup>
+<tbody><tr><td>
+<p>
+<span class="strong"><strong>Abstract method</strong></span>
+</p>
+</td>
+<td>
+<p>
+<span class="strong"><strong>Quick remark</strong></span>
+</p>
+</td>
+</tr>
+<tr><td>
+<p>
+<code class="literal">ApplyStaticArguments</code>
+</p>
+</td>
+<td>
+<p>Apply static parameters of this type provider to a provided type that accepts static arguments.</p>
+</td>
+</tr>
+<tr><td>
+<p>
+<code class="literal">Invalidate</code>
+</p>
+</td>
+<td>
+<p>An event that is triggered when a type resolution semantic changes as part of initial type resolution of the provided type. It has the <code class="literal">IEvent</code> type.</p>
+</td>
+</tr>
+<tr><td>
+<p>
+<code class="literal">add_invalidate</code>
+</p>
+</td>
+<td>
+<p>Add an event handler of <code class="literal">Invalidate</code>. It has the same semantic as the <code class="literal">+=</code> syntax of C# event handler addition.</p>
+</td>
+</tr>
+<tr><td>
+<p>
+<code class="literal">remove_invalidate</code>
+</p>
+</td>
+<td>
+<p>Remove an event handler of <code class="literal">Invalidate</code>. It has the same semantic as <code class="literal">-=</code>
+</p>
+</td>
+</tr>
+<tr><td>
+<p>
+<code class="literal">GetInvokerExpression</code>
+</p>
+</td>
+<td>
+<p>Called by the compiler to ask for an expression tree to replace the given <code class="literal">System.Reflection.MethodBase</code> with. This is also important as <code class="literal">GetInvokerExpression</code> will be used as our entry point to provide reflection information of the methods that we are going to generate as part of the type that will be provided.</p>
+</td>
+</tr>
+<tr><td>
+<p>
+<code class="literal">GetGeneratedAssemblyContents</code>
+</p>
+</td>
+<td>
+<p>Get the physical contents of the given logical assembly.</p>
+</td>
+</tr>
+<tr><td>
+<p>
+<code class="literal">GetNamespaces</code>
+</p>
+</td>
+<td>
+<p>Return the namespace name that this type provider injects types into. This will be the namespace for all types provided. This is why it returns an array of <code class="literal">IProvidedNamespace</code>.</p>
+</td>
+</tr>
+<tr><td>
+<p>
+<code class="literal">GetStaticParameters</code>
+</p>
+</td>
+<td>
+<p>Get all static parameters for this type provider.</p>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>To understand what the context of static parameters in type provider is, let's go back to the sample of using <code class="literal">SqlDataConnection</code>:</p>
+<pre class="programlisting">type NorthwindSchema = SqlDataConnection&lt;"Integrated Security=SSPI;Persist Security Info=False;Initial Catalog=Northwind;Data Source=localhost"&gt; 
+</pre>
+<p>The string parameter in the <code class="literal">&lt; &gt;</code> brackets is the static parameter of the <code class="literal">SqlDataConnection</code> type provider. It is required in the case of <code class="literal">SqlDataConnection</code> because we need to apply the database connection string immediately when we are instantiating the <code class="literal">SqlDataConnection</code> type provider.</p>
+<p>An invalidate event will be used by F# to trigger type resolution validation, and we can add many event handlers as needed.</p>
+<div class="note" title="Note"><h3 class="title"><a id="note67"></a>Note</h3>
+<p>
+<span class="emphasis"><em>Warning</em></span>: <span class="emphasis"><em>It is highly recommended to add only F# event handlers within the F# syntax and semantics instead of C#/VB event handlers</em></span>.
+</p>
+<p>This is crucial because F# event handlers support implicit currying by default. Otherwise, undesirable results will occur, including unexpected memory leaks!</p>
+</div>
+<p>The implementation of code to provide types, constructors, methods, properties, and fields is tedious, not just implementing all members of <code class="literal">ITypeProvider</code> and <code class="literal">IProvidedNamespace</code>. We have to dive deeper into the inner workings of API in the .NET namespaces of <code class="literal">System.Reflection</code> and <code class="literal">System.Reflection.Emit</code>. This is crucial and important because types, constructors, methods, properties, and fields are all related to the reflection.</p>
+<p>Fortunately, Microsoft and F# Foundation have provided a starter pack library to ease the creation of type providers from the start. The name of the NuGet package library is <code class="literal">FSharp.TypeProviders.StarterPack</code>, and we can simply use this library by adding it from NuGet.</p>
+<p>To ensure the validity of the starter pack, use the <a class="ulink" href="http://www.nuget.org">http://www.nuget.org</a> feed because this is the official NuGet repository that contains the commonly used .NET NuGet packages.</p>
+<p>To use this NuGet, add this NuGet package on your project and accept the license agreement. If you have installed it successfully, Visual Studio will display the NuGet package under the <span class="strong"><strong>Installed</strong></span> tab, as shown in the following screenshot:</p>
+<p>
+</p>
+<div class="mediaobject"><img src="../Images/image00316.jpeg" alt="Implementing your own type provider"/></div>
+<p style="clear:both; height: 1em;"> </p>
+<p>
+</p>
+<p>Now, let's dig deeper into building a type itself by looking at the internal working of this starter pack.
+</p>
+<div class="section" title="Building the type's building blocks"><div class="titlepage"><div><div><h2 class="title"><a id="ch06lvl2sec51"></a>Building the type's building blocks</h2>
+</div>
+</div>
+</div>
+<p>A type or a class in C#/VB is basically a blueprint of any object instance. It contains definitions of methods, properties, constructors, and other metadata of a class, such as the attributes applied on the type and its properties, methods, and constructors.</p>
+<p>The .NET BCL provides us reflection API in the <code class="literal">System.Reflection</code> and <code class="literal">System.Reflection.Emit</code> namespaces. We can create the type's building blocks by lining up the calls to reflection APIs, but these calls to reflection API must have enough knowledge not just of ordinary methods/properties but also of the F# delegate, <code class="literal">FSharpFunc</code>.</p>
+<p>Although the semantics are similar because of implementation in invoking the <code class="literal">Delegate</code> class of .NET BCL, the actual class used is different. Usually, to maintain high interoperability with other managed languages, we should use .NET's <code class="literal">Func</code> and <code class="literal">Action</code> instead of <code class="literal">FSharpFunc</code>.</p>
+<p>As a common rule of thumb, <span class="emphasis"><em>it is highly recommended to use Func and Action instead of F# FSharpFunc to provide a high degree of compatibility for the user of the type provider</em></span>. Having a high compatibility bar is important; otherwise, the type provider used will always need conversions from <code class="literal">FSharpFunc</code> to ordinary <code class="literal">Func</code> and <code class="literal">Action</code>, and this conversion will add overhead in using the resulting type provided.</p>
+<p>By looking and examining the type provider starter pack, we see that it has organized the code into the following three files:</p>
+<div class="itemizedlist"><ul class="itemizedlist"><li class="listitem"><code class="literal">ProvidedTypes.fsi</code>: This file contains the type and function declarations</li>
+<li class="listitem"><code class="literal">ProvidedTypes.fs</code>: This file contains code implementations</li>
+<li class="listitem"><code class="literal">DebugProvidedTypes.fs</code>: This file contains helpers to simulate the running and debugging of type providers</li>
+</ul>
+</div>
+<p>We can further ease the development of our custom type provider by adding support for cross-targeting erased type provider or broader .NET <span class="strong"><strong>Portable Class Library</strong></span> (<span class="strong"><strong>PCL</strong></span>), while at the same time we focus on having a single entry of Factory method (based on Factory design pattern) of <code class="literal">ProvidedTypesContext.Create()</code>.</p>
+<p>To add support for this cross-targeting erased type provider, we add these three files from the GitHub repo:</p>
+<div class="itemizedlist"><ul class="itemizedlist"><li class="listitem"><code class="literal">AssemblyReader.fs</code>: This file acts as a façade for reading .NET assemblies, including .NET PCL assemblies</li>
+<li class="listitem"><code class="literal">AssemblyReaderReflection.fs</code>: This file act as a library of helper functions to deal with assembly reflection</li>
+<li class="listitem"><code class="literal">ProvidedTypesContext.fs</code>: This file contains the entry of Factory method of the type provider, including the starting point of the <code class="literal">ProvidedTypesContext.Create()</code> method</li>
+</ul>
+</div>
+<p>After adding the preceding prerequisite files, ensure that <code class="literal">Program.fs</code> is ordered at the last file in the project.</p>
+<p>This neat library provides the basic blocks: type provider base class, reflection metadata type helpers, and helpers to interact with type provider strategy. This library of classes of functions is also used as the infrastructure of how we generate type metadata because we need to prepare the necessary metadata generation infrastructure before we can implement a type generator. This infrastructure planning is crucial because a type is constructed with building blocks of assembly, parameters, methods, constructors, and properties.</p>
+<div class="note" title="Note"><h3 class="title"><a id="note68"></a>Note</h3>
+<p>At the time of writing this book, there were subtle but critical differences on the files of <code class="literal">FSharp.TypeProviders.StarterPack</code> distribution in the NuGet package and the current GitHub repo. If we only follow the NuGet package files, the current NuGet library requires us to manually wire the assembly reflection. The sample source code that complements this chapter is already correct to include the NuGet and the latest release on GitHub. It is strongly recommended to always use the prerequisite files from the source code, compared to using the files from the NuGet distribution.</p>
+</div>
+<div class="section" title="Building type metadata infrastructure"><div class="titlepage"><div><div><h3 class="title"><a id="ch06lvl3sec11"></a>Building type metadata infrastructure</h3>
+</div>
+</div>
+</div>
+<p>Let's look at the type and function declarations first by focusing on the type provider base class. It is quite efficient because it has the implementations of <code class="literal">ITypeProvider</code> and <code class="literal">IProviderNamespace</code> for us to use.</p>
+<p>The class name is <code class="literal">TypeProviderForNamespaces</code>. The type has checking for custom attributes as compiler directive. This is a must have because a type might have a custom attribute that may interfere with the F# compiler when it tries to process the type provider's type resolution.</p>
+<p>Let's see the signature definition file (FSI) of <code class="literal">TypeProviderForNamespaces</code> (I have omitted the <code class="literal">FX_NO_LOCAL_FILESYSTEM</code> compiler constant check):</p>
+<pre class="programlisting">/// A base type providing default implementations of type provider functionality when all provided  
+/// types are of type ProvidedTypeDefinition. 
+type TypeProviderForNamespaces = 
+ 
+    /// Initializes a type provider to provide the types in the given namespace. 
+    new : namespaceName:string * types: ProvidedTypeDefinition list -&gt; TypeProviderForNamespaces 
+ 
+    /// Initializes a type provider  
+    new : unit -&gt; TypeProviderForNamespaces 
+ 
+    /// Invoked by the type provider to add a namespace of provided types in the specification of the type provider. 
+    member AddNamespace : namespaceName:string * types: ProvidedTypeDefinition list -&gt; unit 
+ 
+    /// Invoked by the type provider to get all provided namespaces with their provided types. 
+    member Namespaces : seq&lt;string * ProvidedTypeDefinition list&gt;  
+ 
+    /// Invoked by the type provider to invalidate the information provided by the provider 
+    member Invalidate : unit -&gt; unit 
+ 
+    /// Invoked by the host of the type provider to get the static parameters for a method. 
+    member GetStaticParametersForMethod : MethodBase -&gt; ParameterInfo[] 
+     
+    /// Invoked by the host of the type provider to apply the static argumetns for a method. 
+    member ApplyStaticArgumentsForMethod : MethodBase * string * obj[] -&gt; MethodBase  
+ 
+    /// AssemblyResolve handler. Default implementation searches &lt;assemblyname&gt;.dll file in registered folders  
+    abstract ResolveAssembly : ResolveEventArgs -&gt; Assembly 
+    default ResolveAssembly : ResolveEventArgs -&gt; Assembly 
+ 
+    /// Registers custom probing path that can be used for probing assemblies 
+    member RegisterProbingFolder : folder: string -&gt; unit 
+ 
+    /// Registers location of RuntimeAssembly (from TypeProviderConfig) as probing folder 
+    member RegisterRuntimeAssemblyLocationAsProbingFolder : config: TypeProviderConfig -&gt; unit 
+</pre>
+<p>Let's take a look inside the <code class="literal">TypeProviderForNamespaces.fs</code> file implementation (based on the signature defined in the preceding FSI signature).</p>
+<p>We now visit the constructor implementation. The constructor signature is marked in the FSI by the notion of these <code class="literal">new</code> functions:</p>
+<pre class="programlisting">/// Initializes a type provider to provide the types in the given namespace. 
+new : namespaceName:string * types: ProvidedTypeDefinition list -&gt; TypeProviderForNamespaces 
+ 
+/// Initializes a type provider  
+new : unit -&gt; TypeProviderForNamespaces 
+</pre>
+<p>These constructor definitions are implemented as follows:</p>
+<pre class="programlisting">new (namespaceName:string,types:list&lt;ProvidedTypeDefinition&gt;) = new TypeProviderForNamespaces([(namespaceName,types)]) 
+new () = new TypeProviderForNamespaces([]) 
+</pre>
+<p>The rest of the implementation code is strictly based on the signature convention. For example, the implementation of <code class="literal">Invalidate</code> is matched with the following signature:</p>
+<pre class="programlisting">member this.Invalidate() = invalidateE.Trigger(this,EventArgs())  
+</pre>
+<p>
+<code class="literal">The Invalidate</code> is compliant with the signature of <code class="literal">unit -&gt; unit</code>.</p>
+<p>Now, let's discuss the details of the implementation of the <code class="literal">ITypeProvider</code> interface in <code class="literal">TypeProviderForNamespaces</code>. The F# language specification requires us to declare an interface implementation explicitly, and the implementation of interfaces used must be correctly indented.</p>
+<p>The following code denotes an implementation of the <code class="literal">ITypeProvider</code> interface:</p>
+<pre class="programlisting">interface ITypeProvider with 
+</pre>
+<p>The interesting part of the implementation of the <code class="literal">ITypeProvider</code> interface is the implementation of the <code class="literal">GetInvokerExpression</code> method. This method is implemented to traverse recursively (with a mutual recursive mechanism) to get the expression (as an expression tree of Abstract Syntax Tree) from the method that invoke it. Although the recursive is not required, using recursive in the implementation of this method is better.</p>
+<p>The following code is an implementation of <code class="literal">GetInvokerExpression</code>:</p>
+<pre class="programlisting">        member __.GetInvokerExpression(methodBase, parameters) = 
+            let rec getInvokerExpression (methodBase : MethodBase) parameters = 
+                match methodBase with 
+                | :? ProvidedMethod as m when (match methodBase.DeclaringType with :? ProvidedTypeDefinition as pt -&gt; pt.IsErased | _ -&gt; true) -&gt; 
+                    m.GetInvokeCodeInternal false parameters 
+                    |&gt; expand 
+                | :? ProvidedConstructor as m when (match methodBase.DeclaringType with :? ProvidedTypeDefinition as pt -&gt; pt.IsErased | _ -&gt; true) -&gt;  
+                    m.GetInvokeCodeInternal false parameters 
+                    |&gt; expand 
+                // Otherwise, assume this is a generative assembly and just emit a call to the constructor or method 
+                | :?  ConstructorInfo as cinfo -&gt;   
+                    Expr.NewObjectUnchecked(cinfo, Array.toList parameters)  
+                | :? System.Reflection.MethodInfo as minfo -&gt;   
+                    if minfo.IsStatic then  
+                        Expr.CallUnchecked(minfo, Array.toList parameters)  
+                    else 
+                        Expr.CallUnchecked(parameters.[0], minfo, Array.toList parameters.[1..]) 
+                | _ -&gt; failwith ("TypeProviderForNamespaces.GetInvokerExpression: not a ProvidedMethod/ProvidedConstructor/ConstructorInfo/MethodInfo, name=" + methodBase.Name + " class=" + methodBase.GetType().FullName) 
+            and expand expr =  
+                match expr with 
+                | NewObject(ctor, args) -&gt; getInvokerExpression ctor [| for arg in args -&gt; expand arg|] 
+                | Call(inst, mi, args) -&gt; 
+                    let args =  
+                        [| 
+                            match inst with 
+                            | Some inst -&gt; yield expand inst 
+                            | _ -&gt; () 
+                            yield! List.map expand args 
+                        |] 
+                    getInvokerExpression mi args 
+                | ShapeCombinationUnchecked(shape, args) -&gt; RebuildShapeCombinationUnchecked(shape, List.map expand args) 
+                | ShapeVarUnchecked v -&gt; Expr.Var v 
+                | ShapeLambdaUnchecked(v, body) -&gt; Expr.Lambda(v, expand body) 
+            getInvokerExpression methodBase parameters 
+</pre>
+<p>The mutual recursive implementation of <code class="literal">GetInvokerExpression</code> is split into the following two parts:</p>
+<div class="itemizedlist"><ul class="itemizedlist"><li class="listitem">The first part is for the recognition of the wrapped objects, such as <code class="literal">ProvidedMethod</code> and <code class="literal">ProvidedConstructor.</code></li>
+<li class="listitem">The second part is for translating the expression from the first part into an actual invocation of the method or constructor.</li>
+</ul>
+</div>
+<p>For the first part, recursive is needed because the <code class="literal">methodBase</code> parameter at first is typed as <code class="literal">ProvidedMethod</code> or <code class="literal">ProvidedContructor</code>, then it will invoke the underlying method or constructor with the parameters passed by <code class="literal">parameters</code>.</p>
+<p>This is important, and it is efficient because we do not have to loop through all the types of method implementation iteratively, and this recursive implementation means that it will give the desired method invoker information with the detailed granularity (either constructor, method, or lambda) as needed, without adding a break in the imperative <code class="literal">while</code> or <code class="literal">for</code> loop.</p>
+<p>Then, let's look at the reflection metadata helper class's signature of the provided assembly, parameter, static parameter, constructor, and property in <code class="literal">ProvidedTypes.fsi</code>.</p>
+<div class="section" title="Implementing assembly to provide base assembly"><div class="titlepage"><div><div><h4 class="title"><a id="ch06lvl4sec0"></a>Implementing assembly to provide base assembly</h4>
+</div>
+</div>
+</div>
+<p>First, we need to define the assembly. This is crucial as it is the first point we have to pay to attention because all of our types generated by type providers must have an assembly as the providers' host. The declaration signature to handle assembly generation is implemented in <code class="literal">ProvidedAssembly</code>. The following is the signature of <code class="literal">ProvidedAssembly</code>:</p>
+<pre class="programlisting">type ProvidedAssembly = 
+    /// Create a provided generated assembly 
+    new : assemblyFileName:string -&gt; ProvidedAssembly 
+ 
+    /// Emit the given provided type definitions as part of the assembly  
+    /// and adjust the 'Assembly' property of all provided type definitions to return that 
+    /// assembly. 
+    /// 
+    /// The assembly is only emitted when the Assembly property on the root type is accessed for the first time. 
+    /// The host F# compiler does this when processing a generative type declaration for the type. 
+    member AddTypes : types : ProvidedTypeDefinition list -&gt; unit 
+ 
+    /// &lt;summary&gt; 
+    /// Emit the given nested provided type definitions as part of the assembly. 
+    /// and adjust the 'Assembly' property of all provided type definitions to return that 
+    /// assembly. 
+    /// &lt;/summary&gt; 
+    /// &lt;param name="enclosingTypeNames"&gt;A path of type names to wrap the generated types. The generated types are then generated as nested types.&lt;/param&gt; 
+    member AddNestedTypes : types : ProvidedTypeDefinition list * enclosingGeneratedTypeNames: string list -&gt; unit 
+ 
+    static member RegisterGenerated : fileName:string -&gt; Assembly 
+</pre>
+<p>The implementation of <code class="literal">ProvidedAssembly</code> is as follows:</p>
+<pre class="programlisting">type ProvidedAssembly(assemblyFileName: string) =  
+    let theTypes = ResizeArray&lt;_&gt;() 
+    let assemblyGenerator = AssemblyGenerator(assemblyFileName) 
+    let assemblyLazy =  
+        lazy  
+            assemblyGenerator.Generate(theTypes |&gt; Seq.toList) 
+            assemblyGenerator.Assembly 
+    let theAssemblyBytesLazy =  
+      lazy 
+        assemblyGenerator.GetFinalBytes() 
+ 
+    do 
+        GlobalProvidedAssemblyElementsTable.theTable.Add(assemblyGenerator.Assembly, theAssemblyBytesLazy) 
+</pre>
+<p>For more information on what is a .NET assembly, visit:</p>
+<p>
+<a class="ulink" href="https://docs.microsoft.com/en-us/dotnet/articles/standard/assembly-format">https://docs.microsoft.com/en-us/dotnet/articles/standard/assembly-format</a>
+</p>
+</div>
+<div class="section" title="Implementing parameters for methods and constructors"><div class="titlepage"><div><div><h4 class="title"><a id="ch06lvl4sec1"></a>Implementing parameters for methods and constructors</h4>
+</div>
+</div>
+</div>
+<p>The next step after handling the assembly is to examine the implementation of <code class="literal">ProvidedParameter</code> (some comments removed):</p>
+<pre class="programlisting">type ProvidedParameter = 
+    inherit ParameterInfo 
+    new : parameterName: string * parameterType: Type * ?isOut:bool * ?optionalValue:obj -&gt; ProvidedParameter 
+    member IsParamArray : bool with get,set 
+ 
+/// Represents a provided static parameter. 
+type ProvidedStaticParameter = 
+    inherit ParameterInfo 
+    new : parameterName: string * parameterType:Type * ?parameterDefaultValue:obj -&gt; ProvidedStaticParameter 
+ 
+    /// Add XML documentation information to this provided constructor 
+    member AddXmlDoc            : xmlDoc: string -&gt; unit     
+ 
+    /// Add XML documentation information to this provided constructor, where the computation of the documentation is delayed until necessary 
+    member AddXmlDocDelayed   : xmlDocFunction: (unit -&gt; string) -&gt; unit    
+</pre>
+<p>We discussed the parameter first because the parameter resolution has to be defined carefully, since the parameter is a part of the method and constructor.</p>
+</div>
+<div class="section" title="Implementing generated constructor"><div class="titlepage"><div><div><h4 class="title"><a id="ch06lvl4sec2"></a>Implementing generated constructor</h4>
+</div>
+</div>
+</div>
+<p>To have constructor support for our type provider, we must handle the construction of the reflection type of <code class="literal">ConstructorInfo</code>. This handling is done by <code class="literal">ProvidedConstructor</code>, which is a wrapper for <code class="literal">ConstructorInfo</code> and also extends <code class="literal">ConstructorInfo</code>.</p>
+<p>The following code is the implementation of <code class="literal">ProvidedConstructor:</code>
+</p>
+<pre class="programlisting">type ProvidedConstructor =     
+    inherit ConstructorInfo 
+ 
+    /// Create a new provided constructor. It is not initially associated with any specific provided type definition. 
+    new : parameters: ProvidedParameter list -&gt; ProvidedConstructor 
+ 
+    /// Add a 'System.Obsolete' attribute to this provided constructor 
+    member AddObsoleteAttribute : message: string * ?isError: bool -&gt; unit     
+     
+    member AddXmlDoc          : xmlDoc: string -&gt; unit    
+     
+    member AddXmlDocDelayed   : xmlDocFunction: (unit -&gt; string) -&gt; unit    
+     
+    member AddXmlDocComputed   : xmlDocFunction: (unit -&gt; string) -&gt; unit    
+     
+    member InvokeCode         : (Quotations.Expr list -&gt; Quotations.Expr) with set 
+ 
+    /// FSharp.Data addition: this method is used by Debug.fs 
+    member internal GetInvokeCodeInternal : bool -&gt; (Quotations.Expr [] -&gt; Quotations.Expr) 
+ 
+    /// Set the target and arguments of the base constructor call. Only used for generated types. 
+    member BaseConstructorCall : (Quotations.Expr list -&gt; ConstructorInfo * Quotations.Expr list) with set 
+ 
+    member IsImplicitCtor : bool with get,set 
+ 
+    member AddDefinitionLocation : line:int * column:int * filePath:string -&gt; unit 
+     
+    member IsTypeInitializer : bool with get,set 
+</pre>
+</div>
+<div class="section" title="Implementing generated methods"><div class="titlepage"><div><div><h4 class="title"><a id="ch06lvl4sec3"></a>Implementing generated methods</h4>
+</div>
+</div>
+</div>
+<p>Now, we can use the same constructor handling technique to implement the handling of a method implemented as <code class="literal">ProvidedMethod</code>. The following code is the signature of <code class="literal">ProvidedMethod</code> implementation:</p>
+<pre class="programlisting">type ProvidedMethod =  
+    inherit MethodInfo 
+ 
+    /// Create a new provided method. It is not initially associated with any specific provided type definition. 
+    new : methodName:string * parameters: ProvidedParameter list * returnType: Type -&gt; ProvidedMethod 
+ 
+    member AddObsoleteAttribute : message: string * ?isError: bool -&gt; unit     
+ 
+    member AddXmlDoc            : xmlDoc: string -&gt; unit     
+ 
+    member AddXmlDocDelayed   : xmlDocFunction: (unit -&gt; string) -&gt; unit    
+     
+    /// Add XML documentation information to this provided constructor 
+    member AddXmlDocComputed   : xmlDocFunction: (unit -&gt; string) -&gt; unit    
+     
+    member AddMethodAttrs       : attributes:MethodAttributes -&gt; unit 
+ 
+    member SetMethodAttrs       : attributes:MethodAttributes -&gt; unit 
+ 
+    member IsStaticMethod       : bool with get, set 
+ 
+    member InvokeCode         : (Quotations.Expr list -&gt; Quotations.Expr) with set 
+ 
+    /// FSharp.Data addition: this method is used by Debug.fs 
+    member internal GetInvokeCodeInternal : bool -&gt; (Quotations.Expr [] -&gt; Quotations.Expr) 
+ 
+    member AddDefinitionLocation : line:int * column:int * filePath:string -&gt; unit 
+ 
+    /// Add a custom attribute to the provided method definition. 
+    member AddCustomAttribute : CustomAttributeData -&gt; unit 
+ 
+    member DefineStaticParameters     : parameters: ProvidedStaticParameter list * instantiationFunction: (string -&gt; obj[] -&gt; ProvidedMethod) -&gt; unit 
+</pre>
+</div>
+<div class="section" title="Implementing generated properties"><div class="titlepage"><div><div><h4 class="title"><a id="ch06lvl4sec4"></a>Implementing generated properties</h4>
+</div>
+</div>
+</div>
+<p>One of the natures of a type/class is the availability of properties (or attributes in the realm of OOP). Therefore, we need to handle the generation of properties as well, and the handling of properties is implemented in the <code class="literal">ProvidedProperty</code> class. This class extends <code class="literal">PropertyInfo</code>, and it also has additional functionalities that are quite similar to <code class="literal">ProvidedMethod</code>.</p>
+<p>The following code is the implementation of <code class="literal">ProvidedProperty</code>:</p>
+<pre class="programlisting">type ProvidedProperty = 
+    inherit PropertyInfo 
+ 
+    /// Create a new provided type. It is not initially associated with any specific provided type definition. 
+    new  : propertyName: string * propertyType: Type * ?parameters:ProvidedParameter list -&gt; ProvidedProperty 
+ 
+    member AddObsoleteAttribute : message: string * ?isError: bool -&gt; unit     
+ 
+    /// Add XML documentation information to this provided constructor 
+    member AddXmlDoc            : xmlDoc: string -&gt; unit     
+ 
+    member AddXmlDocDelayed   : xmlDocFunction: (unit -&gt; string) -&gt; unit    
+     
+    member AddXmlDocComputed   : xmlDocFunction: (unit -&gt; string) -&gt; unit    
+     
+    /// Get or set a flag indicating if the property is static. 
+    /// FSharp.Data addition: the getter is used by Debug.fs 
+    member IsStatic             : bool with get,set 
+ 
+    /// Set the quotation used to compute the implementation of gets of this property. 
+    member GetterCode           : (Quotations.Expr list -&gt; Quotations.Expr) with set 
+ 
+    /// Set the function used to compute the implementation of sets of this property. 
+    member SetterCode           : (Quotations.Expr list -&gt; Quotations.Expr) with set 
+ 
+    /// Add definition location information to the provided type definition. 
+    member AddDefinitionLocation : line:int * column:int * filePath:string -&gt; unit 
+ 
+    /// Add a custom attribute to the provided property definition. 
+    member AddCustomAttribute : CustomAttributeData -&gt; unit 
+</pre>
+<p>In the implementation of <code class="literal">ProvidedProperty</code>, we must handle all the characteristic traits and semantics of a property:</p>
+<div class="itemizedlist"><ul class="itemizedlist"><li class="listitem">Property setter.</li>
+<li class="listitem">Property getter.</li>
+<li class="listitem">Definition location of the property: This is very important, because the definition location of the property has the information of the type the property belongs to.</li>
+</ul>
+</div>
+<p>The visibility of a property and its setter and getter methods are handled further in the following override methods of <code class="literal">ProvidedProperty</code> in the <code class="literal">ProvidedTypes.fs</code> file:</p>
+<pre class="programlisting">override __.GetAccessors _nonPublic  = notRequired "nonPublic" propertyName 
+override __.GetGetMethod _nonPublic = if hasGetter() then getter.Force() :&gt; MethodInfo else null 
+override __.GetSetMethod _nonPublic = if hasSetter() then setter.Force() :&gt; MethodInfo else null 
+</pre>
+<p>The methods, <code class="literal">hasGetter()</code> and <code class="literal">hasSetter()</code>, actually act as mini helper functions. These functions are implemented to check for the availability of the getter and setter in the property.</p>
+<p>Again, the <code class="literal">ProvidedTypes.fsi</code> signature file is important, because it will give more meaningful information later when we are designing class libraries for others to use.</p>
+<p>For more information about this FSI's signature file, visit:</p>
+<p>
+<a class="ulink" href="https://docs.microsoft.com/en-us/dotnet/articles/fsharp/language-reference/signatures">https://docs.microsoft.com/en-us/dotnet/articles/fsharp/language-reference/signatures</a>
+</p>
+<p>We shall describe the significance of F# FSI more in <a class="link" title="Chapter&#160;7.&#160;Language Features and Constructs Optimization" href="fsp-hiperf_cu07.html#aid-1ENBI1">Chapter 7</a>, <span class="emphasis"><em>Language Features and Constructs Optimization</em></span>.</p>
+<p>Now, let's look at the implementation of the method provider, <code class="literal">ProvidedMethod</code>.</p>
+<p>Basically, the <code class="literal">ProvidedMethod</code> class extends the <code class="literal">MethodInfo</code> class. Therefore, all of the operations and properties of <code class="literal">MethodInfo</code> are also available in <code class="literal">ProviderMethod</code>. The additional functionalities of <code class="literal">ProviderMethod</code> are implemented with the following design considerations:</p>
+<div class="itemizedlist"><ul class="itemizedlist"><li class="listitem">Handling of XML comment documentation of the method: This is implemented in the <code class="literal">AddXmlDoc</code>, <code class="literal">AddXmlDocDelayed</code>, and <code class="literal">AddXmlDocComputed</code> methods.</li>
+<li class="listitem">Handling of special method attribute, the <code class="literal">ObsoleteAttribute</code>: This is not just a very useful feature, but it is also a necessary feature to warn the consumer of the method that the method should not be used anymore. This obsolete method handling is implemented in <code class="literal">AddObsoleteAttribute</code>.</li>
+<li class="listitem">Handling the detection of <code class="literal">static</code> modifier on the method declaration: This is quite important, because the generation of a static method is different from a normal method and the handling should be explicit. The static detection is implemented in <code class="literal">IsStaticMethod</code>.</li>
+</ul>
+</div>
+<p>If we look back at the implementation of <code class="literal">ProvidedProperty</code> and <code class="literal">ProvidedConstructor</code>, the previous design considerations are also applied to <code class="literal">ProvidedProperty</code> and <code class="literal">ProvidedConstructor</code>, including the handling of the static modifier of a constructor, although F# does not support static constructors as part of F# language constructs specification directly.</p>
+<p>
+<code class="literal">ObsoleteAttribute</code> can also be tuned further to enforce compile errors when the method is used. This attribute is useful and also strongly recommended to mark a feature that should not be used anymore, especially if the method has bugs.</p>
+<p>For more information on the detailed usage of <code class="literal">ObsoleteAttribute</code>, visit MSDN Library at <a class="ulink" href="https://msdn.microsoft.com/en-us/library/system.obsoleteattribute(v=vs.110).aspx">https://msdn.microsoft.com/en-us/library/system.obsoleteattribute(v=vs.110).aspx</a>.</p>
+<p>We are not going to dig deeper into the full implementation of this <code class="literal">ProviderMethod</code> type. We can add optimization to some methods. For example, we can optimize the <code class="literal">GetInvokeCodeInternal</code> method, a part of <code class="literal">ProviderMethod</code> methods operations.</p>
+<p>The following is the original implementation of <code class="literal">GetInvokeCodeInternal</code>:</p>
+<pre class="programlisting">member __.GetInvokeCodeInternal isGenerated = 
+    match invokeCode with 
+    | Some f -&gt;  
+        // FSharp.Data change: use the real variable names instead of indices, to improve output of Debug.fs 
+        let paramNames =  
+            parameters 
+            |&gt; List.map (fun p -&gt; p.Name)  
+            |&gt; List.append (if not isGenerated || isStatic() then [] else ["this"]) 
+            |&gt; Array.ofList 
+        QuotationSimplifier(isGenerated).TranslateQuotationToCode f paramNames 
+    | None -&gt; failwith (sprintf "ProvidedConstructor: no invoker for '%s'" (nameText())) 
+</pre>
+<p>We can further optimize the preceding code of <code class="literal">GetInvokeCodeInternal</code> to use PLINQ instead of non-parallel mapping of F#'s <code class="literal">List.map</code>.</p>
+<p>To use PLINQ in our code, we must add a reference to <code class="literal">System.Linq</code> to tell the F# compiler to recognize classes within <code class="literal">System.Linq</code> namespace. We can insert the import of <code class="literal">System.Linq</code> namespace in the beginning of the open namespace declaration, so the namespace declarations in <code class="literal">ProvidedTypes.fs</code> file become like the following code:</p>
+<pre class="programlisting">open System 
+open System.Text 
+open System.IO 
+open System.Reflection 
+<span class="strong"><strong>open System.Linq</strong></span> 
+open System.Linq.Expressions 
+open System.Collections.Generic 
+open Microsoft.FSharp.Quotations 
+open Microsoft.FSharp.Quotations.Patterns 
+open Microsoft.FSharp.Quotations.DerivedPatterns 
+open Microsoft.FSharp.Core.CompilerServices 
+</pre>
+<p>We can now use parallel support in PLINQ at our disposal. To optimize the mapping using PLINQ, change the method body code of <code class="literal">GetInvokeCodeInternal</code> to the following:</p>
+<pre class="programlisting">    member __.GetInvokeCodeInternal isGenerated = 
+        match invokeCode with 
+        | Some f -&gt;  
+            // FSharp.Data change: use the real variable names instead of indices, to improve output of Debug.fs 
+            let parallelizedSeq = System.Linq.Enumerable.Select(Seq.ofList parameters, fun p -&gt; p.Name).AsParallel() 
+            let paramlist = List.ofSeq parallelizedSeq 
+            let paramNames =  
+                paramlist 
+                |&gt; List.append (if isStatic() then [] else ["this"]) 
+                |&gt; Array.ofList 
+            QuotationSimplifier(isGenerated).TranslateQuotationToCode f paramNames 
+        | None -&gt; failwith (sprintf "ProvidedConstructor: no invoker for '%s'" (nameText())) 
+</pre>
+<p>We have optimized the method provider to use PLINQ, to make the mapping of parameter to parameter name run faster because we do not care for the order of the parameter names. The call of <code class="literal">AsParallel</code> is actually an extension method. This extension method belongs to the <code class="literal">ParallelQuery</code> class.</p>
+<p>The conversion of parameters (as F# list) into a sequence will add a small overhead but this overhead is highly compensated when we change the original map of <code class="literal">List.map</code> to use the PLINQ<code class="literal"> Select</code> query because the <code class="literal">Select</code> method has the same semantic as the map in <code class="literal">List</code> and now the mapping is executed in parallel.</p>
+<p>For more information about the <code class="literal">ParallelQuery</code> class, visit: <a class="ulink" href="https://msdn.microsoft.com/en-us/library/system.linq.parallelquery(v=vs.110).aspx">https://msdn.microsoft.com/en-us/library/system.linq.parallelquery(v=vs.110).aspx</a>.</p>
+<p>For the generic parameterized version of <code class="literal">ParallelQuery</code>, visit:</p>
+<p>
+<a class="ulink" href="https://msdn.microsoft.com/en-us/library/dd383736(v=vs.110).aspx">https://msdn.microsoft.com/en-us/library/dd383736(v=vs.110).aspx</a>
+</p>
+<p>Although the generic type is not specified, the <code class="literal">ParallelQuery</code> class we used when calling the preceding <code class="literal">AsParallel</code> is inferred as calling a generic version of <code class="literal">ParallelQuery.AsParallel</code>. The type inference plays heavy lifting of the necessary flow of type information here.</p>
+<p>It is highly recommended to always start from having the implementation of infrastructure of the type provider first, starting from preparing the assembly, parameters, methods, constructors, and properties, including other CLR type metadata information, such as adding supports for attributes and debug symbols.</p>
+<p>The heavy lifting for reflection should be done carefully. In the next section, we can start implementing the basic custom type provider with minimum metadata supports.</p>
+</div>
+</div>
+<div class="section" title="Basic minimal implementation of type provider"><div class="titlepage"><div><div><h3 class="title"><a id="ch06lvl3sec12"></a>Basic minimal implementation of type provider</h3>
+</div>
+</div>
+</div>
+<p>Now, let's create a very simple type provider after we have done implementing all the necessary infrastructure of type metadata supports.</p>
+<p>The easiest one is to create an erased type provider as a fundamental sample.</p>
+<p>Let's create this sample named <code class="literal">BasicProvider</code>:</p>
+<pre class="programlisting">namespace ProviderImplementation 
+ 
+open System.Reflection 
+open Microsoft.FSharp.Quotations 
+open Microsoft.FSharp.Core.CompilerServices 
+open ProviderImplementation.ProvidedTypes 
+ 
+[&lt;TypeProvider&gt;] 
+type BasicProvider (config : TypeProviderConfig) as this = 
+    inherit TypeProviderForNamespaces () 
+ 
+    let ns = "StaticProperty.Provided" 
+    let asm = Assembly.GetExecutingAssembly() 
+    let ctxt = ProvidedTypesContext.Create(config) 
+ 
+    let createTypes () = 
+        let myType = ctxt.ProvidedTypeDefinition(asm, ns, "MyType", Some typeof&lt;obj&gt;) 
+        let myProp = ctxt.ProvidedProperty("MyProperty", typeof&lt;string&gt;, IsStatic = true, getterCode = (fun args -&gt; &lt;@@ "Hello world" @@&gt;)) 
+        myType.AddMember(myProp) 
+        [myType] 
+ 
+    do 
+        this.AddNamespace(ns, createTypes()) 
+ 
+[&lt;assembly:TypeProviderAssembly&gt;] 
+    do () 
+</pre>
+<p>Let's dive deeper into <code class="literal">BasicProvider</code>.</p>
+<p>The following are the traits and reflection metadata of <code class="literal">BasicProvider</code>:</p>
+<div class="itemizedlist"><ul class="itemizedlist"><li class="listitem"><code class="literal">BasicProvider</code> type declaration has <code class="literal">TypeProviderAttribute</code> mark, as identified by using the abbreviated name of just <code class="literal">TypeProvider</code>.</li>
+<li class="listitem"><code class="literal">BasicProvider</code> inherits from <code class="literal">TypeProviderNamespaces</code>. This class is available in the starter pack's helper of <code class="literal">ProvidedType.fs</code> file.</li>
+<li class="listitem">The provided type has one property called <code class="literal">MyProperty</code> typed as <code class="literal">String</code>, and it has a static modifier. This means that this is a static property. We can also set this property to not static by setting <code class="literal">IsStatic</code> to <code class="literal">false</code>.</li>
+<li class="listitem">The attribute's assembly scope declaration of <code class="literal">TypeProviderAssembly</code> means that this type's assembly is a part of <code class="literal">TypeProviderAssembly</code> and so is the project.</li>
+</ul>
+</div>
+<p>All these traits are matched with the requirements of the type provider implementation that we described in the previous section, <span class="emphasis"><em>Minimum requirements of type providers</em></span>.</p>
+<p>We have implemented a very simple custom type provider. It is quite simple in the sense that it has a basic support for namespace, assembly, public properties, and public methods.
+</p>
+</div>
+</div>
+</div>
+
+
+<div class="section" title="Common pitfalls in implementing type provider" id="aid-1CQAE1"><div class="titlepage"><div><div><h1 class="title"><a id="ch06lvl1sec39"></a>Common pitfalls in implementing type provider</h1>
+</div>
+</div>
+</div>
+<p>We now have enough knowledge of type provider, not just the concept of using a sample type provider and implementing a custom type provider but also that there might be pitfalls as well. In this section, the common pitfalls in type providers are wrapped as a simplified list with a simple explanation as well.</p>
+<p>Common pitfalls in implementing type providers are quite subtle but these are important:</p>
+<div class="itemizedlist"><ul class="itemizedlist"><li class="listitem">Type provider strategy has to be planned first. The planning must also include the infrastructure to ease the metadata generation, whether it employs erased or generative strategy. <span class="emphasis"><em>Do not</em></span> always assume that we can always provide generative type providers instantly. Failing to provide type resolution with the namespace will yield undesirable results, including erased type metadata.</li>
+<li class="listitem">Reflection should use lazy implementation instead of an eager one. This lazy evaluation should not be combined with asynchronous reflection because cross-thread exception will occur and it can also lead to a deadlock as there is no guarantee that the reflection will return a CLR type that is fully CLS-compliant, from the type to the members (properties and methods).</li>
+<li class="listitem">The use of any kind of TPL or PLINQ is encouraged when we are processing to give results as properties and members for each type provided, especially if we have to map a type to other types, such as the names of the properties.</li>
+<li class="listitem">The implementation of type provider is not recommended for non CLI-compliant type, such as COM+ related types or types that are generated via <code class="literal">TLBIMP</code> of .NET SDK. An exception of cross-thread or even invalid object reference might occur, although the type generated may not be null.</li>
+<li class="listitem"><span class="emphasis"><em>Do not</em></span> use TPL/PLINQ when we are processing delegates. It might yield a memory leak because the delegate resolution is best handled as synchronous. This is quite subtle but important because there is no guarantee that the delegate is either unicast (normal delegate) or multicast.</li>
+<li class="listitem">We should avoid F# units of measure implementation when a type with unit of measure is used as a type of the properties and parameters of the generated methods. Because in F#, any type that has <span class="emphasis"><em>unit of measure&#160;is always erased at runtime</em></span>.</li>
+</ul>
+</div>
+<p>The last point about the use of unit of measurement is quite subtle because many F# developers tend to forget that the F# unit of measurement is an erased generic type.</p>
+</div>
+
+
+<div class="section" title="Summary" id="aid-1DOR01"><div class="titlepage"><div><div><h1 class="title"><a id="ch06lvl1sec40"></a>Summary</h1>
+</div>
+</div>
+</div>
+<p>We have the knowledge of type providers and insights of the internal working, while at the same time optimizing and avoiding the pitfalls of type provider implementations. We now have enough knowledge of the strategy behind choosing the erased and generative type providers at our disposal. It is quite important that we can optimize all of the internal language constructs, and not just know the functional programming style.</p>
+<p>This is why we will now visit the optimization of the language syntaxes and semantics in <a class="link" title="Chapter&#160;7.&#160;Language Features and Constructs Optimization" href="fsp-hiperf_cu07.html#aid-1ENBI1">Chapter 7</a>, <span class="emphasis"><em>Language Features and Constructs Optimization</em></span>.</p>
+</div>
+</body>
+</html>

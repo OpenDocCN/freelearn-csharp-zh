@@ -1,0 +1,736 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN"
+  "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" style="font-size:1.200rem;">
+<head><title>Chapter&#160;8.&#160;Optimizing Computation Expressions</title>
+<link rel="stylesheet" href="../Styles/style0001.css" type="text/css"/>
+<meta name="generator" content="DocBook XSL Stylesheets V1.75.2"/>
+</head>
+<body id="page">
+<div class="chapter" title="Chapter&#160;8.&#160;Optimizing Computation Expressions"><div class="titlepage" id="aid-1JFUC2"><div><div><h1 class="title"><a id="ch08"></a>Chapter&#160;8.&#160;Optimizing Computation Expressions</h1>
+</div>
+</div>
+</div>
+<p>One of the most-used and unique features of F# is asynchronous workflow, and we have discussed this with the introduction to concurrency optimization in <a class="link" title="Chapter&#160;4.&#160;Introduction to Concurrency in F#" href="fsp-hiperf_cu04.html#aid-11C3M2">Chapter 4</a>, <span class="emphasis"><em>Introduction to Concurrency in F#</em></span>. The asynchronous workflow itself is actually an implementation of a computation expression, a feature that enables us to have a computation. This computation is, in fact, a sequence of workflows of functions that is composed sequentially and has bindings to bind or combine them.</p>
+<p>The computation expression has many kinds of helper methods to implement, but using these helpers can be overkill, and it may have some overheads as well if it is not constructed properly. It is not as subtle and hard as the previous discussion on language constructs in <a class="link" title="Chapter&#160;7.&#160;Language Features and Constructs Optimization" href="fsp-hiperf_cu07.html#aid-1ENBI1">Chapter 7</a>, <span class="emphasis"><em>Language Features and Constructs Optimization</em></span>.</p>
+<p>In this chapter, we will focus our optimization on the implementation of computation workflows with the following topics:</p>
+<div class="itemizedlist"><ul class="itemizedlist"><li class="listitem">Quick introduction to F# computation workflow</li>
+<li class="listitem">Walkthrough of an example implementation of simple computation workflow</li>
+<li class="listitem">Design consideration in planning the computation workflow implementation</li>
+<li class="listitem">Considerations of computation expression optimization</li>
+</ul>
+</div>
+<div class="section" title="Quick introduction to F# computation expression"><div class="titlepage"><div><div><h1 class="title"><a id="ch08lvl1sec46"></a>Quick introduction to F# computation expression</h1>
+</div>
+</div>
+</div>
+<p>One of the quite subtle, but quite common, traits of a functional programming language is the availability of features to combine and compose functions into more sophisticated conceptual techniques that also encapsulate some side effects when combining functions. Some of these techniques are known as Monoids and Monads. These two come from the world of a subset of algebra, the category theory. This mathematical foundation gives the inspiration and also powerful concepts when composing and combining functions, including side effects.</p>
+<p>For a more gentle introduction and information to Monads in functional programming, you could watch this MSDN Channel 9 interview with Microsoft's developer Brian Beckman:</p>
+<p>
+<a class="ulink" href="https://channel9.msdn.com/Shows/Going+Deep/Brian-Beckman-Dont-fear-the-Monads">https://channel9.msdn.com/Shows/Going+Deep/Brian-Beckman-Dont-fear-the-Monads</a>
+</p>
+<p>The best sample of F# computation expression is the asynchronous workflow. The term workflow in asynchronous workflow comes from the fact that it is implemented from the use of the computation expression feature to provide asynchronous computation. Asynchronous workflow is itself composed from functions with side effects such as switching the context execution of the current thread.</p>
+<div class="note" title="Note"><h3 class="title"><a id="note74"></a>Note</h3>
+<p>We already have discussed these F# concurrencies including asynchronous workflow cases in <a class="link" title="Chapter&#160;4.&#160;Introduction to Concurrency in F#" href="fsp-hiperf_cu04.html#aid-11C3M2">Chapter 4</a>, <span class="emphasis"><em>Introduction to Concurrency in F# </em></span>that asynchronous computations do not always equate to the needs of multithreading.</p>
+</div>
+<p>In F#, the composition of functions is done using builders. These builders are actually methods that help us construct a composition of functions. From the perspective of design patterns in OOP, these methods can be seen as helper methods or builder methods because they focus on building computation expressions.</p>
+<p>Sometimes the composition of functions might contain conditional logic to handle side effects, such as threads, execution context (such as asynchronous workflow), I/O, and many more. The conditional logic is quite similar to workflow concepts whereas execution is always implemented as a sequence of steps. When conditional logic is needed, the execution always follows the branches of conditional logic based on the expression evaluated.
+</p>
+<div class="note" title="Note"><h3 class="title"><a id="note75"></a>Note</h3>
+<p>Earlier, F# language specification and MSDN Library mentioned computation expression as getting mixed with computation workflow. Since F# 3.0, the language specification is consistent and stricter to focus on computation expressions, not workflow.</p>
+</div>
+<p>Based on the official F# 4.0 language specification, the computation workflow syntax is often used by starting to have a construct using <code class="literal">builder-name</code> and the enclosing curly brackets as follows:</p>
+<pre class="programlisting">builder-name { expression } 
+</pre>
+<p>The expression itself might be functions as defined (and also governed) by the builders of the computation expressions.</p>
+<p>For an initial example of the computation expression syntax, let's revisit our own sample code for&#160;<code class="literal">async</code> workflow:</p>
+<pre class="programlisting">let fetchAsync(name, url:string) = 
+    async {  
+        try  
+            let uri = new System.Uri(url) 
+            let webClient = new WebClient() 
+            let! html = webClient.AsyncDownloadString(uri) 
+            printfn "Read %d characters for %s" html.Length name 
+        with 
+            | ex -&gt; printfn "%s" (ex.Message); 
+    } 
+</pre>
+<p>The preceding sample code uses <code class="literal">Control.AsyncBuilder</code>, a builder of <code class="literal">async</code>. The F# compiler will translate <code class="literal">AsyncBuilder</code> to a computation expression of <code class="literal">async</code>.</p>
+<p>We will now go deeper into the fabric of computation expressions: builders of computation expressions. We will also create a simpler computation expression than asynchronous workflow as a starting sample in the next section.</p>
+<div class="section" title="Introduction to builders of computation expression"><div class="titlepage"><div><div><h2 class="title"><a id="ch08lvl2sec61"></a>Introduction to builders of computation expression</h2>
+</div>
+</div>
+</div>
+<p>The notion, <span class="emphasis"><em>builder</em></span>, also means that we construct a computation workflow by using the available builders when composing functions. These builders are actually methods that can be used when composing functions as a computation expression.</p>
+<p>The following table briefly explains the commonly used builders&#160;in F# 4.0:</p>
+<div class="informaltable"><table border="1"><colgroup><col/>
+<col/>
+<col/>
+</colgroup>
+<tbody><tr><td>
+<p>
+<span class="strong"><strong>Method</strong></span>
+</p>
+</td>
+<td>
+<p>
+<span class="strong"><strong>Typical Signature</strong></span>
+</p>
+</td>
+<td>
+<p>
+<span class="strong"><strong>Remark</strong></span>
+</p>
+</td>
+</tr>
+<tr><td>
+<p>
+<code class="literal">Bind</code>
+</p>
+</td>
+<td>
+<p>
+<code class="literal">M&lt;'T&gt; * ('T -&gt; M&lt;'U&gt;) -&gt; M&lt;'U&gt;</code>
+</p>
+</td>
+<td>
+<p>Provide <code class="literal">let!</code> and <code class="literal">do!</code> in a computation expression. It is a basic method to compose functions.</p>
+</td>
+</tr>
+<tr><td>
+<p>
+<code class="literal">Delay</code>
+</p>
+</td>
+<td>
+<p>
+<code class="literal">(unit -&gt; M&lt;'T&gt;) -&gt; M&lt;'T&gt;</code>
+</p>
+</td>
+<td>
+<p>Wraps a computation expression as a function.</p>
+</td>
+</tr>
+<tr><td>
+<p>
+<code class="literal">Return</code>
+</p>
+</td>
+<td>
+<p>
+<code class="literal">'T -&gt; M&lt;'T&gt;</code>
+</p>
+</td>
+<td>
+<p>Equivalent to <code class="literal">return</code> in computation expression.</p>
+</td>
+</tr>
+<tr><td>
+<p>
+<code class="literal">ReturnFrom</code>
+</p>
+</td>
+<td>
+<p>
+<code class="literal">M&lt;'T&gt; -&gt; M&lt;'T&gt;</code>
+</p>
+</td>
+<td>
+<p>Equivalent to <code class="literal">return!</code> in computation expressions.</p>
+</td>
+</tr>
+<tr><td>
+<p>
+<code class="literal">Run</code>
+</p>
+</td>
+<td>
+<p>
+<code class="literal">M&lt;'T&gt; -&gt; M&lt;'T&gt; or M&lt;'T&gt; -&gt; 'T</code>
+</p>
+</td>
+<td>
+<p>Executes a computation expression.</p>
+</td>
+</tr>
+<tr><td>
+<p>
+<code class="literal">TryWith</code>
+</p>
+</td>
+<td>
+<p>
+<code class="literal">M&lt;'T&gt; * (exn -&gt; M&lt;'T&gt;) -&gt; M&lt;'T&gt;</code>
+</p>
+</td>
+<td>
+<p>Called for <code class="literal">try..with</code> to catch exception (<code class="literal">exn</code>) in a computation expression.</p>
+</td>
+</tr>
+<tr><td>
+<p>
+<code class="literal">TryFinally</code>
+</p>
+</td>
+<td>
+<p>
+<code class="literal">M&lt;'T&gt; * (unit -&gt; unit) -&gt; M&lt;'T&gt;</code>
+</p>
+</td>
+<td>
+<p>Called for <code class="literal">try..finally</code> in computation expression.</p>
+</td>
+</tr>
+<tr><td>
+<p>
+<code class="literal">Using</code>
+</p>
+</td>
+<td>
+<p>
+<code class="literal">'T * ('T -&gt; M&lt;'U&gt;) -&gt; M&lt;'U&gt; when 'U :&gt; IDisposable</code>
+</p>
+</td>
+<td>
+<p>Called from <code class="literal">use</code> binding in computation expression. It is equivalent to <code class="literal">using!</code> in computation expression.</p>
+</td>
+</tr>
+<tr><td>
+<p>
+<code class="literal">Yield</code>
+</p>
+</td>
+<td>
+<p>
+<code class="literal">'T -&gt; M&lt;'T&gt;</code>
+</p>
+</td>
+<td>
+<p>Called for <code class="literal">yield</code> in computation expression. It is conceptually the same as <code class="literal">yield</code> in C#/VB, but the semantic is different.</p>
+</td>
+</tr>
+<tr><td>
+<p>
+<code class="literal">YieldFrom</code>
+</p>
+</td>
+<td>
+<p>
+<code class="literal">M&lt;'T&gt; -&gt; M&lt;'T&gt;</code>
+</p>
+</td>
+<td>
+<p>Called for <code class="literal">yield!</code> in computation expression. It is conceptually the same as <code class="literal">yield</code> in C#/VB, but the semantic is different.</p>
+</td>
+</tr>
+<tr><td>
+<p>
+<code class="literal">Zero</code>
+</p>
+</td>
+<td>
+<p>
+<code class="literal">unit -&gt; M&lt;'T&gt;</code>
+</p>
+</td>
+<td>
+<p>Called when there is an empty <code class="literal">else</code> in the <code class="literal">if</code> condition (if there is an <code class="literal">if</code> statement in the computation expression). It is also called when the computation expression has an empty expression.</p>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>For more information about computation&#160;expression and the full list of builder methods, consult the official MSDN F# computation expression on the new Microsoft's docs:</p>
+<p>
+<a class="ulink" href="https://docs.microsoft.com/en-us/dotnet/articles/fsharp/language-reference/computation-expressions">https://docs.microsoft.com/en-us/dotnet/articles/fsharp/language-reference/computation-expressions</a>
+</p>
+<p>We do not have to implement all of the builder methods because there are no definitive minimum requirements of a computation expression. However, we should have the basic requirements of understanding in order to use a computation expression implementation to be used easily. The following are the common requirements in terms of usage requirement with builder methods:</p>
+<div class="itemizedlist"><ul class="itemizedlist"><li class="listitem">A bind to compose functions. This <code class="literal">Bind</code> method will contain a composition of functions. An implementation of <code class="literal">Bind</code> is recommended because the expressions supported inside a computation expression are governed by the types defined in the <code class="literal">Bind</code> method. For example, composing functions that have the same generic type.</li>
+<li class="listitem">A type to return. This requirement enforces us to implement <code class="literal">Return</code> or <code class="literal">ReturnFrom</code>. This is important because computation expressions must return a type, and it is recommended not to return <code class="literal">unit</code> (or <code class="literal">void</code> in .NET and C#).</li>
+<li class="listitem"><code class="literal">Delay</code>, to wrap a computation expression as a function. It is also quite common to call the <code class="literal">Delay</code> method as a wrapper method.</li>
+<li class="listitem"><code class="literal">Using</code>, to leverage the use of a type that implements <code class="literal">IDisposable</code>. This will be translated as <code class="literal">use</code> binding inside the computation workflow.</li>
+<li class="listitem"><code class="literal">TryWith</code>, to handle exceptions inside a composition of functions of <code class="literal">Bind</code> or explicitly handle exceptions outside <code class="literal">Bind</code>.</li>
+</ul>
+</div>
+<p>The <code class="literal">Bind</code> method is crucial because it governs the type of generic type in the functions we are going to compose, but it is also enforcing all the types of the <code class="literal">let!</code> and <code class="literal">do!</code> functions inside a computation expression. Omitting <code class="literal">Bind</code> will make the computation expressions to be less complete because the main goal of a computation expression is the ability to compose expressions, not just returning the underlying type.</p>
+<p>In the case of our previous sample code for asynchronous workflow, the following is the illustration of <code class="literal">Bind</code> as <code class="literal">let!</code> in an asynchronous workflow:</p>
+<p>
+</p>
+<div class="mediaobject"><img src="../Images/image00327.jpeg" alt="Introduction to builders of computation expression"/></div>
+<p style="clear:both; height: 1em;"> </p>
+<p>
+</p>
+<p>The default distribution of the F# core library already has samples of implementations of computation expressions with its own underlying type:</p>
+<div class="itemizedlist"><ul class="itemizedlist"><li class="listitem">LINQ query expressions support that returns <code class="literal">System.Linq.Enumerable&lt;'T&gt;</code></li>
+<li class="listitem">Asynchronous workflow returns <code class="literal">Async&lt;'T&gt;</code></li>
+</ul>
+</div>
+<p>F# LINQ query expression is a little bit subtle, but actually it has implementation details similar to LINQ used in C#/VB. It is semantically the same; therefore, the performance characteristics are also similar to running LINQ in C#/VB. The difference between F# and C#/VB implementation is the type of delegates used: <code class="literal">FastFunc</code> in F#, <code class="literal">Func</code> in C#/VB.</p>
+<p>This strong recommendation of F# function over <code class="literal">Func</code> is crucial and important because the method signature of all method builders use F# curried functions instead of the normal .NET method signature.</p>
+<div class="section" title="Using F# function/delegate over .NET Func"><div class="titlepage"><div><div><h3 class="title"><a id="ch08lvl3sec20"></a>Using F# function/delegate over .NET Func</h3>
+</div>
+</div>
+</div>
+<p>Usage of F# delegate instead of a normal .NET <code class="literal">Func</code> is also more efficient and more functional because of the immediate feature to have F# delegate as a function that supports currying; this allows for a higher order function after the availability of a partial function application.
+</p>
+<div class="note" title="Note"><h3 class="title"><a id="note76"></a>Note</h3>
+<p>When we are developing applications that use our own implementation of computation expressions, of course, it is faster and highly recommended to use F# function/delegate instead of using .NET <code class="literal">Func</code>. It is highly compatible with the rest of F# constructs/features, and it is faster to compile in F#. It is highly recommended due to the availability of function currying.</p>
+</div>
+<p>Proof that F# functions are optimized for supporting currying functions is available in the way F# supports higher order functions. Microsoft has documented this, and it is wrapped in a very nice walkthrough guide for functional programming traits/characteristics, focusing on function as first class values. The concept of function as first class values is then compared to classes and method as first class values of OOP.</p>
+<p>The starting information about function as first class values and F# currying is available in this MSDN docs page of F# functional programming traits:</p>
+<p>
+<a class="ulink" href="https://docs.microsoft.com/en-us/dotnet/articles/fsharp/introduction-to-functional-programming/functions-as-first-class-values">https://docs.microsoft.com/en-us/dotnet/articles/fsharp/introduction-to-functional-programming/functions-as-first-class-values</a>
+</p>
+<p>On that page, we focus on the implied currying of F# in the section on curried function:</p>
+<div class="blockquote"><blockquote class="blockquote"><p>
+<span class="emphasis"><em>Currying is a process that transforms a function that has more than one parameter into a series of embedded functions, each of which has a single parameter. In F#, functions that have more than one parameter are inherently curried.</em></span>
+</p>
+</blockquote>
+</div>
+<p>The implications of currying highly influence the language design of F#; hence, a special or unique F# function/delegate is needed. In the general .NET BCL, this F# unique implementation of a curried function is becoming very important and critical from the perspective of functional programming language architecture because <code class="literal">Func</code> does not support currying.</p>
+<div class="note" title="Note"><h3 class="title"><a id="note77"></a>Note</h3>
+<p>We are not going to dive deeper into the discussion of what is functional programming and the traits of functional programming language. Consult more of functional programming concepts in F# and the functional programming support in F# in the preceding MSDN docs page.</p>
+</div>
+<p>For example, let's examine the common (typical) signature of the <code class="literal">Bind</code> method:</p>
+<pre class="programlisting">M&lt;'T&gt; * ('T -&gt; M&lt;'U&gt;) -&gt; M&lt;'U&gt; 
+</pre>
+<p>This signature means that the function returns <code class="literal">M&lt;'U&gt;</code> as its result, as indicated by the type signature after the last <code class="literal">-&gt;</code>. The <code class="literal">*</code> between two types before the last <code class="literal">-&gt;</code> means that the method takes two arguments-one is a normal type and the second parameter is a function that takes a generic <code class="literal">T</code> returns a type with a type of <code class="literal">M&lt;'U&gt;</code>.</p>
+<p>The use of <code class="literal">*</code> in the signature of a method member of a class means that the types (before the resulting type) are seen as the arguments of a method.</p>
+<p>The function of <code class="literal">('T -&gt; M&lt;'U&gt;)</code> means a function that takes one argument of <code class="literal">'T</code> and returns a result. This argument does not have to be one argument. We can also use more functions that have more than one argument, such as this:</p>
+<pre class="programlisting">'T -&gt; 'U -&gt; M&lt;'V'&gt; 
+</pre>
+<p>Here, <code class="literal">M&lt;'V'&gt;</code> is the result.</p>
+<p>The signature of <code class="literal">'T -&gt; 'U</code> before the last -&gt; means that the function has two arguments, typed generic <code class="literal">T</code> and <code class="literal">U</code>. We can then change and adapt the signature of <code class="literal">Bind</code> to be like this:</p>
+<pre class="programlisting">M&lt;'T&gt; -&gt; ('T -&gt; 'U -&gt; M&lt;'V&gt;) -&gt; M&lt;'V&gt; 
+</pre>
+<p>We can then start to implement our <code class="literal">Bind</code> method. However, be careful as the <code class="literal">let!</code> and <code class="literal">do!</code> constructs are altered quite large, and it's better for us to implement computation expressions as simply as possible.</p>
+</div>
+<div class="section" title="Relation of F# function computation expressions with arguments restriction"><div class="titlepage"><div><div><h3 class="title"><a id="ch08lvl3sec21"></a>Relation of F# function computation expressions with arguments restriction</h3>
+</div>
+</div>
+</div>
+<p>We can also use many arguments, but it is quite common to only use a function with one argument as long as the type is lined up well. If we use more than one argument, our <code class="literal">Bind</code> method implementation will be more complex, and it will always be harder to construct semantically correct computation expressions.</p>
+<p>Not just the generic types have to be aligned carefully; it is also more complex to implement <code class="literal">Bind</code> with many parameters. The F# language specification also implies that the current F# 4.0 compiler (especially the lexer and parser) is preferred instead of using <code class="literal">Func</code>.</p>
+<p>This complexity of having an implementation of <code class="literal">Bind</code> method with parameters will become clearer by having samples of computation expressions with <code class="literal">Bind</code>. The next section is the starting point of a sample of computation expression.
+</p>
+</div>
+</div>
+<div class="section" title="Walkthrough of planning and writing a computation expression"><div class="titlepage"><div><div><h2 class="title"><a id="ch08lvl2sec62"></a>Walkthrough of planning and writing a computation expression</h2>
+</div>
+</div>
+</div>
+<p>Let's start writing a very simple functional way of creating a <span class="strong"><strong>WPF</strong></span> (<span class="strong"><strong>Windows Presentation Foundation</strong></span>) window and composing WPF controls.</p>
+<p>WPF is basically a UI framework implemented on top of DirectX 9.0c that starts from the release of .NET 3.0 as libraries of UI. It is still aggressively developed by Microsoft, and with the release of WPF comes the innovation of XAML as a declarative UI. It has been heavily supported since Visual Studio 2008, and now it is beginning to replace Windows Forms.</p>
+<p>This slightly unfortunate fate of Windows Forms becomes more apparent with the introduction of Visual Studio 2012 and .NET 4.5; Windows Forms are no longer developed (although they are still supported in terms of bug fixes), but they have not yet been deprecated or become obsolete. It is considered as replacing Windows Forms because WPF is still developed heavily, at least not just in Visual Studio 2015/.NET 4.6.1, but it is also evident in the upcoming version of Visual Studio 2015, the Visual Studio 2017.</p>
+<p>For more information about WPF, visit the official home page of WPF on MSDN at&#160;<a class="ulink" href="https://msdn.microsoft.com/en-us/library/ms754130(v=vs.110).aspx">https://msdn.microsoft.com/en-us/library/ms754130(v=vs.110).aspx</a>.</p>
+<p>Before starting to implement WPF composition using computation expressions, we need to have some basic idea to understand the following (as design consideration plans) before having code implementations of WPF:</p>
+<div class="itemizedlist"><ul class="itemizedlist"><li class="listitem">All WPF control derives from <code class="literal">System.Windows.FrameworkElement</code>.</li>
+</ul>
+</div>
+<p>The WPF window is called <code class="literal">System.Windows.Window</code>.</p>
+<div class="itemizedlist"><ul class="itemizedlist"><li class="listitem">On the <code class="literal">Window</code>, all of the controls (typed as <code class="literal">UIElement</code>) to be put are usually laid on a container panel that is inherited from <code class="literal">System.Windows.Controls.Panel</code>.</li>
+<li class="listitem">The adding of controls on <code class="literal">Panel</code> has to be carefully designed to exclude <code class="literal">Window</code> as it will not make sense if we add <code class="literal">Window</code> on to <code class="literal">Panel</code>, although <code class="literal">Window</code> inherits <code class="literal">System.Windows.Controls.Control</code> and <code class="literal">System.Windows.UIElement</code>.</li>
+</ul>
+</div>
+<p>There are special treatments of a <code class="literal">Panel</code> to be taken into account: the knowledge of what a <code class="literal">Panel</code> is and why it is not available to be used directly.</p>
+<p>This is the proof that we cannot use <code class="literal">Panel</code> directly because <code class="literal">Panel</code> is implemented as an abstract class.</p>
+<p>The following is the <code class="literal">System.Windows.Controls.Panel</code> declaration in F#:</p>
+<pre class="programlisting">[&lt;AbstractClass&gt;] 
+[&lt;LocalizabilityAttribute(LocalizationCategory.Ignore)&gt;] 
+[&lt;ContentPropertyAttribute("Children")&gt;] 
+type Panel =  
+    class 
+        inherit FrameworkElement 
+        interface IAddChild 
+    end 
+</pre>
+<p>The <code class="literal">AbstractClass</code> attribute is the same semantic as marking the class as abstract class. Abstract class in F# is treated using the <code class="literal">AbstractClass</code> attribute, not as a keyword as in C#/VB:</p>
+<pre class="programlisting">[LocalizabilityAttribute(LocalizationCategory.Ignore)] 
+[ContentPropertyAttribute("Children")] 
+public abstract class Panel : FrameworkElement, IAddChild 
+</pre>
+<p>To avoid confusion, we should know the OOP concept and keywords in F#, while at the same time relating and interoperating with OOP in C#/VB. This conceptual knowledge is increasingly relevant because it's quite common that in developing WPF application, we rely on inheritances and componentizations of OOP controls.</p>
+<p>Before we start utilizing WPF, ensure that the following assemblies are referenced or registered (if you are in the scripting interactive mode):</p>
+<div class="itemizedlist"><ul class="itemizedlist"><li class="listitem"><code class="literal">WindowsBase</code></li>
+<li class="listitem"><code class="literal">PresentationCore</code></li>
+<li class="listitem"><code class="literal">PresentationFramework</code></li>
+<li class="listitem"><code class="literal">System.Xaml</code></li>
+</ul>
+</div>
+<p>For scripting mode, these assemblies have to be registered first by directly registering the location of the DLL. In the following sample, we register the assemblies with 32-bit assemblies:</p>
+<pre class="programlisting">#r "C:\\Program Files (x86)\\Reference Assemblies\\Microsoft\\Framework\\.NETFramework\\v4.6.1\\WindowsBase.dll" 
+#r "C:\\Program Files (x86)\\Reference Assemblies\\Microsoft\\Framework\\.NETFramework\\v4.6.1\\PresentationCore.dll" 
+#r "C:\\Program Files (x86)\\Reference Assemblies\\Microsoft\\Framework\\.NETFramework\\v4.6.1\\PresentationFramework.dll" 
+#r "C:\\Program Files (x86)\\Reference Assemblies\\Microsoft\\Framework\\.NETFramework\\v4.6.1\\System.Xaml.dll" 
+</pre>
+<p>After registering all the required DLL assemblies, we should tell the F# compiler to scope the namespace of WPF to be available in our script:</p>
+<pre class="programlisting">open System 
+open System.Windows 
+open System.Windows.Controls 
+</pre>
+<p>The open namespace is also useful because it will shorten our naming of WPF type not to use full type name with the namespace. It is semantically similar to the <code class="literal">Using</code> keyword in C# and <code class="literal">Import</code> in VB.</p>
+<p>We can start from just creating <code class="literal">Window</code> with <code class="literal">Panel</code>, but we can also use an abstract class as a template for <code class="literal">Window</code> with <code class="literal">Panel</code> and <code class="literal">Panel</code> with controls because both <code class="literal">Window</code> and <code class="literal">Panel</code> extend <code class="literal">FrameworkElement</code>, as illustrated in this image:</p>
+<p>
+</p>
+<div class="mediaobject"><img src="../Images/image00328.jpeg" alt="Walkthrough of planning and writing a computation expression"/></div>
+<p style="clear:both; height: 1em;"> </p>
+<p>
+</p>
+<p>Next, we are going to implement our abstract class as a template for our builder:</p>
+<pre class="programlisting">[&lt;AbstractClass&gt;] 
+type IComposableControl&lt;'a when 'a :&gt; FrameworkElement&gt; () = 
+    abstract Control : 'a 
+    abstract Bind : System.Windows.FrameworkElement * (System.Windows.FrameworkElement -&gt; 'a) -&gt; 'a 
+    abstract Bind : IComposableControl&lt;'b&gt; * (System.Windows.FrameworkElement -&gt; 'a)  -&gt; 'a 
+    member this.Return (e: unit)  = this.Control 
+    member this.Zero () = this.Control 
+</pre>
+<p>Based on the knowledge that <code class="literal">Window</code> and <code class="literal">Panel</code> inherit from the same <code class="literal">FrameworkElement</code>, we can continue to have the implementation of our own <code class="literal">Window</code> builder as a computation expression:</p>
+<pre class="programlisting">type WindowBuilder() = 
+    inherit IComposableControl&lt;Window&gt;() 
+    let win = Window(Topmost=true) 
+    override this.Control = win 
+    override this.Bind(c: FrameworkElement, body: FrameworkElement -&gt; Window) : Window = 
+        win.Content &lt;- c 
+        body c 
+    override this.Bind(c: IComposableControl&lt;'b&gt;, body: FrameworkElement -&gt; Window) : Window = 
+        win.Content &lt;- c.Control 
+        body c.Control 
+</pre>
+<p>This is the implementation of <code class="literal">PanelBuilder</code>:</p>
+<pre class="programlisting">type PanelBuilder(panel: Panel) = 
+    inherit IComposableControl&lt;Panel&gt;() 
+    override this.Control = panel 
+    override this.Bind(c: FrameworkElement, body: FrameworkElement -&gt; Panel) : Panel= 
+        <span class="strong"><strong>if c :? Window then</strong></span> 
+            raise (ArgumentException("Window cannot be added to panel")) 
+        else 
+            panel.Children.Add(c) |&gt; ignore 
+            body c 
+    override this.Bind(c: IComposableControl&lt;'b&gt;, body: FrameworkElement -&gt; Panel) : Panel= 
+        panel.Children.Add(c.Control) |&gt; ignore 
+        body c.Control 
+    // Implement the code for constructor with no argument. 
+    new() = PanelBuilder(StackPanel()) 
+</pre>
+<p>In the <code class="literal">PanelBuilder</code> implementation, we add type checking for <code class="literal">c</code> (as highlighted). If it is typed as <code class="literal">Window</code>, we should raise <code class="literal">System.ArgumentException</code> to inform us further that we cannot use <code class="literal">Window</code> to be added onto <code class="literal">Panel</code>. We can also return <code class="literal">null</code> as an option instead of <code class="literal">Exception</code>, but returning <code class="literal">null</code> is not recommended in F#, and it also adds more confusion on what is being added. Also, the code is not composed well. Any bad composition in <code class="literal">Bind</code> will always increase the unpredictability of the computation expression. Further information on this consideration is described in the next section.</p>
+<p>Because of the fact that we derive <code class="literal">WindowBuilder</code> and <code class="literal">PanelBuilder</code> from the <code class="literal">IComposableControl</code> abstract class, we must also implement all of the abstract methods of <code class="literal">IComposableControl</code>. The implemented method must have an override modifier to denote that the method is an implementation of abstract methods from <code class="literal">IComposableControl</code>.</p>
+<div class="note" title="Note"><h3 class="title"><a id="note78"></a>Note</h3>
+<p>We are not going to have a full discussion on OOP features of F# because it is outside the scope of this book.</p>
+</div>
+<p>For more information on abstract method and overrides, consult MSDN docs at&#160;<a class="ulink" href="https://docs.microsoft.com/en-us/dotnet/articles/fsharp/language-reference/members/methods">https://docs.microsoft.com/en-us/dotnet/articles/fsharp/language-reference/members/methods</a>.</p>
+<p>Now that we have the builders implemented, we can set the builders in action:</p>
+<pre class="programlisting">let win = 
+    WindowBuilder() 
+        {   let! panel = 
+                PanelBuilder(StackPanel()) 
+                    {   let! btn1 = Button(Content = "Hello") 
+                        let! btn2 = Button(Content = "World") 
+                        return () } 
+            return () } 
+  
+do win.Show() // Pops up the window in FSI.  
+</pre>
+<p>The preceding code will display the following window:</p>
+<p>
+</p>
+<div class="mediaobject"><img src="../Images/image00329.jpeg" alt="Walkthrough of planning and writing a computation expression"/></div>
+<p style="clear:both; height: 1em;"> </p>
+<p>
+</p>
+<p>To test for <code class="literal">Zero</code>, we can simply test it by having an empty expression in the computation expression.</p>
+<p>This is an example of <code class="literal">Zero</code> in our <code class="literal">WindowBuilder</code>:</p>
+<pre class="programlisting">let winzero = WindowBuilder()  
+               { Console.WriteLine("sample Zero") } 
+do winzero.Show() 
+</pre>
+<p>There is a subtle feature, but we have used it and most of us are unaware: the builder object; when it is instantiated, the F# compiler will treat the instance as a keyword!</p>
+<p>This translation of a computation expression instance becoming a keyword is already demonstrated by asynchronous workflow by instantiating <code class="literal">AsyncBuilder</code> as <code class="literal">async</code>. Therefore, the usage of <code class="literal">async</code> instance will be treated as a keyword.</p>
+<p>In the case of <code class="literal">WindowBuilder</code>, the instance of <code class="literal">WindowBuilder</code> will be treated as a keyword too. For example, the following is a sample instance of <code class="literal">WindowBuilder</code>:</p>
+<pre class="programlisting">let windowexp = WindowBuilder() 
+let secondWindow = windowexp  
+                        {  
+                            let! panel = 
+                                PanelBuilder(StackPanel()) 
+                                    {  
+                                        let! btn1 = Button(Content = "Hello") 
+                                        let! btn2 = Button(Content = "Second computation expression") 
+                                        return () 
+                                    } 
+                           return () 
+                        } 
+</pre>
+<p>In Visual Studio, the preceding treatment of <code class="literal">windowexp</code> as a keyword is shown in the following screenshot:</p>
+<p>
+</p>
+<div class="mediaobject"><img src="../Images/image00330.jpeg" alt="Walkthrough of planning and writing a computation expression"/></div>
+<p style="clear:both; height: 1em;"> </p>
+<p>
+</p>
+<p>Now we have <code class="literal">windowexp</code> as an instance of <code class="literal">WindowBuilder()</code>, and we can use it as a <code class="literal">windowexp</code> computation expression keyword. This is shown by having a blue color just like the other F# keywords.</p>
+<p>We have created a simple computation expression that has <code class="literal">Bind</code>, <code class="literal">Return</code>, and <code class="literal">Zero</code>. Let's peek into the implementation of a computation expression inside an asynchronous workflow.</p>
+<p>The implementation of <code class="literal">AsyncBuilder</code> for an asynchronous computation also follows the same pattern as the implementation of <code class="literal">WindowBuilder</code> and <code class="literal">PanelBuilder</code>; it defines the method builder first, although the implementation does not use an abstract class.</p>
+<p>It is quite easy to examine the implementation of F# asynchronous workflow because we can directly examine the source code. The following is the landing page of F# core libraries (<code class="literal">FSharp.Core</code>) source code, including the F# compiler implementation and F# tooling:</p>
+<p>
+<a class="ulink" href="https://github.com/Microsoft/visualfsharp/tree/master/src">https://github.com/Microsoft/visualfsharp/tree/master/src</a>
+</p>
+<p>Let's look at the type declaration and the code of <code class="literal">AsyncBuilder</code> in the <code class="literal">control.fs</code> file:</p>
+<pre class="programlisting">    type AsyncBuilder() = 
+        member b.Zero()                 = doneA 
+        member b.Delay(f)               = delayA(f) 
+        member b.Return(x)              = resultA(x) 
+        member b.ReturnFrom(x:Async&lt;_&gt;) = x 
+        member b.Bind(p1, p2)           = bindA p1 p2 
+        member b.Using(g, p)            = usingA g p 
+        member b.While(gd, prog)        = whileA gd prog 
+        member b.For(e, prog)           = forA e prog 
+        member b.Combine(p1, p2)        = sequentialA p1 p2 
+        member b.TryFinally(p, cf)      = tryFinallyA cf p 
+        member b.TryWith(p, cf)         = tryWithExnA cf p 
+</pre>
+<p>All the members are implicitly <code class="literal">public static</code> methods, so it is again very succinct to quickly implement.</p>
+<p>Let's visit the <code class="literal">Bind</code> method implementation, the <code class="literal">bindA</code>:</p>
+<pre class="programlisting">        // The primitive bind operation. Generate a process that runs the first process, takes 
+        // its result, applies f and then runs the new process produced. Hijack if necessary and  
+        // run 'f' with exception protection 
+        let bindA p1 f  = 
+            unprotectedPrimitive (fun args -&gt; 
+                if args.aux.token.IsCancellationRequested then 
+                    cancelT args 
+                else 
+ 
+                    let args = 
+                        let cont a = protectNoHijack args.aux.econt f a (fun p2 -&gt; invokeA p2 args) 
+                        { cont=cont; 
+                          aux = args.aux 
+                        } 
+                    // Trampoline the continuation onto a new work item every so often  
+                    let trampoline = args.aux.trampolineHolder.Trampoline 
+                    if trampoline.IncrementBindCount() then 
+                        trampoline.Set(fun () -&gt; invokeA p1 args) 
+                        FakeUnit 
+                    else 
+                        // NOTE: this must be a tailcall 
+                        invokeA p1 args) 
+</pre>
+<p>If we want to check the signature of <code class="literal">AsyncBuilder.Bind</code>, the signature is in the <code class="literal">Controls.fsi</code> file. The following is the signature:</p>
+<pre class="programlisting">member Bind: computation: Async&lt;'T&gt; * binder: ('T -&gt; Async&lt;'U&gt;) -&gt; Async&lt;'U&gt; 
+</pre>
+<p>The <code class="literal">Bind</code> signature defines that the method takes two arguments: computation and binder. The computation argument is typed as <code class="literal">Async&lt;'T&gt;</code>, the binder is typed as <code class="literal">'T -&gt; Async&lt;'U&gt;</code>, and the return type is <code class="literal">Async&lt;'U&gt;</code>, the generic parameter of <code class="literal">'U</code> is the underlying type. This <code class="literal">Bind</code> method is then called if we are using <code class="literal">let!</code> within the asynchronous workflow construct.</p>
+<div class="section" title="Understanding the use of type returned in computation expression"><div class="titlepage"><div><div><h3 class="title"><a id="ch08lvl3sec22"></a>Understanding the use of type returned in computation expression</h3>
+</div>
+</div>
+</div>
+<p>There is an apparent pattern of <code class="literal">let!</code>, <code class="literal">return</code>, and <code class="literal">return!</code> expressions in the computation expression. The use of the bang sign <code class="literal">!</code> as a suffix means that these expressions return the underlying type directly without any wrapper type. For example, <code class="literal">return!</code> will call the <code class="literal">ReturnFrom</code> method and <code class="literal">return</code> will call the <code class="literal">Return</code> method. In the case of F# asynchronous workflow, we can just see the signature comparison of <code class="literal">Return</code> and <code class="literal">ReturnFrom</code>:</p>
+<pre class="programlisting">member b.Return(x)              = resultA(x) 
+member b.ReturnFrom(x:Async&lt;_&gt;) = x 
+</pre>
+<p>This is the explanation of the implication of the underlying type:</p>
+<div class="itemizedlist"><ul class="itemizedlist"><li class="listitem">The <code class="literal">ReturnFrom</code> will return the resulting type immediately without the wrapping type. In practice, it returns <code class="literal">'T</code> instead of <code class="literal">Async&lt;'T&gt;</code>.</li>
+<li class="listitem">The<code class="literal"> Return</code> method will return a type that wraps the underlying type. In the case of asynchronous workflow, <code class="literal">Return</code> will return <code class="literal">Async&lt;'T&gt;</code>, whereas the <code class="literal">Async</code> type wraps the type of <code class="literal">`T</code>.</li>
+<li class="listitem">The concept of <code class="literal">ReturnFrom</code> is similar in .NET TPL to having <code class="literal">T</code> as the result of an operation of <code class="literal">Task&lt;'T&gt;</code>.</li>
+</ul>
+</div>
+<p>The F# way of composing a computation expression makes it easier to reason about returning the underlying type, but in .NET TPL, to get the <code class="literal">T</code> in <code class="literal">Task&lt;T&gt;</code>, we have to access the property as the result.</p>
+<p>For example, this type wrap is shown when getting the result of <code class="literal">Task&lt;T&gt;</code> (in C#):</p>
+<pre class="programlisting">   public static void Main() 
+   { 
+      var t = Task&lt;int&gt;.Run( () =&gt; { 
+         for (int ctr = 0; ctr &lt;= 1000000; ctr++) { 
+            if (ctr == max / 2 &amp;&amp; DateTime.Now.Hour &lt;= 12) { 
+               ctr++; 
+               break; 
+            } 
+         } 
+         return ctr; 
+      } ); 
+<span class="strong"><strong>      Console.WriteLine("Finished {0:N0} iterations.", t.Result);</strong></span> 
+   } 
+</pre>
+<p>As highlighted in the preceding code, the underlying result is contained in <code class="literal">t.Result</code> instead of <code class="literal">t</code> because <code class="literal">t</code> is typed as <code class="literal">Task&lt;int&gt;</code>. Therefore, the underlying type is typed as <code class="literal">int</code>; it is matched with the property declaration of <code class="literal">Task&lt;T&gt;</code>. <code class="literal">Result</code> documentation:</p>
+<pre class="programlisting">member Result : 'T with get 
+</pre>
+<p>Other expressions such as <code class="literal">yield</code> and <code class="literal">yield!</code> have the same intention and behavior as <code class="literal">return</code>/<code class="literal">return!</code> and <code class="literal">let</code>/<code class="literal">let!</code> in terms of the type they return.</p>
+<p>The asynchronous workflow and our own WPF computation expressions are samples of the common nature (also called <span class="emphasis"><em>common behavior</em></span> in the realm of practical software engineering) of computation expressions. It is strongly recommended to follow this common nature of computation expression. Therefore, these traits of common nature of computation expression are not just best practices but also make more sense as predefined specifications for implementations. The predefined specifications for common code programming implementations are often called <span class="strong"><strong>design considerations</strong></span>.</p>
+<p>We will discuss the design considerations in the next section.</p>
+</div>
+</div>
+</div>
+</div>
+
+
+<div class="section" title="General computation expression design considerations"><div class="titlepage" id="aid-1KEEU2"><div><div><h1 class="title"><a id="ch08lvl1sec47"></a>General computation expression design considerations</h1>
+</div>
+</div>
+</div>
+<p>We have implemented a very simple computation expression using <code class="literal">Bind</code>, <code class="literal">Return</code>, and <code class="literal">Zero</code> as a starting sample.</p>
+<p>We can conclude that the use of <code class="literal">Bind</code> will translate into <code class="literal">let!</code> as the result of <code class="literal">let!</code> expression will be composed nicely. The other translations are available on the official MSDN docs page of computation expression.</p>
+<p>The translation of builder methods into syntaxes of language constructs such as <code class="literal">let!</code>, <code class="literal">return</code>, <code class="literal">return!</code>, and &#160;<code class="literal">do!</code> are samples of syntactic sugar. The <span class="strong"><strong>syntactic sugar</strong></span> of a computation expression is the ability to translate the builder methods into very neat declarative expressions to combine expressions and functions nicely. It is quite easier to have computation expressions instead of directly calling the method builder after instantiating the builder object's constructor.</p>
+<p>Based on the discussion in the previous sections, we have concluded that there are some aspects of best practices and some advice that must be taken into consideration.</p>
+<p>The appropriate term for these aspects is <span class="emphasis"><em>design considerations</em></span> because they serve as best practices and some initial actions to be avoided at the beginning of the implementation of a computation expression. The design considerations also include the related information on avoiding the pitfalls of computation expression because the design considerations include the related implementation patterns or background reasons behind each of the design considerations. Most of the reasons include pitfalls to avoid.</p>
+<p>The following are the design considerations of computation expression implementations:</p>
+<div class="orderedlist"><ol class="orderedlist arabic"><li class="listitem">Always begin with the planned results and general outcomes of what you want to achieve. Not all builder methods have to be implemented because while any builder method implementation provides more powerful syntactic sugar and also more declarative constructs, it also adds compilation overheads, and therefore the generated IL could be more complex.</li>
+<li class="listitem">The signature of the used builder method must follow the same pattern recommendation as described in MSDN docs for F# computation expressions. This is crucial because any computation expression must have a high degree of predictability in the beginning by obeying or complying with&#160;the same signature recommendation of the builder method. For example, <code class="literal">Bind</code> must follow the signature of <code class="literal">M&lt;'T&gt; * ('T -&gt; M&lt;'U&gt;) -&gt; M&lt;'U&gt;</code> in order to have a predictable result.</li>
+<li class="listitem"><span class="emphasis"><em>The focus of the computation expression is usually differentiated into three main focuses: on the requirement to return underlying type, on&#160;only combining operations in expressions/functions that usually return nothing or return F# Unit (void in C#), and on combining side effects</em></span>. This condition especially applies to the case of <code class="literal">Zero</code> method. The nature of computation workflow does not require to implement <code class="literal">Zero</code> for all cases. For example, a query computation expression (the <code class="literal">query { ... }</code> expression) does not require <code class="literal">Zero</code>, because it does not make sense to implement the <code class="literal">Zero</code> method because the main focus of a query expression is on not the underlying type, but rather&#160;on combining query expressions/functions of LINQ and trying to avoid side effects as much as possible. It makes sense in the case of asynchronous workflows and for <code class="literal">WindowBuilder</code>/<code class="literal">PanelBuilder</code> as combining asynchronous computations and adding UI controls have side effects.</li>
+<li class="listitem">Adding support for <code class="literal">Zero</code> means that we should be aware that the computation of <code class="literal">Zero</code> support might contain side effects. Therefore, the <code class="literal">Zero</code> method support should be added for computation expressions that have the predefined goal to include any side effect instead of composing pure functions or composing objects with a strict hierarchy. Asynchronous workflow is intended to combine functions and operations in a manner so as to have side effects; therefore we can safely include <code class="literal">Zero</code> support as well. <code class="literal">WindowBuilder</code>/<code class="literal">PanelBuilder</code> might not have side effects, but <span class="emphasis"><em>all of the leverage in GUI layer, such as Windows Forms and WPF, always has side effects</em></span>. Sequence computation workflow, the <code class="literal">seq { ... }</code>, might have side effects, but the main goal is to focus on returning the underlying type. Therefore, <code class="literal">seq</code> computation expression does not have the requirement or necessity to implement <code class="literal">Zero</code>.</li>
+<li class="listitem">Adding support for <code class="literal">Combine</code> means that it is strongly recommended to add support for <code class="literal">Delay</code> because it is required based on the implementation body of the <code class="literal">Combine</code> method. But implementations of the <code class="literal">Delay</code> method builder will add more complexity because the result is not evaluated immediately. Such a behavior of not having evaluated immediately happens because the <code class="literal">Delay</code> method is always executed before the <code class="literal">Return</code>/<code class="literal">ReturnFrom</code> method. It can be optimized to be implemented with less complexity only if the method body of <code class="literal">Delay</code> contains simple expressions or if it simply contains a function because the nature of the <code class="literal">Delay</code> method is to wrap a function that contains our computation.</li>
+<li class="listitem">To shorten the instantiation of the computation expression builder, we can instantiate it under a module using the normal <code class="literal">let</code> syntax. F# will treat the instance of the builder as a keyword. <span class="emphasis"><em>It is therefore strongly recommended to have only one instance that will be used as a keyword because it is bad practice to have many instances of a builder to have many keywords with the same semantic</em></span>. For example, we use <code class="literal">windowexp</code> as our instance of <code class="literal">WindowBuilder</code>, which can then be used by other F# library (DLL) or executable applications.</li>
+<li class="listitem">The instantiation of a computation expression must not be the same keyword in the existing pool of F# keywords. Otherwise, we will have unpredictable results and compile errors. This is crucial because we should not add more keywords in form of the name of type builders freely without checking the existing F# keywords.</li>
+<li class="listitem">Use an F# delegate/function (<code class="literal">FSharpFunc</code>) instead of .NET <code class="literal">Func</code> as much as possible, unless we are going to have an explicit use of .NET <code class="literal">Func</code> inside the implementation of the computation expression. For example: a query computation expression contains calls to LINQ's static methods, such as <code class="literal">Enumerable.Where</code> and <code class="literal">Orderable.OrderBy</code>, which requires .NET <code class="literal">System.Func</code> delegates.</li>
+<li class="listitem">The use of <code class="literal">Using</code> method builder is optional but we should use <code class="literal">Using</code> as much as possible if we are allowing the use of types (for the underlying type) that should be disposed immediately. The type that fits into this model is the type that implements <code class="literal">IDisposable</code>. But having this <code class="literal">Using</code> will add more complexity to our computation expression, and not all of the planning focuses (as described in point 3) require us to have implementations of <code class="literal">Using</code> method.</li>
+<li class="listitem">Do not use an implicit type as the underlying type of a computation expression for a type that has an implicit reference counting of events as part of event driven programming mode.. An example of this is the use of any <code class="literal">EventHandler</code> type (or a derived type) for the underlying type of a computation expression. Although there is no restriction on using event handler objects as the underlying type, there is no guarantee that we can always dereference the events from an event handler as the underlying type. Any event might have been added during the running of the computation expression, unless we also remember to dereference all of the referenced event objects, and this always adds more complexity to the implementation of the computation expression itself. Using the <code class="literal">IDisposable</code> pattern will not guarantee that any handled events are deregistered when the type is disposed.</li>
+<li class="listitem">If we use an implicit type as underlying type that is derived from reference-counting type such as <code class="literal">EventHandler</code>, the event registration (reference) and dereference have to be handled explicitly. This explicit reference/dereference implementation will guarantee that the reference to outside events that are referenced outside as delegates are registered and deregistered correctly.</li>
+<li class="listitem">Do not use inline functions on method builders. The context of inline functions does not fit into the context of a computation expression because inline functions will be inlined for every use of our method builder, and this is against the F# language specification. However, the nature of method builders prefers to have normal generic type parameters, which are then generalized instead of having an early optimization on the generic type inlined. Also, all of the method builders cannot be inlined easily because these methods only live within the type set by the computation expression builder type definition and can be used only within the scope of the computation expression when its instance is used. Fortunately, the F# compiler will catch this inline usage on builder methods early as a compile error.</li>
+</ol>
+<div style="height:10px; width: 1px"></div>
+</div>
+<p>It is good for us to have the preceding design guidelines when we are going to implement computation expressions, but they have their own implications and there are additional sub notes and more explanations on some points of the design consideration. The next section describes these implications with the additional explanations.
+</p>
+<div class="section" title="Implications of the design considerations of computation expression"><div class="titlepage"><div><div><h2 class="title"><a id="ch08lvl2sec63"></a>Implications of the design considerations of computation expression</h2>
+</div>
+</div>
+</div>
+<p>The points in the design consideration are quite self-explanatory, but some points have to be explored further because they have some implications not just on the correctness and the clarity of the intention of the computation expression when used outside the scope of the assembly but also on the performance.</p>
+<p>Let's discuss the points of the design considerations that have additional implications to be handled.</p>
+<p>Point 2 defines that we must meet the specifications based on the signature of the commonly used method builder. This is important, especially on the crucial (required) methods that define the core intention and the requirement of the computation expression's focus as described in point 3 of computation expression focus. In the case of asynchronous workflow and <code class="literal">WindowBuilder</code>/<code class="literal">PanelBuilder</code>, all of them have to deal with the side effects, and therefore the implementation of <code class="literal">Bind</code>, <code class="literal">Return</code>, and <code class="literal">ReturnFrom</code> methods has to be implemented using the respective signature guidelines. Failing to comply with these signature guidelines will result as compile errors.</p>
+<p>For example, if we try to have <code class="literal">yield</code> in our use of <code class="literal">PanelBuilder</code>, we will get a compile error.</p>
+<p>Consider the following faulty code:</p>
+<pre class="programlisting">let testUnimplementedYieldWindow = 
+    windowexp  
+        { 
+            let! panel =  
+                PanelBuilder(StackPanel()) 
+                    { 
+                        let! textblock01 = TextBox(Text = "test") 
+                        yield button = Button("World") // &lt;- use to test not implemented yield 
+                        return () 
+                    } 
+            return () 
+        } 
+</pre>
+<p>The Visual Studio editor will display squiggle on the line with the <code class="literal">yield</code> declaration and also will complain that <code class="literal">yield</code> method has not been implemented yet, as shown in the following screenshot:</p>
+<p>
+</p>
+<div class="mediaobject"><img src="../Images/image00331.jpeg" alt="Implications of the design considerations of computation expression"/></div>
+<p style="clear:both; height: 1em;"> </p>
+<p>
+</p>
+<p>This error information from the F# compiler is crucial as currently, we have not yet implemented yield for <code class="literal">PanelBuilder</code>, although <code class="literal">yield</code> itself is a valid keyword in F# when used in a <code class="literal">for</code> loop outside a computation expression.</p>
+<p>This simple quick test is also useful to prove that consistency in the implementation of a computation expression is very important so that we can be sure that our implementation of computation expression is correct in the sense that we have done the implementations based on the initial intention and design considerations. This is also why it is called <span class="emphasis"><em>correctness</em></span>, not just consistency of the implementation and the usage.</p>
+<p>Point 3 in the aspect of computation expression focuses implies that there is a certain deciding plan before implementing a computation expression. This focus plan will also provide guidelines on what method builder we should strongly implement and what method should not be implemented mainly based on how we are going to handle the side effects first.</p>
+<p>Currently, there are no officially defined guidelines for computation expression method builder implementation in F# language specification. The main goal of the focus guideline is to have a starting focus plan on the implementation of computation expressions, which is then easily translated to what method builders we should implement.</p>
+<p>Having the mindset to first focus on side effects is also critical and helpful. It also complies with the functional programming language common practices that we should treat side effects explicitly and identify them early in the beginning of the implementation.</p>
+<p>We can then simplify the narrative description of point 3 with this illustration as the deciding flow (using UML 2 diagram notation):</p>
+<p>
+</p>
+<div class="mediaobject"><img src="../Images/image00332.jpeg" alt="Implications of the design considerations of computation expression"/></div>
+<p style="clear:both; height: 1em;"> </p>
+<p>
+</p>
+<p>The preceding Unified Modeling Language (UML) activity diagram illustration is not meant to limit the creativity of the developer. In fact, there are no restrictions for the minimum method builders for many specific purposes beyond what we have in the illustration.</p>
+<p>We leverage the UML activity diagram because we need to document or illustrate the flow of the deciding factor. UML itself is a software development standard&#160;diagram that focuses on documenting processes and system development (including application development), under the supervision of <span class="strong"><strong>Object Management Group</strong></span> (<span class="strong"><strong>OMG</strong></span>), a non-profit organization for standardizing documented processes and architecture.</p>
+<p>For more information about UML 2 diagram, visit the official UML page at: <a class="ulink" href="http://www.uml.org/">http://www.uml.org/</a>.</p>
+<p>This is the landing page of UML 2 standards with various version histories at OMG: <a class="ulink" href="http://www.omg.org/spec/UML/">http://www.omg.org/spec/UML/</a>.</p>
+<p>The UML activity diagram is part of the UML 2.1 standard diagrams and notations.</p>
+<div class="note" title="Note"><h3 class="title"><a id="note79"></a>Note</h3>
+<p>The UML activity diagram is easier to understand than a flowchart because it can accommodate more conditional concerns (not just yes/no or true/false) and provides more support for event-driven and message passing agents. The most frequently used UML diagram is the activity diagram. Activity diagram is one of the many diagrams under the UML 2.1 umbrella standards. Currently, the UML standard has version 2.5, but still the widely used version in 2016 is UML 2.1. This book does not focus on how to create and use UML diagrams because it is beyond the scope of this book.</p>
+</div>
+<p>When we discuss the side effects in point 3, we should be aware that side effects are not just I/O or any other kind of outside API calls, such as interoperability with Win32 API; side effects such as exceptions, event-driven model, and any GUI library have to be taken into account as well to be carefully handled. When an event handler is instantiated within a computation expression, it is recommended to clear all event handlers of any events that we want to handle by setting them to <code class="literal">None</code> (<code class="literal">null</code> in C# semantic, <code class="literal">Nothing</code> in VB semantic). Otherwise, we will have occurrences of memory leaks even after we are done executing computation expressions.</p>
+<p>Point 5 about the instantiation of computation expression is also a simple but meaningful proof of how we can easily add keywords to the existing F# keywords. It can lead to confusion because more keywords means more semantic and more contexts to be understood.</p>
+<p>Point 8 about leveraging the <code class="literal">Using</code> method in a computation expression has to be implemented carefully. It is nice to have a use pattern for disposable objects, but many uses of disposable objects might lead to having additional overhead on garbage collector (GC) because of the overhead when disposing objects at the end of the computation expression lifetime. Also, having the <code class="literal">Using</code> method only can work for <code class="literal">IDisposable</code> objects, and this constraint will put a restriction on what kind of types to be used in the implementation of the <code class="literal">Using</code> method.</p>
+<p>Point 9 is also important, although it is the last point in our design considerations because any use of types that have implicit reference counting as the underlying type (such as event handler) might be dangerous. Not that we cannot have the guarantee of always dereferencing references to other objects, such as events, but any action of dereferencing itself is always synchronous and it may slow down the running performance a bit.</p>
+<p>Although dereferencing events of an event handler is as easy as setting it to <code class="literal">None</code>, but because of its sequential nature of synchronous executions, it cannot be used nicely in a parallel execution at all. This means that there is no option for parallelism when we have to do dereferencing.</p>
+</div>
+</div>
+
+
+<div class="section" title="Considerations of computation expression optimization"><div class="titlepage" id="aid-1LCVG2"><div><div><h1 class="title"><a id="ch08lvl1sec48"></a>Considerations of computation expression optimization</h1>
+</div>
+</div>
+</div>
+<p>Computation expressions can be further optimized if we carefully implement the design planning. We have discussed the design considerations of a computation workflow in the previous section of this chapter, and we shall carry the considerations as a quick foundation to perform optimization.</p>
+<p>The optimization of computation expression is quite hard because of the following factors as consequences of computation expression syntax translations:</p>
+<div class="orderedlist"><ol class="orderedlist arabic"><li class="listitem">Construction of computation expressions depends heavily on syntactic sugar that becomes language constructs. For example, <code class="literal">ReturnFrom</code> method is translated to a method that returns a result of the underlying type of a computation expression. Therefore, we must follow the strict guidelines of the asynchronous method builders to express translation; otherwise, we will get unpredictable results or even exceptions.</li>
+<li class="listitem">Composing the sequence of <code class="literal">let!</code> requires some wirings of a chained <code class="literal">Bind</code> method builder in the form of chaining <code class="literal">Bind</code> methods. This chaining of <code class="literal">Bind</code> method might be error-prone and it cannot be optimized further. Fortunately, we have a method builder in a computation expression called <code class="literal">Combine</code> to sequence multiple expressions (also called <span class="emphasis"><em>sequencing expression</em></span> in the MSDN documentation of F#). However, the <code class="literal">Combine</code> method has to be carefully rewritten to match the signature requirement specification for <code class="literal">Combine</code>, then all of the necessary requirements of the related builder methods such as <code class="literal">Bind</code>, <code class="literal">Return</code>, and <code class="literal">ReturnFrom</code> must be aligned to match the type signature as well.</li>
+<li class="listitem">By default, the expression returned by expressions within a computation expression is not returned immediately because the order of execution might change based on what the implementation body of <code class="literal">Combine</code> and <code class="literal">Delay</code> is.</li>
+</ol>
+<div style="height:10px; width: 1px"></div>
+</div>
+<p>Points 2 and 3 are closely related to the design considerations, particularly to point 5 of the design considerations of computation expression that we discussed previously in this chapter.</p>
+<p>To understand <code class="literal">Delay</code> and also to prove that it changes the execution order, we could compare two implementations of computation expressions: the first one without <code class="literal">Delay</code>, and the second one that has <code class="literal">Delay</code>.</p>
+<p>This following code is implemented without the <code class="literal">Delay</code> method:</p>
+<pre class="programlisting">// without delay method 
+type ComputeExpression1Builder() = 
+  /// Combine two values 
+  member sm.Combine(a,b) = a + b 
+  /// Zero value 
+  /// sm.Zero() 
+  member sm.Zero() = 0 
+  /// Return a value  
+  /// sm.Yield expr 
+  member sm.Yield(a) = a 
+  /// For loop 
+  member sm.For(e, f) = 
+    Seq.fold(fun s x -&gt; sm.Combine(s, f x)) (sm.Zero()) e 
+</pre>
+<p>Let's test this <code class="literal">ComputeExpression1Builder</code> builder, using the following code:</p>
+<pre class="programlisting">let compute1 = ComputeExpression1Builder() 
+let computeEx1 x = compute1 { for x in [1 .. x] do yield x * x } 
+let computeEx1Result = computeEx1 50 
+</pre>
+<p>Using <span class="strong"><strong>F# Interactive</strong></span> mode, execute the preceding code. The <span class="strong"><strong>F# Interactive</strong></span> window will display the following signature:</p>
+<p>
+</p>
+<div class="mediaobject"><img src="../Images/image00333.jpeg" alt="Considerations of computation expression optimization"/></div>
+<p style="clear:both; height: 1em;"> </p>
+<p>
+</p>
+<p>The following code is the same code as the previous one, but now it has the <code class="literal">Delay</code> method:</p>
+<pre class="programlisting">// Add delay method 
+type ComputeExpression2Builder() = 
+  /// Combine two values 
+  member sm.Combine(a,b) = a + b 
+  /// Zero value 
+  /// sm.Zero() 
+  member sm.Zero() = 0 
+  /// Return a value  
+  /// sm.Yield expr 
+  member sm.Yield(a) = a 
+  /// For loop 
+  member sm.For(e, f) = 
+    Seq.fold(fun s x -&gt; sm.Combine(s, f x)) (sm.Zero()) e 
+<span class="strong"><strong>  /// Delay a computation</strong></span>
+<span class="strong"><strong>  member sm.Delay (f: unit -&gt; int) =</strong></span>
+<span class="strong"><strong>    System.Console.WriteLine("Test") </strong></span>
+<span class="strong"><strong>    f() </strong></span>
+</pre>
+<p>The <code class="literal">Delay</code> method in the preceding code is implemented with type annotations. This is important because without type annotation, F# will set the signature to be generalized; this generalization is caused by automatic generalization. We need to minimize automatic generalization because we want to prevent type checking at the runtime when the generic parameter is bound because we already know that the method body of <code class="literal">Combine</code> will infer that the type of the underlying result type is <code class="literal">Int32</code>.</p>
+<p>Use the following code to test <code class="literal">ComputeExpression2Builder</code>:</p>
+<pre class="programlisting">let compute2 = ComputeExpression2Builder() 
+let computeEx2 x = compute2 { for x in [1 .. x] do yield x * x } 
+let computeEx2Result = computeEx2 50 
+</pre>
+<p>The following display of <span class="strong"><strong>F# Interactive</strong></span> window proves that the <code class="literal">Delay</code> method wraps a function in a computation expression and affects the evaluation (as shown by the display of <span class="strong"><strong>Test</strong></span> from <code class="literal">Console.WriteLine</code>):</p>
+<p>
+</p>
+<div class="mediaobject"><img src="../Images/image00334.jpeg" alt="Considerations of computation expression optimization"/></div>
+<p style="clear:both; height: 1em;"> </p>
+<p>
+</p>
+<p>The preceding code has proved that the <code class="literal">Delay</code> method should be used carefully, and it may contain side effects that not just change the order of execution of <code class="literal">Yield</code> (or other returning result methods, such as <code class="literal">Return</code>/<code class="literal">ReturnFrom</code>), but it also might terminate the execution before returning the result of <code class="literal">Yield</code> because of the possibility of catching an exception.</p>
+<p>This simple sample optimization case combined with the design considerations provides us careful and predictable behaviors. We now have increased awareness of what is going on inside a computation expression and how to minimize the overhead of having unnecessary or overkill usage of method builders.
+</p>
+</div>
+
+
+<div class="section" title="Summary" id="aid-1MBG21"><div class="titlepage"><div><div><h1 class="title"><a id="ch08lvl1sec49"></a>Summary</h1>
+</div>
+</div>
+</div>
+<p>The knowledge of the computation expression correctness is also useful as we are not sacrificing performance as well, while at the same time keeping the functional programming's best practices in place. Although the nature of builder methods in a computation expression implementation is mostly implemented using the object oriented principle, using instantiated computation expression gives us more expressiveness to make our code cleaner and better composed.</p>
+<p>We have the knowledge of the optimization of F# code or applications, starting from identifying the performance aspects of the .NET runtime to the detail of F# performance characteristics, measurement with .NET tooling ecosystem, and optimization of all the aspects of the F# language ecosystem-from the compiler to the existing F# features.</p>
+<p>We not only have an understanding of the general language features but also the knowledge of aligning compilers with concurrency, data structures, language constructs, and other sophisticated and powerful features, such as computation expression.</p>
+</div>
+</body>
+</html>

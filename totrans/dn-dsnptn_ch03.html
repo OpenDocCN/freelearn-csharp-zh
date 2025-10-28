@@ -1,0 +1,689 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" epub:prefix="z3998: http://www.daisy.org/z3998/2012/vocab/structure/#" lang="en" xml:lang="en">
+<head>
+    <title>3. A Logging Library</title>
+    <link href="epub.css" rel="stylesheet" type="text/css"/>
+    <link href="8afe24fba552.css" rel="stylesheet" type="text/css"/>
+  </head>
+  <body>
+    <div id="sbo-rt-content">
+      <div class="chapter" title="Chapter&#160;3.&#160;A Logging Library">
+        <div class="titlepage">
+          <div>
+            <div>
+              <h1 class="title"><a id="ch03"></a>Chapter&#160;3.&#160;A Logging Library</h1>
+            </div>
+          </div>
+        </div>
+        <p>In this chapter, we will try to create a <span class="strong"><strong>logging library</strong></span> that will enable an application developer to log information to a media (file, network, or database) during program execution. This would be a critical library that the developer would be able to use for audit trail (domain pre-requisite) and code instrumentation (from a debugging and verification stand-point). We will design and implement this library from scratch, and make it available as an API to the end developer for consumption.</p>
+        <p>During the course of this chapter, as a reader, you will learn to leverage strategy pattern, factory method pattern, template pattern, singleton and prototype patterns to do the following:</p>
+        <div class="itemizedlist">
+          <ul class="itemizedlist">
+            <li class="listitem" style="list-style-type: disc">Writing data to a file stream</li>
+            <li class="listitem" style="list-style-type: disc">Creating a simple <span class="strong"><strong>Data Access Layer</strong></span> (<span class="strong"><strong>DAL</strong></span>) using ADO.NET</li>
+            <li class="listitem" style="list-style-type: disc">Writing data to an SQLite database</li>
+            <li class="listitem" style="list-style-type: disc">Writing data to a network stream using the System.Net API</li>
+            <li class="listitem" style="list-style-type: disc">Handling concurrency</li>
+            <li class="listitem" style="list-style-type: disc">Threads</li>
+          </ul>
+        </div>
+        <div class="section" title="Requirements for the library">
+          <div class="titlepage">
+            <div>
+              <div>
+                <h1 class="title"><a id="ch03lvl1sec19"></a>Requirements for the library</h1>
+              </div>
+            </div>
+          </div>
+          <p>Before we embark on writing the library, let us scribble down a preliminary requirement statement as shown next:</p>
+          <p>The logging library should provide a unified interface to handle log entries which are supposed to be persisted in a media (file, remote node, or a database) and target media should be determined during runtime from a configuration file. The API should be target-independent and there should be provision to add new log targets without changing the application logic.</p>
+        </div>
+      </div>
+    </div>
+
+
+    <div id="sbo-rt-content">
+      <div class="section" title="Solutions approach">
+        <div class="titlepage">
+          <div>
+            <div>
+              <h1 class="title"><a id="ch03lvl1sec20"></a>Solutions approach</h1>
+            </div>
+          </div>
+        </div>
+        <p>Before we write the code to implement our library (a Windows assembly), let us enumerate the requirements to get the big picture:</p>
+        <div class="itemizedlist">
+          <ul class="itemizedlist">
+            <li class="listitem" style="list-style-type: disc">The data should be written to multiple streams
+<div class="itemizedlist"><ul class="itemizedlist"><li class="listitem" style="list-style-type: disc">File, network, and DB</li>
+</ul>
+</div></li>
+            <li class="listitem" style="list-style-type: disc">The developer API should be target-agnostic</li>
+            <li class="listitem" style="list-style-type: disc">The library should maintain its object lifetime</li>
+            <li class="listitem" style="list-style-type: disc">The library should provide facility for adding new log targets</li>
+            <li class="listitem" style="list-style-type: disc">The library should be able to handle concurrent writes to log targets</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+
+    <div id="sbo-rt-content">
+      <div class="section" title="Writing content to a media">
+        <div class="titlepage">
+          <div>
+            <div>
+              <h1 class="title"><a id="ch03lvl1sec21"></a>Writing content to a media</h1>
+            </div>
+          </div>
+        </div>
+        <p>To manage the complexity of code isolation, let's declare a C# interface which will manage the idiosyncrasies of multiple log targets:</p>
+        <pre class="programlisting">    public interface IContentWriter 
+    { 
+      Task&lt;bool&gt; Write(string content); 
+    } 
+</pre>
+        <p>The basic idea here, is that the concrete classes which implement the interface should provide an implementation of this method that writes the log to the respective media. But on closer inspection, we find that it is better to write a base class implementation of this method and its associated semantics in an abstract class. The base class implementation can add a log entry to a queue (that would give concurrency support), flush the queue, and persist to target the media when a threshold (configured) is reached. A method will be marked as abstract which will provide a mechanism for concrete classes to write entries for the respective media.</p>
+        <p>Since our library is supposed to work in a multi-threaded environment, we need to handle concurrency in a neat manner. While writing to a file or network, we need to be careful that only one thread gets access to the file or socket handle. We will leverage the .NET <code class="literal">async</code>/<code class="literal">await</code> declarative programming model to manage background processing tasks. <span class="strong"><strong>Model-view-controller</strong></span> (<span class="strong"><strong>MVC</strong></span>) is the most dominant paradigm for structuring applications.</p>
+        <div class="section" title="Template method pattern and content writers">
+          <div class="titlepage">
+            <div>
+              <div>
+                <h2 class="title"><a id="ch03lvl2sec14"></a>Template method pattern and content writers</h2>
+              </div>
+            </div>
+          </div>
+          <p>In the first stage, we plan to flush the log contents to the file, network, and database targets. The bulk of our logic is common for all content writers. To aid separation of concerns and avoid duplication of code, it is best to let the concrete content writer classes manage their target media. Base implementation will take care of concurrency and queue management.</p>
+          <div class="note" title="Note" style="">
+            <div class="inner">
+              <h3 class="title"><a id="note14"></a>Note</h3>
+              <p>To make the code simple, we will leverage the <code class="literal">ConcurrentQueue</code> class (data structure introduced with .NET framework version 4) available with the <code class="literal">Systems.Collections.Concurrent</code> package. In the interest of clarity, we've left out the exception handling code. Please note that the <code class="literal">AggregateException</code> class should be leveraged for handling exceptions in concurrent execution scenarios.</p>
+            </div>
+          </div>
+          <p>This class will make sure that only one thread gets to write to the queue at any point of time. We will implement an asynchronous <code class="literal">Flush</code> method using <span class="strong"><strong>Task Parallel Library</strong></span> (<span class="strong"><strong>TPL</strong></span>). This routine will retrieve data from the queue, and delegate the task of persistence (in the media of choice) to the respective concrete classes via an abstract method (<code class="literal">WriteToMedia</code>):</p>
+          <pre class="programlisting">    public abstract class BaseContentWriter : IContentWriter 
+    { 
+      private ConcurrentQueue&lt;string&gt; queue =  
+      new ConcurrentQueue&lt;string&gt;(); 
+      private Object _lock = new Object(); 
+ 
+      public BaseContentWriter() { } 
+      //---- Write to Media 
+      public abstract bool WriteToMedia(string logcontent); 
+ 
+      async Task  Flush() 
+      { 
+        string content; 
+        int count = 0; 
+        while (queue.TryDequeue(out content) &amp;&amp; count &lt;= 10) 
+        { 
+          //--- Write to Appropriate Media 
+          //--- Calls the Overriden method 
+          WriteToMedia(content); 
+          count++; 
+        } 
+      }  
+</pre>
+          <p>Once the contents of the queue reach a threshold level, a thread will acquire the lock for flushing the data. In our case, we will initiate flushing beyond 10 items in queue:</p>
+          <pre class="programlisting">    public async Task&lt;bool&gt; Write(string content) 
+    { 
+      queue.Enqueue(content); 
+      if (queue.Count &lt;= 10) 
+      return true; 
+      lock (_lock){ 
+        Task temp = Task.Run(() =&gt; Flush()); 
+        Task.WaitAll(new Task[] { temp }); 
+      } 
+      return true; 
+    } 
+  } 
+</pre>
+          <p>The concrete classes derived from <code class="literal">BaseContentWriter</code> will implement the following method to handle the specificities:</p>
+          <pre class="programlisting">    public abstract bool WriteToMedia(string logcontent); 
+</pre>
+          <div class="note" title="Note" style="">
+            <div class="inner">
+              <h3 class="title"><a id="note15"></a>Note</h3>
+              <p>This is an instance of a template method pattern. The template method pattern is a behavioral design pattern where the bulk of logic resides in the base class, and certain steps of a process are implemented by concrete classes. In <code class="literal">BaseContentWriter</code>, we have the logic for adding elements to and retrieving elements from a concurrent queue. Persistence is taken care of by the sub-classes that implement our template method (<code class="literal">WriteToMedia</code>).</p>
+            </div>
+          </div>
+          <p>The following UML class diagram represents the realizations, dependencies, and associations between the various classes. Do observe the annotation that clearly outlines the template method pattern in action:</p>
+          <p>
+</p>
+          <div class="mediaobject">
+            <img src="graphics/B05691_03_01.jpg" alt="Template method pattern and content writers"/>
+          </div>
+          <p>
+</p>
+        </div>
+        <div class="section" title="Writing a log entry to a file stream">
+          <div class="titlepage">
+            <div>
+              <div>
+                <h2 class="title"><a id="ch03lvl2sec15"></a>Writing a log entry to a file stream</h2>
+              </div>
+            </div>
+          </div>
+          <p>We will use file streams to write a file. We implement the actual file handling logic in the <code class="literal">WriteToMedia</code> template method:</p>
+          <pre class="programlisting">    public class FileContentWriter : BaseContentWriter 
+    { 
+      private string _file_name; 
+      public FileContentWriter(string name){ 
+        _file_name =  name; 
+      } 
+      public override bool WriteToMedia( string content) 
+      { 
+        using (FileStream SourceStream =  
+        File.Open(_file_name, FileMode.Append )) 
+        { 
+          byte[] buffer =  
+          Encoding.UTF8.GetBytes(content+"\r\n"); 
+          SourceStream.Write (buffer, 0, buffer.Length); 
+        } 
+        return true; 
+      } 
+    } 
+</pre>
+        </div>
+        <div class="section" title="Writing a log entry to a database">
+          <div class="titlepage">
+            <div>
+              <div>
+                <h2 class="title"><a id="ch03lvl2sec16"></a>Writing a log entry to a database</h2>
+              </div>
+            </div>
+          </div>
+          <p>Some familiarity with ADO.NET is necessary to understand the nitty-gritties of this section. To make the matter simple, we have chosen SQLite as our database of choice to persist the log entries. One can choose MySQL, SQL Server, or Oracle. Because of the ADO.NET library, the code will be more or less the same for every RDBMS offering. We have created a class, <code class="literal">SQLAccess</code>, which wraps a subset of the ADO.NET calls to provide a simple interface for SQLite. The class encapsulates and leverages the ADO.NET provider for SQLite to provide an interaction with the SQLite database engine (x86/x64). In case this assembly (<code class="literal">System.Data.SQLite</code>) is not available locally, please use nuget to install it via the Package Manager Console as <code class="literal">PM&gt; Install-Package System.Data.SQLite</code>:</p>
+          <pre class="programlisting">    public class SQLAccess 
+    { 
+      private SQLiteConnection _con = null; 
+      private SQLiteCommand _cmd = null; 
+      private SQLiteTransaction _cts = null; 
+      private string _constr; 
+      public SQLAccess(string constr) 
+      { 
+        _constr = constr; 
+      } 
+</pre>
+          <p>The <code class="literal">Open</code> method given next instantiates the connection object, and invokes the <code class="literal">Open</code> method of the ADO.NET connection object. If we require transaction support, we need to instantiate a transaction context (<code class="literal">SQLiteTransaction</code>) object:</p>
+          <pre class="programlisting">    public bool Open(bool trans = false) 
+    { 
+      try 
+      { 
+        _con = new SQLiteConnection(_constr); 
+        _con.Open(); 
+        if (trans) 
+        _cts = _con.BeginTransaction(); 
+        return true; 
+      } 
+      catch( SQLiteException e) 
+      { 
+        return false; 
+      } 
+    } 
+</pre>
+          <p>To insert a value or set of values to a database, we instantiate a command object by giving a connection object and a string (containing the SQL statement). ADO.NET has the <code class="literal">ExecuteNonQuery</code> method to execute the query:</p>
+          <pre class="programlisting">    public bool ExecuteNonQuery(string SQL) 
+    { 
+      try 
+      { 
+        _cmd = new SQLiteCommand(SQL, _con); 
+        _cmd.ExecuteNonQuery(); 
+        _con.Close(); 
+        _con = null; 
+        return true; 
+      } 
+      catch (Exception e) 
+      { 
+        _con = null; 
+        return false; 
+      } 
+    } 
+</pre>
+          <p>We close the connection once we have finished inserting records to the database:</p>
+          <pre class="programlisting">    public Boolean Close() 
+    { 
+      if (_con != null) 
+      { 
+        if (_cts != null) 
+        { 
+          _cts.Commit(); 
+          _cts = null; 
+        } 
+        _con.Close(); 
+        _con = null; 
+        return true; 
+      } 
+      return false; 
+    } 
+</pre>
+          <p>Once we have a class which will help us persist data to a relational database, writing the template method (<code class="literal">WriteToMedia</code>) becomes easy. The whole code listing is given as follows:</p>
+          <pre class="programlisting">    public class DbContentWriter : BaseContentWriter 
+    { 
+      private string _con_str =  
+      @"Data Source=./Logstorage.db"; 
+      public DbContentWriter(){ } 
+      public override bool WriteToMedia(string logcontent)  
+      { 
+        SQLAccess access = new SQLAccess(_con_str); 
+        if (access.Open()) 
+        { 
+          string query = "INSERT INTO logs VALUES('" + 
+          logcontent + "');"; 
+          bool result =  access.ExecuteNonQuery(query); 
+          access.Close(); 
+          return result; 
+        } 
+        return false;  
+      } 
+    } 
+</pre>
+        </div>
+        <div class="section" title="Writing a log entry to a network stream">
+          <div class="titlepage">
+            <div>
+              <div>
+                <h2 class="title"><a id="ch03lvl2sec17"></a>Writing a log entry to a network stream</h2>
+              </div>
+            </div>
+          </div>
+          <p>We will use the <code class="literal">TCPListener</code> class under the <code class="literal">System.Net</code> namespace for writing data to a network stream. For the current implementation, we have hard-coded the domain name (localhost:<code class="literal">127.0.0.1</code>) and port (<code class="literal">4500</code>). We can read these values from a configuration file. As usual, the whole action happens within the <code class="literal">WriteToMedia</code> template method. At the end of the chapter, we have given a simple implementation of a log server for the sake of completeness. The log server receives the entries we write, and prints it to its console:</p>
+          <pre class="programlisting">    public class NetworkContentWriter : BaseContentWriter 
+    { 
+      private static string domain = "127.0.0.1"; 
+      private static int port = 4500; 
+      public NetworkContentWriter(){} 
+      public override bool WriteToMedia(string content) 
+      { 
+        TcpClient _client = new TcpClient(); 
+        if (_client == null){ return false; } 
+ 
+        try{ 
+          _client.Connect(domain, port); 
+        } 
+        catch (Exception) { return false; } 
+ 
+        StreamWriter _sWriter =  
+        new StreamWriter(_client.GetStream(), Encoding.ASCII); 
+        _sWriter.WriteLine(content); 
+        _sWriter.Flush(); 
+        _sWriter.Close(); 
+        _client.Close(); 
+        return true; 
+      } 
+    } 
+</pre>
+          <p>We have now implemented content writers for file, DB (using ADO.NET), and network streams. With this under our belt, we need to provide an interface for applications to consume these content writers. Depending on the logging strategy chosen by the application, the appropriate content writers are to be connected to the log data streams. This warrants another set of interfaces.</p>
+        </div>
+        <div class="section" title="Logging strategy atop the strategy pattern">
+          <div class="titlepage">
+            <div>
+              <div>
+                <h2 class="title"><a id="ch03lvl2sec18"></a>Logging strategy atop the strategy pattern</h2>
+              </div>
+            </div>
+          </div>
+          <p>We will use the GoF strategy pattern to implement the interface for the logging library.</p>
+          <div class="note" title="Note" style="">
+            <div class="inner">
+              <h3 class="title"><a id="note16"></a>Note</h3>
+              <p>We can treat the logging of data to different streams as algorithms, and strategy pattern is meant to parameterize the algorithm to be executed.</p>
+            </div>
+          </div>
+          <p>By having concrete classes for network, file, and DB strategies, we are able to swap the implementation logic:</p>
+          <pre class="programlisting">    public abstract class LogStrategy 
+    { 
+      // DoLog is our Template method 
+      // Concrete classes will override this  
+      protected abstract bool DoLog(String logitem); 
+      public bool Log(String app, String key, String cause) 
+      { 
+        return DoLog(app + " " + key + " " + cause); 
+      } 
+    } 
+</pre>
+          <p>To test the code, we will write a <code class="literal">NullLogStrategy</code> class, which prints the log entry to the console. Since we have written the logic for scheduling the execution of the code, our implementation will be much simpler. We implement the template method (<code class="literal">DoLog</code>) through which we write the log entry in the console:</p>
+          <pre class="programlisting">    public class NullLogStrategy : LogStrategy 
+    { 
+      protected override bool DoLog(String logitem) 
+      { 
+        // Log into the Console 
+        Console.WriteLine(logitem+"\r\n"); 
+        return true; 
+      } 
+    } 
+</pre>
+          <p>Since we have taken pains to create the <code class="literal">ContentWriter</code> classes, our implementation of strategy classes is just a matter of implementing the <code class="literal">DoLog</code> template method, and delegating the actual work to the respective content writers:</p>
+          <pre class="programlisting">    public class DbLogStrategy : LogStrategy 
+    { 
+      BaseContentWriter wt = new DbContentWriter(); 
+      protected override bool DoLog(String logitem) 
+      { 
+        return wt.Write(logitem); 
+      } 
+    } 
+ 
+    public class FileLogStrategy : LogStrategy 
+    { 
+      BaseContentWriter wt = new FileContentWriter(@"log.txt"); 
+      protected override bool DoLog(String logitem) 
+      { 
+        // Log into the file 
+        wt.Write(logitem); 
+        return true; 
+      } 
+    } 
+ 
+    public class NetLogStrategy : LogStrategy 
+    { 
+      BaseContentWriter nc = new NetworkContentWriter(); 
+      protected override bool DoLog(String logitem) 
+      { 
+        // Log into the Network Socket 
+        nc.Write(logitem); 
+        return true; 
+      } 
+    } 
+</pre>
+          <p>The following image illustrates the strategy pattern in action:</p>
+          <p>
+</p>
+          <div class="mediaobject">
+            <img src="graphics/B05691_03_02.jpg" alt="Logging strategy atop the strategy pattern"/>
+          </div>
+          <p>
+</p>
+        </div>
+      </div>
+    </div>
+
+
+    <div id="sbo-rt-content">
+      <div class="section" title="The factory method pattern for instantiation">
+        <div class="titlepage">
+          <div>
+            <div>
+              <h1 class="title"><a id="ch03lvl1sec22"></a>The factory method pattern for instantiation</h1>
+            </div>
+          </div>
+        </div>
+        <p>Now, we should take care of the instantiation of the right object based on the parameter received (often retrieved &#160;from a &#160;configuration file ) &#160;to identify the strategy.</p>
+        <div class="note" title="Note" style="">
+          <div class="inner">
+            <h3 class="title"><a id="note17"></a>Note</h3>
+            <p>We will use the GoF factory method pattern to instantiate the <code class="literal">LogStrategy</code> object. By checking the <code class="literal">loggertype</code> parameter, the appropriate concrete class will be instantiated.</p>
+          </div>
+        </div>
+        <pre class="programlisting">    public static LogStrategy CreateLogger(string loggertype) 
+    { 
+      if (loggertype == "DB") 
+        return new DbLogStrategy(); 
+      else if (loggertype == "FILE") 
+        return new FileLogStrategy(); 
+      else if (loggertype == "NET") 
+        return new NetLogStrategy(); 
+      else 
+        return new NullLogStrategy(); 
+    } 
+</pre>
+        <p>The application developer can also control the logging strategy through a configuration entry. The process of instantiating the <code class="literal">LogStrategy</code> class is given as follows:</p>
+        <pre class="programlisting">    string loggertype=read_from_config("loggertype"); 
+    LogStrategy lf = LoggerFactory.CreateLogger(loggertype); 
+    //-- somewhere out in the module 
+    lf.Log("APP","KEY","CAUSE"); 
+</pre>
+        <div class="section" title="Writing a generic factory method implementation">
+          <div class="titlepage">
+            <div>
+              <div>
+                <h2 class="title"><a id="ch03lvl2sec19"></a>Writing a generic factory method implementation</h2>
+              </div>
+            </div>
+          </div>
+          <p>As discussed in the previous chapter, writing system logic without impacting the application warrants a mechanism - that of loading a class on the fly. We will tweak the factory method (<code class="literal">LogFactory</code>) implementation to make the system generic. We will use an XML file to provide the metadata that the factory method would use to create the respective log handler (<code class="literal">LogStrategy</code>) for the requested strategy (by the consumer). The sample XML file (<code class="literal">LogStrategy.xml</code>) is given as follows:</p>
+          <pre class="programlisting">    &lt;?xml version="1.0"?&gt; 
+    &lt;entries&gt; 
+      &lt;entry key ="DB" value="LogLibrary.DbLogStrategy"/&gt; 
+      &lt;entry key="NET" value="LogLibrary.NetLogStrategy"/&gt; 
+      &lt;entry key="FILE" value="LogLibrary.FileLogStrategy"/&gt; 
+      &lt;entry key="NULL" value ="LogLibrary.NullLogStrategy"/&gt; 
+    &lt;/entries&gt; 
+</pre>
+          <p>The contents of the XML file can be read very easily using LINQ to XML.</p>
+        </div>
+        <div class="section" title="Factory method, singleton, and prototype pattern for dynamic class loading">
+          <div class="titlepage">
+            <div>
+              <div>
+                <h2 class="title"><a id="ch03lvl2sec20"></a>Factory method, singleton, and prototype pattern for dynamic class loading</h2>
+              </div>
+            </div>
+          </div>
+          <p>The .NET Reflection API helps us to load a class dynamically and instantiate an object . There is option for cloning an existing object to create a new one. We will use both strategies, for &#160;instantiation of objects.</p>
+          <div class="note" title="Note" style="">
+            <div class="inner">
+              <h3 class="title"><a id="note18"></a>Note</h3>
+              <p>The factory method (from the GoF catalog) is a pattern which solves the creation of objects through a static method exposed solely for this purpose. The object we create will be based on a particular class or derived class. The consumer of the <code class="literal">Factory</code> class can also indicate whether it requires a singleton or a prototype. The default behavior of the factory method is to create a singleton, and it will return the same instance whenever a call is made to the factory (<code class="literal">Get</code>) method. If the prototype option is given, a clone of the object will be created and returned. This is a good example that demonstrates how these three patterns compose and work in harmony to give you this desired outcome. Also note the adept usage of the dictionary object to achieve singletons. The constructs for creating an <span class="strong"><strong>object pool</strong></span> is already present in this implementation. That would be a good exercise for any interested reader to uncover and implement.</p>
+            </div>
+          </div>
+          <p>The consumer of the <code class="literal">ObjectFactory</code> class would indicate whether it wants a reference to the object available in the cache or a clone of the object. We can clone an object using binary serialization. By writing an extension method leveraging generics, we can create an all-purpose clone routine. The following code snippet achieves that:</p>
+          <pre class="programlisting"> 
+    public static T DeepClone&lt;T&gt;(this T a) { 
+      using (MemoryStream stream = new MemoryStream()) { 
+        BinaryFormatter formatter = new BinaryFormatter(); 
+        formatter.Serialize(stream, a); 
+        stream.Position = 0; 
+        return (T)formatter.Deserialize(stream); 
+      } 
+    }</pre>
+          <p>However, please note a cloneable interface could be leveraged in case you need custom cloning procedures. Now the implementation of <code class="literal">Get</code> becomes a straightforward affair; the following is a full listing of the <code class="literal">Get</code> method:</p>
+          <pre class="programlisting">    public class ObjectFactory 
+    { 
+      //----- The Dictionary which maps XML configuration 
+      //----- Keys (key) to TypeName (value) 
+      private Dictionary&lt;string, string&gt; entries = 
+      new Dictionary&lt;string, string&gt;(); 
+      //----- The Dictionary which maps Entry Keys to Objects 
+      //----- already instantiated by the Container 
+      private Dictionary&lt;string, Object&gt; objects = 
+      new Dictionary&lt;string, Object&gt;(); 
+ 
+      private Dictionary&lt;string, string&gt; LoadData(string str) 
+      { 
+        //---- We use LINQ lambda syntax to load the contents of the  
+        //---- XML file. 
+        return XDocument.Load(str).Descendants("entries"). 
+        Descendants("entry").ToDictionary(p =&gt;        
+        p.Attribute("key").Value, 
+        p =&gt; p.Attribute("value").Value); 
+      } 
+ 
+      public ObjectFactory(String str) 
+      { 
+        entries = LoadData(str); 
+      } 
+ 
+      public Object Get(string key, string mode = "singleton") 
+      { 
+        //------------ singleton will return the same object 
+        //------------ every time. 
+        //------------ prototype will create a clone of the  
+        //------------ object if already instantiated before 
+        //------------ Singleton and Protype are the permissible 
+        //------------ Parameters 
+        if (mode != "singleton" &amp;&amp; mode != "prototype") 
+          return null; 
+        Object temp = null; 
+        if (objects.TryGetValue(key, out temp)) 
+          return (mode == "singleton") ? temp : 
+        temp.DeepClone&lt;Object&gt;(); 
+        //------ if we could not retrieve an instance of previously  
+        //------ created object, retrieve the typename from entries 
+        //------ map 
+ 
+        string classname = null; 
+        entries.TryGetValue(key, out classname); 
+        if (classname == null) 
+          return null; 
+        string fullpackage = classname; 
+        //---- use .NET Reflection API to retrieve the CLR type 
+        //---- of the class name 
+ 
+        Type t = Type.GetType(fullpackage); 
+        if (t == null) 
+          return null; 
+        //------- Instantiate the object using .NET Reflection API 
+        objects[key] = (Object)Activator.CreateInstance(t); 
+        return objects[key]; 
+      } 
+    }
+  } 
+</pre>
+          <p>We will be using the preceding class and different configuration files for all examples going forward. This will simplify our code, and we would have a terse listing.</p>
+        </div>
+        <div class="section" title="Refactoring the code with the generic factory method">
+          <div class="titlepage">
+            <div>
+              <div>
+                <h2 class="title"><a id="ch03lvl2sec21"></a>Refactoring the code with the generic factory method</h2>
+              </div>
+            </div>
+          </div>
+          <p>Using <code class="literal">ObjectFactory</code>, our strategy instantiation becomes much cleaner. If we cannot locate a proper implementation of strategy by dictionary lookup (within the factory store), we will instantiate a <code class="literal">NullStrategy</code> object (fallback option):</p>
+          <pre class="programlisting">    public class LoggerFactory 
+    { 
+      private static ObjectFactory of =  
+      new ObjectFactory("LogStrategy.xml"); 
+      public static LogStrategy CreateLogger(string loggertype) 
+      { 
+        LogStrategy sf = (LogStrategy)of.Get(loggertype); 
+        return (sf != null)?sf: new NullLogStrategy(); 
+      } 
+    } 
+</pre>
+        </div>
+      </div>
+    </div>
+
+
+    <div id="sbo-rt-content">
+      <div class="section" title="A log server for network logging">
+        <div class="titlepage">
+          <div>
+            <div>
+              <h1 class="title"><a id="ch03lvl1sec23"></a>A log server for network logging</h1>
+            </div>
+          </div>
+        </div>
+        <p>An implementation of a server application that can handle incoming streams of data from a remote application is given next. Here we are using System.Net's <code class="literal">TCPListener</code> class to listen to the incoming connection. Once we receive a connection from the remote process, we will kick-start a thread to handle the log data from that connection. This implementation is given here for the sake of completeness:</p>
+        <pre class="programlisting">    class LogSocketServer 
+    { 
+      private TcpListener _server; 
+      private Boolean _running; 
+      private int port = 4500; 
+ 
+      public LogSocketServer() 
+      { 
+        _server = new TcpListener(IPAddress.Any, port); 
+        _server.Start(); 
+        _running = true; 
+        AcceptClients(); 
+      } 
+ 
+      public void AcceptClients() 
+      { 
+        while (_running) 
+        { 
+          TcpClient newClient = _server.AcceptTcpClient(); 
+          Thread t = new Thread( 
+          new ParameterizedThreadStart( 
+          HandleClientData)); 
+          t.Start(newClient); 
+        } 
+      } 
+ 
+      public void HandleClientData(object obj) 
+      { 
+        TcpClient client = obj as TcpClient; 
+        StreamReader sReader = new 
+        StreamReader(client.GetStream(), 
+        Encoding.ASCII); 
+        bool bRead = true; 
+        while (bRead == true) 
+        { 
+          String sData = sReader.ReadLine(); 
+          if (sData == null || sData.Length == 0) 
+          bRead = false; 
+          Console.WriteLine(sData); 
+        } 
+      }   
+    } 
+</pre>
+      </div>
+    </div>
+
+
+    <div id="sbo-rt-content">
+      <div class="section" title="A simple client program to test the library">
+        <div class="titlepage">
+          <div>
+            <div>
+              <h1 class="title"><a id="ch03lvl1sec24"></a>A simple client program to test the library</h1>
+            </div>
+          </div>
+        </div>
+        <p>A simple test harness for the logging library is given next. The program accepts a command-line parameter, which is the log target (NET | FILE | DB). We create the appropriate logging strategy classes using the factory method pattern.</p>
+        <pre class="programlisting">    class Program 
+    { 
+      private static bool Table(LogStrategy ls) 
+      { 
+        int a = 10; 
+        int b = 1; 
+        while (b &lt; 100) 
+        { 
+          ls.Log("Table", a.ToString() + " * " + 
+          b.ToString(), "=" +(a * b).ToString()); 
+          b++; 
+        } 
+        return true; 
+      } 
+      static void Main(string[] args) 
+      { 
+        if (args.Length != 1) 
+        { 
+          return;  
+        }  
+        string loggertype=args[0]; 
+        LogStrategy lf = LoggerFactory.CreateLogger(loggertype); 
+        Table(lf); 
+      } 
+    } 
+</pre>
+        <p>The following UML diagram illustrates the key set of patterns in action for the logging API:</p>
+        <p>
+</p>
+        <div class="mediaobject">
+          <img src="graphics/B05691_03_03-1.jpg" alt="A simple client program to test the library"/>
+        </div>
+        <p>
+</p>
+      </div>
+    </div>
+
+
+    <div id="sbo-rt-content">
+      <div class="section" title="Summary">
+        <div class="titlepage">
+          <div>
+            <div>
+              <h1 class="title"><a id="ch03lvl1sec25"></a>Summary</h1>
+            </div>
+          </div>
+        </div>
+        <p>In this chapter, we covered more ground to gain a good understanding on some of the design patterns. We created a logging library which can log information from multiple threads and handle different targets like file, database, and remote servers. We used strategy pattern to swap the various logger implementations based on a configuration file. Once again, the template method pattern helped us to create an extensible solution for accommodating new log targets. All we needed to do was to override the base implementation with the specifics of the new log targets, as log information processing is handled by the base implementation. We extended our factory method pattern to handle arbitrary objects based on configuration files. We also learned to leverage dictionary objects for generating singletons and prototypes. In the next chapter, we will write a data access layer which can help an application target multiple databases. In the process, you will learn about adapter pattern, factory methods, and so on.</p>
+      </div>
+    </div>
+</body>
+</html>

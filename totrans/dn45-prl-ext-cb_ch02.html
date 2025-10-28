@@ -1,0 +1,1074 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" epub:prefix="z3998: http://www.daisy.org/z3998/2012/vocab/structure/#" lang="en" xml:lang="en">
+<head>
+    <title>2. Implementing Continuations</title>
+    <link href="epub.css" rel="stylesheet" type="text/css"/>
+    <link href="68851547a55f.css" rel="stylesheet" type="text/css"/>
+  </head>
+  <body>
+    <div id="sbo-rt-content">
+      <div class="chapter" title="Chapter&#160;2.&#160;Implementing Continuations">
+        <div class="titlepage">
+          <div>
+            <div>
+              <h1 class="title"><a id="ch02"></a>Chapter&#160;2.&#160;Implementing Continuations</h1>
+            </div>
+          </div>
+        </div>
+        <p>In this chapter, we will cover:</p>
+        <div class="itemizedlist">
+          <ul class="itemizedlist">
+            <li class="listitem" style="list-style-type: disc">Continuing a task</li>
+            <li class="listitem" style="list-style-type: disc">Passing task results to a continuation</li>
+            <li class="listitem" style="list-style-type: disc">Continue "WhenAny" and "WhenAll"</li>
+            <li class="listitem" style="list-style-type: disc">Specifying when a continuation will run</li>
+            <li class="listitem" style="list-style-type: disc">Using a continuation for exception handling</li>
+            <li class="listitem" style="list-style-type: disc">Cancelling a continuation</li>
+            <li class="listitem" style="list-style-type: disc">Using a continuation to chain multiple tasks</li>
+            <li class="listitem" style="list-style-type: disc">Using a continuation to update a UI</li>
+          </ul>
+        </div>
+        <div class="section" title="Introduction">
+          <div class="titlepage">
+            <div>
+              <div>
+                <h1 class="title" id="sigil_toc_id_4"><a id="ch02lvl1sec19"></a>Introduction</h1>
+              </div>
+            </div>
+          </div>
+          <p>When you are writing an application that has tasks and that execute in parallel, it is common to have some parallel tasks that depend on the results of other tasks. These tasks should not be started until the earlier tasks, known as antecedents, have been completed.</p>
+          <p>In fact, to write truly scalable software, you should not have threads that block. Calling <code class="literal">Wait</code> or querying <code class="literal">Task.Result</code>, when the task has not finished running, will cause your threads to block. Fortunately, there is a better way.</p>
+          <p>Prior to the introduction of the <a id="id102" class="indexterm"></a>
+<span class="strong"><strong>Task Parallel Library</strong></span> (<span class="strong"><strong>TPL</strong></span>), this type of interdependent thread execution was done with callbacks, where a method was called, and one of its parameters was a delegate to execute when the task completed. This provided a viable solution to the dependency problems but quickly became very complex in the real-world application. This is especially true if, for example, you had a task that needed to run after several other tasks had completed.</p>
+          <p>With the TPL, a simpler solution exists in the form of continuation tasks. These tasks are linked to their antecedents, and are automatically started after the earlier tasks have been completed.</p>
+          <p>What makes <a id="id103" class="indexterm"></a>continuations so powerful is that, you can create continuations that run when a task or a group of tasks completes throws an exception, or gets cancelled. As you will see in this chapter, continuations can even provide a means to synchronize the asynchronous method results with the user interface running on another thread.</p>
+          <p>We will start the chapter with a basic, simple continuation that runs when a single task completes. From there, we will look at using continuations to control a collection of tasks, using continuations to handle exceptions, and using continuations to chain multiple tasks together. We will finish the chapter by creating a <span class="strong"><strong>Windows Presentation Foundation</strong></span> (<span class="strong"><strong>WPF</strong></span>) application, using a continuation to marshal data created in a <a id="id104" class="indexterm"></a>task back to the user interface.</p>
+        </div>
+      </div>
+    </div>
+
+
+    <div id="sbo-rt-content">
+      <div class="section" title="Continuing a task">
+        <div class="titlepage">
+          <div>
+            <div>
+              <h1 class="title"><a id="ch02lvl1sec20"></a>Continuing a task</h1>
+            </div>
+          </div>
+        </div>
+        <p>In its simplest form, a <a id="id105" class="indexterm"></a>continuation is an action that runs asynchronously after a target task, called an antecedent, completes.</p>
+        <p>In the first recipe of this chapter, we will build a basic continuation. We will accomplish this by using the <code class="literal">Task.ContinueWith(Action&lt;Task&gt;)</code> method<a id="id106" class="indexterm"></a>.</p>
+        <div class="section" title="How to do it…">
+          <div class="titlepage">
+            <div>
+              <div>
+                <h2 class="title sigil_not_in_toc"><a id="ch02lvl2sec30"></a>How to do it…</h2>
+              </div>
+            </div>
+          </div>
+          <p>Let's go to Visual Studio and create a console application that runs a task continuation after our word count task completes. The steps to create a console application are as follows:</p>
+          <div class="orderedlist">
+            <ol class="orderedlist arabic">
+              <li class="listitem">Start a new project using the <span class="strong"><strong>C# Console Application</strong></span> project template and assign <code class="literal">Continuation1</code> as the <span class="strong"><strong>Solution name</strong></span>.</li>
+              <li class="listitem">Add the following <code class="literal">using</code> directives to the top of your program class:<div class="informalexample"><pre class="programlisting">using System;
+using System.Linq;
+using System.Net;
+using System.Threading;
+using System.Threading.Tasks;</pre>
+</div></li>
+              <li class="listitem">Now let's put a try/catch block and some basic exception handling. The <code class="literal">Main</code> method of the program class, at this point, should look as shown in the following code snippet:<div class="informalexample"><pre class="programlisting">static void Main()
+{
+  try
+  {
+  // The Task and Continuation will go here
+  }
+  catch (AggregateException aEx)
+  {
+    foreach (Exception ex in aEx.InnerExceptions)
+    {
+      Console.WriteLine("An exception has occured: {0}" + ex.Message);
+    }
+  }
+}</pre>
+</div></li>
+              <li class="listitem">Inside the <code class="literal">try</code> block, create a <code class="literal">WebClient</code> object and set the user-agent header as shown in the following code snippet:<div class="informalexample"><pre class="programlisting"><span class="strong"><strong>var client = new WebClient();</strong></span>
+<span class="strong"><strong>const string headerText = "Mozilla/5.0 (compatible; MSIE 10.0; Windows NT 6.1; Trident/6.0)";</strong></span>
+<span class="strong"><strong>client.Headers.Add("user-agent", headerText);</strong></span>
+</pre>
+</div></li>
+              <li class="listitem">Next, in the<a id="id107" class="indexterm"></a> body of the <code class="literal">try</code> block, let's create an anonymous <code class="literal">Task</code> (no name), followed by a <code class="literal">.ContinueWith()</code> right after the closing parenthesis of the <code class="literal">Task</code>. The antecedent <code class="literal">Task</code> doesn't return any results in this recipe.<div class="informalexample"><pre class="programlisting">Task.Factory.StartNew(() =&gt;
+{
+}).ContinueWith(obj =&gt;
+{
+}).Wait();</pre>
+</div></li>
+              <li class="listitem">Finally, we need to create the body of the <code class="literal">Task</code> and the continuation. The <code class="literal">Task</code> will execute one of our familiar word counts. The continuation will be used to clean up the reference to the <code class="literal">WebClient</code> object after the antecedent task completes. After the continuation, prompt the user to exit.<div class="informalexample"><pre class="programlisting">Task.Factory.StartNew(() =&gt;
+  {
+    Console.WriteLine("Antecedent running.");
+    char[] delimiters = { ' ', ',', '.', ';', ':', '-', '_', '/', '\u000A' };                        
+    var words = client.DownloadString(@"http://www.gutenberg.org/files/2009/2009.txt");
+    var wordArray = words.Split(delimiters, StringSplitOptions.RemoveEmptyEntries);
+    Console.WriteLine("Word count for Origin of Species: {0}", wordArray.Count());
+  }
+).ContinueWith(antecedent =&gt;
+  {
+    Console.WriteLine("Continuation running");
+    client.Dispose();
+  }).Wait();</pre>
+</div></li>
+              <li class="listitem">In Visual<a id="id108" class="indexterm"></a> Studio 2012, press <span class="emphasis"><em>F5</em></span> to run the project. You should see output similar to the following screenshot:<div class="mediaobject"><img src="graphics/0225OT_02_01.jpg" alt="How to do it…"/></div></li>
+            </ol>
+          </div>
+        </div>
+        <div class="section" title="How it works…">
+          <div class="titlepage">
+            <div>
+              <div>
+                <h2 class="title sigil_not_in_toc"><a id="ch02lvl2sec31"></a>How it works…</h2>
+              </div>
+            </div>
+          </div>
+          <p>There isn't a lot to explain about this basic continuation, but there are a couple of small points to note.</p>
+          <p>For this recipe, we created an anonymous <code class="literal">Task</code> and made the call to <code class="literal">ContinueWith</code> right after the closing parenthesis of the task as follows:</p>
+          <div class="informalexample">
+            <pre class="programlisting">Task.Factory.StartNew(() =&gt;
+{
+}).ContinueWith(obj =&gt;
+{
+}).Wait();</pre>
+          </div>
+          <p>We could just as well have created a named task and made the call to <code class="literal">ContinueWith</code> in a separate statement shown as follows:</p>
+          <div class="informalexample">
+            <pre class="programlisting">Task task1 = Task.Factory.StartNew(() =&gt;
+{
+});
+task1.ContinueWith(obj =&gt;
+{
+}).Wait();</pre>
+          </div>
+          <p>Also, notice that we can wait for a continuation using the <code class="literal">Wait()</code> method; in the same way we could wait for a <code class="literal">Task</code> (however, you will not normally do this in practice. It causes the thread to<a id="id109" class="indexterm"></a> block waiting for the continuation to complete. In general, you want to avoid causing your threads to block). In fact, tasks and continuations aren't much different and have many of the same instance methods and properties.</p>
+        </div>
+      </div>
+    </div>
+
+
+    <div id="sbo-rt-content">
+      <div class="section" title="Passing task results to a continuation">
+        <div class="titlepage">
+          <div>
+            <div>
+              <h1 class="title"><a id="ch02lvl1sec21"></a>Passing task results to a continuation</h1>
+            </div>
+          </div>
+        </div>
+        <p>In this recipe, we will see how we can pass the results returned from an antecedent <code class="literal">Task</code> to a continuation.</p>
+        <p>Our antecedent <code class="literal">Task</code> is going<a id="id110" class="indexterm"></a> to read in the contents of a book as a <a id="id111" class="indexterm"></a>string and display a word count to the user. The continuation, which will run after the antecedent completes, will take the string array returned by the antecedent and perform a LINQ query which will find the five most frequently used words.</p>
+        <div class="section" title="How to do it…">
+          <div class="titlepage">
+            <div>
+              <div>
+                <h2 class="title sigil_not_in_toc"><a id="ch02lvl2sec32"></a>How to do it…</h2>
+              </div>
+            </div>
+          </div>
+          <p>Let's start Visual Studio and build a Console Application that shows how to pass results from the antecedent to a continuation. The steps are given as follows:</p>
+          <div class="orderedlist">
+            <ol class="orderedlist arabic">
+              <li class="listitem">Start a new project using the <span class="strong"><strong>C# Console Application</strong></span> project template and assign <code class="literal">Continuation2</code> as the <span class="strong"><strong>Solution name</strong></span>.</li>
+              <li class="listitem">Add the following <code class="literal">using</code> directives to the top of your program class:<div class="informalexample"><pre class="programlisting">using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Net;
+using System.Threading.Tasks;</pre>
+</div></li>
+              <li class="listitem">To begin with, let's put some basic stuff in the class. We will need a character array of delimiters so that we can parse out the words properly. Also, we need a try/catch block and some basic exception handling. The <code class="literal">Main</code> method of the Program class, at this point, should look as follows:<div class="informalexample"><pre class="programlisting">static void Main()
+{
+    char[] delimiters = { ' ', ',', '.', ';', ':', '-', '_', '/', '\u000A' };
+    try
+    {
+    // The Task and Continuation will go here
+    }
+    catch (AggregateException aEx)
+    {
+      foreach (Exception ex in aEx.InnerExceptions)
+      {
+        Console.WriteLine("An exception has occured: {0}" + ex.Message);
+      }
+    }
+}</pre>
+</div></li>
+              <li class="listitem">Now let's create a task called <code class="literal">task1</code> that returns an array of strings as its result. The <a id="id112" class="indexterm"></a>purpose of <code class="literal">task1</code> will be to create <code class="literal">System.Net.WebClient</code> which will read in the text of the book as a string. Once the string is parsed and put into a <a id="id113" class="indexterm"></a>string array, we will display the word count to the user by using the <code class="literal">Count</code> method of the array, and then return the array in the tasks result so that it can be used in our continuation. Create the task inside the <code class="literal">try</code> block. The body of the <code class="literal">try</code> block should now look something like the following code:<div class="informalexample"><pre class="programlisting">try
+{
+    Task&lt;string[]&gt; task1 = Task.Factory.StartNew(() =&gt;
+    {
+      var client = new WebClient();
+      const string headerText = "Mozilla/5.0 (compatible; MSIE 10.0; Windows NT 6.1; Trident/6.0)";
+      client.Headers.Add("user-agent",headerText);
+      var words = client.DownloadString(@"http://www.gutenberg.org/files/2009/2009.txt");
+      string[] wordArray = words.Split(delimiters, StringSplitOptions.RemoveEmptyEntries);
+      Console.WriteLine("Word count for Origin of Species: {0}", wordArray.Count());
+      Console.WriteLine();
+      return wordArray;
+    }
+}</pre>
+</div></li>
+              <li class="listitem">Next, we are going to create our continuation using the <code class="literal">Task.ContinueWith()</code> method. Our continuation will have a <code class="literal">Task&lt;string[]&gt; state</code> parameter. The body of the continuation will perform a Linq query on the string array to sort all of the words contained in the array by the number of times the words occur. We will then execute another Linq operation to<a id="id114" class="indexterm"></a> take the top five most frequently used words and write them to the console. Finally, we will <a id="id115" class="indexterm"></a>want to wait on the continuation to complete with the <code class="literal">Wait()</code> method. Create the task continuation right after the body of the antecedent task.<div class="informalexample"><pre class="programlisting">task1.ContinueWith(antecedent =&gt;
+{
+  var wordsByUsage = antecedent.Result.Where(word =&gt; word.Length &gt; 5)
+  .GroupBy(word =&gt; word)
+  .OrderByDescending(grouping =&gt; grouping.Count())
+  .Select(grouping =&gt; grouping.Key);
+  var commonWords = (wordsByUsage.Take(5)).ToArray();
+  Console.WriteLine("The 5 most commonly used words in Origin of Species:");
+  Console.WriteLine("----------------------------------------------------");
+  foreach (var word in commonWords)
+  {
+    Console.WriteLine(word);
+  }
+}).Wait();</pre>
+</div></li>
+              <li class="listitem">OK, the last step for this recipe is to let the user know that our application is finished and prompt them to exit. Put that code right after the continuation. It should be the last lines in the <code class="literal">try</code> block.<div class="informalexample"><pre class="programlisting">Console.WriteLine();
+Console.WriteLine("Complete. Please hit &lt;Enter&gt; to exit.");
+Console.ReadLine();</pre>
+</div></li>
+              <li class="listitem">In Visual Studio 2012, press <span class="emphasis"><em>F5</em></span> to run the project. You should see the output similar to the following screenshot:<div class="mediaobject"><img src="graphics/0225OT_02_02.jpg" alt="How to do it…"/></div></li>
+            </ol>
+          </div>
+        </div>
+        <div class="section" title="How it works…">
+          <div class="titlepage">
+            <div>
+              <div>
+                <h2 class="title sigil_not_in_toc"><a id="ch02lvl2sec33"></a>How it works…</h2>
+              </div>
+            </div>
+          </div>
+          <p>The continuation in this recipe was created using the <code class="literal">ContinueWith</code> method of an existing task instance<a id="id116" class="indexterm"></a> as we did in the previous recipe. In this<a id="id117" class="indexterm"></a> recipe however, we use a Lambda expression to pass in a <code class="literal">Task&lt;string[]&gt;</code> parameter representing the antecedent <code class="literal">Task</code>.</p>
+          <div class="informalexample">
+            <pre class="programlisting">Task&lt;string[]&gt; task1 = Task.Factory.StartNew(() =&gt;
+{
+  //Task Action
+}); 
+task1.ContinueWith(antecedent =&gt;
+{
+  //Continuation Action
+});</pre>
+          </div>
+          <p>Notice that the continuation accesses the result of the antecedent using the <code class="literal">Task.Result</code> property. If this looks familiar, it should. You access the results of a task in nearly the same way in a continuation as you would in any piece of your code, that is, by accessing the <code class="literal">Result</code> property of a <code class="literal">Task</code>. The Parallel Extensions team has made the coding experience very consistent across all parallel operations.</p>
+          <div class="informalexample">
+            <pre class="programlisting">task1.ContinueWith(antecedent =&gt;
+{
+  var wordsByUsage = antecedent.Result.Where(word =&gt; word.Length &gt; 5)
+  .GroupBy(word =&gt; word)
+  .OrderByDescending(grouping =&gt; grouping.Count())
+  .Select(grouping =&gt; grouping.Key);
+  var commonWords = (wordsByUsage.Take(5)).ToArray();
+  Console.WriteLine("The 5 most commonly used words in Origin of Species:");
+  Console.WriteLine("----------------------------------------------------");
+  foreach (var word in commonWords)
+  {
+    Console.WriteLine(word);
+  }
+});</pre>
+          </div>
+          <p>Lastly, we wait for<a id="id118" class="indexterm"></a> the continuation to complete before <a id="id119" class="indexterm"></a>prompting the user to exit.</p>
+        </div>
+      </div>
+    </div>
+
+
+    <div id="sbo-rt-content">
+      <div class="section" title="Continue &quot;WhenAny&quot; and &quot;WhenAll&quot;">
+        <div class="titlepage">
+          <div>
+            <div>
+              <h1 class="title"><a id="ch02lvl1sec22"></a>Continue "WhenAny" and "WhenAll"</h1>
+            </div>
+          </div>
+        </div>
+        <p>In this recipe we will move from continuing single tasks to setting up continuations for groups of tasks. The two methods we will be looking at are <code class="literal">WhenAny</code> and <code class="literal">WhenAll</code>. Both methods are static members of the <code class="literal">Task.Factory</code> class, and take an array of tasks and <code class="literal">Action&lt;Task&gt;</code> as their parameters.</p>
+        <p>First we will look at the <code class="literal">WhenAny</code> continuations.<a id="id120" class="indexterm"></a> The basic idea here is that we have a group of tasks and we only want to wait for the first and fastest of the group to <a id="id121" class="indexterm"></a>complete its work before moving on. In our case, we will be downloading the text of three different books, and performing a word count on each. When the first task completes we will display the word count of the winner to the user.</p>
+        <p>After that we will change to <code class="literal">WhenAll</code> and display the results of all three word counts to the user.</p>
+        <div class="section" title="How to do it…">
+          <div class="titlepage">
+            <div>
+              <div>
+                <h2 class="title sigil_not_in_toc"><a id="ch02lvl2sec34"></a>How to do it…</h2>
+              </div>
+            </div>
+          </div>
+          <p>Let's build a solution that shows how to conditionally continue a task. The steps are as follows:</p>
+          <div class="orderedlist">
+            <ol class="orderedlist arabic">
+              <li class="listitem">Start a new project using the <span class="strong"><strong>C# Console Application</strong></span> project template and assign <code class="literal">Continuation3</code> as the <span class="strong"><strong>Solution name</strong></span>.</li>
+              <li class="listitem">Add the following <code class="literal">using</code> directives to the top of your program class:<div class="informalexample"><pre class="programlisting">using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Net;
+using System.Threading.Tasks;</pre>
+</div></li>
+              <li class="listitem">First, in the <code class="literal">Main</code> method of your program class, let's create a character array of delimiters we can use to split our words with, a string constant for the user agent header of our web client, and a <code class="literal">Dictionary&lt;string, string&gt;</code> method to hold our book titles and URLs. The dictionary will serve as the state object <a id="id122" class="indexterm"></a>parameter for our tasks, which will be created in a <code class="literal">foreach</code> loop.<div class="informalexample"><pre class="programlisting">char[] delimiters = { ' ', ',', '.', ';', ':', '-', '_', '/', '\u000A' };
+const string headerText = "Mozilla/5.0 (compatible; MSIE 10.0; Windows NT 6.1; Trident/6.0)";
+var dictionary = new Dictionary&lt;string, string&gt;
+{
+  {"Origin of Species", "http://www.gutenberg.org/files/2009/2009.txt"},
+    {"Beowulf", "http://www.gutenberg.org/files/16328/16328-8.txt"},
+    {"Ulysses", "http://www.gutenberg.org/files/4300/4300.txt"}
+};</pre>
+</div></li>
+              <li class="listitem">Next, let's create <a id="id123" class="indexterm"></a> a try/catch block with some basic error handling.<div class="informalexample"><pre class="programlisting">try
+{
+  // Loop to create and Continuation will go here
+}
+catch (AggregateException aEx)
+{
+  foreach (Exception ex in aEx.InnerExceptions)
+  {
+    Console.WriteLine("An exception has occured: {0}" + ex.Message);
+  }
+}</pre>
+</div></li>
+              <li class="listitem">Inside the <code class="literal">try</code> block, let's create a new list of <code class="literal">Task&lt;KeyValuePair&lt;string, string&gt;&gt;</code>. Of course, this will be the list of our tasks. Each task will take a <code class="literal">KeyValuePair</code> from the dictionary we created in step 3 as their state parameters.<div class="informalexample"><pre class="programlisting">var tasks = new List&lt;Task&lt;KeyValuePair&lt;string, int&gt;&gt;&gt;();</pre>
+</div></li>
+              <li class="listitem">Now let's create our task in a <code class="literal">foreach</code> loop. Each task will read the text of a book from a string, split the string into a character array, and do a word count. Our antecedent tasks return a <code class="literal">KeyValuePair&lt;string, int&gt;</code> with the book title and the word count for each book.<div class="informalexample"><pre class="programlisting">foreach (var pair in dictionary)
+{
+  tasks.Add(Task.Factory.StartNew(stateObj =&gt;
+  {
+    var taskData = (KeyValuePair&lt;string, string&gt;)stateObj;
+    Console.WriteLine("Starting task for {0}", taskData.Key);
+    var client = new WebClient();
+    client.Headers.Add("user-agent", headerText);
+    var words = client.DownloadString(taskData.Value);
+    var wordArray = words.Split(delimiters, StringSplitOptions.RemoveEmptyEntries);
+    return new KeyValuePair&lt;string, int&gt;(taskData.Key, wordArray.Count());
+  }, pair));
+}</pre>
+</div></li>
+              <li class="listitem">Now let's create<a id="id124" class="indexterm"></a>  the continuation by calling the <code class="literal">Task.Factory.WhenAny</code> method. The continuations will just display the title and word <a id="id125" class="indexterm"></a>count of the winner to the user.<div class="informalexample"><pre class="programlisting">Task.Factory.ContinueWhenAny(tasks.ToArray(), antecedent =&gt;
+{
+    Console.WriteLine("And the winner is: {0}", antecedent.Result.Key);
+    Console.WriteLine("Word count: {0}", antecedent.Result.Value);
+}).Wait();</pre>
+</div></li>
+              <li class="listitem">Lastly, after the catch block, prompt the user to exit and wait for the input.<div class="informalexample"><pre class="programlisting">Console.WriteLine("Complete. Press &lt;Enter&gt; to exit.");
+Console.ReadLine();</pre>
+</div></li>
+              <li class="listitem">In Visual Studio 2012, press <span class="emphasis"><em>F5</em></span> to run the project. You should see output similar to the following. Your winner may vary.<div class="mediaobject"><img src="graphics/0225OT_02_03.jpg" alt="How to do it…"/></div></li>
+              <li class="listitem">Before<a id="id126" class="indexterm"></a>  moving on, let's change our code a bit and continue when all of our tasks complete. All we need to do is change our method call from <code class="literal">Task.Factory.WhenAny</code> to <code class="literal">Task.Factory.WhenAll</code>, change the name of the continuation parameter from <code class="literal">antecedent</code> to <code class="literal">antecedents</code> to reflect plurality, and<a id="id127" class="indexterm"></a> create a <code class="literal">foreach</code> loop in the body of the continuation to loop through the results.<div class="informalexample"><pre class="programlisting">Task.Factory.ContinueWhenAll(tasks.ToArray(), antecedents =&gt;
+{
+    foreach (var antecedent in antecedents)
+    {
+        Console.WriteLine("Book Title: {0}", antecedent.Result.Key);
+        Console.WriteLine("Word count: {0}", antecedent.Result.Value);
+    }
+}).Wait();</pre>
+</div></li>
+              <li class="listitem">In Visual Studio 2012, press <span class="emphasis"><em>F5</em></span> to run the project. You should see output similar to the following screenshot:<div class="mediaobject"><img src="graphics/0225OT_02_04.jpg" alt="How to do it…"/></div></li>
+            </ol>
+          </div>
+        </div>
+        <div class="section" title="How it works…">
+          <div class="titlepage">
+            <div>
+              <div>
+                <h2 class="title sigil_not_in_toc"><a id="ch02lvl2sec35"></a>How it works…</h2>
+              </div>
+            </div>
+          </div>
+          <p>The continuations in<a id="id128" class="indexterm"></a> this recipe are created a bit differently from the continuations that we have created in previous tasks. Instead of calling the<a id="id129" class="indexterm"></a>  instance method <code class="literal">ContinueWith</code> on a <code class="literal">Task</code> variable, we are calling the <code class="literal">ContinueWhenAny</code> and <code class="literal">ContinueWhenAll</code> static methods on <code class="literal">Task.FactoryClass</code>.</p>
+          <div class="informalexample">
+            <pre class="programlisting">Task.Factory.ContinueWhenAll(tasks.ToArray(), antecedents =&gt;
+{
+});</pre>
+          </div>
+          <p>The <code class="literal">ContinueWhenAny</code> and <code class="literal">ContinueWhenAll</code> methods have a different parameter lists than <code class="literal">Task.ContinueWith</code>.</p>
+          <p>
+<code class="literal">ContinueWhenAny</code> takes an array of <code class="literal">Task</code> as its first parameter and a single <code class="literal">Action&lt;Task&gt;</code> delegate as its second parameter.</p>
+          <div class="informalexample">
+            <pre class="programlisting">ContinueWhenAny(Task[], Action&lt;Task&gt;)</pre>
+          </div>
+          <p>
+<code class="literal">ContinueWhenAll</code> takes the same array of <code class="literal">Task</code> as its first parameter and <code class="literal">Action&lt;Task[]&gt;</code> as its second parameter.</p>
+          <div class="informalexample">
+            <pre class="programlisting">ContinueWhenAll(Task[], Action&lt;Task[]&gt;)</pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+
+    <div id="sbo-rt-content">
+      <div class="section" title="Specifying when a continuation will run">
+        <div class="titlepage">
+          <div>
+            <div>
+              <h1 class="title"><a id="ch02lvl1sec23"></a>Specifying when a continuation will run</h1>
+            </div>
+          </div>
+        </div>
+        <p>One of the most powerful <a id="id130" class="indexterm"></a>features of task continuations is the ability to create multiple continuations for a task, and specify the exact conditions under which each continuation will be invoked by using the <code class="literal">Task.TaskContinuationOptions</code> enumeration.</p>
+        <p>When you create a continuation for a task, you can use <code class="literal">Task.ContinueWith</code> overload that takes the <code class="literal">TaskContinuationOptions</code> enumeration to specify that the continuation will only run if the antecedent <code class="literal">Task</code> completed, was cancelled, or is faulted. The enumeration also has<a id="id131" class="indexterm"></a> members that specify when a continuation should not run.</p>
+        <p>In this recipe, we will be looking at two simple tasks, each with two continuations. One of the continuations for each task will run when the task completes, and one will run when the task is cancelled.</p>
+        <div class="section" title="How to do it…">
+          <div class="titlepage">
+            <div>
+              <div>
+                <h2 class="title sigil_not_in_toc"><a id="ch02lvl2sec36"></a>How to do it…</h2>
+              </div>
+            </div>
+          </div>
+          <p>Now, let's create a console application that continues tasks conditionally. The steps to create a console application are as follows:</p>
+          <div class="orderedlist">
+            <ol class="orderedlist arabic">
+              <li class="listitem">Start a new project using the <span class="strong"><strong>C# Console Application</strong></span> project template and assign <code class="literal">Continuation4</code> as the <span class="strong"><strong>Solution name</strong></span>.</li>
+              <li class="listitem">Add the following <code class="literal">using</code> directives to the top of your program class:<div class="informalexample"><pre class="programlisting">using System;
+using System.Threading;
+using System.Threading.Tasks;</pre>
+</div></li>
+              <li class="listitem">At the top of the <code class="literal">Main</code> method, create two <code class="literal">CancellationTokenSource</code> objects and get a <code class="literal">CancellationToken</code> from each one of them.<div class="informalexample"><pre class="programlisting">var tokenSource1 = new CancellationTokenSource();
+var token1 = tokenSource1.Token;
+
+ var tokenSource2 = new CancellationTokenSource();
+ var token2 = tokenSource2.Token;</pre>
+</div></li>
+              <li class="listitem">Next, let's create a try/catch block with some basic error handling.<div class="informalexample"><pre class="programlisting">try
+{
+    // Tasks and Continuations will go here
+}
+catch (AggregateException aEx)
+{
+    foreach (Exception ex in aEx.InnerExceptions)
+    {
+      Console.WriteLine("An exception has occured: {0}" + ex.Message);
+    }
+}</pre>
+</div></li>
+              <li class="listitem">Inside the <code class="literal">try</code> block, let's create two simple tasks. Both tasks just write a message to the console. <a id="id132" class="indexterm"></a>Also create two continuations for each task using <code class="literal">TaskContinuationOptions.OnlyOnRanToCompletion</code> and <code class="literal">Task ContinuationOption.OnlyOnFaulted</code>.<div class="informalexample"><pre class="programlisting">var task1 = Task.Factory.StartNew(() =&gt;
+{
+    Console.WriteLine("Task #1 is running.");
+    //wait a bit
+    Thread.Sleep(2000);
+}, token1);
+
+task1.ContinueWith(antecedent =&gt; Console.WriteLine("Task #1 completion continuation."), TaskContinuationOptions.OnlyOnRanToCompletion);
+task1.ContinueWith(antecedent =&gt; Console.WriteLine("Task #1 cancellation continuation."), TaskContinuationOptions.OnlyOnCanceled);
+                
+var task2 = Task.Factory.StartNew(() =&gt;
+{
+    Console.WriteLine("Task #2 is running.");
+    //wait a bit
+    Thread.Sleep(2000);
+}, token2);
+
+task2.ContinueWith(antecedent =&gt; Console.WriteLine("Task #2 completion continuation."), TaskContinuationOptions.OnlyOnRanToCompletion);
+task2.ContinueWith(antecedent =&gt; Console.WriteLine("Task #2 cancellation continuation."), TaskContinuationOptions.OnlyOnCanceled);</pre>
+</div></li>
+              <li class="listitem">Lastly, after the <code class="literal">catch</code> block, let's cancel the token and wait for user input before exiting.<div class="informalexample"><pre class="programlisting">tokenSource2.Cancel();
+Console.ReadLine();</pre>
+</div></li>
+              <li class="listitem">In Visual Studio 2012, press <span class="emphasis"><em>F5</em></span> to run the project. You should see output similar to the following screenshot:<div class="mediaobject"><img src="graphics/0225OT_02_05.jpg" alt="How to do it…"/></div></li>
+            </ol>
+          </div>
+        </div>
+        <div class="section" title="How it works…">
+          <div class="titlepage">
+            <div>
+              <div>
+                <h2 class="title sigil_not_in_toc"><a id="ch02lvl2sec37"></a>How it works…</h2>
+              </div>
+            </div>
+          </div>
+          <p>In this very simple example, we started by creating two <code class="literal">CancellationTokenSource</code> objects and getting a <a id="id133" class="indexterm"></a>cancellation token source from each. If we had created a <code class="literal">CancellationTokenSource</code> object and passed the token into both tasks, both tasks would have been cancelled when we cancelled the token. In our case, we just wanted to cancel one of the two tasks.</p>
+          <p>The tasks themselves are very simple. They just wait for a bit to give us some time to cancel the token and display a message to the console. We pass one <code class="literal">CancellationToken</code> into each task as shown in the following code snippet:</p>
+          <div class="informalexample">
+            <pre class="programlisting">var task1 = Task.Factory.StartNew(() =&gt;
+{
+    Console.WriteLine("Task #1 is running.");
+    //wait a bit
+    Thread.Sleep(2000);
+}, token1);
+
+var task2 = Task.Factory.StartNew(() =&gt;
+{
+    Console.WriteLine("Task #2 is running.");
+    //wait a bit
+    Task2.Delay(2000);
+}, token2);</pre>
+          </div>
+          <p>Both of the continuations just display a message to the console, and both are created with a member of the <code class="literal">Task.TaskContinuationOptions</code> enumerator. The first continuation is fired when the task runs to completion and the second continuation fires when the task is cancelled.</p>
+          <div class="informalexample">
+            <pre class="programlisting">task1.ContinueWith(antecedent =&gt; Console.WriteLine("Task #1 completion continuation."),         TaskContinuationOptions.OnlyOnRanToCompletion);
+
+task1.ContinueWith(antecedent =&gt; Console.WriteLine("Task #1 cancellation continuation."), TaskContinuationOptions.OnlyOnCanceled);</pre>
+          </div>
+          <p>We cancel the token for <code class="literal">task2</code>, but not for <code class="literal">task1</code> and the corresponding continuation for each executes, and we <a id="id134" class="indexterm"></a>can see the message written on to the console.</p>
+        </div>
+        <div class="section" title="There's more…">
+          <div class="titlepage">
+            <div>
+              <div>
+                <h2 class="title sigil_not_in_toc"><a id="ch02lvl2sec38"></a>There's more…</h2>
+              </div>
+            </div>
+          </div>
+          <p>The <code class="literal">TaskContinuationOptions</code> enumeration has several members which control under which condition a continuation is triggered. The following table contains a list of these members. Note that this is not a complete list of continuation options. The complete list of continuation options can be found at <a class="ulink" href="http://msdn.microsoft.com/en-us/library/system.threading.tasks.taskcontinuationoptions.aspx">http://msdn.microsoft.com/en-us/library/system.threading.tasks.taskcontinuationoptions.aspx</a>. The <code class="literal">OnlyOnFaulted</code> member will have its own recipe later in the chapter.</p>
+          <div class="informaltable">
+            <table border="1">
+              <colgroup>
+                <col style="text-align: left"/>
+                <col style="text-align: left"/>
+              </colgroup>
+              <tbody>
+                <tr>
+                  <td style="text-align: left" valign="top">
+<p>
+<code class="literal">NotOnRanToCompletion</code>
+<a id="id135" class="indexterm"></a>
+</p>
+</td>
+                  <td style="text-align: left" valign="top">
+<p>The continuation should not be<a id="id136" class="indexterm"></a> scheduled if the task ran to completion.</p>
+</td>
+                </tr>
+                <tr>
+                  <td style="text-align: left" valign="top">
+<p>
+<code class="literal">NotOnFaulted</code>
+<a id="id137" class="indexterm"></a>
+</p>
+</td>
+                  <td style="text-align: left" valign="top">
+<p>The continuation should not be scheduled if the task faulted.</p>
+</td>
+                </tr>
+                <tr>
+                  <td style="text-align: left" valign="top">
+<p>
+<code class="literal">NotOnCancelled</code>
+<a id="id138" class="indexterm"></a>
+</p>
+</td>
+                  <td style="text-align: left" valign="top">
+<p>The continuation should not be triggered if the task was cancelled.</p>
+</td>
+                </tr>
+                <tr>
+                  <td style="text-align: left" valign="top">
+<p>
+<code class="literal">OnlyOnRanToCompletion</code>
+<a id="id139" class="indexterm"></a>
+</p>
+</td>
+                  <td style="text-align: left" valign="top">
+<p>The continuation should be scheduled if the task ran to completion.</p>
+</td>
+                </tr>
+                <tr>
+                  <td style="text-align: left" valign="top">
+<p>
+<code class="literal">OnlyOnFaulted</code>
+<a id="id140" class="indexterm"></a>
+</p>
+</td>
+                  <td style="text-align: left" valign="top">
+<p>The continuation should be scheduled if the task faulted.</p>
+</td>
+                </tr>
+                <tr>
+                  <td style="text-align: left" valign="top">
+<p>
+<code class="literal">OnlyOnCancelled</code>
+<a id="id141" class="indexterm"></a>
+</p>
+</td>
+                  <td style="text-align: left" valign="top">
+<p>The continuation should be triggered if the task was cancelled.</p>
+</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p>The <code class="literal">TaskContinuationOptions</code> enumeration can be treated as a bit field and a bitwise combination can be performed on its members.</p>
+        </div>
+      </div>
+    </div>
+
+
+    <div id="sbo-rt-content">
+      <div class="section" title="Using a continuation for exception handling">
+        <div class="titlepage">
+          <div>
+            <div>
+              <h1 class="title"><a id="ch02lvl1sec24"></a>Using a continuation for exception handling</h1>
+            </div>
+          </div>
+        </div>
+        <p>In the <span class="emphasis"><em>Handling task exceptions using try/catch</em></span> recipe, in <a class="link" href="ch01.html" title="Chapter&#160;1.&#160;Getting Started with Task Parallel Library">Chapter 1</a>, <span class="emphasis"><em>Getting Started With Task Parallel Library</em></span> we looked at how to handle exceptions in task. In addition to the techniques used in that recipe, you can<a id="id142" class="indexterm"></a> also use continuations to handle task exceptions. By using a continuation, we can handle errors in a cleaner, less inline way. An exception handling continuation allows for centralizing exception handling logic in cases where you would want to provide logging or other exception related code.</p>
+        <p>The basic concept is<a id="id143" class="indexterm"></a> to use the <code class="literal">Task.TaskContinuationOptions</code> enumeration so we can create a continuation that will be scheduled if the task ran to completion, and another continuation that will be scheduled if the task is put into a faulted state.</p>
+        <div class="section" title="Getting Ready">
+          <div class="titlepage">
+            <div>
+              <div>
+                <h2 class="title sigil_not_in_toc"><a id="ch02lvl2sec39"></a>Getting Ready</h2>
+              </div>
+            </div>
+          </div>
+          <p>For this recipe we need to turn off the <span class="strong"><strong>Visual Studio 2012 Exception Assistant</strong></span>. The Exception Assistant appears whenever a run-time exception is thrown and intercepts the exception before it gets to our handler.</p>
+          <div class="orderedlist">
+            <ol class="orderedlist arabic">
+              <li class="listitem">To turn off the Exception Assistant, go to the <span class="strong"><strong>Debug</strong></span> menu and select <span class="strong"><strong>Exceptions</strong></span>.</li>
+              <li class="listitem">Uncheck the <span class="strong"><strong>User-unhandled</strong></span> checkbox next to <span class="strong"><strong>Common Language Runtime Exceptions</strong></span>.<div class="mediaobject"><img src="graphics/0225OT_02_06.jpg" alt="Getting Ready"/></div></li>
+            </ol>
+          </div>
+        </div>
+        <div class="section" title="How to do it…">
+          <div class="titlepage">
+            <div>
+              <div>
+                <h2 class="title sigil_not_in_toc"><a id="ch02lvl2sec40"></a>How to do it…</h2>
+              </div>
+            </div>
+          </div>
+          <p>Now, let's go to Visual Studio and see how to use a continuation for exception handling. The steps are given <a id="id144" class="indexterm"></a>as follows:</p>
+          <div class="orderedlist">
+            <ol class="orderedlist arabic">
+              <li class="listitem">Start a new project <a id="id145" class="indexterm"></a>using the <span class="strong"><strong>C# Console Application</strong></span> project template and assign <code class="literal">Continuation5</code> as the <span class="strong"><strong>Solution name</strong></span>.</li>
+              <li class="listitem">Add the following <code class="literal">using</code> directives at the top of your program class:<div class="informalexample"><pre class="programlisting">using System;
+using System.Threading;
+using System.Threading.Tasks;</pre>
+</div></li>
+              <li class="listitem">In the <code class="literal">Main</code> method of your program class, create a <code class="literal">Task</code>. The task doesn't need to accept a state parameter or return anything. In the body of the <code class="literal">Task</code>, create the try/finally blocks. In order to have a resource to dispose of, create a new WebClient in the <code class="literal">try</code> block, and then throw an exception. In the <code class="literal">finally</code> block, call the dispose method of the WebClient. Other than that, the exact details don't matter much.<div class="informalexample"><pre class="programlisting">Task task1 = Task.Factory.StartNew(() =&gt;
+{
+    Console.WriteLine("Starting the task.");
+    var client = new WebClient();
+    const string headerText = "Mozilla/5.0 (compatible; MSIE 10.0; Windows NT 6.1; Trident/6.0)";
+    client.Headers.Add("user-agent", headerText);
+    try
+    {
+        var book = client.DownloadString(@"http://www.gutenberg.org/files/2009/2009.txt");
+        var ex = new WebException("Unable to download book contents");
+        throw ex;
+    }
+    finally
+    {
+        client.Dispose();
+        Console.WriteLine("WebClient disposed.");
+    }
+});</pre>
+</div></li>
+              <li class="listitem">Immediately following the <code class="literal">Task</code>, use <code class="literal">TaskContinuationOptions.OnlyOnRanToCompletion</code> to create a trivial continuation to run when the task completes successfully. This continuation only needs to write a message to the console.<div class="informalexample"><pre class="programlisting">task1.ContinueWith(antecedent=&gt; 
+{
+    Console.WriteLine("The task ran to   completion."),
+}, TaskContinuationOptions.OnlyOnRanToCompletion);</pre>
+</div></li>
+              <li class="listitem">Next use <code class="literal">TaskContinuationOptions.OnlyOnFaulted</code> to create a continuation<a id="id146" class="indexterm"></a> that only runs when <code class="literal">task1</code> throws<a id="id147" class="indexterm"></a> a fault. After the continuation, add <code class="literal">Console.Readline</code> to wait for user input before exiting.<div class="informalexample"><pre class="programlisting">task1.ContinueWith(antecedent =&gt;
+{
+    Console.WriteLine("The task faulted.");
+    var aEx = antecedent.Exception;
+    if (aEx != null)
+    foreach (var ex in aEx.InnerExceptions)
+    {
+        Console.WriteLine("Handled Exception: {0}",ex.Message);
+    }
+}, TaskContinuationOptions.OnlyOnFaulted);
+Console.ReadLine();</pre>
+</div></li>
+              <li class="listitem">In Visual Studio 2012, press <span class="emphasis"><em>F5</em></span> to run the project. You should see output similar to the one shown in the following screenshot:<div class="mediaobject"><img src="graphics/0225OT_02_07.jpg" alt="How to do it…"/></div></li>
+            </ol>
+          </div>
+        </div>
+        <div class="section" title="How it works…">
+          <div class="titlepage">
+            <div>
+              <div>
+                <h2 class="title sigil_not_in_toc"><a id="ch02lvl2sec41"></a>How it works…</h2>
+              </div>
+            </div>
+          </div>
+          <p>Creating a continuation that will run when a <code class="literal">Task</code> is in a faulted state, works the same as setting any of the other <a id="id148" class="indexterm"></a>enumerations in <code class="literal">TaskContinuationOptions</code> on a continuation.</p>
+          <p>In order to properly clean up resources used by the <code class="literal">Task</code>, we created <code class="literal">try/finally</code> blocks in our task and disposed of the WebClient in the <code class="literal">finally</code> block:</p>
+          <div class="informalexample">
+            <pre class="programlisting">finally
+{
+    client.Dispose();
+    Console.WriteLine("WebClient disposed.");
+}</pre>
+          </div>
+          <p>Our exception handling<a id="id149" class="indexterm"></a> continuation checks to see if the <code class="literal">AggregateException</code> is null before looping through the <code class="literal">InnerExceptions</code> collection, and writing the result to the console. The null check isn't strictly necessary because the antecedent task needs to be in a faulted state before the continuation is scheduled, but it is a good defensive coding practice none the less:</p>
+          <div class="informalexample">
+            <pre class="programlisting">task1.ContinueWith(antecedent =&gt;
+{
+    Console.WriteLine("The task faulted.");
+    var aEx = antecedent.Exception;
+    if (aEx != null)
+        foreach (var ex in aEx.InnerExceptions)
+        {
+            Console.WriteLine("Handled Exception: {0}",ex.Message);
+        }
+}, TaskContinuationOptions.OnlyOnFaulted);
+Console.ReadLine();</pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+
+    <div id="sbo-rt-content">
+      <div class="section" title="Cancelling a continuation">
+        <div class="titlepage">
+          <div>
+            <div>
+              <h1 class="title"><a id="ch02lvl1sec25"></a>Cancelling a continuation</h1>
+            </div>
+          </div>
+        </div>
+        <p>Cancelling a continuation follows the same basic rules as cancelling a <code class="literal">Task</code>. If a <code class="literal">Task</code> and its continuation are two parts of the same operation, you can pass the same cancellation token to both the <code class="literal">Task</code> and the continuation.</p>
+        <p>In this recipe we will have a <a id="id150" class="indexterm"></a>simple <code class="literal">Task</code> that creates a list of numbers and a continuation that squares the numbers and return a result. After a few seconds of running, we will use the token to cancel both the <code class="literal">Task</code> and the continuation.</p>
+        <div class="section" title="Getting Ready">
+          <div class="titlepage">
+            <div>
+              <div>
+                <h2 class="title sigil_not_in_toc"><a id="ch02lvl2sec42"></a>Getting Ready</h2>
+              </div>
+            </div>
+          </div>
+          <p>Since cancelling a <code class="literal">Task</code> or continuation raises and <code class="literal">OperationCanceledException</code> we need to turn off the Visual Studio 2012 Exception Assistant. The Exception Assistant appears whenever a runtime exception is thrown, and intercepts the exception before it gets to our handler.</p>
+          <div class="orderedlist">
+            <ol class="orderedlist arabic">
+              <li class="listitem">To turn off the Exception Assistant, go to the <span class="strong"><strong>Debug</strong></span> menu and select <span class="strong"><strong>Exceptions</strong></span>.</li>
+              <li class="listitem">Uncheck the <span class="strong"><strong>User-unhandled</strong></span> checkbox next to <span class="strong"><strong>Common Language Runtime Exceptions</strong></span>.<div class="mediaobject"><img src="graphics/0225OT_02_06.jpg" alt="Getting Ready"/></div></li>
+            </ol>
+          </div>
+        </div>
+        <div class="section" title="How to do it…">
+          <div class="titlepage">
+            <div>
+              <div>
+                <h2 class="title sigil_not_in_toc"><a id="ch02lvl2sec43"></a>How to do it…</h2>
+              </div>
+            </div>
+          </div>
+          <p>Now, let's build a console<a id="id151" class="indexterm"></a> application so that we can see how to cancel a continuation. The steps are as follows:</p>
+          <div class="orderedlist">
+            <ol class="orderedlist arabic">
+              <li class="listitem">Start a new project using the <span class="strong"><strong>C# Console Application</strong></span> project template and assign <code class="literal">Continuation6</code> as the <span class="strong"><strong>Solution name</strong></span>.</li>
+              <li class="listitem">Add the following <code class="literal">using</code> directives to the top of your program class.<div class="informalexample"><pre class="programlisting">using System;
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;</pre>
+</div></li>
+              <li class="listitem">In the <code class="literal">Main</code> method of your program class, let's start by creating our <code class="literal">CancellationTokenSource</code> and getting a token. We will pass this token to both the antecedent <code class="literal">Task</code> and the continuation.<div class="informalexample"><pre class="programlisting">var tokenSource = new CancellationTokenSource();
+var token = tokenSource.Token;</pre>
+</div></li>
+              <li class="listitem">Next let's add try/catch/finally blocks to the <code class="literal">Main</code> method, just under the previous lines. Add some basic error handling to the <code class="literal">catch</code> block and dispose of the <code class="literal">CancellationTokenSource</code> in the <code class="literal">finally</code> block.<div class="informalexample"><pre class="programlisting">try
+{
+//Task and Continuation go here
+}
+catch (AggregateException aEx)
+{
+    foreach (var ex in aEx.InnerExceptions)
+    {
+        Console.WriteLine("An exception has occured: " + ex.Message);
+    }
+}
+finally
+{
+    tokenSource.Dispose();
+}</pre>
+</div></li>
+              <li class="listitem">Inside the <code class="literal">try</code> block, create a task that accepts an object state parameter. The parameter will <a id="id152" class="indexterm"></a>determine the size of our number list. We will cast it to <code class="literal">Int32</code> and create a <code class="literal">for</code> loop to add numbers to our list. Also, pass the token created in step 1 to the task constructor.<div class="informalexample"><pre class="programlisting">var task1 = Task.Factory.StartNew(state =&gt;
+{
+    Console.WriteLine("Task has started.");
+    var result = new List&lt;Int32&gt;();
+    for (var i = 0; i &lt; (Int32) state; i++)
+    {
+        token.ThrowIfCancellationRequested();
+        result.Add(i);
+        Thread.Sleep(100); //sleep to simulate some work
+    }
+    return result;
+}, 5000,token);</pre>
+</div></li>
+              <li class="listitem">After the <code class="literal">Task</code>, let's create our continuation. The continuation will receive the results from the antecedent <code class="literal">Task</code>, loop through the list, and square the numbers. Pass the same <code class="literal">CancellationToken</code> into the continuations constructor.<div class="informalexample"><pre class="programlisting">task1.ContinueWith(antecedent =&gt;
+{
+    Console.WriteLine("Continuation has started.");
+    var antecedentResult = antecedent.Result;
+    var squares = new List&lt;int&gt;();
+    foreach (var value in antecedentResult)
+    {
+        token.ThrowIfCancellationRequested();
+        squares.Add(value*value);
+        Thread.Sleep(100);//sleep to simulate some more work
+    }
+    return squares;
+},token);</pre>
+</div></li>
+              <li class="listitem">At the end of the <code class="literal">try</code> block, we need to sleep the thread a bit to give the <code class="literal">Task</code> and continuation <a id="id153" class="indexterm"></a>some time to run, and then we will cancel the token. Finally we will call the <code class="literal">Wait</code> method on <code class="literal">task1</code>.<div class="informalexample"><pre class="programlisting">Thread.Sleep(2000); //wait for 2 seconds
+tokenSource.Cancel();
+task1.Wait();</pre>
+</div></li>
+              <li class="listitem">Last, after the end of the <code class="literal">finally</code> block, write a message to the console that we are finished and wait for the user input.<div class="informalexample"><pre class="programlisting">Console.WriteLine("Complete. Press enter to exit.");
+Console.ReadLine();</pre>
+</div></li>
+              <li class="listitem">In Visual Studio 2012, press <span class="emphasis"><em>F5</em></span> to run the project. You should see output similar to the following screenshot:<div class="mediaobject"><img src="graphics/0225OT_02_08.jpg" alt="How to do it…"/></div></li>
+            </ol>
+          </div>
+        </div>
+        <div class="section" title="How it works…">
+          <div class="titlepage">
+            <div>
+              <div>
+                <h2 class="title sigil_not_in_toc"><a id="ch02lvl2sec44"></a>How it works…</h2>
+              </div>
+            </div>
+          </div>
+          <p>When an antecedent task throws an <code class="literal">OperationCancelledException</code> in response to a cancellation request, as long as the continuation uses the same <code class="literal">CancellationToken</code>, the cancellation request will be treated as an acknowledgement of co-operative cancellation and both the antecedent task and the continuation will go into a cancelled state.</p>
+          <p>This is pretty easy to <a id="id154" class="indexterm"></a>accomplish. We just need to get a <code class="literal">CancellationToken</code> from a <code class="literal">CancellationTokenSource</code>, and pass the token to the constructors for both the antecedent <code class="literal">Task</code> and the continuation.</p>
+          <div class="informalexample">
+            <pre class="programlisting">var tokenSource = new CancellationTokenSource();
+var token = tokenSource.Token;
+
+var task1 = Task.Factory.StartNew(state =&gt;
+{
+    // Task body
+}, 5000,token);
+
+task1.ContinueWith(antecedent =&gt;
+{
+    //Continuation body
+},token);</pre>
+          </div>
+          <p>Inside the body of the loops in our <code class="literal">Task</code> and the continuation, we need to poll for cancellation and throw an <code class="literal">OperationCancelledException</code> if the token gets cancelled. This can be done in one line of code with the <code class="literal">ThrowIfCancellationRequested</code> method of the <code class="literal">CancellationToken</code> object.</p>
+          <div class="informalexample">
+            <pre class="programlisting">foreach (var value in antecedentResult)
+{
+    token.ThrowIfCancellationRequested();
+    squares.Add(value*value);
+    Thread.Sleep(100);//sleep to simulate some more work
+}</pre>
+          </div>
+          <p>Lastly, we just need to make sure we are handling <code class="literal">AggregateExceptions</code> in our <code class="literal">catch</code> block.</p>
+        </div>
+      </div>
+    </div>
+
+
+    <div id="sbo-rt-content">
+      <div class="section" title="Using a continuation to chain multiple tasks">
+        <div class="titlepage">
+          <div>
+            <div>
+              <h1 class="title"><a id="ch02lvl1sec26"></a>Using a continuation to chain multiple tasks</h1>
+            </div>
+          </div>
+        </div>
+        <p>Another feature of continuations is that you can continue continuations in order to chain tasks together to any length. The pipeline<a id="id155" class="indexterm"></a> pattern can be implemented with a series of tasks and continuations. You can think of a pipeline as an assembly<a id="id156" class="indexterm"></a> line in a factory. At the frontend of a pipeline, a producer task generates the data to be operated on, and each of the chained consumer stages operates on or changes the produced data.</p>
+        <p>In this recipe we will return to our word count example to create a simple three stage pipeline using continuations with <code class="literal">TaskContinuationOptions.OnlyOnRanToCompletion</code>.</p>
+        <div class="section" title="How to do it…">
+          <div class="titlepage">
+            <div>
+              <div>
+                <h2 class="title sigil_not_in_toc"><a id="ch02lvl2sec45"></a>How to do it…</h2>
+              </div>
+            </div>
+          </div>
+          <p>Open up Visual Studio, <a id="id157" class="indexterm"></a>and let's see how to chain tasks together into a pipeline. The steps are as follows:</p>
+          <div class="orderedlist">
+            <ol class="orderedlist arabic">
+              <li class="listitem">Start a new project using the <span class="strong"><strong>C# Console Application</strong></span> project template and assign <code class="literal">Continuation7</code> as the <span class="strong"><strong>Solution name</strong></span>.</li>
+              <li class="listitem">Add the following <code class="literal">using</code> directives to the top of your program class:<div class="informalexample"><pre class="programlisting">using System;
+using System.Linq;
+using System.Net;
+using System.Threading.Tasks;</pre>
+</div></li>
+              <li class="listitem">Let's start this application by adding try/catch blocks in the <code class="literal">Main</code> method of the program class. In the <code class="literal">catch</code> block add some handling for any <code class="literal">AggregateException</code> raised by the tasks. At the end of the <code class="literal">catch</code> block, write a message to the console to tell the user we are finished and wait for input to exit.<div class="informalexample"><pre class="programlisting">try
+{
+//Task and continuations go here
+}
+catch (AggregateException aEx)
+{
+    foreach (var ex in aEx.InnerExceptions)
+    {
+        Console.WriteLine("An exception has occured: {0}", ex.Message);
+    }
+}
+Console.WriteLine();
+Console.WriteLine("Complete. Please hit &lt;Enter&gt; to exit.");
+Console.ReadLine();</pre>
+</div></li>
+              <li class="listitem">Now we need to create a <code class="literal">producer</code> task that reads in the text of a book, and returns a string array, <a id="id158" class="indexterm"></a>which the consumer continuations will consume.<div class="informalexample"><pre class="programlisting">var producer = Task.Factory.StartNew(() =&gt;
+{
+    char[] delimiters = { ' ', ',', '.', ';', ':', '-', '_', '/', '\u000A' };
+    var client = new WebClient();
+    const string headerText = "Mozilla/5.0 (compatible; MSIE 10.0; Windows NT 6.1; Trident/6.0)";
+    client.Headers.Add("user-agent", headerText);
+    try
+    {
+        var words = client.DownloadString(@"http://www.gutenberg.org/files/2009/2009.txt");
+        var wordArray = words.Split(delimiters, StringSplitOptions.RemoveEmptyEntries);
+        Console.WriteLine("Word count for Origin of Species: {0}", wordArray.Count());
+        Console.WriteLine();
+        return wordArray;
+    }
+    finally
+    {
+        client.Dispose();
+    }
+});</pre>
+</div></li>
+              <li class="listitem">The first consumer will <a id="id159" class="indexterm"></a>perform a Linq query on the results of the producer to find the five most commonly used words.<div class="informalexample"><pre class="programlisting">Task&lt;string[]&gt; consumer1 = producer.ContinueWith(antecedent =&gt;
+{
+    var wordsByUsage =antecedent.Result.Where(word =&gt; word.Length &gt; 5)
+        .GroupBy(word =&gt; word)
+        .OrderByDescending(grouping =&gt; grouping.Count())
+        .Select(grouping =&gt; grouping.Key);
+    var commonWords = (wordsByUsage.Take(5)).ToArray();
+    Console.WriteLine("The 5 most commonly used words in Origin of Species:");
+    Console.WriteLine("----------------------------------------------------");
+    foreach (var word in commonWords)
+    {
+        Console.WriteLine(word);
+    }
+    Console.WriteLine();
+    return antecedent.Result;
+}, TaskContinuationOptions.OnlyOnRanToCompletion);
+The second <a id="id160" class="indexterm"></a>consumer will perform another Linq query to find the longest word used.
+Task consumer2 = consumer1.ContinueWith(antecedent =&gt;
+{
+    var longestWord = (antecedent.Result.OrderByDescending(w =&gt; w.Length)).First();
+    Console.WriteLine("The longest word is: {0}", longestWord);
+}, TaskContinuationOptions.OnlyOnRanToCompletion);
+consumer2.Wait();</pre>
+</div></li>
+              <li class="listitem">In Visual Studio 2012, press <span class="emphasis"><em>F5</em></span> to run<a id="id161" class="indexterm"></a> the project. You should see output similar to the following screenshot:<div class="mediaobject"><img src="graphics/0225OT_02_09.jpg" alt="How to do it…"/></div></li>
+            </ol>
+          </div>
+        </div>
+        <div class="section" title="How it works…">
+          <div class="titlepage">
+            <div>
+              <div>
+                <h2 class="title sigil_not_in_toc"><a id="ch02lvl2sec46"></a>How it works…</h2>
+              </div>
+            </div>
+          </div>
+          <p>The task and continuations we used in this example are pretty much the same as the tasks we have created in other recipes. The primary difference is how we chained them together and the length <a id="id162" class="indexterm"></a>of the chain. Our antecedent task produces and returns a string array, and then we have a continuation that finds the five most commonly used words, finally we continue the continuation to find the longest word.</p>
+          <p>Note that we also use <code class="literal">TaskContinuationOptions.OnlyOnRanToCompletion</code> because we only want the consumers to be scheduled to run when the previous task succeeded. To be a more complete solution, we would want to use <code class="literal">TaskContinuationOptions.OnlyOnFaulted</code> to set up a continuation for the failure path as well.</p>
+        </div>
+      </div>
+    </div>
+
+
+    <div id="sbo-rt-content">
+      <div class="section" title="Using a continuation to update a UI">
+        <div class="titlepage">
+          <div>
+            <div>
+              <h1 class="title"><a id="ch02lvl1sec27"></a>Using a continuation to update a UI</h1>
+            </div>
+          </div>
+        </div>
+        <p>A common challenge when developing multithreaded WPF applications is that the UI controls have thread affinity, meaning<a id="id163" class="indexterm"></a> they can only be updated by the thread that created them. This is usually the main thread of the application.</p>
+        <p>The TPL, however, <a id="id164" class="indexterm"></a>offers a clean way to marshal the results from a TPL task to the correct thread for updating the UI. It accomplishes this with the <code class="literal">TaskScheduler.FromCurrentSynchronizationContext</code> method which creates a <code class="literal">TaskScheduler</code> associated with the current <code class="literal">SyncronizationContext</code>.</p>
+        <p>In this recipe we are going to create a WPF application which will start a task to get the word count of a book. <a id="id165" class="indexterm"></a>The task will have a continuation that is created in the correct synchronization context by calling <code class="literal">TaskScheduler.FromCurrentSynchronizationContext</code>. The continuation will perform the UI update.</p>
+        <div class="section" title="How to do it…">
+          <div class="titlepage">
+            <div>
+              <div>
+                <h2 class="title sigil_not_in_toc"><a id="ch02lvl2sec47"></a>How to do it…</h2>
+              </div>
+            </div>
+          </div>
+          <p>Let's create a WPF application and see how we can use the TPL marshal data to the UI thread.</p>
+          <div class="orderedlist">
+            <ol class="orderedlist arabic">
+              <li class="listitem">Start a new project using the <span class="strong"><strong>WPF Application</strong></span> project template and assign <code class="literal">Continuation8</code> as the <span class="strong"><strong>Solution name</strong></span>.</li>
+              <li class="listitem">Open the <code class="literal">MainWindow.xaml.cs</code> file and ensure the following <code class="literal">using</code> directives to the top of your <code class="literal">MainWindow</code> class:<div class="informalexample"><pre class="programlisting">using System;
+using System.Linq;
+using System.Net;
+using System.Threading.Tasks;
+using System.Windows;</pre>
+</div></li>
+              <li class="listitem">Go back to <code class="literal">MainWindow.xaml</code> and replace the XAML with the following code to create the UI layout:<div class="informalexample"><pre class="programlisting">&lt;Window x:Class="Continuation8.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="MainWindow" Height="350" Width="525"&gt;
+    &lt;Grid&gt;
+        &lt;Button Content="Get Word Count" 
+            HorizontalAlignment="Left" 
+            Margin="207,236,0,0" 
+            VerticalAlignment="Top" 
+            Width="96" 
+            Click="Button_Click_1"/&gt;
+        &lt;Label x:Name="lblWordCount" 
+            Content="" 
+            HorizontalAlignment="Left" 
+            Margin="121,148,0,0" 
+            VerticalAlignment="Top" 
+            RenderTransformOrigin="0.094,0.923" 
+            Width="278"/&gt;
+
+    &lt;/Grid&gt;
+&lt;/Window&gt;</pre>
+</div><div class="mediaobject"><img src="graphics/0225OT_02_10.jpg" alt="How to do it…"/></div></li>
+              <li class="listitem">Now add a <code class="literal">Label</code> from<a id="id166" class="indexterm"></a> the toolbox to <a id="id167" class="indexterm"></a>your window. Change the <span class="strong"><strong>Name</strong></span> property to <code class="literal">lblWordCount</code> and remove the default value from the <span class="strong"><strong>Content</strong></span> property.<div class="mediaobject"><img src="graphics/0225OT_02_12.jpg" alt="How to do it…"/></div></li>
+              <li class="listitem">OK, now double click on the <span class="strong"><strong>Get Word Count</strong></span> button on your form to open up <code class="literal">Mai</code><code class="literal">nWindow.xaml.cs</code> in the <code class="literal">Button_Click_1</code> event handler. This is where we will create our task and continuation.</li>
+              <li class="listitem">In the <code class="literal">Button_Click_1</code> event handler, create a <code class="literal">Task</code> that reads the content of a book into a <a id="id168" class="indexterm"></a>string array. The <code class="literal">Task</code> will return a string array result which will be used in a continuation to display the<a id="id169" class="indexterm"></a> word count to the UI. The <code class="literal">Task</code> will be continued with a continuation created with <code class="literal">TaskScheduler.FromCurrentSynchronizationContext</code> called in the constructor:<div class="informalexample"><pre class="programlisting">private void Button_Click_1(object sender, RoutedEventArgs e)
+{
+    Task.Factory.StartNew(() =&gt;
+    {
+        char[] delimiters = {' ', ',', '.', ';', ':', '-', '_', '/', '\u000A'};
+        var client = new WebClient();
+        const string headerText = "Mozilla/5.0 (compatible; MSIE 10.0; Windows NT 6.1; Trident/6.0)";
+        client.Headers.Add("user-agent", headerText);
+        try
+        {
+            var words = client.DownloadString(@"http://www.gutenberg.org/files/2009/2009.txt");
+            var wordArray = words.Split(delimiters, StringSplitOptions.RemoveEmptyEntries);
+            return wordArray;
+        }
+        finally
+        {
+            client.Dispose();
+        }
+    }).ContinueWith(antecedent =&gt;
+    {
+        lblWordCount.Content = String.Concat("Origin of Species word count: ",antecedent.Result.Count().ToString());
+    }, TaskScheduler.FromCurrentSynchronizationContext());
+}</pre>
+</div></li>
+              <li class="listitem">In Visual Studio 2012,<a id="id170" class="indexterm"></a> press <span class="emphasis"><em>F5</em></span> to run the project. Your application windows should look something as shown in the following screenshot:<div class="mediaobject"><img src="graphics/0225OT_02_13.jpg" alt="How to do it…"/></div></li>
+            </ol>
+          </div>
+        </div>
+        <div class="section" title="How it works…">
+          <div class="titlepage">
+            <div>
+              <div>
+                <h2 class="title sigil_not_in_toc"><a id="ch02lvl2sec48"></a>How it works…</h2>
+              </div>
+            </div>
+          </div>
+          <p>Tasks run on instances of the <code class="literal">TaskScheduler</code> class. Two implementations of <code class="literal">TaskScheduler</code> are<a id="id171" class="indexterm"></a> included as <a id="id172" class="indexterm"></a>part of the .NET Framework 4.5. One is the default scheduler, which is integrated with the .NET ThreadPool. The other is the type of <code class="literal">TaskScheduler</code> returned from the static method <code class="literal">TaskScheduler.FromCurrentSynchronizationContext</code>.</p>
+          <p>
+<code class="literal">SynchronizationContext</code> provides two methods, <code class="literal">Send</code> and <code class="literal">Post</code>, both of which accept a delegate to be executed. <code class="literal">Send</code> synchronously invokes the delegate, and <code class="literal">Post</code> asynchronously invokes the delegate.</p>
+          <p>UI controls should only be accessed by the thread that created them, usually the main UI thread. So, if a thread working in the background wants to update something in the UI, it needs to marshal that data back to the UI thread so that the controls can be accessed safely. In WPF, you would do this with the target thread's <code class="literal">Dispatcher</code> and corresponding <code class="literal">Invoke/BeginInvoke</code> methods<a id="id173" class="indexterm"></a>. With the .NET 4.5 TPL, a new type may be derived from <code class="literal">SynchronizationContext</code> such that its <code class="literal">Send</code> method synchronously marshals a delegate to the right thread for execution, and <code class="literal">Post</code> does the same but asynchronously.</p>
+          <p>UI frameworks like WPF publish<a id="id174" class="indexterm"></a> an instance of their <code class="literal">SynchronizationContext</code> derived class to <code class="literal">SynchronizationContext.Current</code>. Your code can then get <code class="literal">SynchronizationContext.Current</code> and use it to marshal work.</p>
+          <p>
+<code class="literal">TaskScheduler.FromCurrentSynchronizationContext</code> creates a <code class="literal">TaskScheduler</code> that wraps the <code class="literal">SynchronizationContext</code> returned from <code class="literal">SynchronizationContext.Current</code>. In doing so, this gives you a <code class="literal">TaskScheduler</code> that will execute <code class="literal">Tasks</code> on the current <code class="literal">SynchronizationContext</code>. This means you can create tasks that are able to access UI controls safely by running them on the right scheduler.</p>
+          <p>Since we can create<a id="id175" class="indexterm"></a> a <code class="literal">Task</code> or continuation with a derived <code class="literal">TaskScheduler</code>, we can create the continuation with a scheduler that will execute the continuation on the proper context to update the UI.</p>
+          <div class="informalexample">
+            <pre class="programlisting">Task.Factory.StartNew(() =&gt;
+{
+}).ContinueWith(antecedent =&gt;
+{
+}, TaskScheduler.FromCurrentSynchronizationContext());</pre>
+          </div>
+        </div>
+      </div>
+    </div>
+</body>
+</html>

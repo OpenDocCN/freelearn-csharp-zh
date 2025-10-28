@@ -1,0 +1,1067 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" epub:prefix="z3998: http://www.daisy.org/z3998/2012/vocab/structure/#" lang="en" xml:lang="en">
+<head>
+    <title>6. Synchronization Primitives</title>
+    <link href="epub.css" rel="stylesheet" type="text/css"/>
+    <link href="68851547a55f.css" rel="stylesheet" type="text/css"/>
+  </head>
+  <body>
+    <div id="sbo-rt-content">
+      <div class="chapter" title="Chapter&#160;6.&#160;Synchronization Primitives">
+        <div class="titlepage">
+          <div>
+            <div>
+              <h1 class="title"><a id="ch06"></a>Chapter&#160;6.&#160;Synchronization Primitives</h1>
+            </div>
+          </div>
+        </div>
+        <p>In this chapter, we will cover the following recipes:</p>
+        <div class="itemizedlist">
+          <ul class="itemizedlist">
+            <li class="listitem" style="list-style-type: disc">Using monitor</li>
+            <li class="listitem" style="list-style-type: disc">Using mutual exclusion lock</li>
+            <li class="listitem" style="list-style-type: disc">Using <code class="literal">SpinLock</code> for synchronization</li>
+            <li class="listitem" style="list-style-type: disc">Interlocked operations</li>
+            <li class="listitem" style="list-style-type: disc">Synchronizing multiple tasks with a Barrier</li>
+            <li class="listitem" style="list-style-type: disc">Using <code class="literal">ReaderWriterLockSlim</code> </li>
+            <li class="listitem" style="list-style-type: disc">Using <code class="literal">WaitHandles</code> with Mutex</li>
+            <li class="listitem" style="list-style-type: disc">Waiting for multiple threads with <code class="literal">CountdownEvent</code></li>
+            <li class="listitem" style="list-style-type: disc">Using <code class="literal">ManualResetEventSlim</code> to spin and wait</li>
+            <li class="listitem" style="list-style-type: disc">Using <code class="literal">SemaphoreSlim</code> to limit access</li>
+          </ul>
+        </div>
+        <div class="section" title="Introduction">
+          <div class="titlepage">
+            <div>
+              <div>
+                <h1 class="title" id="sigil_toc_id_8"><a id="ch06lvl1sec60"></a>Introduction</h1>
+              </div>
+            </div>
+          </div>
+          <p>This chapter is about coordinating the work that is performed by parallel tasks.</p>
+          <p>When concurrent tasks read from and write to variables without an appropriate synchronization mechanism, a <span class="strong"><strong>race condition</strong></span>
+<a id="id440" class="indexterm"></a> has the potential to appear. Race conditions can produce inconsistent results in your program, and can be very difficult to detect and correct.</p>
+          <p>Let's take a second to understand what a race condition is. Consider a scenario that has two parallel tasks; task1 and task2. Each task tries to read and increment the value of a public variable. Task1 reads the original value of the variable, let's say 10, and increments the value to 11. At the same time task1 is reading the value of the variable but before it increments the value, task2 reads the same value of 10 and increments to 11. The final value of the variable ends up being 11 instead of the correct value of 12.</p>
+          <p>
+<span class="strong"><strong>.NET framework 4.5</strong></span> offers several new data structures for parallel programming that simplify complex synchronization <a id="id441" class="indexterm"></a>problems. Knowledge of these synchronization primitives will enable you to implement more complex algorithms and solve many of the issues associated with multithreaded programming. It is important to learn the various alternatives so that you can choose the most appropriate one for scenarios that require communication and synchronization among multiple tasks.</p>
+        </div>
+      </div>
+    </div>
+
+
+    <div id="sbo-rt-content">
+      <div class="section" title="Using monitor">
+        <div class="titlepage">
+          <div>
+            <div>
+              <h1 class="title"><a id="ch06lvl1sec61"></a>Using monitor</h1>
+            </div>
+          </div>
+        </div>
+        <p>A monitor, like the lock <a id="id442" class="indexterm"></a>statement, is a mechanism for ensuring that only one thread at a time may be running in a critical section of code. A monitor has a lock, and only one thread at a time may acquire it. To run in a critical section of code, a thread must have acquired the monitor. While a thread owns the lock for an object, no other thread can acquire that lock.</p>
+        <p>For this recipe, we are going to create an application that uses a <code class="literal">ConsoleWriter</code> class with a <code class="literal">WriteNumbers</code> method to write some numbers out to the Console. Three parallel tasks will each be trying to write some numbers to the Console, and we will use monitor to control access to the critical section of code.</p>
+        <div class="section" title="How to do it…">
+          <div class="titlepage">
+            <div>
+              <div>
+                <h2 class="title sigil_not_in_toc"><a id="ch06lvl2sec111"></a>How to do it…</h2>
+              </div>
+            </div>
+          </div>
+          <p>Have a look at the following steps:</p>
+          <div class="orderedlist">
+            <ol class="orderedlist arabic">
+              <li class="listitem">Start a new project<a id="id443" class="indexterm"></a> using the <span class="strong"><strong>C# Console Application</strong></span> project template and assign <code class="literal">MonitorExample</code> as the <span class="strong"><strong>Solution name</strong></span>.</li>
+              <li class="listitem">Add a new class to your project and name the class <code class="literal">ConsoleWriter.cs</code>.</li>
+              <li class="listitem">Add the following code snippet using the directives to the top of your <code class="literal">ConsoleWriter</code> class:<div class="informalexample"><pre class="programlisting">using System;
+using System.Threading;</pre>
+</div></li>
+              <li class="listitem">First, inside the declaration of your <code class="literal">ConsoleWriter</code> class, create a private member variable of type object which we will use as our lock object.<div class="informalexample"><pre class="programlisting">public class ConsoleWriter
+{
+  private object _locker = new object(); 
+}</pre>
+</div></li>
+              <li class="listitem">Now let's create a method of the <code class="literal">ConsoleWriter</code> class<a id="id444" class="indexterm"></a> called <code class="literal">WriteNumbersUnprotected</code>. This is a simple method that executes a <code class="literal">for</code> loop. Each iteration of the loop will write the number of the loop index to the Console. As you might have guessed by the method name, we will not use monitor to lock the critical section of this method.<div class="informalexample"><pre class="programlisting">public void WriteNumbersUnprotected()
+{
+  for (int numbers = 0; numbers &lt; 5; numbers++)
+  {
+    Thread.Sleep(100);
+    Console.Write(numbers + ",");
+  }
+  Console.WriteLine();
+}</pre>
+</div></li>
+              <li class="listitem">Now let's create a<a id="id445" class="indexterm"></a> method on the <code class="literal">ConsoleWriter</code> class named <code class="literal">WriteNumbers</code>. This method will have the same functionality as the previous method we created. However, this method will use monitor to ensure that only a single thread can enter the critical section of code.<div class="informalexample"><pre class="programlisting">public void WriteNumbers()
+{
+  Monitor.Enter(_locker);
+  try
+  {
+    for (int number = 0; number &lt;= 5; number++)
+    {
+      Thread.Sleep(100);
+      Console.Write(number + ",");
+    }
+    Console.WriteLine();
+  }
+  finally
+  {
+    Monitor.Exit(_locker);
+  }
+}</pre>
+</div></li>
+              <li class="listitem">Now let's go back to the <code class="literal">Program</code> class. Add the following code snippet using directives to the top of the <code class="literal">Program</code> class:<div class="informalexample"><pre class="programlisting">using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;</pre>
+</div></li>
+              <li class="listitem">In the <code class="literal">Main</code> method of the <code class="literal">Program</code> class, start by creating, and instantiating an instance of <code class="literal">ConsoleWriter</code>. Also create a list of tasks which we will use to hold a reference to our tasks.<div class="informalexample"><pre class="programlisting">static void Main(string[] args)
+{  
+  var writer = new ConsoleWriter();
+  var taskList = new List&lt;Task&gt;();	
+}</pre>
+</div></li>
+              <li class="listitem">Now let's create a <code class="literal">for</code> loop that creates and starts three tasks. The task will each call the <a id="id446" class="indexterm"></a><code class="literal">WriteNumbersUnprotected</code> method<a id="id447" class="indexterm"></a> of the shared <code class="literal">ConsoleWriter</code> object.<div class="informalexample"><pre class="programlisting">for (int i = 0; i &lt; 3; i++)
+{
+  taskList.Add(Task.Factory.StartNew(()=&gt;
+    {
+      writer.WriteNumbersUnprotected();
+    }));                
+}</pre>
+</div></li>
+              <li class="listitem">Finish up the <code class="literal">Main</code> method of the <code class="literal">Program</code> class by waiting on the tasks to complete and waiting on user input before exiting.<div class="informalexample"><pre class="programlisting">Task.WaitAll(taskList.ToArray());
+Console.WriteLine("Finished. Press &lt;Enter&gt; to exit.");
+Console.ReadLine();</pre>
+</div></li>
+              <li class="listitem">Now, in Visual Studio 2012, press <span class="emphasis"><em>F5</em></span> to run the project. You will probably see some pretty ugly output because more than one thread is calling the method at a time. Have look at the following screenshot:<div class="mediaobject"><img src="graphics/0225OT_06_03.jpg" alt="How to do it…"/></div></li>
+              <li class="listitem">Let's fix this by going back to our tasks in the <code class="literal">Main</code> method of the <code class="literal">Program</code> class and change <a id="id448" class="indexterm"></a>them now to call the <code class="literal">WriteNumbers</code> method which protects the critical section of code with monitor.<div class="informalexample"><pre class="programlisting">for (int i = 0; i &lt; 3; i++)
+{
+  taskList.Add(Task.Factory.StartNew(()=&gt;
+    {
+      writer.WriteNumbers();
+    }));                
+}</pre>
+</div></li>
+              <li class="listitem">Let's press <span class="emphasis"><em>F5</em></span> again to run the project. This time you should see more orderly output because only one thread at a time can be in the critical section. This is shown in the following screenshot:<div class="mediaobject"><img src="graphics/0225OT_06_04.jpg" alt="How to do it…"/></div></li>
+            </ol>
+          </div>
+        </div>
+        <div class="section" title="How it works…">
+          <div class="titlepage">
+            <div>
+              <div>
+                <h2 class="title sigil_not_in_toc"><a id="ch06lvl2sec112"></a>How it works…</h2>
+              </div>
+            </div>
+          </div>
+          <p>Lock and monitor are very similar. In fact, the <code class="literal">lock</code> keyword is implemented using the <code class="literal">Monitor</code> class. When using <code class="literal">Monitor</code>, the developer has to be a bit more careful to explicitly remove the lock using <code class="literal">exit</code>. Lock calls <code class="literal">Enter</code> and <code class="literal">Exit</code> implicitly, but when using <code class="literal">Monitor</code> they have to be called by the developer. It is best practice to call <code class="literal">exit</code> in a <code class="literal">finally</code> block to ensure the lock will be released in the event of an <code class="literal">Exception</code>.</p>
+          <div class="informalexample">
+            <pre class="programlisting">Monitor.Enter(_locker);
+try
+{
+	// Critical Section
+}
+finally
+{
+  Monitor.Exit(_locker);</pre>
+          </div>
+          <p>Using <code class="literal">lock</code> is generally preferred over using <code class="literal">Monitor</code> directly. This is because lock is more concise and lock ensures that the underlying monitor is released, even if the protected code <a id="id449" class="indexterm"></a>throws an <code class="literal">Exception</code>.</p>
+          <p>However, the <code class="literal">lock</code> keyword isn't quite as fully-featured as the <code class="literal">Monitor</code> class. For example, <code class="literal">Monitor</code> has a <code class="literal">TryEnter</code> method that can wait for a <code class="literal">lock</code> for a specified period of time instead of waiting infinitely.</p>
+        </div>
+      </div>
+    </div>
+
+
+    <div id="sbo-rt-content">
+      <div class="section" title="Using a mutual exclusion lock">
+        <div class="titlepage">
+          <div>
+            <div>
+              <h1 class="title"><a id="ch06lvl1sec62"></a>Using a mutual exclusion lock</h1>
+            </div>
+          </div>
+        </div>
+        <p>Locking is essential in parallel programs. <a id="id450" class="indexterm"></a>It restricts code from being executed by more than one thread at the same time. Exclusive locking is used to ensure<a id="id451" class="indexterm"></a> that only one thread can enter a particular section of code at a time.</p>
+        <p>The simplest way to use synchronization in c# is with the <code class="literal">lock</code> keyword. The <code class="literal">lock</code> keyword works by marking a block of code as a critical section by obtaining a mutual exclusion lock for an object running a statement and then releasing the lock.</p>
+        <p>In this recipe, we are going to create a class that represents a bank account. An object of this class will be shared by a couple of parallel tasks that will be making a series of withdrawals for random amounts. The critical section of code in the <code class="literal">Withdraw</code> method that updates the balance of the shared account object will be protected by a <code class="literal">lock</code> statement.</p>
+        <div class="section" title="How to do it…">
+          <div class="titlepage">
+            <div>
+              <div>
+                <h2 class="title sigil_not_in_toc"><a id="ch06lvl2sec113"></a>How to do it…</h2>
+              </div>
+            </div>
+          </div>
+          <p>Let's go to Visual Studio 2012 and take a look at the following steps on how to use mutual exclusion locks:</p>
+          <div class="orderedlist">
+            <ol class="orderedlist arabic">
+              <li class="listitem">Start a new project using the <span class="strong"><strong>C# Console Application</strong></span> project template and assign <code class="literal">LockExample</code> as the <span class="strong"><strong>Solution name</strong></span>.</li>
+              <li class="listitem">Add a new class to the project and name the class <code class="literal">Account.cs</code>.</li>
+              <li class="listitem">Add the following code snippet using directives to the top of your <code class="literal">Account</code> class:<div class="informalexample"><pre class="programlisting">using System.Text;
+using System.Threading.Tasks;</pre>
+</div></li>
+              <li class="listitem">Add a private field of type <code class="literal">double</code> to the <code class="literal">Account</code> class to store the balance of the account and a private object that will be used for locking.<div class="informalexample"><pre class="programlisting">private double _balance;
+private object _locker = new object();</pre>
+</div></li>
+              <li class="listitem">Next let's <a id="id452" class="indexterm"></a>add a constructor to the <code class="literal">Account</code> class. This constructor should accept a parameter of type <code class="literal">double</code> and should initialize the <code class="literal">balance</code> field.<div class="informalexample"><pre class="programlisting">public Account(double initialBalance)
+<code class="literal">{</code>
+<code class="literal">  _balance = initialBalance;</code>
+<code class="literal">}</code>
+</pre>
+</div></li>
+              <li class="listitem">Now let's <a id="id453" class="indexterm"></a>create a <code class="literal">Withdraw</code> method for the account. If the account has a negative balance, the <code class="literal">Withdraw</code> method should throw an error. Otherwise, the <code class="literal">Withdraw</code> method should obtain a mutual exclusion lock on the <code class="literal">Account</code> object and deduct the requested amount from the balance.<div class="informalexample"><pre class="programlisting">public double Withdraw(double amount)
+{
+
+  if (_balance &lt; 0)
+  throw new Exception("Account has a negative balance.");
+  }
+
+  lock (_locker)
+  {
+    if (_balance &gt;= amount)
+    {
+      Console.WriteLine("Starting balance :  " + _balance);
+      Console.WriteLine("Withdraw  amount : -" + amount);
+      _balance = _balance - amount;
+      Console.WriteLine("Current balance :  " + _balance);
+      return amount;
+    }
+    else
+    {
+      return 0;
+    }
+  }
+}</pre>
+</div></li>
+              <li class="listitem">Now let's go back to our <code class="literal">Program</code> class. Make sure to add the following code snippet using directives that are at the top of the <code class="literal">Program</code> class:<div class="informalexample"><pre class="programlisting">using System;
+using System.Threading.Tasks;</pre>
+</div></li>
+              <li class="listitem">Create a static <code class="literal">DoTransactions</code> method for the <code class="literal">Program</code> class. The <code class="literal">DoTransactions</code><a id="id454" class="indexterm"></a> method should loop ten times<a id="id455" class="indexterm"></a> doing a withdrawal of a random amount.<div class="informalexample"><pre class="programlisting">static void DoTransactions(Account account)
+{
+  Random r = new Random();
+  for (int i = 0; i &lt; 10; i++)
+  {
+    account.Withdraw((double)r.Next(1, 100));
+  }
+}</pre>
+</div></li>
+              <li class="listitem">Finally, in the <code class="literal">Main</code> method of the <code class="literal">Program</code> class, let's create a shared account object and two tasks that will concurrently execute the withdrawals. Finish up by waiting for the user input before exiting.<div class="informalexample"><pre class="programlisting">static void Main(string[] args)
+{
+  Account account = new Account(1000);
+  Task task1 = Task.Factory.StartNew(() =&gt; DoTransactions(account));
+  Task task2 = Task.Factory.StartNew(() =&gt; DoTransactions(account));
+  Console.ReadLine();
+}</pre>
+</div></li>
+              <li class="listitem">In Visual Studio 2012, press <span class="emphasis"><em>F5</em></span> to run the project. You should see output similar to the following screenshot:<div class="mediaobject"><img src="graphics/0225OT_06_02.jpg" alt="How to do it…"/></div></li>
+            </ol>
+          </div>
+        </div>
+        <div class="section" title="How it works…">
+          <div class="titlepage">
+            <div>
+              <div>
+                <h2 class="title sigil_not_in_toc"><a id="ch06lvl2sec114"></a>How it works…</h2>
+              </div>
+            </div>
+          </div>
+          <p>The <code class="literal">lock</code> keyword<a id="id456" class="indexterm"></a> is a c# language shortcut for using the <code class="literal">System.Threading</code>.<code class="literal">Monitor</code> class.<a id="id457" class="indexterm"></a> Basically, the <code class="literal">lock</code> keyword ensures that threads cannot enter a critical section of code while another thread<a id="id458" class="indexterm"></a> is in the critical section; the following is the code contained in the scope of the <code class="literal">lock</code> statement:</p>
+          <div class="note" title="Note" style="">
+            <div class="inner">
+              <h3 class="title sigil_not_in_toc"><a id="tip03"></a>Tip</h3>
+              <p>A critical section is simply a piece of code that accesses a shared resource that must not be concurrently accessed by more than one thread.</p>
+            </div>
+          </div>
+          <div class="informalexample">
+            <pre class="programlisting">lock (this)
+{
+  //This is the critical section
+}</pre>
+          </div>
+          <p>If a thread tries to enter a locked section of code, it will block and wait until the locked object is released. The lock will be released when the locking thread exits the scope of the lock. The <code class="literal">lock</code> keyword calls <code class="literal">System.Threading.Monitor.Enter</code> at the start of the scope and <code class="literal">System.Threading.Monitor.Exit</code> at the end of the scope.</p>
+          <p>Notice that we created a private lockable object to lock on instead of locking on the instance of the <code class="literal">Account</code> class. This is the best practice. In general, you should avoid locking on a public type or on instances of objects that are beyond your code's control. If another programmer locks your class to synchronize their data, a deadlock can occur. A deadlock is a situation in which two or more competing threads are waiting for each other to finish their work and release a lock, and thus neither one ever does. Note also that locks can only be obtained on reference types.</p>
+        </div>
+      </div>
+    </div>
+
+
+    <div id="sbo-rt-content">
+      <div class="section" title="Using SpinLock for synchronization">
+        <div class="titlepage">
+          <div>
+            <div>
+              <h1 class="title"><a id="ch06lvl1sec63"></a>Using SpinLock for synchronization</h1>
+            </div>
+          </div>
+        </div>
+        <p>
+<span class="strong"><strong>SpinLock</strong></span>
+<a id="id459" class="indexterm"></a> is a special purpose lock that should only be used when lock contention is relatively rare and when lock-hold times are always very short. Unlike monitor and other lock types that work by using what is essentially a wait event; SpinLock sits in a loop and repeatedly checks until the lock becomes available. The SpinLock can be faster than a monitor lock because it reduces thread context switches. However, because the thread is spinning in a loop, a<a id="id460" class="indexterm"></a> SpinLock can cause high CPU usage if locks are held for a long time.</p>
+        <p>In this recipe, we are going to revisit our bank account solution which will have a shared bank account object that will be updated by multiple tasks in parallel. Each of the tasks will have access to the shared account object and will manage concurrency using SpinLock.</p>
+        <div class="section" title="How to do it…">
+          <div class="titlepage">
+            <div>
+              <div>
+                <h2 class="title sigil_not_in_toc"><a id="ch06lvl2sec115"></a>How to do it…</h2>
+              </div>
+            </div>
+          </div>
+          <p>Let's create a new Console <a id="id461" class="indexterm"></a>Application and see how to use SpinLock for synchronization, by going through the following steps:</p>
+          <div class="orderedlist">
+            <ol class="orderedlist arabic">
+              <li class="listitem">Start a new project using the <span class="strong"><strong>C# Console Application</strong></span> project template and assign <code class="literal">SpinBasedLocking</code> as the <span class="strong"><strong>Solution name</strong></span>.</li>
+              <li class="listitem">Add the following code snippet using directives to the top of your <code class="literal">Program</code> class:<div class="informalexample"><pre class="programlisting">using System;
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;</pre>
+</div></li>
+              <li class="listitem">After the <code class="literal">Program</code> class, but inside the <code class="literal">SpinBasedLocking</code> namespace, create a very simple definition for an <code class="literal">Account</code> class. This class only needs to have a single <code class="literal">public integer</code> field for the balance.<div class="informalexample"><pre class="programlisting">class Account
+{
+  public int Balance { get; set; }
+}</pre>
+</div></li>
+              <li class="listitem">Now, in the <code class="literal">Main</code> method of the <code class="literal">Program</code> class, let's start by creating the shared account object, a <code class="literal">SpinLock</code>, and a list to hold our tasks.<div class="informalexample"><pre class="programlisting">var account = new Account();
+var spinLock = new SpinLock();
+var taskList = new List&lt;Task&gt;();</pre>
+</div></li>
+              <li class="listitem">Next, let's add a <code class="literal">for</code> loop to the <code class="literal">Main</code> method that creates five tasks. Each task will loop several times updating the balance and using <code class="literal">SpinLock</code> to manage concurrent access. The <code class="literal">SpinLock</code> should be acquired in a <code class="literal">try</code> block and released in a <code class="literal">finally</code> block.<div class="informalexample"><pre class="programlisting">for (int i = 0; i &lt; 5; i++)
+{
+  taskList.Add(Task.Factory.StartNew(() =&gt;
+  {
+    for (int x = 0; x &lt; 50; x++)
+    {
+      bool lockAquired = false;
+      try
+      {
+        spinLock.Enter(ref lockAquired); 
+        Thread.Sleep(50);
+        account.Balance = account.Balance + 10;
+        Console.WriteLine("Task {0} added 10 to the balance.", 
+            Thread.CurrentThread.ManagedThreadId);     
+      }
+      finally
+      {
+        if(lockAquired) spinLock.Exit();
+      }
+    }
+  }));
+}</pre>
+</div></li>
+              <li class="listitem">Finish up the <a id="id462" class="indexterm"></a><code class="literal">Main</code> method by waiting for all of our tasks to complete and wait for the user input before exiting.<div class="informalexample"><pre class="programlisting">Task.WaitAll(taskList.ToArray());
+Console.WriteLine("Expected account balance: 2500,  Actual account balance:      {0}", account.Balance);
+Console.ReadLine();</pre>
+</div></li>
+              <li class="listitem">In Visual Studio 2012, press <span class="emphasis"><em>F5</em></span> to run the project. You should see output, similar to the following screenshot:<div class="mediaobject"><img src="graphics/0225OT_06_06.jpg" alt="How to do it…"/></div></li>
+            </ol>
+          </div>
+        </div>
+        <div class="section" title="How it works…">
+          <div class="titlepage">
+            <div>
+              <div>
+                <h2 class="title sigil_not_in_toc"><a id="ch06lvl2sec116"></a>How it works…</h2>
+              </div>
+            </div>
+          </div>
+          <p>A SpinLock can be useful to avoid blocking in our applications, but if we expect a large amount of blocking, we <a id="id463" class="indexterm"></a>probably shouldn't use SpinLock, as excessive spinning could make the situation much worse. However, if the critical section performs a very minimal amount of work and the wait times for the lock are minimal, then spin locking could be a good choice.</p>
+          <p>The <code class="literal">enter</code> method of <code class="literal">SpinLock</code> takes a <code class="literal">Boolean</code> parameter that indicates if the lock was successfully taken. Even in the case of an <code class="literal">Exception</code>, we can examine the <code class="literal">Boolean</code> parameter to reliably determine if the lock was successfully taken.</p>
+          <div class="informalexample">
+            <pre class="programlisting">bool lockAquired = false;
+try
+{
+  spinLock.Enter(ref lockAquired); 
+  //Critical section                               
+}
+finally
+{
+  if(lockAquired) spinLock.Exit();
+}</pre>
+          </div>
+          <p>The <code class="literal">SpinLock</code> should be exited in a <code class="literal">finally</code> block to ensure that the locked is released. You should also use the <code class="literal">Boolean</code> parameter to check if the lock is actually held before exiting because calling <code class="literal">exit</code> on a lock that isn't held will produce an error.</p>
+        </div>
+      </div>
+    </div>
+
+
+    <div id="sbo-rt-content">
+      <div class="section" title="Interlocked operations">
+        <div class="titlepage">
+          <div>
+            <div>
+              <h1 class="title"><a id="ch06lvl1sec64"></a>Interlocked operations</h1>
+            </div>
+          </div>
+        </div>
+        <p>Locking is fairly safe in most of the cases but there are cases when locking may not be the safe solution. Some of these cases are incrementing or decrementing the value of a variable, adding to, or subtracting from a variable, and exchanging two variables with each other. These operations seem like atomic operations, but actually are not.</p>
+        <p>For example, increment and decrement <a id="id464" class="indexterm"></a>operations include three steps. The first is loading the value of from the variable to a register, the second is incrementing the value of variable, and the third is storing the incremented value back in the variable.</p>
+        <p>The problem is that a thread can be pre-empted after the first two steps and another thread can start execution before the incremented value of the variable is saved back in the variable from the register. In the meantime, a second thread can go ahead and execute all three steps. After that, the first thread executes the third step and overwrites the value of the counter variable. Now the operation that was executed by the second thread is lost.</p>
+        <p>So how do can we avoid this scenario? This is where interlocking comes in. The <code class="literal">Interlock</code> class provides members that can be used to increment/decrement values, and exchange data between two variables. The <code class="literal">Interlock</code> class provides atomic operations in variables that are shared among multiple concurrent threads.</p>
+        <p>In this recipe, we are going to create an application that has a bank account object that will be updated by<a id="id465" class="indexterm"></a> multiple tasks in parallel. Each of the tasks will have access to the shared account object, which has only a public field for the balance. The tasks will use <code class="literal">Interlocked.Add</code> to update the account balance as an atomic operation.</p>
+        <div class="section" title="How to do it…">
+          <div class="titlepage">
+            <div>
+              <div>
+                <h2 class="title sigil_not_in_toc"><a id="ch06lvl2sec117"></a>How to do it…</h2>
+              </div>
+            </div>
+          </div>
+          <p>Now, let's take a look at the following steps on how to use interlocked in a Console Application:</p>
+          <div class="orderedlist">
+            <ol class="orderedlist arabic">
+              <li class="listitem">Start a new project using the <span class="strong"><strong>C# Console Application</strong></span> project template and assign <code class="literal">InterlockedExample</code> as the <span class="strong"><strong>Solution name</strong></span>.</li>
+              <li class="listitem">Add the following code snippet using directives to the top of your <code class="literal">InterlockedExample</code> namespace:<div class="informalexample"><pre class="programlisting">using System;
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;</pre>
+</div></li>
+              <li class="listitem">After the <code class="literal">Program</code> class, but inside the <code class="literal">InterlockedExample</code> namespace, create a very simple definition for an <code class="literal">Account</code> class. This class only needs to have a single <code class="literal">public integer</code> field for the balance.<div class="informalexample"><pre class="programlisting">class Account
+{
+  public int Balance = 0;
+}</pre>
+</div></li>
+              <li class="listitem">Now, in the <code class="literal">Main</code> method of the <code class="literal">Program</code> class, let's start by creating the shared account object and a list of <code class="literal">Task</code> to hold our tasks.<div class="informalexample"><pre class="programlisting">static void Main(string[] args)
+{
+  var account = new Account();            
+  var taskList = new List&lt;Task&gt;();  
+}</pre>
+</div></li>
+              <li class="listitem">Next, let's add a <code class="literal">for</code> loop to the <code class="literal">Main</code> method that creates five tasks. Each task will loop several times and use <code class="literal">Interlocked.Add</code> to increase the balance of the <code class="literal">Account</code> object as an atomic operation.<div class="informalexample"><pre class="programlisting">for (int i = 0; i &lt; 5; i++)
+{
+  taskList.Add(Task.Factory.StartNew(() =&gt;
+  {
+    for (int x = 0; x &lt; 50; x++)
+    {
+      Thread.Sleep(50);
+      Interlocked.Add(ref account.Balance, 10);
+      Console.WriteLine("Task {0} added 10 to the balance.", 
+        Thread.CurrentThread.ManagedThreadId);                       
+    }
+  }));
+}</pre>
+</div></li>
+              <li class="listitem">Finish up the <code class="literal">Main</code> <a id="id466" class="indexterm"></a>method by waiting for all of our tasks to complete and wait for the user input before exiting.<div class="informalexample"><pre class="programlisting">Task.WaitAll(taskList.ToArray());
+Console.WriteLine("Expected account balance: 2500,  
+    Actual account balance: {0}", account.Balance);
+Console.ReadLine();</pre>
+</div></li>
+              <li class="listitem">In Visual Studio 2012, press <span class="emphasis"><em>F5</em></span> to run the project. You should see an output similar to the following screenshot:<div class="mediaobject"><img src="graphics/0225OT_06_05.jpg" alt="How to do it…"/></div></li>
+            </ol>
+          </div>
+        </div>
+        <div class="section" title="How it works…">
+          <div class="titlepage">
+            <div>
+              <div>
+                <h2 class="title sigil_not_in_toc"><a id="ch06lvl2sec118"></a>How it works…</h2>
+              </div>
+            </div>
+          </div>
+          <p>Interlocked can be used instead of a locking mechanism to provide simpler and fast operations on shared variables.</p>
+          <p>The usage of interlocked is<a id="id467" class="indexterm"></a> very simple. You just use its <code class="literal">static</code> method to automatically, add to, subtract from, increment, decrement, or exchange values in a variable.</p>
+          <div class="informalexample">
+            <pre class="programlisting">Interlocked.Add(ref account.Balance, 10);</pre>
+          </div>
+          <p>These <code class="literal">static</code> methods change the math operations to be atomic. This means no other operations can be performed on the value during the call, and the operation won't be affected by context switching between threads.</p>
+        </div>
+      </div>
+    </div>
+
+
+    <div id="sbo-rt-content">
+      <div class="section" title="Synchronizing multiple tasks with a Barrier">
+        <div class="titlepage">
+          <div>
+            <div>
+              <h1 class="title"><a id="ch06lvl1sec65"></a>Synchronizing multiple tasks with a Barrier</h1>
+            </div>
+          </div>
+        </div>
+        <p>When you need some tasks to perform a series of parallel phases, and each phase needs to start, after all other tasks <a id="id468" class="indexterm"></a>complete the previous phase, you can synchronize and coordinate this work using a barrier. In short, a barrier prevents individual tasks from continuing until all tasks reach the barrier.</p>
+        <p>Each task in the group is<a id="id469" class="indexterm"></a> referred to as a participant, and signals that it has reached the barrier in each phase and is waiting for all the other participants to signal their arrival at the barrier before continuing. Optionally, you can also specify a time out to avoid the deadlock that will occur if one task fails to reach the barrier.</p>
+        <p>In this recipe, we are going to create a Console Application that has four participant tasks that execute a method with a <code class="literal">for</code> loop. Each iteration of the loop is a phase controlled by the barrier. The tasks will signal when they have reached the barrier and wait for all of the other tasks before continuing.</p>
+        <div class="section" title="How to do it…">
+          <div class="titlepage">
+            <div>
+              <div>
+                <h2 class="title sigil_not_in_toc"><a id="ch06lvl2sec119"></a>How to do it…</h2>
+              </div>
+            </div>
+          </div>
+          <p>Let's create a new Console Application and take a look at the following steps on how to synchronize tasks with Barrier:</p>
+          <div class="orderedlist">
+            <ol class="orderedlist arabic">
+              <li class="listitem">Start a new project using the <span class="strong"><strong>C# Console Application</strong></span> project template and assign <code class="literal">Barrier</code> as the <span class="strong"><strong>Solution name</strong></span>.</li>
+              <li class="listitem">Add the following code snippet using directives to the top of your <code class="literal">Program</code> class:<div class="informalexample"><pre class="programlisting">using System;
+using System.Threading;
+using System.Threading.Tasks;</pre>
+</div></li>
+              <li class="listitem">First, in the <code class="literal">Program</code> class, let's use a <code class="literal">static</code> method called <code class="literal">OperationWithBarrier</code> that accepts a parameter of a <code class="literal">Barrier</code> object.<div class="informalexample"><pre class="programlisting">static void OperationWithBarrier(Barrier barrier)
+{
+  
+}</pre>
+</div></li>
+              <li class="listitem">Now, in the body <a id="id470" class="indexterm"></a>of the <code class="literal">OperationWithBarrier</code> method, let's create a <code class="literal">for</code> loop that loops three times. In each loop, <a id="id471" class="indexterm"></a>get the <code class="literal">threadId</code> of the executing thread and then signal that the thread has reached the barrier.<div class="informalexample"><pre class="programlisting">for (int i = 0; i &lt; 3; ++i)
+{
+  var threadId = Thread.CurrentThread.ManagedThreadId;
+  Console.WriteLine("Thread {0} has reached wait.", threadId);
+  barrier.SignalAndWait(100);
+  Console.WriteLine("Thread {0} after wait wait.", threadId);
+}</pre>
+</div></li>
+              <li class="listitem">Back in the <code class="literal">Main</code> method of the <code class="literal">Program</code> class, let's create a <code class="literal">Barrier</code> object that has four participants and a post-phase action that writes to the Console when each barrier phase is reached.<div class="informalexample"><pre class="programlisting">var barrier = new Barrier(4, (b) =&gt; 
+  Console.WriteLine("Barrier phase {0} reached.", b.CurrentPhaseNumber));</pre>
+</div></li>
+              <li class="listitem">Now let's start four new tasks, each of which runs <code class="literal">OperationWithBarrier</code> passing in the <code class="literal">Barrier</code> object we just created at the parameter.<div class="informalexample"><pre class="programlisting">var task1 = Task.Factory.StartNew(() =&gt; OperationWithBarrier(barrier));
+var task2 = Task.Factory.StartNew(() =&gt; OperationWithBarrier(barrier));
+var task3 = Task.Factory.StartNew(() =&gt; OperationWithBarrier(barrier));
+var task4 = Task.Factory.StartNew(() =&gt; OperationWithBarrier(barrier));</pre>
+</div></li>
+              <li class="listitem">Finally, let's wait for all of our tasks to complete and wait for user input before exiting.<div class="informalexample"><pre class="programlisting">Task.WaitAll(task1, task2, task3, task4);
+Console.ReadLine();</pre>
+</div></li>
+              <li class="listitem">In Visual Studio 2012, press <span class="emphasis"><em>F5</em></span> to run the project. You should see output similar to the following screenshot:<div class="mediaobject"><img src="graphics/0225OT_06_01.jpg" alt="How to do it…"/></div></li>
+            </ol>
+          </div>
+        </div>
+        <div class="section" title="How it works…">
+          <div class="titlepage">
+            <div>
+              <div>
+                <h2 class="title sigil_not_in_toc"><a id="ch06lvl2sec120"></a>How it works…</h2>
+              </div>
+            </div>
+          </div>
+          <p>When you create a <code class="literal">Barrier</code>, specify the number of participants; in our case four. The <code class="literal">Barrier</code> constructor also has<a id="id472" class="indexterm"></a> an overload that allows you to specify a post phase action of type <code class="literal">Action&lt;Barrier&gt;</code>. This action will fire after all<a id="id473" class="indexterm"></a> the four tasks signal have reached the barrier.</p>
+          <div class="informalexample">
+            <pre class="programlisting">Barrier barrier = new Barrier(4, (b) =&gt; 
+  Console.WriteLine("Barrier phase {0} reached.", b.CurrentPhaseNumber));</pre>
+          </div>
+          <p>Each of the four tasks signals reach the barrier and wait for the other tasks by calling the <code class="literal">Barrier.SignalAndWait</code> method.</p>
+          <div class="informalexample">
+            <pre class="programlisting">barrier.SignalAndWait(100);</pre>
+          </div>
+          <p>A deadlock will occur if one participant's task fails to reach the barrier because the tasks that reach the barrier will wait indefinitely for the fourth call to <code class="literal">Barrier.SignalAndWait</code>. To avoid these deadlocks, we used one of the overloads of the <code class="literal">SignalAndWait</code> method<a id="id474" class="indexterm"></a> that specifies a time out. After the time out the remaining tasks are free to continue to the next phase.</p>
+        </div>
+      </div>
+    </div>
+
+
+    <div id="sbo-rt-content">
+      <div class="section" title="Using ReaderWriterLockSlim">
+        <div class="titlepage">
+          <div>
+            <div>
+              <h1 class="title"><a id="ch06lvl1sec66"></a>Using ReaderWriterLockSlim</h1>
+            </div>
+          </div>
+        </div>
+        <p>The <code class="literal">ReaderWriterLockSlim</code> class is used to protect a resource that is read by multiple threads and written to by one thread at a <a id="id475" class="indexterm"></a>time.</p>
+        <p>
+<code class="literal">ReaderWriterLockSlim</code> allows a thread to enter one of the following three modes:</p>
+        <div class="itemizedlist">
+          <ul class="itemizedlist">
+            <li class="listitem" style="list-style-type: disc"><span class="strong"><strong>Read mode</strong></span>: Allows multiple threads to enter the lock as long as there is no thread currently holding a write lock <a id="id476" class="indexterm"></a>or waiting to acquire a write lock. If there are any threads that are holding or waiting for a write lock, the threads waiting to enter in read mode are blocked.</li>
+            <li class="listitem" style="list-style-type: disc"><span class="strong"><strong>Upgradeable mode</strong></span>: Intended for <a id="id477" class="indexterm"></a>cases where a thread usually performs reads and might also occasionally perform writes.</li>
+            <li class="listitem" style="list-style-type: disc"><span class="strong"><strong>Write mode</strong></span>: Only one<a id="id478" class="indexterm"></a> thread can be in write mode at a time. A thread waiting to enter the lock in write mode will block if there is a thread currently holding a lock in write mode or waiting to enter write mode. If there are threads in read mode, the thread that is upgrading to write mode will block.</li>
+          </ul>
+        </div>
+        <p>In this recipe, we are going to build a Console Application that creates a writer task to write numeric values to an array. The application will also start up three reader tasks that read the values that were written to the array and append the values to a string using <code class="literal">StringBuilder</code>.</p>
+        <div class="section" title="How to do it…">
+          <div class="titlepage">
+            <div>
+              <div>
+                <h2 class="title sigil_not_in_toc"><a id="ch06lvl2sec121"></a>How to do it…</h2>
+              </div>
+            </div>
+          </div>
+          <p>Now, let's see how to use <code class="literal">ReaderWriterLockSlim</code> by having a look at the following steps:</p>
+          <div class="orderedlist">
+            <ol class="orderedlist arabic">
+              <li class="listitem">Start a new project using the <span class="strong"><strong>C# Console Application</strong></span> project template and assign <code class="literal">ReaderWriter</code> as the <span class="strong"><strong>Solution name</strong></span>.</li>
+              <li class="listitem">Add the following code snippet using directives to the top of your <code class="literal">Program</code> class:<div class="informalexample"><pre class="programlisting">using System;
+using System.Collections.Generic;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;</pre>
+</div></li>
+              <li class="listitem">Let's start by creating a <code class="literal">static</code> method on the <code class="literal">Program</code> class which our writer task will call to write values to an array. The <code class="literal">write</code> method will ask to enter the lock in write mode and will loop a few times writing the square of the loop <a id="id479" class="indexterm"></a>index to the array.<div class="informalexample"><pre class="programlisting">static void Write()
+{
+  int id = Thread.CurrentThread.ManagedThreadId;
+  for (int i = 0; i &lt; MaxNumberValues; ++i)
+  {
+    _lock.EnterWriteLock();
+    Console.WriteLine("Entered WriteLock on thread {0}", id);
+    _array[i] = i*i;
+    Console.WriteLine("Added {0} to array on thread {1}", 
+        _array[i], id);
+
+    Console.WriteLine("Exiting WriteLock on the thread {0}", 
+        id);
+    _lock.ExitWriteLock();
+    Thread.Sleep(1000);
+  }
+}</pre>
+</div></li>
+              <li class="listitem">Now let's create another <code class="literal">static</code> method<a id="id480" class="indexterm"></a> on the <code class="literal">Program</code> class called <code class="literal">Read</code> that our reader tasks will use to read the values from the array and append the values to a string using <code class="literal">StringBuilder</code>. The <code class="literal">Write</code> method will request a reader lock and loop through the values of the array, writing the values to the output string.<div class="informalexample"><pre class="programlisting">static void Read()
+{
+  int idNumber = Thread.CurrentThread.ManagedThreadId;
+  for (int i = 0; i &lt; MaxNumberValues; ++i)
+  {
+    _lock.EnterReadLock();
+    Console.WriteLine("Entered ReadLock on the thread {0}", 
+              idNumber);
+    StringBuilder sbObj = new StringBuilder();
+    for (int j = 0; j &lt; i; j++)
+    {
+      if (sbObj.Length &gt; 0) sbObj.Append(", ");
+      sbObj.Append(_array[j]);
+    }
+    Console.WriteLine("Array: {0} on the thread {1}", sbObj, 
+              idNumber);
+    Console.WriteLine("Exiting the ReadLock on thread {0}", 
+              idNumber);
+    _lock.ExitReadLock();
+    Thread.Sleep(2000);
+  }
+}</pre>
+</div></li>
+              <li class="listitem">Next, at the top of the <code class="literal">Program</code> class, let's create a constant for the maximum number of values and a couple of static fields for the array and the lock.<div class="informalexample"><pre class="programlisting">const int MaxNumberValues = 5;
+static int[] _array = new int[MaxNumberValues];
+static ReaderWriterLockSlim _lock = new ReaderWriterLockSlim();</pre>
+</div></li>
+              <li class="listitem">Now we need<a id="id481" class="indexterm"></a> to create the <code class="literal">Main</code> method of our <code class="literal">program</code> class. The <code class="literal">Main</code> method will have a list of tasks that we can use to wait. We will need to create a single writer task that calls the <code class="literal">write</code> method and will do a loop to create three reader tasks which will call the <code class="literal">reader</code> method. Finish up by waiting for the user input before exiting.<div class="informalexample"><pre class="programlisting">static void Main(string[] args)
+{
+  var taskList = new List&lt;Task&gt;();
+  taskList.Add(Task.Factory.StartNew(() =&gt; Write()));
+  Thread.Sleep(1000);
+  for (int i = 0; i &lt; 3; i++)
+  {
+    taskList.Add(Task.Factory.StartNew(()=&gt;Read()));
+  }
+  Task.WaitAll(taskList.ToArray());
+  Console.WriteLine("Finished. Press &lt;Enter&gt; to exit.");
+  Console.ReadKey();
+}</pre>
+</div></li>
+              <li class="listitem">In Visual Studio 2012, press <span class="emphasis"><em>F5</em></span> to run the project. Notice the ordered results in the following screenshot:<div class="mediaobject"><img src="graphics/0225OT_06_07.jpg" alt="How to do it…"/></div></li>
+            </ol>
+          </div>
+        </div>
+        <div class="section" title="How it works…">
+          <div class="titlepage">
+            <div>
+              <div>
+                <h2 class="title sigil_not_in_toc"><a id="ch06lvl2sec122"></a>How it works…</h2>
+              </div>
+            </div>
+          </div>
+          <p>
+<code class="literal">ReaderWriterLockSlim</code> allows multiple threads to be in read mode; allows one thread to be in write mode with an exclusive ownership of the lock, and allows one thread that has read access to be in upgradeable read mode.</p>
+          <p>A thread can enter the lock in three modes: read mode, write mode, and upgradeable read mode. In our Console <a id="id482" class="indexterm"></a>Application, the <code class="literal">Write</code> method requests to enter the lock in write mode by calling the <code class="literal">EnterWriteLock</code> method and the <code class="literal">Read</code> method enters the read mode by calling the <code class="literal">EnterReadLock</code> method<a id="id483" class="indexterm"></a>.</p>
+          <p>Only one thread can be in write mode at any time. When a thread is in write mode, no other thread can enter the lock in any mode. So, any of our reader tasks will block if a writer lock is currently held. Once our writer task releases the write lock by calling the <code class="literal">ExitWriteLock</code> method, multiple reader tasks will be able to obtain a read lock and enter the critical section.</p>
+        </div>
+      </div>
+    </div>
+
+
+    <div id="sbo-rt-content">
+      <div class="section" title="Using WaitHandles with Mutex">
+        <div class="titlepage">
+          <div>
+            <div>
+              <h1 class="title"><a id="ch06lvl1sec67"></a>Using WaitHandles with Mutex</h1>
+            </div>
+          </div>
+        </div>
+        <p>A <span class="strong"><strong>Mutex</strong></span>
+<a id="id484" class="indexterm"></a> is like a lock, but it can work across multiple processes. A Mutex is a synchronization primitive<a id="id485" class="indexterm"></a> that can also be used for inter-process synchronization. When two or more threads need to access a shared resource at the <a id="id486" class="indexterm"></a>same time, the system needs a synchronization mechanism to ensure that only one thread at a time uses the resource. Mutex is a synchronization primitive that grants exclusive access to the shared resource to only one thread. If a thread acquires a Mutex, the second thread that wants to acquire that Mutex is suspended until the first thread releases the Mutex.</p>
+        <p>In this recipe, we are going to return to our bank account example and build a Console Application that <a id="id487" class="indexterm"></a>creates several tasks to update the balance on a shared bank account object. The tasks<a id="id488" class="indexterm"></a> will use a Mutex to provide <a id="id489" class="indexterm"></a>access to the balance for a single task at a time.</p>
+        <div class="section" title="How to do it…">
+          <div class="titlepage">
+            <div>
+              <div>
+                <h2 class="title sigil_not_in_toc"><a id="ch06lvl2sec123"></a>How to do it…</h2>
+              </div>
+            </div>
+          </div>
+          <p>Let's create a new Console Application and see how to use Mutex by having a look at the following steps:</p>
+          <div class="orderedlist">
+            <ol class="orderedlist arabic">
+              <li class="listitem">Start a new project using the <span class="strong"><strong>C# Console Application</strong></span> project template and assign <code class="literal">MutexExample</code> as the <span class="strong"><strong>Solution name</strong></span>.</li>
+              <li class="listitem">Add the following code snippet using directives to the top of your <code class="literal">Program</code> class:<div class="informalexample"><pre class="programlisting">using System;
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;</pre>
+</div></li>
+              <li class="listitem">After the <code class="literal">Program</code> class, but inside the <code class="literal">MutexExample</code> namespace, create a very simple definition for an <code class="literal">Account</code> class. This class only needs to have a single <code class="literal">public integer</code> field for the balance.<div class="informalexample"><pre class="programlisting">class Account
+{
+  public int Balance { get; set; }
+}</pre>
+</div></li>
+              <li class="listitem">Now, in the <code class="literal">Main</code> method of the <code class="literal">Program</code> class, let's start by creating the shared account object, a <code class="literal">Mutex</code>, and a list of <code class="literal">Task</code> to hold our tasks.<div class="informalexample"><pre class="programlisting">var account = new Account();
+var mutex = new Mutex();
+var taskList = new List&lt;Task&gt;();</pre>
+</div></li>
+              <li class="listitem">Next, let's add a <code class="literal">for</code> loop to the <code class="literal">Main</code> method that creates five tasks. Each task will loop several times updating the balance and using <code class="literal">Mutex</code> to manage concurrent access. The <code class="literal">Mutex</code> should be acquired in a <code class="literal">try</code> block and released in a <code class="literal">finally</code> block.<div class="informalexample"><pre class="programlisting">for (int i = 0; i &lt; 5; i++)
+{
+  taskList.Add(Task.Factory.StartNew(() =&gt;
+  {
+    for (int x = 0; x &lt; 50; x++)
+    {
+      bool lockAquired = false;
+      try
+      {
+        lockAquired = mutex.WaitOne();
+        Thread.Sleep(50);
+        account.Balance = account.Balance + 10;
+        Console.WriteLine("Task {0} added 10 to the balance.", 
+          Thread.CurrentThread.ManagedThreadId);
+      }
+      finally
+      {
+        if (lockAquired) mutex.ReleaseMutex();
+      }
+    }
+  }));
+}</pre>
+</div></li>
+              <li class="listitem">Finish up the <code class="literal">Main</code> method<a id="id490" class="indexterm"></a> by waiting for all <a id="id491" class="indexterm"></a>of our tasks to complete and wait for the user input before exiting.<div class="informalexample"><pre class="programlisting">Task.WaitAll(taskList.ToArray());
+Console.WriteLine("Expected account balance: 2500,  
+      Actual account balance: {0}", account.Balance);
+Console.ReadLine();</pre>
+</div></li>
+              <li class="listitem">In Visual Studio 2012, press <span class="emphasis"><em>F5</em></span> to run the project. You should see output similar to the following screenshot:<div class="mediaobject"><img src="graphics/0225OT_06_08.jpg" alt="How to do it…"/></div></li>
+            </ol>
+          </div>
+        </div>
+        <div class="section" title="How it works…">
+          <div class="titlepage">
+            <div>
+              <div>
+                <h2 class="title sigil_not_in_toc"><a id="ch06lvl2sec124"></a>How it works…</h2>
+              </div>
+            </div>
+          </div>
+          <p>Basically, a Mutex is a mechanism that acts as a flag to prevent two threads from performing one or<a id="id492" class="indexterm"></a> more actions simultaneously.</p>
+          <p>With a <code class="literal">Mutex</code> class, <a id="id493" class="indexterm"></a> you call the <code class="literal">WaitHandle.WaitOne</code> method to lock. The <code class="literal">WaitOne</code> method<a id="id494" class="indexterm"></a> takes a <code class="literal">Boolean</code> parameter that indicates if the lock was successfully taken. Even in the case of an <code class="literal">Exception</code>, you can examine the<a id="id495" class="indexterm"></a> <code class="literal">Boolean</code> parameter to reliably determine if the lock was successfully taken.</p>
+          <div class="informalexample">
+            <pre class="programlisting">bool lockAquired = false;
+try
+{
+  lockAquired = mutex.WaitOne(); 
+  //Critical section                               
+}
+finally
+{
+  if(lockAquired) mutex.ReleaseMutex();
+}</pre>
+          </div>
+          <p>Closing or disposing a <code class="literal">Mutex</code> automatically releases it. Just as with the lock statement, a Mutex can be released only from the same thread that obtained it. The <code class="literal">Mutex</code> should be released in a <code class="literal">finally</code> block to ensure that the locked is released. You should also use the <code class="literal">Boolean</code> parameter to check if the <code class="literal">Mutex</code> is actually held before exiting because calling <code class="literal">ReleaseMutex</code> on a <code class="literal">Mutex</code> that isn't held will produce an error.</p>
+        </div>
+      </div>
+    </div>
+
+
+    <div id="sbo-rt-content">
+      <div class="section" title="Waiting for multiple threads with CountdownEvent">
+        <div class="titlepage">
+          <div>
+            <div>
+              <h1 class="title"><a id="ch06lvl1sec68"></a>Waiting for multiple threads with CountdownEvent</h1>
+            </div>
+          </div>
+        </div>
+        <p>A common asynchronous pattern is the pattern known as fork/join parallelism. This typically manifests by starting a number of pieces of work and later joining with that work.</p>
+        <p>A <code class="literal">CountdownEvent</code> is<a id="id496" class="indexterm"></a> initialized with a count. Threads can block waiting on the event until the count reaches <code class="literal">0</code>, at which point the <code class="literal">CountdownEvent</code> will be set and the threads can proceed.</p>
+        <p>In this recipe, we will create a Console Application that performs some simulated work in a loop. We will initialize a <code class="literal">CountdownEvent</code> to a small number of tasks, and then start simulating the work with the specified number of tasks. Each task will decrement the <code class="literal">CountDownEvent</code>. When the <code class="literal">CountDownEvent</code> reaches <code class="literal">0</code> and is signaled, we will reset the <code class="literal">CountDownEvent</code> with a higher count and start over until we reach the maximum number of tasks.</p>
+        <div class="section" title="How to do it…">
+          <div class="titlepage">
+            <div>
+              <div>
+                <h2 class="title sigil_not_in_toc"><a id="ch06lvl2sec125"></a>How to do it…</h2>
+              </div>
+            </div>
+          </div>
+          <p>Now, let's take a look at using <code class="literal">CoundownEven</code>t to wait for multiple threads. Have a look at the following steps:</p>
+          <div class="orderedlist">
+            <ol class="orderedlist arabic">
+              <li class="listitem">Start a new project using the <span class="strong"><strong>C# Console Application</strong></span> project template and assign <code class="literal">ForkAndJoin</code> as the <span class="strong"><strong>Solution name</strong></span>.</li>
+              <li class="listitem">Add the following code snippet using directives to the top of your <code class="literal">Program</code> class:<div class="informalexample"><pre class="programlisting">using System;
+using System.Threading;
+using System.Threading.Tasks;</pre>
+</div></li>
+              <li class="listitem">At the beginning of your <code class="literal">Program</code> class, start by creating a static variable for the <code class="literal">CountdownEvent</code> and a couple of constants for the number of tasks we want to start with and the number of tasks we want to finish with.<div class="informalexample"><pre class="programlisting">private static CountdownEvent _countdownEvent;
+private const int BEGIN_TASKS = 2;
+private const int END_TASKS = 6;</pre>
+</div></li>
+              <li class="listitem">At the bottom of the <code class="literal">Program</code> class, after the <code class="literal">Main</code> method, create a new <code class="literal">static</code> method called <code class="literal">SimulateWork</code>. This method will take an <code class="literal">integer</code> parameter which represents the number of tasks to create. The method will then loop to create the number of tasks specified. The tasks will just sleep for a bit and write a message to the Console. When the tasks are finished executing, <a id="id497" class="indexterm"></a>to call the <code class="literal">Signal</code> method of the <code class="literal">CountdownEvent</code> to decrement the count.<div class="informalexample"><pre class="programlisting">private static void SimulateTasks(int taskCount)
+{
+  for (int i = 0; i &lt; taskCount; i++)
+  {
+    Task.Factory.StartNew((num) =&gt;
+      {
+        try
+        {
+          var taskNumber = (int)num;
+          Thread.Sleep(2500);
+          Console.WriteLine("Task {0} simultated.", 
+              taskNumber);
+        }
+        finally
+        {
+          _countdownEvent.Signal();
+        }
+      },i);
+  }
+}</pre>
+</div></li>
+              <li class="listitem">In the <code class="literal">Main</code> method of your <code class="literal">Program</code> class, start with instantiating the <code class="literal">CountdownEvent</code> object. Pass in the <code class="literal">Begin_Tasks</code> constant to the <code class="literal">CountdownEvent</code> constructor so that the event will be signaled after two tasks.<div class="informalexample"><pre class="programlisting">_countdownEvent = new CountdownEvent(BEGIN_TASKS);</pre>
+</div></li>
+              <li class="listitem">Next, in the <code class="literal">Main</code> method, create a task that executes a <code class="literal">for</code> loop. Each iteration of the loop should reset the <code class="literal">CountdownEvent</code> to the number of tasks we want to wait for. Then the task will call the <code class="literal">SimulateWork</code> method and wait for the tasks to finish by calling the <code class="literal">Wait</code> method of <code class="literal">CountdownEvent</code>.<div class="informalexample"><pre class="programlisting">var task1 = Task.Factory.StartNew(() =&gt;
+{
+  for (int i = BEGIN_TASKS; i &lt;= END_TASKS; i++)
+  {
+    Console.WriteLine("**** Start simulating {0} tasks.", i);
+    _countdownEvent.Reset(i);
+    SimulateTasks(i);
+    _countdownEvent.Wait();
+    Console.WriteLine("**** End simulating {0} tasks.", i);
+  }
+});</pre>
+</div></li>
+              <li class="listitem">Finish up the <code class="literal">Main</code> method by waiting for the previous task to complete in a <code class="literal">try</code> block and disposing of the <code class="literal">CountdownEvent</code> in a <code class="literal">finally</code> block. Wait for the user input before exiting.<div class="informalexample"><pre class="programlisting">try
+{
+  task1.Wait();
+  Console.WriteLine("Finished. Press &lt;Enter&gt; to exit.");
+}
+finally
+{
+  _countdownEvent.Dispose();
+}
+Console.ReadLine();</pre>
+</div></li>
+              <li class="listitem">In Visual Studio <a id="id498" class="indexterm"></a>2012, press <span class="emphasis"><em>F5</em></span> to run the project. You should see output similar to the following screenshot:<div class="mediaobject"><img src="graphics/0225OT_06_09.jpg" alt="How to do it…"/></div></li>
+            </ol>
+          </div>
+        </div>
+        <div class="section" title="How it works…">
+          <div class="titlepage">
+            <div>
+              <div>
+                <h2 class="title sigil_not_in_toc"><a id="ch06lvl2sec126"></a>How it works…</h2>
+              </div>
+            </div>
+          </div>
+          <p>The main feature of <code class="literal">CoutndownEvent</code>, as you have already seen, is that it can be used to signal when several tasks have been completed.</p>
+          <p>The constructor for <code class="literal">CountDownEvent</code> accepts an <code class="literal">integer</code> parameter to specify the initial count of signals that we want to wait for before triggering the event. In our case, we passed in a constant value that is equal to two.</p>
+          <div class="informalexample">
+            <pre class="programlisting">_countdownEvent = new CountdownEvent(BEGIN_TASKS);</pre>
+          </div>
+          <p>The number of <a id="id499" class="indexterm"></a>events we are waiting for can be reset by calling the <code class="literal">Reset</code> method as we have done in our <code class="literal">for</code> loop. Each iteration of the <code class="literal">for</code> loop increases the number of events we are waiting for, up to the maximum number which we specified in another constant.</p>
+          <div class="informalexample">
+            <pre class="programlisting">for (int i = BEGIN_TASKS; i &lt;= END_TASKS; i++)
+{
+  Console.WriteLine("**** Start simulating {0} tasks.", i);
+<span class="strong"><strong>  _countdownEvent.Reset(i);</strong></span>
+  SimulateTasks(i);
+<span class="strong"><strong>  _countdownEvent.Wait();</strong></span>
+  Console.WriteLine("**** End simulating {0} tasks.", i);
+}</pre>
+          </div>
+          <p>After calling the <code class="literal">SimulateWork</code> method with the desired number of tasks to spin up, we wait for the tasks to complete by calling the <code class="literal">WaitMethod</code> on the <code class="literal">CountdownEvent</code>.</p>
+          <p>Finally, in the <code class="literal">SimulateWork</code> method<a id="id500" class="indexterm"></a>, each task indicates that it has completed and decrements the count of the signals we are waiting for by calling the <code class="literal">Signal</code> method of <code class="literal">CountDownEvent</code>.</p>
+          <div class="informalexample">
+            <pre class="programlisting">Task.Factory.StartNew((num) =&gt;
+{
+  try
+  {
+    var taskNumber = (int)num;
+    Thread.Sleep(2500);
+    Console.WriteLine("Task {0} simultated.", taskNumber);
+  }
+  finally
+  {
+<span class="strong"><strong>    _countdownEvent.Signal();</strong></span>
+  }
+},i);</pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+
+    <div id="sbo-rt-content">
+      <div class="section" title="Using ManualResetEventSlim to spin and wait">
+        <div class="titlepage">
+          <div>
+            <div>
+              <h1 class="title"><a id="ch06lvl1sec69"></a>Using ManualResetEventSlim to spin and wait</h1>
+            </div>
+          </div>
+        </div>
+        <p>
+<code class="literal">ManualResetEventSlim</code>, a light-weight synchronization <a id="id501" class="indexterm"></a>primitive that was introduced in .NET Framework 4.0, allows threads to communicate with each other by signaling.</p>
+        <p>When a task begins an activity that it must complete before other tasks proceed, it calls <code class="literal">Reset</code> to put <code class="literal">ManualResetEventSlim</code> in the non-signaled state. This thread can be thought of as controlling the reset event. Tasks that call the <code class="literal">Wait</code> method of <code class="literal">ManualResetEventSlim</code> will block, awaiting the signal. When the controlling thread completes the activity, <a id="id502" class="indexterm"></a>it calls <code class="literal">Set</code> to signal that the waiting threads can proceed. All waiting threads are then released.</p>
+        <p>In this recipe, the main application thread will create a <code class="literal">ManualResetEventSlim</code> to coordinate five tasks that it spins up. The tasks will call the <code class="literal">Wait</code> method of the reset event and wait for the event to be signaled. After sleeping for a bit, the main thread will wake up and call the <code class="literal">Set</code> method of the reset event to release all of the other tasks to proceed.</p>
+        <div class="section" title="How to do it…">
+          <div class="titlepage">
+            <div>
+              <div>
+                <h2 class="title sigil_not_in_toc"><a id="ch06lvl2sec127"></a>How to do it…</h2>
+              </div>
+            </div>
+          </div>
+          <p>Now, let's take a look at how to use <code class="literal">ManualResetEventSlim</code> by going through the following steps:</p>
+          <div class="orderedlist">
+            <ol class="orderedlist arabic">
+              <li class="listitem">Start a new project using the <span class="strong"><strong>C# Console Application</strong></span> project template and assign <code class="literal">SpinAndWait</code> as the <span class="strong"><strong>Solution name</strong></span>.</li>
+              <li class="listitem">Add the following code snippet using directives to the top of your <code class="literal">Program</code> class:<div class="informalexample"><pre class="programlisting">using System;
+using System.Threading;
+using System.Threading.Tasks;</pre>
+</div></li>
+              <li class="listitem">First, let's create a <code class="literal">static</code> method on the <code class="literal">Program</code> class that will use a <code class="literal">for</code> loop to create and start five tasks. Each task will sleep for two seconds, write a message to the Console, and wait for the main thread to set the <code class="literal">ManualResetEventSlim</code>.<div class="informalexample"><pre class="programlisting">private static void StartTasks()   
+{   
+  for (int i = 0; i &lt; 5; i++)   
+  {
+    Task.Factory.StartNew(()=&gt;
+    {   
+      Thread.Sleep(2000);   
+      Console.WriteLine("Task {0} waiting for event...", 
+        Thread.CurrentThread.ManagedThreadId);   
+      resetEvent.Wait();   
+      Console.WriteLine("Task {0} event signalled", 
+        Thread.CurrentThread.ManagedThreadId);   
+    } );   
+  }               
+}</pre>
+</div></li>
+              <li class="listitem">Now, in the <code class="literal">Main</code> method, create a <code class="literal">ManualResetEventSlim</code> object, and call the <code class="literal">StartTasks</code> method.<div class="informalexample"><pre class="programlisting">resetEvent = new ManualResetEventSlim(false); 
+StartTasks();</pre>
+</div></li>
+              <li class="listitem">Now, put the main thread to sleep for a second and then call the <code class="literal">Set</code> method of the reset event object to the tasks that are waiting.<div class="informalexample"><pre class="programlisting">Thread.Sleep(1000);
+Console.WriteLine("Main thread setting event");
+resetEvent.Set();</pre>
+</div></li>
+              <li class="listitem">Next, sleep<a id="id503" class="indexterm"></a> the main thread for <code class="literal">500</code> ms and then call the <code class="literal">Reset</code> method of the reset event object to stop any more tasks from continuing.<div class="informalexample"><pre class="programlisting">Thread.Sleep(500);
+Console.WriteLine("Main thread re-setting event");
+resetEvent.Reset();</pre>
+</div></li>
+              <li class="listitem">Finally, sleep the main thread for another second, the call the <code class="literal">Set</code> method of the reset event to release the waiting tasks. Wait for the user input before exiting.<div class="informalexample"><pre class="programlisting">Thread.Sleep(1000);
+Console.WriteLine("Main thread setting event again");
+resetEvent.Set();
+
+Console.WriteLine("Finished. Press &lt;Enter&gt; to exit.");
+Console.ReadLine();</pre>
+</div></li>
+              <li class="listitem">In Visual Studio 2012, press <span class="emphasis"><em>F5</em></span> to run the project. You should see output similar to the following screenshot:<div class="mediaobject"><img src="graphics/0225OT_06_10.jpg" alt="How to do it…"/></div></li>
+            </ol>
+          </div>
+        </div>
+        <div class="section" title="How it works…">
+          <div class="titlepage">
+            <div>
+              <div>
+                <h2 class="title sigil_not_in_toc"><a id="ch06lvl2sec128"></a>How it works…</h2>
+              </div>
+            </div>
+          </div>
+          <p>
+<code class="literal">ManualResetEventSlim</code> functions like a gate. When you call the <code class="literal">Set</code> method, you open the up the gate, allowing <a id="id504" class="indexterm"></a>any tasks that have called the <code class="literal">Wait</code> method to start running. Calling <code class="literal">Reset</code> closes the gate and any task that calls <code class="literal">Wait</code> will block, waiting for the event to be set. When the gate is next opened, they will all be released again at once.</p>
+          <p>The code is pretty simple. We create five tasks and each of the tasks call the <code class="literal">Wait</code> method of the reset event object and block, waiting for the event to be set.</p>
+          <div class="informalexample">
+            <pre class="programlisting">Task.Factory.StartNew(()=&gt;
+{   
+  ...   
+  resetEvent.Wait();   
+  ...   
+} );</pre>
+          </div>
+          <p>The main thread then goes to sleep for a second, releasing the currently blocking tasks to run. Then we sleep for a bit more, reset, and set the event again, releasing the remaining tasks.</p>
+          <p>
+<code class="literal">ManualResetEventSlim</code> is optimized for short waiting times and has the ability to opt into spinning for a set number of iterations. It also has a more efficiently managed implementation and allows a <code class="literal">Wait</code> to be cancelled via a <code class="literal">CancellationToken</code>.</p>
+        </div>
+      </div>
+    </div>
+
+
+    <div id="sbo-rt-content">
+      <div class="section" title="Using SemaphoreSlim to limit access">
+        <div class="titlepage">
+          <div>
+            <div>
+              <h1 class="title"><a id="ch06lvl1sec70"></a>Using SemaphoreSlim to limit access</h1>
+            </div>
+          </div>
+        </div>
+        <p>A semaphore works by keeping a counter. Each time a thread obtains the semaphore, the counter is reduced and each time the thread returns the semaphore, it is increased.</p>
+        <p>
+<code class="literal">SemaphoreSlim</code> is a lightweight semophore that limits the number of threads that can access a resource or resources <a id="id505" class="indexterm"></a>concurrently. A task that calls the <code class="literal">Wait</code> method of a <code class="literal">SemaphoreSlim</code> object will block until the semaphore counter is below the number of requests the semaphore can grant, which is specified in the constructor.</p>
+        <p>In this recipe, the main application thread will use a <code class="literal">for</code> loop to create five tasks. Each of the tasks call a method that waits in a <code class="literal">SemaphoreSlim</code> object before allowing access to a simulated shared resource.</p>
+        <div class="section" title="How to do it…">
+          <div class="titlepage">
+            <div>
+              <div>
+                <h2 class="title sigil_not_in_toc"><a id="ch06lvl2sec129"></a>How to do it…</h2>
+              </div>
+            </div>
+          </div>
+          <p>Let's finish up the chapter by seeing how to use <code class="literal">SemaphoreSlim</code> to limit access to a shared resource. Have a look at the following steps:</p>
+          <div class="orderedlist">
+            <ol class="orderedlist arabic">
+              <li class="listitem">Start a new project using the <span class="strong"><strong>C# Console Application</strong></span> project template and assign <code class="literal">SemaphoreSlimExample</code> as the <span class="strong"><strong>Solution name</strong></span>.</li>
+              <li class="listitem">Add the following code snippet using directives to the top of your program class:<div class="informalexample"><pre class="programlisting">using System;
+using System.Threading;
+using System.Threading.Tasks;</pre>
+</div></li>
+              <li class="listitem">First, let's create a <code class="literal">static</code> method on the <code class="literal">Program</code> class that each of our threads will call in order to access a simulated shared resource. This method will call the <code class="literal">Wait</code> method<a id="id506" class="indexterm"></a> of a <code class="literal">SemaphoreSlim</code> object, which will only grant access to three tasks at a time.<div class="informalexample"><pre class="programlisting">static void Enter(object id)
+{
+  Console.WriteLine("Task {0} is trying to enter.",id);
+  _semaphoreSlim.Wait();
+  Console.WriteLine("Task {0} has entered.", id);   
+  Thread.Sleep(2000); //Shared resource           
+  Console.WriteLine("Task {0} is leaving.", id); 
+  _semaphoreSlim.Release();
+}</pre>
+</div></li>
+              <li class="listitem">Now, previously to the <code class="literal">Main</code> method, create a static <code class="literal">SemaphoreSlim</code> object field on the <code class="literal">Program</code> class that will grant three access requests.<div class="informalexample"><pre class="programlisting">static SemaphoreSlim _semaphoreSlim = new SemaphoreSlim(3);</pre>
+</div></li>
+              <li class="listitem">The <code class="literal">Main</code> method <a id="id507" class="indexterm"></a>just needs to create and start five tasks in a <code class="literal">for</code> loop. The tasks only need to call the <code class="literal">Enter</code> method. Now, wait for the user input before exiting.<div class="informalexample"><pre class="programlisting">for (int i = 1; i &lt;= 5; i++)
+{
+  Task.Factory.StartNew((num) =&gt;
+    {
+      Enter(num);
+    }, i);
+}
+Console.ReadLine();</pre>
+</div></li>
+              <li class="listitem">In Visual Studio <a id="id508" class="indexterm"></a>2012, press <span class="emphasis"><em>F5</em></span> to run the project. You should see output similar to the following screenshot:<div class="mediaobject"><img src="graphics/0225OT_06_10.jpg" alt="How to do it…"/></div></li>
+            </ol>
+          </div>
+        </div>
+        <div class="section" title="How it works…">
+          <div class="titlepage">
+            <div>
+              <div>
+                <h2 class="title sigil_not_in_toc"><a id="ch06lvl2sec130"></a>How it works…</h2>
+              </div>
+            </div>
+          </div>
+          <p>A semaphore is an enforcement of access limitation to a shared resource. Once it's full, no more tasks can enter the semaphore until one or more tasks complete and get terminated. A queue builds up outside for other tasks. Then, for each task that leaves the semaphore, another enters from the queue.</p>
+          <p>Using <code class="literal">SemaphoreSlim</code> is an easy two-step process. First you need to create a <code class="literal">SemaphoreSlim</code> object that all of your threads have visibility to. Use the constructor to specify the number of requests the semaphore can grant concurrently.</p>
+          <div class="informalexample">
+            <pre class="programlisting">static SemaphoreSlim _semaphoreSlim = new SemaphoreSlim(3);</pre>
+          </div>
+          <p>Before accessing a shared <a id="id509" class="indexterm"></a>resource, call the <code class="literal">Wait</code> method <a id="id510" class="indexterm"></a>on the semaphore method. Execution will continue into the shared resource for the specified number of tasks. All other tasks will block until one of the current tasks exits. Exiting tasks release the semaphore and decrement the request count by calling the<a id="id511" class="indexterm"></a> <code class="literal">Release</code> method.</p>
+          <div class="informalexample">
+            <pre class="programlisting">static void Enter(object id)
+{
+	 _semaphoreSlim.Wait();
+	//Shared resource   
+	_semaphoreSlim.Release();
+}</pre>
+          </div>
+        </div>
+      </div>
+    </div>
+</body>
+</html>
